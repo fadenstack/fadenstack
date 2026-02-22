@@ -41,14 +41,14 @@ import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import LayersIcon from "@mui/icons-material/Layers";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import SecurityIcon from "@mui/icons-material/Security";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import WidgetsIcon from "@mui/icons-material/Widgets";
 import LanIcon from '@mui/icons-material/Lan';
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import HubIcon from "@mui/icons-material/Hub";
+import DescriptionIcon from "@mui/icons-material/Description";
 import LlmIcon from "~/components/LlmIcon";
 import AppBrand from "~/components/AppBrand";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
@@ -68,6 +68,7 @@ interface NavChild {
   to: string;
   labelKey: string;
   icon: React.ReactNode;
+  permission?: string;
 }
 
 interface NavGroup {
@@ -82,6 +83,7 @@ interface NavLeaf {
   to: string;
   labelKey: string;
   icon: React.ReactNode;
+  permission?: string;
 }
 
 type NavEntry = NavGroup | NavLeaf;
@@ -110,6 +112,20 @@ const NAV: NavEntry[] = [
       { to: "/admin/llm/jobs", labelKey: "nav.jobs", icon: <DownloadIcon /> },
     ],
   },
+  {
+    kind: "leaf",
+    to: "/admin/llm/agent-trace",
+    labelKey: "nav.agent_trace",
+    icon: <HubIcon />,
+    permission: "llm.graph:read",
+  },
+  {
+    kind: "leaf",
+    to: "/admin/llm/endpoint",
+    labelKey: "nav.endpoint",
+    icon: <DescriptionIcon />,
+    permission: "llm.graph:read",
+  },
 ];
 
 function adminPageTitle(pathname: string, search: string, t: (key: string) => string): string {
@@ -126,6 +142,11 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/llm/runtimes/")) return t("llm_runtime_detail.page_title");
   if (pathname.startsWith("/admin/llm/runtimes")) return t("llm_runtimes.title");
   if (pathname.startsWith("/admin/llm/jobs")) return t("llm_jobs.title");
+  if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
+  if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.agent_trace");
+  if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
+  if (pathname.startsWith("/admin/agents/graph")) return t("nav.agent_trace");
+  if (pathname.startsWith("/admin/llm/graph")) return t("nav.agent_trace");
   if (pathname.startsWith("/admin/logs")) {
     const tab = new URLSearchParams(search).get("tab");
     return tab === "audit" ? t("logs.tab_audit") : t("logs.tab_logs");
@@ -165,6 +186,7 @@ export default function AdminLayout() {
   const [authReady, setAuthReady] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [permissionKeys, setPermissionKeys] = useState<Set<string>>(new Set());
 
   /* Drawer open/collapsed state */
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -191,6 +213,7 @@ export default function AdminLayout() {
       const access = await adminUsers.meAccess();
       setCurrentUserEmail(access.email);
       setIsSuperuser(access.is_superuser);
+      setPermissionKeys(new Set(access.permissions.map((p) => `${p.resource}:${p.action}`)));
       setAuthReady(true);
     } catch {
       navigate(`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`, {
@@ -270,7 +293,18 @@ export default function AdminLayout() {
 
   const isRootActive = rootStatus?.active ?? false;
   const currentDrawerWidth = drawerOpen ? DRAWER_WIDTH_OPEN : DRAWER_WIDTH_CLOSED;
-  const navEntries = NAV;
+  const hasPermission = (permission?: string): boolean => {
+    if (!permission) return true;
+    return isSuperuser || permissionKeys.has(permission);
+  };
+  const navEntries = NAV
+    .map((entry) => {
+      if (entry.kind === "leaf") return hasPermission(entry.permission) ? entry : null;
+      const children = entry.children.filter((child) => hasPermission(child.permission));
+      return { ...entry, children };
+    })
+    .filter((entry): entry is NavEntry => entry !== null)
+    .filter((entry) => entry.kind === "leaf" || entry.children.length > 0);
 
   if (!authReady) {
     return (
@@ -312,19 +346,27 @@ export default function AdminLayout() {
             size="small"
             onClick={() => setDrawerOpen((o) => !o)}
             sx={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              borderRadius: 1.5,
               flexShrink: 0,
-              background: "linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%)",
-              color: "#fff",
+              p: 0.5,
               "&:hover": {
-                opacity: 0.9,
-                background: "linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%)",
+                bgcolor: "action.hover",
               },
             }}
           >
-            <AdminPanelSettingsIcon sx={{ fontSize: 20 }} />
+            <Box
+              component="img"
+              src="/icon_color.png"
+              alt="llm-port"
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                borderRadius: 1,
+              }}
+            />
           </IconButton>
           {drawerOpen && <AppBrand />}
         </Box>

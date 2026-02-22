@@ -4,6 +4,7 @@ export default [
   index("routes/home.tsx"),
   route("/login", "routes/login.tsx"),
   layout("routes/admin.tsx", [
+    route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
     route("/admin/dashboard", "pages/admin/DashboardPage.tsx"),
     route("/admin/containers", "pages/admin/ContainersPage.tsx"),
     route("/admin/containers/new", "pages/admin/CreateContainerPage.tsx"),
@@ -20,5 +21,7 @@ export default [
     route("/admin/llm/runtimes", "pages/admin/llm/RuntimesPage.tsx"),
     route("/admin/llm/runtimes/:id", "pages/admin/llm/RuntimeDetailPage.tsx"),
     route("/admin/llm/jobs", "pages/admin/llm/JobsPage.tsx"),
+    route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
+    route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
   ]),
 ] satisfies RouteConfig;

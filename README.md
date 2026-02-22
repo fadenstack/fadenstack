@@ -103,6 +103,16 @@ Built with ❤️ using React Router.
 - Language selection is available in the admin top bar and persisted in `localStorage` (`llm-port-lang`).
 - New languages can be added on backend bundle files without rebuilding frontend assets.
 
+## LLM Graph Visualizer
+
+- New route: `/admin/llm/graph`
+- Built with `reactflow` and rendered as read-only topology + live traces view.
+- Data source is backend-only:
+  - `GET /api/llm/graph/topology`
+  - `GET /api/llm/graph/traces`
+  - `GET /api/llm/graph/traces/stream` (SSE)
+- Frontend never calls Langfuse directly and does not contain Langfuse credentials.
+
 ## Breaking Rename Migration (`airgap` -> `llm-port`)
 
 - Frontend branding is now `llm-port`.
