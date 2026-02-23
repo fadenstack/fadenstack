@@ -60,6 +60,10 @@ export default function RagSearchPage() {
           sources: splitCsv(sources),
           tags: splitCsv(tags),
           doc_types: splitCsv(docTypes),
+          container_ids: [],
+          include_descendants: true,
+          source_kind: null,
+          asset_ids: [],
           time_from: null,
           time_to: null,
         },
@@ -239,4 +243,3 @@ export default function RagSearchPage() {
     </Stack>
   );
 }
-

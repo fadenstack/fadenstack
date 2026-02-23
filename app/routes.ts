@@ -25,6 +25,8 @@ export default [
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
     route("/admin/rag/runtime", "pages/admin/rag/RagRuntimeConfigPage.tsx"),
     route("/admin/rag/collectors", "pages/admin/rag/RagCollectorsPage.tsx"),
+    route("/admin/rag/explorer", "pages/admin/rag/RagExplorerPage.tsx"),
+    route("/admin/rag/publishes", "pages/admin/rag/RagPublishesPage.tsx"),
     route("/admin/rag/search", "pages/admin/rag/RagSearchPage.tsx"),
   ]),
 ] satisfies RouteConfig;

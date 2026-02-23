@@ -41,6 +41,10 @@ export interface RagSearchFilters {
   sources: string[];
   tags: string[];
   doc_types: string[];
+  container_ids: string[];
+  include_descendants: boolean;
+  source_kind: string | null;
+  asset_ids: string[];
   time_from: string | null;
   time_to: string | null;
 }
@@ -100,6 +104,9 @@ export interface RagIngestJobEvent {
 export interface RagIngestJob {
   job_id: string;
   collector_id: string;
+  job_type: string;
+  publish_id: string | null;
+  container_id: string | null;
   source_id: string | null;
   tenant_id: string;
   workspace_id: string | null;
@@ -115,11 +122,152 @@ export interface RagJobListResponse {
   jobs: RagIngestJob[];
 }
 
+export interface RagContainerPayload {
+  tenant_id: string;
+  workspace_id: string | null;
+  parent_id: string | null;
+  name: string;
+  sort_order: number;
+  acl_principals: string[];
+}
+
+export interface RagContainer {
+  id: string;
+  tenant_id: string;
+  workspace_id: string | null;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  path: string;
+  depth: number;
+  sort_order: number;
+  acl_principals: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RagContainerTreeResponse {
+  containers: RagContainer[];
+}
+
+export interface RagUploadPresignRequest {
+  tenant_id: string;
+  workspace_id: string | null;
+  container_id: string;
+  filename: string;
+  size_bytes: number;
+  content_type: string;
+  sha256?: string | null;
+}
+
+export interface RagUploadPresignResponse {
+  object_key: string;
+  upload_url: string;
+  required_headers: Record<string, string>;
+  expires_at: string;
+}
+
+export interface RagUploadCompleteRequest {
+  object_key: string;
+  tenant_id: string;
+  workspace_id: string | null;
+  container_id: string;
+  filename: string;
+  size_bytes: number;
+  content_type: string;
+  sha256: string;
+  draft_id: string | null;
+  tags: string[];
+  acl_principals: string[];
+  created_by: string | null;
+}
+
+export interface RagUploadCompleteResponse {
+  draft_id: string;
+  operation_id: number;
+  status: string;
+}
+
+export interface RagDraftCreateRequest {
+  tenant_id: string;
+  workspace_id: string | null;
+  container_id: string;
+  created_by: string | null;
+}
+
+export interface RagDraftOperationPayload {
+  op_type: "upload" | "replace" | "delete" | "move" | "retag" | "set_acl" | "rename";
+  asset_id: string | null;
+  target_container_id: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface RagDraftUpdateRequest {
+  operations?: RagDraftOperationPayload[] | null;
+  status?: "open" | "saved" | "published" | "cancelled" | null;
+}
+
+export interface RagDraftOperation {
+  id: number;
+  op_type: string;
+  asset_id: string | null;
+  target_container_id: string | null;
+  payload: Record<string, unknown>;
+  status: string;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RagDraft {
+  id: string;
+  tenant_id: string;
+  workspace_id: string | null;
+  container_id: string;
+  status: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  operations: RagDraftOperation[];
+}
+
+export interface RagPublishTriggerRequest {
+  scheduled_for: string | null;
+  triggered_by: string | null;
+}
+
+export interface RagPublishTriggerResponse {
+  publish_id: string;
+  job_id: string | null;
+  status: string;
+}
+
+export interface RagPublish {
+  id: string;
+  draft_id: string;
+  tenant_id: string;
+  workspace_id: string | null;
+  container_id: string;
+  scheduled_for: string | null;
+  status: string;
+  triggered_by: string;
+  stats: Record<string, unknown>;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RagPublishListResponse {
+  publishes: RagPublish[];
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isFormData = init.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(init.headers ?? {}),
     },
     credentials: "include",
@@ -167,6 +315,81 @@ export const ragCollectors = {
   },
 };
 
+export const ragContainers = {
+  create(body: RagContainerPayload) {
+    return request<RagContainer>("/containers", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  tree(tenantId?: string, workspaceId?: string) {
+    const params = new URLSearchParams();
+    if (tenantId) params.set("tenant_id", tenantId);
+    if (workspaceId) params.set("workspace_id", workspaceId);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<RagContainerTreeResponse>(`/containers/tree${suffix}`);
+  },
+  update(containerId: string, body: RagContainerPayload) {
+    return request<RagContainer>(`/containers/${containerId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  },
+  remove(containerId: string) {
+    return request<RagContainer>(`/containers/${containerId}`, {
+      method: "DELETE",
+    });
+  },
+};
+
+export const ragUploads = {
+  presign(body: RagUploadPresignRequest) {
+    return request<RagUploadPresignResponse>("/uploads/presign", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  complete(body: RagUploadCompleteRequest) {
+    return request<RagUploadCompleteResponse>("/uploads/complete", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+};
+
+export const ragDrafts = {
+  create(body: RagDraftCreateRequest) {
+    return request<RagDraft>("/drafts", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  get(draftId: string) {
+    return request<RagDraft>(`/drafts/${draftId}`);
+  },
+  patch(draftId: string, body: RagDraftUpdateRequest) {
+    return request<RagDraft>(`/drafts/${draftId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  },
+  publish(draftId: string, body: RagPublishTriggerRequest) {
+    return request<RagPublishTriggerResponse>(`/drafts/${draftId}/publish`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+};
+
+export const ragPublishes = {
+  list(limit = 100) {
+    return request<RagPublishListResponse>(`/publishes?limit=${limit}`);
+  },
+  get(publishId: string) {
+    return request<RagPublish>(`/publishes/${publishId}`);
+  },
+};
+
 export const ragJobs = {
   list(limit = 50) {
     return request<RagJobListResponse>(`/jobs?limit=${limit}`);
@@ -175,4 +398,3 @@ export const ragJobs = {
     return request<RagIngestJob>(`/jobs/${jobId}`);
   },
 };
-

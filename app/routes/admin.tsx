@@ -143,19 +143,31 @@ const NAV: NavEntry[] = [
         to: "/admin/rag/runtime",
         labelKey: "nav.rag_runtime",
         icon: <SettingsInputAntennaIcon />,
-        permission: "llm.runtimes:read",
+        permission: "rag.runtime:read",
       },
       {
         to: "/admin/rag/collectors",
         labelKey: "nav.rag_collectors",
         icon: <SourceIcon />,
-        permission: "llm.runtimes:read",
+        permission: "rag.jobs:read",
+      },
+      {
+        to: "/admin/rag/explorer",
+        labelKey: "nav.rag_explorer",
+        icon: <StorageIcon />,
+        permission: "rag.containers:read",
+      },
+      {
+        to: "/admin/rag/publishes",
+        labelKey: "nav.rag_publishes",
+        icon: <DownloadIcon />,
+        permission: "rag.publish:read",
       },
       {
         to: "/admin/rag/search",
         labelKey: "nav.rag_search",
         icon: <ManageSearchIcon />,
-        permission: "llm.runtimes:read",
+        permission: "rag.search:read",
       },
     ],
   },
@@ -178,6 +190,8 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
   if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
+  if (pathname.startsWith("/admin/rag/explorer")) return t("rag_explorer.title");
+  if (pathname.startsWith("/admin/rag/publishes")) return t("rag_publishes.title");
   if (pathname.startsWith("/admin/rag/search")) return t("rag_search.title");
   if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.agent_trace");
   if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
