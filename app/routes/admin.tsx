@@ -57,6 +57,9 @@ import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import DownloadIcon from "@mui/icons-material/Download";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ManageSearchIcon from "@mui/icons-material/ManageSearch";
+import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
+import SourceIcon from "@mui/icons-material/Source";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -131,6 +134,31 @@ const NAV: NavEntry[] = [
     icon: <DescriptionIcon />,
     permission: "llm.graph:read",
   },
+  {
+    kind: "group",
+    labelKey: "nav.rag_group",
+    icon: <ManageSearchIcon />,
+    children: [
+      {
+        to: "/admin/rag/runtime",
+        labelKey: "nav.rag_runtime",
+        icon: <SettingsInputAntennaIcon />,
+        permission: "llm.runtimes:read",
+      },
+      {
+        to: "/admin/rag/collectors",
+        labelKey: "nav.rag_collectors",
+        icon: <SourceIcon />,
+        permission: "llm.runtimes:read",
+      },
+      {
+        to: "/admin/rag/search",
+        labelKey: "nav.rag_search",
+        icon: <ManageSearchIcon />,
+        permission: "llm.runtimes:read",
+      },
+    ],
+  },
 ];
 
 function adminPageTitle(pathname: string, search: string, t: (key: string) => string): string {
@@ -148,6 +176,9 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/llm/runtimes")) return t("llm_runtimes.title");
   if (pathname.startsWith("/admin/llm/jobs")) return t("llm_jobs.title");
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
+  if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
+  if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
+  if (pathname.startsWith("/admin/rag/search")) return t("rag_search.title");
   if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.agent_trace");
   if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/agents/graph")) return t("nav.agent_trace");
