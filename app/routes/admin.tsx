@@ -70,6 +70,73 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 
 const DRAWER_WIDTH_OPEN = 240;
 const DRAWER_WIDTH_CLOSED = 64;
+const ACCESS_CACHE_KEY = "llm-port-admin-access-v1";
+const ACCESS_CACHE_TTL_MS = 60_000;
+
+interface AccessCacheEntry {
+  email: string;
+  isSuperuser: boolean;
+  permissions: string[];
+  expiresAt: number;
+}
+
+let accessCacheMemory: AccessCacheEntry | null = null;
+
+function isValidAccessCache(value: unknown): value is AccessCacheEntry {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<AccessCacheEntry>;
+  return (
+    typeof candidate.email === "string" &&
+    typeof candidate.isSuperuser === "boolean" &&
+    Array.isArray(candidate.permissions) &&
+    candidate.permissions.every((p) => typeof p === "string") &&
+    typeof candidate.expiresAt === "number"
+  );
+}
+
+function readCachedAccess(): AccessCacheEntry | null {
+  const now = Date.now();
+  if (accessCacheMemory && accessCacheMemory.expiresAt > now) return accessCacheMemory;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(ACCESS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidAccessCache(parsed) || parsed.expiresAt <= now) {
+      window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
+      return null;
+    }
+    accessCacheMemory = parsed;
+    return parsed;
+  } catch {
+    window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
+    return null;
+  }
+}
+
+function writeCachedAccess(entry: Omit<AccessCacheEntry, "expiresAt">) {
+  const value: AccessCacheEntry = {
+    ...entry,
+    expiresAt: Date.now() + ACCESS_CACHE_TTL_MS,
+  };
+  accessCacheMemory = value;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(ACCESS_CACHE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore storage failures (private mode / quota / disabled storage)
+  }
+}
+
+function clearCachedAccess() {
+  accessCacheMemory = null;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
 
 /* ── Navigation structure ──────────────────────────────────────────── */
 interface NavChild {
@@ -259,15 +326,29 @@ export default function AdminLayout() {
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
   }
 
+  function applyAccessState(access: {
+    email: string;
+    is_superuser: boolean;
+    permissions: Array<{ resource: string; action: string }>;
+  }) {
+    const permissions = access.permissions.map((p) => `${p.resource}:${p.action}`);
+    setCurrentUserEmail(access.email);
+    setIsSuperuser(access.is_superuser);
+    setPermissionKeys(new Set(permissions));
+    setAuthReady(true);
+    writeCachedAccess({
+      email: access.email,
+      isSuperuser: access.is_superuser,
+      permissions,
+    });
+  }
+
   async function ensureAuthenticated() {
     try {
-      await auth.me();
       const access = await adminUsers.meAccess();
-      setCurrentUserEmail(access.email);
-      setIsSuperuser(access.is_superuser);
-      setPermissionKeys(new Set(access.permissions.map((p) => `${p.resource}:${p.action}`)));
-      setAuthReady(true);
+      applyAccessState(access);
     } catch {
+      clearCachedAccess();
       navigate(`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`, {
         replace: true,
       });
@@ -293,6 +374,13 @@ export default function AdminLayout() {
   }
 
   useEffect(() => {
+    const cachedAccess = readCachedAccess();
+    if (cachedAccess) {
+      setCurrentUserEmail(cachedAccess.email);
+      setIsSuperuser(cachedAccess.isSuperuser);
+      setPermissionKeys(new Set(cachedAccess.permissions));
+      setAuthReady(true);
+    }
     void ensureAuthenticated();
     void loadLanguages();
   }, []);

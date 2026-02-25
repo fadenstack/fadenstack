@@ -90,8 +90,8 @@ Make sure to deploy the output of `npm run build`
 sequenceDiagram
     autonumber
     participant User
-    participant Frontend as airgap_frontend
-    participant Backend as airgap_backend
+    participant Frontend as llm_port_frontend
+    participant Backend as llm_port_backend
     participant Gateway as llm_port_api
     participant Shared as Shared Stack (Postgres/Redis/Loki/Langfuse)
     participant Provider as LLM Providers
@@ -127,10 +127,10 @@ sequenceDiagram
   - Step-based system initialization wizard (`/api/admin/system/wizard/*`)
   - Uses the same backend settings update/apply path as General settings.
 
-## Breaking Rename Migration (`airgap` -> `llm-port`)
+## Breaking Rename Migration (`llm-port` -> `llm-port`)
 
 - Frontend branding is now `llm-port`.
 - Local storage keys changed:
-  - `airgap-lang` -> `llm-port-lang`
-  - `airgap-theme-mode` -> `llm-port-theme-mode`
+  - `llm-port-lang` -> `llm-port-lang`
+  - `llm-port-theme-mode` -> `llm-port-theme-mode`
 - Existing browsers may need one fresh login/theme/language re-selection after upgrade.
