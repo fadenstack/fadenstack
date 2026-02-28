@@ -59,7 +59,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, next, params]);
+  }, [navigate, next]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -143,7 +143,9 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => {
-                      window.location.href = adminAuthProviders.authorizeUrl(provider.id);
+                      if (typeof window !== "undefined") {
+                        window.location.href = adminAuthProviders.authorizeUrl(provider.id);
+                      }
                     }}
                   >
                     {t("auth.sign_in_with", { provider: provider.name })}
