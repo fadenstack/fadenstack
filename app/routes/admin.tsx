@@ -70,6 +70,9 @@ import TranslateIcon from "@mui/icons-material/Translate";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import PeopleIcon from "@mui/icons-material/People";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import GroupWorkIcon from "@mui/icons-material/GroupWork";
 
 const DRAWER_WIDTH_OPEN = 240;
 const DRAWER_WIDTH_CLOSED = 64;
@@ -209,6 +212,15 @@ const NAV: NavEntry[] = [
   },
   {
     kind: "group",
+    labelKey: "nav.access_control_group",
+    icon: <SecurityIcon />,
+    children: [
+      { to: "/admin/users", labelKey: "nav.users", icon: <PeopleIcon /> },
+      { to: "/admin/roles", labelKey: "nav.roles", icon: <AdminPanelSettingsIcon /> },
+    ],
+  },
+  {
+    kind: "group",
     labelKey: "nav.pii_group",
     icon: <ShieldIcon />,
     module: "pii",
@@ -282,6 +294,8 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/pii/dashboard")) return t("pii_dashboard.title");
   if (pathname.startsWith("/admin/pii/activity")) return t("pii_log.title");
+  if (pathname.startsWith("/admin/users")) return t("users.title");
+  if (pathname.startsWith("/admin/roles")) return t("roles.title");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
   if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
   if (pathname.startsWith("/admin/rag/explorer")) return t("rag_explorer.title");

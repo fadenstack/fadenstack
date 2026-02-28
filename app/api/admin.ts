@@ -468,8 +468,10 @@ export interface RbacRole {
   id: string;
   name: string;
   description: string | null;
+  is_builtin: boolean;
   created_at: string;
   permissions: RbacPermission[];
+  user_count: number;
 }
 
 export interface AdminUser {
@@ -500,11 +502,41 @@ export const adminUsers = {
   listRoles() {
     return request<RbacRole[]>("/users/roles");
   },
+  getRole(roleId: string) {
+    return request<RbacRole>(`/users/roles/${roleId}`);
+  },
+  createRole(payload: { name: string; description?: string; permission_ids: string[] }) {
+    return request<RbacRole>("/users/roles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  updateRole(roleId: string, payload: { name?: string; description?: string; permission_ids?: string[] }) {
+    return request<RbacRole>(`/users/roles/${roleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteRole(roleId: string) {
+    return request<void>(`/users/roles/${roleId}`, { method: "DELETE" });
+  },
+  listPermissions() {
+    return request<RbacPermission[]>("/users/permissions");
+  },
   setUserRoles(userId: string, roleIds: string[]) {
     return request<AdminUser>(`/users/${userId}/roles`, {
       method: "PUT",
       body: JSON.stringify({ role_ids: roleIds }),
     });
+  },
+  createUser(payload: { email: string; password: string; is_superuser?: boolean; role_ids?: string[] }) {
+    return request<AdminUser>("/users/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteUser(userId: string) {
+    return request<void>(`/users/${userId}`, { method: "DELETE" });
   },
 };
 

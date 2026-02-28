@@ -14,8 +14,14 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormGroup from "@mui/material/FormGroup";
+import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -27,6 +33,18 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Create user dialog
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newSuperuser, setNewSuperuser] = useState(false);
+  const [newRoleIds, setNewRoleIds] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  // Delete user dialog
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -68,6 +86,54 @@ export default function UsersPage() {
       setError(err instanceof Error ? err.message : t("users.failed_update_roles"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openCreate() {
+    setNewEmail("");
+    setNewPassword("");
+    setNewSuperuser(false);
+    setNewRoleIds([]);
+    setCreateOpen(true);
+  }
+
+  function toggleNewRole(roleId: string) {
+    setNewRoleIds((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
+    );
+  }
+
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    try {
+      await adminUsers.createUser({
+        email: newEmail,
+        password: newPassword,
+        is_superuser: newSuperuser,
+        role_ids: newRoleIds,
+      });
+      setCreateOpen(false);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("users.failed_create"));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await adminUsers.deleteUser(deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("users.failed_delete"));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -144,18 +210,23 @@ export default function UsersPage() {
       label: t("common.actions"),
       align: "right",
       render: (u) => (
-        <Button size="small" variant="outlined" onClick={() => openEdit(u)}>
-          {t("users.edit_roles")}
-        </Button>
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+          <Button size="small" variant="outlined" onClick={() => openEdit(u)}>
+            {t("users.edit_roles")}
+          </Button>
+          <IconButton size="small" color="error" onClick={() => setDeleteTarget(u)} title={t("common.delete")}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Stack>
       ),
-      minWidth: 140,
+      minWidth: 200,
     },
   ];
 
   return (
     <>
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
@@ -169,8 +240,14 @@ export default function UsersPage() {
         onRefresh={load}
         emptyMessage={t("users.empty")}
         searchPlaceholder={t("users.search_placeholder")}
+        toolbarActions={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate} size="small">
+            {t("users.create")}
+          </Button>
+        }
       />
 
+      {/* ── Edit roles dialog ── */}
       <Dialog open={!!editing} onClose={() => (saving ? undefined : setEditing(null))} fullWidth maxWidth="sm">
         <DialogTitle>{t("users.assign_roles")}</DialogTitle>
         <DialogContent>
@@ -204,6 +281,87 @@ export default function UsersPage() {
         <DialogActions>
           <Button onClick={() => setEditing(null)} disabled={saving}>{t("common.cancel")}</Button>
           <Button variant="contained" onClick={saveRoles} disabled={saving}>{t("common.save")}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Create user dialog ── */}
+      <Dialog open={createOpen} onClose={() => (creating ? undefined : setCreateOpen(false))} fullWidth maxWidth="sm">
+        <DialogTitle>{t("users.create_title")}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label={t("auth.email")}
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              fullWidth
+              required
+              disabled={creating}
+            />
+            <TextField
+              label={t("auth.password")}
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              fullWidth
+              required
+              disabled={creating}
+              inputProps={{ minLength: 6 }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newSuperuser}
+                  onChange={(e) => setNewSuperuser(e.target.checked)}
+                  disabled={creating}
+                />
+              }
+              label={t("users.superuser")}
+            />
+            <Typography variant="subtitle2">{t("users.assign_roles")}</Typography>
+            <FormGroup>
+              {roles.map((role) => (
+                <FormControlLabel
+                  key={role.id}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={newRoleIds.includes(role.id)}
+                      onChange={() => toggleNewRole(role.id)}
+                      disabled={creating}
+                    />
+                  }
+                  label={role.name}
+                />
+              ))}
+            </FormGroup>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)} disabled={creating}>{t("common.cancel")}</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreate}
+            disabled={creating || !newEmail.trim() || newPassword.length < 6}
+          >
+            {t("users.create")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete user dialog ── */}
+      <Dialog open={!!deleteTarget} onClose={() => (deleting ? undefined : setDeleteTarget(null))}>
+        <DialogTitle>{t("users.delete_title")}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t("users.delete_confirm", { email: deleteTarget?.email ?? "" })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>{t("common.cancel")}</Button>
+          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+            {t("common.delete")}
+          </Button>
         </DialogActions>
       </Dialog>
     </>
