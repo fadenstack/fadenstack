@@ -246,20 +246,6 @@ export default function ProvidersPage() {
               fullWidth
             />
             <FormControl fullWidth>
-              <InputLabel>{t("llm_common.engine")}</InputLabel>
-              <Select
-                value={createType}
-                label={t("llm_common.engine")}
-                onChange={(e) => setCreateType(e.target.value as ProviderType)}
-              >
-                {PROVIDER_TYPES.map((t) => (
-                  <MenuItem key={t} value={t}>
-                    {t}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
               <InputLabel>{t("llm_providers.target")}</InputLabel>
               <Select
                 value={createTarget}
@@ -273,6 +259,24 @@ export default function ProvidersPage() {
                 ))}
               </Select>
             </FormControl>
+
+            {/* Engine type — only relevant for local Docker providers */}
+            {createTarget === "local_docker" && (
+              <FormControl fullWidth>
+                <InputLabel>{t("llm_common.engine")}</InputLabel>
+                <Select
+                  value={createType}
+                  label={t("llm_common.engine")}
+                  onChange={(e) => setCreateType(e.target.value as ProviderType)}
+                >
+                  {PROVIDER_TYPES.map((t) => (
+                    <MenuItem key={t} value={t}>
+                      {t}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             {/* Remote endpoint fields */}
             {createTarget === "remote_endpoint" && (
