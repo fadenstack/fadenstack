@@ -541,8 +541,74 @@ export const adminUsers = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Capability helpers (mirror backend policy matrix client-side for UI gating)
+// Groups
 // ─────────────────────────────────────────────────────────────────────────────
+
+export interface GroupRole {
+  id: string;
+  name: string;
+  description: string | null;
+  is_builtin: boolean;
+  created_at: string;
+  permissions: RbacPermission[];
+  user_count: number;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  roles: GroupRole[];
+  member_count: number;
+}
+
+export interface GroupMember {
+  id: string;
+  email: string;
+}
+
+export const adminGroups = {
+  list() {
+    return request<Group[]>("/groups/");
+  },
+  get(groupId: string) {
+    return request<Group>(`/groups/${groupId}`);
+  },
+  create(payload: { name: string; description?: string; role_ids: string[] }) {
+    return request<Group>("/groups/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  update(groupId: string, payload: { name?: string; description?: string; role_ids?: string[] }) {
+    return request<Group>(`/groups/${groupId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+  delete(groupId: string) {
+    return request<void>(`/groups/${groupId}`, { method: "DELETE" });
+  },
+  listMembers(groupId: string) {
+    return request<GroupMember[]>(`/groups/${groupId}/members`);
+  },
+  setMembers(groupId: string, userIds: string[]) {
+    return request<GroupMember[]>(`/groups/${groupId}/members`, {
+      method: "PUT",
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  },
+  addMembers(groupId: string, userIds: string[]) {
+    return request<void>(`/groups/${groupId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  },
+  removeMember(groupId: string, userId: string) {
+    return request<void>(`/groups/${groupId}/members/${userId}`, { method: "DELETE" });
+  },
+};
 
 export function canExec(cls: ContainerClass, rootModeActive: boolean): boolean {
   if (cls === "TENANT_APP") return true;

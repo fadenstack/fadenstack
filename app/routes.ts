@@ -17,6 +17,7 @@ export default [
     route("/admin/settings", "pages/admin/SettingsPage.tsx"),
     route("/admin/users", "pages/admin/UsersPage.tsx"),
     route("/admin/roles", "pages/admin/RolesPage.tsx"),
+    route("/admin/groups", "pages/admin/GroupsPage.tsx"),
     route("/admin/llm/providers", "pages/admin/llm/ProvidersPage.tsx"),
     route("/admin/llm/models", "pages/admin/llm/ModelsPage.tsx"),
     route("/admin/llm/models/:id", "pages/admin/llm/ModelDetailPage.tsx"),

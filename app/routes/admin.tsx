@@ -217,6 +217,7 @@ const NAV: NavEntry[] = [
     children: [
       { to: "/admin/users", labelKey: "nav.users", icon: <PeopleIcon /> },
       { to: "/admin/roles", labelKey: "nav.roles", icon: <AdminPanelSettingsIcon /> },
+      { to: "/admin/groups", labelKey: "nav.groups", icon: <GroupWorkIcon /> },
     ],
   },
   {
@@ -296,6 +297,7 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/pii/activity")) return t("pii_log.title");
   if (pathname.startsWith("/admin/users")) return t("users.title");
   if (pathname.startsWith("/admin/roles")) return t("roles.title");
+  if (pathname.startsWith("/admin/groups")) return t("groups.title");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
   if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
   if (pathname.startsWith("/admin/rag/explorer")) return t("rag_explorer.title");
