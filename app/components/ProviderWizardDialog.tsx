@@ -41,7 +41,10 @@ import Stepper from "@mui/material/Stepper";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+import CircularProgress from "@mui/material/CircularProgress";
+
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import NetworkCheckIcon from "@mui/icons-material/NetworkCheck";
 
 // ── Constants ────────────────────────────────────────────────────────
 const PROVIDER_TYPES: ProviderType[] = ["vllm", "llamacpp", "tgi", "ollama"];
@@ -80,6 +83,8 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
   const [engine, setEngine] = useState<ProviderType>("vllm");
   const [endpointUrl, setEndpointUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testMessage, setTestMessage] = useState("");
 
   // Step 2 — runtime config (local only)
   const [modelId, setModelId] = useState("");
@@ -110,6 +115,8 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       setEngine("vllm");
       setEndpointUrl("");
       setApiKey("");
+      setTestStatus("idle");
+      setTestMessage("");
       setModelId("");
       setHwInfo(null);
       setImageChoice(AUTO_IMAGE_VALUE);
@@ -144,6 +151,28 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       });
     return () => { cancelled = true; };
   }, [open, step, target]);
+
+  // ── Test connection handler ──────────────────────────────────────
+  async function handleTestConnection() {
+    setTestStatus("testing");
+    setTestMessage("");
+    try {
+      const result = await providers.testEndpoint({
+        endpoint_url: endpointUrl,
+        ...(apiKey && { api_key: apiKey }),
+      });
+      if (result.compatible) {
+        setTestStatus("success");
+        setTestMessage(t("llm_providers.test_connection_success", { count: result.models.length }));
+      } else {
+        setTestStatus("error");
+        setTestMessage(result.error ?? t("llm_providers.test_connection_failed"));
+      }
+    } catch {
+      setTestStatus("error");
+      setTestMessage(t("llm_providers.test_connection_failed"));
+    }
+  }
 
   const steps =
     target === "local_docker"
@@ -266,7 +295,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
                   label={t("llm_providers.endpoint_url")}
                   placeholder="https://api.example.com/v1"
                   value={endpointUrl}
-                  onChange={(e) => setEndpointUrl(e.target.value)}
+                  onChange={(e) => { setEndpointUrl(e.target.value); setTestStatus("idle"); }}
                   required
                   fullWidth
                   helperText={t("llm_providers.endpoint_url_help")}
@@ -275,10 +304,38 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
                   label={t("llm_providers.api_key")}
                   type="password"
                   value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  onChange={(e) => { setApiKey(e.target.value); setTestStatus("idle"); }}
                   fullWidth
                   helperText={t("llm_providers.api_key_help")}
                 />
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={
+                    testStatus === "testing"
+                      ? <CircularProgress size={16} color="inherit" />
+                      : <NetworkCheckIcon />
+                  }
+                  disabled={!endpointUrl || testStatus === "testing"}
+                  onClick={() => void handleTestConnection()}
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  {testStatus === "testing"
+                    ? t("llm_providers.test_connection_testing")
+                    : t("llm_providers.test_connection")}
+                </Button>
+
+                {testStatus === "success" && (
+                  <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
+                    {testMessage}
+                  </Alert>
+                )}
+                {testStatus === "error" && (
+                  <Alert severity="error" variant="outlined" sx={{ py: 0.5 }}>
+                    {testMessage}
+                  </Alert>
+                )}
               </>
             )}
           </>
