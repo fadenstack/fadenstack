@@ -8,6 +8,7 @@ import { adminUsers, rootMode, type RootModeStatus } from "~/api/admin";
 import { auth } from "~/api/auth";
 import { useThemeMode } from "~/theme-mode";
 import { listLanguages, type UiLanguage } from "~/api/i18n";
+import { ServicesProvider, useServices } from "~/lib/ServicesContext";
 import { useTranslation } from "react-i18next";
 import i18n from "~/i18n";
 
@@ -151,6 +152,8 @@ interface NavGroup {
   labelKey: string;
   icon: React.ReactNode;
   children: NavChild[];
+  /** Optional module name — group is hidden when this module is disabled. */
+  module?: string;
 }
 
 interface NavLeaf {
@@ -159,6 +162,8 @@ interface NavLeaf {
   labelKey: string;
   icon: React.ReactNode;
   permission?: string;
+  /** Optional module name — leaf is hidden when this module is disabled. */
+  module?: string;
 }
 
 type NavEntry = NavGroup | NavLeaf;
@@ -205,6 +210,7 @@ const NAV: NavEntry[] = [
     kind: "group",
     labelKey: "nav.rag_group",
     icon: <ManageSearchIcon />,
+    module: "rag",
     children: [
       {
         to: "/admin/rag/runtime",
@@ -288,6 +294,14 @@ const linkButtonSx = {
 };
 
 export default function AdminLayout() {
+  return (
+    <ServicesProvider>
+      <AdminLayoutInner />
+    </ServicesProvider>
+  );
+}
+
+function AdminLayoutInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode, toggleMode } = useThemeMode();
@@ -437,8 +451,11 @@ export default function AdminLayout() {
     if (!permission) return true;
     return isSuperuser || permissionKeys.has(permission);
   };
+  const { isModuleEnabled } = useServices();
   const navEntries = NAV
     .map((entry) => {
+      // Hide entries that belong to a disabled module
+      if (entry.module && !isModuleEnabled(entry.module)) return null;
       if (entry.kind === "leaf") return hasPermission(entry.permission) ? entry : null;
       const children = entry.children.filter((child) => hasPermission(child.permission));
       return { ...entry, children };

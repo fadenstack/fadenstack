@@ -6,6 +6,7 @@ import {
   type DashboardHealth,
   type DashboardOverview,
 } from "~/api/admin";
+import { useServices } from "~/lib/ServicesContext";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -81,6 +82,41 @@ function StatCard({ label, value, detail }: StatCardProps) {
             {detail}
           </Typography>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function moduleStatusColor(status: string): "success" | "warning" | "error" | "default" {
+  if (status === "healthy") return "success";
+  if (status === "configured") return "warning";
+  if (status === "unhealthy") return "error";
+  return "default";
+}
+
+function ModuleStatusSection() {
+  const { t } = useTranslation();
+  const { services, loading: servicesLoading } = useServices();
+
+  if (servicesLoading || services.length === 0) return null;
+
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>
+          {t("dashboard.optional_modules", { defaultValue: "Optional Modules" })}
+        </Typography>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+          {services.map((svc) => (
+            <Chip
+              key={svc.name}
+              label={`${svc.display_name}: ${svc.enabled ? svc.status : "disabled"}`}
+              color={svc.enabled ? moduleStatusColor(svc.status) : "default"}
+              variant="outlined"
+              size="small"
+            />
+          ))}
+        </Stack>
       </CardContent>
     </Card>
   );
@@ -339,6 +375,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <ModuleStatusSection />
       
       {overview && (
         <Grid container spacing={1.5}>
