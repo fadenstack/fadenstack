@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   adminGroups,
@@ -9,6 +9,9 @@ import {
   type AdminUser,
 } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { FormDialog } from "~/components/FormDialog";
+import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -36,11 +39,26 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 
 export default function GroupsPage() {
   const { t } = useTranslation();
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [roles, setRoles] = useState<RbacRole[]>([]);
-  const [allUsers, setAllUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Data loading via useAsyncData ──
+  const {
+    data: { groups, roles, allUsers },
+    loading,
+    error,
+    refresh: load,
+    setError,
+  } = useAsyncData(
+    async () => {
+      const [g, r, u] = await Promise.all([
+        adminGroups.list(),
+        adminUsers.listRoles(),
+        adminUsers.list(),
+      ]);
+      return { groups: g, roles: r, allUsers: u };
+    },
+    [],
+    { initialValue: { groups: [] as Group[], roles: [] as RbacRole[], allUsers: [] as AdminUser[] } },
+  );
 
   // Group editor dialog
   const [editorOpen, setEditorOpen] = useState(false);
@@ -60,29 +78,6 @@ export default function GroupsPage() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [g, r, u] = await Promise.all([
-        adminGroups.list(),
-        adminUsers.listRoles(),
-        adminUsers.list(),
-      ]);
-      setGroups(g);
-      setRoles(r);
-      setAllUsers(u);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("groups.failed_load"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   // ── Group editor ───────────────────────────────────────────────────
 
@@ -280,11 +275,16 @@ export default function GroupsPage() {
       />
 
       {/* ── Create / Edit Group Dialog ─────────────────────────────── */}
-      <Dialog open={editorOpen} onClose={() => setEditorOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingGroup ? t("groups.edit_title") : t("groups.create_title")}
-        </DialogTitle>
-        <DialogContent>
+      <FormDialog
+        open={editorOpen}
+        title={editingGroup ? t("groups.edit_title") : t("groups.create_title")}
+        loading={saving}
+        submitLabel={editingGroup ? t("common.save") : t("groups.create")}
+        cancelLabel={t("common.cancel")}
+        submitDisabled={!groupName.trim()}
+        onSubmit={handleSave}
+        onClose={() => setEditorOpen(false)}
+      >
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               label={t("groups.name")}
@@ -332,44 +332,30 @@ export default function GroupsPage() {
               ))}
             </Box>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditorOpen(false)}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || !groupName.trim()}
-          >
-            {editingGroup ? t("common.save") : t("groups.create")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* ── Delete Confirmation Dialog ────────────────────────────── */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t("groups.delete_title")}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {t("groups.delete_confirm", { name: deleteTarget?.name })}
-          </Typography>
-          {(deleteTarget?.member_count ?? 0) > 0 && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              {t("groups.delete_warning_members", { count: deleteTarget?.member_count })}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {t("common.delete")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("groups.delete_title")}
+        message={
+          <>
+            <Typography>
+              {t("groups.delete_confirm", { name: deleteTarget?.name })}
+            </Typography>
+            {(deleteTarget?.member_count ?? 0) > 0 && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {t("groups.delete_warning_members", { count: deleteTarget?.member_count })}
+              </Alert>
+            )}
+          </>
+        }
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
 
       {/* ── Members Management Dialog ─────────────────────────────── */}
       <Dialog

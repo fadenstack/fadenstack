@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { adminUsers, type RbacRole, type RbacPermission } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { FormDialog } from "~/components/FormDialog";
+import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
@@ -39,10 +38,22 @@ function groupByResource(perms: RbacPermission[]): Record<string, RbacPermission
 
 export default function RolesPage() {
   const { t } = useTranslation();
-  const [roles, setRoles] = useState<RbacRole[]>([]);
-  const [allPermissions, setAllPermissions] = useState<RbacPermission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Data loading via useAsyncData ──
+  const {
+    data: { roles, allPermissions },
+    loading,
+    error,
+    refresh: load,
+    setError,
+  } = useAsyncData(
+    async () => {
+      const [r, p] = await Promise.all([adminUsers.listRoles(), adminUsers.listPermissions()]);
+      return { roles: r, allPermissions: p };
+    },
+    [],
+    { initialValue: { roles: [] as RbacRole[], allPermissions: [] as RbacPermission[] } },
+  );
 
   // Editor dialog state
   const [editorOpen, setEditorOpen] = useState(false);
@@ -57,24 +68,6 @@ export default function RolesPage() {
   const [deleting, setDeleting] = useState(false);
 
   const grouped = useMemo(() => groupByResource(allPermissions), [allPermissions]);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [r, p] = await Promise.all([adminUsers.listRoles(), adminUsers.listPermissions()]);
-      setRoles(r);
-      setAllPermissions(p);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("roles.failed_load"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   function openCreate() {
     setEditingRole(null);
@@ -257,16 +250,17 @@ export default function RolesPage() {
       />
 
       {/* ── Role editor dialog ── */}
-      <Dialog
+      <FormDialog
         open={editorOpen}
-        onClose={() => (saving ? undefined : setEditorOpen(false))}
-        fullWidth
+        title={editingRole ? t("roles.edit_title") : t("roles.create_title")}
+        loading={saving}
+        submitLabel={editingRole ? t("common.save") : t("roles.create")}
+        cancelLabel={t("common.cancel")}
+        submitDisabled={!roleName.trim()}
+        onSubmit={save}
+        onClose={() => setEditorOpen(false)}
         maxWidth="md"
       >
-        <DialogTitle>
-          {editingRole ? t("roles.edit_title") : t("roles.create_title")}
-        </DialogTitle>
-        <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               label={t("roles.name")}
@@ -343,39 +337,30 @@ export default function RolesPage() {
                 })}
             </Box>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditorOpen(false)} disabled={saving}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="contained" onClick={save} disabled={saving || !roleName.trim()}>
-            {editingRole ? t("common.save") : t("roles.create")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* ── Delete confirmation ── */}
-      <Dialog open={!!deleteTarget} onClose={() => (deleting ? undefined : setDeleteTarget(null))}>
-        <DialogTitle>{t("roles.delete_title")}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {t("roles.delete_confirm", { name: deleteTarget?.name ?? "" })}
-          </Typography>
-          {(deleteTarget?.user_count ?? 0) > 0 && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              {t("roles.delete_warning_users", { count: deleteTarget?.user_count ?? 0 })}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {t("common.delete")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("roles.delete_title")}
+        message={
+          <>
+            <Typography>
+              {t("roles.delete_confirm", { name: deleteTarget?.name ?? "" })}
+            </Typography>
+            {(deleteTarget?.user_count ?? 0) > 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                {t("roles.delete_warning_users", { count: deleteTarget?.user_count ?? 0 })}
+              </Alert>
+            )}
+          </>
+        }
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

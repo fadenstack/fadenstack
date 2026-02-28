@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { adminUsers, type AdminUser, type RbacRole } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { FormDialog } from "~/components/FormDialog";
+import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormGroup from "@mui/material/FormGroup";
 import IconButton from "@mui/material/IconButton";
@@ -25,10 +24,22 @@ import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function UsersPage() {
   const { t } = useTranslation();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [roles, setRoles] = useState<RbacRole[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Data loading via useAsyncData ──
+  const {
+    data: { users, roles },
+    loading,
+    error,
+    refresh: load,
+    setError,
+  } = useAsyncData(
+    async () => {
+      const [allUsers, allRoles] = await Promise.all([adminUsers.list(), adminUsers.listRoles()]);
+      return { users: allUsers, roles: allRoles };
+    },
+    [],
+    { initialValue: { users: [] as AdminUser[], roles: [] as RbacRole[] } },
+  );
 
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
@@ -46,24 +57,6 @@ export default function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [allUsers, allRoles] = await Promise.all([adminUsers.list(), adminUsers.listRoles()]);
-      setUsers(allUsers);
-      setRoles(allRoles);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("users.failed_load"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
   function openEdit(user: AdminUser) {
     setEditing(user);
     setSelectedRoleIds(user.roles.map((role) => role.id));
@@ -79,9 +72,9 @@ export default function UsersPage() {
     if (!editing) return;
     setSaving(true);
     try {
-      const updated = await adminUsers.setUserRoles(editing.id, selectedRoleIds);
-      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      await adminUsers.setUserRoles(editing.id, selectedRoleIds);
       setEditing(null);
+      await load();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("users.failed_update_roles"));
     } finally {
@@ -248,9 +241,15 @@ export default function UsersPage() {
       />
 
       {/* ── Edit roles dialog ── */}
-      <Dialog open={!!editing} onClose={() => (saving ? undefined : setEditing(null))} fullWidth maxWidth="sm">
-        <DialogTitle>{t("users.assign_roles")}</DialogTitle>
-        <DialogContent>
+      <FormDialog
+        open={!!editing}
+        title={t("users.assign_roles")}
+        loading={saving}
+        submitLabel={t("common.save")}
+        cancelLabel={t("common.cancel")}
+        onSubmit={saveRoles}
+        onClose={() => setEditing(null)}
+      >
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {editing?.email}
           </Typography>
@@ -277,17 +276,19 @@ export default function UsersPage() {
               <Typography variant="body2" color="text.secondary">{t("users.no_roles_available")}</Typography>
             </Box>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={saving}>{t("common.cancel")}</Button>
-          <Button variant="contained" onClick={saveRoles} disabled={saving}>{t("common.save")}</Button>
-        </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* ── Create user dialog ── */}
-      <Dialog open={createOpen} onClose={() => (creating ? undefined : setCreateOpen(false))} fullWidth maxWidth="sm">
-        <DialogTitle>{t("users.create_title")}</DialogTitle>
-        <DialogContent>
+      <FormDialog
+        open={createOpen}
+        title={t("users.create_title")}
+        loading={creating}
+        submitLabel={t("users.create")}
+        cancelLabel={t("common.cancel")}
+        submitDisabled={!newEmail.trim() || newPassword.length < 6}
+        onSubmit={handleCreate}
+        onClose={() => setCreateOpen(false)}
+      >
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               label={t("auth.email")}
@@ -336,34 +337,19 @@ export default function UsersPage() {
               ))}
             </FormGroup>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)} disabled={creating}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            onClick={handleCreate}
-            disabled={creating || !newEmail.trim() || newPassword.length < 6}
-          >
-            {t("users.create")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* ── Delete user dialog ── */}
-      <Dialog open={!!deleteTarget} onClose={() => (deleting ? undefined : setDeleteTarget(null))}>
-        <DialogTitle>{t("users.delete_title")}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {t("users.delete_confirm", { email: deleteTarget?.email ?? "" })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>{t("common.cancel")}</Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {t("common.delete")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("users.delete_title")}
+        message={t("users.delete_confirm", { email: deleteTarget?.email ?? "" })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

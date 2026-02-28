@@ -1,19 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   adminAuthProviders,
   type AuthProviderDetail,
 } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { FormDialog } from "~/components/FormDialog";
+import { useAsyncData } from "~/lib/useAsyncData";
 
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
@@ -28,9 +26,19 @@ import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function AuthProvidersPage() {
   const { t } = useTranslation();
-  const [providers, setProviders] = useState<AuthProviderDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Data loading via useAsyncData ──
+  const {
+    data: providers,
+    loading,
+    error,
+    refresh: load,
+    setError,
+  } = useAsyncData(
+    () => adminAuthProviders.list(),
+    [],
+    { initialValue: [] as AuthProviderDetail[] },
+  );
 
   // Editor dialog
   const [editorOpen, setEditorOpen] = useState(false);
@@ -51,23 +59,6 @@ export default function AuthProvidersPage() {
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<AuthProviderDetail | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await adminAuthProviders.list();
-      setProviders(data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("auth_providers.failed_load"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   // ── Editor ─────────────────────────────────────────────────────────
 
@@ -236,11 +227,16 @@ export default function AuthProvidersPage() {
       />
 
       {/* ── Create / Edit Provider Dialog ──────────────────────────── */}
-      <Dialog open={editorOpen} onClose={() => setEditorOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editing ? t("auth_providers.edit_title") : t("auth_providers.create_title")}
-        </DialogTitle>
-        <DialogContent>
+      <FormDialog
+        open={editorOpen}
+        title={editing ? t("auth_providers.edit_title") : t("auth_providers.create_title")}
+        loading={saving}
+        submitLabel={editing ? t("common.save") : t("auth_providers.create")}
+        cancelLabel={t("common.cancel")}
+        submitDisabled={!formName.trim() || !formClientId.trim() || (!editing && !formClientSecret.trim())}
+        onSubmit={handleSave}
+        onClose={() => setEditorOpen(false)}
+      >
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               label={t("auth_providers.name")}
@@ -346,39 +342,19 @@ export default function AuthProvidersPage() {
               />
             </Stack>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditorOpen(false)}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || !formName.trim() || !formClientId.trim() || (!editing && !formClientSecret.trim())}
-          >
-            {editing ? t("common.save") : t("auth_providers.create")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </FormDialog>
 
       {/* ── Delete Confirmation Dialog ────────────────────────────── */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t("auth_providers.delete_title")}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {t("auth_providers.delete_confirm", { name: deleteTarget?.name })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {t("common.delete")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("auth_providers.delete_title")}
+        message={t("auth_providers.delete_confirm", { name: deleteTarget?.name })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
     </Box>
   );
 }
