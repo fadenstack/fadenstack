@@ -1,8 +1,14 @@
 /**
  * Admin → LLM → Runtimes list page.
  * Create, start, stop, restart, delete LLM serving runtimes.
+ *
+ * The create dialog now includes:
+ *  - GPU hardware detection with VRAM display
+ *  - Image preset picker  (built-in + admin-defined via env var)
+ *  - Custom image text field (for NVIDIA NGC, private registries, etc.)
+ *  - Advanced options: generic_config, provider_config, openai_compat
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,15 +20,24 @@ import {
   type Model,
   type CreateRuntimePayload,
 } from "~/api/llm";
+import { hardware, type HardwareInfo, type VllmImagePreset } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { RuntimeStatusChip, EngineChip } from "~/components/Chips";
 
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
+import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import Link from "@mui/material/Link";
@@ -35,10 +50,22 @@ import Typography from "@mui/material/Typography";
 
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+
+// ── Helpers ──────────────────────────────────────────────────────────
+const CUSTOM_IMAGE_VALUE = "__custom__";
+const AUTO_IMAGE_VALUE = "__auto__";
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
 
 export default function RuntimesPage() {
   const { t } = useTranslation();
@@ -55,11 +82,32 @@ export default function RuntimesPage() {
   const [cProviderId, setCProviderId] = useState("");
   const [cModelId, setCModelId] = useState("");
 
+  // Image selection
+  const [hwInfo, setHwInfo] = useState<HardwareInfo | null>(null);
+  const [hwLoading, setHwLoading] = useState(false);
+  const [imageChoice, setImageChoice] = useState(AUTO_IMAGE_VALUE);
+  const [customImage, setCustomImage] = useState("");
+
+  // Advanced options
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [maxModelLen, setMaxModelLen] = useState("");
+  const [dtype, setDtype] = useState("");
+  const [gpuMemUtil, setGpuMemUtil] = useState("");
+  const [tensorParallel, setTensorParallel] = useState("");
+  const [extraArgs, setExtraArgs] = useState("");
+  const [openaiCompat, setOpenaiCompat] = useState(true);
+
   // lookup maps
   const provMap = Object.fromEntries(providersList.map((p) => [p.id, p]));
   const modelMap = Object.fromEntries(modelsList.map((m) => [m.id, m]));
 
-  async function load() {
+  // Image presets from hardware endpoint
+  const imagePresets = useMemo<VllmImagePreset[]>(
+    () => hwInfo?.vllm_image_presets ?? [],
+    [hwInfo],
+  );
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -76,25 +124,91 @@ export default function RuntimesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [t]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  // Fetch hardware info when the create dialog opens
+  useEffect(() => {
+    if (!showCreate) return;
+    let cancelled = false;
+    setHwLoading(true);
+    hardware
+      .info()
+      .then((info) => {
+        if (!cancelled) {
+          setHwInfo(info);
+          // Pre-select the recommended preset
+          const rec = info.vllm_image_presets.find((p) => p.is_recommended);
+          if (rec) setImageChoice(rec.image);
+        }
+      })
+      .catch(() => {
+        // non-fatal — the user can still type a custom image
+      })
+      .finally(() => {
+        if (!cancelled) setHwLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCreate]);
+
+  function resetCreateForm() {
+    setCName("");
+    setCProviderId("");
+    setCModelId("");
+    setImageChoice(AUTO_IMAGE_VALUE);
+    setCustomImage("");
+    setAdvancedOpen(false);
+    setMaxModelLen("");
+    setDtype("");
+    setGpuMemUtil("");
+    setTensorParallel("");
+    setExtraArgs("");
+    setOpenaiCompat(true);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+
+    // Build generic_config from advanced fields
+    const generic_config: Record<string, unknown> = {};
+    if (maxModelLen) generic_config.max_model_len = Number(maxModelLen);
+    if (dtype) generic_config.dtype = dtype;
+    if (gpuMemUtil) generic_config.gpu_memory_utilization = Number(gpuMemUtil);
+    if (tensorParallel) generic_config.tensor_parallel_size = Number(tensorParallel);
+
+    // Build provider_config — image override
+    const provider_config: Record<string, unknown> = {};
+    const resolvedImage =
+      imageChoice === CUSTOM_IMAGE_VALUE
+        ? customImage.trim()
+        : imageChoice === AUTO_IMAGE_VALUE
+          ? undefined
+          : imageChoice;
+    if (resolvedImage) provider_config.image = resolvedImage;
+    if (extraArgs) {
+      provider_config.extra_args = extraArgs
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+    }
+
     const payload: CreateRuntimePayload = {
       name: cName,
       provider_id: cProviderId,
       model_id: cModelId,
+      openai_compat: openaiCompat,
+      ...(Object.keys(generic_config).length > 0 && { generic_config }),
+      ...(Object.keys(provider_config).length > 0 && { provider_config }),
     };
     try {
       await runtimes.create(payload);
       setShowCreate(false);
-      setCName("");
-      setCProviderId("");
-      setCModelId("");
+      resetCreateForm();
       await load();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : t("common.create_failed"));
@@ -320,6 +434,24 @@ export default function RuntimesPage() {
         <form onSubmit={handleCreate}>
           <DialogTitle>{t("llm_runtimes.new_runtime")}</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "8px !important" }}>
+
+            {/* ── GPU info banner ─────────────────────────────── */}
+            {hwInfo && (
+              <Alert
+                severity={hwInfo.gpu.has_gpu ? "success" : "warning"}
+                variant="outlined"
+                sx={{ py: 0.5 }}
+              >
+                {hwInfo.gpu.has_gpu
+                  ? t("llm_runtimes.gpu_detected", {
+                      model: hwInfo.gpu.devices[0]?.model ?? hwInfo.gpu.primary_vendor,
+                      vram: formatBytes(hwInfo.gpu.total_vram_bytes),
+                    })
+                  : t("llm_runtimes.gpu_none")}
+              </Alert>
+            )}
+
+            {/* ── Basic fields ────────────────────────────────── */}
             <TextField
               label={t("common.name")}
               value={cName}
@@ -358,6 +490,136 @@ export default function RuntimesPage() {
                   ))}
               </Select>
             </FormControl>
+
+            {/* ── Container image selector ────────────────────── */}
+            <FormControl fullWidth>
+              <InputLabel>{t("llm_runtimes.container_image")}</InputLabel>
+              <Select
+                value={imageChoice}
+                label={t("llm_runtimes.container_image")}
+                onChange={(e) => setImageChoice(e.target.value)}
+                disabled={hwLoading}
+              >
+                <MenuItem value={AUTO_IMAGE_VALUE}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2">{t("llm_runtimes.image_auto")}</Typography>
+                  </Stack>
+                </MenuItem>
+                {imagePresets.map((preset) => (
+                  <MenuItem key={preset.image} value={preset.image}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2">{preset.label}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                          {preset.image}
+                        </Typography>
+                      </Box>
+                      {preset.is_recommended && (
+                        <Chip label={t("llm_runtimes.recommended_tag")} size="small" color="success" variant="outlined" />
+                      )}
+                    </Stack>
+                  </MenuItem>
+                ))}
+                <MenuItem value={CUSTOM_IMAGE_VALUE}>
+                  <Typography variant="body2" color="primary">
+                    {t("llm_runtimes.image_custom")}
+                  </Typography>
+                </MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Custom image text field */}
+            {imageChoice === CUSTOM_IMAGE_VALUE && (
+              <TextField
+                label={t("llm_runtimes.container_image")}
+                placeholder={t("llm_runtimes.image_custom_placeholder")}
+                value={customImage}
+                onChange={(e) => setCustomImage(e.target.value)}
+                required
+                fullWidth
+                sx={{ fontFamily: "monospace" }}
+              />
+            )}
+
+            {/* ── Advanced options accordion ──────────────────── */}
+            <Accordion
+              expanded={advancedOpen}
+              onChange={(_, expanded) => setAdvancedOpen(expanded)}
+              disableGutters
+              elevation={0}
+              sx={{
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                "&::before": { display: "none" },
+              }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle2">{t("llm_runtimes.advanced_options")}</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    label={t("llm_runtimes.max_model_len")}
+                    type="number"
+                    value={maxModelLen}
+                    onChange={(e) => setMaxModelLen(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                  <FormControl fullWidth size="small">
+                    <InputLabel>{t("llm_runtimes.dtype")}</InputLabel>
+                    <Select
+                      value={dtype}
+                      label={t("llm_runtimes.dtype")}
+                      onChange={(e) => setDtype(e.target.value)}
+                    >
+                      <MenuItem value="">auto</MenuItem>
+                      <MenuItem value="float16">float16</MenuItem>
+                      <MenuItem value="bfloat16">bfloat16</MenuItem>
+                      <MenuItem value="float32">float32</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    label={t("llm_runtimes.gpu_memory_util")}
+                    type="number"
+                    inputProps={{ min: 0.1, max: 1.0, step: 0.05 }}
+                    value={gpuMemUtil}
+                    onChange={(e) => setGpuMemUtil(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label={t("llm_runtimes.tensor_parallel")}
+                    type="number"
+                    inputProps={{ min: 1, step: 1 }}
+                    value={tensorParallel}
+                    onChange={(e) => setTensorParallel(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                </Stack>
+                <TextField
+                  label={t("llm_runtimes.extra_args")}
+                  helperText={t("llm_runtimes.extra_args_help")}
+                  value={extraArgs}
+                  onChange={(e) => setExtraArgs(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={openaiCompat}
+                      onChange={(e) => setOpenaiCompat(e.target.checked)}
+                    />
+                  }
+                  label={t("llm_runtimes.openai_compat")}
+                />
+              </AccordionDetails>
+            </Accordion>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowCreate(false)}>{t("common.cancel")}</Button>

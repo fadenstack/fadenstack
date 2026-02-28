@@ -576,10 +576,20 @@ export interface GpuMetrics {
   vram_total_bytes: number | null;
 }
 
+export interface VllmImagePreset {
+  label: string;
+  image: string;
+  vendor: string | null;
+  description: string | null;
+  is_default: boolean;
+  is_recommended: boolean;
+}
+
 export interface HardwareInfo {
   gpu: GpuInventory;
   gpu_metrics: GpuMetrics;
   recommended_vllm_image: string | null;
+  vllm_image_presets: VllmImagePreset[];
 }
 
 export const hardware = {
