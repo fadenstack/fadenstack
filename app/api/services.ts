@@ -19,6 +19,9 @@ export interface ServiceInfo {
   name: string;
   display_name: string;
   description: string;
+  /** Whether the settings flag is set (env var configured). */
+  configured: boolean;
+  /** Whether module containers are actually running. */
   enabled: boolean;
   status: "disabled" | "configured" | "healthy" | "unhealthy";
   containers?: ContainerState[];

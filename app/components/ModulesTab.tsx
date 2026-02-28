@@ -156,8 +156,7 @@ export default function ModulesTab() {
 
       {/* Module cards */}
       {services.map((svc) => {
-        const isRunning =
-          svc.enabled && (svc.status === "healthy" || svc.status === "configured");
+        const isRunning = svc.enabled;
         const isBusy = busy === svc.name;
 
         return (
@@ -190,7 +189,6 @@ export default function ModulesTab() {
                   ) : (
                     <Switch
                       checked={isRunning}
-                      disabled={!svc.enabled && !isRunning}
                       onChange={() =>
                         void handleToggle(svc, isRunning ? "disable" : "enable")
                       }
@@ -222,35 +220,23 @@ export default function ModulesTab() {
             </CardContent>
 
             <CardActions sx={{ px: 2, pb: 1.5 }}>
-              {svc.enabled && (
-                <>
-                  <Button
-                    size="small"
-                    startIcon={<PlayArrowIcon />}
-                    disabled={isBusy}
-                    onClick={() => void handleToggle(svc, "enable")}
-                  >
-                    {t("common.start")}
-                  </Button>
-                  <Button
-                    size="small"
-                    startIcon={<StopIcon />}
-                    disabled={isBusy}
-                    color="warning"
-                    onClick={() => void handleToggle(svc, "disable")}
-                  >
-                    {t("common.stop")}
-                  </Button>
-                </>
-              )}
-              {!svc.enabled && (
-                <Typography variant="caption" color="text.secondary">
-                  {t("modules_tab.not_configured", {
-                    defaultValue:
-                      "Not configured. Set the corresponding environment variable and restart to enable.",
-                  })}
-                </Typography>
-              )}
+              <Button
+                size="small"
+                startIcon={<PlayArrowIcon />}
+                disabled={isBusy || isRunning}
+                onClick={() => void handleToggle(svc, "enable")}
+              >
+                {t("common.start")}
+              </Button>
+              <Button
+                size="small"
+                startIcon={<StopIcon />}
+                disabled={isBusy || !isRunning}
+                color="warning"
+                onClick={() => void handleToggle(svc, "disable")}
+              >
+                {t("common.stop")}
+              </Button>
             </CardActions>
           </Card>
         );
