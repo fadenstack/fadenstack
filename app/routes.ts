@@ -23,6 +23,9 @@ export default [
     route("/admin/llm/jobs", "pages/admin/llm/JobsPage.tsx"),
     route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
+    // PII dashboard routes
+    route("/admin/pii/dashboard", "pages/admin/pii/PIIDashboardPage.tsx"),
+    route("/admin/pii/activity", "pages/admin/pii/PIIActivityLogPage.tsx"),
     // RAG routes — guarded by the rag-guard layout that checks module status
     layout("routes/rag-guard.tsx", [
       route("/admin/rag/runtime", "pages/admin/rag/RagRuntimeConfigPage.tsx"),

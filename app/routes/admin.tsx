@@ -60,6 +60,9 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
 import SourceIcon from "@mui/icons-material/Source";
+import ShieldIcon from "@mui/icons-material/Shield";
+import PrivacyTipIcon from "@mui/icons-material/PrivacyTip";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -206,6 +209,24 @@ const NAV: NavEntry[] = [
   },
   {
     kind: "group",
+    labelKey: "nav.pii_group",
+    icon: <ShieldIcon />,
+    module: "pii",
+    children: [
+      {
+        to: "/admin/pii/dashboard",
+        labelKey: "nav.pii_dashboard",
+        icon: <PrivacyTipIcon />,
+      },
+      {
+        to: "/admin/pii/activity",
+        labelKey: "nav.pii_activity",
+        icon: <EventNoteIcon />,
+      },
+    ],
+  },
+  {
+    kind: "group",
     labelKey: "nav.rag_group",
     icon: <ManageSearchIcon />,
     module: "rag",
@@ -259,6 +280,8 @@ function adminPageTitle(pathname: string, search: string, t: (key: string) => st
   if (pathname.startsWith("/admin/llm/runtimes")) return t("llm_providers.title");
   if (pathname.startsWith("/admin/llm/jobs")) return t("llm_jobs.title");
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
+  if (pathname.startsWith("/admin/pii/dashboard")) return t("pii_dashboard.title");
+  if (pathname.startsWith("/admin/pii/activity")) return t("pii_log.title");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
   if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
   if (pathname.startsWith("/admin/rag/explorer")) return t("rag_explorer.title");
