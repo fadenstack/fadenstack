@@ -22,15 +22,17 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";
 
+import ModulesTab from "~/components/ModulesTab";
 import UsersPage from "~/pages/admin/UsersPage";
 import { systemSettingsApi, type SystemSettingSchemaItem, type WizardStep } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "system-init" | "users";
+type SettingsTab = "general" | "system-init" | "users" | "modules";
 
 function getCurrentTab(pathname: string, tabQuery: string | null): SettingsTab {
   if (pathname === "/admin/users") return "users";
   if (tabQuery === "users") return "users";
   if (tabQuery === "system-init") return "system-init";
+  if (tabQuery === "modules") return "modules";
   return "general";
 }
 
@@ -240,6 +242,7 @@ export default function SettingsPage() {
         <Tabs value={tab} onChange={handleTabChange}>
           <Tab label={t("settings.general.title")} value="general" />
           <Tab label={t("settings.system_init.title")} value="system-init" />
+          <Tab label={t("settings.modules.title", { defaultValue: "Modules" })} value="modules" />
           <Tab label={t("users.title")} value="users" />
         </Tabs>
       </Box>
@@ -450,6 +453,8 @@ export default function SettingsPage() {
             </Paper>
           </Stack>
         )}
+
+        {tab === "modules" && <ModulesTab />}
 
         {tab === "users" && <UsersPage />}
       </Box>
