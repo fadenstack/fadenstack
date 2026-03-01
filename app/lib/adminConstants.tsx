@@ -150,6 +150,7 @@ export type NavEntry = NavGroup | NavLeaf;
 
 export const NAV: NavEntry[] = [
   { id: "dashboard", kind: "leaf", to: "/admin/dashboard", labelKey: "nav.dashboard", icon: <DashboardIcon /> },
+  { id: "security-map", kind: "leaf", to: "/admin/security-map", labelKey: "nav.security_map", icon: <ShieldIcon /> },
   {
     id: "containers",
     kind: "group",
@@ -273,6 +274,7 @@ export const NAV_BY_ID = new Map(NAV.map((e) => [e.id, e]));
 
 export function adminPageTitle(pathname: string, search: string, t: (key: string) => string): string {
   if (pathname.startsWith("/admin/dashboard")) return t("dashboard.title");
+  if (pathname.startsWith("/admin/security-map")) return t("security_map.title");
   if (pathname.startsWith("/admin/containers/new")) return t("create_container.title");
   if (pathname.startsWith("/admin/containers/")) return t("container_detail.page_title");
   if (pathname.startsWith("/admin/containers")) return t("containers.title");

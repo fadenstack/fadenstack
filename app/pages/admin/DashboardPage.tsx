@@ -8,7 +8,9 @@ import {
   type DashboardOverview,
   type HardwareInfo,
 } from "~/api/admin";
+import { providers as providersApi, type Provider } from "~/api/llm";
 import { useServices } from "~/lib/ServicesContext";
+import DataResidencyCard from "~/components/DataResidencyCard";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -146,6 +148,7 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [health, setHealth] = useState<DashboardHealth | null>(null);
   const [hw, setHw] = useState<HardwareInfo | null>(null);
+  const [llmProviders, setLlmProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,14 +156,16 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [o, h, hwInfo] = await Promise.all([
+      const [o, h, hwInfo, prov] = await Promise.all([
         dashboard.overview(),
         dashboard.health(),
         hardware.info().catch(() => null),
+        providersApi.list().catch(() => [] as Provider[]),
       ]);
       setOverview(o);
       setHealth(h);
       setHw(hwInfo);
+      setLlmProviders(prov);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("dashboard.failed_load"));
     } finally {
@@ -396,7 +401,9 @@ export default function DashboardPage() {
       )}
 
       <ModuleStatusSection />
-      
+
+      <DataResidencyCard providers={llmProviders} />
+
       {overview && (
         <Grid container spacing={1.5}>
           <Grid size={{ xs: 12, md: 6 }}>
