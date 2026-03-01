@@ -2,8 +2,10 @@
  * AdminTopbar — top app bar for the admin layout.
  *
  * Contains help button, language selector, theme toggle,
- * root-mode controls, and user/logout chip.
+ * root-mode controls, and user dropdown menu with profile/logout.
  */
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { RootModeStatus } from "~/api/admin";
 import type { UiLanguage } from "~/api/i18n";
@@ -13,15 +15,19 @@ import AppBar from "@mui/material/AppBar";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import SecurityIcon from "@mui/icons-material/Security";
 import TranslateIcon from "@mui/icons-material/Translate";
 
@@ -61,7 +67,11 @@ export function AdminTopbar({
   onLogout,
 }: AdminTopbarProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const isRootActive = rootStatus?.active ?? false;
+
+  // User dropdown menu state
+  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <AppBar position="static" elevation={0}>
@@ -152,16 +162,43 @@ export function AdminTopbar({
           </>
         )}
         <Chip
+          icon={<AccountCircleIcon />}
           label={currentUserEmail}
-          onDelete={onLogout}
-          deleteIcon={<LogoutIcon fontSize="small" />}
           variant="outlined"
+          onClick={(e) => setUserMenuAnchor(e.currentTarget)}
           sx={{
             height: 30,
+            cursor: "pointer",
             "& .MuiChip-label": { px: 1.25 },
-            "& .MuiChip-deleteIcon": { fontSize: 18, mr: 0.5 },
           }}
         />
+        <Menu
+          anchorEl={userMenuAnchor}
+          open={Boolean(userMenuAnchor)}
+          onClose={() => setUserMenuAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          slotProps={{ paper: { sx: { minWidth: 180 } } }}
+        >
+          <MenuItem
+            onClick={() => {
+              setUserMenuAnchor(null);
+              navigate("/admin/profile");
+            }}
+          >
+            <ListItemIcon><ManageAccountsIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>{t("profile.manage_profile")}</ListItemText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              setUserMenuAnchor(null);
+              onLogout();
+            }}
+          >
+            <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>{t("profile.logout")}</ListItemText>
+          </MenuItem>
+        </Menu>
       </Toolbar>
     </AppBar>
   );

@@ -32,6 +32,8 @@ export default [
     route("/admin/pii/activity", "pages/admin/pii/PIIActivityLogPage.tsx"),
     // Security map
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
+    // User profile
+    route("/admin/profile", "pages/admin/ProfilePage.tsx"),
     // RAG routes — guarded by the rag-guard layout that checks module status
     layout("routes/rag-guard.tsx", [
       route("/admin/rag/runtime", "pages/admin/rag/RagRuntimeConfigPage.tsx"),
