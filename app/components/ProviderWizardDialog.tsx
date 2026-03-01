@@ -4,7 +4,7 @@
  * Step 1: Name, target (local / remote), engine, endpoint.
  * Step 2: Runtime config for local Docker providers.
  */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   providers,
@@ -15,7 +15,7 @@ import {
   type CreateProviderPayload,
   type CreateRuntimePayload,
 } from "~/api/llm";
-import { hardware, images, type HardwareInfo, type VllmImagePreset } from "~/api/admin";
+import { hardware, images, type HardwareInfo, type VllmImagePreset, type PullProgressEvent } from "~/api/admin";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -105,6 +105,9 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
   // Image availability check & pull
   const [imageStatus, setImageStatus] = useState<"idle" | "checking" | "available" | "missing" | "pulling" | "pulled" | "error">("idle");
   const [imageError, setImageError] = useState("");
+  const [pullPercent, setPullPercent] = useState(0);
+  const [pullLayers, setPullLayers] = useState({ done: 0, total: 0 });
+  const sseRef = useRef<EventSource | null>(null);
 
   const imagePresets = useMemo<VllmImagePreset[]>(
     () => hwInfo?.vllm_image_presets ?? [],
@@ -136,6 +139,12 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       setOpenaiCompat(true);
       setImageStatus("idle");
       setImageError("");
+      setPullPercent(0);
+      setPullLayers({ done: 0, total: 0 });
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
     }
   }, [open]);
 
@@ -159,6 +168,47 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       });
     return () => { cancelled = true; };
   }, [open, step, target]);
+
+  // ── Subscribe to pull progress via SSE ──────────────────────────
+  const subscribeToPull = useCallback((pullId: string) => {
+    // Clean up any prior SSE connection
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    setImageStatus("pulling");
+    setPullPercent(0);
+    setPullLayers({ done: 0, total: 0 });
+
+    const source = images.pullProgress(
+      pullId,
+      (data: PullProgressEvent) => {
+        setPullPercent(data.percent ?? 0);
+        setPullLayers({ done: data.layers_done ?? 0, total: data.layers_total ?? 0 });
+      },
+      (_data: PullProgressEvent) => {
+        setImageStatus("pulled");
+        setPullPercent(100);
+        sseRef.current = null;
+      },
+      (data: PullProgressEvent | null) => {
+        setImageStatus("error");
+        setImageError(data?.error ?? "Connection lost");
+        sseRef.current = null;
+      },
+    );
+    sseRef.current = source;
+  }, []);
+
+  // Clean up SSE on unmount
+  useEffect(() => {
+    return () => {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Check image availability when selection changes ──────────────
   useEffect(() => {
@@ -189,13 +239,20 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
     images
       .check(imageName, imageTag)
       .then((res) => {
-        if (!cancelled) setImageStatus(res.exists ? "available" : "missing");
+        if (!cancelled) {
+          if (res.pulling && res.pull_id) {
+            // A pull is already in progress — subscribe to it
+            subscribeToPull(res.pull_id);
+          } else {
+            setImageStatus(res.exists ? "available" : "missing");
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setImageStatus("idle");
       });
     return () => { cancelled = true; };
-  }, [open, step, target, imageChoice, customImage, hwInfo]);
+  }, [open, step, target, imageChoice, customImage, hwInfo, subscribeToPull]);
 
   // ── Test connection handler ──────────────────────────────────────
   async function handleTestConnection() {
@@ -241,11 +298,9 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
     const imageName = lastColon > 0 ? resolvedImage.slice(0, lastColon) : resolvedImage;
     const imageTag = lastColon > 0 ? resolvedImage.slice(lastColon + 1) : "latest";
 
-    setImageStatus("pulling");
-    setImageError("");
     try {
-      await images.pull(imageName, imageTag);
-      setImageStatus("pulled");
+      const result = await images.pull(imageName, imageTag);
+      subscribeToPull(result.pull_id);
     } catch (err: unknown) {
       setImageStatus("error");
       setImageError(err instanceof Error ? err.message : String(err));
@@ -531,9 +586,24 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
               </Alert>
             )}
             {imageStatus === "pulling" && (
-              <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
-                {t("llm_runtimes.image_pulling")}
-                <LinearProgress sx={{ mt: 1 }} />
+              <Alert severity="info" variant="outlined" sx={{ py: 1 }}>
+                <Stack spacing={1} sx={{ width: "100%" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body2">
+                      {t("llm_runtimes.image_pulling")}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {pullPercent > 0
+                        ? `${pullPercent}%${pullLayers.total > 0 ? ` · ${pullLayers.done}/${pullLayers.total} ${t("llm_runtimes.image_pull_layers")}` : ""}`
+                        : t("llm_runtimes.image_pull_starting")}
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant={pullPercent > 0 ? "determinate" : "indeterminate"}
+                    value={pullPercent}
+                    sx={{ borderRadius: 1 }}
+                  />
+                </Stack>
               </Alert>
             )}
             {imageStatus === "error" && (

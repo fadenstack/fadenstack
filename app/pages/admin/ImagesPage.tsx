@@ -2,10 +2,10 @@
  * Admin → Images page.
  * Pull, prune, and browse local images — table powered by DataTable.
  */
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useOutletContext } from "react-router";
 import { useTranslation } from "react-i18next";
-import { images, type ImageSummary, type PruneReport } from "~/api/admin";
+import { images, type ImageSummary, type PruneReport, type PullProgressEvent } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { useAsyncData } from "~/lib/useAsyncData";
 
@@ -14,6 +14,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -49,9 +50,57 @@ export default function ImagesPage() {
   const [pullImage, setPullImage] = useState("");
   const [pullTag, setPullTag] = useState("latest");
   const [pulling, setPulling] = useState(false);
+  const [pullPercent, setPullPercent] = useState(0);
+  const [pullLayers, setPullLayers] = useState({ done: 0, total: 0 });
   const [pullError, setPullError] = useState<string | null>(null);
   const [pruneReport, setPruneReport] = useState<PruneReport | null>(null);
   const [pruning, setPruning] = useState(false);
+  const sseRef = useRef<EventSource | null>(null);
+
+  // ── Subscribe to pull progress via SSE ──────────────────────────
+  const subscribeToPull = useCallback((pullId: string) => {
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    setPulling(true);
+    setPullPercent(0);
+    setPullLayers({ done: 0, total: 0 });
+
+    const source = images.pullProgress(
+      pullId,
+      (data: PullProgressEvent) => {
+        setPullPercent(data.percent ?? 0);
+        setPullLayers({ done: data.layers_done ?? 0, total: data.layers_total ?? 0 });
+      },
+      (_data: PullProgressEvent) => {
+        setPulling(false);
+        setPullPercent(0);
+        setPullLayers({ done: 0, total: 0 });
+        setPullImage("");
+        setPullTag("latest");
+        sseRef.current = null;
+        void load();
+      },
+      (data: PullProgressEvent | null) => {
+        setPulling(false);
+        setPullError(data?.error ?? "Connection lost");
+        sseRef.current = null;
+      },
+    );
+    sseRef.current = source;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clean up SSE on unmount
+  useEffect(() => {
+    return () => {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+    };
+  }, []);
   const columns: ColumnDef<ImageSummary>[] = [
     {
       key: "tags",
@@ -113,16 +162,11 @@ export default function ImagesPage() {
   async function handlePull(e: React.FormEvent) {
     e.preventDefault();
     setPullError(null);
-    setPulling(true);
     try {
-      await images.pull(pullImage, pullTag);
-      setPullImage("");
-      setPullTag("latest");
-      await load();
+      const result = await images.pull(pullImage, pullTag);
+      subscribeToPull(result.pull_id);
     } catch (e: unknown) {
       setPullError(e instanceof Error ? e.message : t("images.pull_failed"));
-    } finally {
-      setPulling(false);
     }
   }
 
@@ -173,6 +217,22 @@ export default function ImagesPage() {
                 {pulling ? t("images.pulling") : t("images.pull_image")}
               </Button>
             </Stack>
+            {pulling && (
+              <Stack spacing={0.5} sx={{ mt: 1.5 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="caption" color="text.secondary">
+                    {pullPercent > 0
+                      ? `${pullPercent}%${pullLayers.total > 0 ? ` · ${pullLayers.done}/${pullLayers.total} ${t("llm_runtimes.image_pull_layers")}` : ""}`
+                      : t("llm_runtimes.image_pull_starting")}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant={pullPercent > 0 ? "determinate" : "indeterminate"}
+                  value={pullPercent}
+                  sx={{ borderRadius: 1 }}
+                />
+              </Stack>
+            )}
             {pullError && (
               <Alert severity="error" sx={{ mt: 1.5 }}>
                 {pullError}

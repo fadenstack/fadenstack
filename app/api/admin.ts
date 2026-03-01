@@ -74,6 +74,27 @@ export interface ImageCheckResponse {
   exists: boolean;
   image: string;
   tag: string;
+  pulling: boolean;
+  pull_id: string | null;
+}
+
+export interface PullStartedResponse {
+  pull_id: string;
+  image: string;
+  tag: string;
+  already_pulling: boolean;
+}
+
+export interface PullProgressEvent {
+  pull_id: string;
+  image: string;
+  state: "pulling" | "complete" | "failed";
+  percent?: number;
+  current_bytes?: number;
+  total_bytes?: number;
+  layers_done?: number;
+  layers_total?: number;
+  error?: string;
 }
 
 export interface StackRevision {
@@ -297,10 +318,40 @@ export const images = {
     return request<ImageCheckResponse>(`/images/check?image=${encodeURIComponent(image)}&tag=${encodeURIComponent(tag)}`);
   },
   pull(image: string, tag = "latest") {
-    return request<void>("/images/pull", {
+    return request<PullStartedResponse>("/images/pull", {
       method: "POST",
       body: JSON.stringify({ image, tag }),
     });
+  },
+  /** Open an SSE stream for pull progress. Returns an EventSource. */
+  pullProgress(
+    pullId: string,
+    onProgress: (data: PullProgressEvent) => void,
+    onComplete: (data: PullProgressEvent) => void,
+    onError: (data: PullProgressEvent | null) => void,
+  ): EventSource {
+    const source = new EventSource(`${BASE}/images/pull/${pullId}/progress`, {
+      withCredentials: true,
+    });
+    source.addEventListener("progress", (raw) => {
+      const data = JSON.parse((raw as MessageEvent<string>).data) as PullProgressEvent;
+      onProgress(data);
+    });
+    source.addEventListener("complete", (raw) => {
+      const data = JSON.parse((raw as MessageEvent<string>).data) as PullProgressEvent;
+      onComplete(data);
+      source.close();
+    });
+    source.addEventListener("error", (raw) => {
+      if (raw instanceof MessageEvent) {
+        const data = JSON.parse(raw.data as string) as PullProgressEvent;
+        onError(data);
+      } else {
+        onError(null);
+      }
+      source.close();
+    });
+    return source;
   },
   prune(dry_run = false) {
     return request<PruneReport>("/images/prune", {
