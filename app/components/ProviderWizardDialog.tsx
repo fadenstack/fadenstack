@@ -15,7 +15,7 @@ import {
   type CreateProviderPayload,
   type CreateRuntimePayload,
 } from "~/api/llm";
-import { hardware, type HardwareInfo, type VllmImagePreset } from "~/api/admin";
+import { hardware, images, type HardwareInfo, type VllmImagePreset } from "~/api/admin";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -42,7 +42,9 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
 
+import DownloadIcon from "@mui/icons-material/Download";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import NetworkCheckIcon from "@mui/icons-material/NetworkCheck";
 
@@ -100,6 +102,10 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
   const [extraArgs, setExtraArgs] = useState("");
   const [openaiCompat, setOpenaiCompat] = useState(true);
 
+  // Image availability check & pull
+  const [imageStatus, setImageStatus] = useState<"idle" | "checking" | "available" | "missing" | "pulling" | "pulled" | "error">("idle");
+  const [imageError, setImageError] = useState("");
+
   const imagePresets = useMemo<VllmImagePreset[]>(
     () => hwInfo?.vllm_image_presets ?? [],
     [hwInfo],
@@ -128,6 +134,8 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       setTensorParallel("");
       setExtraArgs("");
       setOpenaiCompat(true);
+      setImageStatus("idle");
+      setImageError("");
     }
   }, [open]);
 
@@ -151,6 +159,43 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       });
     return () => { cancelled = true; };
   }, [open, step, target]);
+
+  // ── Check image availability when selection changes ──────────────
+  useEffect(() => {
+    if (!open || step !== 1 || target !== "local_docker") return;
+
+    // Resolve the actual image string
+    let resolvedImage: string | undefined;
+    if (imageChoice === AUTO_IMAGE_VALUE) {
+      resolvedImage = hwInfo?.recommended_vllm_image ?? undefined;
+    } else if (imageChoice === CUSTOM_IMAGE_VALUE) {
+      resolvedImage = customImage.trim() || undefined;
+    } else {
+      resolvedImage = imageChoice;
+    }
+    if (!resolvedImage) {
+      setImageStatus("idle");
+      return;
+    }
+
+    // Parse image:tag
+    const lastColon = resolvedImage.lastIndexOf(":");
+    const imageName = lastColon > 0 ? resolvedImage.slice(0, lastColon) : resolvedImage;
+    const imageTag = lastColon > 0 ? resolvedImage.slice(lastColon + 1) : "latest";
+
+    let cancelled = false;
+    setImageStatus("checking");
+    setImageError("");
+    images
+      .check(imageName, imageTag)
+      .then((res) => {
+        if (!cancelled) setImageStatus(res.exists ? "available" : "missing");
+      })
+      .catch(() => {
+        if (!cancelled) setImageStatus("idle");
+      });
+    return () => { cancelled = true; };
+  }, [open, step, target, imageChoice, customImage, hwInfo]);
 
   // ── Test connection handler ──────────────────────────────────────
   async function handleTestConnection() {
@@ -179,6 +224,33 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       ? [t("llm_providers.wizard_step_basics"), t("llm_providers.wizard_step_runtime")]
       : [t("llm_providers.wizard_step_basics")];
   const isLast = step >= steps.length - 1;
+
+  // ── Pull image handler ────────────────────────────────────────────
+  async function handlePullImage() {
+    let resolvedImage: string | undefined;
+    if (imageChoice === AUTO_IMAGE_VALUE) {
+      resolvedImage = hwInfo?.recommended_vllm_image ?? undefined;
+    } else if (imageChoice === CUSTOM_IMAGE_VALUE) {
+      resolvedImage = customImage.trim() || undefined;
+    } else {
+      resolvedImage = imageChoice;
+    }
+    if (!resolvedImage) return;
+
+    const lastColon = resolvedImage.lastIndexOf(":");
+    const imageName = lastColon > 0 ? resolvedImage.slice(0, lastColon) : resolvedImage;
+    const imageTag = lastColon > 0 ? resolvedImage.slice(lastColon + 1) : "latest";
+
+    setImageStatus("pulling");
+    setImageError("");
+    try {
+      await images.pull(imageName, imageTag);
+      setImageStatus("pulled");
+    } catch (err: unknown) {
+      setImageStatus("error");
+      setImageError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async function handleFinish() {
     setBusy(true);
@@ -424,6 +496,65 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
               />
             )}
 
+            {/* ── Image availability check & pull ────────────── */}
+            {imageStatus === "checking" && (
+              <Alert severity="info" variant="outlined" icon={<CircularProgress size={18} />} sx={{ py: 0.5 }}>
+                {t("llm_runtimes.image_checking")}
+              </Alert>
+            )}
+            {imageStatus === "available" && (
+              <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
+                {t("llm_runtimes.image_available")}
+              </Alert>
+            )}
+            {(imageStatus === "pulled") && (
+              <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
+                {t("llm_runtimes.image_pull_success")}
+              </Alert>
+            )}
+            {imageStatus === "missing" && (
+              <Alert
+                severity="warning"
+                variant="outlined"
+                sx={{ py: 0.5 }}
+                action={
+                  <Button
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => void handlePullImage()}
+                  >
+                    {t("llm_runtimes.image_pull_button")}
+                  </Button>
+                }
+              >
+                {t("llm_runtimes.image_not_local")}
+              </Alert>
+            )}
+            {imageStatus === "pulling" && (
+              <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
+                {t("llm_runtimes.image_pulling")}
+                <LinearProgress sx={{ mt: 1 }} />
+              </Alert>
+            )}
+            {imageStatus === "error" && (
+              <Alert
+                severity="error"
+                variant="outlined"
+                sx={{ py: 0.5 }}
+                action={
+                  <Button
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => void handlePullImage()}
+                  >
+                    {t("llm_runtimes.image_pull_button")}
+                  </Button>
+                }
+              >
+                {t("llm_runtimes.image_pull_failed", { error: imageError })}
+              </Alert>
+            )}
+
             <Accordion
               expanded={advancedOpen}
               onChange={(_, expanded) => setAdvancedOpen(expanded)}
@@ -513,7 +644,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
         {isLast ? (
           <Button
             variant="contained"
-            disabled={busy || !name}
+            disabled={busy || !name || (target === "local_docker" && (imageStatus === "missing" || imageStatus === "pulling" || imageStatus === "checking"))}
             onClick={() => void handleFinish()}
           >
             {busy ? t("common.creating") : t("common.create")}

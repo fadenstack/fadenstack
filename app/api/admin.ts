@@ -70,6 +70,12 @@ export interface PruneReport {
   dry_run: boolean;
 }
 
+export interface ImageCheckResponse {
+  exists: boolean;
+  image: string;
+  tag: string;
+}
+
 export interface StackRevision {
   id: string;
   stack_id: string;
@@ -286,6 +292,9 @@ export const containers = {
 export const images = {
   list() {
     return request<ImageSummary[]>("/images/");
+  },
+  check(image: string, tag = "latest") {
+    return request<ImageCheckResponse>(`/images/check?image=${encodeURIComponent(image)}&tag=${encodeURIComponent(tag)}`);
   },
   pull(image: string, tag = "latest") {
     return request<void>("/images/pull", {
