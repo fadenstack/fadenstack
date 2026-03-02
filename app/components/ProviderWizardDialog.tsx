@@ -638,13 +638,13 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
               </Alert>
             )}
             {imageStatus === "pulling" && (
-              <Alert severity="info" variant="outlined" sx={{ py: 1 }}>
-                <Stack spacing={1} sx={{ width: "100%" }}>
+              <Alert severity="info" variant="outlined" sx={{ py: 1, "& .MuiAlert-message": { width: "100%" } }}>
+                <Stack spacing={1}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="body2">
                       {t("llm_runtimes.image_pulling")}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap", ml: 1 }}>
                       {(pullPercent > 0 || pullLayers.total > 0)
                         ? `${pullPercent}%${pullLayers.total > 0 ? ` · ${pullLayers.done}/${pullLayers.total} ${t("llm_runtimes.image_pull_layers")}` : ""}`
                         : t("llm_runtimes.image_pull_starting")}

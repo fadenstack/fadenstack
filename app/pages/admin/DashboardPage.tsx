@@ -20,6 +20,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
+import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
@@ -27,6 +28,7 @@ import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import GaugeCard from "~/components/GaugeCard";
 
 function fmtPct(value: number | null | undefined): string {
@@ -152,6 +154,7 @@ export default function DashboardPage() {
   const grafanaMountRef = useRef<HTMLDivElement | null>(null);
   const [loadGrafana, setLoadGrafana] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [rescanning, setRescanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -172,6 +175,18 @@ export default function DashboardPage() {
       setError(err instanceof Error ? err.message : t("dashboard.failed_load"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function rescanGpu() {
+    setRescanning(true);
+    try {
+      const hwInfo = await hardware.rescan();
+      setHw(hwInfo);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("dashboard.gpu_rescan_failed", { defaultValue: "GPU rescan failed" }));
+    } finally {
+      setRescanning(false);
     }
   }
 
@@ -312,25 +327,42 @@ export default function DashboardPage() {
               />
             </Grid>
             <Grid size={{ xs: 6, sm: 3 }}>
-              <GaugeCard
-                label={
-                  hw?.gpu.has_gpu
-                    ? `GPU (${hw.gpu.primary_vendor.toUpperCase()})`
-                    : t("dashboard.gauges.gpu")
-                }
-                value={overview.gpu_util_percent}
-                detail={overview.gpu_util_percent != null ? fmtRatio(overview.gpu_vram_used_bytes, overview.gpu_vram_total_bytes) : undefined}
-                secondaryDetail={
-                  hw?.gpu.has_gpu
-                    ? `${hw.gpu.device_count}× ${hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
-                    : overview.gpu_util_percent != null ? t("dashboard.gauges.vram") : undefined
-                }
-              />
-              {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
-                <Tooltip title={hw.gpu.devices.map(d => `#${d.index} ${d.model} (${fmtBytes(d.vram_bytes)})`).join(", ")}>
-                  <Chip label={`${hw.gpu.device_count} GPUs`} size="small" variant="outlined" sx={{ mt: 0.5 }} />
+              <Box sx={{ position: "relative" }}>
+                <GaugeCard
+                  label={
+                    hw?.gpu.has_gpu
+                      ? `GPU (${hw.gpu.primary_vendor.toUpperCase()})`
+                      : t("dashboard.gauges.gpu")
+                  }
+                  value={overview.gpu_util_percent}
+                  detail={overview.gpu_util_percent != null ? fmtRatio(overview.gpu_vram_used_bytes, overview.gpu_vram_total_bytes) : undefined}
+                  secondaryDetail={
+                    hw?.gpu.has_gpu
+                      ? `${hw.gpu.devices.find(d => d.vendor === hw.gpu.primary_vendor)?.model ?? hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
+                      : overview.gpu_util_percent != null ? t("dashboard.gauges.vram") : undefined
+                  }
+                />
+                <Tooltip title={t("dashboard.gpu_rescan", { defaultValue: "Re-detect GPUs" })}>
+                  <IconButton
+                    size="small"
+                    onClick={rescanGpu}
+                    disabled={rescanning}
+                    sx={{ position: "absolute", top: 4, right: 4, opacity: 0.7, "&:hover": { opacity: 1 } }}
+                  >
+                    {rescanning ? <CircularProgress size={16} /> : <RefreshIcon fontSize="small" />}
+                  </IconButton>
                 </Tooltip>
-              )}
+                {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
+                  <Tooltip title={hw.gpu.devices.map(d => `#${d.index} ${d.vendor.toUpperCase()} ${d.model} (${fmtBytes(d.vram_bytes)})`).join("\n")}>
+                    <Chip
+                      label={`${hw.gpu.device_count} GPUs`}
+                      size="small"
+                      variant="outlined"
+                      sx={{ position: "absolute", bottom: 6, right: 6, fontSize: "0.65rem", height: 20 }}
+                    />
+                  </Tooltip>
+                )}
+              </Box>
             </Grid>
           </Grid>
 

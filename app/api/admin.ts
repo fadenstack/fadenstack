@@ -860,4 +860,7 @@ export const hardware = {
   info() {
     return request<HardwareInfo>("/hardware");
   },
+  rescan() {
+    return request<HardwareInfo>("/hardware/rescan", { method: "POST" });
+  },
 };
