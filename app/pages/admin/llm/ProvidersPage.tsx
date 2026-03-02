@@ -15,6 +15,7 @@ import {
   type Provider,
   type Runtime,
   type Model,
+  type UpdateProviderPayload,
 } from "~/api/llm";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { EngineChip, RuntimeStatusChip } from "~/components/Chips";
@@ -75,6 +76,9 @@ export default function ProvidersPage() {
   // Edit dialog
   const [editTarget, setEditTarget] = useState<Provider | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEndpointUrl, setEditEndpointUrl] = useState("");
+  const [editApiKey, setEditApiKey] = useState("");
+  const [editRemoteModel, setEditRemoteModel] = useState("");
 
   // ── Derived data ─────────────────────────────────────────────────
   const runtimeByProvider = useMemo(() => {
@@ -124,11 +128,16 @@ export default function ProvidersPage() {
     }
   }
 
-  async function handleUpdate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleUpdate() {
     if (!editTarget) return;
     try {
-      await providers.update(editTarget.id, { name: editName });
+      const payload: UpdateProviderPayload = { name: editName.trim() };
+      if (editTarget.target === "remote_endpoint") {
+        payload.endpoint_url = editEndpointUrl.trim();
+        if (editApiKey.trim()) payload.api_key = editApiKey.trim();
+        payload.remote_model = editRemoteModel.trim() || null;
+      }
+      await providers.update(editTarget.id, payload);
       setEditTarget(null);
       await load();
     } catch (err: unknown) {
@@ -195,9 +204,15 @@ export default function ProvidersPage() {
             {r.model.display_name}
           </Typography>
         ) : r.provider.target === "remote_endpoint" ? (
-          <Typography variant="body2" color="text.disabled" fontSize="0.8rem">
-            —
-          </Typography>
+          r.provider.remote_model ? (
+            <Typography variant="body2" fontSize="0.8rem">
+              {r.provider.remote_model}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.disabled" fontSize="0.8rem">
+              —
+            </Typography>
+          )
         ) : (
           <Typography variant="body2" color="text.disabled" fontSize="0.8rem">
             {t("llm_providers.no_runtime")}
@@ -314,6 +329,9 @@ export default function ProvidersPage() {
                   e.stopPropagation();
                   setEditTarget(r.provider);
                   setEditName(r.provider.name);
+                  setEditEndpointUrl(r.provider.endpoint_url ?? "");
+                  setEditApiKey("");
+                  setEditRemoteModel(r.provider.remote_model ?? "");
                 }}
               >
                 <EditIcon fontSize="small" />
@@ -377,9 +395,13 @@ export default function ProvidersPage() {
         title={t("llm_providers.edit_provider")}
         submitLabel={t("common.save")}
         cancelLabel={t("common.cancel")}
-        onSubmit={() => void handleUpdate(new Event("submit") as unknown as React.FormEvent)}
+        submitDisabled={
+          !editName.trim()
+          || (editTarget?.target === "remote_endpoint" && !editEndpointUrl.trim())
+        }
+        onSubmit={() => void handleUpdate()}
         onClose={() => setEditTarget(null)}
-        maxWidth="xs"
+        maxWidth={editTarget?.target === "remote_endpoint" ? "sm" : "xs"}
       >
             <TextField
               label={t("common.name")}
@@ -389,6 +411,31 @@ export default function ProvidersPage() {
               autoFocus
               fullWidth
             />
+            {editTarget?.target === "remote_endpoint" && (
+              <Stack spacing={2} sx={{ mt: 2 }}>
+                <TextField
+                  label={t("llm_providers.endpoint_url")}
+                  value={editEndpointUrl}
+                  onChange={(e) => setEditEndpointUrl(e.target.value)}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label={t("llm_providers.api_key")}
+                  type="password"
+                  value={editApiKey}
+                  onChange={(e) => setEditApiKey(e.target.value)}
+                  fullWidth
+                  helperText={t("llm_providers.api_key_help")}
+                />
+                <TextField
+                  label={t("llm_common.model")}
+                  value={editRemoteModel}
+                  onChange={(e) => setEditRemoteModel(e.target.value)}
+                  fullWidth
+                />
+              </Stack>
+            )}
       </FormDialog>
     </>
   );

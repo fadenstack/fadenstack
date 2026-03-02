@@ -23,6 +23,7 @@ export interface Provider {
   target: ProviderTarget;
   endpoint_url: string | null;
   capabilities: Record<string, unknown> | null;
+  remote_model: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,6 +97,7 @@ export interface CreateProviderPayload {
   target?: ProviderTarget;
   endpoint_url?: string;
   api_key?: string;
+  remote_model?: string;
 }
 
 export interface UpdateProviderPayload {
@@ -103,6 +105,7 @@ export interface UpdateProviderPayload {
   capabilities?: Record<string, unknown>;
   endpoint_url?: string;
   api_key?: string;
+  remote_model?: string | null;
 }
 
 export interface DownloadModelPayload {

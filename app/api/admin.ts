@@ -236,8 +236,11 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      Pragma: "no-cache",
       ...(init.headers ?? {}),
     },
     credentials: "include",

@@ -22,6 +22,7 @@ import {
   DEFAULT_PINNED_IDS,
   adminPageTitle,
   readCachedAccess,
+  readCachedAccessAnyAge,
   writeCachedAccess,
   clearCachedAccess,
   type NavEntry,
@@ -30,6 +31,16 @@ import { AdminTopbar } from "~/components/AdminTopbar";
 import { AdminSidebar } from "~/components/AdminSidebar";
 import { RootModeDialog } from "~/components/RootModeDialog";
 import { HelpWizardDialog } from "~/components/HelpWizardDialog";
+
+let meAccessInFlight: ReturnType<typeof adminUsers.meAccess> | null = null;
+
+function fetchMeAccessDedup(): ReturnType<typeof adminUsers.meAccess> {
+  if (meAccessInFlight) return meAccessInFlight;
+  meAccessInFlight = adminUsers.meAccess().finally(() => {
+    meAccessInFlight = null;
+  });
+  return meAccessInFlight;
+}
 
 export default function AdminLayout() {
   return (
@@ -83,7 +94,7 @@ function AdminLayoutInner() {
 
   async function ensureAuthenticated() {
     try {
-      const access = await adminUsers.meAccess();
+      const access = await fetchMeAccessDedup();
       applyAccessState(access);
     } catch {
       clearCachedAccess();
@@ -112,14 +123,17 @@ function AdminLayoutInner() {
   }
 
   useEffect(() => {
-    const cachedAccess = readCachedAccess();
-    if (cachedAccess) {
+    const freshCachedAccess = readCachedAccess();
+    const cachedAccess = freshCachedAccess ?? readCachedAccessAnyAge();
+    if (cachedAccess !== null) {
       setCurrentUserEmail(cachedAccess.email);
       setIsSuperuser(cachedAccess.isSuperuser);
       setPermissionKeys(new Set(cachedAccess.permissions));
       setAuthReady(true);
     }
-    void ensureAuthenticated();
+    if (freshCachedAccess === null) {
+      void ensureAuthenticated();
+    }
     void loadLanguages();
   }, []);
 

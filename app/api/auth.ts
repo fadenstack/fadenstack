@@ -6,6 +6,16 @@ export interface AuthUser {
   is_verified: boolean;
 }
 
+const ME_CACHE_TTL_MS = 30_000;
+
+let meCache: { value: AuthUser; expiresAt: number } | null = null;
+let meInFlight: Promise<AuthUser> | null = null;
+
+function clearMeCache(): void {
+  meCache = null;
+  meInFlight = null;
+}
+
 async function assertOk(res: Response): Promise<void> {
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -23,6 +33,7 @@ export const auth = {
       body: body.toString(),
     });
     await assertOk(res);
+    clearMeCache();
   },
 
   async logout(): Promise<void> {
@@ -31,9 +42,38 @@ export const auth = {
       credentials: "include",
     });
     await assertOk(res);
+    clearMeCache();
   },
 
   async me(): Promise<AuthUser> {
+    const now = Date.now();
+    if (meCache && meCache.expiresAt > now) {
+      return meCache.value;
+    }
+    if (meInFlight) {
+      return meInFlight;
+    }
+
+    meInFlight = (async () => {
+      const res = await fetch("/api/users/me", {
+        method: "GET",
+        credentials: "include",
+      });
+      await assertOk(res);
+      const user = (await res.json()) as AuthUser;
+      meCache = { value: user, expiresAt: Date.now() + ME_CACHE_TTL_MS };
+      return user;
+    })();
+
+    try {
+      return await meInFlight;
+    } finally {
+      meInFlight = null;
+    }
+  },
+
+  async meFresh(): Promise<AuthUser> {
+    clearMeCache();
     const res = await fetch("/api/users/me", {
       method: "GET",
       credentials: "include",
@@ -48,5 +88,6 @@ export const auth = {
       credentials: "include",
     });
     await assertOk(res);
+    clearMeCache();
   },
 };

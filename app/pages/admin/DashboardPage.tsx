@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -149,6 +149,8 @@ export default function DashboardPage() {
   const [health, setHealth] = useState<DashboardHealth | null>(null);
   const [hw, setHw] = useState<HardwareInfo | null>(null);
   const [llmProviders, setLlmProviders] = useState<Provider[]>([]);
+  const grafanaMountRef = useRef<HTMLDivElement | null>(null);
+  const [loadGrafana, setLoadGrafana] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,6 +178,24 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (loadGrafana) return;
+    if (typeof window === "undefined") return;
+    const node = grafanaMountRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setLoadGrafana(true);
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadGrafana]);
 
   /* Remaining flat stat cards (non-gauge metrics) */
   const cards = useMemo(() => {
@@ -339,44 +359,71 @@ export default function DashboardPage() {
             </Button>
           </Stack>
 
-          <Box sx={{ position: "relative", borderRadius: 1, overflow: "hidden" }}>
-            <Box
-              component="iframe"
-              src={`${grafanaDashboardUrl}&kiosk`}
-              title={t("dashboard.grafana_title")}
-              sx={{
-                display: "block",
-                width: "100%",
-                minHeight: 720,
-                height: 720,
-                border: 0,
-                bgcolor: "background.default",
-              }}
-            />
-            <Box
-              component="a"
-              href={grafanaDashboardUrl}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={t("dashboard.open_grafana_aria")}
-              sx={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textDecoration: "none",
-                color: "common.white",
-                bgcolor: "rgba(0,0,0,0.06)",
-                opacity: 0,
-                transition: "opacity 120ms ease-in-out",
-                "&:hover": { opacity: 1, bgcolor: "rgba(0,0,0,0.28)" },
-              }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {t("dashboard.open_grafana")}
-              </Typography>
-            </Box>
+          <Box ref={grafanaMountRef} sx={{ position: "relative", borderRadius: 1, overflow: "hidden" }}>
+            {loadGrafana ? (
+              <>
+                <Box
+                  component="iframe"
+                  loading="lazy"
+                  src={`${grafanaDashboardUrl}&kiosk`}
+                  title={t("dashboard.grafana_title")}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    minHeight: 720,
+                    height: 720,
+                    border: 0,
+                    bgcolor: "background.default",
+                  }}
+                />
+                <Box
+                  component="a"
+                  href={grafanaDashboardUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t("dashboard.open_grafana_aria")}
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textDecoration: "none",
+                    color: "common.white",
+                    bgcolor: "rgba(0,0,0,0.06)",
+                    opacity: 0,
+                    transition: "opacity 120ms ease-in-out",
+                    "&:hover": { opacity: 1, bgcolor: "rgba(0,0,0,0.28)" },
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {t("dashboard.open_grafana")}
+                  </Typography>
+                </Box>
+              </>
+            ) : (
+              <Box
+                sx={{
+                  minHeight: 320,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: 1.5,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  p: 3,
+                }}
+              >
+                <Typography color="text.secondary">
+                  {t("dashboard.open_grafana")}
+                </Typography>
+                <Button variant="outlined" onClick={() => setLoadGrafana(true)}>
+                  {t("dashboard.open_grafana", { defaultValue: "Load Grafana" })}
+                </Button>
+              </Box>
+            )}
           </Box>
         </CardContent>
       </Card>

@@ -50,7 +50,7 @@ export const DRAWER_WIDTH_CLOSED = 64;
 
 // ── Auth caching ─────────────────────────────────────────────────
 export const ACCESS_CACHE_KEY = "llm-port-admin-access-v1";
-export const ACCESS_CACHE_TTL_MS = 60_000;
+export const ACCESS_CACHE_TTL_MS = 5 * 60_000;
 
 export interface AccessCacheEntry {
   email: string;
@@ -82,6 +82,25 @@ export function readCachedAccess(): AccessCacheEntry | null {
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isValidAccessCache(parsed) || parsed.expiresAt <= now) {
+      window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
+      return null;
+    }
+    accessCacheMemory = parsed;
+    return parsed;
+  } catch {
+    window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
+    return null;
+  }
+}
+
+export function readCachedAccessAnyAge(): AccessCacheEntry | null {
+  if (accessCacheMemory) return accessCacheMemory;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(ACCESS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidAccessCache(parsed)) {
       window.sessionStorage.removeItem(ACCESS_CACHE_KEY);
       return null;
     }

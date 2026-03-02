@@ -85,6 +85,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
   const [engine, setEngine] = useState<ProviderType>("vllm");
   const [endpointUrl, setEndpointUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [remoteModel, setRemoteModel] = useState("");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
 
@@ -125,6 +126,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       setEngine("vllm");
       setEndpointUrl("");
       setApiKey("");
+      setRemoteModel("");
       setTestStatus("idle");
       setTestMessage("");
       setModelId("");
@@ -295,6 +297,9 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
       ? [t("llm_providers.wizard_step_basics"), t("llm_providers.wizard_step_runtime")]
       : [t("llm_providers.wizard_step_basics")];
   const isLast = step >= steps.length - 1;
+  const localImageReady = imageStatus === "available" || imageStatus === "pulled";
+  const localCheckInProgress = hwLoading || imageStatus === "checking";
+  const localCreateBlocked = !modelId || !localImageReady || localCheckInProgress;
 
   // ── Pull image handler ────────────────────────────────────────────
   async function handlePullImage() {
@@ -331,6 +336,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
         target,
         ...(target === "remote_endpoint" && endpointUrl && { endpoint_url: endpointUrl }),
         ...(target === "remote_endpoint" && apiKey && { api_key: apiKey }),
+        ...(target === "remote_endpoint" && remoteModel.trim() && { remote_model: remoteModel.trim() }),
       };
       const newProv = await providers.create(provPayload);
       newProvId = newProv.id;
@@ -456,6 +462,12 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
                   fullWidth
                   helperText={t("llm_providers.api_key_help")}
                 />
+                <TextField
+                  label={t("llm_common.model")}
+                  value={remoteModel}
+                  onChange={(e) => setRemoteModel(e.target.value)}
+                  fullWidth
+                />
 
                 <Button
                   variant="outlined"
@@ -524,41 +536,60 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
               </Select>
             </FormControl>
 
-            <FormControl fullWidth>
-              <InputLabel>{t("llm_runtimes.container_image")}</InputLabel>
-              <Select
-                value={imageChoice}
-                label={t("llm_runtimes.container_image")}
-                onChange={(e) => setImageChoice(e.target.value)}
-                disabled={hwLoading}
-              >
-                <MenuItem value={AUTO_IMAGE_VALUE}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="body2">{t("llm_runtimes.image_auto")}</Typography>
-                  </Stack>
-                </MenuItem>
-                {imagePresets.map((preset) => (
-                  <MenuItem key={preset.image} value={preset.image}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2">{preset.label}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                          {preset.image}
-                        </Typography>
-                      </Box>
-                      {preset.is_recommended && (
-                        <Chip label={t("llm_runtimes.recommended_tag")} size="small" color="success" variant="outlined" />
-                      )}
+            <Box sx={{ position: "relative" }}>
+              <FormControl fullWidth>
+                <InputLabel>{t("llm_runtimes.container_image")}</InputLabel>
+                <Select
+                  value={imageChoice}
+                  label={t("llm_runtimes.container_image")}
+                  onChange={(e) => setImageChoice(e.target.value)}
+                  disabled={hwLoading}
+                >
+                  <MenuItem value={AUTO_IMAGE_VALUE}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography variant="body2">{t("llm_runtimes.image_auto")}</Typography>
                     </Stack>
                   </MenuItem>
-                ))}
-                <MenuItem value={CUSTOM_IMAGE_VALUE}>
-                  <Typography variant="body2" color="primary">
-                    {t("llm_runtimes.image_custom")}
-                  </Typography>
-                </MenuItem>
-              </Select>
-            </FormControl>
+                  {imagePresets.map((preset) => (
+                    <MenuItem key={preset.image} value={preset.image}>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2">{preset.label}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                            {preset.image}
+                          </Typography>
+                        </Box>
+                        {preset.is_recommended && (
+                          <Chip label={t("llm_runtimes.recommended_tag")} size="small" color="success" variant="outlined" />
+                        )}
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                  <MenuItem value={CUSTOM_IMAGE_VALUE}>
+                    <Typography variant="body2" color="primary">
+                      {t("llm_runtimes.image_custom")}
+                    </Typography>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              {localCheckInProgress && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 2,
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "action.hover",
+                    pointerEvents: "all",
+                  }}
+                >
+                  <CircularProgress size={24} />
+                </Box>
+              )}
+            </Box>
 
             {imageChoice === CUSTOM_IMAGE_VALUE && (
               <TextField
@@ -614,7 +645,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
                       {t("llm_runtimes.image_pulling")}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {pullPercent > 0
+                      {(pullPercent > 0 || pullLayers.total > 0)
                         ? `${pullPercent}%${pullLayers.total > 0 ? ` · ${pullLayers.done}/${pullLayers.total} ${t("llm_runtimes.image_pull_layers")}` : ""}`
                         : t("llm_runtimes.image_pull_starting")}
                     </Typography>
@@ -744,7 +775,7 @@ export function ProviderWizardDialog({ open, models, onClose, onCreated }: Provi
         {isLast ? (
           <Button
             variant="contained"
-            disabled={busy || !name || (target === "local_docker" && (imageStatus === "missing" || imageStatus === "pulling" || imageStatus === "checking"))}
+            disabled={busy || !name || (target === "local_docker" && localCreateBlocked)}
             onClick={() => void handleFinish()}
           >
             {busy ? t("common.creating") : t("common.create")}
