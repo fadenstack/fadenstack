@@ -27,9 +27,12 @@ export default [
     route("/admin/llm/jobs", "pages/admin/llm/JobsPage.tsx"),
     route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
-    // PII dashboard routes
-    route("/admin/pii/dashboard", "pages/admin/pii/PIIDashboardPage.tsx"),
-    route("/admin/pii/activity", "pages/admin/pii/PIIActivityLogPage.tsx"),
+    // PII routes — guarded by module status
+    layout("routes/pii-guard.tsx", [
+      route("/admin/pii/dashboard", "pages/admin/pii/PIIDashboardPage.tsx"),
+      route("/admin/pii/activity", "pages/admin/pii/PIIActivityLogPage.tsx"),
+      route("/admin/pii/policies", "pages/admin/pii/PIITenantPoliciesPage.tsx"),
+    ]),
     // Security map
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
     // User profile

@@ -23,6 +23,9 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";
 
 import ModulesTab from "~/components/ModulesTab";
+import PiiPolicyForm from "~/components/PiiPolicyForm";
+import { useServices } from "~/lib/ServicesContext";
+import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import { systemSettingsApi, type SystemSettingSchemaItem, type WizardStep } from "~/api/systemSettings";
 
 type SettingsTab = "general" | "system-init" | "modules";
@@ -63,8 +66,13 @@ function toTitleCase(value: string): string {
     .join(" ");
 }
 
+function isPiiSettingKey(key: string): boolean {
+  return key.startsWith("llm_port_api.pii_");
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const { isModuleEnabled, loading: modulesLoading } = useServices();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,6 +91,9 @@ export default function SettingsPage() {
   const [wizardStepIndex, setWizardStepIndex] = useState(0);
   const [wizardTargetHost, setWizardTargetHost] = useState("local");
   const [wizardSaving, setWizardSaving] = useState(false);
+  const [piiOptionsLoading, setPiiOptionsLoading] = useState(false);
+  const [piiOptionsError, setPiiOptionsError] = useState<string | null>(null);
+  const [piiOptions, setPiiOptions] = useState<Awaited<ReturnType<typeof fetchPIIPolicyOptions>> | null>(null);
 
   useEffect(() => {
     setTab(getCurrentTab(location.pathname, searchParams.get("tab")));
@@ -127,11 +138,46 @@ export default function SettingsPage() {
     void loadSettings();
   }, []);
 
+  const piiModuleEnabled = isModuleEnabled("pii");
+
+  useEffect(() => {
+    if (modulesLoading || !piiModuleEnabled) {
+      setPiiOptionsError(null);
+      return;
+    }
+    let cancelled = false;
+    setPiiOptionsLoading(true);
+    fetchPIIPolicyOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setPiiOptions(options);
+          setPiiOptionsError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPiiOptionsError(error instanceof Error ? error.message : "Failed to load PII options.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPiiOptionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modulesLoading, piiModuleEnabled]);
+
+  const piiPolicyValue = useMemo(
+    () => normalizePIIPolicy(values["llm_port_api.pii_default_policy"], piiOptions ?? undefined),
+    [values, piiOptions],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const visibleSchema = schema.filter((item) => !isPiiSettingKey(item.key));
     const items = q
-      ? schema.filter((s) => `${s.label} ${s.description} ${s.key} ${s.category} ${s.group}`.toLowerCase().includes(q))
-      : schema;
+      ? visibleSchema.filter((s) => `${s.label} ${s.description} ${s.key} ${s.category} ${s.group}`.toLowerCase().includes(q))
+      : visibleSchema;
     const groups = new Map<string, SystemSettingSchemaItem[]>();
     for (const item of items) {
       const key = `${item.category}::${item.group}`;
@@ -204,6 +250,24 @@ export default function SettingsPage() {
     }
   }
 
+  async function savePiiSettings() {
+    const piiServiceUrlKey = "llm_port_api.pii_service_url";
+    const piiPolicyKey = "llm_port_api.pii_default_policy";
+    setBusyKey("__pii_policy__");
+    setStatusMessage(null);
+    setError(null);
+    try {
+      await systemSettingsApi.update(piiServiceUrlKey, values[piiServiceUrlKey] ?? "", "local");
+      const result = await systemSettingsApi.update(piiPolicyKey, piiPolicyValue, "local");
+      setStatusMessage(`PII policy: ${result.apply_status} (${result.apply_scope})`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update PII settings.");
+    } finally {
+      setBusyKey(null);
+      await loadSettings();
+    }
+  }
+
   async function applyWizardStep() {
     const step = wizardSteps[wizardStepIndex];
     if (!step) return;
@@ -212,7 +276,8 @@ export default function SettingsPage() {
     setError(null);
     try {
       const payload: Record<string, unknown> = {};
-      for (const key of step.setting_keys) {
+      const keysForStep = step.setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled));
+      for (const key of keysForStep) {
         if (values[key] !== undefined) payload[key] = values[key];
       }
       const result = await systemSettingsApi.wizardApply(payload, wizardTargetHost);
@@ -333,6 +398,43 @@ export default function SettingsPage() {
                 </Paper>
               );
             })}
+
+            {!modulesLoading && piiModuleEnabled && (
+              <Paper sx={{ p: 2 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  {t("pii_policy.system_section", { defaultValue: "PII Policy (System Default)" })}
+                </Typography>
+                <Stack spacing={1.5}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label={t("pii_policy.pii_service_url", { defaultValue: "PII Service URL" })}
+                    value={asInputValue(values["llm_port_api.pii_service_url"])}
+                    onChange={(event) => setLocalValue("llm_port_api.pii_service_url", event.target.value, "string")}
+                    helperText={t("pii_policy.pii_service_url_help", {
+                      defaultValue: "Internal URL for llm_port_pii (for example http://llm-port-pii:8000/api).",
+                    })}
+                  />
+                  {piiOptionsError && <Alert severity="warning">{piiOptionsError}</Alert>}
+                  <PiiPolicyForm
+                    value={piiPolicyValue}
+                    options={piiOptions}
+                    disabled={piiOptionsLoading}
+                    onChange={(next) => setValues((prev) => ({ ...prev, ["llm_port_api.pii_default_policy"]: next }))}
+                  />
+                  <Stack direction="row" justifyContent="flex-end">
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={busyKey === "__pii_policy__" || piiOptionsLoading}
+                      onClick={() => void savePiiSettings()}
+                    >
+                      {busyKey === "__pii_policy__" ? t("common.loading") : t("common.save")}
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Paper>
+            )}
           </Stack>
         )}
 
@@ -374,11 +476,36 @@ export default function SettingsPage() {
                   <Typography variant="body2" color="text.secondary">
                     {wizardSteps[wizardStepIndex].description}
                   </Typography>
-                  {wizardSteps[wizardStepIndex].setting_keys.length > 0 ? (
+                  {wizardSteps[wizardStepIndex].id === "pii" && !piiModuleEnabled && (
+                    <Alert severity="info" sx={{ mt: 1.5 }}>
+                      {t("pii_policy.hidden_when_disabled", {
+                        defaultValue: "PII settings are hidden because the PII module is currently disabled.",
+                      })}
+                    </Alert>
+                  )}
+                  {wizardSteps[wizardStepIndex].setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled)).length > 0 ? (
                     <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-                      {wizardSteps[wizardStepIndex].setting_keys.map((key) => {
+                      {wizardSteps[wizardStepIndex].setting_keys
+                        .filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled))
+                        .map((key) => {
                         const item = schema.find((s) => s.key === key);
                         if (!item) return null;
+                        if (item.key === "llm_port_api.pii_default_policy") {
+                          return (
+                            <Box key={item.key}>
+                              <Typography variant="body2" sx={{ mb: 1 }}>
+                                {item.label}
+                              </Typography>
+                              {piiOptionsError && <Alert severity="warning" sx={{ mb: 1 }}>{piiOptionsError}</Alert>}
+                              <PiiPolicyForm
+                                value={piiPolicyValue}
+                                options={piiOptions}
+                                disabled={piiOptionsLoading}
+                                onChange={(next) => setValues((prev) => ({ ...prev, [item.key]: next }))}
+                              />
+                            </Box>
+                          );
+                        }
                         return (
                           <Stack key={item.key} direction={{ xs: "column", md: "row" }} spacing={1}>
                             <TextField

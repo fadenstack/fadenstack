@@ -38,6 +38,7 @@ import SourceIcon from "@mui/icons-material/Source";
 import ShieldIcon from "@mui/icons-material/Shield";
 import PrivacyTipIcon from "@mui/icons-material/PrivacyTip";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import PolicyOutlinedIcon from "@mui/icons-material/PolicyOutlined";
 import PeopleIcon from "@mui/icons-material/People";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import GroupWorkIcon from "@mui/icons-material/GroupWork";
@@ -238,6 +239,11 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.pii_activity",
         icon: <EventNoteIcon />,
       },
+      {
+        to: "/admin/pii/policies",
+        labelKey: "nav.pii_policies",
+        icon: <PolicyOutlinedIcon />,
+      },
     ],
   },
   {
@@ -310,6 +316,7 @@ export function adminPageTitle(pathname: string, search: string, t: (key: string
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/pii/dashboard")) return t("pii_dashboard.title");
   if (pathname.startsWith("/admin/pii/activity")) return t("pii_log.title");
+  if (pathname.startsWith("/admin/pii/policies")) return t("pii_policy.tenants_title");
   if (pathname.startsWith("/admin/users")) return t("users.title");
   if (pathname.startsWith("/admin/roles")) return t("roles.title");
   if (pathname.startsWith("/admin/groups")) return t("groups.title");
