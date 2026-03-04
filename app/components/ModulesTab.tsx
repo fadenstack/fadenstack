@@ -95,7 +95,9 @@ export default function ModulesTab() {
         setActionSuccess(
           t("modules_tab.action_success", {
             defaultValue: "{{module}} {{action}}d successfully.",
-            module: svc.display_name,
+            module: t(`modules.${svc.name}.name`, {
+              defaultValue: svc.display_name,
+            }),
             action,
           }),
         );
@@ -178,17 +180,29 @@ export default function ModulesTab() {
               >
                 <Box>
                   <Typography variant="subtitle1" fontWeight="bold">
-                    {svc.display_name}
+                    {t(`modules.${svc.name}.name`, {
+                      defaultValue: svc.display_name,
+                    })}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {svc.description}
+                    {t(`modules.${svc.name}.description`, {
+                      defaultValue: svc.description,
+                    })}
                   </Typography>
                 </Box>
 
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Chip
                     size="small"
-                    label={svc.enabled ? svc.status : "disabled"}
+                    label={
+                      svc.enabled
+                        ? t(`modules.status.${svc.status}`, {
+                            defaultValue: svc.status,
+                          })
+                        : t("modules.status.disabled", {
+                            defaultValue: "disabled",
+                          })
+                    }
                     color={svc.enabled ? statusColor(svc.status) : "default"}
                     variant="outlined"
                   />
@@ -203,7 +217,9 @@ export default function ModulesTab() {
                       inputProps={{
                         "aria-label": t("modules_tab.toggle_aria", {
                           defaultValue: "Toggle {{module}}",
-                          module: svc.display_name,
+                          module: t(`modules.${svc.name}.name`, {
+                            defaultValue: svc.display_name,
+                          }),
                         }),
                       }}
                     />
@@ -273,11 +289,15 @@ export default function ModulesTab() {
           {confirmDialog?.action === "enable"
             ? t("modules_tab.confirm_enable_title", {
                 defaultValue: "Enable {{module}}?",
-                module: confirmDialog?.module.display_name,
+                module: t(`modules.${confirmDialog?.module.name}.name`, {
+                  defaultValue: confirmDialog?.module.display_name,
+                }),
               })
             : t("modules_tab.confirm_disable_title", {
                 defaultValue: "Disable {{module}}?",
-                module: confirmDialog?.module.display_name,
+                module: t(`modules.${confirmDialog?.module.name}.name`, {
+                  defaultValue: confirmDialog?.module.display_name,
+                }),
               })}
         </DialogTitle>
         <DialogContent>
@@ -286,12 +306,16 @@ export default function ModulesTab() {
               ? t("modules_tab.confirm_enable_body", {
                   defaultValue:
                     "This will start all containers for the {{module}} module.",
-                  module: confirmDialog?.module.display_name,
+                  module: t(`modules.${confirmDialog?.module.name}.name`, {
+                    defaultValue: confirmDialog?.module.display_name,
+                  }),
                 })
               : t("modules_tab.confirm_disable_body", {
                   defaultValue:
                     "This will stop all containers for the {{module}} module. Any in-flight requests will be interrupted.",
-                  module: confirmDialog?.module.display_name,
+                  module: t(`modules.${confirmDialog?.module.name}.name`, {
+                    defaultValue: confirmDialog?.module.display_name,
+                  }),
                 })}
           </DialogContentText>
         </DialogContent>
@@ -316,7 +340,9 @@ export default function ModulesTab() {
         open={logsModule !== null}
         onClose={() => setLogsModule(null)}
         module={logsModule?.name ?? ""}
-        moduleDisplayName={logsModule?.display_name ?? ""}
+        moduleDisplayName={t(`modules.${logsModule?.name}.name`, {
+          defaultValue: logsModule?.display_name ?? "",
+        })}
         containers={logsModule?.containers ?? []}
       />
     </Stack>

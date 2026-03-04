@@ -51,7 +51,14 @@ export default function ModuleGuard({
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 8 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          py: 8,
+        }}
+      >
         <CircularProgress size={32} />
       </Box>
     );
@@ -63,7 +70,9 @@ export default function ModuleGuard({
       return null;
     }
 
-    const displayName = info?.display_name ?? module;
+    const displayName = t(`modules.${module}.name`, {
+      defaultValue: info?.display_name ?? module,
+    });
     return (
       <Box sx={{ px: 3, py: 6, textAlign: "center" }}>
         <Alert severity="info" sx={{ maxWidth: 600, mx: "auto", mb: 2 }}>

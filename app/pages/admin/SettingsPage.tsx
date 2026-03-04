@@ -432,8 +432,13 @@ export default function SettingsPage() {
               return (
                 <Paper key={groupKey} sx={{ p: 2 }}>
                   <Typography variant="subtitle1">
-                    {toTitleCase(category.replaceAll("_", " "))} /{" "}
-                    {toTitleCase(group.replaceAll("_", " "))}
+                    {t(`settings.categories.${category}`, {
+                      defaultValue: toTitleCase(category.replaceAll("_", " ")),
+                    })}{" "}
+                    /{" "}
+                    {t(`settings.groups.${group}`, {
+                      defaultValue: toTitleCase(group.replaceAll("_", " ")),
+                    })}
                   </Typography>
                   <Divider sx={{ my: 1 }} />
                   <Stack spacing={1.5}>

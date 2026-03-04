@@ -128,7 +128,7 @@ function ModuleStatusSection() {
           {services.map((svc) => (
             <Chip
               key={svc.name}
-              label={`${svc.display_name}: ${svc.enabled ? svc.status : "disabled"}`}
+              label={`${t(`modules.${svc.name}.name`, { defaultValue: svc.display_name })}: ${svc.enabled ? t(`modules.status.${svc.status}`, { defaultValue: svc.status }) : t("modules.status.disabled", { defaultValue: "disabled" })}`}
               color={svc.enabled ? moduleStatusColor(svc.status) : "default"}
               variant="outlined"
               size="small"

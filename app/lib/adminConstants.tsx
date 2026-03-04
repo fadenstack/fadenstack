@@ -46,6 +46,8 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import GroupWorkIcon from "@mui/icons-material/GroupWork";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import DataThresholdingIcon from "@mui/icons-material/DataThresholding";
+import InsightsIcon from "@mui/icons-material/Insights";
+import MapIcon from "@mui/icons-material/Map";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -181,11 +183,23 @@ export const NAV: NavEntry[] = [
     icon: <DashboardIcon />,
   },
   {
-    id: "security-map",
-    kind: "leaf",
-    to: "/admin/security-map",
-    labelKey: "nav.security_map",
-    icon: <ShieldIcon />,
+    id: "observability",
+    kind: "group",
+    labelKey: "nav.observability_group",
+    icon: <InsightsIcon />,
+    children: [
+      {
+        to: "/admin/security-map",
+        labelKey: "nav.data_residency",
+        icon: <MapIcon />,
+      },
+      {
+        to: "/admin/llm/agent-trace",
+        labelKey: "nav.llm_calls",
+        icon: <HubIcon />,
+        permission: "llm.graph:read",
+      },
+    ],
   },
   {
     id: "containers",
@@ -222,14 +236,7 @@ export const NAV: NavEntry[] = [
       { to: "/admin/llm/jobs", labelKey: "nav.jobs", icon: <DownloadIcon /> },
     ],
   },
-  {
-    id: "agent-trace",
-    kind: "leaf",
-    to: "/admin/llm/agent-trace",
-    labelKey: "nav.agent_trace",
-    icon: <HubIcon />,
-    permission: "llm.graph:read",
-  },
+
   {
     id: "endpoint",
     kind: "leaf",
@@ -354,7 +361,7 @@ export function adminPageTitle(
 ): string {
   if (pathname.startsWith("/admin/dashboard")) return t("dashboard.title");
   if (pathname.startsWith("/admin/security-map"))
-    return t("security_map.title");
+    return t("nav.data_residency");
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");
@@ -393,11 +400,10 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/rag/publishes"))
     return t("rag_publishes.title");
   if (pathname.startsWith("/admin/rag/search")) return t("rag_search.title");
-  if (pathname.startsWith("/admin/llm/agent-trace"))
-    return t("nav.agent_trace");
+  if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
-  if (pathname.startsWith("/admin/agents/graph")) return t("nav.agent_trace");
-  if (pathname.startsWith("/admin/llm/graph")) return t("nav.agent_trace");
+  if (pathname.startsWith("/admin/agents/graph")) return t("nav.llm_calls");
+  if (pathname.startsWith("/admin/llm/graph")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/logs")) {
     const tab = new URLSearchParams(search).get("tab");
     return tab === "audit" ? t("logs.tab_audit") : t("logs.tab_logs");
