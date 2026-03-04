@@ -79,7 +79,11 @@ export default function ContainerLogViewer({
     <Box sx={{ mt: 1 }}>
       {/* Toolbar */}
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flexGrow: 1 }}
+        >
           {containerName}
         </Typography>
 
@@ -102,7 +106,9 @@ export default function ContainerLogViewer({
           ))}
         </TextField>
 
-        <Tooltip title={t("logs.scroll_bottom", { defaultValue: "Auto-scroll" })}>
+        <Tooltip
+          title={t("logs.scroll_bottom", { defaultValue: "Auto-scroll" })}
+        >
           <IconButton
             size="small"
             color={autoScroll ? "primary" : "default"}
@@ -113,13 +119,21 @@ export default function ContainerLogViewer({
         </Tooltip>
 
         <Tooltip title={t("logs.copy", { defaultValue: "Copy logs" })}>
-          <IconButton size="small" onClick={() => void copyLogs()} disabled={!logs}>
+          <IconButton
+            size="small"
+            onClick={() => void copyLogs()}
+            disabled={!logs}
+          >
             <ContentCopyIcon fontSize="small" />
           </IconButton>
         </Tooltip>
 
         <Tooltip title={t("dashboard.refresh", { defaultValue: "Refresh" })}>
-          <IconButton size="small" onClick={() => void fetchLogs()} disabled={loading}>
+          <IconButton
+            size="small"
+            onClick={() => void fetchLogs()}
+            disabled={loading}
+          >
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>

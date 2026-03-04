@@ -100,9 +100,21 @@ function LogPanel({
   if (!active) return null;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, flexGrow: 1 }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        flexGrow: 1,
+      }}
+    >
       {/* Toolbar */}
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5, flexShrink: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ mb: 0.5, flexShrink: 0 }}
+      >
         <Box sx={{ flexGrow: 1 }} />
 
         <TextField
@@ -122,7 +134,9 @@ function LogPanel({
           ))}
         </TextField>
 
-        <Tooltip title={t("logs.scroll_bottom", { defaultValue: "Auto-scroll" })}>
+        <Tooltip
+          title={t("logs.scroll_bottom", { defaultValue: "Auto-scroll" })}
+        >
           <IconButton
             size="small"
             color={autoScroll ? "primary" : "default"}
@@ -133,13 +147,21 @@ function LogPanel({
         </Tooltip>
 
         <Tooltip title={t("logs.copy", { defaultValue: "Copy logs" })}>
-          <IconButton size="small" onClick={() => void copyLogs()} disabled={!logs}>
+          <IconButton
+            size="small"
+            onClick={() => void copyLogs()}
+            disabled={!logs}
+          >
             <ContentCopyIcon fontSize="small" />
           </IconButton>
         </Tooltip>
 
         <Tooltip title={t("dashboard.refresh", { defaultValue: "Refresh" })}>
-          <IconButton size="small" onClick={() => void fetchLogs()} disabled={loading}>
+          <IconButton
+            size="small"
+            onClick={() => void fetchLogs()}
+            disabled={loading}
+          >
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>

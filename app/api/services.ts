@@ -63,20 +63,26 @@ export const servicesApi = {
 
   /** Start all containers belonging to the named module. */
   async enable(name: string): Promise<ModuleActionResult> {
-    const res = await fetch(`${BASE}/services/${encodeURIComponent(name)}/enable`, {
-      method: "PUT",
-      credentials: "include",
-    });
+    const res = await fetch(
+      `${BASE}/services/${encodeURIComponent(name)}/enable`,
+      {
+        method: "PUT",
+        credentials: "include",
+      },
+    );
     await assertOk(res);
     return res.json() as Promise<ModuleActionResult>;
   },
 
   /** Stop all containers belonging to the named module. */
   async disable(name: string): Promise<ModuleActionResult> {
-    const res = await fetch(`${BASE}/services/${encodeURIComponent(name)}/disable`, {
-      method: "PUT",
-      credentials: "include",
-    });
+    const res = await fetch(
+      `${BASE}/services/${encodeURIComponent(name)}/disable`,
+      {
+        method: "PUT",
+        credentials: "include",
+      },
+    );
     await assertOk(res);
     return res.json() as Promise<ModuleActionResult>;
   },

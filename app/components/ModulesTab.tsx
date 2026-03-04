@@ -34,14 +34,18 @@ import { servicesApi, type ServiceInfo } from "~/api/services";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function statusColor(status: string): "success" | "warning" | "error" | "default" {
+function statusColor(
+  status: string,
+): "success" | "warning" | "error" | "default" {
   if (status === "healthy") return "success";
   if (status === "configured") return "warning";
   if (status === "unhealthy") return "error";
   return "default";
 }
 
-function containerStateColor(state: string): "success" | "warning" | "error" | "default" {
+function containerStateColor(
+  state: string,
+): "success" | "warning" | "error" | "default" {
   if (state === "running") return "success";
   if (state === "paused" || state === "restarting") return "warning";
   if (state === "exited" || state === "dead") return "error";
@@ -152,7 +156,8 @@ export default function ModulesTab() {
       {services.length === 0 && (
         <Typography color="text.secondary">
           {t("modules_tab.no_modules", {
-            defaultValue: "No optional modules are configured in this deployment.",
+            defaultValue:
+              "No optional modules are configured in this deployment.",
           })}
         </Typography>
       )}
@@ -208,7 +213,13 @@ export default function ModulesTab() {
 
               {/* Container states */}
               {svc.containers && svc.containers.length > 0 && (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  flexWrap="wrap"
+                  useFlexGap
+                  sx={{ mt: 1.5 }}
+                >
                   {svc.containers.map((c) => (
                     <Chip
                       key={c.name}
@@ -254,7 +265,10 @@ export default function ModulesTab() {
       })}
 
       {/* Confirmation dialog */}
-      <Dialog open={confirmDialog !== null} onClose={() => setConfirmDialog(null)}>
+      <Dialog
+        open={confirmDialog !== null}
+        onClose={() => setConfirmDialog(null)}
+      >
         <DialogTitle>
           {confirmDialog?.action === "enable"
             ? t("modules_tab.confirm_enable_title", {
