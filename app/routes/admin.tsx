@@ -56,8 +56,11 @@ function AdminLayoutInner() {
   const { mode, toggleMode } = useThemeMode();
   const { t } = useTranslation();
   const [languages, setLanguages] = useState<UiLanguage[]>([]);
-  const [language, setLanguage] = useState(i18n.resolvedLanguage || i18n.language || "en");
-  const [languageMenuAnchor, setLanguageMenuAnchor] = useState<HTMLElement | null>(null);
+  const [language, setLanguage] = useState(
+    i18n.resolvedLanguage || i18n.language || "en",
+  );
+  const [languageMenuAnchor, setLanguageMenuAnchor] =
+    useState<HTMLElement | null>(null);
   const [rootStatus, setRootStatus] = useState<RootModeStatus | null>(null);
   const [showRootForm, setShowRootForm] = useState(false);
   const [showInfoWizard, setShowInfoWizard] = useState(false);
@@ -73,14 +76,19 @@ function AdminLayoutInner() {
   const [drawerOpen, setDrawerOpen] = useState(true);
 
   /* ── DnD: nav reordering ────────────────────────────────────────── */
-  const { order, setOrder, resetOrder } = useNavOrder(ALL_NAV_IDS, DEFAULT_PINNED_IDS);
+  const { order, setOrder, resetOrder } = useNavOrder(
+    ALL_NAV_IDS,
+    DEFAULT_PINNED_IDS,
+  );
 
   function applyAccessState(access: {
     email: string;
     is_superuser: boolean;
     permissions: Array<{ resource: string; action: string }>;
   }) {
-    const permissions = access.permissions.map((p) => `${p.resource}:${p.action}`);
+    const permissions = access.permissions.map(
+      (p) => `${p.resource}:${p.action}`,
+    );
     setCurrentUserEmail(access.email);
     setIsSuperuser(access.is_superuser);
     setPermissionKeys(new Set(permissions));
@@ -98,9 +106,12 @@ function AdminLayoutInner() {
       applyAccessState(access);
     } catch {
       clearCachedAccess();
-      navigate(`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`, {
-        replace: true,
-      });
+      navigate(
+        `/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+        {
+          replace: true,
+        },
+      );
     }
   }
 
@@ -138,7 +149,8 @@ function AdminLayoutInner() {
   }, []);
 
   useEffect(() => {
-    const handler = () => setLanguage(i18n.resolvedLanguage || i18n.language || "en");
+    const handler = () =>
+      setLanguage(i18n.resolvedLanguage || i18n.language || "en");
     i18n.on("languageChanged", handler);
     return () => {
       i18n.off("languageChanged", handler);
@@ -174,7 +186,9 @@ function AdminLayoutInner() {
       setReason("");
       await loadRootStatus();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to start root mode.");
+      setError(
+        err instanceof Error ? err.message : "Failed to start root mode.",
+      );
     }
   }
 
@@ -191,29 +205,38 @@ function AdminLayoutInner() {
   const { isModuleEnabled } = useServices();
 
   // Filter entries by permissions / modules / superuser, then split by saved order
-  const visibleEntries = NAV
-    .map((entry) => {
-      if (entry.module && !isModuleEnabled(entry.module)) return null;
-      if (entry.kind === "leaf") {
-        if (entry.superuserOnly && !isSuperuser) return null;
-        return hasPermission(entry.permission) ? entry : null;
-      }
-      const children = entry.children.filter((child) => {
-        if (child.module && !isModuleEnabled(child.module)) return false;
-        return hasPermission(child.permission);
-      });
-      return children.length > 0 ? { ...entry, children } : null;
-    })
-    .filter((entry): entry is NavEntry => entry !== null);
+  const visibleEntries = NAV.map((entry) => {
+    if (entry.module && !isModuleEnabled(entry.module)) return null;
+    if (entry.kind === "leaf") {
+      if (entry.superuserOnly && !isSuperuser) return null;
+      return hasPermission(entry.permission) ? entry : null;
+    }
+    const children = entry.children.filter((child) => {
+      if (child.module && !isModuleEnabled(child.module)) return false;
+      return hasPermission(child.permission);
+    });
+    return children.length > 0 ? { ...entry, children } : null;
+  }).filter((entry): entry is NavEntry => entry !== null);
 
   const visibleById = new Map(visibleEntries.map((e) => [e.id, e]));
   const visibleIdSet = new Set(visibleEntries.map((e) => e.id));
-  const mainVisible = order.mainIds.filter((id) => visibleIdSet.has(id)).map((id) => visibleById.get(id)!);
-  const pinnedVisible = order.pinnedIds.filter((id) => visibleIdSet.has(id)).map((id) => visibleById.get(id)!);
+  const mainVisible = order.mainIds
+    .filter((id) => visibleIdSet.has(id))
+    .map((id) => visibleById.get(id)!);
+  const pinnedVisible = order.pinnedIds
+    .filter((id) => visibleIdSet.has(id))
+    .map((id) => visibleById.get(id)!);
 
   if (!authReady) {
     return (
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+        }}
+      >
         <Typography color="text.secondary">{t("app.check_session")}</Typography>
       </Box>
     );
@@ -231,7 +254,14 @@ function AdminLayoutInner() {
         resetOrder={resetOrder}
       />
 
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
         <AdminTopbar
           mode={mode}
           toggleMode={toggleMode}
@@ -258,7 +288,10 @@ function AdminLayoutInner() {
           onReasonChange={setReason}
           onDurationChange={setDuration}
           onSubmit={handleActivateRoot}
-          onClose={() => { setShowRootForm(false); setError(null); }}
+          onClose={() => {
+            setShowRootForm(false);
+            setError(null);
+          }}
         />
 
         <HelpWizardDialog

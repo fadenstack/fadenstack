@@ -15,16 +15,18 @@
 import type React from "react";
 
 // Package integrity seal — do not modify.
-const _SEAL = [0xcb, 0x54, 0x88, 0xe3, 0x30, 0xa2, 0x7e, 0x15, 0xdb, 0x6c] as const;
+const _SEAL = [
+  0xcb, 0x54, 0x88, 0xe3, 0x30, 0xa2, 0x7e, 0x15, 0xdb, 0x6c,
+] as const;
 
-import StorageIcon from '@mui/icons-material/Storage';
+import StorageIcon from "@mui/icons-material/Storage";
 import DnsIcon from "@mui/icons-material/Dns";
 import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import LayersIcon from "@mui/icons-material/Layers";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import SecurityIcon from "@mui/icons-material/Security";
-import LanIcon from '@mui/icons-material/Lan';
+import LanIcon from "@mui/icons-material/Lan";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import HubIcon from "@mui/icons-material/Hub";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -43,7 +45,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import GroupWorkIcon from "@mui/icons-material/GroupWork";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
-import DataThresholdingIcon from '@mui/icons-material/DataThresholding';
+import DataThresholdingIcon from "@mui/icons-material/DataThresholding";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -76,7 +78,8 @@ let accessCacheMemory: AccessCacheEntry | null = null;
 
 export function readCachedAccess(): AccessCacheEntry | null {
   const now = Date.now();
-  if (accessCacheMemory && accessCacheMemory.expiresAt > now) return accessCacheMemory;
+  if (accessCacheMemory && accessCacheMemory.expiresAt > now)
+    return accessCacheMemory;
   if (typeof window === "undefined") return null;
   try {
     const raw = window.sessionStorage.getItem(ACCESS_CACHE_KEY);
@@ -170,15 +173,31 @@ export interface NavLeaf {
 export type NavEntry = NavGroup | NavLeaf;
 
 export const NAV: NavEntry[] = [
-  { id: "dashboard", kind: "leaf", to: "/admin/dashboard", labelKey: "nav.dashboard", icon: <DashboardIcon /> },
-  { id: "security-map", kind: "leaf", to: "/admin/security-map", labelKey: "nav.security_map", icon: <ShieldIcon /> },
+  {
+    id: "dashboard",
+    kind: "leaf",
+    to: "/admin/dashboard",
+    labelKey: "nav.dashboard",
+    icon: <DashboardIcon />,
+  },
+  {
+    id: "security-map",
+    kind: "leaf",
+    to: "/admin/security-map",
+    labelKey: "nav.security_map",
+    icon: <ShieldIcon />,
+  },
   {
     id: "containers",
     kind: "group",
     labelKey: "nav.containers_group",
     icon: <StorageIcon />,
     children: [
-      { to: "/admin/containers", labelKey: "nav.containers", icon: <DnsIcon /> },
+      {
+        to: "/admin/containers",
+        labelKey: "nav.containers",
+        icon: <DnsIcon />,
+      },
       { to: "/admin/images", labelKey: "nav.images", icon: <ViewInArIcon /> },
       { to: "/admin/networks", labelKey: "nav.networks", icon: <LanIcon /> },
       { to: "/admin/stacks", labelKey: "nav.stacks", icon: <LayersIcon /> },
@@ -190,8 +209,16 @@ export const NAV: NavEntry[] = [
     labelKey: "nav.llm_group",
     icon: <LlmIcon />,
     children: [
-      { to: "/admin/llm/providers", labelKey: "nav.providers", icon: <AccountTreeIcon /> },
-      { to: "/admin/llm/models", labelKey: "nav.models", icon: <ModelTrainingIcon /> },
+      {
+        to: "/admin/llm/providers",
+        labelKey: "nav.providers",
+        icon: <AccountTreeIcon />,
+      },
+      {
+        to: "/admin/llm/models",
+        labelKey: "nav.models",
+        icon: <ModelTrainingIcon />,
+      },
       { to: "/admin/llm/jobs", labelKey: "nav.jobs", icon: <DownloadIcon /> },
     ],
   },
@@ -218,9 +245,18 @@ export const NAV: NavEntry[] = [
     icon: <SecurityIcon />,
     children: [
       { to: "/admin/users", labelKey: "nav.users", icon: <PeopleIcon /> },
-      { to: "/admin/roles", labelKey: "nav.roles", icon: <AdminPanelSettingsIcon /> },
+      {
+        to: "/admin/roles",
+        labelKey: "nav.roles",
+        icon: <AdminPanelSettingsIcon />,
+      },
       { to: "/admin/groups", labelKey: "nav.groups", icon: <GroupWorkIcon /> },
-      { to: "/admin/auth-providers", labelKey: "nav.auth_providers", icon: <VpnKeyIcon />, module: "auth" },
+      {
+        to: "/admin/auth-providers",
+        labelKey: "nav.auth_providers",
+        icon: <VpnKeyIcon />,
+        module: "auth",
+      },
     ],
   },
   {
@@ -287,8 +323,21 @@ export const NAV: NavEntry[] = [
     ],
   },
   // ── Items pinned to the bottom section by default ──
-  { id: "logs", kind: "leaf", to: "/admin/logs", labelKey: "nav.logs", icon: <ReceiptLongIcon /> },
-  { id: "settings", kind: "leaf", to: "/admin/settings?tab=general", labelKey: "nav.settings", superuserOnly: true, icon: <SettingsIcon /> },
+  {
+    id: "logs",
+    kind: "leaf",
+    to: "/admin/logs",
+    labelKey: "nav.logs",
+    icon: <ReceiptLongIcon />,
+  },
+  {
+    id: "settings",
+    kind: "leaf",
+    to: "/admin/settings?tab=general",
+    labelKey: "nav.settings",
+    superuserOnly: true,
+    icon: <SettingsIcon />,
+  },
 ];
 
 /** IDs that belong to the bottom "pinned" section by default. */
@@ -298,36 +347,54 @@ export const ALL_NAV_IDS = NAV.map((e) => e.id);
 /** Quick lookup from id → static NavEntry (used by DragOverlay). */
 export const NAV_BY_ID = new Map(NAV.map((e) => [e.id, e]));
 
-export function adminPageTitle(pathname: string, search: string, t: (key: string) => string): string {
+export function adminPageTitle(
+  pathname: string,
+  search: string,
+  t: (key: string) => string,
+): string {
   if (pathname.startsWith("/admin/dashboard")) return t("dashboard.title");
-  if (pathname.startsWith("/admin/security-map")) return t("security_map.title");
+  if (pathname.startsWith("/admin/security-map"))
+    return t("security_map.title");
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
-  if (pathname.startsWith("/admin/containers/new")) return t("create_container.title");
-  if (pathname.startsWith("/admin/containers/")) return t("container_detail.page_title");
+  if (pathname.startsWith("/admin/containers/new"))
+    return t("create_container.title");
+  if (pathname.startsWith("/admin/containers/"))
+    return t("container_detail.page_title");
   if (pathname.startsWith("/admin/containers")) return t("containers.title");
   if (pathname.startsWith("/admin/images")) return t("images.title");
   if (pathname.startsWith("/admin/networks")) return t("networks.title");
   if (pathname.startsWith("/admin/stacks")) return t("stacks.title");
-  if (pathname.startsWith("/admin/llm/providers")) return t("llm_providers.title");
-  if (pathname.startsWith("/admin/llm/models/")) return t("llm_model_detail.page_title");
+  if (pathname.startsWith("/admin/llm/providers"))
+    return t("llm_providers.title");
+  if (pathname.startsWith("/admin/llm/models/"))
+    return t("llm_model_detail.page_title");
   if (pathname.startsWith("/admin/llm/models")) return t("llm_models.title");
-  if (pathname.startsWith("/admin/llm/runtimes/")) return t("llm_runtime_detail.page_title");
-  if (pathname.startsWith("/admin/llm/runtimes")) return t("llm_providers.title");
+  if (pathname.startsWith("/admin/llm/runtimes/"))
+    return t("llm_runtime_detail.page_title");
+  if (pathname.startsWith("/admin/llm/runtimes"))
+    return t("llm_providers.title");
   if (pathname.startsWith("/admin/llm/jobs")) return t("llm_jobs.title");
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");
-  if (pathname.startsWith("/admin/pii/dashboard")) return t("pii_dashboard.title");
+  if (pathname.startsWith("/admin/pii/dashboard"))
+    return t("pii_dashboard.title");
   if (pathname.startsWith("/admin/pii/activity")) return t("pii_log.title");
-  if (pathname.startsWith("/admin/pii/policies")) return t("pii_policy.tenants_title");
+  if (pathname.startsWith("/admin/pii/policies"))
+    return t("pii_policy.tenants_title");
   if (pathname.startsWith("/admin/users")) return t("users.title");
   if (pathname.startsWith("/admin/roles")) return t("roles.title");
   if (pathname.startsWith("/admin/groups")) return t("groups.title");
-  if (pathname.startsWith("/admin/auth-providers")) return t("auth_providers.title");
+  if (pathname.startsWith("/admin/auth-providers"))
+    return t("auth_providers.title");
   if (pathname.startsWith("/admin/rag/runtime")) return t("rag_runtime.title");
-  if (pathname.startsWith("/admin/rag/collectors")) return t("rag_collectors.title");
-  if (pathname.startsWith("/admin/rag/explorer")) return t("rag_explorer.title");
-  if (pathname.startsWith("/admin/rag/publishes")) return t("rag_publishes.title");
+  if (pathname.startsWith("/admin/rag/collectors"))
+    return t("rag_collectors.title");
+  if (pathname.startsWith("/admin/rag/explorer"))
+    return t("rag_explorer.title");
+  if (pathname.startsWith("/admin/rag/publishes"))
+    return t("rag_publishes.title");
   if (pathname.startsWith("/admin/rag/search")) return t("rag_search.title");
-  if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.agent_trace");
+  if (pathname.startsWith("/admin/llm/agent-trace"))
+    return t("nav.agent_trace");
   if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/agents/graph")) return t("nav.agent_trace");
   if (pathname.startsWith("/admin/llm/graph")) return t("nav.agent_trace");
@@ -335,7 +402,10 @@ export function adminPageTitle(pathname: string, search: string, t: (key: string
     const tab = new URLSearchParams(search).get("tab");
     return tab === "audit" ? t("logs.tab_audit") : t("logs.tab_logs");
   }
-  if (pathname.startsWith("/admin/settings") || pathname.startsWith("/admin/users")) {
+  if (
+    pathname.startsWith("/admin/settings") ||
+    pathname.startsWith("/admin/users")
+  ) {
     return t("settings.title");
   }
   return t("app.title");
