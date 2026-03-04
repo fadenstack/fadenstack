@@ -126,6 +126,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
             />
+            <Button
+              component={RouterLink}
+              to="/forgot-password"
+              size="small"
+              sx={{ alignSelf: "flex-start", mt: -1 }}
+            >
+              {t("auth.forgot_password")}
+            </Button>
 
             <Button type="submit" variant="contained" size="large" disabled={loading}>
               {t("auth.sign_in")}

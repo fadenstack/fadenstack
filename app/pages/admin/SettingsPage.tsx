@@ -70,6 +70,10 @@ function isPiiSettingKey(key: string): boolean {
   return key.startsWith("llm_port_api.pii_");
 }
 
+function isMailerSettingKey(key: string): boolean {
+  return key.startsWith("llm_port_mailer.");
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { isModuleEnabled, loading: modulesLoading } = useServices();
@@ -139,6 +143,7 @@ export default function SettingsPage() {
   }, []);
 
   const piiModuleEnabled = isModuleEnabled("pii");
+  const mailerModuleEnabled = isModuleEnabled("mailer");
 
   useEffect(() => {
     if (modulesLoading || !piiModuleEnabled) {
@@ -174,7 +179,7 @@ export default function SettingsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const visibleSchema = schema.filter((item) => !isPiiSettingKey(item.key));
+    const visibleSchema = schema.filter((item) => !isPiiSettingKey(item.key) && !(isMailerSettingKey(item.key) && !mailerModuleEnabled));
     const items = q
       ? visibleSchema.filter((s) => `${s.label} ${s.description} ${s.key} ${s.category} ${s.group}`.toLowerCase().includes(q))
       : visibleSchema;
@@ -276,7 +281,7 @@ export default function SettingsPage() {
     setError(null);
     try {
       const payload: Record<string, unknown> = {};
-      const keysForStep = step.setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled));
+      const keysForStep = step.setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled) && !(isMailerSettingKey(key) && !mailerModuleEnabled));
       for (const key of keysForStep) {
         if (values[key] !== undefined) payload[key] = values[key];
       }
@@ -391,7 +396,6 @@ export default function SettingsPage() {
                             {busyKey === item.key ? t("common.loading") : t("common.save")}
                           </Button>
                         </Stack>
-                        <Typography variant="caption" color="text.secondary">{item.key}</Typography>
                       </Box>
                     ))}
                   </Stack>
@@ -483,10 +487,17 @@ export default function SettingsPage() {
                       })}
                     </Alert>
                   )}
-                  {wizardSteps[wizardStepIndex].setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled)).length > 0 ? (
+                  {wizardSteps[wizardStepIndex].id === "mailer" && !mailerModuleEnabled && (
+                    <Alert severity="info" sx={{ mt: 1.5 }}>
+                      {t("mailer.hidden_when_disabled", {
+                        defaultValue: "Mailer settings are hidden because the Mailer module is currently disabled.",
+                      })}
+                    </Alert>
+                  )}
+                  {wizardSteps[wizardStepIndex].setting_keys.filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled) && !(isMailerSettingKey(key) && !mailerModuleEnabled)).length > 0 ? (
                     <Stack spacing={1.5} sx={{ mt: 1.5 }}>
                       {wizardSteps[wizardStepIndex].setting_keys
-                        .filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled))
+                        .filter((key) => !(isPiiSettingKey(key) && !piiModuleEnabled) && !(isMailerSettingKey(key) && !mailerModuleEnabled))
                         .map((key) => {
                         const item = schema.find((s) => s.key === key);
                         if (!item) return null;

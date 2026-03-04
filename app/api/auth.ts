@@ -90,4 +90,26 @@ export const auth = {
     await assertOk(res);
     clearMeCache();
   },
+
+  async forgotPassword(email: string): Promise<void> {
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (res.status !== 202) {
+      await assertOk(res);
+    }
+  },
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    await assertOk(res);
+  },
 };
