@@ -198,7 +198,10 @@ function AdminLayoutInner() {
         if (entry.superuserOnly && !isSuperuser) return null;
         return hasPermission(entry.permission) ? entry : null;
       }
-      const children = entry.children.filter((child) => hasPermission(child.permission));
+      const children = entry.children.filter((child) => {
+        if (child.module && !isModuleEnabled(child.module)) return false;
+        return hasPermission(child.permission);
+      });
       return children.length > 0 ? { ...entry, children } : null;
     })
     .filter((entry): entry is NavEntry => entry !== null);

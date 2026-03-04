@@ -144,6 +144,7 @@ export interface NavChild {
   labelKey: string;
   icon: React.ReactNode;
   permission?: string;
+  module?: string;
 }
 
 export interface NavGroup {
@@ -219,7 +220,7 @@ export const NAV: NavEntry[] = [
       { to: "/admin/users", labelKey: "nav.users", icon: <PeopleIcon /> },
       { to: "/admin/roles", labelKey: "nav.roles", icon: <AdminPanelSettingsIcon /> },
       { to: "/admin/groups", labelKey: "nav.groups", icon: <GroupWorkIcon /> },
-      { to: "/admin/auth-providers", labelKey: "nav.auth_providers", icon: <VpnKeyIcon /> },
+      { to: "/admin/auth-providers", labelKey: "nav.auth_providers", icon: <VpnKeyIcon />, module: "auth" },
     ],
   },
   {
