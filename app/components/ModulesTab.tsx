@@ -179,11 +179,21 @@ export default function ModulesTab() {
                 spacing={1}
               >
                 <Box>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {t(`modules.${svc.name}.name`, {
-                      defaultValue: svc.display_name,
-                    })}
-                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      {t(`modules.${svc.name}.name`, {
+                        defaultValue: svc.display_name,
+                      })}
+                    </Typography>
+                    {svc.enterprise && (
+                      <Chip
+                        size="small"
+                        label="Enterprise"
+                        color="secondary"
+                        variant="outlined"
+                      />
+                    )}
+                  </Stack>
                   <Typography variant="body2" color="text.secondary">
                     {t(`modules.${svc.name}.description`, {
                       defaultValue: svc.description,
@@ -270,7 +280,11 @@ export default function ModulesTab() {
               <Button
                 size="small"
                 startIcon={<ArticleIcon />}
-                disabled={!svc.containers || svc.containers.length === 0}
+                disabled={
+                  svc.module_type === "plugin" ||
+                  !svc.containers ||
+                  svc.containers.length === 0
+                }
                 onClick={() => setLogsModule(svc)}
               >
                 {t("modules_tab.logs", { defaultValue: "Logs" })}

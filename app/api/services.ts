@@ -25,6 +25,10 @@ export interface ServiceInfo {
   enabled: boolean;
   status: "disabled" | "configured" | "healthy" | "unhealthy";
   containers?: ContainerState[];
+  /** Module type: "container" (Docker-managed) or "plugin" (in-process). */
+  module_type?: "container" | "plugin";
+  /** Whether this is an enterprise-only module. */
+  enterprise?: boolean;
 }
 
 export interface ServicesManifest {
