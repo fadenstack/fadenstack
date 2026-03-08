@@ -52,6 +52,10 @@ export default [
       route("/admin/rag/publishes", "pages/admin/rag/RagPublishesPage.tsx"),
       route("/admin/rag/search", "pages/admin/rag/RagSearchPage.tsx"),
       // RAG Lite
+      route(
+        "/admin/rag/knowledge-base",
+        "pages/admin/rag/RagLiteKnowledgeBasePage.tsx",
+      ),
       route("/admin/rag/documents", "pages/admin/rag/RagLiteDocumentsPage.tsx"),
       route(
         "/admin/rag/collections",

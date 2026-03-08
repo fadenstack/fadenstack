@@ -443,10 +443,34 @@ export default function RuntimeDetailPage() {
               label={t("llm_common.model")}
               value={model?.display_name ?? rt.model_id.slice(0, 8)}
             />
+            {model?.hf_repo_id && (
+              <MetaField
+                label={t("llm_runtime_detail.model_id")}
+                value={model.hf_repo_id}
+                mono
+              />
+            )}
             <MetaField
               label={t("llm_runtime_detail.openai_compat")}
               value={rt.openai_compat ? t("common.yes") : t("common.no")}
             />
+            {provider?.capabilities &&
+              (provider.capabilities as Record<string, unknown>)
+                .supports_embeddings && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    {t("llm_runtime_detail.capabilities")}
+                  </Typography>
+                  <Box mt={0.5}>
+                    <Chip
+                      label={t("llm_runtime_detail.supports_embeddings")}
+                      color="info"
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                </Box>
+              )}
             {rt.endpoint_url && (
               <MetaField
                 label={t("llm_runtimes.endpoint")}

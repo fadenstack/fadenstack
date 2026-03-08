@@ -21,6 +21,7 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 
 import DeleteIcon from "@mui/icons-material/Delete";
+import ReplayIcon from "@mui/icons-material/Replay";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 
 import { ragLite, type RagLiteDocumentDTO } from "~/api/rag";
@@ -84,6 +85,15 @@ export default function RagLiteDocumentsPage() {
       setDocs((prev) => prev.filter((d) => d.id !== docId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  async function handleRetry(docId: string) {
+    try {
+      await ragLite.retryDocument(docId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Retry failed");
     }
   }
 
@@ -170,6 +180,16 @@ export default function RagLiteDocumentsPage() {
                     {new Date(doc.created_at).toLocaleString()}
                   </TableCell>
                   <TableCell>
+                    {doc.status === "error" && (
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => handleRetry(doc.id)}
+                        title={t("rag_lite.retry", "Retry")}
+                      >
+                        <ReplayIcon fontSize="small" />
+                      </IconButton>
+                    )}
                     <IconButton
                       size="small"
                       color="error"

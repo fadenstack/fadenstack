@@ -310,22 +310,9 @@ export const NAV: NavEntry[] = [
     module: "rag",
     children: [
       {
-        to: "/admin/rag/runtime",
-        labelKey: "nav.rag_runtime",
-        icon: <SettingsInputAntennaIcon />,
-        permission: "rag.runtime:read",
-      },
-      {
-        to: "/admin/rag/documents",
-        labelKey: "nav.rag_documents",
-        icon: <StorageIcon />,
-        permission: "rag.search:read",
-        ragMode: "lite",
-      },
-      {
-        to: "/admin/rag/collections",
-        labelKey: "nav.rag_collections",
-        icon: <LibraryBooksIcon />,
+        to: "/admin/rag/knowledge-base",
+        labelKey: "nav.rag_knowledge_base",
+        icon: <AccountTreeIcon />,
         permission: "rag.search:read",
         ragMode: "lite",
       },
@@ -355,6 +342,12 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.rag_search",
         icon: <ManageSearchIcon />,
         permission: "rag.search:read",
+      },
+      {
+        to: "/admin/rag/runtime",
+        labelKey: "nav.rag_runtime",
+        icon: <SettingsInputAntennaIcon />,
+        permission: "rag.runtime:read",
       },
     ],
   },
@@ -430,6 +423,8 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/rag/publishes"))
     return t("rag_publishes.title");
   if (pathname.startsWith("/admin/rag/search")) return t("rag_search.title");
+  if (pathname.startsWith("/admin/rag/knowledge-base"))
+    return t("rag_lite.knowledge_base_title");
   if (pathname.startsWith("/admin/rag/documents"))
     return t("rag_lite.documents_title");
   if (pathname.startsWith("/admin/rag/collections"))

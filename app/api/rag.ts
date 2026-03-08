@@ -426,6 +426,7 @@ export interface RagLiteDocumentDTO {
   size_bytes: number;
   chunk_count: number;
   status: string;
+  summary: string | null;
   created_at: string;
 }
 
@@ -452,8 +453,20 @@ export interface RagLiteCollectionDTO {
   id: string;
   name: string;
   description: string | null;
+  parent_id: string | null;
+  document_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface RagLiteGraphSearchResponse {
+  query: string;
+  collection_hits: {
+    collection_id: string;
+    collection_name: string;
+    score: number;
+  }[];
+  results: RagLiteSearchResult[];
 }
 
 export interface RagLiteUploadResponse {
@@ -496,6 +509,12 @@ export const ragLite = {
   deleteDocument(documentId: string) {
     return request<void>(`/documents/${documentId}`, { method: "DELETE" });
   },
+  retryDocument(documentId: string) {
+    return request<{ document_id: string; job_id: string }>(
+      `/documents/${documentId}/retry`,
+      { method: "POST" },
+    );
+  },
   upload(file: File, collectionId?: string) {
     const form = new FormData();
     form.append("file", file);
@@ -514,14 +533,72 @@ export const ragLite = {
   listCollections() {
     return request<RagLiteCollectionDTO[]>("/collections");
   },
-  createCollection(name: string, description?: string | null) {
+  createCollection(
+    name: string,
+    description?: string | null,
+    parentId?: string | null,
+  ) {
     return request<RagLiteCollectionDTO>("/collections", {
       method: "POST",
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, parent_id: parentId ?? null }),
+    });
+  },
+  updateCollection(
+    collectionId: string,
+    body: {
+      name?: string;
+      description?: string | null;
+      parent_id?: string | null;
+    },
+  ) {
+    return request<RagLiteCollectionDTO>(`/collections/${collectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
     });
   },
   deleteCollection(collectionId: string) {
     return request<void>(`/collections/${collectionId}`, { method: "DELETE" });
+  },
+  listAllDocuments(limit = 500, offset = 0) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return request<RagLiteDocumentDTO[]>(`/documents/all?${params}`);
+  },
+  moveDocument(documentId: string, collectionId: string | null) {
+    return request<RagLiteDocumentDTO>(`/documents/${documentId}/move`, {
+      method: "PATCH",
+      body: JSON.stringify({ collection_id: collectionId }),
+    });
+  },
+  updateDocumentSummary(documentId: string, summary: string) {
+    return request<{ summary: string }>(`/documents/${documentId}/summary`, {
+      method: "PATCH",
+      body: JSON.stringify({ summary }),
+    });
+  },
+  generateCollectionSummary(collectionId: string) {
+    return request<{ summary: string }>(
+      `/collections/${collectionId}/generate-summary`,
+      { method: "POST" },
+    );
+  },
+  generateDocumentSummary(documentId: string) {
+    return request<{ summary: string }>(
+      `/documents/${documentId}/generate-summary`,
+      { method: "POST" },
+    );
+  },
+  graphSearch(body: {
+    query: string;
+    top_k_collections?: number;
+    top_k_chunks?: number;
+  }) {
+    return request<RagLiteGraphSearchResponse>("/search/graph", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   },
   listJobs(limit = 50) {
     return request<RagLiteJobDTO[]>(`/jobs?limit=${limit}`);
