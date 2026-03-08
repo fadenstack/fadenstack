@@ -4,6 +4,15 @@
  * Mirrors the backend routes at /api/admin/chat/*.
  */
 
+import type {
+  ChatProject,
+  ChatSession,
+  ChatAttachment,
+  ChatStats,
+} from "./chatTypes";
+
+export type { ChatProject, ChatSession, ChatAttachment, ChatStats };
+
 const BASE = "/api/admin/chat";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -24,53 +33,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
-}
-
-// ── Types ────────────────────────────────────────────────────────
-
-export interface ChatProject {
-  id: string;
-  tenant_id: string;
-  user_id: string;
-  name: string;
-  description: string | null;
-  model_alias: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ChatSession {
-  id: string;
-  tenant_id: string;
-  user_id: string;
-  project_id: string | null;
-  title: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ChatAttachment {
-  id: string;
-  tenant_id: string;
-  user_id: string;
-  session_id: string | null;
-  project_id: string | null;
-  filename: string;
-  content_type: string;
-  size_bytes: number;
-  extraction_status: string;
-  scope: string;
-  page_count: number | null;
-  truncated: boolean;
-  created_at: string;
-}
-
-export interface ChatStats {
-  total_projects: number;
-  total_sessions: number;
-  total_attachments: number;
-  total_attachment_bytes: number;
 }
 
 // ── API ──────────────────────────────────────────────────────────

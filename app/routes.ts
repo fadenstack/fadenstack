@@ -10,6 +10,11 @@ export default [
   route("/login", "routes/login.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
+  // Standalone chat UI
+  layout("routes/chat.tsx", [
+    route("/chat", "pages/chat/ChatPage.tsx"),
+    route("/chat/:sessionId", "pages/chat/ChatPage.tsx", { id: "chat-session" }),
+  ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
     route("/admin/dashboard", "pages/admin/DashboardPage.tsx"),

@@ -23,6 +23,7 @@ import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -76,6 +77,15 @@ export function AdminTopbar({
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar variant="dense" sx={{ justifyContent: "flex-end", gap: 1.5 }}>
+        <Tooltip title={t("chat.title", { defaultValue: "Chat" })} arrow>
+          <IconButton
+            size="small"
+            onClick={() => navigate("/chat")}
+            sx={{ color: "text.primary" }}
+          >
+            <AutoAwesomeIcon />
+          </IconButton>
+        </Tooltip>
         <Tooltip title={t("help.title")} arrow>
           <IconButton
             size="small"
