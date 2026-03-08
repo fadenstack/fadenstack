@@ -44,6 +44,15 @@ export default [
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
     // User profile
     route("/admin/profile", "pages/admin/ProfilePage.tsx"),
+    // Chat routes — guarded by the chat-guard layout that checks module status
+    layout("routes/chat-guard.tsx", [
+      route("/admin/chat/projects", "pages/admin/chat/ChatProjectsPage.tsx"),
+      route("/admin/chat/sessions", "pages/admin/chat/ChatSessionsPage.tsx"),
+      route(
+        "/admin/chat/attachments",
+        "pages/admin/chat/ChatAttachmentsPage.tsx",
+      ),
+    ]),
     // RAG routes — guarded by the rag-guard layout that checks module status
     layout("routes/rag-guard.tsx", [
       route("/admin/rag/runtime", "pages/admin/rag/RagRuntimeConfigPage.tsx"),

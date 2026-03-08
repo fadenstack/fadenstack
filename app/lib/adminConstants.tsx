@@ -52,6 +52,10 @@ import ApiIcon from "@mui/icons-material/Api";
 import DataThresholdingIcon from "@mui/icons-material/DataThresholding";
 import InsightsIcon from "@mui/icons-material/Insights";
 import MapIcon from "@mui/icons-material/Map";
+import ChatIcon from "@mui/icons-material/Chat";
+import FolderIcon from "@mui/icons-material/Folder";
+import ForumIcon from "@mui/icons-material/Forum";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -351,6 +355,30 @@ export const NAV: NavEntry[] = [
       },
     ],
   },
+  {
+    id: "chat-workspace",
+    kind: "group",
+    labelKey: "nav.chat_group",
+    icon: <ChatIcon />,
+    module: "chat",
+    children: [
+      {
+        to: "/admin/chat/projects",
+        labelKey: "nav.chat_projects",
+        icon: <FolderIcon />,
+      },
+      {
+        to: "/admin/chat/sessions",
+        labelKey: "nav.chat_sessions",
+        icon: <ForumIcon />,
+      },
+      {
+        to: "/admin/chat/attachments",
+        labelKey: "nav.chat_attachments",
+        icon: <AttachFileIcon />,
+      },
+    ],
+  },
   // ── Items pinned to the bottom section by default ──
   {
     id: "logs",
@@ -429,6 +457,12 @@ export function adminPageTitle(
     return t("rag_lite.documents_title");
   if (pathname.startsWith("/admin/rag/collections"))
     return t("rag_lite.collections_title");
+  if (pathname.startsWith("/admin/chat/projects"))
+    return t("chat_admin.projects_title");
+  if (pathname.startsWith("/admin/chat/sessions"))
+    return t("chat_admin.sessions_title");
+  if (pathname.startsWith("/admin/chat/attachments"))
+    return t("chat_admin.attachments_title");
   if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
   if (pathname.startsWith("/admin/agents/graph")) return t("nav.llm_calls");
