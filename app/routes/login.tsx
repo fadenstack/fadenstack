@@ -150,11 +150,20 @@ export default function LoginPage() {
               {t("auth.forgot_password")}
             </Button>
 
-            <Button type="submit" variant="contained" size="large" disabled={loading}>
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={loading}
+            >
               {t("auth.sign_in")}
             </Button>
             {isDevMode && (
-              <Button variant="outlined" disabled={loading} onClick={handleDevLogin}>
+              <Button
+                variant="outlined"
+                disabled={loading}
+                onClick={handleDevLogin}
+              >
                 {t("auth.dev_login")}
               </Button>
             )}
@@ -169,7 +178,9 @@ export default function LoginPage() {
                     disabled={loading}
                     onClick={() => {
                       if (typeof window !== "undefined") {
-                        window.location.href = adminAuthProviders.authorizeUrl(provider.id);
+                        window.location.href = adminAuthProviders.authorizeUrl(
+                          provider.id,
+                        );
                       }
                     }}
                   >
