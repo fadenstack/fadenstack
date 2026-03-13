@@ -145,16 +145,20 @@ export default function DashboardPage() {
   const theme = useTheme();
   const grafanaDashboardBaseUrl =
     (import.meta.env.VITE_GRAFANA_DASHBOARD_URL as string | undefined) ??
-    "http://127.0.0.1:3001/d/llm-port-overview/llm-port-overview?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s";
+    "/grafana/d/llm-port-overview/llm-port-overview?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s";
 
   const grafanaDashboardUrl = useMemo(() => {
     try {
-      const url = new URL(grafanaDashboardBaseUrl);
+      const base = grafanaDashboardBaseUrl.startsWith("/")
+        ? window.location.origin
+        : undefined;
+      const url = new URL(grafanaDashboardBaseUrl, base);
       url.searchParams.set(
         "theme",
         theme.palette.mode === "dark" ? "dark" : "light",
       );
-      return url.toString();
+      // Return path-only for same-origin to avoid cross-origin iframe issues
+      return base ? `${url.pathname}${url.search}` : url.toString();
     } catch {
       const separator = grafanaDashboardBaseUrl.includes("?") ? "&" : "?";
       return `${grafanaDashboardBaseUrl}${separator}theme=${theme.palette.mode === "dark" ? "dark" : "light"}`;
