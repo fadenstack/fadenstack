@@ -1,9 +1,12 @@
 /**
- * MessageBubble — renders a single chat message with markdown and token badge.
+ * MessageBubble — renders a single chat message with markdown, avatar, and token badge.
  */
+import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import PersonIcon from "@mui/icons-material/Person";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -16,6 +19,7 @@ interface Props {
   content: string;
   modelAlias?: string | null;
   usage?: TokenUsage | null;
+  responseMs?: number | null;
   streaming?: boolean;
 }
 
@@ -24,6 +28,7 @@ export default function MessageBubble({
   content,
   modelAlias,
   usage,
+  responseMs,
   streaming = false,
 }: Props) {
   const theme = useTheme();
@@ -33,11 +38,31 @@ export default function MessageBubble({
     <Box
       sx={{
         display: "flex",
-        justifyContent: isUser ? "flex-end" : "flex-start",
+        flexDirection: isUser ? "row-reverse" : "row",
+        alignItems: "flex-start",
+        gap: 1,
         mb: 1.5,
         px: 1,
       }}
     >
+      {/* Avatar */}
+      <Avatar
+        sx={{
+          width: 32,
+          height: 32,
+          mt: 0.5,
+          bgcolor: isUser
+            ? theme.palette.primary.dark
+            : theme.palette.secondary.dark,
+        }}
+      >
+        {isUser ? (
+          <PersonIcon sx={{ fontSize: 18 }} />
+        ) : (
+          <AutoAwesomeIcon sx={{ fontSize: 18 }} />
+        )}
+      </Avatar>
+
       <Box
         sx={{
           maxWidth: "75%",
@@ -139,10 +164,28 @@ export default function MessageBubble({
           )}
         </Box>
 
-        {/* Token usage */}
-        {usage && !streaming && (
-          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5 }}>
-            <TokenUsageBadge usage={usage} />
+        {/* Token usage + response time */}
+        {(usage || responseMs) && !streaming && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 0.5,
+              mt: 0.5,
+              alignItems: "center",
+            }}
+          >
+            {responseMs != null && (
+              <Typography
+                variant="caption"
+                sx={{ fontSize: "0.7rem", opacity: 0.6 }}
+              >
+                {responseMs >= 1000
+                  ? `${(responseMs / 1000).toFixed(1)}s`
+                  : `${responseMs}ms`}
+              </Typography>
+            )}
+            {usage && <TokenUsageBadge usage={usage} />}
           </Box>
         )}
       </Box>

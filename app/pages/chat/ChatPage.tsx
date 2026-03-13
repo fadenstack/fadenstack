@@ -4,13 +4,14 @@
  * Route: /chat (welcome) and /chat/:sessionId (active session).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useOutletContext } from "react-router";
+import { useNavigate, useParams, useOutletContext, useLocation } from "react-router";
 import Box from "@mui/material/Box";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 
 import { chatApi, type ChatSession, type ChatProject } from "~/api/chatClient";
 import type { AuthUser } from "~/api/auth";
+import type { InitialMessageState } from "./components/ChatWelcome";
 import ChatSidebar from "./components/ChatSidebar";
 import ChatWelcome from "./components/ChatWelcome";
 import ChatWindow from "./components/ChatWindow";
@@ -71,9 +72,9 @@ export default function ChatPage() {
   );
 
   const handleSessionCreated = useCallback(
-    (sess: ChatSession) => {
+    (sess: ChatSession, initialState?: InitialMessageState) => {
       setSessions((prev) => [sess, ...prev]);
-      navigate(`/chat/${sess.id}`);
+      navigate(`/chat/${sess.id}`, { state: initialState });
     },
     [navigate],
   );
@@ -116,6 +117,19 @@ export default function ChatPage() {
     [],
   );
 
+  const handleUpdateProject = useCallback(
+    async (
+      id: string,
+      updates: { name?: string; description?: string; system_instructions?: string },
+    ) => {
+      await chatApi.updateProject(id, updates);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+      );
+    },
+    [],
+  );
+
   const handleSessionUpdated = useCallback((updated: ChatSession) => {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }, []);
@@ -136,6 +150,7 @@ export default function ChatPage() {
         onDeleteSession={handleDeleteSession}
         onCreateProject={handleCreateProject}
         onDeleteProject={handleDeleteProject}
+        onUpdateProject={handleUpdateProject}
         onMoveSession={handleMoveSession}
         width={SIDEBAR_WIDTH}
         isMobile={isMobile}

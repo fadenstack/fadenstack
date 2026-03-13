@@ -11,8 +11,44 @@ import type {
   ChatMessage,
   ChatSession,
   TokenUsage,
-  StreamDelta,
 } from "~/api/chatTypes";
+
+/** Small helper: flush accumulated text to state at display frame rate. */
+function useStreamThrottle(setter: (v: string) => void) {
+  const accRef = useRef("");
+  const rafRef = useRef<number | null>(null);
+
+  const push = useCallback(
+    (text: string) => {
+      accRef.current = text;
+      if (rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          setter(accRef.current);
+        });
+      }
+    },
+    [setter],
+  );
+
+  const flush = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setter(accRef.current);
+  }, [setter]);
+
+  const reset = useCallback(() => {
+    accRef.current = "";
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  return { push, flush, reset };
+}
 
 export interface UseChatStreamOptions {
   sessionId?: string;
@@ -27,6 +63,10 @@ export interface UseChatStreamReturn {
   isStreaming: boolean;
   isLoading: boolean;
   error: string | null;
+  /** Response time in ms for the last completed assistant message. */
+  lastResponseMs: number | null;
+  /** Get response time for a specific message id, if tracked. */
+  getResponseMs: (msgId: string) => number | null;
   send: (text: string, model: string, files?: File[]) => Promise<void>;
   stop: () => void;
   loadHistory: () => Promise<void>;
@@ -39,10 +79,14 @@ export function useChatStream({
 }: UseChatStreamOptions): UseChatStreamReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
+  const streamThrottle = useStreamThrottle(setStreamingContent);
   const [streamingUsage, setStreamingUsage] = useState<TokenUsage | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastResponseMs, setLastResponseMs] = useState<number | null>(null);
+  /** Per-message response times (keyed by message id). */
+  const responseMsMapRef = useRef<Map<string, number>>(new Map());
 
   const abortRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef(sessionId);
@@ -110,8 +154,11 @@ export function useChatStream({
 
         // 4. Start streaming
         setIsStreaming(true);
+        streamThrottle.reset();
         setStreamingContent("");
         setStreamingUsage(null);
+
+        const streamStartedAt = performance.now();
 
         const { reader, abort } = streamChat({
           session_id: sid,
@@ -126,7 +173,7 @@ export function useChatStream({
         for await (const delta of reader) {
           if (delta.content) {
             accumulated += delta.content;
-            setStreamingContent(accumulated);
+            streamThrottle.push(accumulated);
           }
           if (delta.usage) {
             finalUsage = delta.usage;
@@ -135,8 +182,10 @@ export function useChatStream({
         }
 
         // 5. Streaming complete — materialise assistant message
+        const elapsedMs = Math.round(performance.now() - streamStartedAt);
+        const assistantMsgId = `tmp-${Date.now()}-a`;
         const assistantMsg: ChatMessage = {
-          id: `tmp-${Date.now()}-a`,
+          id: assistantMsgId,
           session_id: sid,
           role: "assistant",
           content: accumulated,
@@ -149,6 +198,9 @@ export function useChatStream({
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);
+        responseMsMapRef.current.set(assistantMsgId, elapsedMs);
+        setLastResponseMs(elapsedMs);
+        streamThrottle.flush();
         setStreamingContent("");
         setStreamingUsage(null);
         setIsStreaming(false);
@@ -181,6 +233,9 @@ export function useChatStream({
     isStreaming,
     isLoading,
     error,
+    lastResponseMs,
+    /** Get response time for a specific message id, if tracked. */
+    getResponseMs: (msgId: string) => responseMsMapRef.current.get(msgId) ?? null,
     send,
     stop,
     loadHistory,

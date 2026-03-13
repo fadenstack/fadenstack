@@ -4,14 +4,20 @@
 import { useEffect, useRef } from "react";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router";
 
 import type { ChatSession, TokenUsage } from "~/api/chatTypes";
+import type { InitialMessageState } from "./ChatWelcome";
+import { useThemeMode } from "~/theme-mode";
 import { useChatStream } from "../hooks/useChatStream";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
@@ -37,7 +43,10 @@ export default function ChatWindow({
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const { mode, toggleMode } = useThemeMode();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const initialSentRef = useRef(false);
 
   const {
     messages,
@@ -46,6 +55,7 @@ export default function ChatWindow({
     isStreaming,
     isLoading,
     error,
+    getResponseMs,
     send,
     stop,
     loadHistory,
@@ -59,6 +69,15 @@ export default function ChatWindow({
   useEffect(() => {
     loadHistory();
   }, [sessionId, loadHistory]);
+
+  // Auto-send initial message passed from ChatWelcome via navigation state
+  useEffect(() => {
+    const state = location.state as InitialMessageState | undefined;
+    if (state?.initialMessage && !initialSentRef.current) {
+      initialSentRef.current = true;
+      send(state.initialMessage, state.initialModel, state.initialFiles);
+    }
+  }, [location.state, send]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -110,6 +129,15 @@ export default function ChatWindow({
         <Typography variant="body1" fontWeight={600} noWrap sx={{ flex: 1 }}>
           {t("chat.conversation", { defaultValue: "Conversation" })}
         </Typography>
+        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+          <IconButton size="small" onClick={toggleMode}>
+            {mode === "dark" ? (
+              <LightModeIcon fontSize="small" />
+            ) : (
+              <DarkModeIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* Messages area */}
@@ -153,6 +181,9 @@ export default function ChatWindow({
                 msg.role === "assistant"
                   ? usageFromMessage(msg.token_estimate, msg.model_alias)
                   : null
+              }
+              responseMs={
+                msg.role === "assistant" ? getResponseMs(msg.id) : null
               }
             />
           ))}

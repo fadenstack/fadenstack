@@ -27,11 +27,12 @@ import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import { useTranslation } from "react-i18next";
 
 import type { ChatSession, ChatProject } from "~/api/chatTypes";
+import ProjectSettingsDialog from "./ProjectSettingsDialog";
 
 interface Props {
   open: boolean;
@@ -44,6 +45,10 @@ interface Props {
   onDeleteSession: (id: string) => void;
   onCreateProject: (name: string) => Promise<ChatProject>;
   onDeleteProject: (id: string) => void;
+  onUpdateProject: (
+    id: string,
+    updates: { name?: string; description?: string; system_instructions?: string },
+  ) => Promise<void>;
   onMoveSession: (sessionId: string, projectId: string | null) => void;
   width: number;
   isMobile: boolean;
@@ -60,6 +65,7 @@ export default function ChatSidebar({
   onDeleteSession,
   onCreateProject,
   onDeleteProject,
+  onUpdateProject,
   onMoveSession,
   width,
   isMobile,
@@ -77,6 +83,10 @@ export default function ChatSidebar({
     el: HTMLElement;
     sessionId: string;
   } | null>(null);
+  // Project settings dialog state
+  const [editingProject, setEditingProject] = useState<ChatProject | null>(
+    null,
+  );
 
   // Partition sessions by project
   const orphanSessions = sessions.filter((s) => !s.project_id);
@@ -228,6 +238,16 @@ export default function ChatSidebar({
                     size="small"
                     onClick={(e) => {
                       e.stopPropagation();
+                      setEditingProject(proj);
+                    }}
+                    sx={{ ml: 0.5 }}
+                  >
+                    <SettingsOutlinedIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onDeleteProject(proj.id);
                     }}
                     sx={{ ml: 0.5 }}
@@ -309,6 +329,14 @@ export default function ChatSidebar({
           </MenuItem>
         ))}
       </Menu>
+
+      {/* Project settings dialog */}
+      <ProjectSettingsDialog
+        open={!!editingProject}
+        project={editingProject}
+        onClose={() => setEditingProject(null)}
+        onSave={onUpdateProject}
+      />
     </Box>
   );
 

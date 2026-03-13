@@ -1,25 +1,40 @@
 /**
  * ChatWelcome — centred welcome when no session is active.
+ *
+ * On first message, creates a session and navigates to it, passing the
+ * initial message via React Router state so ChatWindow can send it.
  */
+import { useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import Chip from "@mui/material/Chip";
+import Tooltip from "@mui/material/Tooltip";
 import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTranslation } from "react-i18next";
 
 import type { ChatSession } from "~/api/chatTypes";
-import { useChatStream } from "../hooks/useChatStream";
+import { chatApi } from "~/api/chatClient";
+import { useThemeMode } from "~/theme-mode";
 import ChatInput from "./ChatInput";
 
 interface Props {
   selectedModel: string;
   onModelChange: (alias: string) => void;
-  onSessionCreated: (session: ChatSession) => void;
+  onSessionCreated: (session: ChatSession, initialState?: InitialMessageState) => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
+}
+
+/** Navigation state passed to ChatWindow for first-message auto-send. */
+export interface InitialMessageState {
+  initialMessage: string;
+  initialModel: string;
+  initialFiles?: File[];
 }
 
 const SUGGESTIONS = [
@@ -38,15 +53,28 @@ export default function ChatWelcome({
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const { mode, toggleMode } = useThemeMode();
+  const [sending, setSending] = useState(false);
 
-  const { send, isStreaming } = useChatStream({ onSessionCreated });
-
-  const handleSend = (text: string, files: File[]) => {
-    send(text, selectedModel, files);
+  const handleSend = async (text: string, files: File[]) => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const session = await chatApi.createSession({
+        title: text.slice(0, 100),
+      });
+      onSessionCreated(session, {
+        initialMessage: text,
+        initialModel: selectedModel,
+        initialFiles: files.length > 0 ? files : undefined,
+      });
+    } catch {
+      setSending(false);
+    }
   };
 
   const handleSuggestion = (text: string) => {
-    send(text, selectedModel);
+    handleSend(text, []);
   };
 
   return (
@@ -63,16 +91,28 @@ export default function ChatWelcome({
         sx={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           px: 1.5,
           py: 1,
           minHeight: 56,
         }}
       >
-        {!sidebarOpen && (
-          <IconButton size="small" onClick={onToggleSidebar}>
-            <MenuIcon />
+        <Box>
+          {!sidebarOpen && (
+            <IconButton size="small" onClick={onToggleSidebar}>
+              <MenuIcon />
+            </IconButton>
+          )}
+        </Box>
+        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+          <IconButton size="small" onClick={toggleMode}>
+            {mode === "dark" ? (
+              <LightModeIcon fontSize="small" />
+            ) : (
+              <DarkModeIcon fontSize="small" />
+            )}
           </IconButton>
-        )}
+        </Tooltip>
       </Box>
 
       {/* Centred hero area */}
@@ -136,7 +176,7 @@ export default function ChatWelcome({
         onSend={handleSend}
         selectedModel={selectedModel}
         onModelChange={onModelChange}
-        streaming={isStreaming}
+        streaming={sending}
       />
     </Box>
   );
