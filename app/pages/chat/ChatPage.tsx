@@ -4,7 +4,12 @@
  * Route: /chat (welcome) and /chat/:sessionId (active session).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useOutletContext, useLocation } from "react-router";
+import {
+  useNavigate,
+  useParams,
+  useOutletContext,
+  useLocation,
+} from "react-router";
 import Box from "@mui/material/Box";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
@@ -120,7 +125,11 @@ export default function ChatPage() {
   const handleUpdateProject = useCallback(
     async (
       id: string,
-      updates: { name?: string; description?: string; system_instructions?: string },
+      updates: {
+        name?: string;
+        description?: string;
+        system_instructions?: string;
+      },
     ) => {
       await chatApi.updateProject(id, updates);
       setProjects((prev) =>

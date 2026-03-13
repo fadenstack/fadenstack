@@ -30,11 +30,22 @@ export default function ModelSelector({
 }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: models, loading } = useAsyncData<ModelAlias[]>(
-    () => chatApi.listModels(),
-    [],
-    { initialValue: [] },
-  );
+  const {
+    data: models,
+    loading,
+    refresh: refreshModels,
+  } = useAsyncData<ModelAlias[]>(() => chatApi.listModels(), [], {
+    initialValue: [],
+  });
+
+  // Re-fetch models when window regains focus (e.g. after editing in admin)
+  useEffect(() => {
+    const onFocus = () => {
+      void refreshModels();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshModels]);
 
   // Auto-select first model when list loads and no selection
   useEffect(() => {

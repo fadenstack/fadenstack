@@ -3,9 +3,12 @@
  */
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonIcon from "@mui/icons-material/Person";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -52,8 +55,10 @@ export default function MessageBubble({
           height: 32,
           mt: 0.5,
           bgcolor: isUser
-            ? theme.palette.primary.dark
-            : theme.palette.secondary.dark,
+            ? theme.palette.primary.main
+            : theme.palette.mode === "dark"
+              ? theme.palette.grey[800]
+              : theme.palette.grey[400],
         }}
       >
         {isUser ? (
@@ -69,36 +74,29 @@ export default function MessageBubble({
           minWidth: 60,
           px: 2,
           py: 1.5,
-          borderRadius: 3,
+          // Chat-style radius: flat on the side closest to the avatar
+          borderRadius: isUser ? "12px 4px 12px 12px" : "4px 12px 12px 12px",
           bgcolor: isUser
-            ? theme.palette.primary.dark
-            : theme.palette.background.paper,
+            ? theme.palette.primary.main
+            : theme.palette.mode === "dark"
+              ? theme.palette.grey[900]
+              : theme.palette.grey[100],
           border: isUser ? "none" : `1px solid ${theme.palette.divider}`,
-          color: theme.palette.text.primary,
+          color: isUser
+            ? theme.palette.primary.contrastText
+            : theme.palette.text.primary,
           position: "relative",
         }}
       >
-        {/* Model label for assistant */}
-        {!isUser && modelAlias && (
-          <Typography
-            variant="caption"
-            sx={{
-              color: "text.secondary",
-              fontWeight: 600,
-              mb: 0.5,
-              display: "block",
-            }}
-          >
-            {modelAlias}
-          </Typography>
-        )}
-
         {/* Content */}
         <Box
           sx={{
             "& p": { m: 0, mb: 1, "&:last-child": { mb: 0 } },
             "& pre": {
-              bgcolor: "rgba(0,0,0,0.3)",
+              bgcolor:
+                theme.palette.mode === "dark"
+                  ? "rgba(0,0,0,0.35)"
+                  : "rgba(0,0,0,0.06)",
               borderRadius: 1,
               p: 1.5,
               overflowX: "auto",
@@ -109,7 +107,10 @@ export default function MessageBubble({
               fontFamily: '"Fira Code", "Fira Mono", monospace',
             },
             "& :not(pre) > code": {
-              bgcolor: "rgba(0,0,0,0.2)",
+              bgcolor:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgba(0,0,0,0.06)",
               borderRadius: 0.5,
               px: 0.5,
               py: 0.25,
@@ -131,7 +132,7 @@ export default function MessageBubble({
               ml: 0,
               color: "text.secondary",
             },
-            "& a": { color: theme.palette.secondary.main },
+            "& a": { color: isUser ? "inherit" : theme.palette.primary.main },
             "& ul, & ol": { pl: 2.5, mb: 1 },
             fontSize: "0.925rem",
             lineHeight: 1.65,
@@ -164,8 +165,8 @@ export default function MessageBubble({
           )}
         </Box>
 
-        {/* Token usage + response time */}
-        {(usage || responseMs) && !streaming && (
+        {/* Footer: info tooltip + response time + token usage */}
+        {!isUser && !streaming && (
           <Box
             sx={{
               display: "flex",
@@ -186,6 +187,19 @@ export default function MessageBubble({
               </Typography>
             )}
             {usage && <TokenUsageBadge usage={usage} />}
+            {/* Info icon with model details */}
+            <Tooltip
+              title={modelAlias || "Unknown model"}
+              arrow
+              placement="top"
+            >
+              <IconButton
+                size="small"
+                sx={{ opacity: 0.4, p: 0.25, "&:hover": { opacity: 0.8 } }}
+              >
+                <InfoOutlinedIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
           </Box>
         )}
       </Box>

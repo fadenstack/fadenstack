@@ -108,6 +108,16 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 
         try {
           const parsed = JSON.parse(data);
+
+          // Detect error payloads from the gateway
+          if (parsed.error) {
+            const msg =
+              parsed.error.message ||
+              parsed.error.type ||
+              "Unknown streaming error";
+            throw new Error(msg);
+          }
+
           const choice = parsed.choices?.[0];
           const delta: StreamDelta = {};
 
@@ -128,8 +138,14 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
           if (delta.content || delta.finish_reason || delta.usage) {
             yield delta;
           }
-        } catch {
-          // Skip malformed JSON chunks
+        } catch (e) {
+          // Re-throw gateway errors, skip malformed JSON
+          if (
+            e instanceof Error &&
+            e.message !== "Unexpected end of JSON input"
+          ) {
+            throw e;
+          }
         }
       }
     }

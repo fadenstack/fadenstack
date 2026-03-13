@@ -7,11 +7,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { chatApi, streamChat } from "~/api/chatClient";
-import type {
-  ChatMessage,
-  ChatSession,
-  TokenUsage,
-} from "~/api/chatTypes";
+import type { ChatMessage, ChatSession, TokenUsage } from "~/api/chatTypes";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
 function useStreamThrottle(setter: (v: string) => void) {
@@ -68,6 +64,8 @@ export interface UseChatStreamReturn {
   /** Get response time for a specific message id, if tracked. */
   getResponseMs: (msgId: string) => number | null;
   send: (text: string, model: string, files?: File[]) => Promise<void>;
+  /** Retry the last failed request. */
+  retry: () => Promise<void>;
   stop: () => void;
   loadHistory: () => Promise<void>;
 }
@@ -92,6 +90,13 @@ export function useChatStream({
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
+  /** Stores the last send args so retry can re-issue the request. */
+  const lastSendRef = useRef<{
+    text: string;
+    model: string;
+    files?: File[];
+  } | null>(null);
+
   // Load existing messages for the current session
   const loadHistory = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -100,6 +105,14 @@ export function useChatStream({
     try {
       const msgs = await chatApi.listMessages(sid);
       setMessages(msgs);
+
+      // If the last message is from the user with no assistant reply,
+      // the previous request likely failed — surface a retry prompt.
+      if (msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
+        const lastUser = msgs[msgs.length - 1];
+        lastSendRef.current = { text: lastUser.content, model: "" };
+        setError("The last message did not receive a response. You can retry.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -116,6 +129,7 @@ export function useChatStream({
   const send = useCallback(
     async (text: string, model: string, files?: File[]) => {
       setError(null);
+      lastSendRef.current = { text, model, files };
       let sid = sessionIdRef.current;
 
       try {
@@ -226,6 +240,27 @@ export function useChatStream({
     [onSessionCreated, onSessionUpdated],
   );
 
+  const retry = useCallback(async () => {
+    const last = lastSendRef.current;
+    if (!last) return;
+    // If the last user message was optimistic (tmp-*), remove it so
+    // send() can re-add it. If it's a persisted server message (real
+    // id from a reload), keep it — the gateway already has it in the
+    // session and send() will append a new optimistic copy that we
+    // deduplicate by reloading history on success.
+    setMessages((prev) => {
+      const lastUserIdx = prev.findLastIndex((m) => m.role === "user");
+      if (lastUserIdx === -1) return prev;
+      const lastUser = prev[lastUserIdx];
+      if (lastUser.id.startsWith("tmp-")) {
+        return prev.slice(0, lastUserIdx);
+      }
+      return prev;
+    });
+    setError(null);
+    await send(last.text, last.model, last.files);
+  }, [send]);
+
   return {
     messages,
     streamingContent,
@@ -235,8 +270,10 @@ export function useChatStream({
     error,
     lastResponseMs,
     /** Get response time for a specific message id, if tracked. */
-    getResponseMs: (msgId: string) => responseMsMapRef.current.get(msgId) ?? null,
+    getResponseMs: (msgId: string) =>
+      responseMsMapRef.current.get(msgId) ?? null,
     send,
+    retry,
     stop,
     loadHistory,
   };

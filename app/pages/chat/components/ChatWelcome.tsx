@@ -25,7 +25,10 @@ import ChatInput from "./ChatInput";
 interface Props {
   selectedModel: string;
   onModelChange: (alias: string) => void;
-  onSessionCreated: (session: ChatSession, initialState?: InitialMessageState) => void;
+  onSessionCreated: (
+    session: ChatSession,
+    initialState?: InitialMessageState,
+  ) => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
 }

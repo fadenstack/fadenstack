@@ -67,7 +67,9 @@ export default function ProjectSettingsDialog({
       <DialogTitle>
         {t("chat.project_settings", { defaultValue: "Project Settings" })}
       </DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+      <DialogContent
+        sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}
+      >
         <TextField
           label={t("chat.project_name", { defaultValue: "Project name" })}
           value={name}
@@ -97,8 +99,7 @@ export default function ProjectSettingsDialog({
           maxRows={12}
           fullWidth
           placeholder={t("chat.system_prompt_placeholder", {
-            defaultValue:
-              "You are a helpful assistant that specialises in…",
+            defaultValue: "You are a helpful assistant that specialises in…",
           })}
         />
       </DialogContent>

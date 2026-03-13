@@ -1,7 +1,8 @@
 /**
  * ChatSidebar — session list grouped by project with project CRUD.
+ * Supports drag-and-drop of sessions between projects via @dnd-kit.
  */
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
@@ -30,6 +31,18 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import { useTranslation } from "react-i18next";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  useDraggable,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 
 import type { ChatSession, ChatProject } from "~/api/chatTypes";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
@@ -47,7 +60,11 @@ interface Props {
   onDeleteProject: (id: string) => void;
   onUpdateProject: (
     id: string,
-    updates: { name?: string; description?: string; system_instructions?: string },
+    updates: {
+      name?: string;
+      description?: string;
+      system_instructions?: string;
+    },
   ) => Promise<void>;
   onMoveSession: (sessionId: string, projectId: string | null) => void;
   width: number;
@@ -86,6 +103,37 @@ export default function ChatSidebar({
   // Project settings dialog state
   const [editingProject, setEditingProject] = useState<ChatProject | null>(
     null,
+  );
+  // Drag-and-drop state
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+  const activeDragSession = activeDragId
+    ? sessions.find((s) => s.id === activeDragId)
+    : null;
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDragId(null);
+      const { active, over } = event;
+      if (!over) return;
+      const sessionId = String(active.id);
+      const targetId = String(over.id);
+      // Determine the target project — "__no_project__" means remove from project
+      const projectId = targetId === "__no_project__" ? null : targetId;
+      // Find the session being dragged to check if it's already in the target
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const currentProjectId = session.project_id ?? null;
+      if (currentProjectId === projectId) return; // No change
+      onMoveSession(sessionId, projectId);
+    },
+    [sessions, onMoveSession],
   );
 
   // Partition sessions by project
@@ -201,99 +249,148 @@ export default function ChatSidebar({
         </Box>
       )}
 
-      {/* Session list */}
+      {/* Session list with drag-and-drop */}
       <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-        {/* Projects */}
-        {projects.map((proj) => {
-          const collapsed = collapsedProjects.has(proj.id);
-          const projSessions = sessionsByProject.get(proj.id) ?? [];
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          {/* Projects */}
+          {projects.map((proj) => {
+            const collapsed = collapsedProjects.has(proj.id);
+            const projSessions = sessionsByProject.get(proj.id) ?? [];
 
-          return (
-            <Box key={proj.id}>
-              <ListSubheader
+            return (
+              <DroppableProjectZone
+                key={proj.id}
+                projectId={proj.id}
+                isOver={false}
+              >
+                <ListSubheader
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    bgcolor: "transparent",
+                    cursor: "pointer",
+                    lineHeight: "32px",
+                    px: 1.5,
+                  }}
+                  onClick={() => toggleProject(proj.id)}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <FolderIcon sx={{ fontSize: 16 }} />
+                    <Typography variant="caption" fontWeight={600} noWrap>
+                      {proj.name}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    {collapsed ? (
+                      <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                    ) : (
+                      <ExpandLessIcon sx={{ fontSize: 16 }} />
+                    )}
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingProject(proj);
+                      }}
+                      sx={{ ml: 0.5 }}
+                    >
+                      <SettingsOutlinedIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteProject(proj.id);
+                      }}
+                      sx={{ ml: 0.5 }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                </ListSubheader>
+                <Collapse in={!collapsed}>
+                  <List dense disablePadding>
+                    {projSessions.map((s) => (
+                      <DraggableSessionItem
+                        key={s.id}
+                        session={s}
+                        active={s.id === activeSessionId}
+                        onSelect={onSelectSession}
+                        onDelete={onDeleteSession}
+                        onMoveClick={(el) =>
+                          setMoveAnchor({ el, sessionId: s.id })
+                        }
+                      />
+                    ))}
+                  </List>
+                </Collapse>
+              </DroppableProjectZone>
+            );
+          })}
+
+          {/* Unorganised sessions */}
+          {orphanSessions.length > 0 && (
+            <DroppableProjectZone projectId="__no_project__" isOver={false}>
+              {projects.length > 0 && <Divider sx={{ my: 0.5 }} />}
+              <List dense disablePadding>
+                {orphanSessions.map((s) => (
+                  <DraggableSessionItem
+                    key={s.id}
+                    session={s}
+                    active={s.id === activeSessionId}
+                    onSelect={onSelectSession}
+                    onDelete={onDeleteSession}
+                    onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
+                  />
+                ))}
+              </List>
+            </DroppableProjectZone>
+          )}
+
+          {/* Also allow dropping onto orphan zone when it's empty */}
+          {orphanSessions.length === 0 && projects.length > 0 && (
+            <DroppableProjectZone projectId="__no_project__" isOver={false}>
+              <Box sx={{ px: 1.5, py: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("chat.drop_here_no_project", {
+                    defaultValue: "Drop here to remove from project",
+                  })}
+                </Typography>
+              </Box>
+            </DroppableProjectZone>
+          )}
+
+          {/* Drag overlay — floating ghost */}
+          <DragOverlay dropAnimation={null}>
+            {activeDragSession ? (
+              <Box
                 sx={{
+                  bgcolor: "action.selected",
+                  borderRadius: 1,
+                  px: 1.5,
+                  py: 0.5,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  bgcolor: "transparent",
-                  cursor: "pointer",
-                  lineHeight: "32px",
-                  px: 1.5,
+                  gap: 0.5,
+                  opacity: 0.9,
+                  boxShadow: 3,
                 }}
-                onClick={() => toggleProject(proj.id)}
               >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <FolderIcon sx={{ fontSize: 16 }} />
-                  <Typography variant="caption" fontWeight={600} noWrap>
-                    {proj.name}
-                  </Typography>
-                </Box>
-                <Box>
-                  {collapsed ? (
-                    <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                  ) : (
-                    <ExpandLessIcon sx={{ fontSize: 16 }} />
-                  )}
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingProject(proj);
-                    }}
-                    sx={{ ml: 0.5 }}
-                  >
-                    <SettingsOutlinedIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteProject(proj.id);
-                    }}
-                    sx={{ ml: 0.5 }}
-                  >
-                    <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Box>
-              </ListSubheader>
-              <Collapse in={!collapsed}>
-                <List dense disablePadding>
-                  {projSessions.map((s) => (
-                    <SessionItem
-                      key={s.id}
-                      session={s}
-                      active={s.id === activeSessionId}
-                      onSelect={onSelectSession}
-                      onDelete={onDeleteSession}
-                      onMoveClick={(el) =>
-                        setMoveAnchor({ el, sessionId: s.id })
-                      }
-                    />
-                  ))}
-                </List>
-              </Collapse>
-            </Box>
-          );
-        })}
-
-        {/* Unorganised sessions */}
-        {orphanSessions.length > 0 && (
-          <>
-            {projects.length > 0 && <Divider sx={{ my: 0.5 }} />}
-            <List dense disablePadding>
-              {orphanSessions.map((s) => (
-                <SessionItem
-                  key={s.id}
-                  session={s}
-                  active={s.id === activeSessionId}
-                  onSelect={onSelectSession}
-                  onDelete={onDeleteSession}
-                  onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
-                />
-              ))}
-            </List>
-          </>
-        )}
+                <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+                <Typography variant="body2" noWrap sx={{ fontSize: "0.85rem" }}>
+                  {activeDragSession.title ||
+                    t("chat.untitled", { defaultValue: "Untitled chat" })}
+                </Typography>
+              </Box>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </Box>
 
       {/* Move-to-project popover menu */}
@@ -368,6 +465,76 @@ export default function ChatSidebar({
     >
       {drawerContent}
     </Drawer>
+  );
+}
+
+// ── DroppableProjectZone (internal) ──────────────────────────────
+
+function DroppableProjectZone({
+  projectId,
+  children,
+}: {
+  projectId: string;
+  isOver: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver: isOverCurrent } = useDroppable({
+    id: projectId,
+  });
+  const theme = useTheme();
+
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        transition: "background-color 150ms ease",
+        bgcolor: isOverCurrent ? theme.palette.action.hover : "transparent",
+        borderRadius: 1,
+        ...(isOverCurrent && {
+          outline: `2px dashed ${theme.palette.primary.main}`,
+          outlineOffset: -2,
+        }),
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+// ── DraggableSessionItem (internal) ─────────────────────────────
+
+function DraggableSessionItem({
+  session,
+  active,
+  onSelect,
+  onDelete,
+  onMoveClick,
+}: {
+  session: ChatSession;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onMoveClick: (el: HTMLElement) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: session.id,
+  });
+
+  return (
+    <Box
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      sx={{ opacity: isDragging ? 0.4 : 1 }}
+    >
+      <SessionItem
+        session={session}
+        active={active}
+        onSelect={onSelect}
+        onDelete={onDelete}
+        onMoveClick={onMoveClick}
+      />
+    </Box>
   );
 }
 

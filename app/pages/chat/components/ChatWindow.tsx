@@ -6,15 +6,18 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
-import Alert from "@mui/material/Alert";
 import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
+import ReplayIcon from "@mui/icons-material/Replay";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
+import Avatar from "@mui/material/Avatar";
 import type { ChatSession, TokenUsage } from "~/api/chatTypes";
 import type { InitialMessageState } from "./ChatWelcome";
 import { useThemeMode } from "~/theme-mode";
@@ -57,6 +60,7 @@ export default function ChatWindow({
     error,
     getResponseMs,
     send,
+    retry,
     stop,
     loadHistory,
   } = useChatStream({
@@ -65,19 +69,28 @@ export default function ChatWindow({
     onSessionUpdated,
   });
 
-  // Load history when session changes
-  useEffect(() => {
-    loadHistory();
-  }, [sessionId, loadHistory]);
-
-  // Auto-send initial message passed from ChatWelcome via navigation state
+  // Load history OR auto-send initial message (mutually exclusive on mount).
+  // A new session navigated from ChatWelcome carries an initialMessage in
+  // location.state — send it immediately without loading history (there is
+  // none yet). On page refresh the state is cleared so we fall through to
+  // loadHistory which fetches persisted messages from the server.
   useEffect(() => {
     const state = location.state as InitialMessageState | undefined;
     if (state?.initialMessage && !initialSentRef.current) {
       initialSentRef.current = true;
       send(state.initialMessage, state.initialModel, state.initialFiles);
+      // Clear navigation state so a page refresh won't re-send the message.
+      // Preserve React Router's internal history keys while removing user state.
+      const { usr: _usr, ...rest } = (window.history.state ?? {}) as Record<
+        string,
+        unknown
+      >;
+      window.history.replaceState(rest, "");
+      return;
     }
-  }, [location.state, send]);
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -164,12 +177,6 @@ export default function ChatWindow({
             </Box>
           )}
 
-          {error && (
-            <Alert severity="error" sx={{ mx: 2, mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
           {/* Rendered messages */}
           {messages.map((msg) => (
             <MessageBubble
@@ -199,6 +206,76 @@ export default function ChatWindow({
             />
           )}
 
+          {/* Error bubble — shown after messages so it appears at the bottom */}
+          {error && (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 1,
+                mb: 1.5,
+                px: 1,
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  mt: 0.5,
+                  bgcolor: theme.palette.error.dark,
+                }}
+              >
+                <ErrorOutlineIcon sx={{ fontSize: 18 }} />
+              </Avatar>
+              <Box
+                sx={{
+                  maxWidth: "75%",
+                  minWidth: 60,
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: "4px 12px 12px 12px",
+                  bgcolor:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.background.paper
+                      : theme.palette.grey[100],
+                  border: `1px solid ${theme.palette.error.main}`,
+                  color: theme.palette.text.primary,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "error.main",
+                    fontWeight: 600,
+                    mb: 0.5,
+                    display: "block",
+                  }}
+                >
+                  Error
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ mb: 1, wordBreak: "break-word" }}
+                >
+                  {error}
+                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={<ReplayIcon />}
+                    onClick={retry}
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    Retry
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          )}
+
           {/* Streaming indicator when waiting for first token */}
           {isStreaming && !streamingContent && (
             <Box
@@ -213,8 +290,11 @@ export default function ChatWindow({
                 sx={{
                   px: 2,
                   py: 1.5,
-                  borderRadius: 3,
-                  bgcolor: theme.palette.background.paper,
+                  borderRadius: "4px 12px 12px 12px",
+                  bgcolor:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.background.paper
+                      : theme.palette.grey[100],
                   border: `1px solid ${theme.palette.divider}`,
                 }}
               >
