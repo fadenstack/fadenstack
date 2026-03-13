@@ -160,7 +160,7 @@ def deploy_cmd(
             error("Docker Compose V2 is not installed.")
             sys.exit(1)
         if not docker.daemon_running:
-            error("Docker daemon is not running. Start Docker first.")
+            error(f"Docker daemon is not running. {docker.daemon_hint}")
             sys.exit(1)
 
         success(
