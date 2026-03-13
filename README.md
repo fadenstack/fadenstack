@@ -1,214 +1,230 @@
-# llm.port CLI
+# llmport-cli
 
-The single entry point to install, configure, and manage the **llm.port** platform.
+[![PyPI version](https://img.shields.io/pypi/v/llmport-cli)](https://pypi.org/project/llmport-cli/)
+[![Python 3.12+](https://img.shields.io/pypi/pyversions/llmport-cli)](https://pypi.org/project/llmport-cli/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/llm-port/llm-port-cli/blob/main/LICENSE)
 
-## Developer Setup
+The single entry point to **deploy, configure, and manage** the
+[llm.port](https://llm-port.github.io) platform — an open-source LLM gateway
+that routes, secures, and observes traffic across local runtimes and remote
+providers.
 
-### Prerequisites
+```
+pip install llmport-cli        # or: uv tool install llmport-cli
+llmport doctor                 # verify prerequisites
+llmport deploy /opt/llmport    # full production deployment
+```
 
-- **Python 3.12+**
-- **uv** — Install from [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/)
-- **Docker** + **Docker Compose v2**
-- **Git**
+---
 
-### Install from source (development)
+## Features
+
+- **One-command production deploy** — pre-flight checks, `.env` generation,
+  image builds, database migrations, and service startup.
+- **Auto-tuning** — detects host CPU / RAM and computes optimal worker counts,
+  DB pool sizes, and queue channel pools.
+- **Module management** — enable / disable optional services
+  (PII redaction, Auth, Mailer, Docling OCR) via Docker Compose profiles.
+- **GPU auto-detection** — discovers NVIDIA (CUDA), AMD (ROCm), and Intel GPUs;
+  selects the correct vLLM container image automatically.
+- **Developer workflow** — clone all repos, install deps, run infra + migrations,
+  and generate a VS Code workspace in one command.
+- **Rich terminal UI** — tables, progress bars, and themed output powered by
+  [Rich](https://github.com/Textualize/rich). Interactive TUI wizard via
+  [Textual](https://github.com/Textualize/textual).
+- **Command abbreviation** — type `llmport st` instead of `llmport status`.
+
+---
+
+## Requirements
+
+| Dependency     | Minimum |
+| -------------- | ------- |
+| Python         | 3.12    |
+| Docker Engine  | 24.0    |
+| Docker Compose | v2      |
+| Git            | 2.x     |
+
+---
+
+## Installation
+
+### From PyPI
 
 ```bash
-# Clone the repo
+pip install llmport-cli
+
+# or with uv
+uv tool install llmport-cli
+```
+
+### From source
+
+```bash
 git clone https://github.com/llm-port/llm-port-cli.git
 cd llm-port-cli
-
-# Install dependencies + entry point in editable mode
-uv sync
-
-# Run commands via uv
+uv sync                   # install deps + editable entry point
 uv run llmport --help
-uv run llmport version
-uv run llmport doctor
 ```
 
-### Install globally (from local source)
+### Verify
 
 ```bash
-cd llm-port-cli
-
-# Option A: install as a uv tool from local path
-uv tool install --editable .
-
-# Option B: install via pip into an existing environment
-pip install -e .
-
-# Now use directly from anywhere
-llmport --help
+llmport version
+llmport doctor
 ```
 
-> **Note:** `uv tool install llmport-cli` (from PyPI) is not yet available.
-> Use the local install methods above during development.
+---
 
-### Verify installation
-
-```bash
-llmport version       # Print CLI + runtime versions
-llmport doctor        # Check system requirements
-```
-
-## Usage
-
-### Bootstrap a new development workspace
-
-```bash
-# Clone all repos + install deps + start infra + run migrations
-llmport dev init C:\Projects\llm-port
-
-# With SSH cloning instead of HTTPS
-llmport dev init C:\Projects\llm-port --ssh
-
-# Force pull latest on existing repos
-llmport dev init C:\Projects\llm-port --overwrite
-
-# Specify a branch
-llmport dev init C:\Projects\llm-port --branch develop
-```
-
-### Start the dev stack
-
-```bash
-# Start shared infrastructure + backend + frontend in separate terminals
-llmport dev up
-
-# From a specific workspace directory
-llmport dev up --workspace C:\Projects\llm-port
-```
-
-### Stop the dev stack
-
-```bash
-llmport dev down
-```
-
-### Check status
-
-```bash
-# Show running containers + dev processes
-llmport dev status
-
-# Show container status (production)
-llmport status
-```
+## Quick start
 
 ### Production deployment
 
 ```bash
-# Interactive setup wizard
-llmport init
+# Full deploy — pre-flight, env gen, build, migrate, start
+llmport deploy /opt/llmport
 
-# Non-interactive
-llmport init \
-  --install-dir /opt/llmport \
-  --admin-email admin@company.com \
-  --admin-password s3cret \
-  --modules rag,pii \
-  --gpu auto
+# Enable optional modules
+llmport deploy /opt/llmport --modules pii,auth
 
-# Start / stop
-llmport up
-llmport down
+# Skip image builds (pull only)
+llmport deploy /opt/llmport --no-build
 ```
 
-### Module management
+### Day-to-day operations
 
 ```bash
-llmport module list
-llmport module enable rag
-llmport module disable pii
+llmport up                          # start all services
+llmport up --build llm-port-api     # rebuild a single service
+llmport down                        # stop all services
+llmport down --volumes              # stop + remove volumes
+llmport status                      # service table
+llmport logs -f                     # tail all logs
+llmport logs -f llm-port-backend    # tail one service
+```
+
+### Modules
+
+```bash
+llmport module list                 # show available modules
+llmport module enable pii auth      # enable modules
+llmport module disable docling      # disable a module
 ```
 
 ### Configuration
 
 ```bash
-llmport config show          # Print current config (secrets masked)
-llmport config set KEY VALUE # Update a config value
-llmport config edit          # Open config in $EDITOR
+llmport config show                 # print current config
+llmport config set dev.branch main  # update a value (dot-notation)
+llmport config edit                 # open in $EDITOR
+llmport config path                 # print config file location
 ```
 
-### Logs
+### Auto-tuning
 
 ```bash
-llmport logs                 # Tail all service logs
-llmport logs --service backend
+llmport tune                        # detect resources, write .env
+llmport tune --profile prod         # production-grade sizing
+llmport tune --dry-run              # preview without writing
 ```
 
-### System diagnostics
+### Admin utilities
 
 ```bash
-llmport doctor
+llmport admin reset-password --email admin@localhost
 ```
 
-Output:
+### Developer workflow
+
+```bash
+# Bootstrap everything — clone repos, install deps, start infra,
+# run migrations, generate VS Code workspace
+llmport dev init ~/projects/llm-port
+llmport dev init ~/projects/llm-port --ssh        # SSH cloning
+llmport dev init ~/projects/llm-port --overwrite   # force pull
+
+# Start / stop / status
+llmport dev up
+llmport dev up --backend-only
+llmport dev down
+llmport dev status
+
+# Check dev prerequisites (optionally auto-install missing tools)
+llmport dev doctor
+llmport dev doctor --install --yes
 ```
-┌─ System Check ──────────────────────────────────────┐
-│ OS            Windows 11 (10.0.26100)         ✓     │
-│ Docker        27.3.0                          ✓     │
-│ Compose       v2.30.0                         ✓     │
-│ GPU           AMD Radeon 780M · 8 GB · ROCm   ✓     │
-│ RAM           32 GB available                 ✓     │
-│ Disk          214 GB free                     ✓     │
-│ Ports         All 16 ports available          ✓     │
-└─────────────────────────────────────────────────────┘
-```
 
-## Command Reference
+---
 
-| Command | Description |
-|---|---|
-| `llmport version` | Print CLI and runtime versions |
-| `llmport doctor` | Run system health checks |
-| `llmport init` | Production setup wizard |
-| `llmport up` | Start all services |
-| `llmport down` | Stop all services |
-| `llmport status` | Show service status |
-| `llmport logs` | Stream service logs |
-| `llmport config show\|set\|edit` | Manage configuration |
-| `llmport module list\|enable\|disable` | Toggle platform modules |
-| `llmport dev init [path]` | Bootstrap dev workspace |
-| `llmport dev up` | Start dev stack |
-| `llmport dev down` | Stop dev stack |
-| `llmport dev status` | Show dev environment status |
+## Command reference
 
-## Project Structure
+| Command                                      | Description                                                   |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `llmport version`                            | Print CLI, Python, Docker, and Compose versions               |
+| `llmport doctor`                             | Run system health checks (OS, RAM, disk, Docker, GPU, ports)  |
+| `llmport deploy [DIR]`                       | Full production deployment with pre-flight checks             |
+| `llmport up [SERVICES...]`                   | Start services (supports `--build`, `--pull`)                 |
+| `llmport down`                               | Stop and remove containers (`--volumes`, `--all`)             |
+| `llmport status`                             | Show service state, health, and ports (`--json`)              |
+| `llmport logs [SERVICES...]`                 | Stream logs (`-f`, `-n`, `--timestamps`)                      |
+| `llmport config show\|set\|edit\|path\|init` | Manage YAML configuration                                     |
+| `llmport module list\|enable\|disable`       | Toggle optional platform modules                              |
+| `llmport tune`                               | Auto-tune worker and pool settings (`--profile`, `--dry-run`) |
+| `llmport admin reset-password`               | Reset a user password directly in the database                |
+| `llmport dev init [DIR]`                     | Bootstrap full developer workspace                            |
+| `llmport dev up`                             | Start backend, worker, and frontend dev servers               |
+| `llmport dev down`                           | Stop all dev processes                                        |
+| `llmport dev status`                         | Show repo branches, infra, and dev processes                  |
+| `llmport dev doctor`                         | Check dev prerequisites (`--install`)                         |
+
+---
+
+## Project structure
 
 ```
 llm_port_cli/
-├── pyproject.toml              # uv-managed, entry point: llmport
+├── pyproject.toml
 ├── src/
 │   └── llmport/
-│       ├── cli.py              # Click root group
-│       ├── commands/           # Command implementations
-│       │   ├── doctor.py
-│       │   ├── init_cmd.py
-│       │   ├── up.py
-│       │   ├── status.py
-│       │   ├── logs.py
-│       │   ├── module.py
-│       │   ├── config.py
-│       │   ├── version.py
-│       │   └── dev/            # Dev-mode commands
+│       ├── cli.py                 # Click root group + AliasedGroup
+│       ├── commands/
+│       │   ├── version.py         # version
+│       │   ├── doctor.py          # doctor
+│       │   ├── deploy.py          # deploy
+│       │   ├── up.py              # up
+│       │   ├── down.py            # down
+│       │   ├── status.py          # status
+│       │   ├── logs_cmd.py        # logs
+│       │   ├── config.py          # config group
+│       │   ├── module.py          # module group
+│       │   ├── tune.py            # tune
+│       │   ├── admin.py           # admin group
+│       │   └── dev/               # developer workflow
 │       │       ├── dev_init.py
 │       │       ├── dev_up.py
-│       │       └── dev_status.py
-│       ├── core/               # Shared utilities
-│       │   ├── compose.py      # Docker Compose wrapper
-│       │   ├── detect.py       # System detection
-│       │   ├── settings.py     # Config management
-│       │   ├── api_client.py   # Backend API client
-│       │   ├── env_gen.py      # .env generation
-│       │   ├── git.py          # Git helpers
-│       │   └── console.py      # Rich console
-│       ├── tui/                # Textual TUI (init wizard)
-│       └── templates/          # Jinja2 templates
+│       │       ├── dev_status.py
+│       │       └── dev_doctor.py
+│       ├── core/                  # shared utilities
+│       │   ├── compose.py         # Docker Compose wrapper
+│       │   ├── detect.py          # OS / GPU / port detection
+│       │   ├── settings.py        # YAML config (~/.config/llmport/)
+│       │   ├── api_client.py      # Backend REST client (httpx)
+│       │   ├── bootstrap.py       # First-admin bootstrap
+│       │   ├── env_gen.py         # .env generation (Jinja2)
+│       │   ├── git.py             # Git clone / checkout helpers
+│       │   ├── install.py         # Cross-platform tool installer
+│       │   ├── registry.py        # Central metadata registry
+│       │   ├── sysinfo.py         # Resource detection + tuning
+│       │   └── console.py         # Rich themed output
+│       ├── tui/                   # Textual TUI wizard
+│       └── templates/             # Jinja2 .env templates
 └── tests/
 ```
+
+---
 
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.
+
+Part of the [llm.port](https://github.com/llm-port) project.

@@ -40,6 +40,12 @@ dependencies = [
     "psutil >=6.0,<7",
 ]
 
+[project.urls]
+Homepage = "https://llm-port.github.io"
+Repository = "https://github.com/llm-port/llm-port-cli"
+Documentation = "https://llm-port.github.io/docs"
+Issues = "https://github.com/llm-port/llm-port-cli/issues"
+
 [project.scripts]
 llmport = "llmport.cli:main"
 
