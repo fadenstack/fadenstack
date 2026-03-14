@@ -31,7 +31,10 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ScienceIcon from "@mui/icons-material/Science";
 
-const STATUS_COLOR: Record<string, "success" | "warning" | "error" | "default" | "info"> = {
+const STATUS_COLOR: Record<
+  string,
+  "success" | "warning" | "error" | "default" | "info"
+> = {
   active: "success",
   degraded: "warning",
   error: "error",
@@ -51,21 +54,17 @@ export default function MCPServerDetailPage() {
     error: serverError,
     refresh: reloadServer,
     setError,
-  } = useAsyncData(
-    () => getServer(id!),
-    [id],
-    { initialValue: null as MCPServerDetail | null },
-  );
+  } = useAsyncData(() => getServer(id!), [id], {
+    initialValue: null as MCPServerDetail | null,
+  });
 
   const {
     data: tools,
     loading: toolsLoading,
     refresh: reloadTools,
-  } = useAsyncData(
-    () => listServerTools(id!),
-    [id],
-    { initialValue: [] as MCPToolDetail[] },
-  );
+  } = useAsyncData(() => listServerTools(id!), [id], {
+    initialValue: [] as MCPToolDetail[],
+  });
 
   const [testResult, setTestResult] = useState<MCPTestResult | null>(null);
   const [testing, setTesting] = useState(false);
@@ -124,7 +123,11 @@ export default function MCPServerDetailPage() {
       searchValue: (tool) => `${tool.qualified_name} ${tool.description}`,
       render: (tool) => (
         <>
-          <Typography fontWeight={600} fontFamily="monospace" fontSize="0.85rem">
+          <Typography
+            fontWeight={600}
+            fontFamily="monospace"
+            fontSize="0.85rem"
+          >
             {tool.qualified_name}
           </Typography>
           <Typography variant="caption" color="text.secondary">
@@ -191,7 +194,8 @@ export default function MCPServerDetailPage() {
           onClose={() => setTestResult(null)}
         >
           {testResult.message}
-          {testResult.success && ` (${testResult.tools_discovered} tools discovered)`}
+          {testResult.success &&
+            ` (${testResult.tools_discovered} tools discovered)`}
         </Alert>
       )}
 
@@ -253,7 +257,9 @@ export default function MCPServerDetailPage() {
                 <Typography variant="caption" color="text.secondary">
                   {t("mcp.tool_prefix", "Tool Prefix")}
                 </Typography>
-                <Typography fontFamily="monospace">{server.tool_prefix}</Typography>
+                <Typography fontFamily="monospace">
+                  {server.tool_prefix}
+                </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Typography variant="caption" color="text.secondary">

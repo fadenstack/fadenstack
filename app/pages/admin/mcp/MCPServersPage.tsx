@@ -29,7 +29,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
-const STATUS_COLOR: Record<string, "success" | "warning" | "error" | "default" | "info"> = {
+const STATUS_COLOR: Record<
+  string,
+  "success" | "warning" | "error" | "default" | "info"
+> = {
   active: "success",
   degraded: "warning",
   error: "error",
@@ -48,7 +51,9 @@ export default function MCPServersPage() {
     error,
     refresh: load,
     setError,
-  } = useAsyncData(() => listServers(), [], { initialValue: [] as MCPServerSummary[] });
+  } = useAsyncData(() => listServers(), [], {
+    initialValue: [] as MCPServerSummary[],
+  });
 
   // Register dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -61,7 +66,9 @@ export default function MCPServersPage() {
   const [creating, setCreating] = useState(false);
 
   // Delete dialog
-  const [deleteTarget, setDeleteTarget] = useState<MCPServerSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MCPServerSummary | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
 
   function openCreate() {
@@ -81,7 +88,8 @@ export default function MCPServersPage() {
       await registerServer({
         name: newName,
         transport: newTransport,
-        tool_prefix: newPrefix || newName.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+        tool_prefix:
+          newPrefix || newName.toLowerCase().replace(/[^a-z0-9]/g, "_"),
         ...(newTransport === "sse" ? { url: newUrl } : {}),
         ...(newTransport === "stdio"
           ? { command_json: newCommand.split(/\s+/).filter(Boolean) }
@@ -92,7 +100,9 @@ export default function MCPServersPage() {
       setCreateOpen(false);
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to register server");
+      setError(
+        err instanceof Error ? err.message : "Failed to register server",
+      );
     } finally {
       setCreating(false);
     }
@@ -132,7 +142,11 @@ export default function MCPServersPage() {
       render: (s) => (
         <>
           <Typography fontWeight={600}>{s.name}</Typography>
-          <Typography variant="caption" color="text.secondary" fontFamily="monospace">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontFamily="monospace"
+          >
             {s.tool_prefix}
           </Typography>
         </>
@@ -178,7 +192,9 @@ export default function MCPServersPage() {
     {
       key: "pii_mode",
       label: t("mcp.pii_mode", "PII Mode"),
-      render: (s) => <Chip size="small" label={s.pii_mode} variant="outlined" />,
+      render: (s) => (
+        <Chip size="small" label={s.pii_mode} variant="outlined" />
+      ),
       minWidth: 100,
     },
     {
@@ -251,7 +267,9 @@ export default function MCPServersPage() {
         loading={creating}
         submitLabel={t("mcp.register", "Register")}
         cancelLabel={t("common.cancel", "Cancel")}
-        submitDisabled={!newName.trim() || (newTransport === "sse" && !newUrl.trim())}
+        submitDisabled={
+          !newName.trim() || (newTransport === "sse" && !newUrl.trim())
+        }
         onSubmit={handleCreate}
         onClose={() => setCreateOpen(false)}
       >
@@ -268,7 +286,9 @@ export default function MCPServersPage() {
             label={t("mcp.transport", "Transport")}
             select
             value={newTransport}
-            onChange={(e) => setNewTransport(e.target.value as MCPTransportType)}
+            onChange={(e) =>
+              setNewTransport(e.target.value as MCPTransportType)
+            }
             fullWidth
             disabled={creating}
           >
@@ -305,7 +325,9 @@ export default function MCPServersPage() {
             label={t("mcp.tool_prefix", "Tool Prefix")}
             value={newPrefix}
             onChange={(e) => setNewPrefix(e.target.value)}
-            placeholder={newName.toLowerCase().replace(/[^a-z0-9]/g, "_") || "my_server"}
+            placeholder={
+              newName.toLowerCase().replace(/[^a-z0-9]/g, "_") || "my_server"
+            }
             fullWidth
             disabled={creating}
             helperText={t(

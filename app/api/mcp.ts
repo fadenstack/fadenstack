@@ -154,10 +154,9 @@ export async function refreshServer(id: string): Promise<MCPServerDetail> {
 }
 
 export async function testServer(id: string): Promise<MCPTestResult> {
-  return request<MCPTestResult>(
-    `/servers/${encodeURIComponent(id)}/test`,
-    { method: "POST" },
-  );
+  return request<MCPTestResult>(`/servers/${encodeURIComponent(id)}/test`, {
+    method: "POST",
+  });
 }
 
 // ── Tools ──────────────────────────────────────────────────────────────────
@@ -174,8 +173,8 @@ export async function updateTool(
   toolId: string,
   payload: UpdateMCPToolPayload,
 ): Promise<MCPToolDetail> {
-  return request<MCPToolDetail>(
-    `/tools/${encodeURIComponent(toolId)}`,
-    { method: "PATCH", body: JSON.stringify(payload) },
-  );
+  return request<MCPToolDetail>(`/tools/${encodeURIComponent(toolId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }

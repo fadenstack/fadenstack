@@ -13,7 +13,9 @@ export default [
   // Standalone chat UI
   layout("routes/chat.tsx", [
     route("/chat", "pages/chat/ChatPage.tsx"),
-    route("/chat/:sessionId", "pages/chat/ChatPage.tsx", { id: "chat-session" }),
+    route("/chat/:sessionId", "pages/chat/ChatPage.tsx", {
+      id: "chat-session",
+    }),
   ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
