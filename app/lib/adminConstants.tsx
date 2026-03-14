@@ -398,6 +398,20 @@ export const NAV: NavEntry[] = [
       },
     ],
   },
+  {
+    id: "mcp",
+    kind: "group",
+    labelKey: "nav.mcp_group",
+    icon: <HubIcon />,
+    module: "mcp",
+    children: [
+      {
+        to: "/admin/mcp/servers",
+        labelKey: "nav.mcp_servers",
+        icon: <DnsIcon />,
+      },
+    ],
+  },
   // ── Items pinned to the bottom section by default ──
   {
     id: "logs",

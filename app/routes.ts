@@ -76,5 +76,13 @@ export default [
         "pages/admin/rag/RagLiteCollectionsPage.tsx",
       ),
     ]),
+    // MCP routes — guarded by module status
+    layout("routes/mcp-guard.tsx", [
+      route("/admin/mcp/servers", "pages/admin/mcp/MCPServersPage.tsx"),
+      route(
+        "/admin/mcp/servers/:id",
+        "pages/admin/mcp/MCPServerDetailPage.tsx",
+      ),
+    ]),
   ]),
 ] satisfies RouteConfig;
