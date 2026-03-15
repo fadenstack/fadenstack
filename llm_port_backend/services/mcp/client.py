@@ -115,6 +115,25 @@ class MCPServiceClient:
             "PATCH", f"/api/admin/tools/{tool_id}", json_body=payload,
         )
 
+    # ── Provider Settings ────────────────────────────────────────────────
+
+    async def get_settings_schema(self, server_id: str) -> dict[str, Any]:
+        return await self._request(
+            "GET", f"/api/admin/servers/{server_id}/settings/schema",
+        )
+
+    async def get_settings(self, server_id: str) -> dict[str, Any]:
+        return await self._request(
+            "GET", f"/api/admin/servers/{server_id}/settings",
+        )
+
+    async def update_settings(
+        self, server_id: str, payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await self._request(
+            "PUT", f"/api/admin/servers/{server_id}/settings", json_body=payload,
+        )
+
     # ── Health ───────────────────────────────────────────────────────────
 
     async def health(self) -> dict[str, Any]:

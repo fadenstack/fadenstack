@@ -237,7 +237,8 @@
     "empty": "Keine Container gefunden.",
     "search_placeholder": "Nach Name, Image, Status suchen...",
     "failed_load": "Container konnten nicht geladen werden.",
-    "confirm_delete": "Diesen Container loeschen?"
+    "confirm_delete": "Diesen Container loeschen?",
+    "endpoint": "Endpunkt"
   },
   "create_container": {
     "title": "Container erstellen",

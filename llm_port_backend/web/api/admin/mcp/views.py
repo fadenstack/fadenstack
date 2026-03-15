@@ -107,3 +107,34 @@ async def update_tool(
     payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
     return await client.update_tool(tool_id, payload)
+
+
+# ── Provider Settings ────────────────────────────────────────────────────────
+
+
+@router.get("/servers/{server_id}/settings/schema")
+async def get_server_settings_schema(
+    server_id: Annotated[str, Path()],
+    _user: Annotated[User, Depends(require_superuser)],
+    client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
+) -> dict[str, Any]:
+    return await client.get_settings_schema(server_id)
+
+
+@router.get("/servers/{server_id}/settings")
+async def get_server_settings(
+    server_id: Annotated[str, Path()],
+    _user: Annotated[User, Depends(require_superuser)],
+    client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
+) -> dict[str, Any]:
+    return await client.get_settings(server_id)
+
+
+@router.put("/servers/{server_id}/settings")
+async def update_server_settings(
+    server_id: Annotated[str, Path()],
+    _user: Annotated[User, Depends(require_superuser)],
+    client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
+    payload: Annotated[dict[str, Any], Body()],
+) -> dict[str, Any]:
+    return await client.update_settings(server_id, payload)

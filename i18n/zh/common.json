@@ -237,7 +237,8 @@
     "empty": "未找到容器。",
     "search_placeholder": "按名称、镜像、状态搜索...",
     "failed_load": "加载容器失败。",
-    "confirm_delete": "删除该容器？"
+    "confirm_delete": "删除该容器？",
+    "endpoint": "端点"
   },
   "create_container": {
     "title": "创建容器",

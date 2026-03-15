@@ -237,7 +237,8 @@
     "empty": "Aucun conteneur trouvé.",
     "search_placeholder": "Rechercher nom, image, état…",
     "failed_load": "Échec du chargement des conteneurs.",
-    "confirm_delete": "Supprimer ce conteneur ?"
+    "confirm_delete": "Supprimer ce conteneur ?",
+    "endpoint": "Point d'acc\u00e8s"
   },
   "create_container": {
     "title": "Créer un conteneur",

@@ -237,7 +237,8 @@
     "empty": "No containers found.",
     "search_placeholder": "Search name, image, state...",
     "failed_load": "Failed to load containers.",
-    "confirm_delete": "Delete this container?"
+    "confirm_delete": "Delete this container?",
+    "endpoint": "Endpoint"
   },
   "create_container": {
     "title": "Create Container",
