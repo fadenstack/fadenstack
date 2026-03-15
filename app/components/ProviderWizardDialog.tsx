@@ -604,8 +604,14 @@ export function ProviderWizardDialog({
                       label={t("llm_common.model")}
                       placeholder={
                         discoveredModels.length > 0
-                          ? t("llm_providers.select_or_type_model", "Select or type a model…")
-                          : t("llm_providers.test_to_discover", "Test connection to discover models")
+                          ? t(
+                              "llm_providers.select_or_type_model",
+                              "Select or type a model…",
+                            )
+                          : t(
+                              "llm_providers.test_to_discover",
+                              "Test connection to discover models",
+                            )
                       }
                       fullWidth
                     />
