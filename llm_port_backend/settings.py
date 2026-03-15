@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     db_max_overflow: int = max(10, _CPU_COUNT * 3)
 
     # Variables for RabbitMQ
-    rabbit_host: str = "llm-port-backend-rmq"
+    rabbit_host: str = "llm-port-rmq"
     rabbit_port: int = 5672
     rabbit_user: str = "guest"
     rabbit_pass: str = "guest"  # noqa: S105

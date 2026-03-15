@@ -329,6 +329,10 @@ async def create_provider(
         extra_params=body.extra_params,
     )
 
+    # Commit eagerly so the provider is visible to the follow-up
+    # runtime creation request the frontend fires immediately after.
+    await provider_dao.session.commit()
+
     # ── Auto-provision remote providers ──────────────────────────
     if body.target == ProviderTarget.REMOTE_ENDPOINT and (
         body.endpoint_url or body.litellm_provider

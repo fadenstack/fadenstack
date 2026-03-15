@@ -139,6 +139,17 @@ class MCPServiceClient:
     async def health(self) -> dict[str, Any]:
         return await self._request("GET", "/api/health")
 
+    async def scan_servers(self, payload: dict[str, Any]) -> dict[str, Any]:
+        # Scanning many ports can take longer than the default timeout
+        orig = self.timeout_sec
+        self.timeout_sec = max(orig, 120.0)
+        try:
+            return await self._request(
+                "POST", "/api/admin/scan", json_body=payload,
+            )
+        finally:
+            self.timeout_sec = orig
+
 
 def get_mcp_client() -> MCPServiceClient:
     """Factory — raises 503 when the MCP module is disabled."""

@@ -6,14 +6,20 @@ All endpoints require superuser privileges.
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Path
+import httpx
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from pydantic import BaseModel, Field
 
 from llm_port_backend.db.models.users import User
 from llm_port_backend.services.mcp.client import MCPServiceClient, get_mcp_client
 from llm_port_backend.web.api.admin.dependencies import require_superuser
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -138,3 +144,171 @@ async def update_server_settings(
     payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
     return await client.update_settings(server_id, payload)
+
+
+# ── Network scanner ──────────────────────────────────────────────────────────
+
+
+class ScanRequest(BaseModel):
+    host: str = Field(min_length=1, max_length=256)
+    port_start: int = Field(default=8000, ge=1, le=65535)
+    port_end: int = Field(default=9000, ge=1, le=65535)
+
+
+class DiscoveredServer(BaseModel):
+    host: str
+    port: int
+    url: str
+    server_name: str
+    protocol_version: str | None = None
+    tools: list[str] = Field(default_factory=list)
+    already_registered: bool = False
+
+
+class ScanResponse(BaseModel):
+    discovered: list[DiscoveredServer]
+    scanned_ports: int
+
+
+def _parse_jsonrpc_response(resp: httpx.Response) -> dict[str, Any] | None:
+    """Parse a JSON-RPC response that may be plain JSON or SSE-wrapped."""
+    content_type = resp.headers.get("content-type", "")
+    if "text/event-stream" in content_type:
+        # SSE format: lines like "event: message\ndata: {...}\n\n"
+        for line in resp.text.splitlines():
+            if line.startswith("data: "):
+                return json.loads(line[6:])
+        return None
+    return resp.json()
+
+
+async def _probe_mcp_port(
+    host: str,
+    port: int,
+    *,
+    timeout: float = 3.0,
+) -> DiscoveredServer | None:
+    """Try to handshake with an MCP server at host:port/mcp/."""
+    url = f"http://{host}:{port}/mcp/"
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {"name": "llm-port-scanner", "version": "1.0"},
+        },
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code != 200:
+                return None
+
+            body = _parse_jsonrpc_response(resp)
+            if not body:
+                return None
+            result = body.get("result", {})
+            server_info = result.get("serverInfo", {})
+            server_name = server_info.get("name", f"unknown-{port}")
+            protocol_version = result.get("protocolVersion")
+
+            # Grab session id for tools/list call
+            session_id = resp.headers.get("mcp-session-id")
+
+            # Try to list tools (reuse same client & session)
+            tools = await _probe_list_tools(
+                client, url, session_id=session_id, timeout=timeout,
+            )
+
+        return DiscoveredServer(
+            host=host,
+            port=port,
+            url=url,
+            server_name=server_name,
+            protocol_version=protocol_version,
+            tools=tools,
+        )
+    except Exception:
+        return None
+
+
+async def _probe_list_tools(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    session_id: str | None = None,
+    timeout: float = 3.0,
+) -> list[str]:
+    """Try to list tools from a discovered MCP server."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {},
+    }
+    headers: dict[str, str] = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    if session_id:
+        headers["Mcp-Session-Id"] = session_id
+    try:
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code != 200:
+            return []
+        body = _parse_jsonrpc_response(resp)
+        if not body:
+            return []
+        result = body.get("result", {})
+        return [t.get("name", "") for t in result.get("tools", [])]
+    except Exception:
+        return []
+
+
+@router.post("/scan", response_model=ScanResponse)
+async def scan_for_servers(
+    _user: Annotated[User, Depends(require_superuser)],
+    body: ScanRequest,
+    client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
+) -> ScanResponse:
+    """Scan a host for running MCP servers on a port range."""
+    if body.port_end < body.port_start:
+        raise HTTPException(status_code=422, detail="port_end must be >= port_start.")
+    port_range = body.port_end - body.port_start + 1
+    if port_range > 1000:
+        raise HTTPException(status_code=422, detail="Port range must not exceed 1000 ports.")
+
+    # Get already-registered server URLs to flag duplicates
+    registered_urls: set[str] = set()
+    try:
+        data = await client.list_servers()
+        servers_list = data.get("servers", []) if isinstance(data, dict) else data
+        for s in servers_list:
+            if isinstance(s, dict) and s.get("url"):
+                registered_urls.add(s["url"])
+    except Exception:
+        logger.debug("Could not fetch registered servers for duplicate check", exc_info=True)
+
+    # Probe all ports concurrently with bounded parallelism
+    sem = asyncio.Semaphore(50)
+
+    async def probe(port: int) -> DiscoveredServer | None:
+        async with sem:
+            return await _probe_mcp_port(body.host, port)
+
+    tasks = [probe(p) for p in range(body.port_start, body.port_end + 1)]
+    results = await asyncio.gather(*tasks)
+
+    discovered: list[DiscoveredServer] = []
+    for result in results:
+        if result is not None:
+            result.already_registered = result.url in registered_urls
+            discovered.append(result)
+
+    return ScanResponse(discovered=discovered, scanned_ports=port_range)
