@@ -18,7 +18,10 @@ import type {
 
 const CLASS_CONFIG: Record<
   ContainerClass,
-  { color: "error" | "warning" | "success" | "default" | "secondary"; label: string }
+  {
+    color: "error" | "warning" | "success" | "default" | "secondary";
+    label: string;
+  }
 > = {
   SYSTEM_CORE: { color: "error", label: "SYSTEM_CORE" },
   SYSTEM_AUX: { color: "warning", label: "SYSTEM_AUX" },

@@ -74,7 +74,10 @@ export default function ContainersPage() {
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  async function handleClassChange(c: ContainerSummary, newClass: ContainerClass) {
+  async function handleClassChange(
+    c: ContainerSummary,
+    newClass: ContainerClass,
+  ) {
     if (newClass === c.container_class) return;
     setActionLoading(`${c.id}-class`);
     try {

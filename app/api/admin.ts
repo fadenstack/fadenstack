@@ -827,7 +827,8 @@ export function canExec(cls: ContainerClass, rootModeActive: boolean): boolean {
 
 export function canStop(cls: ContainerClass, rootModeActive: boolean): boolean {
   if (cls === "UNTRUSTED") return false;
-  if (cls === "TENANT_APP" || cls === "SYSTEM_AUX" || cls === "MCP") return true;
+  if (cls === "TENANT_APP" || cls === "SYSTEM_AUX" || cls === "MCP")
+    return true;
   if (cls === "SYSTEM_CORE") return rootModeActive;
   return false;
 }

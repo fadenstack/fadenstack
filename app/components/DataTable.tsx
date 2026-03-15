@@ -180,7 +180,9 @@ export function DataTable<T>({
     try {
       const raw = localStorage.getItem(columnVisibilityKey);
       if (raw) return new Set(JSON.parse(raw) as string[]);
-    } catch { /* ignore bad data */ }
+    } catch {
+      /* ignore bad data */
+    }
     return new Set();
   }, [columnVisibilityKey]);
 
