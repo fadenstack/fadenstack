@@ -65,6 +65,7 @@ export default function ChatWindow({
     loadHistory,
   } = useChatStream({
     sessionId,
+    selectedModel,
     onSessionCreated,
     onSessionUpdated,
   });

@@ -27,6 +27,7 @@ import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
 import AccordionSummary from "@mui/material/AccordionSummary";
 import Alert from "@mui/material/Alert";
+import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -124,6 +125,7 @@ export function ProviderWizardDialog({
     "idle" | "testing" | "success" | "error"
   >("idle");
   const [testMessage, setTestMessage] = useState("");
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
   // Step 2 — runtime config (local only)
   const [modelId, setModelId] = useState("");
@@ -172,6 +174,7 @@ export function ProviderWizardDialog({
       setLitellmProvider("");
       setTestStatus("idle");
       setTestMessage("");
+      setDiscoveredModels([]);
       setModelId("");
       setHwInfo(null);
       setImageChoice(AUTO_IMAGE_VALUE);
@@ -336,9 +339,12 @@ export function ProviderWizardDialog({
             count: result.models.length,
           }),
         );
-        // Auto-fill the remote model name from the first available model
-        if (!remoteModel.trim() && result.models.length > 0) {
-          setRemoteModel(result.models[0]);
+        // Populate the model dropdown with discovered models
+        if (result.models.length > 0) {
+          setDiscoveredModels(result.models);
+          if (!remoteModel.trim()) {
+            setRemoteModel(result.models[0]);
+          }
         }
       } else {
         setTestStatus("error");
@@ -544,7 +550,10 @@ export function ProviderWizardDialog({
                   <Select
                     value={litellmProvider}
                     label={t("llm_providers.litellm_provider", "Provider")}
-                    onChange={(e) => setLitellmProvider(e.target.value)}
+                    onChange={(e) => {
+                      setLitellmProvider(e.target.value);
+                      setDiscoveredModels([]);
+                    }}
                   >
                     {LITELLM_PROVIDERS.map((p) => (
                       <MenuItem key={`${p.value}-${p.label}`} value={p.value}>
@@ -561,6 +570,7 @@ export function ProviderWizardDialog({
                   onChange={(e) => {
                     setEndpointUrl(e.target.value);
                     setTestStatus("idle");
+                    setDiscoveredModels([]);
                   }}
                   fullWidth
                   helperText={
@@ -583,11 +593,23 @@ export function ProviderWizardDialog({
                   fullWidth
                   helperText={t("llm_providers.api_key_help")}
                 />
-                <TextField
-                  label={t("llm_common.model")}
+                <Autocomplete
+                  freeSolo
+                  options={discoveredModels}
                   value={remoteModel}
-                  onChange={(e) => setRemoteModel(e.target.value)}
-                  fullWidth
+                  onInputChange={(_e, value) => setRemoteModel(value)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t("llm_common.model")}
+                      placeholder={
+                        discoveredModels.length > 0
+                          ? t("llm_providers.select_or_type_model", "Select or type a model…")
+                          : t("llm_providers.test_to_discover", "Test connection to discover models")
+                      }
+                      fullWidth
+                    />
+                  )}
                 />
 
                 <Button

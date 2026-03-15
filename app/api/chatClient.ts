@@ -154,6 +154,81 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
   return { reader: read(), abort: () => controller.abort() };
 }
 
+/**
+ * Reconnect to an in-progress SSE stream for a session.
+ *
+ * Returns the same `StreamHandle` interface as `streamChat` so callers
+ * can use it interchangeably.  Returns `null` if no active stream.
+ */
+export function resumeStream(sessionId: string): StreamHandle {
+  const controller = new AbortController();
+
+  async function* read(): AsyncGenerator<StreamDelta> {
+    const res = await fetch(`${BASE}/sessions/${sessionId}/stream`, {
+      credentials: "include",
+      signal: controller.signal,
+      headers: { "Cache-Control": "no-store" },
+    });
+
+    // 204 = no buffer available
+    if (res.status === 204) return;
+    if (!res.ok) return;
+
+    const reader = res.body?.getReader();
+    if (!reader) return;
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") return;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) continue;
+
+          const choice = parsed.choices?.[0];
+          const delta: StreamDelta = {};
+
+          if (choice?.delta?.content) {
+            delta.content = choice.delta.content;
+          }
+          if (choice?.finish_reason) {
+            delta.finish_reason = choice.finish_reason;
+          }
+          if (parsed.usage) {
+            delta.usage = {
+              prompt_tokens: parsed.usage.prompt_tokens ?? 0,
+              completion_tokens: parsed.usage.completion_tokens ?? 0,
+              total_tokens: parsed.usage.total_tokens ?? 0,
+            };
+          }
+
+          if (delta.content || delta.finish_reason || delta.usage) {
+            yield delta;
+          }
+        } catch {
+          // skip malformed
+        }
+      }
+    }
+  }
+
+  return { reader: read(), abort: () => controller.abort() };
+}
+
 // ── REST API ─────────────────────────────────────────────────────
 
 export const chatApi = {
@@ -231,6 +306,10 @@ export const chatApi = {
     request<{ data: ChatMessage[] }>(
       `/sessions/${sessionId}/messages?limit=${limit}`,
     ).then((r) => r.data),
+
+  // Stream reconnection
+  streamStatus: (sessionId: string) =>
+    request<{ active: boolean }>(`/sessions/${sessionId}/stream/status`),
 
   // Attachments
   uploadAttachment: async (sessionId: string, file: File) => {
