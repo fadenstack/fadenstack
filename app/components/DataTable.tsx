@@ -7,7 +7,7 @@
  *  - sticky header + scrollable body that fits into flex containers
  *  - optional client-side pagination
  */
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -17,6 +17,7 @@ import {
   flexRender,
   type SortingState,
   type ColumnDef as TanColumnDef,
+  type ColumnSizingState,
 } from "@tanstack/react-table";
 
 import Alert from "@mui/material/Alert";
@@ -47,6 +48,7 @@ import Typography from "@mui/material/Typography";
 import ClearIcon from "@mui/icons-material/Clear";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -76,6 +78,12 @@ export interface ColumnDef<T> {
   sortValue?: (row: T) => string | number;
   /** Optional min-width hint passed to the <TableCell>. */
   minWidth?: number | string;
+  /**
+   * Whether the user can hide this column via the column-visibility toggle.
+   * Defaults to `true`. Set to `false` for columns that must always be visible
+   * (e.g. actions).
+   */
+  hideable?: boolean;
 }
 
 /** A declarative column-filter dropdown shown in the toolbar. */
@@ -132,6 +140,12 @@ export interface DataTableProps<T> {
    * highlighted background and is scrolled into view on mount.
    */
   highlightId?: string | null;
+  /**
+   * Unique localStorage key for persisting column visibility preferences.
+   * When provided, a column-toggle button appears in the toolbar.
+   * Example: `"dt-containers"` or `"dt-images"`.
+   */
+  columnVisibilityKey?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,10 +168,54 @@ export function DataTable<T>({
   pagination,
   pageSizeOptions = [10, 25, 50, 100],
   highlightId,
+  columnVisibilityKey,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const highlightRef = useRef<HTMLTableRowElement>(null);
+  const [colMenuAnchor, setColMenuAnchor] = useState<HTMLElement | null>(null);
+
+  // ── Column visibility ──────────────────────────────────────────────────
+  const loadHiddenCols = useCallback((): Set<string> => {
+    if (!columnVisibilityKey) return new Set();
+    try {
+      const raw = localStorage.getItem(columnVisibilityKey);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      /* ignore bad data */
+    }
+    return new Set();
+  }, [columnVisibilityKey]);
+
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadHiddenCols);
+
+  const toggleColumn = useCallback(
+    (key: string) => {
+      setHiddenCols((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        if (columnVisibilityKey) {
+          localStorage.setItem(columnVisibilityKey, JSON.stringify([...next]));
+        }
+        return next;
+      });
+    },
+    [columnVisibilityKey],
+  );
+
+  // Columns that are actually rendered (respecting visibility)
+  const visibleColumns = useMemo(
+    () => columns.filter((col) => !hiddenCols.has(col.key)),
+    [columns, hiddenCols],
+  );
+
+  // Columns the user can toggle (hideable !== false)
+  const hideableColumns = useMemo(
+    () => columns.filter((col) => col.hideable !== false),
+    [columns],
+  );
 
   // Scroll highlighted row into view on first render
   useEffect(() => {
@@ -175,7 +233,7 @@ export function DataTable<T>({
   // Map our ColumnDef<T> to TanStack column defs
   const tanColumns = useMemo<TanColumnDef<T, unknown>[]>(
     () =>
-      columns.map((col) => ({
+      visibleColumns.map((col) => ({
         id: col.key,
         header: col.label,
         accessorFn: (row: T) => col.sortValue?.(row) ?? "",
@@ -183,7 +241,7 @@ export function DataTable<T>({
         enableSorting: col.sortable ?? false,
         meta: { align: col.align, minWidth: col.minWidth },
       })),
-    [columns],
+    [visibleColumns],
   );
 
   // Global text filter
@@ -201,8 +259,10 @@ export function DataTable<T>({
   const table = useReactTable<T>({
     data: filteredRows,
     columns: tanColumns,
-    state: { sorting },
+    state: { sorting, columnSizing },
     onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     ...(isPaginated
@@ -354,6 +414,62 @@ export function DataTable<T>({
             {/* Caller-supplied actions */}
             {toolbarActions}
 
+            {/* Column visibility toggle */}
+            {columnVisibilityKey && hideableColumns.length > 0 && (
+              <>
+                <Tooltip title="Toggle columns">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => setColMenuAnchor(e.currentTarget)}
+                  >
+                    <ViewColumnIcon />
+                  </IconButton>
+                </Tooltip>
+                {colMenuAnchor && (
+                  <Paper
+                    elevation={8}
+                    sx={{
+                      position: "fixed",
+                      zIndex: 1300,
+                      top: colMenuAnchor.getBoundingClientRect().bottom + 4,
+                      left: colMenuAnchor.getBoundingClientRect().left,
+                      minWidth: 180,
+                      maxHeight: 320,
+                      overflow: "auto",
+                      py: 0.5,
+                    }}
+                  >
+                    {/* Click-away overlay */}
+                    <Box
+                      sx={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: -1,
+                      }}
+                      onClick={() => setColMenuAnchor(null)}
+                    />
+                    {hideableColumns.map((col) => (
+                      <MenuItem
+                        key={col.key}
+                        dense
+                        onClick={() => toggleColumn(col.key)}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={!hiddenCols.has(col.key)}
+                          sx={{ py: 0 }}
+                        />
+                        <ListItemText
+                          primary={col.label}
+                          primaryTypographyProps={{ fontSize: "0.85rem" }}
+                        />
+                      </MenuItem>
+                    ))}
+                  </Paper>
+                )}
+              </>
+            )}
+
             {/* Refresh */}
             {onRefresh && (
               <Tooltip title="Refresh">
@@ -387,7 +503,14 @@ export function DataTable<T>({
           variant="outlined"
           sx={{ flexGrow: 1, overflow: "auto" }}
         >
-          <Table size="small" stickyHeader>
+          <Table
+            size="small"
+            stickyHeader
+            style={{
+              minWidth: table.getCenterTotalSize(),
+              tableLayout: "fixed",
+            }}
+          >
             <TableHead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -405,9 +528,16 @@ export function DataTable<T>({
                       <TableCell
                         key={header.id}
                         align={align}
-                        style={{ minWidth: meta?.minWidth }}
                         sortDirection={sorted || false}
-                        sx={{ bgcolor: "background.paper" }}
+                        sx={{
+                          width: header.getSize(),
+                          minWidth: meta?.minWidth,
+                          userSelect: "none",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          position: "relative",
+                        }}
                       >
                         {canSort ? (
                           <TableSortLabel
@@ -426,6 +556,36 @@ export function DataTable<T>({
                             header.getContext(),
                           )
                         )}
+                        {/* Column resize handle */}
+                        <Box
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          sx={{
+                            position: "absolute",
+                            right: -3,
+                            top: 0,
+                            height: "100%",
+                            width: 8,
+                            cursor: "col-resize",
+                            zIndex: 1,
+                            "&::after": {
+                              content: '""',
+                              position: "absolute",
+                              top: "25%",
+                              left: 3,
+                              width: 2,
+                              height: "50%",
+                              borderRadius: 1,
+                              bgcolor: header.column.getIsResizing()
+                                ? "primary.main"
+                                : "divider",
+                              transition: "background-color 0.15s",
+                            },
+                            "&:hover::after": {
+                              bgcolor: "primary.main",
+                            },
+                          }}
+                        />
                       </TableCell>
                     );
                   })}
@@ -436,7 +596,7 @@ export function DataTable<T>({
               {visibleRows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length}
+                    colSpan={visibleColumns.length}
                     align="center"
                     sx={{ py: 4, color: "text.secondary" }}
                   >
@@ -482,6 +642,14 @@ export function DataTable<T>({
                               | "center"
                               | "right"
                           }
+                          style={{ width: cell.column.getSize() }}
+                          sx={{
+                            maxWidth: cell.column.getSize(),
+                            overflow: "hidden",
+                            whiteSpace: "normal",
+                            overflowWrap: "anywhere",
+                            wordBreak: "break-word",
+                          }}
                         >
                           {flexRender(
                             cell.column.columnDef.cell,

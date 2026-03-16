@@ -56,6 +56,7 @@ import ChatIcon from "@mui/icons-material/Chat";
 import FolderIcon from "@mui/icons-material/Folder";
 import ForumIcon from "@mui/icons-material/Forum";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -399,16 +400,22 @@ export const NAV: NavEntry[] = [
     ],
   },
   {
-    id: "mcp",
+    id: "extensions",
     kind: "group",
-    labelKey: "nav.mcp_group",
+    labelKey: "nav.extensions_group",
     icon: <HubIcon />,
-    module: "mcp",
     children: [
       {
         to: "/admin/mcp/servers",
-        labelKey: "nav.mcp_servers",
+        labelKey: "nav.mcp_hub",
         icon: <DnsIcon />,
+        module: "mcp",
+      },
+      {
+        to: "/admin/skills",
+        labelKey: "nav.skills_hub",
+        icon: <AutoFixHighIcon />,
+        module: "skills",
       },
     ],
   },

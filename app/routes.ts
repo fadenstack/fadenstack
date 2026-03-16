@@ -86,5 +86,11 @@ export default [
         "pages/admin/mcp/MCPServerDetailPage.tsx",
       ),
     ]),
+    // Skills routes — guarded by module status
+    layout("routes/skills-guard.tsx", [
+      route("/admin/skills", "pages/admin/skills/SkillsListPage.tsx"),
+      route("/admin/skills/create", "pages/admin/skills/CreateSkillPage.tsx"),
+      route("/admin/skills/:id", "pages/admin/skills/SkillDetailPage.tsx"),
+    ]),
   ]),
 ] satisfies RouteConfig;

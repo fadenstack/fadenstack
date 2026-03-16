@@ -5,8 +5,9 @@
  * file attachments, and token‐usage extraction.
  */
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { chatApi, streamChat } from "~/api/chatClient";
+import { chatApi, resumeStream, streamChat } from "~/api/chatClient";
 import type { ChatMessage, ChatSession, TokenUsage } from "~/api/chatTypes";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
@@ -48,6 +49,7 @@ function useStreamThrottle(setter: (v: string) => void) {
 
 export interface UseChatStreamOptions {
   sessionId?: string;
+  selectedModel?: string;
   onSessionCreated?: (session: ChatSession) => void;
   onSessionUpdated?: (session: ChatSession) => void;
 }
@@ -72,9 +74,13 @@ export interface UseChatStreamReturn {
 
 export function useChatStream({
   sessionId,
+  selectedModel,
   onSessionCreated,
   onSessionUpdated,
 }: UseChatStreamOptions): UseChatStreamReturn {
+  const { t } = useTranslation();
+  const selectedModelRef = useRef(selectedModel);
+  selectedModelRef.current = selectedModel;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const streamThrottle = useStreamThrottle(setStreamingContent);
@@ -106,12 +112,74 @@ export function useChatStream({
       const msgs = await chatApi.listMessages(sid);
       setMessages(msgs);
 
+      // Check if there is an active stream we can reconnect to
+      try {
+        const { active } = await chatApi.streamStatus(sid);
+        if (active) {
+          // Reconnect to the in-progress stream
+          setIsStreaming(true);
+          streamThrottle.reset();
+          setStreamingContent("");
+          setStreamingUsage(null);
+
+          const { reader, abort } = resumeStream(sid);
+          abortRef.current = abort;
+
+          let accumulated = "";
+          let finalUsage: TokenUsage | null = null;
+
+          for await (const delta of reader) {
+            if (delta.content) {
+              accumulated += delta.content;
+              streamThrottle.push(accumulated);
+            }
+            if (delta.usage) {
+              finalUsage = delta.usage;
+              setStreamingUsage(delta.usage);
+            }
+          }
+
+          // Stream complete — materialise assistant message
+          if (accumulated.trim()) {
+            const assistantMsg: ChatMessage = {
+              id: `tmp-${Date.now()}-a`,
+              session_id: sid,
+              role: "assistant",
+              content: accumulated,
+              content_parts: null,
+              tool_call_json: null,
+              model_alias: null,
+              provider_instance_id: null,
+              token_estimate: finalUsage?.total_tokens ?? null,
+              trace_id: null,
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          }
+
+          streamThrottle.flush();
+          setStreamingContent("");
+          setStreamingUsage(null);
+          setIsStreaming(false);
+          abortRef.current = null;
+          return;
+        }
+      } catch {
+        // Stream status check failed — fall through to retry prompt
+      }
+
       // If the last message is from the user with no assistant reply,
       // the previous request likely failed — surface a retry prompt.
       if (msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
         const lastUser = msgs[msgs.length - 1];
         lastSendRef.current = { text: lastUser.content, model: "" };
-        setError("The last message did not receive a response. You can retry.");
+        setError(
+          t("error_last_message_no_response", {
+            ns: "chat",
+            defaultValue:
+              "The last message did not receive a response. You can retry.",
+          }),
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -150,7 +218,7 @@ export function useChatStream({
           );
         }
 
-        // 3. Append the user message optimistically
+        // 3. Append the user message optimistically (skip if duplicate)
         const userMsg: ChatMessage = {
           id: `tmp-${Date.now()}`,
           session_id: sid,
@@ -164,7 +232,13 @@ export function useChatStream({
           trace_id: null,
           created_at: new Date().toISOString(),
         };
-        setMessages((prev) => [...prev, userMsg]);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "user" && last.content === text) {
+            return prev;
+          }
+          return [...prev, userMsg];
+        });
 
         // 4. Start streaming
         setIsStreaming(true);
@@ -174,9 +248,18 @@ export function useChatStream({
 
         const streamStartedAt = performance.now();
 
+        if (!model) {
+          throw new Error(
+            t("error_select_model", {
+              ns: "chat",
+              defaultValue: "Please select a model before sending a message.",
+            }),
+          );
+        }
+
         const { reader, abort } = streamChat({
           session_id: sid,
-          model: model || undefined,
+          model,
           messages: [{ role: "user", content: text }],
         });
         abortRef.current = abort;
@@ -196,6 +279,14 @@ export function useChatStream({
         }
 
         // 5. Streaming complete — materialise assistant message
+        if (!accumulated.trim()) {
+          throw new Error(
+            t("error_no_response", {
+              ns: "chat",
+              defaultValue: "No response received from the model.",
+            }),
+          );
+        }
         const elapsedMs = Math.round(performance.now() - streamStartedAt);
         const assistantMsgId = `tmp-${Date.now()}-a`;
         const assistantMsg: ChatMessage = {
@@ -243,22 +334,24 @@ export function useChatStream({
   const retry = useCallback(async () => {
     const last = lastSendRef.current;
     if (!last) return;
-    // If the last user message was optimistic (tmp-*), remove it so
-    // send() can re-add it. If it's a persisted server message (real
-    // id from a reload), keep it — the gateway already has it in the
-    // session and send() will append a new optimistic copy that we
-    // deduplicate by reloading history on success.
-    setMessages((prev) => {
-      const lastUserIdx = prev.findLastIndex((m) => m.role === "user");
-      if (lastUserIdx === -1) return prev;
-      const lastUser = prev[lastUserIdx];
-      if (lastUser.id.startsWith("tmp-")) {
-        return prev.slice(0, lastUserIdx);
-      }
-      return prev;
-    });
+    // Use the currently selected model, not the one from the failed attempt
+    const model = selectedModelRef.current || last.model;
     setError(null);
-    await send(last.text, last.model, last.files);
+
+    // Reload messages from the server to get the authoritative state.
+    // This removes any optimistic duplicates and picks up messages
+    // that were persisted on the previous (failed) attempt.
+    const sid = sessionIdRef.current;
+    if (sid) {
+      try {
+        const freshMsgs = await chatApi.listMessages(sid);
+        setMessages(freshMsgs);
+      } catch {
+        // Fall back to local state if fetch fails
+      }
+    }
+
+    await send(last.text, model, last.files);
   }, [send]);
 
   return {
