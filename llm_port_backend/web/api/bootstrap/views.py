@@ -152,7 +152,8 @@ async def bootstrap(
         from llm_port_backend.settings import settings  # noqa: PLC0415
 
         # Resolve the JWT signing secret (same logic as the token endpoint).
-        secret = settings.users_secret.strip() if settings.users_secret else ""
+        # Use the secret WITHOUT stripping — JWTStrategy uses it as-is.
+        secret = settings.users_secret if settings.users_secret else ""
         if not secret and settings.settings_master_key:
             row = await session.execute(
                 text("SELECT ciphertext FROM system_setting_secret WHERE key = :k"),
@@ -169,6 +170,7 @@ async def bootstrap(
             now = int(time.time())
             claims = {
                 "sub": str(admin_user.id),
+                "aud": "fastapi-users:auth",
                 "tenant_id": payload.tenant_id,
                 "email": admin_user.email,
                 "iat": now,
