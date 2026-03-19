@@ -242,31 +242,6 @@ def dev_up(
         from llmport.commands.dev.dev_init import _run_migrations
         _run_migrations(backend_dir)
 
-    # ── Optional local-node provisioning ─────────────────────────
-    if local_node:
-        from llmport.core.local_node import provision_local_node_agent
-
-        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
-        remote_host = local_node_host.strip() or None
-        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
-        github_token = cfg.dev.github_token if cfg.dev else ""
-
-        ok = provision_local_node_agent(
-            workspace=workspace,
-            branch=branch,
-            backend_url=local_node_backend_url,
-            advertise_host=local_node_advertise_host,
-            enrollment_token=local_node_enrollment_token,
-            remote_host=remote_host,
-            use_sudo=local_node_sudo,
-            method=method,
-            github_token=github_token,
-            workdir_override=local_node_workdir.strip() or None,
-        )
-        if not ok:
-            error("Local-node provisioning failed.")
-            sys.exit(1)
-
     # ── Launch backend ────────────────────────────────────────────
     if not frontend_only:
         if not backend_dir.exists():
@@ -302,6 +277,77 @@ def dev_up(
                 "npm run dev",
             )
             success("Frontend server → http://localhost:5173")
+
+    # ── Optional local-node provisioning (after backend is up) ───
+    if local_node:
+        from llmport.core.local_node import (  # noqa: PLC0415
+            create_enrollment_token,
+            provision_local_node_agent,
+        )
+
+        enrollment_token = local_node_enrollment_token
+
+        # Auto-create token if none provided: wait for backend,
+        # then bootstrap (idempotent — skips if already done) to
+        # obtain an API token and create an enrollment token.
+        if not enrollment_token.strip():
+            from llmport.core.bootstrap import (  # noqa: PLC0415
+                bootstrap_interactive,
+                wait_for_backend,
+            )
+
+            dev_backend_url = local_node_backend_url.strip() or "http://localhost:8000"
+            console.print("  [dim]Waiting for backend to become healthy…[/dim]")
+            if wait_for_backend(dev_backend_url, timeout=60):
+                shared_dir = workspace / "llm_port_shared"
+                creds = bootstrap_interactive(
+                    dev_backend_url,
+                    shared_dir,
+                    auto_confirm=True,
+                )
+                if creds and creds.get("api_token"):
+                    info("No enrollment token provided — creating one automatically…")
+                    enrollment_token = create_enrollment_token(dev_backend_url, creds["api_token"]) or ""
+                elif not creds:
+                    # Already bootstrapped — try reading saved credentials
+                    creds_file = shared_dir / ".bootstrap-credentials"
+                    if creds_file.exists():
+                        for line in creds_file.read_text(encoding="utf-8").splitlines():
+                            if line.startswith("API_TOKEN="):
+                                api_token = line.split("=", 1)[1].strip()
+                                if api_token:
+                                    info("Using saved API token to create enrollment token…")
+                                    enrollment_token = create_enrollment_token(dev_backend_url, api_token) or ""
+                                break
+            else:
+                warning("Backend not healthy — cannot auto-create enrollment token.")
+
+            if not enrollment_token.strip():
+                warning(
+                    "No enrollment token available. Provide one with"
+                    " --local-node-enrollment-token."
+                )
+
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        remote_host = local_node_host.strip() or None
+        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
+        github_token = cfg.dev.github_token if cfg.dev else ""
+
+        ok = provision_local_node_agent(
+            workspace=workspace,
+            branch=branch,
+            backend_url=local_node_backend_url,
+            advertise_host=local_node_advertise_host,
+            enrollment_token=enrollment_token,
+            remote_host=remote_host,
+            use_sudo=local_node_sudo,
+            method=method,
+            github_token=github_token,
+            workdir_override=local_node_workdir.strip() or None,
+        )
+        if not ok:
+            error("Local-node provisioning failed.")
+            sys.exit(1)
 
     # ── Summary ───────────────────────────────────────────────────
     console.print("\n[bold green]Dev environment started![/bold green]")

@@ -118,6 +118,7 @@ def _find_shared_dir(workspace: Path) -> Path | None:
 )
 @click.option("--no-build", is_flag=True, help="Skip building images (pull only).")
 @click.option("--no-cache", is_flag=True, help="Build images without Docker cache.")
+@click.option("--gpu/--no-gpu", default=None, help="Include GPU (NVIDIA) compose overlay. Default: auto-detect.")
 @click.option("--force-env", is_flag=True, help="Regenerate .env even if it exists.")
 @click.option(
     "--skip-doctor", is_flag=True,
@@ -175,6 +176,7 @@ def deploy_cmd(
     modules: str,
     no_build: bool,
     no_cache: bool,
+    gpu: bool | None,
     force_env: bool,
     skip_doctor: bool,
     yes: bool,
@@ -339,10 +341,16 @@ def deploy_cmd(
     save_config(cfg)
 
     # ── 5. Build images ───────────────────────────────────────────
+    from llmport.core.compose import has_nvidia_gpu  # noqa: PLC0415
+
+    use_gpu = has_nvidia_gpu() if gpu is None else gpu
     compose_files = [compose_file]
     gpu_overlay = shared_dir / "docker-compose.gpu.yaml"
-    if gpu_overlay.exists():
+    if use_gpu and gpu_overlay.exists():
         compose_files.append(gpu_overlay)
+        info("NVIDIA GPU detected — including GPU overlay.")
+    elif gpu_overlay.exists():
+        info("GPU overlay skipped (no NVIDIA runtime detected or --no-gpu).")
 
     ctx = ComposeContext(
         compose_files=compose_files,
@@ -393,35 +401,8 @@ def deploy_cmd(
         sys.exit(rc)
     success("All services started.")
 
-    # ── 6. Optional local-node provisioning ───────────────────────
-    if local_node:
-        console.print("\n[bold cyan]Step 6: Local node-agent provisioning…[/bold cyan]")
-        from llmport.core.local_node import provision_local_node_agent  # noqa: PLC0415
-
-        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
-        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
-        github_token = cfg.dev.github_token if cfg.dev else ""
-        remote_host = local_node_host.strip() or None
-        workspace_for_node = shared_dir.parent
-
-        ok = provision_local_node_agent(
-            workspace=workspace_for_node,
-            branch=branch,
-            backend_url=local_node_backend_url,
-            advertise_host=local_node_advertise_host,
-            enrollment_token=local_node_enrollment_token,
-            remote_host=remote_host,
-            use_sudo=local_node_sudo,
-            method=method,
-            github_token=github_token,
-            workdir_override=local_node_workdir.strip() or None,
-        )
-        if not ok:
-            error("Local-node provisioning failed.")
-            sys.exit(1)
-
-    # ── 7. Initial admin setup ────────────────────────────────────
-    console.print("\n[bold cyan]Step 7: Initial admin setup…[/bold cyan]")
+    # ── 6. Initial admin setup ────────────────────────────────────
+    console.print("\n[bold cyan]Step 6: Initial admin setup…[/bold cyan]")
 
     from llmport.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
 
@@ -437,6 +418,7 @@ def deploy_cmd(
             pass
     backend_url = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
     console.print("  [dim]Waiting for backend to become healthy…[/dim]")
+    creds = None
     if wait_for_backend(backend_url):
         creds = bootstrap_interactive(
             backend_url,
@@ -483,6 +465,48 @@ def deploy_cmd(
     else:
         warning("Backend did not become healthy in time — skipping admin setup.")
         console.print("  [dim]Run 'llmport deploy' again or create an admin via the UI.[/dim]")
+
+    # ── 7. Optional local-node provisioning ───────────────────────
+    if local_node:
+        console.print("\n[bold cyan]Step 7: Local node-agent provisioning…[/bold cyan]")
+        from llmport.core.local_node import (  # noqa: PLC0415
+            create_enrollment_token,
+            provision_local_node_agent,
+        )
+
+        # Auto-create enrollment token if none was provided and
+        # bootstrap gave us an API token.
+        enrollment_token = local_node_enrollment_token
+        if not enrollment_token.strip() and creds and creds.get("api_token"):
+            info("No enrollment token provided — creating one automatically…")
+            enrollment_token = create_enrollment_token(backend_url, creds["api_token"]) or ""
+        if not enrollment_token.strip():
+            warning(
+                "No enrollment token available. Provide one with"
+                " --local-node-enrollment-token or re-run after bootstrap."
+            )
+
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
+        github_token = cfg.dev.github_token if cfg.dev else ""
+        remote_host = local_node_host.strip() or None
+        workspace_for_node = shared_dir.parent
+
+        ok = provision_local_node_agent(
+            workspace=workspace_for_node,
+            branch=branch,
+            backend_url=local_node_backend_url,
+            advertise_host=local_node_advertise_host,
+            enrollment_token=enrollment_token,
+            remote_host=remote_host,
+            use_sudo=local_node_sudo,
+            method=method,
+            github_token=github_token,
+            workdir_override=local_node_workdir.strip() or None,
+        )
+        if not ok:
+            error("Local-node provisioning failed.")
+            sys.exit(1)
 
     # ── 8. Endpoint summary ───────────────────────────────────────
     console.print("\n[bold green]✨ Deployment complete![/bold green]\n")

@@ -63,3 +63,9 @@ def down_cmd(*, volumes: bool, remove_orphans: bool, nuke: bool) -> None:
             info(f"Removed {removed} llmport image(s).")
         else:
             info("No llmport images to remove.")
+
+        # Stop and remove the local node agent if present.
+        from llmport.core.local_node import remove_local_node_agent  # noqa: PLC0415
+
+        workspace = cfg.install_path.parent
+        remove_local_node_agent(workspace=workspace)

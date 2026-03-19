@@ -9,11 +9,91 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import httpx
+
 from llmport.core.console import error, info, success, warning
 from llmport.core.registry import repo_clone_url
 
 _NODE_AGENT_REPO = "llm-port-node-agent"
 _NODE_AGENT_DIR = "llm_port_node_agent"
+
+
+def create_enrollment_token(
+    backend_url: str,
+    api_token: str,
+    *,
+    note: str = "Auto-enrolled local node",
+) -> str | None:
+    """Create an enrollment token via the backend API.
+
+    Returns the plaintext token string, or None on failure.
+    """
+    url = f"{backend_url.rstrip('/')}/api/admin/system/nodes/enrollment-tokens"
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = httpx.post(url, json={"note": note}, headers=headers, timeout=15)
+        if resp.status_code == 201:
+            token = resp.json().get("token", "")
+            if token:
+                success("Enrollment token created for local node.")
+                return token
+            error("Enrollment token response missing 'token' field.")
+            return None
+        error(f"Failed to create enrollment token (HTTP {resp.status_code}): {resp.text}")
+        return None
+    except httpx.HTTPError as exc:
+        error(f"Could not reach backend for enrollment token: {exc}")
+        return None
+
+
+def remove_local_node_agent(*, workspace: Path, use_sudo: bool = True) -> bool:
+    """Stop the local node agent (systemd service and/or running process).
+
+    The cloned source directory is intentionally left in place so that
+    unpushed work is never destroyed by ``llmport down --all``.
+
+    Returns True if cleanup succeeded (or nothing to clean up).
+    """
+    removed_anything = False
+
+    # ── Stop and remove systemd service (Linux only) ──────────
+    if platform.system() == "Linux" and use_sudo:
+        systemctl = shutil.which("systemctl")
+        if systemctl:
+            # Check if the service unit exists before trying to stop it
+            probe = subprocess.run(  # noqa: S603
+                ["systemctl", "list-unit-files", "llm-port-node-agent.service"],
+                capture_output=True, text=True,
+            )
+            if "llm-port-node-agent.service" in (probe.stdout or ""):
+                info("Stopping llm-port-node-agent systemd service…")
+                _run(["sudo", "systemctl", "disable", "--now", "llm-port-node-agent"], check=False)
+                _run(["sudo", "rm", "-f", "/etc/systemd/system/llm-port-node-agent.service"], check=False)
+                _run(["sudo", "rm", "-f", "/etc/llm-port-node-agent.env"], check=False)
+                _run(["sudo", "systemctl", "daemon-reload"], check=False)
+                removed_anything = True
+
+    # ── Kill any running agent process (cross-platform) ───────
+    if platform.system() == "Windows":
+        # Best-effort: kill by process name
+        subprocess.run(  # noqa: S603
+            ["taskkill", "/F", "/IM", "llm-port-node-agent.exe"],
+            capture_output=True, text=True,
+        )
+    else:
+        subprocess.run(  # noqa: S603
+            ["pkill", "-f", "llm.port.node.agent"],
+            capture_output=True, text=True,
+        )
+
+    if removed_anything:
+        success("Local node agent stopped and service removed.")
+    else:
+        info("No local node agent service found to remove.")
+    return True
 
 
 def provision_local_node_agent(
@@ -317,3 +397,18 @@ def _run(cmd: list[str], *, cwd: Path | None = None, check: bool = True) -> int:
         if detail:
             error(detail)
     return proc.returncode
+
+
+def _has_uncommitted_changes(repo_dir: Path) -> bool:
+    """Return True if *repo_dir* is a git repo with uncommitted changes."""
+    git = shutil.which("git")
+    if not git or not (repo_dir / ".git").exists():
+        # Not a git repo — be safe and assume there are changes.
+        return True
+    proc = subprocess.run(  # noqa: S603
+        [git, "status", "--porcelain"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+    return bool(proc.stdout.strip())
