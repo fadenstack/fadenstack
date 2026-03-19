@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import shlex
 import shutil
@@ -35,7 +36,7 @@ def create_enrollment_token(
     }
     try:
         resp = httpx.post(url, json={"note": note}, headers=headers, timeout=15)
-        if resp.status_code == 201:
+        if resp.status_code in (200, 201):
             token = resp.json().get("token", "")
             if token:
                 success("Enrollment token created for local node.")
@@ -156,9 +157,17 @@ def _provision_local(
     if not _install_agent_dependencies(repo_dir):
         return False
 
+    # Build the env lines shared by all platforms.
+    env_lines = [f"LLM_PORT_NODE_AGENT_BACKEND_URL={backend_url}"]
+    if advertise_host:
+        env_lines.append(f"LLM_PORT_NODE_AGENT_ADVERTISE_HOST={advertise_host}")
+    if enrollment_token:
+        env_lines.append(f"LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN={enrollment_token}")
+    else:
+        warning("No enrollment token provided. Agent will require later onboarding.")
+
     if platform.system() != "Linux":
-        warning("Systemd install is skipped on non-Linux hosts.")
-        return True
+        return _start_agent_foreground(repo_dir, env_lines)
 
     if not use_sudo:
         warning("Skipped systemd install (--local-node-no-sudo).")
@@ -169,14 +178,6 @@ def _provision_local(
     if not service_file.exists():
         error(f"Systemd service file missing: {service_file}")
         return False
-
-    env_lines = [f"LLM_PORT_NODE_AGENT_BACKEND_URL={backend_url}"]
-    if advertise_host:
-        env_lines.append(f"LLM_PORT_NODE_AGENT_ADVERTISE_HOST={advertise_host}")
-    if enrollment_token:
-        env_lines.append(f"LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN={enrollment_token}")
-    else:
-        warning("No enrollment token provided. Agent service will require later onboarding token.")
 
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
         handle.write("\n".join(env_lines))
@@ -199,6 +200,60 @@ def _provision_local(
             pass
 
     success("Local node agent installed and started via systemd.")
+    return True
+
+
+def _start_agent_foreground(repo_dir: Path, env_lines: list[str]) -> bool:
+    """Write a .env file and start the node agent as a background process (non-Linux)."""
+    # Write env file
+    env_file = repo_dir / ".env"
+    env_file.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+    info(f"Wrote agent env to {env_file}")
+
+    # Resolve the Python interpreter from the uv venv
+    if platform.system() == "Windows":
+        venv_python = repo_dir / ".venv" / "Scripts" / "python.exe"
+    else:
+        venv_python = repo_dir / ".venv" / "bin" / "python"
+
+    if not venv_python.exists():
+        # Fallback to system python
+        python = shutil.which("python3") or shutil.which("python")
+        if not python:
+            error("Cannot locate Python to start node agent.")
+            return False
+        venv_python = Path(python)
+
+    # Build environment with the agent env vars
+    proc_env = {**os.environ}
+    for line in env_lines:
+        if "=" in line:
+            k, v = line.split("=", 1)
+            proc_env[k] = v
+
+    # Launch as detached background process
+    cmd = [str(venv_python), "-m", "llm_port_node_agent"]
+    if platform.system() == "Windows":
+        # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        creationflags = 0x00000008 | 0x00000200
+        proc = subprocess.Popen(  # noqa: S603
+            cmd,
+            cwd=str(repo_dir),
+            env=proc_env,
+            creationflags=creationflags,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        proc = subprocess.Popen(  # noqa: S603
+            cmd,
+            cwd=str(repo_dir),
+            env=proc_env,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    success(f"Node agent started (PID {proc.pid}).")
     return True
 
 
