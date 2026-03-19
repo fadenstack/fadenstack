@@ -35,7 +35,6 @@ import LlmIcon from "~/components/LlmIcon";
 import ModelTrainingIcon from "@mui/icons-material/ModelTraining";
 import DownloadIcon from "@mui/icons-material/Download";
 import ScheduleIcon from "@mui/icons-material/Schedule";
-import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
@@ -265,6 +264,14 @@ export const NAV: NavEntry[] = [
     ],
   },
   {
+    id: "nodes",
+    kind: "leaf",
+    to: "/admin/nodes",
+    labelKey: "nav.nodes",
+    icon: <HubIcon />,
+    permission: "system.nodes:read",
+  },
+  {
     id: "scheduler",
     kind: "leaf",
     to: "/admin/scheduler",
@@ -471,6 +478,8 @@ export function adminPageTitle(
     return t("llm_runtime_detail.page_title");
   if (pathname.startsWith("/admin/llm/runtimes"))
     return t("llm_providers.title");
+  if (pathname.startsWith("/admin/nodes/onboarding")) return "Node Onboarding";
+  if (pathname.startsWith("/admin/nodes")) return "Node Fleet";
   if (pathname.startsWith("/admin/llm/jobs")) return t("scheduler.title");
   if (pathname.startsWith("/admin/scheduler")) return t("scheduler.title");
   if (pathname.startsWith("/admin/llm/endpoint")) return t("nav.endpoint");

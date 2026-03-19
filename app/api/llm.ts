@@ -93,6 +93,11 @@ export interface Runtime {
   generic_config: Record<string, unknown> | null;
   provider_config: Record<string, unknown> | null;
   container_ref: string | null;
+  execution_target: string;
+  assigned_node_id: string | null;
+  desired_state: string;
+  placement_explain_json: Record<string, unknown> | null;
+  last_command_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -176,6 +181,8 @@ export interface CreateRuntimePayload {
   generic_config?: Record<string, unknown>;
   provider_config?: Record<string, unknown>;
   openai_compat?: boolean;
+  target_node_id?: string;
+  placement_hints?: Record<string, unknown>;
 }
 
 export interface UpdateRuntimePayload {
@@ -183,6 +190,8 @@ export interface UpdateRuntimePayload {
   generic_config?: Record<string, unknown> | null;
   provider_config?: Record<string, unknown> | null;
   openai_compat?: boolean;
+  target_node_id?: string;
+  placement_hints?: Record<string, unknown>;
 }
 
 export interface TestEndpointPayload {
