@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { useAsyncData } from "~/lib/useAsyncData";
+import NodeOnboardingDrawer from "./NodeOnboardingPage";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -18,9 +19,16 @@ import ExploreOffIcon from "@mui/icons-material/ExploreOff";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
-function statusColor(status: string): "success" | "warning" | "error" | "default" {
+function statusColor(
+  status: string,
+): "success" | "warning" | "error" | "default" {
   if (status === "healthy") return "success";
-  if (status === "maintenance" || status === "draining" || status === "degraded") return "warning";
+  if (
+    status === "maintenance" ||
+    status === "draining" ||
+    status === "degraded"
+  )
+    return "warning";
   if (status === "offline" || status === "error") return "error";
   return "default";
 }
@@ -46,6 +54,7 @@ export default function NodeFleetPage() {
     { initialValue: [] as ManagedNode[] },
   );
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   async function runAction(key: string, action: () => Promise<void>) {
     setActionBusyKey(key);
@@ -71,7 +80,11 @@ export default function NodeFleetPage() {
           <Typography variant="body2" fontWeight={600}>
             {row.host}
           </Typography>
-          <Typography variant="caption" color="text.secondary" fontFamily="monospace">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontFamily="monospace"
+          >
             {row.agent_id}
           </Typography>
         </Box>
@@ -83,7 +96,9 @@ export default function NodeFleetPage() {
       sortable: true,
       sortValue: (row) => row.status,
       searchValue: (row) => row.status,
-      render: (row) => <Chip size="small" color={statusColor(row.status)} label={row.status} />,
+      render: (row) => (
+        <Chip size="small" color={statusColor(row.status)} label={row.status} />
+      ),
     },
     {
       key: "gpu",
@@ -104,8 +119,22 @@ export default function NodeFleetPage() {
         `${row.maintenance_mode ? "maintenance" : ""} ${row.draining ? "draining" : ""}`.trim(),
       render: (row) => (
         <Stack direction="row" spacing={0.5} flexWrap="wrap">
-          {row.maintenance_mode && <Chip size="small" label="maintenance" color="warning" variant="outlined" />}
-          {row.draining && <Chip size="small" label="draining" color="warning" variant="outlined" />}
+          {row.maintenance_mode && (
+            <Chip
+              size="small"
+              label="maintenance"
+              color="warning"
+              variant="outlined"
+            />
+          )}
+          {row.draining && (
+            <Chip
+              size="small"
+              label="draining"
+              color="warning"
+              variant="outlined"
+            />
+          )}
           {!row.maintenance_mode && !row.draining && (
             <Typography variant="body2" color="text.secondary">
               -
@@ -147,14 +176,23 @@ export default function NodeFleetPage() {
                 <OpenInNewIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title={row.maintenance_mode ? "Disable maintenance" : "Enable maintenance"}>
+            <Tooltip
+              title={
+                row.maintenance_mode
+                  ? "Disable maintenance"
+                  : "Enable maintenance"
+              }
+            >
               <span>
                 <IconButton
                   size="small"
                   onClick={(event) => {
                     event.stopPropagation();
                     runAction(maintenanceKey, async () => {
-                      await nodesApi.setMaintenance(row.id, !row.maintenance_mode);
+                      await nodesApi.setMaintenance(
+                        row.id,
+                        !row.maintenance_mode,
+                      );
                     });
                   }}
                   disabled={actionBusyKey === maintenanceKey}
@@ -186,7 +224,9 @@ export default function NodeFleetPage() {
                   onClick={(event) => {
                     event.stopPropagation();
                     runAction(invKey, async () => {
-                      await nodesApi.issueCommand(row.id, { command_type: "refresh_inventory" });
+                      await nodesApi.issueCommand(row.id, {
+                        command_type: "refresh_inventory",
+                      });
                     });
                   }}
                   disabled={actionBusyKey === invKey}
@@ -202,24 +242,30 @@ export default function NodeFleetPage() {
   ];
 
   return (
-    <DataTable
-      title="Node Fleet"
-      rows={data}
-      columns={columns}
-      rowKey={(row) => row.id}
-      loading={loading}
-      error={error}
-      onRefresh={refresh}
-      emptyMessage="No nodes registered yet."
-      searchPlaceholder="Search host or agent id"
-      onRowClick={(row) => navigate(`/admin/nodes/${row.id}`)}
-      toolbarActions={
-        <Button variant="contained" onClick={() => navigate("/admin/nodes/onboarding")}>
-          Add Node
-        </Button>
-      }
-      pagination={25}
-      columnVisibilityKey="dt-node-fleet"
-    />
+    <>
+      <DataTable
+        title="Node Fleet"
+        rows={data}
+        columns={columns}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+        onRefresh={refresh}
+        emptyMessage="No nodes registered yet."
+        searchPlaceholder="Search host or agent id"
+        onRowClick={(row) => navigate(`/admin/nodes/${row.id}`)}
+        toolbarActions={
+          <Button variant="contained" onClick={() => setOnboardingOpen(true)}>
+            Add Node
+          </Button>
+        }
+        pagination={25}
+        columnVisibilityKey="dt-node-fleet"
+      />
+      <NodeOnboardingDrawer
+        open={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+      />
+    </>
   );
 }
