@@ -10,6 +10,8 @@ CREATE DATABASE llm_port_backend;
 CREATE DATABASE llm_api;
 -- DB for MCP tool registry
 CREATE DATABASE llm_mcp;
+-- DB for Skills Registry
+CREATE DATABASE llm_skills;
 
 -- Dedicated least-privileged role for llm_api
 DO $$
