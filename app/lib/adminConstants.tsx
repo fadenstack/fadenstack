@@ -58,6 +58,7 @@ import FolderIcon from "@mui/icons-material/Folder";
 import ForumIcon from "@mui/icons-material/Forum";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import BuildIcon from "@mui/icons-material/Build";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -263,32 +264,39 @@ export const NAV: NavEntry[] = [
         icon: <ModelTrainingIcon />,
         permission: "llm.models:read",
       },
+      {
+        to: "/admin/llm/endpoint",
+        labelKey: "nav.endpoint",
+        icon: <ApiIcon />,
+        permission: "llm.graph:read",
+      },
     ],
   },
   {
-    id: "nodes",
-    kind: "leaf",
-    to: "/admin/nodes",
-    labelKey: "nav.nodes",
-    icon: <SettingsRemoteIcon />,
-    permission: "system.nodes:read",
-  },
-  {
-    id: "scheduler",
-    kind: "leaf",
-    to: "/admin/scheduler",
-    labelKey: "nav.scheduler",
-    icon: <ScheduleIcon />,
-    permission: "llm.jobs:read",
-  },
-
-  {
-    id: "endpoint",
-    kind: "leaf",
-    to: "/admin/llm/endpoint",
-    labelKey: "nav.endpoint",
-    icon: <ApiIcon />,
-    permission: "llm.graph:read",
+    id: "utilities",
+    kind: "group",
+    labelKey: "nav.utilities_group",
+    icon: <BuildIcon />,
+    children: [
+      {
+        to: "/admin/nodes",
+        labelKey: "nav.nodes",
+        icon: <SettingsRemoteIcon />,
+        permission: "system.nodes:read",
+      },
+      {
+        to: "/admin/scheduler",
+        labelKey: "nav.scheduler",
+        icon: <ScheduleIcon />,
+        permission: "llm.jobs:read",
+      },
+      {
+        to: "/admin/logs",
+        labelKey: "nav.logs",
+        icon: <ReceiptLongIcon />,
+        permission: "logs:read",
+      },
+    ],
   },
   {
     id: "access-control",
@@ -430,14 +438,6 @@ export const NAV: NavEntry[] = [
   },
   // ── Items pinned to the bottom section by default ──
   {
-    id: "logs",
-    kind: "leaf",
-    to: "/admin/logs",
-    labelKey: "nav.logs",
-    icon: <ReceiptLongIcon />,
-    permission: "logs:read",
-  },
-  {
     id: "settings",
     kind: "leaf",
     to: "/admin/settings?tab=general",
@@ -448,7 +448,7 @@ export const NAV: NavEntry[] = [
 ];
 
 /** IDs that belong to the bottom "pinned" section by default. */
-export const DEFAULT_PINNED_IDS = ["logs", "settings"];
+export const DEFAULT_PINNED_IDS = ["settings"];
 /** All nav entry IDs in definition order. */
 export const ALL_NAV_IDS = NAV.map((e) => e.id);
 /** Quick lookup from id → static NavEntry (used by DragOverlay). */
