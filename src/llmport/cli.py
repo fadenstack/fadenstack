@@ -67,6 +67,9 @@ def register_core_commands(group: click.Group | None = None) -> None:
     from llmport.commands.tune import tune_cmd
     from llmport.commands.deploy import deploy_cmd
     from llmport.commands.rebuild import rebuild_cmd
+    from llmport.commands.backup import backup_cmd
+    from llmport.commands.restore import restore_cmd
+    from llmport.commands.upgrade import upgrade_cmd
     from llmport.commands.dev.dev_group import dev_group
     from llmport.commands.admin import admin_group
 
@@ -81,6 +84,9 @@ def register_core_commands(group: click.Group | None = None) -> None:
     target.add_command(tune_cmd, "tune")
     target.add_command(deploy_cmd, "deploy")
     target.add_command(rebuild_cmd, "rebuild")
+    target.add_command(backup_cmd, "backup")
+    target.add_command(restore_cmd, "restore")
+    target.add_command(upgrade_cmd, "upgrade")
     target.add_command(dev_group, "dev")
     target.add_command(admin_group, "admin")
 
