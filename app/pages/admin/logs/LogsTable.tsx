@@ -84,7 +84,6 @@ export default function LogsTable({
   const navigate = useNavigate();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [levelFilter, setLevelFilter] = useState<string[]>([]);
-  const [serviceFilter, setServiceFilter] = useState<string[]>([]);
   const [containerFilter, setContainerFilter] = useState<string[]>([]);
 
   const flatLogs = useMemo(() => {
@@ -127,14 +126,6 @@ export default function LogsTable({
     [flatLogs],
   );
 
-  const serviceOptions = useMemo(
-    () =>
-      Array.from(new Set(flatLogs.map((r) => r.__service).filter(Boolean)))
-        .sort()
-        .map((value) => ({ value, label: value })),
-    [flatLogs],
-  );
-
   const containerOptions = useMemo(
     () =>
       Array.from(new Set(flatLogs.map((r) => r.__container).filter(Boolean)))
@@ -147,15 +138,11 @@ export default function LogsTable({
     return flatLogs.filter((row) => {
       const levelActive =
         levelFilter.length > 0 && levelFilter.length < levelOptions.length;
-      const serviceActive =
-        serviceFilter.length > 0 &&
-        serviceFilter.length < serviceOptions.length;
       const containerActive =
         containerFilter.length > 0 &&
         containerFilter.length < containerOptions.length;
 
       if (levelActive && !levelFilter.includes(row.__level)) return false;
-      if (serviceActive && !serviceFilter.includes(row.__service)) return false;
       if (containerActive && !containerFilter.includes(row.__container))
         return false;
       return true;
@@ -163,10 +150,8 @@ export default function LogsTable({
   }, [
     flatLogs,
     levelFilter,
-    serviceFilter,
     containerFilter,
     levelOptions.length,
-    serviceOptions.length,
     containerOptions.length,
   ]);
 
@@ -190,16 +175,12 @@ export default function LogsTable({
   }, [levelOptions]);
 
   useEffect(() => {
-    setServiceFilter((prev) => withDefaults(prev, serviceOptions));
-  }, [serviceOptions]);
-
-  useEffect(() => {
     setContainerFilter((prev) => withDefaults(prev, containerOptions));
   }, [containerOptions]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [levelFilter, serviceFilter, containerFilter]);
+  }, [levelFilter, containerFilter]);
 
   const columns: ColumnDef<FlattenedLog>[] = [
     {
@@ -207,7 +188,7 @@ export default function LogsTable({
       label: t("logs.time"),
       sortable: true,
       sortValue: (row) => row.__tsMs,
-      minWidth: 120,
+      minWidth: 105,
       render: (row) => (
         <Typography
           variant="body2"
@@ -225,7 +206,7 @@ export default function LogsTable({
       sortable: true,
       sortValue: (row) => row.__level,
       searchValue: (row) => row.__level,
-      minWidth: 90,
+      minWidth: 100,
       render: (row) => {
         const ui = levelUi(row.__level);
         return (
@@ -239,23 +220,6 @@ export default function LogsTable({
           />
         );
       },
-    },
-    {
-      key: "service",
-      label: t("logs.service"),
-      sortable: true,
-      sortValue: (row) => row.__service,
-      searchValue: (row) => `${row.__service} ${row.__job} ${row.__host}`,
-      minWidth: 180,
-      render: (row) => (
-        <Tooltip
-          title={`${row.__service || "—"} ${row.__job ? `(${t("logs.job")}=${row.__job})` : ""}`}
-        >
-          <Typography variant="body2" noWrap sx={{ maxWidth: 260 }}>
-            {row.__service || "—"}
-          </Typography>
-        </Tooltip>
-      ),
     },
     {
       key: "container",
@@ -308,17 +272,16 @@ export default function LogsTable({
       key: "message",
       label: t("logs.message"),
       searchValue: (row) => row.line,
-      minWidth: 480,
+      minWidth: 300,
       render: (row) => (
         <Tooltip title={row.line}>
           <Typography
             variant="body2"
             fontFamily="monospace"
             sx={{
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "100%",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
             }}
           >
             {row.line}
@@ -329,7 +292,7 @@ export default function LogsTable({
     {
       key: "copy",
       label: t("common.actions"),
-      minWidth: 90,
+      minWidth: 70,
       render: (row) => (
         <Button
           size="small"
@@ -369,21 +332,6 @@ export default function LogsTable({
         flexGrow: 1,
       }}
     >
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 0.5 }}
-      >
-        <Typography variant="caption" color="text.secondary">
-          {t("logs.lines_count", { count: filteredRows.length })}
-        </Typography>
-        {live && (
-          <Typography variant="caption" color="success.main">
-            {t("logs.live_tail_active")}
-          </Typography>
-        )}
-      </Stack>
       <DataTable
         title={t("logs.entries_title")}
         columns={columns}
@@ -391,6 +339,7 @@ export default function LogsTable({
         rowKey={(row) => row.id}
         loading={false}
         error={null}
+        tableLayout="auto"
         emptyMessage={
           flatLogs.length === 0
             ? t("logs.no_logs_found")
@@ -406,15 +355,6 @@ export default function LogsTable({
             multiValue: levelFilter,
             onMultiChange: (values) => setLevelFilter(values),
             minWidth: 120,
-          },
-          {
-            label: t("logs.service"),
-            value: "",
-            options: serviceOptions,
-            multi: true,
-            multiValue: serviceFilter,
-            onMultiChange: (values) => setServiceFilter(values),
-            minWidth: 160,
           },
           {
             label: t("logs.container"),

@@ -183,7 +183,7 @@ export default function NodePerformanceCard({
             {node.host}
           </Typography>
           <Chip
-            label={node.maintenance_mode ? "maintenance" : node.status}
+            label={node.maintenance_mode ? t("nodes.maintenance") : node.status}
             color={node.maintenance_mode ? "warning" : statusColor(node.status)}
             size="small"
             variant="outlined"
@@ -243,13 +243,13 @@ export default function NodePerformanceCard({
           <Stack spacing={0.5} sx={{ mt: 0.5 }}>
             {util.disk_percent != null && (
               <DetailRow
-                label="Disk"
+                label={t("nodes.disk")}
                 value={`${util.disk_percent.toFixed(1)}% — ${fmtBytes(util.disk_used_bytes)} used, ${fmtBytes(util.disk_free_bytes)} free`}
               />
             )}
             {util.network && (
               <DetailRow
-                label="Network"
+                label={t("nodes.network")}
                 value={`RX ${fmtBytes(util.network.bytes_recv)} / TX ${fmtBytes(util.network.bytes_sent)}`}
               />
             )}
@@ -258,16 +258,18 @@ export default function NodePerformanceCard({
                 {gpu.devices.map((dev, i) => (
                   <DetailRow
                     key={i}
-                    label={`GPU #${dev.index ?? i}`}
+                    label={`${t("nodes.gpu")} #${dev.index ?? i}`}
                     value={`${dev.utilization_pct ?? 0}% util, ${dev.memory_used_mib ?? 0}/${dev.memory_total_mib ?? 0} MiB${dev.temperature_c != null ? `, ${dev.temperature_c}°C` : ""}`}
                   />
                 ))}
               </>
             )}
-            {node.version && <DetailRow label="Agent" value={node.version} />}
+            {node.version && (
+              <DetailRow label={t("nodes.agent")} value={node.version} />
+            )}
             {Object.keys(node.labels).length > 0 && (
               <DetailRow
-                label="Labels"
+                label={t("nodes.labels")}
                 value={Object.entries(node.labels)
                   .map(([k, v]) => `${k}=${v}`)
                   .join(", ")}

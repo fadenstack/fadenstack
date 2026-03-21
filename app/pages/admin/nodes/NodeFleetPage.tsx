@@ -71,7 +71,7 @@ export default function NodeFleetPage() {
   const columns: ColumnDef<ManagedNode>[] = [
     {
       key: "host",
-      label: "Host",
+      label: t("nodes.host"),
       sortable: true,
       sortValue: (row) => row.host,
       searchValue: (row) => `${row.host} ${row.agent_id}`,
@@ -92,7 +92,7 @@ export default function NodeFleetPage() {
     },
     {
       key: "status",
-      label: "Status",
+      label: t("nodes.status"),
       sortable: true,
       sortValue: (row) => row.status,
       searchValue: (row) => row.status,
@@ -102,7 +102,7 @@ export default function NodeFleetPage() {
     },
     {
       key: "gpu",
-      label: "GPU",
+      label: t("nodes.gpu"),
       align: "center",
       sortable: true,
       sortValue: (row) => gpuCount(row),
@@ -114,7 +114,7 @@ export default function NodeFleetPage() {
     },
     {
       key: "flags",
-      label: "State",
+      label: t("nodes.state"),
       searchValue: (row) =>
         `${row.maintenance_mode ? "maintenance" : ""} ${row.draining ? "draining" : ""}`.trim(),
       render: (row) => (
@@ -145,7 +145,7 @@ export default function NodeFleetPage() {
     },
     {
       key: "last_seen",
-      label: "Last Seen",
+      label: t("nodes.last_seen"),
       sortable: true,
       sortValue: (row) => (row.last_seen ? Date.parse(row.last_seen) : 0),
       render: (row) => (
@@ -165,7 +165,7 @@ export default function NodeFleetPage() {
         const invKey = `${row.id}:inventory`;
         return (
           <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-            <Tooltip title="Details">
+            <Tooltip title={t("nodes.details")}>
               <IconButton
                 size="small"
                 onClick={(event) => {
@@ -179,8 +179,8 @@ export default function NodeFleetPage() {
             <Tooltip
               title={
                 row.maintenance_mode
-                  ? "Disable maintenance"
-                  : "Enable maintenance"
+                  ? t("nodes.disable_maintenance")
+                  : t("nodes.enable_maintenance")
               }
             >
               <span>
@@ -201,7 +201,13 @@ export default function NodeFleetPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title={row.draining ? "Disable drain" : "Enable drain"}>
+            <Tooltip
+              title={
+                row.draining
+                  ? t("nodes.disable_drain")
+                  : t("nodes.enable_drain")
+              }
+            >
               <span>
                 <IconButton
                   size="small"
@@ -217,7 +223,7 @@ export default function NodeFleetPage() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title="Refresh inventory">
+            <Tooltip title={t("nodes.refresh_inventory")}>
               <span>
                 <IconButton
                   size="small"
@@ -244,19 +250,19 @@ export default function NodeFleetPage() {
   return (
     <>
       <DataTable
-        title="Node Fleet"
+        title={t("nodes.fleet_title")}
         rows={data}
         columns={columns}
         rowKey={(row) => row.id}
         loading={loading}
         error={error}
         onRefresh={refresh}
-        emptyMessage="No nodes registered yet."
-        searchPlaceholder="Search host or agent id"
+        emptyMessage={t("nodes.no_nodes_registered")}
+        searchPlaceholder={t("nodes.search_placeholder")}
         onRowClick={(row) => navigate(`/admin/nodes/${row.id}`)}
         toolbarActions={
           <Button variant="contained" onClick={() => setOnboardingOpen(true)}>
-            Add Node
+            {t("nodes.add_node")}
           </Button>
         }
         pagination={25}
