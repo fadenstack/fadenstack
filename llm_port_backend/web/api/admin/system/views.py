@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from typing import Annotated, Any
 
@@ -683,8 +684,12 @@ async def system_node_stream(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "commands", "items": dispatch_items})
             await session.commit()
     except WebSocketDisconnect:
+        _node_id = node.id if node else "unknown"
+        logging.getLogger(__name__).info("Node agent %s disconnected from stream.", _node_id)
         await session.rollback()
     except Exception:
+        _node_id = node.id if node else "unknown"
+        logging.getLogger(__name__).exception("Node stream error for node %s.", _node_id)
         await session.rollback()
         raise
     finally:
