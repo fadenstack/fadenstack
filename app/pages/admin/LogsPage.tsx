@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
@@ -71,7 +72,10 @@ function buildLogql(
   return `${selector} |= "${search.replaceAll('"', '\\"')}"`;
 }
 
-function mergeStreams(current: LogStream[], incoming: LogStream[]): LogStream[] {
+function mergeStreams(
+  current: LogStream[],
+  incoming: LogStream[],
+): LogStream[] {
   const byKey = new Map<string, LogStream>();
   for (const stream of current) {
     const key = JSON.stringify(stream.labels);
@@ -128,8 +132,12 @@ export default function LogsPage() {
   const [live, setLive] = useState(false);
 
   const [availableLabelKeys, setAvailableLabelKeys] = useState<string[]>([]);
-  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>({});
-  const [valuesByLabel, setValuesByLabel] = useState<Record<string, string[]>>({});
+  const [selectedLabels, setSelectedLabels] = useState<Record<string, string>>(
+    {},
+  );
+  const [valuesByLabel, setValuesByLabel] = useState<Record<string, string[]>>(
+    {},
+  );
 
   const [streams, setStreams] = useState<LogStream[]>([]);
   const [loading, setLoading] = useState(false);
@@ -209,7 +217,9 @@ export default function LogsPage() {
   async function loadLabels() {
     try {
       const result = await logsApi.getLabels();
-      const preferred = LABEL_PRIORITY.filter((key) => result.labels.includes(key));
+      const preferred = LABEL_PRIORITY.filter((key) =>
+        result.labels.includes(key),
+      );
       setAvailableLabelKeys(preferred);
 
       const valuesPairs = await Promise.all(
@@ -220,7 +230,9 @@ export default function LogsPage() {
       );
       setValuesByLabel(Object.fromEntries(valuesPairs));
     } catch (e: unknown) {
-      setTopError(e instanceof Error ? e.message : t("logs.failed_load_labels"));
+      setTopError(
+        e instanceof Error ? e.message : t("logs.failed_load_labels"),
+      );
     }
   }
 
@@ -260,7 +272,14 @@ export default function LogsPage() {
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, height: "100%" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        height: "100%",
+      }}
+    >
       <Typography variant="h5" sx={{ mb: 1 }}>
         {t("logs.title")}
       </Typography>
@@ -270,8 +289,19 @@ export default function LogsPage() {
       </Tabs>
 
       {tab === "logs" && (
-        <Box sx={{ minHeight: 0, display: "flex", flexDirection: "column", flexGrow: 1 }}>
-          {topError && <Alert severity="error" sx={{ mb: 1 }}>{topError}</Alert>}
+        <Box
+          sx={{
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            flexGrow: 1,
+          }}
+        >
+          {topError && (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {topError}
+            </Alert>
+          )}
           <LogsFilters
             preset={preset}
             customStart={customStart}
@@ -289,15 +319,52 @@ export default function LogsPage() {
             onLabelValueChange={onLabelValueChange}
             onApply={onApplyFilters}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }} fontFamily="monospace">
-            {query}
-          </Typography>
-          <LogsTable streams={streams} loading={loading} error={error} live={live} />
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ mb: 0.5 }}
+            flexWrap="wrap"
+            useFlexGap
+          >
+            <Typography variant="caption" color="text.secondary">
+              {t("logs.query_hint")}
+            </Typography>
+            <Typography
+              variant="caption"
+              fontFamily="monospace"
+              color="text.secondary"
+            >
+              {query}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {streams.reduce((sum, s) => sum + s.entries.length, 0)}{" "}
+              {t("logs.lines_label", { defaultValue: "lines" })}
+            </Typography>
+            {live && (
+              <Typography variant="caption" color="success.main">
+                {t("logs.live_tail_active")}
+              </Typography>
+            )}
+          </Stack>
+          <LogsTable
+            streams={streams}
+            loading={loading}
+            error={error}
+            live={live}
+          />
         </Box>
       )}
 
       {tab === "audit" && (
-        <Box sx={{ minHeight: 0, display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <Box
+          sx={{
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            flexGrow: 1,
+          }}
+        >
           <AuditLogsTab />
         </Box>
       )}

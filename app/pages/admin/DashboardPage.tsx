@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -9,7 +9,7 @@ import {
   type HardwareInfo,
 } from "~/api/admin";
 import { providers as providersApi, type Provider } from "~/api/llm";
-import { useServices } from "~/lib/ServicesContext";
+import { nodesApi, type ManagedNode } from "~/api/nodes";
 import DataResidencyCard from "~/components/DataResidencyCard";
 
 import Alert from "@mui/material/Alert";
@@ -20,6 +20,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
+import Skeleton from "@mui/material/Skeleton";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -29,7 +30,30 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import TuneIcon from "@mui/icons-material/Tune";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import GaugeCard from "~/components/GaugeCard";
+import StatCard from "~/components/dashboard/StatCard";
+import ModuleStatusSection from "~/components/dashboard/ModuleStatusSection";
+import NodeFleetRow from "~/components/dashboard/NodeFleetRow";
+import DashboardSection from "~/components/dashboard/DashboardSection";
+import { useDashboardLayout, type SectionId } from "~/lib/useDashboardLayout";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 function fmtPct(value: number | null | undefined): string {
   if (value == null) return "N/A";
@@ -75,74 +99,61 @@ function systemBadgeColor(
   return "default";
 }
 
-interface StatCardProps {
-  label: string;
-  value: string;
-  detail?: string;
-}
-
-function StatCard({ label, value, detail }: StatCardProps) {
-  return (
-    <Card variant="outlined" sx={{ height: "100%" }}>
-      <CardContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          {label}
-        </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          {value}
-        </Typography>
-        {detail && (
-          <Typography variant="caption" color="text.secondary">
-            {detail}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function moduleStatusColor(
-  status: string,
-): "success" | "warning" | "error" | "default" {
-  if (status === "healthy") return "success";
-  if (status === "configured") return "warning";
-  if (status === "unhealthy") return "error";
-  return "default";
-}
-
-function ModuleStatusSection() {
-  const { t } = useTranslation();
-  const { services, loading: servicesLoading } = useServices();
-
-  if (servicesLoading || services.length === 0) return null;
-
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Typography variant="h6" sx={{ mb: 1.5 }}>
-          {t("dashboard.optional_modules", {
-            defaultValue: "Optional Modules",
-          })}
-        </Typography>
-        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-          {services.map((svc) => (
-            <Chip
-              key={svc.name}
-              label={`${t(`modules.${svc.name}.name`, { defaultValue: svc.display_name })}: ${svc.enabled ? t(`modules.status.${svc.status}`, { defaultValue: svc.status }) : t("modules.status.disabled", { defaultValue: "disabled" })}`}
-              color={svc.enabled ? moduleStatusColor(svc.status) : "default"}
-              variant="outlined"
-              size="small"
-            />
-          ))}
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function DashboardPage() {
   const { t } = useTranslation();
   const theme = useTheme();
+
+  /* --- Dashboard layout (DnD + visibility) --- */
+  const { layout, reorder, toggleVisibility, resetLayout } =
+    useDashboardLayout();
+  const [editMode, setEditMode] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    reorder(active.id as string, over.id as string);
+  }
+
+  const SECTION_TITLES: Record<SectionId, string> = {
+    gauges: t("dashboard.section_gauges", { defaultValue: "System Gauges" }),
+    node_fleet: t("dashboard.section_node_fleet", {
+      defaultValue: "Node Fleet",
+    }),
+    stat_cards: t("dashboard.section_stat_cards", {
+      defaultValue: "Statistics",
+    }),
+    grafana: t("dashboard.section_grafana", { defaultValue: "Grafana" }),
+    dependency_health: t("dashboard.section_dependency_health", {
+      defaultValue: "Dependency Health",
+    }),
+    module_status: t("dashboard.section_module_status", {
+      defaultValue: "Module Status",
+    }),
+    data_residency: t("dashboard.section_data_residency", {
+      defaultValue: "Data Residency",
+    }),
+    top_containers: t("dashboard.section_top_containers", {
+      defaultValue: "Top Containers",
+    }),
+    quick_links: t("dashboard.section_quick_links", {
+      defaultValue: "Quick Links",
+    }),
+  };
+
+  /* --- Data --- */
   const grafanaDashboardBaseUrl =
     (import.meta.env.VITE_GRAFANA_DASHBOARD_URL as string | undefined) ??
     "/grafana/d/llm-port-overview/llm-port-overview?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s";
@@ -169,31 +180,47 @@ export default function DashboardPage() {
   const [health, setHealth] = useState<DashboardHealth | null>(null);
   const [hw, setHw] = useState<HardwareInfo | null>(null);
   const [llmProviders, setLlmProviders] = useState<Provider[]>([]);
-  const grafanaMountRef = useRef<HTMLDivElement | null>(null);
-  const [loadGrafana, setLoadGrafana] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [nodes, setNodes] = useState<ManagedNode[]>([]);
+  const [refreshing, setRefreshing] = useState(true);
   const [rescanning, setRescanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
+  /** Fire every API independently — sections render as each resolves. */
+  function loadAll() {
+    setRefreshing(true);
     setError(null);
-    try {
-      const [o, h, hwInfo, prov] = await Promise.all([
-        dashboard.overview(),
-        dashboard.health(),
-        hardware.info().catch(() => null),
-        providersApi.list().catch(() => [] as Provider[]),
-      ]);
-      setOverview(o);
-      setHealth(h);
-      setHw(hwInfo);
-      setLlmProviders(prov);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t("dashboard.failed_load"));
-    } finally {
-      setLoading(false);
-    }
+
+    const overviewP = dashboard
+      .overview()
+      .then(setOverview)
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error ? err.message : t("dashboard.failed_load"),
+        );
+      });
+
+    const rest = [
+      dashboard
+        .health()
+        .then(setHealth)
+        .catch(() => {}),
+      hardware
+        .info()
+        .then(setHw)
+        .catch(() => {}),
+      providersApi
+        .list()
+        .then(setLlmProviders)
+        .catch(() => {}),
+      nodesApi
+        .list()
+        .then(setNodes)
+        .catch(() => {}),
+    ];
+
+    void Promise.allSettled([overviewP, ...rest]).then(() =>
+      setRefreshing(false),
+    );
   }
 
   async function rescanGpu() {
@@ -214,27 +241,48 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => {
-    void load();
+  const handleRefreshNode = useCallback((updated: ManagedNode) => {
+    setNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
   }, []);
 
-  useEffect(() => {
-    if (loadGrafana) return;
-    if (typeof window === "undefined") return;
-    const node = grafanaMountRef.current;
-    if (!node) return;
+  const refreshSingleNode = useCallback(
+    (nodeId: string) => nodesApi.get(nodeId),
+    [],
+  );
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setLoadGrafana(true);
-        }
-      },
-      { rootMargin: "300px 0px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [loadGrafana]);
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  // After the first node list arrives, immediately fetch each node
+  // individually to ensure fresh utilization data is available.
+  const initialNodeFetchDone = useRef(false);
+  useEffect(() => {
+    if (nodes.length === 0 || initialNodeFetchDone.current) return;
+    initialNodeFetchDone.current = true;
+    for (const node of nodes) {
+      nodesApi
+        .get(node.id)
+        .then((updated) => {
+          setNodes((prev) =>
+            prev.map((n) => (n.id === updated.id ? updated : n)),
+          );
+        })
+        .catch(() => {});
+    }
+  }, [nodes]);
+
+  // Auto-refresh node utilization every 30s (only when node_fleet section is visible)
+  useEffect(() => {
+    if (layout.hidden.includes("node_fleet")) return;
+    const interval = setInterval(() => {
+      nodesApi
+        .list()
+        .then(setNodes)
+        .catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [layout.hidden]);
 
   /* Remaining flat stat cards (non-gauge metrics) */
   const cards = useMemo(() => {
@@ -292,169 +340,204 @@ export default function DashboardPage() {
     return 100 - overview.disk_free_percent;
   }, [overview]);
 
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        flexShrink: 0,
-        pr: 0.5,
-      }}
-    >
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        flexWrap="wrap"
-        gap={1}
-      >
-        <Typography variant="h5">{t("dashboard.title")}</Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {loading && <CircularProgress size={20} />}
-          <Button variant="outlined" onClick={load} disabled={loading}>
-            {t("dashboard.refresh")}
-          </Button>
-        </Stack>
-      </Stack>
+  /** GPU VRAM usage as 0-100, used as gauge fallback when util is null */
+  const gpuVramPercent = useMemo(() => {
+    if (
+      !overview?.gpu_vram_used_bytes ||
+      !overview?.gpu_vram_total_bytes ||
+      overview.gpu_vram_total_bytes <= 0
+    )
+      return null;
+    return (overview.gpu_vram_used_bytes / overview.gpu_vram_total_bytes) * 100;
+  }, [overview]);
 
-      {error && <Alert severity="error">{error}</Alert>}
+  /* --- Section content renderer --- */
+  function renderSection(id: SectionId) {
+    switch (id) {
+      case "gauges": {
+        // Always render the grid shell so cards appear instantly.
+        // Individual cards show "N/A" until overview resolves;
+        // GPU label upgrades once hw resolves (separate call).
+        const cpuLabel = t("dashboard.gauges.cpu");
+        const ramLabel = t("dashboard.gauges.ram");
+        const diskLabel = t("dashboard.gauges.disk");
+        const gpuLabel = hw?.gpu.has_gpu
+          ? `GPU (${hw.gpu.primary_vendor.toUpperCase()})`
+          : t("dashboard.gauges.gpu");
 
-      {overview ? (
-        <Box>
-          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-            <Chip
-              label={t("dashboard.system", { status: overview.system_status })}
-              color={systemBadgeColor(overview.system_badge)}
-              size="small"
-            />
-            {health && (
-              <Chip
-                label={t("dashboard.dependencies", {
-                  status: health.overall_status,
-                })}
-                color={healthColor(health.overall_status)}
-                size="small"
-              />
-            )}
-          </Stack>
-
-          {/* Gauge row — CPU, RAM, Disk, GPU */}
-          <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <GaugeCard
-                label={t("dashboard.gauges.cpu")}
-                value={overview.cpu_percent}
-                detail={t("dashboard.gauges.load", {
-                  one: overview.load_1m ?? "-",
-                  five: overview.load_5m ?? "-",
-                  fifteen: overview.load_15m ?? "-",
-                })}
-              />
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <GaugeCard
-                label={t("dashboard.gauges.ram")}
-                value={ramPercent}
-                detail={fmtRatio(
-                  overview.ram_used_bytes,
-                  overview.ram_total_bytes,
-                )}
-                secondaryDetail={t("dashboard.gauges.swap", {
-                  value: fmtRatio(
-                    overview.swap_used_bytes,
-                    overview.swap_total_bytes,
-                  ),
-                })}
-              />
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <GaugeCard
-                label={t("dashboard.gauges.disk")}
-                value={diskUsedPercent}
-                detail={t("dashboard.gauges.disk_free_of", {
-                  free: fmtBytes(overview.disk_free_bytes),
-                  total: fmtBytes(overview.disk_total_bytes),
-                })}
-              />
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <Box sx={{ position: "relative" }}>
+        return (
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+              {overview ? (
+                <Chip
+                  label={t("dashboard.system", {
+                    status: overview.system_status,
+                  })}
+                  color={systemBadgeColor(overview.system_badge)}
+                  size="small"
+                />
+              ) : (
+                <Skeleton variant="rounded" width={120} height={24} />
+              )}
+              {health ? (
+                <Chip
+                  label={t("dashboard.dependencies", {
+                    status: health.overall_status,
+                  })}
+                  color={healthColor(health.overall_status)}
+                  size="small"
+                />
+              ) : (
+                <Skeleton variant="rounded" width={160} height={24} />
+              )}
+            </Stack>
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <GaugeCard
-                  label={
-                    hw?.gpu.has_gpu
-                      ? `GPU (${hw.gpu.primary_vendor.toUpperCase()})`
-                      : t("dashboard.gauges.gpu")
-                  }
-                  value={overview.gpu_util_percent}
+                  label={cpuLabel}
+                  value={overview?.cpu_percent ?? null}
                   detail={
-                    overview.gpu_util_percent != null
+                    overview
+                      ? t("dashboard.gauges.load", {
+                          one: overview.load_1m ?? "-",
+                          five: overview.load_5m ?? "-",
+                          fifteen: overview.load_15m ?? "-",
+                        })
+                      : undefined
+                  }
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <GaugeCard
+                  label={ramLabel}
+                  value={ramPercent}
+                  detail={
+                    overview
                       ? fmtRatio(
-                          overview.gpu_vram_used_bytes,
-                          overview.gpu_vram_total_bytes,
+                          overview.ram_used_bytes,
+                          overview.ram_total_bytes,
                         )
                       : undefined
                   }
                   secondaryDetail={
-                    hw?.gpu.has_gpu
-                      ? `${hw.gpu.devices.find((d) => d.vendor === hw.gpu.primary_vendor)?.model ?? hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
-                      : overview.gpu_util_percent != null
-                        ? t("dashboard.gauges.vram")
-                        : undefined
+                    overview
+                      ? t("dashboard.gauges.swap", {
+                          value: fmtRatio(
+                            overview.swap_used_bytes,
+                            overview.swap_total_bytes,
+                          ),
+                        })
+                      : undefined
                   }
                 />
-                <Tooltip
-                  title={t("dashboard.gpu_rescan", {
-                    defaultValue: "Re-detect GPUs",
-                  })}
-                >
-                  <IconButton
-                    size="small"
-                    onClick={rescanGpu}
-                    disabled={rescanning}
-                    sx={{
-                      position: "absolute",
-                      top: 4,
-                      right: 4,
-                      opacity: 0.7,
-                      "&:hover": { opacity: 1 },
-                    }}
-                  >
-                    {rescanning ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <RefreshIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                </Tooltip>
-                {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <GaugeCard
+                  label={diskLabel}
+                  value={diskUsedPercent}
+                  detail={
+                    overview
+                      ? t("dashboard.gauges.disk_free_of", {
+                          free: fmtBytes(overview.disk_free_bytes),
+                          total: fmtBytes(overview.disk_total_bytes),
+                        })
+                      : undefined
+                  }
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <Box sx={{ position: "relative", height: "100%" }}>
+                  <GaugeCard
+                    label={gpuLabel}
+                    value={overview?.gpu_util_percent ?? gpuVramPercent}
+                    innerText={
+                      overview?.gpu_util_percent == null &&
+                      gpuVramPercent != null
+                        ? `${gpuVramPercent.toFixed(1)}%`
+                        : undefined
+                    }
+                    detail={
+                      overview?.gpu_vram_total_bytes != null
+                        ? fmtRatio(
+                            overview.gpu_vram_used_bytes,
+                            overview.gpu_vram_total_bytes,
+                          )
+                        : undefined
+                    }
+                    secondaryDetail={
+                      hw?.gpu.has_gpu
+                        ? `${hw.gpu.devices.find((d) => d.vendor === hw.gpu.primary_vendor)?.model ?? hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
+                        : overview?.gpu_util_percent != null ||
+                            gpuVramPercent != null
+                          ? t("dashboard.gauges.vram")
+                          : undefined
+                    }
+                  />
                   <Tooltip
-                    title={hw.gpu.devices
-                      .map(
-                        (d) =>
-                          `#${d.index} ${d.vendor.toUpperCase()} ${d.model} (${fmtBytes(d.vram_bytes)})`,
-                      )
-                      .join("\n")}
+                    title={t("dashboard.gpu_rescan", {
+                      defaultValue: "Re-detect GPUs",
+                    })}
                   >
-                    <Chip
-                      label={`${hw.gpu.device_count} GPUs`}
+                    <IconButton
                       size="small"
-                      variant="outlined"
+                      onClick={rescanGpu}
+                      disabled={rescanning}
                       sx={{
                         position: "absolute",
-                        bottom: 6,
-                        right: 6,
-                        fontSize: "0.65rem",
-                        height: 20,
+                        top: 4,
+                        right: 4,
+                        opacity: 0.7,
+                        "&:hover": { opacity: 1 },
                       }}
-                    />
+                    >
+                      {rescanning ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <RefreshIcon fontSize="small" />
+                      )}
+                    </IconButton>
                   </Tooltip>
-                )}
-              </Box>
+                  {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
+                    <Tooltip
+                      title={hw.gpu.devices
+                        .map(
+                          (d) =>
+                            `#${d.index} ${d.vendor.toUpperCase()} ${d.model} (${fmtBytes(d.vram_bytes)})`,
+                        )
+                        .join("\n")}
+                    >
+                      <Chip
+                        label={`${hw.gpu.device_count} GPUs`}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          position: "absolute",
+                          bottom: 6,
+                          right: 6,
+                          fontSize: "0.65rem",
+                          height: 20,
+                        }}
+                      />
+                    </Tooltip>
+                  )}
+                </Box>
+              </Grid>
             </Grid>
-          </Grid>
+          </Box>
+        );
+      }
 
-          {/* Remaining stat cards */}
+      case "node_fleet":
+        return (
+          <NodeFleetRow
+            nodes={nodes}
+            onRefreshNode={handleRefreshNode}
+            refreshNode={refreshSingleNode}
+          />
+        );
+
+      case "stat_cards":
+        return overview ? (
           <Grid container spacing={1.5} columns={{ xs: 12, lg: 10 }}>
             {cards.map((card) => (
               <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
@@ -466,38 +549,45 @@ export default function DashboardPage() {
               </Grid>
             ))}
           </Grid>
-        </Box>
-      ) : loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : null}
+        ) : (
+          <Grid container spacing={1.5} columns={{ xs: 12, lg: 10 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Grid key={i} size={{ xs: 12, sm: 6, md: 4, lg: 2 }}>
+                <Skeleton variant="rounded" height={80} />
+              </Grid>
+            ))}
+          </Grid>
+        );
 
-      <Card variant="outlined">
-        <CardContent>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 1.5 }}
-          >
-            <Typography variant="h6">{t("dashboard.grafana_title")}</Typography>
-            <Button
-              component="a"
-              href={grafanaDashboardUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t("dashboard.open_full")}
-            </Button>
-          </Stack>
-
-          <Box
-            ref={grafanaMountRef}
-            sx={{ position: "relative", borderRadius: 1, overflow: "hidden" }}
-          >
-            {loadGrafana ? (
-              <>
+      case "grafana":
+        return (
+          <Card variant="outlined">
+            <CardContent>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ mb: 1.5 }}
+              >
+                <Typography variant="h6">
+                  {t("dashboard.grafana_title")}
+                </Typography>
+                <Button
+                  component="a"
+                  href={grafanaDashboardUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("dashboard.open_full")}
+                </Button>
+              </Stack>
+              <Box
+                sx={{
+                  position: "relative",
+                  borderRadius: 1,
+                  overflow: "hidden",
+                }}
+              >
                 <Box
                   component="iframe"
                   loading="lazy"
@@ -506,8 +596,8 @@ export default function DashboardPage() {
                   sx={{
                     display: "block",
                     width: "100%",
-                    minHeight: 720,
-                    height: 720,
+                    minHeight: { xs: 300, md: 720 },
+                    height: { xs: 300, md: 720 },
                     border: 0,
                     bgcolor: "background.default",
                   }}
@@ -529,175 +619,299 @@ export default function DashboardPage() {
                     bgcolor: "rgba(0,0,0,0.06)",
                     opacity: 0,
                     transition: "opacity 120ms ease-in-out",
-                    "&:hover": { opacity: 1, bgcolor: "rgba(0,0,0,0.28)" },
+                    "&:hover": {
+                      opacity: 1,
+                      bgcolor: "rgba(0,0,0,0.28)",
+                    },
                   }}
                 >
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {t("dashboard.open_grafana")}
                   </Typography>
                 </Box>
-              </>
-            ) : (
-              <Box
-                sx={{
-                  minHeight: 320,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: 1.5,
-                  border: "1px dashed",
-                  borderColor: "divider",
-                  borderRadius: 1,
-                  p: 3,
-                }}
-              >
-                <Typography color="text.secondary">
-                  {t("dashboard.open_grafana")}
-                </Typography>
-                <Button variant="outlined" onClick={() => setLoadGrafana(true)}>
-                  {t("dashboard.open_grafana", {
-                    defaultValue: "Load Grafana",
-                  })}
-                </Button>
               </Box>
-            )}
-          </Box>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        );
 
-      {health && (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 1.5 }}>
-              {t("dashboard.dependency_health")}
-            </Typography>
-            <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-              {health.items.map((item) => (
-                <Chip
-                  key={item.name}
-                  label={
-                    item.detail
-                      ? `${item.name}: ${item.status} (${item.detail})`
-                      : `${item.name}: ${item.status}`
-                  }
-                  color={healthColor(item.status)}
+      case "dependency_health":
+        return health ? (
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                {t("dashboard.dependency_health")}
+              </Typography>
+              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+                {health.items.map((item) => (
+                  <Chip
+                    key={item.name}
+                    label={
+                      item.detail
+                        ? `${item.name}: ${item.status} (${item.detail})`
+                        : `${item.name}: ${item.status}`
+                    }
+                    color={healthColor(item.status)}
+                    variant="outlined"
+                    size="small"
+                  />
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card variant="outlined">
+            <CardContent>
+              <Skeleton variant="text" width={180} height={32} sx={{ mb: 1 }} />
+              <Stack direction="row" gap={1} flexWrap="wrap">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} variant="rounded" width={120} height={24} />
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+
+      case "module_status":
+        return <ModuleStatusSection />;
+
+      case "data_residency":
+        return <DataResidencyCard providers={llmProviders} />;
+
+      case "top_containers":
+        return overview ? (
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {t("dashboard.top_cpu")}
+                  </Typography>
+                  {overview.top_cpu_containers.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      {t("dashboard.no_running_stats")}
+                    </Typography>
+                  ) : (
+                    <List dense disablePadding>
+                      {overview.top_cpu_containers.map((item) => (
+                        <ListItem key={item.container_id} disableGutters>
+                          <ListItemText
+                            primary={item.name}
+                            secondary={`${item.value.toFixed(2)} ${item.unit}`}
+                            primaryTypographyProps={{
+                              fontFamily: "monospace",
+                              fontSize: "0.85rem",
+                            }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {t("dashboard.top_memory")}
+                  </Typography>
+                  {overview.top_memory_containers.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      {t("dashboard.no_running_stats")}
+                    </Typography>
+                  ) : (
+                    <List dense disablePadding>
+                      {overview.top_memory_containers.map((item) => (
+                        <ListItem key={item.container_id} disableGutters>
+                          <ListItemText
+                            primary={item.name}
+                            secondary={fmtBytes(item.value)}
+                            primaryTypographyProps={{
+                              fontFamily: "monospace",
+                              fontSize: "0.85rem",
+                            }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        ) : (
+          <Grid container spacing={1.5}>
+            {[0, 1].map((i) => (
+              <Grid key={i} size={{ xs: 12, md: 6 }}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Skeleton
+                      variant="text"
+                      width={140}
+                      height={32}
+                      sx={{ mb: 1 }}
+                    />
+                    {Array.from({ length: 3 }).map((_, j) => (
+                      <Skeleton
+                        key={j}
+                        variant="text"
+                        height={28}
+                        sx={{ mb: 0.5 }}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        );
+
+      case "quick_links":
+        return (
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                {t("dashboard.drill_down")}
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Button
+                  component={RouterLink}
+                  to="/admin/containers"
                   variant="outlined"
-                  size="small"
-                />
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
+                >
+                  {t("dashboard.links.containers")}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/admin/logs"
+                  variant="outlined"
+                >
+                  {t("dashboard.links.logs_audit")}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/admin/stacks"
+                  variant="outlined"
+                >
+                  {t("dashboard.links.services_stacks")}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/admin/settings?tab=users"
+                  variant="outlined"
+                >
+                  {t("dashboard.links.db_users")}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/admin/llm/runtimes"
+                  variant="outlined"
+                >
+                  {t("dashboard.links.gpu_runtimes")}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        );
 
-      <ModuleStatusSection />
+      default:
+        return null;
+    }
+  }
 
-      <DataResidencyCard providers={llmProviders} />
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        flexShrink: 0,
+        pr: 0.5,
+      }}
+    >
+      {/* Toolbar */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        gap={1}
+      >
+        <Typography variant="h5">{t("dashboard.title")}</Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {refreshing && <CircularProgress size={20} />}
+          <Tooltip
+            title={t("dashboard.customize", { defaultValue: "Customize" })}
+          >
+            <IconButton
+              size="small"
+              onClick={() => setEditMode((v) => !v)}
+              color={editMode ? "primary" : "default"}
+            >
+              <TuneIcon />
+            </IconButton>
+          </Tooltip>
+          {editMode && (
+            <Tooltip
+              title={t("dashboard.reset_layout", {
+                defaultValue: "Reset layout",
+              })}
+            >
+              <IconButton size="small" onClick={resetLayout}>
+                <RestartAltIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Button variant="outlined" onClick={loadAll} disabled={refreshing}>
+            {t("dashboard.refresh")}
+          </Button>
+        </Stack>
+      </Stack>
 
-      {overview && (
-        <Grid container spacing={1.5}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  {t("dashboard.top_cpu")}
-                </Typography>
-                {overview.top_cpu_containers.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {t("dashboard.no_running_stats")}
-                  </Typography>
-                ) : (
-                  <List dense disablePadding>
-                    {overview.top_cpu_containers.map((item) => (
-                      <ListItem key={item.container_id} disableGutters>
-                        <ListItemText
-                          primary={item.name}
-                          secondary={`${item.value.toFixed(2)} ${item.unit}`}
-                          primaryTypographyProps={{
-                            fontFamily: "monospace",
-                            fontSize: "0.85rem",
-                          }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  {t("dashboard.top_memory")}
-                </Typography>
-                {overview.top_memory_containers.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {t("dashboard.no_running_stats")}
-                  </Typography>
-                ) : (
-                  <List dense disablePadding>
-                    {overview.top_memory_containers.map((item) => (
-                      <ListItem key={item.container_id} disableGutters>
-                        <ListItemText
-                          primary={item.name}
-                          secondary={fmtBytes(item.value)}
-                          primaryTypographyProps={{
-                            fontFamily: "monospace",
-                            fontSize: "0.85rem",
-                          }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
+      {error && <Alert severity="error">{error}</Alert>}
 
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1.5 }}>
-            {t("dashboard.drill_down")}
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button
-              component={RouterLink}
-              to="/admin/containers"
-              variant="outlined"
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={layout.order}
+          strategy={verticalListSortingStrategy}
+        >
+          {layout.order.map((sectionId) => (
+            <DashboardSection
+              key={sectionId}
+              id={sectionId}
+              title={SECTION_TITLES[sectionId]}
+              hidden={layout.hidden.includes(sectionId)}
+              editMode={editMode}
+              onToggleVisibility={toggleVisibility}
             >
-              {t("dashboard.links.containers")}
-            </Button>
-            <Button component={RouterLink} to="/admin/logs" variant="outlined">
-              {t("dashboard.links.logs_audit")}
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/admin/stacks"
-              variant="outlined"
+              {renderSection(sectionId)}
+            </DashboardSection>
+          ))}
+        </SortableContext>
+        <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
+          {activeId ? (
+            <Box
+              sx={{
+                bgcolor: "background.paper",
+                boxShadow: 4,
+                borderRadius: 1,
+                px: 2,
+                py: 1,
+                opacity: 0.92,
+              }}
             >
-              {t("dashboard.links.services_stacks")}
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/admin/settings?tab=users"
-              variant="outlined"
-            >
-              {t("dashboard.links.db_users")}
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/admin/llm/runtimes"
-              variant="outlined"
-            >
-              {t("dashboard.links.gpu_runtimes")}
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+              <Typography sx={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                {SECTION_TITLES[activeId as SectionId]}
+              </Typography>
+            </Box>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </Box>
   );
 }

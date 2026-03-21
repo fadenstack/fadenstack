@@ -78,6 +78,8 @@ export interface ColumnDef<T> {
   sortValue?: (row: T) => string | number;
   /** Optional min-width hint passed to the <TableCell>. */
   minWidth?: number | string;
+  /** Optional explicit width passed as TanStack column `size`. */
+  width?: number;
   /**
    * Whether the user can hide this column via the column-visibility toggle.
    * Defaults to `true`. Set to `false` for columns that must always be visible
@@ -146,6 +148,8 @@ export interface DataTableProps<T> {
    * Example: `"dt-containers"` or `"dt-images"`.
    */
   columnVisibilityKey?: string;
+  /** CSS table-layout. Defaults to `"fixed"`. Use `"auto"` when columns should size to content. */
+  tableLayout?: "fixed" | "auto";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,6 +173,7 @@ export function DataTable<T>({
   pageSizeOptions = [10, 25, 50, 100],
   highlightId,
   columnVisibilityKey,
+  tableLayout = "fixed",
 }: DataTableProps<T>) {
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -239,6 +244,7 @@ export function DataTable<T>({
         accessorFn: (row: T) => col.sortValue?.(row) ?? "",
         cell: ({ row }) => col.render(row.original),
         enableSorting: col.sortable ?? false,
+        ...(col.width != null ? { size: col.width } : {}),
         meta: { align: col.align, minWidth: col.minWidth },
       })),
     [visibleColumns],
@@ -507,8 +513,12 @@ export function DataTable<T>({
             size="small"
             stickyHeader
             style={{
-              minWidth: table.getCenterTotalSize(),
-              tableLayout: "fixed",
+              width: "100%",
+              minWidth:
+                tableLayout === "fixed"
+                  ? table.getCenterTotalSize()
+                  : undefined,
+              tableLayout,
             }}
           >
             <TableHead>
@@ -530,7 +540,10 @@ export function DataTable<T>({
                         align={align}
                         sortDirection={sorted || false}
                         sx={{
-                          width: header.getSize(),
+                          width:
+                            tableLayout === "fixed"
+                              ? header.getSize()
+                              : meta?.minWidth,
                           minWidth: meta?.minWidth,
                           userSelect: "none",
                           overflow: "hidden",
@@ -642,9 +655,16 @@ export function DataTable<T>({
                               | "center"
                               | "right"
                           }
-                          style={{ width: cell.column.getSize() }}
+                          style={
+                            tableLayout === "fixed"
+                              ? { width: cell.column.getSize() }
+                              : undefined
+                          }
                           sx={{
-                            maxWidth: cell.column.getSize(),
+                            maxWidth:
+                              tableLayout === "fixed"
+                                ? cell.column.getSize()
+                                : undefined,
                             overflow: "hidden",
                             whiteSpace: "normal",
                             overflowWrap: "anywhere",

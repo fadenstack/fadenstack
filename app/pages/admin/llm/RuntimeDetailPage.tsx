@@ -454,6 +454,21 @@ export default function RuntimeDetailPage() {
               label={t("llm_runtime_detail.openai_compat")}
               value={rt.openai_compat ? t("common.yes") : t("common.no")}
             />
+            <MetaField
+              label="Execution Target"
+              value={rt.execution_target || "local"}
+            />
+            {rt.assigned_node_id && (
+              <MetaField
+                label="Assigned Node"
+                value={rt.assigned_node_id}
+                mono
+              />
+            )}
+            <MetaField
+              label="Desired State"
+              value={rt.desired_state || "running"}
+            />
             {provider?.capabilities &&
               (provider.capabilities as Record<string, unknown>)
                 .supports_embeddings && (
@@ -490,6 +505,32 @@ export default function RuntimeDetailPage() {
               value={new Date(rt.created_at).toLocaleString()}
             />
           </Stack>
+          {rt.placement_explain_json && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                Placement Explainability
+              </Typography>
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  mt: 0.75,
+                  p: 1.25,
+                  borderRadius: 1,
+                  bgcolor: "background.default",
+                  border: 1,
+                  borderColor: "divider",
+                  fontSize: "0.76rem",
+                  fontFamily: "monospace",
+                  overflow: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {JSON.stringify(rt.placement_explain_json, null, 2)}
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
 

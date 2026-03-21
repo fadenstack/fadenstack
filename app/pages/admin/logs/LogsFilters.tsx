@@ -51,8 +51,14 @@ export default function LogsFilters({
   const { t } = useTranslation();
 
   return (
-    <Stack spacing={1.5} sx={{ mb: 2 }}>
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+    <Stack spacing={1} sx={{ mb: 1 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+      >
         <FormControl size="small" sx={{ minWidth: 130 }}>
           <InputLabel>{t("logs.time_range")}</InputLabel>
           <Select
@@ -97,26 +103,17 @@ export default function LogsFilters({
           sx={{ minWidth: 200 }}
         />
 
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <Switch checked={live} onChange={(e) => onLiveChange(e.target.checked)} />
-          <Typography variant="body2">{t("logs.live")}</Typography>
-        </Stack>
-
-        <Button variant="outlined" size="small" onClick={onApply}>
-          {t("logs.apply")}
-        </Button>
-      </Stack>
-
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
         {availableLabelKeys.map((labelKey) => (
-          <FormControl key={labelKey} size="small" sx={{ minWidth: 180 }}>
+          <FormControl key={labelKey} size="small" sx={{ minWidth: 160 }}>
             <InputLabel>{labelKey}</InputLabel>
             <Select
               value={selectedLabels[labelKey] ?? ""}
               label={labelKey}
               onChange={(e) => onLabelValueChange(labelKey, e.target.value)}
             >
-              <MenuItem value="">{t("table.all", { defaultValue: "All" })}</MenuItem>
+              <MenuItem value="">
+                {t("table.all", { defaultValue: "All" })}
+              </MenuItem>
               {(valuesByLabel[labelKey] ?? []).map((value) => (
                 <MenuItem key={value} value={value}>
                   {value}
@@ -125,13 +122,19 @@ export default function LogsFilters({
             </Select>
           </FormControl>
         ))}
-      </Stack>
 
-      <Box>
-        <Typography variant="caption" color="text.secondary">
-          {t("logs.query_hint")}
-        </Typography>
-      </Box>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Switch
+            checked={live}
+            onChange={(e) => onLiveChange(e.target.checked)}
+          />
+          <Typography variant="body2">{t("logs.live")}</Typography>
+        </Stack>
+
+        <Button variant="outlined" size="small" onClick={onApply}>
+          {t("logs.apply")}
+        </Button>
+      </Stack>
     </Stack>
   );
 }

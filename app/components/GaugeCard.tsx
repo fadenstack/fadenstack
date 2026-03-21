@@ -1,4 +1,5 @@
 import { useTheme } from "@mui/material/styles";
+import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -33,6 +34,7 @@ export default function GaugeCard({
   innerText,
 }: GaugeCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const pct = value ?? 0;
   const color = arcColor(pct, theme);
 
@@ -48,7 +50,11 @@ export default function GaugeCard({
           "&:last-child": { pb: 1.5 },
         }}
       >
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: 600 }}
+        >
           {label}
         </Typography>
 
@@ -62,7 +68,7 @@ export default function GaugeCard({
             }}
           >
             <Typography variant="h6" color="text.secondary">
-              N/A
+              {t("nodes.not_available")}
             </Typography>
           </Box>
         ) : (
@@ -92,12 +98,20 @@ export default function GaugeCard({
         )}
 
         {detail && (
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", lineHeight: 1.3 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textAlign: "center", lineHeight: 1.3 }}
+          >
             {detail}
           </Typography>
         )}
         {secondaryDetail && (
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", lineHeight: 1.3, mt: -0.25 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textAlign: "center", lineHeight: 1.3, mt: -0.25 }}
+          >
             {secondaryDetail}
           </Typography>
         )}
