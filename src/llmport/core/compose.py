@@ -21,6 +21,58 @@ from pathlib import Path
 from llmport.core.console import console, error
 
 
+# ── GPU detection ─────────────────────────────────────────────────
+
+_gpu_cache: bool | None = None
+
+
+def has_nvidia_gpu() -> bool:
+    """Return True if an NVIDIA GPU is actually usable by Docker.
+
+    Checks two things:
+      1. The Docker daemon has the ``nvidia`` runtime registered.
+      2. ``nvidia-smi`` succeeds on the host, proving real GPU
+         adapters are present (the runtime alone may be installed
+         in WSL/CI without any physical GPU).
+    """
+    global _gpu_cache  # noqa: PLW0603
+    if _gpu_cache is not None:
+        return _gpu_cache
+
+    docker = shutil.which("docker")
+    if not docker:
+        _gpu_cache = False
+        return False
+
+    # 1. Runtime check
+    try:
+        proc = subprocess.run(
+            [docker, "info", "--format", "{{.Runtimes}}"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if "nvidia" not in (proc.stdout or "").lower():
+            _gpu_cache = False
+            return False
+    except Exception:  # noqa: BLE001
+        _gpu_cache = False
+        return False
+
+    # 2. Actual GPU adapter check
+    smi = shutil.which("nvidia-smi")
+    if not smi:
+        _gpu_cache = False
+        return False
+    try:
+        proc = subprocess.run(
+            [smi, "-L"],
+            capture_output=True, text=True, timeout=10,
+        )
+        _gpu_cache = proc.returncode == 0 and "GPU" in (proc.stdout or "")
+    except Exception:  # noqa: BLE001
+        _gpu_cache = False
+    return _gpu_cache
+
+
 # ── Types ─────────────────────────────────────────────────────────
 
 
@@ -331,10 +383,23 @@ def _resolve_compose_path(cfg: "LlmportConfig") -> Path:
     return primary
 
 
-def build_context_from_config(cfg: "LlmportConfig") -> ComposeContext:
-    """Build a ComposeContext from the current config."""
+def build_context_from_config(cfg: "LlmportConfig", *, gpu: bool | None = None) -> ComposeContext:
+    """Build a ComposeContext from the current config.
+
+    *gpu* controls whether the GPU overlay is included:
+      - ``None`` (default): auto-detect via :func:`has_nvidia_gpu`
+      - ``True``: force-include the GPU overlay
+      - ``False``: never include the GPU overlay
+    """
     compose_file = _resolve_compose_path(cfg)
     files = [compose_file]
+
+    use_gpu = has_nvidia_gpu() if gpu is None else gpu
+    if use_gpu:
+        gpu_overlay = compose_file.parent / "docker-compose.gpu.yaml"
+        if gpu_overlay.exists():
+            files.append(gpu_overlay)
+
     return ComposeContext(
         compose_files=files,
         env_file=cfg.env_path if cfg.env_path.exists() else None,

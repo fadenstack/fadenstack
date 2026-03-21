@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import platform
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -127,6 +126,48 @@ def _stop_old_workers() -> None:
 @click.option("--skip-infra", is_flag=True, help="Skip shared infrastructure check.")
 @click.option("--skip-deps", is_flag=True, help="Skip dependency installation.")
 @click.option("--skip-migrations", is_flag=True, help="Skip Alembic migrations.")
+@click.option(
+    "--local-node",
+    is_flag=True,
+    help="Provision llm_port_node_agent locally or over SSH before launching dev services.",
+)
+@click.option(
+    "--local-node-host",
+    default="",
+    help="SSH host for node-agent provisioning (example: ubuntu@10.0.0.12).",
+)
+@click.option(
+    "--local-node-workdir",
+    default="",
+    help="Install directory for node-agent repo on target host.",
+)
+@click.option(
+    "--local-node-branch",
+    default="",
+    help="Git branch for llm-port-node-agent (default: config dev.branch).",
+)
+@click.option(
+    "--local-node-backend-url",
+    default="http://127.0.0.1:8000",
+    show_default=True,
+    help="Backend URL written to node-agent environment.",
+)
+@click.option(
+    "--local-node-advertise-host",
+    default="",
+    help="Host/IP that node agent advertises for runtime endpoints.",
+)
+@click.option(
+    "--local-node-enrollment-token",
+    default="",
+    help="Optional one-time enrollment token for initial node onboarding.",
+)
+@click.option(
+    "--local-node-sudo/--local-node-no-sudo",
+    default=True,
+    show_default=True,
+    help="Use sudo for systemd installation in node-agent provisioning.",
+)
 def dev_up(
     *,
     backend_only: bool,
@@ -134,6 +175,14 @@ def dev_up(
     skip_infra: bool,
     skip_deps: bool,
     skip_migrations: bool,
+    local_node: bool,
+    local_node_host: str,
+    local_node_workdir: str,
+    local_node_branch: str,
+    local_node_backend_url: str,
+    local_node_advertise_host: str,
+    local_node_enrollment_token: str,
+    local_node_sudo: bool,
 ) -> None:
     """Start backend, worker, and frontend dev servers.
 
@@ -146,6 +195,7 @@ def dev_up(
       • Worker    → uv run taskiq worker …       (task processing)
       • Frontend  → npm run dev                  (http://localhost:5173)
     """
+    cfg = load_config()
     workspace = _find_workspace()
     backend_dir = workspace / "llm_port_backend"
     frontend_dir = workspace / "llm_port_frontend"
@@ -227,6 +277,77 @@ def dev_up(
                 "npm run dev",
             )
             success("Frontend server → http://localhost:5173")
+
+    # ── Optional local-node provisioning (after backend is up) ───
+    if local_node:
+        from llmport.core.local_node import (  # noqa: PLC0415
+            create_enrollment_token,
+            provision_local_node_agent,
+        )
+
+        enrollment_token = local_node_enrollment_token
+
+        # Auto-create token if none provided: wait for backend,
+        # then bootstrap (idempotent — skips if already done) to
+        # obtain an API token and create an enrollment token.
+        if not enrollment_token.strip():
+            from llmport.core.bootstrap import (  # noqa: PLC0415
+                bootstrap_interactive,
+                wait_for_backend,
+            )
+
+            dev_backend_url = local_node_backend_url.strip() or "http://localhost:8000"
+            console.print("  [dim]Waiting for backend to become healthy…[/dim]")
+            if wait_for_backend(dev_backend_url, timeout=60):
+                shared_dir = workspace / "llm_port_shared"
+                creds = bootstrap_interactive(
+                    dev_backend_url,
+                    shared_dir,
+                    auto_confirm=True,
+                )
+                if creds and creds.get("api_token"):
+                    info("No enrollment token provided — creating one automatically…")
+                    enrollment_token = create_enrollment_token(dev_backend_url, creds["api_token"]) or ""
+                elif not creds:
+                    # Already bootstrapped — try reading saved credentials
+                    creds_file = shared_dir / ".bootstrap-credentials"
+                    if creds_file.exists():
+                        for line in creds_file.read_text(encoding="utf-8").splitlines():
+                            if line.startswith("API_TOKEN="):
+                                api_token = line.split("=", 1)[1].strip()
+                                if api_token:
+                                    info("Using saved API token to create enrollment token…")
+                                    enrollment_token = create_enrollment_token(dev_backend_url, api_token) or ""
+                                break
+            else:
+                warning("Backend not healthy — cannot auto-create enrollment token.")
+
+            if not enrollment_token.strip():
+                warning(
+                    "No enrollment token available. Provide one with"
+                    " --local-node-enrollment-token."
+                )
+
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        remote_host = local_node_host.strip() or None
+        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
+        github_token = cfg.dev.github_token if cfg.dev else ""
+
+        ok = provision_local_node_agent(
+            workspace=workspace,
+            branch=branch,
+            backend_url=local_node_backend_url,
+            advertise_host=local_node_advertise_host,
+            enrollment_token=enrollment_token,
+            remote_host=remote_host,
+            use_sudo=local_node_sudo,
+            method=method,
+            github_token=github_token,
+            workdir_override=local_node_workdir.strip() or None,
+        )
+        if not ok:
+            error("Local-node provisioning failed.")
+            sys.exit(1)
 
     # ── Summary ───────────────────────────────────────────────────
     console.print("\n[bold green]Dev environment started![/bold green]")

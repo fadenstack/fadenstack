@@ -105,6 +105,33 @@ def _find_shared_dir(workspace: Path) -> Path | None:
     return None
 
 
+def _login_for_api_token(backend_url: str, email: str) -> str | None:
+    """Prompt for password, login via the auth endpoint, and return an access token."""
+    import click  # noqa: PLC0415
+
+    import httpx  # noqa: PLC0415
+
+    from llmport.core.console import error, success  # noqa: PLC0415
+
+    password = click.prompt(f"  Password for {email}", hide_input=True, show_default=False)
+    try:
+        resp = httpx.post(
+            f"{backend_url.rstrip('/')}/api/auth/jwt/login",
+            data={"username": email, "password": password},
+            timeout=15,
+        )
+        if resp.status_code == 200:  # noqa: PLR2004
+            token = resp.json().get("access_token", "")
+            if token:
+                success("Logged in — creating enrollment token…")
+                return token
+        error(f"Login failed (HTTP {resp.status_code})")
+        return None
+    except httpx.HTTPError as exc:
+        error(f"Could not reach backend for login: {exc}")
+        return None
+
+
 @click.command("deploy")
 @click.argument(
     "install_dir",
@@ -118,6 +145,7 @@ def _find_shared_dir(workspace: Path) -> Path | None:
 )
 @click.option("--no-build", is_flag=True, help="Skip building images (pull only).")
 @click.option("--no-cache", is_flag=True, help="Build images without Docker cache.")
+@click.option("--gpu/--no-gpu", default=None, help="Include GPU (NVIDIA) compose overlay. Default: auto-detect.")
 @click.option("--force-env", is_flag=True, help="Regenerate .env even if it exists.")
 @click.option(
     "--skip-doctor", is_flag=True,
@@ -127,15 +155,65 @@ def _find_shared_dir(workspace: Path) -> Path | None:
     "--yes", "-y", is_flag=True,
     help="Auto-confirm all prompts.",
 )
+@click.option(
+    "--local-node",
+    is_flag=True,
+    help="Provision llm_port_node_agent locally or over SSH during deployment.",
+)
+@click.option(
+    "--local-node-host",
+    default="",
+    help="SSH host for node-agent provisioning (example: ubuntu@10.0.0.12).",
+)
+@click.option(
+    "--local-node-workdir",
+    default="",
+    help="Install directory for node-agent repo on target host.",
+)
+@click.option(
+    "--local-node-branch",
+    default="",
+    help="Git branch for llm-port-node-agent (default: config dev.branch).",
+)
+@click.option(
+    "--local-node-backend-url",
+    default="",
+    help="Backend URL written to node-agent environment. Default: same as deploy target.",
+)
+@click.option(
+    "--local-node-advertise-host",
+    default="",
+    help="Host/IP that node agent advertises for runtime endpoints.",
+)
+@click.option(
+    "--local-node-enrollment-token",
+    default="",
+    help="Optional one-time enrollment token for initial node onboarding.",
+)
+@click.option(
+    "--local-node-sudo/--local-node-no-sudo",
+    default=True,
+    show_default=True,
+    help="Use sudo for systemd installation in node-agent provisioning.",
+)
 def deploy_cmd(
     install_dir: str | None,
     *,
     modules: str,
     no_build: bool,
     no_cache: bool,
+    gpu: bool | None,
     force_env: bool,
     skip_doctor: bool,
     yes: bool,
+    local_node: bool,
+    local_node_host: str,
+    local_node_workdir: str,
+    local_node_branch: str,
+    local_node_backend_url: str,
+    local_node_advertise_host: str,
+    local_node_enrollment_token: str,
+    local_node_sudo: bool,
 ) -> None:
     """Deploy llm.port to a local production environment.
 
@@ -274,9 +352,18 @@ def deploy_cmd(
     if "HF_CACHE_DIR" not in existing:
         hf_default = Path.home() / ".cache" / "huggingface" / "hub"
         if hf_default.is_dir():
+            # Docker Desktop on Windows needs POSIX-style paths
+            # (e.g. /c/Users/…) because ':' is used as the volume
+            # mount delimiter in compose files.
+            hf_str = str(hf_default)
+            if sys.platform == "win32":
+                hf_str = hf_default.as_posix()
+                # C:/Users/… → /c/Users/…
+                if len(hf_str) >= 2 and hf_str[1] == ":":
+                    hf_str = "/" + hf_str[0].lower() + hf_str[2:]
             with env_path.open("a", encoding="utf-8") as f:
                 f.write("\n# HuggingFace cache — auto-detected, mount into backend\n")
-                f.write(f"HF_CACHE_DIR={hf_default}\n")
+                f.write(f"HF_CACHE_DIR={hf_str}\n")
             info(f"Auto-detected HF cache: {hf_default}")
     # Ensure empty fallback directory exists for compose
     fallback_dir = shared_dir / ".empty-hf-cache"
@@ -289,10 +376,16 @@ def deploy_cmd(
     save_config(cfg)
 
     # ── 5. Build images ───────────────────────────────────────────
+    from llmport.core.compose import has_nvidia_gpu  # noqa: PLC0415
+
+    use_gpu = has_nvidia_gpu() if gpu is None else gpu
     compose_files = [compose_file]
     gpu_overlay = shared_dir / "docker-compose.gpu.yaml"
-    if gpu_overlay.exists():
+    if use_gpu and gpu_overlay.exists():
         compose_files.append(gpu_overlay)
+        info("NVIDIA GPU detected — including GPU overlay.")
+    elif gpu_overlay.exists():
+        info("GPU overlay skipped (no NVIDIA runtime detected or --no-gpu).")
 
     ctx = ComposeContext(
         compose_files=compose_files,
@@ -343,7 +436,7 @@ def deploy_cmd(
         sys.exit(rc)
     success("All services started.")
 
-    # ── 7. Initial admin setup ────────────────────────────────────
+    # ── 6. Initial admin setup ────────────────────────────────────
     console.print("\n[bold cyan]Step 6: Initial admin setup…[/bold cyan]")
 
     from llmport.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
@@ -360,6 +453,7 @@ def deploy_cmd(
             pass
     backend_url = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
     console.print("  [dim]Waiting for backend to become healthy…[/dim]")
+    creds = None
     if wait_for_backend(backend_url):
         creds = bootstrap_interactive(
             backend_url,
@@ -406,6 +500,57 @@ def deploy_cmd(
     else:
         warning("Backend did not become healthy in time — skipping admin setup.")
         console.print("  [dim]Run 'llmport deploy' again or create an admin via the UI.[/dim]")
+
+    # ── 7. Optional local-node provisioning ───────────────────────
+    if local_node:
+        console.print("\n[bold cyan]Step 7: Local node-agent provisioning…[/bold cyan]")
+        from llmport.core.local_node import (  # noqa: PLC0415
+            create_enrollment_token,
+            provision_local_node_agent,
+        )
+
+        # Auto-create enrollment token if none was provided and
+        # bootstrap gave us an API token.
+        enrollment_token = local_node_enrollment_token
+        if not enrollment_token.strip() and creds and creds.get("api_token"):
+            info("No enrollment token provided — creating one automatically…")
+            enrollment_token = create_enrollment_token(backend_url, creds["api_token"]) or ""
+        if not enrollment_token.strip():
+            # Bootstrap already happened — try logging in to get a token.
+            info("No API token from bootstrap — attempting login…")
+            api_token = _login_for_api_token(backend_url, cfg.admin_email)
+            if api_token:
+                enrollment_token = create_enrollment_token(backend_url, api_token) or ""
+        if not enrollment_token.strip():
+            warning(
+                "No enrollment token available. Provide one with"
+                " --local-node-enrollment-token or re-run after bootstrap."
+            )
+
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
+        github_token = cfg.dev.github_token if cfg.dev else ""
+        remote_host = local_node_host.strip() or None
+        workspace_for_node = shared_dir.parent
+
+        # Default to the resolved backend URL (via nginx) if not explicitly set.
+        node_backend = local_node_backend_url.strip() or backend_url
+
+        ok = provision_local_node_agent(
+            workspace=workspace_for_node,
+            branch=branch,
+            backend_url=node_backend,
+            advertise_host=local_node_advertise_host,
+            enrollment_token=enrollment_token,
+            remote_host=remote_host,
+            use_sudo=local_node_sudo,
+            method=method,
+            github_token=github_token,
+            workdir_override=local_node_workdir.strip() or None,
+        )
+        if not ok:
+            error("Local-node provisioning failed.")
+            sys.exit(1)
 
     # ── 8. Endpoint summary ───────────────────────────────────────
     console.print("\n[bold green]✨ Deployment complete![/bold green]\n")
