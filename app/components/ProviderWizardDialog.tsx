@@ -1,7 +1,7 @@
 /**
  * ProviderWizardDialog — multi-step wizard for creating a new Provider.
  *
- * Step 1: Name, target (local / remote), engine, endpoint.
+ * Step 1: Name, target (local / remote), engine, endpoint, deployment target.
  * Step 2: Runtime config for local Docker providers.
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -22,6 +22,7 @@ import {
   type VllmImagePreset,
   type PullProgressEvent,
 } from "~/api/admin";
+import { nodesApi, type ManagedNode } from "~/api/nodes";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -127,6 +128,11 @@ export function ProviderWizardDialog({
   const [testMessage, setTestMessage] = useState("");
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
+  // Node deployment target (local Docker providers)
+  const [nodeList, setNodeList] = useState<ManagedNode[]>([]);
+  const [nodesLoading, setNodesLoading] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+
   // Step 2 — runtime config (local only)
   const [modelId, setModelId] = useState("");
   const [hwInfo, setHwInfo] = useState<HardwareInfo | null>(null);
@@ -175,6 +181,7 @@ export function ProviderWizardDialog({
       setTestStatus("idle");
       setTestMessage("");
       setDiscoveredModels([]);
+      setSelectedNodeId("");
       setModelId("");
       setHwInfo(null);
       setImageChoice(AUTO_IMAGE_VALUE);
@@ -206,13 +213,47 @@ export function ProviderWizardDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [legacyGpu]);
 
-  // Fetch hardware info for step 2
+  // Fetch available nodes when wizard opens with local_docker target
+  useEffect(() => {
+    if (!open || target !== "local_docker") return;
+    let cancelled = false;
+    setNodesLoading(true);
+    nodesApi
+      .list()
+      .then((nodes) => {
+        if (!cancelled) {
+          // Only show healthy, scheduler-eligible, non-draining nodes
+          setNodeList(
+            nodes.filter(
+              (n) =>
+                n.scheduler_eligible &&
+                !n.maintenance_mode &&
+                !n.draining &&
+                (n.status === "healthy" || n.status === "degraded"),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNodeList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setNodesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, target]);
+
+  // Fetch hardware info for step 2 — local or from a specific node
   useEffect(() => {
     if (!open || step !== 1 || target !== "local_docker") return;
     let cancelled = false;
     setHwLoading(true);
-    hardware
-      .info()
+    const hwPromise = selectedNodeId
+      ? nodesApi.hardware(selectedNodeId)
+      : hardware.info();
+    hwPromise
       .then((info) => {
         if (!cancelled) {
           setHwInfo(info);
@@ -227,7 +268,7 @@ export function ProviderWizardDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, step, target]);
+  }, [open, step, target, selectedNodeId]);
 
   // ── Subscribe to pull progress via SSE ──────────────────────────
   const subscribeToPull = useCallback((pullId: string) => {
@@ -458,6 +499,7 @@ export function ProviderWizardDialog({
           openai_compat: openaiCompat,
           ...(Object.keys(generic_config).length > 0 && { generic_config }),
           ...(Object.keys(provider_config).length > 0 && { provider_config }),
+          ...(selectedNodeId && { target_node_id: selectedNodeId }),
         };
         await runtimes.create(rtPayload);
       }
@@ -535,6 +577,48 @@ export function ProviderWizardDialog({
                   {PROVIDER_TYPES.map((pt) => (
                     <MenuItem key={pt} value={pt}>
                       {pt}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {target === "local_docker" && (
+              <FormControl fullWidth>
+                <InputLabel>
+                  {t("llm_providers.deploy_target", "Deploy To")}
+                </InputLabel>
+                <Select
+                  value={selectedNodeId}
+                  label={t("llm_providers.deploy_target", "Deploy To")}
+                  onChange={(e) => {
+                    setSelectedNodeId(e.target.value);
+                    // Reset step-2 state when deployment target changes
+                    setHwInfo(null);
+                    setImageChoice(AUTO_IMAGE_VALUE);
+                    setImageStatus("idle");
+                  }}
+                  disabled={nodesLoading}
+                >
+                  <MenuItem value="">
+                    <Typography variant="body2">
+                      {t(
+                        "llm_providers.deploy_this_server",
+                        "This Server (local)",
+                      )}
+                    </Typography>
+                  </MenuItem>
+                  {nodeList.map((node) => (
+                    <MenuItem key={node.id} value={node.id}>
+                      <Stack>
+                        <Typography variant="body2">{node.host}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {node.agent_id}
+                          {node.latest_inventory
+                            ? ` · ${(node.latest_inventory as Record<string, unknown>).gpu_count ?? 0} GPU(s)`
+                            : ""}
+                        </Typography>
+                      </Stack>
                     </MenuItem>
                   ))}
                 </Select>

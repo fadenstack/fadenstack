@@ -1,3 +1,5 @@
+import type { HardwareInfo } from "~/api/admin";
+
 const BASE = "/api/admin/system";
 
 export interface NodeEnrollmentToken {
@@ -141,6 +143,13 @@ export const nodesApi = {
   commandTimeline(nodeId: string, commandId: string) {
     return request<NodeCommandTimeline>(
       `/nodes/${encodeURIComponent(nodeId)}/commands/${encodeURIComponent(commandId)}`,
+    );
+  },
+
+  /** Get GPU hardware info for a specific node (same shape as /admin/hardware). */
+  hardware(nodeId: string) {
+    return request<HardwareInfo>(
+      `/nodes/${encodeURIComponent(nodeId)}/hardware`,
     );
   },
 };
