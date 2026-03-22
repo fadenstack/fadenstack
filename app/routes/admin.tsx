@@ -104,6 +104,17 @@ function AdminLayoutInner() {
   async function ensureAuthenticated() {
     try {
       const access = await fetchMeAccessDedup();
+      if (!access.is_superuser) {
+        writeCachedAccess({
+          email: access.email,
+          isSuperuser: access.is_superuser,
+          permissions: access.permissions.map(
+            (p) => `${p.resource}:${p.action}`,
+          ),
+        });
+        navigate("/chat", { replace: true });
+        return;
+      }
       applyAccessState(access);
     } catch {
       clearCachedAccess();
@@ -138,14 +149,16 @@ function AdminLayoutInner() {
     const freshCachedAccess = readCachedAccess();
     const cachedAccess = freshCachedAccess ?? readCachedAccessAnyAge();
     if (cachedAccess !== null) {
+      if (!cachedAccess.isSuperuser) {
+        navigate("/chat", { replace: true });
+        return;
+      }
       setCurrentUserEmail(cachedAccess.email);
       setIsSuperuser(cachedAccess.isSuperuser);
       setPermissionKeys(new Set(cachedAccess.permissions));
       setAuthReady(true);
     }
-    if (freshCachedAccess === null) {
-      void ensureAuthenticated();
-    }
+    void ensureAuthenticated();
     void loadLanguages();
   }, []);
 
@@ -174,6 +187,7 @@ function AdminLayoutInner() {
     try {
       await auth.logout();
     } finally {
+      clearCachedAccess();
       navigate("/login", { replace: true });
     }
   }

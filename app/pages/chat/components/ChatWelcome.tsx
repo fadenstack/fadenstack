@@ -217,14 +217,18 @@ export default function ChatWelcome({
           sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 2 }}
         />
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          {t("chat.welcome_title", { defaultValue: "How can I help you?" })}
+          {t("welcome_title", {
+            ns: "chat",
+            defaultValue: "How can I help you?",
+          })}
         </Typography>
         <Typography
           variant="body1"
           color="text.secondary"
           sx={{ mb: 4, maxWidth: 480, textAlign: "center" }}
         >
-          {t("chat.welcome_subtitle", {
+          {t("welcome_subtitle", {
+            ns: "chat",
             defaultValue:
               "Start a conversation, upload a file, or try one of these suggestions.",
           })}

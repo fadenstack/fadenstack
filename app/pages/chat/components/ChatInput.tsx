@@ -148,7 +148,10 @@ export default function ChatInput({
           fullWidth
           placeholder={
             placeholder ??
-            t("chat.input_placeholder", { defaultValue: "Type a message…" })
+            t("input_placeholder", {
+              ns: "chat",
+              defaultValue: "Type a message…",
+            })
           }
           value={text}
           onChange={(e) => setText(e.target.value)}

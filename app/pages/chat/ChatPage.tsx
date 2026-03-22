@@ -17,6 +17,7 @@ import { useTheme } from "@mui/material/styles";
 import { chatApi, type ChatSession, type ChatProject } from "~/api/chatClient";
 import { auth, type AuthUser } from "~/api/auth";
 import { listLanguages, type UiLanguage } from "~/api/i18n";
+import { clearCachedAccess } from "~/lib/adminConstants";
 import type { InitialMessageState } from "./components/ChatWelcome";
 import ChatSidebar from "./components/ChatSidebar";
 import ChatWelcome from "./components/ChatWelcome";
@@ -149,6 +150,7 @@ export default function ChatPage() {
 
   const handleLogout = useCallback(async () => {
     await auth.logout();
+    clearCachedAccess();
     navigate("/");
   }, [navigate]);
 

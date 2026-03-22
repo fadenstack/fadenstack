@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
 import { auth } from "~/api/auth";
 import { adminAuthProviders, type AuthProviderPublic } from "~/api/admin";
+import { clearCachedAccess } from "~/lib/adminConstants";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
@@ -21,6 +22,16 @@ export default function LoginPage() {
   const [params] = useSearchParams();
   const next = params.get("next") || "/admin/dashboard";
 
+  function resolvePostLoginPath(
+    user: { is_superuser: boolean },
+    target: string,
+  ) {
+    if (!user.is_superuser && target.startsWith("/admin")) {
+      return "/chat";
+    }
+    return target;
+  }
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,11 +41,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     let cancelled = false;
+    clearCachedAccess();
     auth
       .me()
-      .then(() => {
+      .then((user) => {
         if (!cancelled) {
-          navigate(next, { replace: true });
+          navigate(resolvePostLoginPath(user, next), { replace: true });
         }
       })
       .catch(() => {
@@ -82,7 +94,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await auth.login(username, password);
-      navigate(next, { replace: true });
+      const user = await auth.me();
+      navigate(resolvePostLoginPath(user, next), { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
@@ -95,7 +108,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await auth.devLogin();
-      navigate(next, { replace: true });
+      const user = await auth.me();
+      navigate(resolvePostLoginPath(user, next), { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Dev login failed.");
     } finally {

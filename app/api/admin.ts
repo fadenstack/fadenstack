@@ -6,6 +6,8 @@
  * mirroring the server-side matrix.
  */
 
+import { clearCachedAccess } from "~/lib/adminConstants";
+
 const BASE = "/api/admin";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,6 +252,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      clearCachedAccess();
+    }
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`API ${res.status}: ${text}`);
   }
