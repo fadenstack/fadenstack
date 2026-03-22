@@ -115,8 +115,18 @@ class NodeControlDAO:
             node.capabilities_json = capabilities_json
         if version is not None:
             node.version = version
-        node.last_seen = datetime.now(tz=UTC)
+        now = datetime.now(tz=UTC)
+        node.last_seen = now
+        node.updated_at = now  # set explicitly to avoid server-side refresh after flush
         return node
+
+    async def delete_node(self, *, node_id: uuid.UUID) -> bool:
+        node = await self.get_node_by_id(node_id)
+        if node is None:
+            return False
+        await self.session.delete(node)
+        await self.session.flush()
+        return True
 
     async def list_nodes(self) -> list[InfraNode]:
         result = await self.session.execute(select(InfraNode).order_by(InfraNode.host.asc()))

@@ -348,6 +348,9 @@ class NodeControlService:
         await self._dao.sync_legacy_infra_agent(node=node)
         return self.serialize_node(node)
 
+    async def delete_node(self, *, node_id: uuid.UUID) -> bool:
+        return await self._dao.delete_node(node_id=node_id)
+
     async def list_nodes(self) -> list[dict[str, Any]]:
         rows = await self._dao.list_nodes()
         return [self.serialize_node(item) for item in rows]

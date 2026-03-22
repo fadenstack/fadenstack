@@ -1059,7 +1059,16 @@
     "stat_projects": "Projets",
     "stat_sessions": "Sessions",
     "stat_attachments": "Pièces jointes",
-    "stat_storage": "Stockage total"
+    "stat_storage": "Stockage total",
+    "status_active": "active",
+    "status_archived": "archivée",
+    "status_deleted": "supprimée",
+    "extraction_pending": "en attente",
+    "extraction_completed": "terminée",
+    "extraction_failed": "échec",
+    "extraction_skipped": "ignorée",
+    "scope_session": "session",
+    "scope_project": "projet"
   },
   "chat": {
     "title": "Conversation",

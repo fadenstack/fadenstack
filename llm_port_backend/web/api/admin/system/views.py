@@ -463,6 +463,22 @@ async def system_node_get(
     return NodeDTO(**payload)
 
 
+@router.delete("/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT, name="system_node_delete")
+async def system_node_delete(
+    node_id: str,
+    _user: Annotated[User, Depends(require_permission("system.nodes", "manage"))],
+    service: NodeControlService = Depends(get_node_control_service),
+) -> None:
+    """Delete a registered node and all its associated data."""
+    try:
+        parsed = uuid.UUID(node_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid node id.") from exc
+    deleted = await service.delete_node(node_id=parsed)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node not found.")
+
+
 @router.post("/nodes/{node_id}/maintenance", response_model=NodeDTO, name="system_node_maintenance")
 async def system_node_maintenance(
     node_id: str,
@@ -584,6 +600,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
         return
 
     session = session_factory()
+    session.expire_on_commit = False
     dao = NodeControlDAO(session)
     service = NodeControlService(
         dao=dao,
@@ -602,10 +619,11 @@ async def system_node_stream(websocket: WebSocket) -> None:
         await session.close()
         return
 
+    _node_id = node.id  # cache before any commit may expire the object
     await websocket.accept()
     try:
         stream_session = await service.create_stream_session(node=node, credential=credential)
-        commands = await service.list_commands_for_dispatch(node_id=node.id)
+        commands = await service.list_commands_for_dispatch(node_id=_node_id)
         await websocket.send_json(
             {
                 "type": "hello_ack",
@@ -684,11 +702,9 @@ async def system_node_stream(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "commands", "items": dispatch_items})
             await session.commit()
     except WebSocketDisconnect:
-        _node_id = node.id if node else "unknown"
         logging.getLogger(__name__).info("Node agent %s disconnected from stream.", _node_id)
         await session.rollback()
     except Exception:
-        _node_id = node.id if node else "unknown"
         logging.getLogger(__name__).exception("Node stream error for node %s.", _node_id)
         await session.rollback()
         raise
