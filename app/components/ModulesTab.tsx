@@ -4,9 +4,12 @@
  *
  * Lives at  /admin/settings?tab=modules
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -20,17 +23,26 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import ArticleIcon from "@mui/icons-material/Article";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
 import ContainerLogsDialog from "~/components/ContainerLogsDialog";
+import PiiPolicyForm from "~/components/PiiPolicyForm";
+import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import { useServices } from "~/lib/ServicesContext";
 import { servicesApi, type ServiceInfo } from "~/api/services";
+import {
+  systemSettingsApi,
+  type SystemSettingSchemaItem,
+} from "~/api/systemSettings";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -52,6 +64,92 @@ function containerStateColor(
   return "default";
 }
 
+function isPiiSettingKey(key: string): boolean {
+  return key.startsWith("llm_port_api.pii_");
+}
+
+function isMailerSettingKey(key: string): boolean {
+  return key.startsWith("llm_port_mailer.");
+}
+
+function isMcpSettingKey(key: string): boolean {
+  return key.startsWith("llm_port_api.mcp_") || key.startsWith("llm_port_mcp.");
+}
+
+function isSkillsSettingKey(key: string): boolean {
+  return (
+    key.startsWith("llm_port_api.skills_") || key.startsWith("llm_port_skills.")
+  );
+}
+
+function isRagLiteSettingKey(key: string): boolean {
+  return (
+    key.startsWith("llm_port_api.rag_lite_") || key.startsWith("llm_port_rag.")
+  );
+}
+
+function isModuleEnableFlag(key: string): boolean {
+  const explicitModuleFlags = new Set([
+    "llm_port_api.pii_enabled",
+    "llm_port_api.mailer_enabled",
+    "llm_port_api.mcp_enabled",
+    "llm_port_api.skills_enabled",
+    "llm_port_api.rag_lite_enabled",
+    "llm_port_pii.enabled",
+    "llm_port_mailer.enabled",
+    "llm_port_mcp.enabled",
+    "llm_port_skills.enabled",
+    "llm_port_rag.enabled",
+  ]);
+  if (explicitModuleFlags.has(key)) return true;
+  return /(?:^|\.)(pii|mailer|mcp|skills|rag_lite)_enabled$/.test(key);
+}
+
+function moduleSettingsFor(
+  moduleName: string,
+  schema: SystemSettingSchemaItem[],
+): SystemSettingSchemaItem[] {
+  if (moduleName === "pii") {
+    return schema.filter(
+      (item) => isPiiSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
+  if (moduleName === "mailer") {
+    return schema.filter(
+      (item) => isMailerSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
+  if (moduleName === "mcp") {
+    return schema.filter(
+      (item) => isMcpSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
+  if (moduleName === "skills") {
+    return schema.filter(
+      (item) => isSkillsSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
+  if (moduleName === "rag_lite") {
+    return schema.filter(
+      (item) => isRagLiteSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
+  return [];
+}
+
+function asInputValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export default function ModulesTab() {
@@ -65,6 +163,146 @@ export default function ModulesTab() {
     action: "enable" | "disable";
   } | null>(null);
   const [logsModule, setLogsModule] = useState<ServiceInfo | null>(null);
+  const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [settingsSchema, setSettingsSchema] = useState<
+    SystemSettingSchemaItem[]
+  >([]);
+  const [settingsValues, setSettingsValues] = useState<Record<string, unknown>>(
+    {},
+  );
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsBusyKey, setSettingsBusyKey] = useState<string | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState<string | null>(null);
+  const [piiOptionsLoading, setPiiOptionsLoading] = useState(false);
+  const [piiOptionsError, setPiiOptionsError] = useState<string | null>(null);
+  const [piiOptions, setPiiOptions] = useState<Awaited<
+    ReturnType<typeof fetchPIIPolicyOptions>
+  > | null>(null);
+
+  const piiPolicyValue = useMemo(
+    () =>
+      normalizePIIPolicy(
+        settingsValues["llm_port_api.pii_default_policy"],
+        piiOptions ?? undefined,
+      ),
+    [settingsValues, piiOptions],
+  );
+
+  const hasPiiSettings = useMemo(
+    () => settingsSchema.some((item) => isPiiSettingKey(item.key)),
+    [settingsSchema],
+  );
+
+  async function loadModuleSettings() {
+    setSettingsLoading(true);
+    setSettingsError(null);
+    try {
+      const [schemaItems, valuesResp] = await Promise.all([
+        systemSettingsApi.schema(),
+        systemSettingsApi.values(),
+      ]);
+      setSettingsSchema(schemaItems);
+
+      const nextValues: Record<string, unknown> = {};
+      for (const item of schemaItems) {
+        const v = valuesResp.items[item.key];
+        if (!v) {
+          nextValues[item.key] = item.default;
+          continue;
+        }
+        nextValues[item.key] = item.is_secret ? "" : (v.value ?? item.default);
+      }
+      setSettingsValues(nextValues);
+    } catch (error: unknown) {
+      setSettingsError(
+        error instanceof Error
+          ? error.message
+          : t("common.action_failed", { defaultValue: "Action failed." }),
+      );
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadModuleSettings();
+  }, []);
+
+  useEffect(() => {
+    if (!hasPiiSettings) return;
+    let cancelled = false;
+    setPiiOptionsLoading(true);
+    fetchPIIPolicyOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setPiiOptions(options);
+          setPiiOptionsError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPiiOptionsError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load PII options.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPiiOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasPiiSettings]);
+
+  function setLocalValue(
+    key: string,
+    raw: string,
+    type: SystemSettingSchemaItem["type"],
+  ) {
+    let parsed: unknown = raw;
+    if (type === "int") parsed = Number(raw);
+    if (type === "bool") parsed = raw === "true";
+    if (type === "json") {
+      try {
+        parsed = raw.trim() ? JSON.parse(raw) : {};
+      } catch {
+        parsed = raw;
+      }
+    }
+    setSettingsValues((prev) => ({ ...prev, [key]: parsed }));
+  }
+
+  async function saveSetting(
+    item: SystemSettingSchemaItem,
+    overrideValue?: unknown,
+  ) {
+    setSettingsBusyKey(item.key);
+    setSettingsStatus(null);
+    setSettingsError(null);
+    try {
+      const value = overrideValue ?? settingsValues[item.key];
+      const result = await systemSettingsApi.update(item.key, value, "local");
+      setSettingsStatus(
+        `${item.label}: ${result.apply_status} (${result.apply_scope})`,
+      );
+      if (item.is_secret) {
+        setSettingsValues((prev) => ({ ...prev, [item.key]: "" }));
+      }
+    } catch (error: unknown) {
+      setSettingsError(
+        error instanceof Error
+          ? error.message
+          : t("common.action_failed", { defaultValue: "Action failed." }),
+      );
+    } finally {
+      setSettingsBusyKey(null);
+      await loadModuleSettings();
+    }
+  }
 
   async function handleToggle(svc: ServiceInfo, action: "enable" | "disable") {
     setConfirmDialog({ module: svc, action });
@@ -130,7 +368,10 @@ export default function ModulesTab() {
         <Button
           size="small"
           startIcon={<RefreshIcon />}
-          onClick={() => void refresh()}
+          onClick={() => {
+            void refresh();
+            void loadModuleSettings();
+          }}
         >
           {t("dashboard.refresh", { defaultValue: "Refresh" })}
         </Button>
@@ -256,6 +497,204 @@ export default function ModulesTab() {
                     />
                   ))}
                 </Stack>
+              )}
+
+              {moduleSettingsFor(svc.name, settingsSchema).length > 0 && (
+                <Accordion
+                  disableGutters
+                  sx={{ mt: 1.5 }}
+                  expanded={expandedModule === svc.name}
+                  onChange={(_event, expanded) => {
+                    setExpandedModule(expanded ? svc.name : null);
+                  }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {t("modules_tab.module_settings", {
+                        defaultValue: "Module Settings",
+                      })}
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Stack spacing={1.5}>
+                      {settingsError && (
+                        <Alert severity="error">{settingsError}</Alert>
+                      )}
+                      {settingsStatus && (
+                        <Alert
+                          severity="success"
+                          onClose={() => setSettingsStatus(null)}
+                        >
+                          {settingsStatus}
+                        </Alert>
+                      )}
+
+                      {settingsLoading ? (
+                        <Box
+                          sx={{
+                            py: 1,
+                            display: "flex",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <CircularProgress size={20} />
+                        </Box>
+                      ) : (
+                        moduleSettingsFor(svc.name, settingsSchema).map(
+                          (item) => {
+                            if (
+                              item.key === "llm_port_api.pii_default_policy"
+                            ) {
+                              return (
+                                <Box key={item.key}>
+                                  <Typography variant="body2" sx={{ mb: 1 }}>
+                                    {item.label}
+                                  </Typography>
+                                  {piiOptionsError && (
+                                    <Alert severity="warning" sx={{ mb: 1 }}>
+                                      {piiOptionsError}
+                                    </Alert>
+                                  )}
+                                  <PiiPolicyForm
+                                    value={piiPolicyValue}
+                                    options={piiOptions}
+                                    disabled={piiOptionsLoading}
+                                    onChange={(next) =>
+                                      setSettingsValues((prev) => ({
+                                        ...prev,
+                                        [item.key]: next,
+                                      }))
+                                    }
+                                  />
+                                  <Stack
+                                    direction="row"
+                                    justifyContent="flex-end"
+                                    sx={{ mt: 1 }}
+                                  >
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      disabled={
+                                        settingsBusyKey === item.key ||
+                                        piiOptionsLoading
+                                      }
+                                      onClick={() =>
+                                        void saveSetting(item, piiPolicyValue)
+                                      }
+                                    >
+                                      {settingsBusyKey === item.key
+                                        ? t("common.loading")
+                                        : t("common.save")}
+                                    </Button>
+                                  </Stack>
+                                </Box>
+                              );
+                            }
+
+                            return (
+                              <Stack
+                                key={item.key}
+                                direction={{ xs: "column", md: "row" }}
+                                spacing={1}
+                              >
+                                {item.type === "bool" ? (
+                                  <FormControlLabel
+                                    sx={{ flexGrow: 1 }}
+                                    control={
+                                      <Switch
+                                        checked={
+                                          settingsValues[item.key] === true ||
+                                          settingsValues[item.key] === "true"
+                                        }
+                                        onChange={(event) =>
+                                          setSettingsValues((prev) => ({
+                                            ...prev,
+                                            [item.key]: event.target.checked,
+                                          }))
+                                        }
+                                      />
+                                    }
+                                    label={
+                                      <Box>
+                                        <Typography variant="body2">
+                                          {item.label}
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                        >
+                                          {item.description}
+                                        </Typography>
+                                      </Box>
+                                    }
+                                  />
+                                ) : item.type === "enum" ? (
+                                  <TextField
+                                    size="small"
+                                    fullWidth
+                                    select
+                                    label={item.label}
+                                    value={asInputValue(
+                                      settingsValues[item.key],
+                                    )}
+                                    onChange={(event) =>
+                                      setLocalValue(
+                                        item.key,
+                                        event.target.value,
+                                        item.type,
+                                      )
+                                    }
+                                    helperText={item.description}
+                                  >
+                                    {(item.enum_values ?? []).map((v) => (
+                                      <MenuItem key={v} value={v}>
+                                        {v}
+                                      </MenuItem>
+                                    ))}
+                                  </TextField>
+                                ) : (
+                                  <TextField
+                                    size="small"
+                                    fullWidth
+                                    multiline={item.type === "json"}
+                                    minRows={
+                                      item.type === "json" ? 2 : undefined
+                                    }
+                                    type={
+                                      item.type === "int" ? "number" : "text"
+                                    }
+                                    label={item.label}
+                                    value={asInputValue(
+                                      settingsValues[item.key],
+                                    )}
+                                    onChange={(event) =>
+                                      setLocalValue(
+                                        item.key,
+                                        event.target.value,
+                                        item.type,
+                                      )
+                                    }
+                                    helperText={item.description}
+                                  />
+                                )}
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  disabled={settingsBusyKey === item.key}
+                                  onClick={() => void saveSetting(item)}
+                                >
+                                  {settingsBusyKey === item.key
+                                    ? t("common.loading")
+                                    : t("common.save")}
+                                </Button>
+                              </Stack>
+                            );
+                          },
+                        )
+                      )}
+                    </Stack>
+                  </AccordionDetails>
+                </Accordion>
               )}
             </CardContent>
 

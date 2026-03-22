@@ -25,22 +25,17 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";
 
 import ModulesTab from "~/components/ModulesTab";
-import PiiPolicyForm from "~/components/PiiPolicyForm";
-import { useServices } from "~/lib/ServicesContext";
-import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import {
   systemSettingsApi,
   type SystemSettingSchemaItem,
-  type WizardStep,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "system-init" | "modules";
+type SettingsTab = "general" | "modules";
 
 function getCurrentTab(
   _pathname: string,
   tabQuery: string | null,
 ): SettingsTab {
-  if (tabQuery === "system-init") return "system-init";
   if (tabQuery === "modules") return "modules";
   return "general";
 }
@@ -87,7 +82,6 @@ function isMailerSettingKey(key: string): boolean {
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { isModuleEnabled, loading: modulesLoading } = useServices();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -104,16 +98,6 @@ export default function SettingsPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [wizardSteps, setWizardSteps] = useState<WizardStep[]>([]);
-  const [wizardStepIndex, setWizardStepIndex] = useState(0);
-  const [wizardTargetHost, setWizardTargetHost] = useState("local");
-  const [wizardSaving, setWizardSaving] = useState(false);
-  const [piiOptionsLoading, setPiiOptionsLoading] = useState(false);
-  const [piiOptionsError, setPiiOptionsError] = useState<string | null>(null);
-  const [piiOptions, setPiiOptions] = useState<Awaited<
-    ReturnType<typeof fetchPIIPolicyOptions>
-  > | null>(null);
-
   useEffect(() => {
     setTab(getCurrentTab(location.pathname, searchParams.get("tab")));
   }, [location.pathname, searchParams]);
@@ -122,13 +106,11 @@ export default function SettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [schemaItems, valuesResp, stepsResp] = await Promise.all([
+      const [schemaItems, valuesResp] = await Promise.all([
         systemSettingsApi.schema(),
         systemSettingsApi.values(),
-        systemSettingsApi.wizardSteps(),
       ]);
       setSchema(schemaItems);
-      setWizardSteps(stepsResp.steps);
       const nextValues: Record<string, unknown> = {};
       const masked: Record<string, string> = {};
       for (const item of schemaItems) {
@@ -159,55 +141,13 @@ export default function SettingsPage() {
     void loadSettings();
   }, []);
 
-  const piiModuleEnabled = isModuleEnabled("pii");
-  const mailerModuleEnabled = isModuleEnabled("mailer");
-
-  useEffect(() => {
-    if (modulesLoading || !piiModuleEnabled) {
-      setPiiOptionsError(null);
-      return;
-    }
-    let cancelled = false;
-    setPiiOptionsLoading(true);
-    fetchPIIPolicyOptions()
-      .then((options) => {
-        if (!cancelled) {
-          setPiiOptions(options);
-          setPiiOptionsError(null);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setPiiOptionsError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load PII options.",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPiiOptionsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [modulesLoading, piiModuleEnabled]);
-
-  const piiPolicyValue = useMemo(
-    () =>
-      normalizePIIPolicy(
-        values["llm_port_api.pii_default_policy"],
-        piiOptions ?? undefined,
-      ),
-    [values, piiOptions],
-  );
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const visibleSchema = schema.filter(
       (item) =>
         !isPiiSettingKey(item.key) &&
-        !(isMailerSettingKey(item.key) && !mailerModuleEnabled),
+        !isMailerSettingKey(item.key) &&
+        item.category.toLowerCase() !== "modules",
     );
     const items = q
       ? visibleSchema.filter((s) =>
@@ -298,70 +238,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function savePiiSettings() {
-    const piiServiceUrlKey = "llm_port_api.pii_service_url";
-    const piiPolicyKey = "llm_port_api.pii_default_policy";
-    setBusyKey("__pii_policy__");
-    setStatusMessage(null);
-    setError(null);
-    try {
-      await systemSettingsApi.update(
-        piiServiceUrlKey,
-        values[piiServiceUrlKey] ?? "",
-        "local",
-      );
-      const result = await systemSettingsApi.update(
-        piiPolicyKey,
-        piiPolicyValue,
-        "local",
-      );
-      setStatusMessage(
-        `PII policy: ${result.apply_status} (${result.apply_scope})`,
-      );
-    } catch (e: unknown) {
-      setError(
-        e instanceof Error ? e.message : "Failed to update PII settings.",
-      );
-    } finally {
-      setBusyKey(null);
-      await loadSettings();
-    }
-  }
-
-  async function applyWizardStep() {
-    const step = wizardSteps[wizardStepIndex];
-    if (!step) return;
-    setWizardSaving(true);
-    setStatusMessage(null);
-    setError(null);
-    try {
-      const payload: Record<string, unknown> = {};
-      const keysForStep = step.setting_keys.filter(
-        (key) =>
-          !(isPiiSettingKey(key) && !piiModuleEnabled) &&
-          !(isMailerSettingKey(key) && !mailerModuleEnabled),
-      );
-      for (const key of keysForStep) {
-        if (values[key] !== undefined) payload[key] = values[key];
-      }
-      const result = await systemSettingsApi.wizardApply(
-        payload,
-        wizardTargetHost,
-      );
-      const failed = result.results.filter((r) => r.apply_status !== "success");
-      if (failed.length > 0) {
-        setError(`Wizard apply failed for ${failed.length} setting(s).`);
-      } else {
-        setStatusMessage(`Wizard step "${step.title}" applied successfully.`);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Wizard apply failed.");
-    } finally {
-      setWizardSaving(false);
-      await loadSettings();
-    }
-  }
-
   return (
     <Box
       sx={{
@@ -377,7 +253,6 @@ export default function SettingsPage() {
         </Typography>
         <Tabs value={tab} onChange={handleTabChange}>
           <Tab label={t("settings.general.title")} value="general" />
-          <Tab label={t("settings.system_init.title")} value="system-init" />
           <Tab
             label={t("settings.modules.title", { defaultValue: "Modules" })}
             value="modules"
@@ -606,337 +481,6 @@ export default function SettingsPage() {
                 </Paper>
               );
             })}
-
-            {!modulesLoading && piiModuleEnabled && (
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                  {t("pii_policy.system_section", {
-                    defaultValue: "PII Policy (System Default)",
-                  })}
-                </Typography>
-                <Stack spacing={1.5}>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    label={t("pii_policy.pii_service_url", {
-                      defaultValue: "PII Service URL",
-                    })}
-                    value={asInputValue(values["llm_port_api.pii_service_url"])}
-                    onChange={(event) =>
-                      setLocalValue(
-                        "llm_port_api.pii_service_url",
-                        event.target.value,
-                        "string",
-                      )
-                    }
-                    helperText={t("pii_policy.pii_service_url_help", {
-                      defaultValue:
-                        "Internal URL for llm_port_pii (for example http://llm-port-pii:8000/api).",
-                    })}
-                  />
-                  {piiOptionsError && (
-                    <Alert severity="warning">{piiOptionsError}</Alert>
-                  )}
-                  <PiiPolicyForm
-                    value={piiPolicyValue}
-                    options={piiOptions}
-                    disabled={piiOptionsLoading}
-                    onChange={(next) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        ["llm_port_api.pii_default_policy"]: next,
-                      }))
-                    }
-                  />
-                  <Stack direction="row" justifyContent="flex-end">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={
-                        busyKey === "__pii_policy__" || piiOptionsLoading
-                      }
-                      onClick={() => void savePiiSettings()}
-                    >
-                      {busyKey === "__pii_policy__"
-                        ? t("common.loading")
-                        : t("common.save")}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Paper>
-            )}
-          </Stack>
-        )}
-
-        {tab === "system-init" && (
-          <Stack spacing={2}>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6">
-                {t("settings.system_init.title")}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {t("settings.system_init.description")}
-              </Typography>
-              <Stack
-                direction={{ xs: "column", md: "row" }}
-                spacing={1}
-                sx={{ mt: 1 }}
-              >
-                <TextField
-                  size="small"
-                  label={t("settings.system_init.target_host")}
-                  value={wizardTargetHost}
-                  onChange={(event) => setWizardTargetHost(event.target.value)}
-                  select
-                  sx={{ minWidth: 220 }}
-                >
-                  <MenuItem value="local">local</MenuItem>
-                </TextField>
-              </Stack>
-            </Paper>
-
-            <Paper sx={{ p: 2 }}>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                {wizardSteps.map((step, idx) => (
-                  <Chip
-                    key={step.id}
-                    color={idx === wizardStepIndex ? "primary" : "default"}
-                    label={`${idx + 1}. ${step.title}`}
-                    onClick={() => setWizardStepIndex(idx)}
-                  />
-                ))}
-              </Stack>
-              {wizardSteps[wizardStepIndex] && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle1">
-                    {wizardSteps[wizardStepIndex].title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {wizardSteps[wizardStepIndex].description}
-                  </Typography>
-                  {wizardSteps[wizardStepIndex].id === "pii" &&
-                    !piiModuleEnabled && (
-                      <Alert severity="info" sx={{ mt: 1.5 }}>
-                        {t("pii_policy.hidden_when_disabled", {
-                          defaultValue:
-                            "PII settings are hidden because the PII module is currently disabled.",
-                        })}
-                      </Alert>
-                    )}
-                  {wizardSteps[wizardStepIndex].id === "mailer" &&
-                    !mailerModuleEnabled && (
-                      <Alert severity="info" sx={{ mt: 1.5 }}>
-                        {t("mailer.hidden_when_disabled", {
-                          defaultValue:
-                            "Mailer settings are hidden because the Mailer module is currently disabled.",
-                        })}
-                      </Alert>
-                    )}
-                  {wizardSteps[wizardStepIndex].setting_keys.filter(
-                    (key) =>
-                      !(isPiiSettingKey(key) && !piiModuleEnabled) &&
-                      !(isMailerSettingKey(key) && !mailerModuleEnabled),
-                  ).length > 0 ? (
-                    <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-                      {wizardSteps[wizardStepIndex].setting_keys
-                        .filter(
-                          (key) =>
-                            !(isPiiSettingKey(key) && !piiModuleEnabled) &&
-                            !(isMailerSettingKey(key) && !mailerModuleEnabled),
-                        )
-                        .map((key) => {
-                          const item = schema.find((s) => s.key === key);
-                          if (!item) return null;
-                          if (item.key === "llm_port_api.pii_default_policy") {
-                            return (
-                              <Box key={item.key}>
-                                <Typography variant="body2" sx={{ mb: 1 }}>
-                                  {item.label}
-                                </Typography>
-                                {piiOptionsError && (
-                                  <Alert severity="warning" sx={{ mb: 1 }}>
-                                    {piiOptionsError}
-                                  </Alert>
-                                )}
-                                <PiiPolicyForm
-                                  value={piiPolicyValue}
-                                  options={piiOptions}
-                                  disabled={piiOptionsLoading}
-                                  onChange={(next) =>
-                                    setValues((prev) => ({
-                                      ...prev,
-                                      [item.key]: next,
-                                    }))
-                                  }
-                                />
-                              </Box>
-                            );
-                          }
-                          return (
-                            <Stack
-                              key={item.key}
-                              direction={{ xs: "column", md: "row" }}
-                              spacing={1}
-                            >
-                              {item.type === "bool" ? (
-                                <FormControlLabel
-                                  control={
-                                    <Switch
-                                      checked={
-                                        values[item.key] === true ||
-                                        values[item.key] === "true"
-                                      }
-                                      onChange={(event) =>
-                                        setValues((prev) => ({
-                                          ...prev,
-                                          [item.key]: event.target.checked,
-                                        }))
-                                      }
-                                    />
-                                  }
-                                  label={
-                                    <Box>
-                                      <Typography variant="body2">
-                                        {item.label}
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {item.description}
-                                      </Typography>
-                                    </Box>
-                                  }
-                                  sx={{ flexGrow: 1 }}
-                                />
-                              ) : item.type === "int" ? (
-                                <TextField
-                                  size="small"
-                                  fullWidth
-                                  type="number"
-                                  label={item.label}
-                                  value={asInputValue(values[item.key])}
-                                  onChange={(event) =>
-                                    setLocalValue(
-                                      item.key,
-                                      event.target.value,
-                                      item.type,
-                                    )
-                                  }
-                                  helperText={item.description}
-                                />
-                              ) : item.type === "enum" ? (
-                                <TextField
-                                  size="small"
-                                  fullWidth
-                                  select
-                                  label={item.label}
-                                  value={asInputValue(values[item.key])}
-                                  onChange={(event) =>
-                                    setLocalValue(
-                                      item.key,
-                                      event.target.value,
-                                      item.type,
-                                    )
-                                  }
-                                  helperText={item.description}
-                                >
-                                  {(item.enum_values ?? []).map((v) => (
-                                    <MenuItem key={v} value={v}>
-                                      {v}
-                                    </MenuItem>
-                                  ))}
-                                </TextField>
-                              ) : (
-                                <TextField
-                                  size="small"
-                                  fullWidth
-                                  type={
-                                    item.type === "secret" ? "password" : "text"
-                                  }
-                                  label={item.label}
-                                  value={asInputValue(values[item.key])}
-                                  onChange={(event) =>
-                                    setLocalValue(
-                                      item.key,
-                                      event.target.value,
-                                      item.type,
-                                    )
-                                  }
-                                  helperText={item.description}
-                                />
-                              )}
-                              {item.type === "secret" && (
-                                <>
-                                  <Tooltip
-                                    title={t("settings.generate_secret")}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() =>
-                                        generateSecretForKey(item.key)
-                                      }
-                                    >
-                                      <AutoFixHighIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title={t("common.copy")}>
-                                    <IconButton
-                                      size="small"
-                                      color="primary"
-                                      onClick={() =>
-                                        void copySecretForKey(item.key)
-                                      }
-                                    >
-                                      <ContentCopyIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                </>
-                              )}
-                            </Stack>
-                          );
-                        })}
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2" sx={{ mt: 1.5 }}>
-                      {t("settings.system_init.no_fields")}
-                    </Typography>
-                  )}
-                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                    <Button
-                      variant="outlined"
-                      disabled={wizardStepIndex === 0}
-                      onClick={() =>
-                        setWizardStepIndex((idx) => Math.max(0, idx - 1))
-                      }
-                    >
-                      {t("common.back")}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      disabled={wizardSaving}
-                      onClick={() => void applyWizardStep()}
-                    >
-                      {wizardSaving
-                        ? t("common.loading")
-                        : t("settings.system_init.apply_step")}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      disabled={wizardStepIndex >= wizardSteps.length - 1}
-                      onClick={() =>
-                        setWizardStepIndex((idx) =>
-                          Math.min(wizardSteps.length - 1, idx + 1),
-                        )
-                      }
-                    >
-                      {t("settings.system_init.next_step")}
-                    </Button>
-                  </Stack>
-                </Box>
-              )}
-            </Paper>
           </Stack>
         )}
 
