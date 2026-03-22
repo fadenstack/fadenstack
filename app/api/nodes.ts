@@ -96,14 +96,23 @@ export const nodesApi = {
     return request<ManagedNode>(`/nodes/${encodeURIComponent(nodeId)}`);
   },
 
-  setMaintenance(nodeId: string, enabled: boolean, reason?: string) {
-    return request<ManagedNode>(`/nodes/${encodeURIComponent(nodeId)}/maintenance`, {
-      method: "POST",
-      body: JSON.stringify({
-        enabled,
-        reason: reason?.trim() || null,
-      }),
+  delete(nodeId: string) {
+    return request<void>(`/nodes/${encodeURIComponent(nodeId)}`, {
+      method: "DELETE",
     });
+  },
+
+  setMaintenance(nodeId: string, enabled: boolean, reason?: string) {
+    return request<ManagedNode>(
+      `/nodes/${encodeURIComponent(nodeId)}/maintenance`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          enabled,
+          reason: reason?.trim() || null,
+        }),
+      },
+    );
   },
 
   setDrain(nodeId: string, enabled: boolean) {
@@ -114,14 +123,19 @@ export const nodesApi = {
   },
 
   issueCommand(nodeId: string, payload: IssueNodeCommandPayload) {
-    return request<NodeCommand>(`/nodes/${encodeURIComponent(nodeId)}/commands`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return request<NodeCommand>(
+      `/nodes/${encodeURIComponent(nodeId)}/commands`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
   },
 
   listCommands(nodeId: string) {
-    return request<NodeCommand[]>(`/nodes/${encodeURIComponent(nodeId)}/commands`);
+    return request<NodeCommand[]>(
+      `/nodes/${encodeURIComponent(nodeId)}/commands`,
+    );
   },
 
   commandTimeline(nodeId: string, commandId: string) {

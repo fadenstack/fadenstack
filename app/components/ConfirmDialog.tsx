@@ -15,11 +15,13 @@
  *     onClose={() => setDeleteTarget(null)}
  *   />
  */
+import { useState, useEffect } from "react";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 export interface ConfirmDialogProps {
@@ -35,6 +37,13 @@ export interface ConfirmDialogProps {
   confirmColor?: "error" | "primary" | "warning" | "success" | "info";
   /** Label for the cancel button (default: "Cancel"). */
   cancelLabel?: string;
+  /**
+   * When set, the user must type this exact text to enable the confirm button.
+   * Similar to GitHub's repo-delete prompt.
+   */
+  confirmText?: string;
+  /** Placeholder / helper shown above the type-to-confirm input. */
+  confirmTextLabel?: string;
   /** While true, the confirm button is disabled and the dialog cannot close. */
   loading?: boolean;
   /** Called when the user confirms. */
@@ -52,11 +61,22 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   confirmColor = "error",
   cancelLabel = "Cancel",
+  confirmText,
+  confirmTextLabel,
   loading = false,
   onConfirm,
   onClose,
   maxWidth = "xs",
 }: ConfirmDialogProps) {
+  const [typed, setTyped] = useState("");
+
+  // Reset the input whenever the dialog opens/closes or target text changes.
+  useEffect(() => {
+    if (open) setTyped("");
+  }, [open, confirmText]);
+
+  const textMatch = !confirmText || typed === confirmText;
+
   return (
     <Dialog
       open={open}
@@ -65,12 +85,26 @@ export function ConfirmDialog({
       fullWidth
     >
       <DialogTitle>{title}</DialogTitle>
-      {message && (
+      {(message || confirmText) && (
         <DialogContent>
           {typeof message === "string" ? (
             <Typography>{message}</Typography>
           ) : (
             message
+          )}
+          {confirmText && (
+            <TextField
+              fullWidth
+              size="small"
+              label={confirmTextLabel ?? `Type "${confirmText}" to confirm`}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              sx={{ mt: 2 }}
+              autoFocus
+              slotProps={{
+                htmlInput: { autoComplete: "off", spellCheck: false },
+              }}
+            />
           )}
         </DialogContent>
       )}
@@ -82,7 +116,7 @@ export function ConfirmDialog({
           variant="contained"
           color={confirmColor}
           onClick={onConfirm}
-          disabled={loading}
+          disabled={loading || !textMatch}
         >
           {confirmLabel}
         </Button>

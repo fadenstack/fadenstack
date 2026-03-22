@@ -364,6 +364,11 @@ export default function DashboardPage() {
         const gpuLabel = hw?.gpu.has_gpu
           ? `GPU (${hw.gpu.primary_vendor.toUpperCase()})`
           : t("dashboard.gauges.gpu");
+        const hasGpu =
+          hw?.gpu.has_gpu ||
+          overview?.gpu_util_percent != null ||
+          gpuVramPercent != null;
+        const gaugeSm = hasGpu ? 3 : 4;
 
         return (
           <Box>
@@ -392,22 +397,22 @@ export default function DashboardPage() {
               )}
             </Stack>
             <Grid container spacing={1.5}>
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid size={{ xs: 6, sm: gaugeSm }}>
                 <GaugeCard
                   label={cpuLabel}
                   value={overview?.cpu_percent ?? null}
                   detail={
                     overview
                       ? t("dashboard.gauges.load", {
-                          one: overview.load_1m ?? "-",
-                          five: overview.load_5m ?? "-",
-                          fifteen: overview.load_15m ?? "-",
+                          one: overview.load_1m?.toFixed(2) ?? "-",
+                          five: overview.load_5m?.toFixed(2) ?? "-",
+                          fifteen: overview.load_15m?.toFixed(2) ?? "-",
                         })
                       : undefined
                   }
                 />
               </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid size={{ xs: 6, sm: gaugeSm }}>
                 <GaugeCard
                   label={ramLabel}
                   value={ramPercent}
@@ -431,7 +436,7 @@ export default function DashboardPage() {
                   }
                 />
               </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
+              <Grid size={{ xs: 6, sm: gaugeSm }}>
                 <GaugeCard
                   label={diskLabel}
                   value={diskUsedPercent}
@@ -445,83 +450,85 @@ export default function DashboardPage() {
                   }
                 />
               </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <Box sx={{ position: "relative", height: "100%" }}>
-                  <GaugeCard
-                    label={gpuLabel}
-                    value={overview?.gpu_util_percent ?? gpuVramPercent}
-                    innerText={
-                      overview?.gpu_util_percent == null &&
-                      gpuVramPercent != null
-                        ? `${gpuVramPercent.toFixed(1)}%`
-                        : undefined
-                    }
-                    detail={
-                      overview?.gpu_vram_total_bytes != null
-                        ? fmtRatio(
-                            overview.gpu_vram_used_bytes,
-                            overview.gpu_vram_total_bytes,
-                          )
-                        : undefined
-                    }
-                    secondaryDetail={
-                      hw?.gpu.has_gpu
-                        ? `${hw.gpu.devices.find((d) => d.vendor === hw.gpu.primary_vendor)?.model ?? hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
-                        : overview?.gpu_util_percent != null ||
-                            gpuVramPercent != null
-                          ? t("dashboard.gauges.vram")
+              {hasGpu && (
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Box sx={{ position: "relative", height: "100%" }}>
+                    <GaugeCard
+                      label={gpuLabel}
+                      value={overview?.gpu_util_percent ?? gpuVramPercent}
+                      innerText={
+                        overview?.gpu_util_percent == null &&
+                        gpuVramPercent != null
+                          ? `${gpuVramPercent.toFixed(1)}%`
                           : undefined
-                    }
-                  />
-                  <Tooltip
-                    title={t("dashboard.gpu_rescan", {
-                      defaultValue: "Re-detect GPUs",
-                    })}
-                  >
-                    <IconButton
-                      size="small"
-                      onClick={rescanGpu}
-                      disabled={rescanning}
-                      sx={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        opacity: 0.7,
-                        "&:hover": { opacity: 1 },
-                      }}
-                    >
-                      {rescanning ? (
-                        <CircularProgress size={16} />
-                      ) : (
-                        <RefreshIcon fontSize="small" />
-                      )}
-                    </IconButton>
-                  </Tooltip>
-                  {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
+                      }
+                      detail={
+                        overview?.gpu_vram_total_bytes != null
+                          ? fmtRatio(
+                              overview.gpu_vram_used_bytes,
+                              overview.gpu_vram_total_bytes,
+                            )
+                          : undefined
+                      }
+                      secondaryDetail={
+                        hw?.gpu.has_gpu
+                          ? `${hw.gpu.devices.find((d) => d.vendor === hw.gpu.primary_vendor)?.model ?? hw.gpu.devices[0]?.model ?? ""} · ${hw.gpu.primary_compute_api.toUpperCase()}`
+                          : overview?.gpu_util_percent != null ||
+                              gpuVramPercent != null
+                            ? t("dashboard.gauges.vram")
+                            : undefined
+                      }
+                    />
                     <Tooltip
-                      title={hw.gpu.devices
-                        .map(
-                          (d) =>
-                            `#${d.index} ${d.vendor.toUpperCase()} ${d.model} (${fmtBytes(d.vram_bytes)})`,
-                        )
-                        .join("\n")}
+                      title={t("dashboard.gpu_rescan", {
+                        defaultValue: "Re-detect GPUs",
+                      })}
                     >
-                      <Chip
-                        label={`${hw.gpu.device_count} GPUs`}
+                      <IconButton
                         size="small"
-                        variant="outlined"
+                        onClick={rescanGpu}
+                        disabled={rescanning}
                         sx={{
                           position: "absolute",
-                          bottom: 6,
-                          right: 6,
-                          fontSize: "0.65rem",
-                          height: 20,
+                          top: 4,
+                          right: 4,
+                          opacity: 0.7,
+                          "&:hover": { opacity: 1 },
                         }}
-                      />
+                      >
+                        {rescanning ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <RefreshIcon fontSize="small" />
+                        )}
+                      </IconButton>
                     </Tooltip>
-                  )}
-                </Box>
-              </Grid>
+                    {hw?.gpu.has_gpu && hw.gpu.device_count > 1 && (
+                      <Tooltip
+                        title={hw.gpu.devices
+                          .map(
+                            (d) =>
+                              `#${d.index} ${d.vendor.toUpperCase()} ${d.model} (${fmtBytes(d.vram_bytes)})`,
+                          )
+                          .join("\n")}
+                      >
+                        <Chip
+                          label={`${hw.gpu.device_count} GPUs`}
+                          size="small"
+                          variant="outlined"
+                          sx={{
+                            position: "absolute",
+                            bottom: 6,
+                            right: 6,
+                            fontSize: "0.65rem",
+                            height: 20,
+                          }}
+                        />
+                      </Tooltip>
+                    )}
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </Box>
         );

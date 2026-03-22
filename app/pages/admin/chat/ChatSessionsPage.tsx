@@ -48,6 +48,9 @@ export default function ChatSessionsPage() {
     return "warning";
   };
 
+  const statusLabel = (status: string) =>
+    t(`chat_admin.status_${status}`, { defaultValue: status });
+
   const columns: ColumnDef<ChatSession>[] = [
     {
       key: "title",
@@ -72,7 +75,7 @@ export default function ChatSessionsPage() {
       sortValue: (r) => r.status,
       render: (r) => (
         <Chip
-          label={r.status}
+          label={statusLabel(r.status)}
           color={statusColor(r.status) as "success" | "default" | "warning"}
           size="small"
           variant="outlined"

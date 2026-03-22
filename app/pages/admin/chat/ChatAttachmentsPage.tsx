@@ -80,6 +80,12 @@ export default function ChatAttachmentsPage() {
     return "warning";
   };
 
+  const extractionStatusLabel = (status: string) =>
+    t(`chat_admin.extraction_${status}`, { defaultValue: status });
+
+  const scopeLabel = (scope: string) =>
+    t(`chat_admin.scope_${scope}`, { defaultValue: scope });
+
   const columns: ColumnDef<ChatAttachment>[] = [
     {
       key: "filename",
@@ -118,7 +124,7 @@ export default function ChatAttachmentsPage() {
       sortValue: (r) => r.extraction_status,
       render: (r) => (
         <Chip
-          label={r.extraction_status}
+          label={extractionStatusLabel(r.extraction_status)}
           color={
             statusColor(r.extraction_status) as
               | "success"
@@ -134,7 +140,7 @@ export default function ChatAttachmentsPage() {
     {
       key: "scope",
       label: t("chat_admin.col_scope"),
-      render: (r) => r.scope,
+      render: (r) => scopeLabel(r.scope),
     },
     {
       key: "created_at",

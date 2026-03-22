@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { useAsyncData } from "~/lib/useAsyncData";
 import NodeOnboardingDrawer from "./NodeOnboardingPage";
@@ -15,6 +16,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExploreOffIcon from "@mui/icons-material/ExploreOff";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -55,6 +57,8 @@ export default function NodeFleetPage() {
   );
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ManagedNode | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function runAction(key: string, action: () => Promise<void>) {
     setActionBusyKey(key);
@@ -241,6 +245,22 @@ export default function NodeFleetPage() {
                 </IconButton>
               </span>
             </Tooltip>
+            <Tooltip
+              title={t("nodes.delete_node", { defaultValue: "Delete node" })}
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setDeleteTarget(row);
+                  }}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Stack>
         );
       },
@@ -271,6 +291,36 @@ export default function NodeFleetPage() {
       <NodeOnboardingDrawer
         open={onboardingOpen}
         onClose={() => setOnboardingOpen(false)}
+      />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("nodes.delete_node_title", { defaultValue: "Delete Node" })}
+        message={t("nodes.delete_node_confirm", {
+          defaultValue: `This will permanently remove the node "{{host}}" and all its sessions, inventory snapshots, commands, and events. This action cannot be undone.`,
+          host: deleteTarget?.host,
+        })}
+        confirmText={deleteTarget?.host}
+        confirmTextLabel={t("nodes.delete_node_type_host", {
+          defaultValue: `Type "{{host}}" to confirm`,
+          host: deleteTarget?.host,
+        })}
+        confirmLabel={t("common.delete", { defaultValue: "Delete" })}
+        confirmColor="error"
+        loading={deleting}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          setDeleting(true);
+          try {
+            await nodesApi.delete(deleteTarget.id);
+            setDeleteTarget(null);
+            await refresh();
+          } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Delete failed.");
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        onClose={() => setDeleteTarget(null)}
       />
     </>
   );

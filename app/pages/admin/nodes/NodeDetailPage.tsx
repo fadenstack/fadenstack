@@ -270,7 +270,9 @@ export default function NodeDetailPage() {
     gpu && gpu.total_vram_bytes && gpu.total_vram_bytes > 0
       ? ((gpu.used_vram_bytes ?? 0) / gpu.total_vram_bytes) * 100
       : null;
-  const hasGpu = (inv.gpu_count ?? gpu?.count ?? 0) > 0;
+  const hasGpu =
+    (inv.gpu_count ?? gpu?.count ?? 0) > 0 &&
+    (gpuVramPct != null || (gpu?.devices?.length ?? 0) > 0);
 
   const flatLogs = useMemo(() => {
     const lines: { ts: string; line: string; tsMs: number }[] = [];
@@ -465,7 +467,7 @@ export default function NodeDetailPage() {
 
       {/* ── Performance Gauges ───────────────────────────────────── */}
       <Grid container spacing={2}>
-        <Grid size={{ xs: 6, sm: 3 }}>
+        <Grid size={{ xs: 6, sm: hasGpu ? 3 : 4 }}>
           <GaugeCard
             label={t("nodes.cpu")}
             value={cpuPct}
@@ -475,7 +477,7 @@ export default function NodeDetailPage() {
             })}
           />
         </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
+        <Grid size={{ xs: 6, sm: hasGpu ? 3 : 4 }}>
           <GaugeCard
             label={t("nodes.memory")}
             value={ramPct}
@@ -485,7 +487,7 @@ export default function NodeDetailPage() {
             })}
           />
         </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
+        <Grid size={{ xs: 6, sm: hasGpu ? 3 : 4 }}>
           <GaugeCard
             label={t("nodes.disk")}
             value={diskPct}
@@ -495,8 +497,8 @@ export default function NodeDetailPage() {
             })}
           />
         </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          {hasGpu ? (
+        {hasGpu && (
+          <Grid size={{ xs: 6, sm: 3 }}>
             <GaugeCard
               label={`${t("nodes.gpu")}${(gpu?.count ?? 1) > 1 ? ` (${gpu?.count})` : ""}`}
               value={gpuVramPct}
@@ -511,14 +513,8 @@ export default function NodeDetailPage() {
                   : undefined
               }
             />
-          ) : (
-            <GaugeCard
-              label={t("nodes.gpu")}
-              value={null}
-              detail={t("nodes.no_gpu_detected")}
-            />
-          )}
-        </Grid>
+          </Grid>
+        )}
       </Grid>
 
       {/* ── Network + GPU Devices ────────────────────────────────── */}
