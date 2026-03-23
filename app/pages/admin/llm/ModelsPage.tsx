@@ -9,6 +9,7 @@ import {
   models,
   search,
   type Model,
+  type ModelInstance,
   type DownloadModelPayload,
   type RegisterModelPayload,
   type HFModelHit,
@@ -18,7 +19,9 @@ import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ModelStatusChip } from "~/components/Chips";
 
 import Autocomplete from "@mui/material/Autocomplete";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -35,6 +38,10 @@ import CircularProgress from "@mui/material/CircularProgress";
 
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import ComputerIcon from "@mui/icons-material/Computer";
+import DnsIcon from "@mui/icons-material/Dns";
+import CloudIcon from "@mui/icons-material/Cloud";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 export default function ModelsPage() {
   const { t } = useTranslation();
@@ -47,6 +54,9 @@ export default function ModelsPage() {
   // Add dialog
   const [showAdd, setShowAdd] = useState(false);
   const [addTab, setAddTab] = useState(0); // 0 = download, 1 = register
+
+  // In-use guard dialog
+  const [inUseModel, setInUseModel] = useState<Model | null>(null);
 
   // Download fields
   const [hfRepo, setHfRepo] = useState("");
@@ -164,15 +174,25 @@ export default function ModelsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  function requestDelete(model: Model) {
+    // Check if any runtime instance is active (not stopped / error)
+    const active = (model.instances ?? []).filter(
+      (i) => i.runtime_status !== "stopped" && i.runtime_status !== "error",
+    );
+    if (active.length > 0) {
+      setInUseModel(model);
+      return;
+    }
+    void confirmDelete(model.id);
+  }
+
+  async function confirmDelete(id: string) {
     if (!confirm(t("llm_models.confirm_delete"))) return;
-    // Optimistic: remove from list immediately
     setData((prev) => prev.filter((m) => m.id !== id));
     try {
       await models.delete(id);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : t("common.delete_failed"));
-      // Revert on failure
       await load(true);
     }
   }
@@ -183,6 +203,60 @@ export default function ModelsPage() {
     setDlDisplayName("");
     setRegName("");
     setRegPath("");
+  }
+
+  /** Render compact location chips for a model's running instances. */
+  function renderInstanceChips(instances: ModelInstance[]) {
+    if (!instances || instances.length === 0) {
+      return (
+        <Typography variant="caption" color="text.disabled" fontSize="0.75rem">
+          {t("llm_models.not_deployed")}
+        </Typography>
+      );
+    }
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+        {instances.map((inst) => {
+          const isRemote = inst.execution_target === "node";
+          const isCloud = inst.provider_type === "cloud";
+          const label = isCloud
+            ? inst.provider_name
+            : isRemote
+              ? (inst.node_host ?? "Remote")
+              : "Local";
+          const icon = isCloud ? (
+            <CloudIcon fontSize="small" />
+          ) : isRemote ? (
+            <DnsIcon fontSize="small" />
+          ) : (
+            <ComputerIcon fontSize="small" />
+          );
+          const statusColor =
+            inst.runtime_status === "running"
+              ? "success"
+              : inst.runtime_status === "error"
+                ? "error"
+                : inst.runtime_status === "stopped"
+                  ? "default"
+                  : "warning";
+          return (
+            <Tooltip
+              key={inst.runtime_id}
+              title={`${inst.runtime_name} (${inst.runtime_status}) — ${inst.provider_name} [${inst.provider_type}]`}
+            >
+              <Chip
+                icon={icon}
+                label={label}
+                size="small"
+                color={statusColor}
+                variant="outlined"
+                sx={{ fontSize: "0.7rem", height: 22 }}
+              />
+            </Tooltip>
+          );
+        })}
+      </Box>
+    );
   }
 
   const columns: ColumnDef<Model>[] = [
@@ -230,6 +304,11 @@ export default function ModelsPage() {
       ),
     },
     {
+      key: "instances",
+      label: t("llm_models.deployed_on"),
+      render: (m) => renderInstanceChips(m.instances),
+    },
+    {
       key: "status",
       label: t("common.status"),
       sortable: true,
@@ -270,7 +349,7 @@ export default function ModelsPage() {
             color="error"
             onClick={(e) => {
               e.stopPropagation();
-              void handleDelete(m.id);
+              requestDelete(m);
             }}
           >
             <DeleteIcon fontSize="small" />
@@ -486,6 +565,72 @@ export default function ModelsPage() {
             </DialogActions>
           </form>
         )}
+      </Dialog>
+
+      {/* In-use guard dialog */}
+      <Dialog
+        open={inUseModel !== null}
+        onClose={() => setInUseModel(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{t("llm_models.in_use_title")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            {t("llm_models.in_use_message", {
+              model: inUseModel?.display_name ?? "",
+            })}
+          </Typography>
+          {inUseModel?.instances
+            ?.filter(
+              (i) =>
+                i.runtime_status !== "stopped" && i.runtime_status !== "error",
+            )
+            .map((inst) => (
+              <Stack
+                key={inst.runtime_id}
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{
+                  py: 0.75,
+                  px: 1,
+                  mb: 0.5,
+                  borderRadius: 1,
+                  bgcolor: "action.hover",
+                }}
+              >
+                <Stack>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    fontSize="0.85rem"
+                  >
+                    {inst.runtime_name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {inst.provider_name} &middot; {inst.runtime_status}
+                  </Typography>
+                </Stack>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  endIcon={<OpenInNewIcon fontSize="small" />}
+                  onClick={() => {
+                    setInUseModel(null);
+                    navigate(`/admin/llm/providers/${inst.provider_id}`);
+                  }}
+                >
+                  {t("llm_models.go_to_provider")}
+                </Button>
+              </Stack>
+            ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInUseModel(null)}>
+            {t("common.close")}
+          </Button>
+        </DialogActions>
       </Dialog>
     </>
   );

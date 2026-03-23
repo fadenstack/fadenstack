@@ -232,6 +232,7 @@ const ENGINE_COLOR: Record<
   llamacpp: "secondary",
   tgi: "info",
   ollama: "warning",
+  cloud: "info",
 };
 
 export function EngineChip({ value }: { value: ProviderType }) {

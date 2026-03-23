@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import {
   providers,
   runtimes,
+  models as modelsApi,
   type ProviderType,
   type ProviderTarget,
   type Model,
@@ -23,6 +24,7 @@ import {
   type PullProgressEvent,
 } from "~/api/admin";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
+import { HfModelSearch } from "~/components/HfModelSearch";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -41,6 +43,8 @@ import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Step from "@mui/material/Step";
@@ -132,6 +136,10 @@ export function ProviderWizardDialog({
   const [nodeList, setNodeList] = useState<ManagedNode[]>([]);
   const [nodesLoading, setNodesLoading] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+  const [modelSource, setModelSource] = useState<
+    "sync_from_server" | "download_from_hf"
+  >("sync_from_server");
+  const [hfRepoId, setHfRepoId] = useState("");
 
   // Step 2 — runtime config (local only)
   const [modelId, setModelId] = useState("");
@@ -182,6 +190,8 @@ export function ProviderWizardDialog({
       setTestMessage("");
       setDiscoveredModels([]);
       setSelectedNodeId("");
+      setModelSource("sync_from_server");
+      setHfRepoId("");
       setModelId("");
       setHwInfo(null);
       setImageChoice(AUTO_IMAGE_VALUE);
@@ -318,6 +328,14 @@ export function ProviderWizardDialog({
   useEffect(() => {
     if (!open || step !== 1 || target !== "local_docker") return;
 
+    // Remote + internet: the node pulls the image — skip local check.
+    const remoteWithInternet =
+      !!selectedNodeId && modelSource === "download_from_hf";
+    if (remoteWithInternet) {
+      setImageStatus("idle");
+      return;
+    }
+
     // Resolve the actual image string
     let resolvedImage: string | undefined;
     if (imageChoice === AUTO_IMAGE_VALUE) {
@@ -360,7 +378,17 @@ export function ProviderWizardDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, step, target, imageChoice, customImage, hwInfo, subscribeToPull]);
+  }, [
+    open,
+    step,
+    target,
+    imageChoice,
+    customImage,
+    hwInfo,
+    subscribeToPull,
+    selectedNodeId,
+    modelSource,
+  ]);
 
   // ── Test connection handler ──────────────────────────────────────
   async function handleTestConnection() {
@@ -410,8 +438,20 @@ export function ProviderWizardDialog({
   const localImageReady =
     imageStatus === "available" || imageStatus === "pulled";
   const localCheckInProgress = hwLoading || imageStatus === "checking";
-  const localCreateBlocked =
-    !modelId || !localImageReady || localCheckInProgress;
+  const hasModel =
+    selectedNodeId && modelSource === "download_from_hf"
+      ? !!hfRepoId.trim()
+      : !!modelId;
+  // Remote + internet: image will be pulled on the node, no local check needed.
+  // Remote + air-gapped: image must be available locally for transfer.
+  // Local: image must be available locally.
+  const isRemoteNode = !!selectedNodeId;
+  const isRemoteWithInternet =
+    isRemoteNode && modelSource === "download_from_hf";
+  const needsLocalImage = !isRemoteNode || modelSource === "sync_from_server";
+  const localCreateBlocked = isRemoteWithInternet
+    ? !hasModel
+    : !hasModel || !localImageReady || localCheckInProgress;
 
   // ── Pull image handler ────────────────────────────────────────────
   async function handlePullImage() {
@@ -446,7 +486,7 @@ export function ProviderWizardDialog({
     try {
       const provPayload: CreateProviderPayload = {
         name,
-        type: target === "local_docker" ? engine : "vllm",
+        type: target === "local_docker" ? engine : "cloud",
         target,
         ...(target === "remote_endpoint" &&
           endpointUrl && { endpoint_url: endpointUrl }),
@@ -492,14 +532,43 @@ export function ProviderWizardDialog({
             mergedArgs["tensor-parallel-size"];
         if (mergedArgs["enforce-eager"]) generic_config.enforce_eager = true;
 
+        // Resolve model_id: use existing model or create one via download for HF-direct
+        let resolvedModelId = modelId;
+        let runtimeName: string | undefined;
+        if (
+          selectedNodeId &&
+          modelSource === "download_from_hf" &&
+          hfRepoId.trim()
+        ) {
+          const dlResp = await modelsApi.download({
+            hf_repo_id: hfRepoId.trim(),
+            display_name: hfRepoId.trim().split("/").pop() ?? hfRepoId.trim(),
+          });
+          resolvedModelId = dlResp.model.id;
+          runtimeName = hfRepoId.trim().split("/").pop() ?? hfRepoId.trim();
+        }
+        // Use model display name as the runtime alias so chat routing
+        // resolves by model name, not the provider name.
+        if (!runtimeName) {
+          runtimeName =
+            models.find((m) => m.id === resolvedModelId)?.display_name ?? name;
+        }
+
         const rtPayload: CreateRuntimePayload = {
-          name,
+          name: runtimeName,
           provider_id: newProv.id,
-          model_id: modelId,
+          model_id: resolvedModelId,
           openai_compat: openaiCompat,
           ...(Object.keys(generic_config).length > 0 && { generic_config }),
           ...(Object.keys(provider_config).length > 0 && { provider_config }),
           ...(selectedNodeId && { target_node_id: selectedNodeId }),
+          ...(selectedNodeId && { model_source: modelSource }),
+          ...(selectedNodeId && {
+            image_source:
+              modelSource === "download_from_hf"
+                ? "pull_from_registry"
+                : "transfer_from_server",
+          }),
         };
         await runtimes.create(rtPayload);
       }
@@ -584,45 +653,113 @@ export function ProviderWizardDialog({
             )}
 
             {target === "local_docker" && (
-              <FormControl fullWidth>
-                <InputLabel>
-                  {t("llm_providers.deploy_target", "Deploy To")}
-                </InputLabel>
-                <Select
-                  value={selectedNodeId}
-                  label={t("llm_providers.deploy_target", "Deploy To")}
-                  onChange={(e) => {
-                    setSelectedNodeId(e.target.value);
-                    // Reset step-2 state when deployment target changes
-                    setHwInfo(null);
-                    setImageChoice(AUTO_IMAGE_VALUE);
-                    setImageStatus("idle");
-                  }}
-                  disabled={nodesLoading}
-                >
-                  <MenuItem value="">
-                    <Typography variant="body2">
-                      {t(
-                        "llm_providers.deploy_this_server",
-                        "This Server (local)",
-                      )}
-                    </Typography>
-                  </MenuItem>
-                  {nodeList.map((node) => (
-                    <MenuItem key={node.id} value={node.id}>
-                      <Stack>
-                        <Typography variant="body2">{node.host}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {node.agent_id}
-                          {node.latest_inventory
-                            ? ` · ${(node.latest_inventory as Record<string, unknown>).gpu_count ?? 0} GPU(s)`
-                            : ""}
-                        </Typography>
-                      </Stack>
+              <>
+                <FormControl fullWidth>
+                  <InputLabel>
+                    {t("llm_providers.deploy_target", "Deploy To")}
+                  </InputLabel>
+                  <Select
+                    value={selectedNodeId}
+                    label={t("llm_providers.deploy_target", "Deploy To")}
+                    onChange={(e) => {
+                      setSelectedNodeId(e.target.value);
+                      // Reset step-2 state when deployment target changes
+                      setHwInfo(null);
+                      setImageChoice(AUTO_IMAGE_VALUE);
+                      setImageStatus("idle");
+                    }}
+                    disabled={nodesLoading}
+                  >
+                    <MenuItem value="">
+                      <Typography variant="body2">
+                        {t(
+                          "llm_providers.deploy_this_server",
+                          "This Server (local)",
+                        )}
+                      </Typography>
                     </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                    {nodeList.map((node) => (
+                      <MenuItem key={node.id} value={node.id}>
+                        <Stack>
+                          <Typography variant="body2">{node.host}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {node.agent_id}
+                            {node.latest_inventory
+                              ? ` · ${(node.latest_inventory as Record<string, unknown>).gpu_count ?? 0} GPU(s)`
+                              : ""}
+                          </Typography>
+                        </Stack>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Model source — only shown when deploying to a remote node */}
+                {selectedNodeId && (
+                  <FormControl component="fieldset" fullWidth>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      {t("llm_providers.model_source", "Model Source")}
+                    </Typography>
+                    <RadioGroup
+                      value={modelSource}
+                      onChange={(e) =>
+                        setModelSource(
+                          e.target.value as
+                            | "sync_from_server"
+                            | "download_from_hf",
+                        )
+                      }
+                    >
+                      <FormControlLabel
+                        value="sync_from_server"
+                        control={<Radio size="small" />}
+                        label={
+                          <Stack>
+                            <Typography variant="body2">
+                              {t(
+                                "llm_providers.model_source_sync",
+                                "Sync from this server",
+                              )}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {t(
+                                "llm_providers.model_source_sync_desc",
+                                "Transfer model from the server's cache (for air-gapped nodes)",
+                              )}
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                      <FormControlLabel
+                        value="download_from_hf"
+                        control={<Radio size="small" />}
+                        label={
+                          <Stack>
+                            <Typography variant="body2">
+                              {t(
+                                "llm_providers.model_source_hf",
+                                "Download from HuggingFace",
+                              )}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {t(
+                                "llm_providers.model_source_hf_desc",
+                                "Node downloads the model directly (requires internet)",
+                              )}
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                    </RadioGroup>
+                  </FormControl>
+                )}
+              </>
             )}
 
             {target === "remote_endpoint" && (
@@ -759,22 +896,32 @@ export function ProviderWizardDialog({
               </Alert>
             )}
 
-            <FormControl fullWidth required>
-              <InputLabel>{t("llm_common.model")}</InputLabel>
-              <Select
-                value={modelId}
-                label={t("llm_common.model")}
-                onChange={(e) => setModelId(e.target.value)}
-              >
-                {models
-                  .filter((m) => m.status === "available")
-                  .map((m) => (
-                    <MenuItem key={m.id} value={m.id}>
-                      {m.display_name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
+            {/* Model selector — HF search when downloading on node, dropdown otherwise */}
+            {selectedNodeId && modelSource === "download_from_hf" ? (
+              <HfModelSearch
+                value={hfRepoId}
+                onChange={setHfRepoId}
+                label={t("llm_models.hf_repo_id")}
+                required
+              />
+            ) : (
+              <FormControl fullWidth required>
+                <InputLabel>{t("llm_common.model")}</InputLabel>
+                <Select
+                  value={modelId}
+                  label={t("llm_common.model")}
+                  onChange={(e) => setModelId(e.target.value)}
+                >
+                  {models
+                    .filter((m) => m.status === "available")
+                    .map((m) => (
+                      <MenuItem key={m.id} value={m.id}>
+                        {m.display_name}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            )}
 
             <Box sx={{ position: "relative" }}>
               <FormControl fullWidth>
@@ -862,7 +1009,25 @@ export function ProviderWizardDialog({
             )}
 
             {/* ── Image availability check & pull ────────────── */}
-            {imageStatus === "checking" && (
+            {isRemoteWithInternet && (
+              <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
+                {t(
+                  "llm_runtimes.image_pull_on_node",
+                  "The container image will be pulled directly on the remote node.",
+                )}
+              </Alert>
+            )}
+            {isRemoteNode &&
+              modelSource === "sync_from_server" &&
+              imageStatus === "available" && (
+                <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
+                  {t(
+                    "llm_runtimes.image_transfer_ready",
+                    "Image available locally — it will be transferred to the remote node.",
+                  )}
+                </Alert>
+              )}
+            {!isRemoteWithInternet && imageStatus === "checking" && (
               <Alert
                 severity="info"
                 variant="outlined"
@@ -872,17 +1037,17 @@ export function ProviderWizardDialog({
                 {t("llm_runtimes.image_checking")}
               </Alert>
             )}
-            {imageStatus === "available" && (
+            {!isRemoteWithInternet && imageStatus === "available" && (
               <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
                 {t("llm_runtimes.image_available")}
               </Alert>
             )}
-            {imageStatus === "pulled" && (
+            {!isRemoteWithInternet && imageStatus === "pulled" && (
               <Alert severity="success" variant="outlined" sx={{ py: 0.5 }}>
                 {t("llm_runtimes.image_pull_success")}
               </Alert>
             )}
-            {imageStatus === "missing" && (
+            {!isRemoteWithInternet && imageStatus === "missing" && (
               <Alert
                 severity="warning"
                 variant="outlined"
@@ -900,7 +1065,7 @@ export function ProviderWizardDialog({
                 {t("llm_runtimes.image_not_local")}
               </Alert>
             )}
-            {imageStatus === "pulling" && (
+            {!isRemoteWithInternet && imageStatus === "pulling" && (
               <Alert
                 severity="info"
                 variant="outlined"
@@ -933,7 +1098,7 @@ export function ProviderWizardDialog({
                 </Stack>
               </Alert>
             )}
-            {imageStatus === "error" && (
+            {!isRemoteWithInternet && imageStatus === "error" && (
               <Alert
                 severity="error"
                 variant="outlined"

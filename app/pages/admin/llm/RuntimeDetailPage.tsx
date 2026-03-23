@@ -14,6 +14,7 @@ import {
   type Provider,
   type Model,
 } from "~/api/llm";
+import { nodesApi, type NodeCommandTimeline } from "~/api/nodes";
 import { RuntimeStatusChip, EngineChip } from "~/components/Chips";
 import { VllmEngineArgsPanel } from "~/components/VllmEngineArgsPanel";
 
@@ -23,10 +24,19 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import Collapse from "@mui/material/Collapse";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import LinearProgress from "@mui/material/LinearProgress";
 import Alert from "@mui/material/Alert";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import Stepper from "@mui/material/Stepper";
+import Step from "@mui/material/Step";
+import StepLabel from "@mui/material/StepLabel";
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -37,6 +47,130 @@ import StopIcon from "@mui/icons-material/Stop";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import HeartBrokenIcon from "@mui/icons-material/HeartBroken";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import MemoryIcon from "@mui/icons-material/Memory";
+
+/* ── Node Deployment Progress ─────────────────────────────────────── */
+
+/** vLLM deployment stages emitted by the node agent. */
+const DEPLOY_STAGES = [
+  "dispatched",
+  "validate",
+  "remove_stale",
+  "sync_model",
+  "pull_image",
+  "start_container",
+  "resolve_endpoint",
+  "ready",
+] as const;
+
+const STAGE_LABELS: Record<string, string> = {
+  dispatched: "Dispatched",
+  validate: "Validate",
+  remove_stale: "Cleanup",
+  sync_model: "Sync Model",
+  pull_image: "Pull Image",
+  start_container: "Start Container",
+  resolve_endpoint: "Resolve Endpoint",
+  ready: "Ready",
+};
+
+export function NodeDeploymentProgress({
+  timeline,
+}: {
+  timeline: NodeCommandTimeline;
+}) {
+  const { command, events } = timeline;
+  const isFailed =
+    command.status === "failed" ||
+    command.status === "canceled" ||
+    command.status === "timed_out";
+  const isFinished = command.status === "succeeded";
+
+  // Determine the latest deployment phase by scanning progress events
+  let lastPhase: string | null = null;
+  for (const ev of events) {
+    const phase = (ev.payload as Record<string, unknown> | undefined)?.phase;
+    if (
+      typeof phase === "string" &&
+      DEPLOY_STAGES.includes(phase as (typeof DEPLOY_STAGES)[number])
+    ) {
+      lastPhase = phase;
+    }
+  }
+
+  // Compute active step index from last known phase
+  let activeStep: number;
+  if (isFinished) {
+    activeStep = DEPLOY_STAGES.length; // all complete
+  } else if (lastPhase) {
+    activeStep = DEPLOY_STAGES.indexOf(
+      lastPhase as (typeof DEPLOY_STAGES)[number],
+    );
+  } else {
+    // Fallback: map command status for backward compat (no granular events)
+    if (command.status === "queued") activeStep = 0;
+    else if (command.status === "dispatched") activeStep = 0;
+    else if (command.status === "running") activeStep = 1;
+    else activeStep = 0;
+  }
+
+  // Find the step index where the failure occurred
+  const failedStep = isFailed ? Math.max(activeStep, 0) : -1;
+
+  return (
+    <Box>
+      <Stepper
+        activeStep={activeStep === -1 ? 0 : activeStep}
+        alternativeLabel
+        sx={{ mb: 2 }}
+      >
+        {DEPLOY_STAGES.map((phase, idx) => (
+          <Step key={phase} completed={!isFailed && activeStep > idx}>
+            <StepLabel error={isFailed && idx === failedStep}>
+              {STAGE_LABELS[phase] ?? phase}
+            </StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      {!isFinished && !isFailed && command.status === "running" && (
+        <LinearProgress sx={{ mb: 2 }} />
+      )}
+
+      {isFailed && (
+        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+          {command.error_message || command.status}
+        </Typography>
+      )}
+
+      {events.length > 0 && (
+        <Box
+          component="pre"
+          sx={{
+            fontSize: "0.75rem",
+            fontFamily: "monospace",
+            bgcolor: "grey.900",
+            color: "grey.100",
+            p: 1.5,
+            borderRadius: 1,
+            maxHeight: 200,
+            overflow: "auto",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            m: 0,
+          }}
+        >
+          {events.map((e) => {
+            const ts = new Date(e.ts).toLocaleTimeString();
+            return `[${ts}] ${e.phase}: ${e.message}\n`;
+          })}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 export default function RuntimeDetailPage() {
   const { t } = useTranslation();
@@ -58,6 +192,21 @@ export default function RuntimeDetailPage() {
     Record<string, string | number | boolean>
   >({});
   const [saving, setSaving] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+
+  // Container resource fields (stored in provider_config)
+  const [gpuRequest, setGpuRequest] = useState("");
+  const [ipcMode, setIpcMode] = useState("");
+  const [shmSize, setShmSize] = useState("");
+  const [memoryLimit, setMemoryLimit] = useState("");
+  const [cpuLimit, setCpuLimit] = useState("");
+  const [containerPort, setContainerPort] = useState("");
+
+  // ── Node deployment timeline ─────────────────────────────────────
+  const [cmdTimeline, setCmdTimeline] = useState<NodeCommandTimeline | null>(
+    null,
+  );
+  const isNodeDeployment = !!rt?.assigned_node_id;
 
   // Map from generic_config snake_case keys to CLI kebab-case flags
   const GC_TO_FLAG: Record<string, string> = {
@@ -86,6 +235,14 @@ export default function RuntimeDetailPage() {
       }
     }
     setEngineArgs(args);
+    // Seed container resource fields
+    setGpuRequest(String(pc.gpu_request ?? ""));
+    setIpcMode(String(pc.ipc_mode ?? ""));
+    setShmSize(String(pc.shm_size ?? ""));
+    setMemoryLimit(String(pc.memory_limit ?? ""));
+    setCpuLimit(String(pc.cpu_limit ?? ""));
+    setContainerPort(String(pc.container_port ?? ""));
+    setResourcesOpen(false);
     setEditing(true);
   }
 
@@ -126,6 +283,21 @@ export default function RuntimeDetailPage() {
       // When enforce-eager is enabled the adapter auto-selects the correct
       // image — remove any previously stored image override.
       if (engineArgs["enforce-eager"]) delete provider_config.image;
+
+      // Container resource fields
+      if (gpuRequest.trim()) provider_config.gpu_request = gpuRequest.trim();
+      else delete provider_config.gpu_request;
+      if (ipcMode.trim()) provider_config.ipc_mode = ipcMode.trim();
+      else delete provider_config.ipc_mode;
+      if (shmSize.trim()) provider_config.shm_size = shmSize.trim();
+      else delete provider_config.shm_size;
+      if (memoryLimit.trim()) provider_config.memory_limit = memoryLimit.trim();
+      else delete provider_config.memory_limit;
+      if (cpuLimit.trim()) provider_config.cpu_limit = cpuLimit.trim();
+      else delete provider_config.cpu_limit;
+      if (containerPort.trim())
+        provider_config.container_port = containerPort.trim();
+      else delete provider_config.container_port;
 
       const updated = await runtimes.update(id, {
         name: editName !== rt.name ? editName : undefined,
@@ -177,6 +349,19 @@ export default function RuntimeDetailPage() {
           setLogs("");
         }
       }
+
+      // Fetch node command timeline for node-deployed runtimes
+      if (r.assigned_node_id && r.last_command_id) {
+        try {
+          const tl = await nodesApi.commandTimeline(
+            r.assigned_node_id,
+            r.last_command_id,
+          );
+          setCmdTimeline(tl);
+        } catch {
+          /* command may not exist yet */
+        }
+      }
     } catch (e: unknown) {
       setError(
         e instanceof Error ? e.message : t("llm_runtime_detail.failed_load"),
@@ -204,6 +389,19 @@ export default function RuntimeDetailPage() {
       try {
         const updated = await runtimes.get(id); // triggers reconcile on backend
         setRt(updated);
+
+        // Refresh node deployment command timeline
+        if (updated.assigned_node_id && updated.last_command_id) {
+          try {
+            const tl = await nodesApi.commandTimeline(
+              updated.assigned_node_id,
+              updated.last_command_id,
+            );
+            setCmdTimeline(tl);
+          } catch {
+            /* ignore – command may not exist yet */
+          }
+        }
 
         if (updated.status === "error" || updated.status === "stopped") {
           load(); // full reload for logs; deps change stops this poller
@@ -292,8 +490,6 @@ export default function RuntimeDetailPage() {
         display: "flex",
         flexDirection: "column",
         gap: 3,
-        height: "100%",
-        overflow: "auto",
       }}
     >
       {/* Header */}
@@ -397,6 +593,90 @@ export default function RuntimeDetailPage() {
                 version={engineArgs["enforce-eager"] ? "0.6.6" : "0.7.3"}
                 modelName={model?.display_name}
               />
+
+              {/* Container Resources */}
+              <Button
+                size="small"
+                startIcon={<MemoryIcon />}
+                endIcon={
+                  resourcesOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                }
+                onClick={() => setResourcesOpen(!resourcesOpen)}
+                sx={{ alignSelf: "flex-start" }}
+              >
+                Container Resources
+              </Button>
+              <Collapse in={resourcesOpen}>
+                <Stack spacing={2} sx={{ pl: 1 }}>
+                  <Stack direction="row" spacing={2}>
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                      <InputLabel>GPU</InputLabel>
+                      <Select
+                        label="GPU"
+                        value={gpuRequest}
+                        onChange={(e) => setGpuRequest(e.target.value)}
+                      >
+                        <MenuItem value="">
+                          <em>Default</em>
+                        </MenuItem>
+                        <MenuItem value="all">all</MenuItem>
+                        <MenuItem value="0">0</MenuItem>
+                        <MenuItem value="0,1">0,1</MenuItem>
+                        <MenuItem value="0,1,2,3">0,1,2,3</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                      <InputLabel>IPC Mode</InputLabel>
+                      <Select
+                        label="IPC Mode"
+                        value={ipcMode}
+                        onChange={(e) => setIpcMode(e.target.value)}
+                      >
+                        <MenuItem value="">
+                          <em>Default</em>
+                        </MenuItem>
+                        <MenuItem value="host">host</MenuItem>
+                        <MenuItem value="private">private</MenuItem>
+                        <MenuItem value="shareable">shareable</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="SHM Size"
+                      size="small"
+                      placeholder="e.g. 1g"
+                      value={shmSize}
+                      onChange={(e) => setShmSize(e.target.value)}
+                      sx={{ width: 120 }}
+                    />
+                  </Stack>
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      label="Memory Limit"
+                      size="small"
+                      placeholder="e.g. 32g"
+                      value={memoryLimit}
+                      onChange={(e) => setMemoryLimit(e.target.value)}
+                      sx={{ width: 140 }}
+                    />
+                    <TextField
+                      label="CPU Limit"
+                      size="small"
+                      placeholder="e.g. 8"
+                      value={cpuLimit}
+                      onChange={(e) => setCpuLimit(e.target.value)}
+                      sx={{ width: 120 }}
+                    />
+                    <TextField
+                      label="Container Port"
+                      size="small"
+                      placeholder="8000"
+                      value={containerPort}
+                      onChange={(e) => setContainerPort(e.target.value)}
+                      sx={{ width: 140 }}
+                    />
+                  </Stack>
+                </Stack>
+              </Collapse>
             </Stack>
           </CardContent>
           <Stack
@@ -469,23 +749,37 @@ export default function RuntimeDetailPage() {
               label="Desired State"
               value={rt.desired_state || "running"}
             />
-            {provider?.capabilities &&
-              (provider.capabilities as Record<string, unknown>)
-                .supports_embeddings && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {t("llm_runtime_detail.capabilities")}
-                  </Typography>
-                  <Box mt={0.5}>
-                    <Chip
-                      label={t("llm_runtime_detail.supports_embeddings")}
-                      color="info"
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Box>
+            {!!(
+              provider?.capabilities &&
+              Object.keys(provider.capabilities as Record<string, unknown>)
+                .length > 0
+            ) && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  {t("llm_runtime_detail.capabilities")}
+                </Typography>
+                <Box
+                  mt={0.5}
+                  sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}
+                >
+                  {Object.entries(
+                    provider.capabilities as Record<string, unknown>,
+                  )
+                    .filter(([, v]) => v === true)
+                    .map(([key]) => (
+                      <Chip
+                        key={key}
+                        label={key
+                          .replace(/^(supports|requires)_/i, "")
+                          .replace(/_/g, " ")}
+                        color="info"
+                        size="small"
+                        variant="outlined"
+                      />
+                    ))}
                 </Box>
-              )}
+              </Box>
+            )}
             {rt.endpoint_url && (
               <MetaField
                 label={t("llm_runtimes.endpoint")}
@@ -523,6 +817,7 @@ export default function RuntimeDetailPage() {
                   fontSize: "0.76rem",
                   fontFamily: "monospace",
                   overflow: "auto",
+                  maxHeight: 300,
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
                 }}
@@ -534,11 +829,28 @@ export default function RuntimeDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Node deployment progress */}
+      {isNodeDeployment && cmdTimeline && (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="subtitle2" sx={{ mb: 2 }}>
+              Node Deployment
+            </Typography>
+            <NodeDeploymentProgress timeline={cmdTimeline} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Health card */}
       {!editing && (isRunning || rt.status === "error") && (
         <Card variant="outlined">
           <CardContent>
-            <Stack direction="row" alignItems="center" spacing={2}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={2}
+              flexWrap="wrap"
+            >
               {health ? (
                 <>
                   {health.healthy ? (
@@ -556,7 +868,11 @@ export default function RuntimeDetailPage() {
                       size="small"
                     />
                   )}
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ wordBreak: "break-word", minWidth: 0 }}
+                  >
                     {health.detail}
                   </Typography>
                 </>

@@ -8,7 +8,7 @@ const BASE = "/api/llm";
 // Types (mirror backend schemas)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ProviderType = "vllm" | "llamacpp" | "tgi" | "ollama";
+export type ProviderType = "vllm" | "llamacpp" | "tgi" | "ollama" | "cloud";
 export type ProviderTarget = "local_docker" | "remote_endpoint";
 
 /** LiteLLM provider prefixes for remote endpoints. */
@@ -26,7 +26,11 @@ export type LiteLLMProvider =
   | "cohere"
   | "openrouter"
   | string;
-export type ModelSource = "huggingface" | "local_path" | "archive_import";
+export type ModelSource =
+  | "huggingface"
+  | "local_path"
+  | "archive_import"
+  | "remote";
 export type ModelStatus = "available" | "downloading" | "failed" | "deleting";
 export type ArtifactFormat = "safetensors" | "gguf" | "other";
 export type RuntimeStatus =
@@ -58,6 +62,18 @@ export interface Provider {
   updated_at: string;
 }
 
+export interface ModelInstance {
+  runtime_id: string;
+  runtime_name: string;
+  runtime_status: RuntimeStatus;
+  provider_id: string;
+  provider_name: string;
+  provider_type: ProviderType;
+  execution_target: string;
+  node_id: string | null;
+  node_host: string | null;
+}
+
 export interface Model {
   id: string;
   display_name: string;
@@ -67,6 +83,7 @@ export interface Model {
   license_ack_required: boolean;
   tags: string[] | null;
   status: ModelStatus;
+  instances: ModelInstance[];
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +200,10 @@ export interface CreateRuntimePayload {
   openai_compat?: boolean;
   target_node_id?: string;
   placement_hints?: Record<string, unknown>;
+  /** How the model reaches the remote node: sync from server or download from HF. */
+  model_source?: "sync_from_server" | "download_from_hf";
+  /** How the container image reaches the remote node. */
+  image_source?: "pull_from_registry" | "transfer_from_server";
 }
 
 export interface UpdateRuntimePayload {

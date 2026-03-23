@@ -8,6 +8,7 @@ import {
   type NodeCommandTimeline,
 } from "~/api/nodes";
 import { logsApi, type LogStream } from "~/api/logs";
+import { NodeDeploymentProgress } from "~/pages/admin/llm/RuntimeDetailPage";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -153,6 +154,12 @@ export default function NodeDetailPage() {
   const [logsExpanded, setLogsExpanded] = useState(true);
   const [commandsExpanded, setCommandsExpanded] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
+  const [containerLogStreams, setContainerLogStreams] = useState<LogStream[]>(
+    [],
+  );
+  const [containerLogsExpanded, setContainerLogsExpanded] = useState(true);
+  const [deployTimeline, setDeployTimeline] =
+    useState<NodeCommandTimeline | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sortedCommands = useMemo(
@@ -211,6 +218,44 @@ export default function NodeDetailPage() {
     }
   }, []);
 
+  const loadContainerLogs = useCallback(async (host: string) => {
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      start.setMinutes(start.getMinutes() - 15);
+      const res = await logsApi.queryRange({
+        query: `{job="node-container", host="${host}"}`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        limit: 200,
+        direction: "BACKWARD",
+      });
+      setContainerLogStreams(res.streams);
+    } catch {
+      /* container logs are best-effort */
+    }
+  }, []);
+
+  const loadDeployTimeline = useCallback(
+    async (nodeId: string, cmds: NodeCommand[]) => {
+      // Find the most recent DEPLOY_WORKLOAD command
+      const deployCmds = cmds
+        .filter((c) => c.command_type === "deploy_workload")
+        .sort((a, b) => Date.parse(b.issued_at) - Date.parse(a.issued_at));
+      if (deployCmds.length === 0) {
+        setDeployTimeline(null);
+        return;
+      }
+      try {
+        const tl = await nodesApi.commandTimeline(nodeId, deployCmds[0].id);
+        setDeployTimeline(tl);
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
   async function runAction(key: string, action: () => Promise<void>) {
     setBusyKey(key);
     try {
@@ -241,20 +286,38 @@ export default function NodeDetailPage() {
 
   useEffect(() => {
     if (node?.host) void loadLogs(node.host);
-  }, [node?.host, loadLogs]);
+    if (node?.host) void loadContainerLogs(node.host);
+  }, [node?.host, loadLogs, loadContainerLogs]);
+
+  useEffect(() => {
+    if (id && commands.length > 0) void loadDeployTimeline(id, commands);
+  }, [id, commands, loadDeployTimeline]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (autoRefresh && id) {
       intervalRef.current = setInterval(() => {
         void silentRefresh();
-        if (node?.host) void loadLogs(node.host);
+        if (node?.host) {
+          void loadLogs(node.host);
+          void loadContainerLogs(node.host);
+        }
+        if (id && commands.length > 0) void loadDeployTimeline(id, commands);
       }, REFRESH_INTERVAL_MS);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [autoRefresh, id, silentRefresh, node?.host, loadLogs]);
+  }, [
+    autoRefresh,
+    id,
+    silentRefresh,
+    node?.host,
+    loadLogs,
+    loadContainerLogs,
+    loadDeployTimeline,
+    commands,
+  ]);
 
   /* ── derived data ──────────────────────────────────────────────── */
 
@@ -288,6 +351,28 @@ export default function NodeDetailPage() {
     }
     return lines.sort((a, b) => b.tsMs - a.tsMs).slice(0, 100);
   }, [logStreams]);
+
+  const flatContainerLogs = useMemo(() => {
+    const lines: {
+      ts: string;
+      line: string;
+      tsMs: number;
+      container: string;
+    }[] = [];
+    for (const stream of containerLogStreams) {
+      const container = stream.labels?.container ?? "";
+      for (const entry of stream.entries) {
+        const ms = new Date(entry.ts).getTime();
+        lines.push({
+          ts: entry.ts,
+          line: entry.line,
+          tsMs: Number.isNaN(ms) ? 0 : ms,
+          container,
+        });
+      }
+    }
+    return lines.sort((a, b) => a.tsMs - b.tsMs).slice(-200);
+  }, [containerLogStreams]);
 
   /* ── render ────────────────────────────────────────────────────── */
 
@@ -660,6 +745,112 @@ export default function NodeDetailPage() {
                     >
                       {new Date(entry.ts).toLocaleTimeString()}
                     </Typography>
+                    {entry.line}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Collapse>
+        </CardContent>
+      </Card>
+
+      {/* ── Latest Deployment Progress ──────────────────────────── */}
+      {deployTimeline && (
+        <Card variant="outlined">
+          <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Deployment Progress
+              <Typography
+                component="span"
+                variant="caption"
+                color="text.secondary"
+                sx={{ ml: 1 }}
+              >
+                {deployTimeline.command.command_type} &middot;{" "}
+                {deployTimeline.command.status}
+              </Typography>
+            </Typography>
+            <NodeDeploymentProgress timeline={deployTimeline} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Container Logs ──────────────────────────────────────── */}
+      <Card variant="outlined">
+        <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle2">Container Logs</Typography>
+              <Typography variant="caption" color="text.secondary">
+                last 15 min &middot; {flatContainerLogs.length} entries
+              </Typography>
+            </Stack>
+            <IconButton
+              size="small"
+              onClick={() => setContainerLogsExpanded((v) => !v)}
+              sx={{
+                transform: containerLogsExpanded
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
+                transition: "transform 0.2s",
+              }}
+            >
+              <ExpandMoreIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+          <Collapse in={containerLogsExpanded}>
+            {flatContainerLogs.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                No container logs found for host {node.host}
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  mt: 1,
+                  maxHeight: 400,
+                  overflow: "auto",
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                  lineHeight: 1.6,
+                  bgcolor: "grey.900",
+                  color: "grey.100",
+                  borderRadius: 1,
+                  p: 1,
+                }}
+              >
+                {flatContainerLogs.map((entry, i) => (
+                  <Box
+                    key={i}
+                    sx={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+                  >
+                    <Typography
+                      component="span"
+                      sx={{
+                        fontSize: "inherit",
+                        fontFamily: "inherit",
+                        color: "grey.500",
+                        mr: 1,
+                      }}
+                    >
+                      {new Date(entry.ts).toLocaleTimeString()}
+                    </Typography>
+                    {entry.container && (
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: "inherit",
+                          fontFamily: "inherit",
+                          color: "info.main",
+                          mr: 1,
+                        }}
+                      >
+                        [{entry.container}]
+                      </Typography>
+                    )}
                     {entry.line}
                   </Box>
                 ))}
