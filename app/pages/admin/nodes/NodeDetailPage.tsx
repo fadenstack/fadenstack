@@ -6,6 +6,7 @@ import {
   type ManagedNode,
   type NodeCommand,
   type NodeCommandTimeline,
+  type NodeEnrollmentToken,
 } from "~/api/nodes";
 import { logsApi, type LogStream } from "~/api/logs";
 import { NodeDeploymentProgress } from "~/pages/admin/llm/RuntimeDetailPage";
@@ -25,14 +26,18 @@ import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
+import TextField from "@mui/material/TextField";
+
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import BuildIcon from "@mui/icons-material/Build";
 import BugReportIcon from "@mui/icons-material/BugReport";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InvertColorsOffIcon from "@mui/icons-material/InvertColorsOff";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import PauseCircleOutlineIcon from "@mui/icons-material/PauseCircleOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import GaugeCard from "~/components/GaugeCard";
 
@@ -160,6 +165,11 @@ export default function NodeDetailPage() {
   const [containerLogsExpanded, setContainerLogsExpanded] = useState(true);
   const [deployTimeline, setDeployTimeline] =
     useState<NodeCommandTimeline | null>(null);
+  const [enrollToken, setEnrollToken] = useState<NodeEnrollmentToken | null>(
+    null,
+  );
+  const [enrollBusy, setEnrollBusy] = useState(false);
+  const [enrollCopied, setEnrollCopied] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sortedCommands = useMemo(
@@ -265,6 +275,35 @@ export default function NodeDetailPage() {
       setError(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusyKey(null);
+    }
+  }
+
+  async function generateEnrollToken() {
+    setEnrollBusy(true);
+    setEnrollCopied(false);
+    try {
+      const tok = await nodesApi.createEnrollmentToken(
+        `re-enroll ${node?.host ?? id}`,
+      );
+      setEnrollToken(tok);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to create enrollment token.",
+      );
+    } finally {
+      setEnrollBusy(false);
+    }
+  }
+
+  async function copyEnrollToken() {
+    if (!enrollToken) return;
+    try {
+      await navigator.clipboard.writeText(enrollToken.token);
+      setEnrollCopied(true);
+    } catch {
+      setError("Failed to copy token to clipboard.");
     }
   }
 
@@ -548,7 +587,81 @@ export default function NodeDetailPage() {
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        <Tooltip title="Generate a one-time enrollment token for this node">
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<VpnKeyIcon />}
+              disabled={enrollBusy}
+              onClick={() => void generateEnrollToken()}
+            >
+              {enrollBusy ? "Generating..." : "Enrollment Token"}
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
+
+      {/* ── Enrollment Token (shown after generation) ────────────── */}
+      <Collapse in={!!enrollToken}>
+        {enrollToken && (
+          <Card variant="outlined">
+            <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+              <Stack spacing={1}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <VpnKeyIcon fontSize="small" color="warning" />
+                  <Typography variant="subtitle2">Enrollment Token</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    expires {new Date(enrollToken.expires_at).toLocaleString()}
+                  </Typography>
+                </Stack>
+                <Alert severity="warning" variant="outlined" sx={{ py: 0.25 }}>
+                  Shown once. Copy it now and set it in the agent&apos;s env
+                  file.
+                </Alert>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    value={enrollToken.token}
+                    fullWidth
+                    size="small"
+                    slotProps={{
+                      input: {
+                        readOnly: true,
+                        sx: { fontFamily: "monospace", fontSize: "0.85rem" },
+                      },
+                    }}
+                  />
+                  <Tooltip title={enrollCopied ? "Copied!" : "Copy token"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => void copyEnrollToken()}
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Box
+                  component="pre"
+                  sx={{
+                    fontFamily: "monospace",
+                    fontSize: "0.75rem",
+                    m: 0,
+                    whiteSpace: "pre-wrap",
+                    color: "text.secondary",
+                  }}
+                >
+                  {`# On the remote node:
+rm ~/.local/share/llmport-agent/state.json
+# Add to ~/.config/llmport-agent/agent.env:
+LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN=${enrollToken.token}
+# Then restart:
+llmport-agent run`}
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
+      </Collapse>
 
       {/* ── Performance Gauges ───────────────────────────────────── */}
       <Grid container spacing={2}>

@@ -61,6 +61,10 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import NetworkCheckIcon from "@mui/icons-material/NetworkCheck";
 
 import { VllmEngineArgsPanel } from "~/components/VllmEngineArgsPanel";
+import {
+  ContainerResourcesPanel,
+  type ContainerResourceValues,
+} from "~/components/ContainerResourcesPanel";
 
 // ── Constants ────────────────────────────────────────────────────────
 const PROVIDER_TYPES: ProviderType[] = ["vllm", "llamacpp", "tgi", "ollama"];
@@ -153,6 +157,16 @@ export function ProviderWizardDialog({
   >({});
   const [openaiCompat, setOpenaiCompat] = useState(true);
   const [legacyGpu, setLegacyGpu] = useState(false);
+  const [containerRes, setContainerRes] = useState<ContainerResourceValues>({
+    gpuRequest: "",
+    ipcMode: "",
+    shmSize: "",
+    memoryLimit: "",
+    cpuLimit: "",
+    containerPort: "",
+  });
+  const updateRes = (field: keyof ContainerResourceValues, value: string) =>
+    setContainerRes((prev) => ({ ...prev, [field]: value }));
 
   // Image availability check & pull
   const [imageStatus, setImageStatus] = useState<
@@ -199,6 +213,14 @@ export function ProviderWizardDialog({
       setAdvancedOpen(false);
       setLegacyGpu(false);
       setEngineArgs({});
+      setContainerRes({
+        gpuRequest: "",
+        ipcMode: "",
+        shmSize: "",
+        memoryLimit: "",
+        cpuLimit: "",
+        containerPort: "",
+      });
       setOpenaiCompat(true);
       setImageStatus("idle");
       setImageError("");
@@ -517,6 +539,14 @@ export function ProviderWizardDialog({
         if (resolvedImage) provider_config.image = resolvedImage;
         if (Object.keys(mergedArgs).length > 0)
           provider_config.engine_args = mergedArgs;
+
+        // Container resource fields
+        if (containerRes.gpuRequest.trim()) provider_config.gpu_request = containerRes.gpuRequest.trim();
+        if (containerRes.ipcMode.trim()) provider_config.ipc_mode = containerRes.ipcMode.trim();
+        if (containerRes.shmSize.trim()) provider_config.shm_size = containerRes.shmSize.trim();
+        if (containerRes.memoryLimit.trim()) provider_config.memory_limit = containerRes.memoryLimit.trim();
+        if (containerRes.cpuLimit.trim()) provider_config.cpu_limit = containerRes.cpuLimit.trim();
+        if (containerRes.containerPort.trim()) provider_config.container_port = containerRes.containerPort.trim();
 
         // Backward-compat: also populate generic_config with commonly-used fields
         const generic_config: Record<string, unknown> = {};
@@ -1163,6 +1193,14 @@ export function ProviderWizardDialog({
                     />
                   }
                   label={t("llm_runtime_detail.enforce_eager")}
+                />
+
+                <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                  Container Resources
+                </Typography>
+                <ContainerResourcesPanel
+                  values={containerRes}
+                  onChange={updateRes}
                 />
               </AccordionDetails>
             </Accordion>

@@ -17,6 +17,10 @@ import {
 import { nodesApi, type NodeCommandTimeline } from "~/api/nodes";
 import { RuntimeStatusChip, EngineChip } from "~/components/Chips";
 import { VllmEngineArgsPanel } from "~/components/VllmEngineArgsPanel";
+import {
+  ContainerResourcesPanel,
+  type ContainerResourceValues,
+} from "~/components/ContainerResourcesPanel";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -25,12 +29,8 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
 import LinearProgress from "@mui/material/LinearProgress";
 import Alert from "@mui/material/Alert";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -78,8 +78,12 @@ const STAGE_LABELS: Record<string, string> = {
 
 export function NodeDeploymentProgress({
   timeline,
+  runtimeStatus,
+  statusMessage,
 }: {
   timeline: NodeCommandTimeline;
+  runtimeStatus?: string;
+  statusMessage?: string | null;
 }) {
   const { command, events } = timeline;
   const isFailed =
@@ -87,6 +91,9 @@ export function NodeDeploymentProgress({
     command.status === "canceled" ||
     command.status === "timed_out";
   const isFinished = command.status === "succeeded";
+
+  // Command succeeded but runtime crashed shortly after (post-deploy failure)
+  const isPostDeployFailure = isFinished && runtimeStatus === "error";
 
   // Determine the latest deployment phase by scanning progress events
   let lastPhase: string | null = null;
@@ -119,29 +126,54 @@ export function NodeDeploymentProgress({
   // Find the step index where the failure occurred
   const failedStep = isFailed ? Math.max(activeStep, 0) : -1;
 
+  // For post-deploy crash, mark the last stage ("ready") as failed
+  const lastStageIdx = DEPLOY_STAGES.length - 1;
+  const showError = isFailed || isPostDeployFailure;
+  const errorStep = isFailed
+    ? failedStep
+    : isPostDeployFailure
+      ? lastStageIdx
+      : -1;
+
   return (
     <Box>
       <Stepper
-        activeStep={activeStep === -1 ? 0 : activeStep}
+        activeStep={
+          isPostDeployFailure
+            ? lastStageIdx
+            : activeStep === -1
+              ? 0
+              : activeStep
+        }
         alternativeLabel
         sx={{ mb: 2 }}
       >
         {DEPLOY_STAGES.map((phase, idx) => (
-          <Step key={phase} completed={!isFailed && activeStep > idx}>
-            <StepLabel error={isFailed && idx === failedStep}>
+          <Step
+            key={phase}
+            completed={showError ? idx < errorStep : activeStep > idx}
+          >
+            <StepLabel error={showError && idx === errorStep}>
               {STAGE_LABELS[phase] ?? phase}
             </StepLabel>
           </Step>
         ))}
       </Stepper>
 
-      {!isFinished && !isFailed && command.status === "running" && (
-        <LinearProgress sx={{ mb: 2 }} />
-      )}
+      {!isFinished &&
+        !isFailed &&
+        !isPostDeployFailure &&
+        command.status === "running" && <LinearProgress sx={{ mb: 2 }} />}
 
       {isFailed && (
         <Typography variant="body2" color="error" sx={{ mb: 1 }}>
           {command.error_message || command.status}
+        </Typography>
+      )}
+
+      {isPostDeployFailure && (
+        <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+          {statusMessage || "Container crashed after startup"}
         </Typography>
       )}
 
@@ -195,12 +227,23 @@ export default function RuntimeDetailPage() {
   const [resourcesOpen, setResourcesOpen] = useState(false);
 
   // Container resource fields (stored in provider_config)
-  const [gpuRequest, setGpuRequest] = useState("");
-  const [ipcMode, setIpcMode] = useState("");
-  const [shmSize, setShmSize] = useState("");
-  const [memoryLimit, setMemoryLimit] = useState("");
-  const [cpuLimit, setCpuLimit] = useState("");
-  const [containerPort, setContainerPort] = useState("");
+  const [containerRes, setContainerRes] = useState<ContainerResourceValues>({
+    gpuRequest: "",
+    ipcMode: "",
+    shmSize: "",
+    memoryLimit: "",
+    cpuLimit: "",
+    containerPort: "",
+  });
+  const updateRes = (field: keyof ContainerResourceValues, value: string) =>
+    setContainerRes((prev) => ({ ...prev, [field]: value }));
+
+  // Remote provider fields (for edit config)
+  const [editRemoteModel, setEditRemoteModel] = useState("");
+  const [editEndpointUrl, setEditEndpointUrl] = useState("");
+  const [editApiKey, setEditApiKey] = useState("");
+
+  const isRemoteProvider = provider?.target === "remote_endpoint";
 
   // ── Node deployment timeline ─────────────────────────────────────
   const [cmdTimeline, setCmdTimeline] = useState<NodeCommandTimeline | null>(
@@ -236,13 +279,19 @@ export default function RuntimeDetailPage() {
     }
     setEngineArgs(args);
     // Seed container resource fields
-    setGpuRequest(String(pc.gpu_request ?? ""));
-    setIpcMode(String(pc.ipc_mode ?? ""));
-    setShmSize(String(pc.shm_size ?? ""));
-    setMemoryLimit(String(pc.memory_limit ?? ""));
-    setCpuLimit(String(pc.cpu_limit ?? ""));
-    setContainerPort(String(pc.container_port ?? ""));
+    setContainerRes({
+      gpuRequest: String(pc.gpu_request ?? ""),
+      ipcMode: String(pc.ipc_mode ?? ""),
+      shmSize: String(pc.shm_size ?? ""),
+      memoryLimit: String(pc.memory_limit ?? ""),
+      cpuLimit: String(pc.cpu_limit ?? ""),
+      containerPort: String(pc.container_port ?? ""),
+    });
     setResourcesOpen(false);
+    // Seed remote provider fields
+    setEditRemoteModel(provider?.remote_model ?? "");
+    setEditEndpointUrl(provider?.endpoint_url ?? "");
+    setEditApiKey("");
     setEditing(true);
   }
 
@@ -250,61 +299,88 @@ export default function RuntimeDetailPage() {
     if (!id || !rt) return;
     setSaving(true);
     try {
-      // Backward-compat: populate generic_config with commonly-used fields
-      const generic_config: Record<string, unknown> = {
-        ...(rt.generic_config ?? {}),
-      };
-      const FLAG_TO_GC: Record<string, string> = {
-        "max-model-len": "max_model_len",
-        dtype: "dtype",
-        "gpu-memory-utilization": "gpu_memory_utilization",
-        "tensor-parallel-size": "tensor_parallel_size",
-        "swap-space": "swap_space",
-        "enforce-eager": "enforce_eager",
-      };
-      // Clear legacy gc keys, then repopulate from engine args
-      for (const gcKey of Object.values(FLAG_TO_GC))
-        delete generic_config[gcKey];
-      for (const [flag, gcKey] of Object.entries(FLAG_TO_GC)) {
-        if (engineArgs[flag] != null) generic_config[gcKey] = engineArgs[flag];
-      }
+      if (isRemoteProvider && provider) {
+        // ── Remote provider: update provider fields + runtime name ──
+        const provUpdate: Record<string, unknown> = {};
+        if (editRemoteModel.trim() !== (provider.remote_model ?? ""))
+          provUpdate.remote_model = editRemoteModel.trim() || null;
+        if (editEndpointUrl.trim() !== (provider.endpoint_url ?? ""))
+          provUpdate.endpoint_url = editEndpointUrl.trim() || null;
+        if (editApiKey.trim()) provUpdate.api_key = editApiKey.trim();
 
-      const provider_config: Record<string, unknown> = {
-        ...(rt.provider_config ?? {}),
-      };
-      // Store full engine_args dict
-      if (Object.keys(engineArgs).length > 0) {
-        provider_config.engine_args = engineArgs;
+        if (Object.keys(provUpdate).length > 0) {
+          const updatedProv = await provApi.update(provider.id, provUpdate);
+          setProvider(updatedProv);
+        }
+        // Also update the runtime name if it changed
+        const updated = await runtimes.update(id, {
+          name: editName !== rt.name ? editName : undefined,
+        });
+        setRt(updated);
       } else {
-        delete provider_config.engine_args;
+        // ── Local provider: update engine args + container resources ──
+        // Backward-compat: populate generic_config with commonly-used fields
+        const generic_config: Record<string, unknown> = {
+          ...(rt.generic_config ?? {}),
+        };
+        const FLAG_TO_GC: Record<string, string> = {
+          "max-model-len": "max_model_len",
+          dtype: "dtype",
+          "gpu-memory-utilization": "gpu_memory_utilization",
+          "tensor-parallel-size": "tensor_parallel_size",
+          "swap-space": "swap_space",
+          "enforce-eager": "enforce_eager",
+        };
+        // Clear legacy gc keys, then repopulate from engine args
+        for (const gcKey of Object.values(FLAG_TO_GC))
+          delete generic_config[gcKey];
+        for (const [flag, gcKey] of Object.entries(FLAG_TO_GC)) {
+          if (engineArgs[flag] != null)
+            generic_config[gcKey] = engineArgs[flag];
+        }
+
+        const provider_config: Record<string, unknown> = {
+          ...(rt.provider_config ?? {}),
+        };
+        // Store full engine_args dict
+        if (Object.keys(engineArgs).length > 0) {
+          provider_config.engine_args = engineArgs;
+        } else {
+          delete provider_config.engine_args;
+        }
+        // Remove legacy extra_args — everything is in engine_args now
+        delete provider_config.extra_args;
+        // When enforce-eager is enabled the adapter auto-selects the correct
+        // image — remove any previously stored image override.
+        if (engineArgs["enforce-eager"]) delete provider_config.image;
+
+        // Container resource fields
+        if (containerRes.gpuRequest.trim())
+          provider_config.gpu_request = containerRes.gpuRequest.trim();
+        else delete provider_config.gpu_request;
+        if (containerRes.ipcMode.trim())
+          provider_config.ipc_mode = containerRes.ipcMode.trim();
+        else delete provider_config.ipc_mode;
+        if (containerRes.shmSize.trim())
+          provider_config.shm_size = containerRes.shmSize.trim();
+        else delete provider_config.shm_size;
+        if (containerRes.memoryLimit.trim())
+          provider_config.memory_limit = containerRes.memoryLimit.trim();
+        else delete provider_config.memory_limit;
+        if (containerRes.cpuLimit.trim())
+          provider_config.cpu_limit = containerRes.cpuLimit.trim();
+        else delete provider_config.cpu_limit;
+        if (containerRes.containerPort.trim())
+          provider_config.container_port = containerRes.containerPort.trim();
+        else delete provider_config.container_port;
+
+        const updated = await runtimes.update(id, {
+          name: editName !== rt.name ? editName : undefined,
+          generic_config,
+          provider_config,
+        });
+        setRt(updated);
       }
-      // Remove legacy extra_args — everything is in engine_args now
-      delete provider_config.extra_args;
-      // When enforce-eager is enabled the adapter auto-selects the correct
-      // image — remove any previously stored image override.
-      if (engineArgs["enforce-eager"]) delete provider_config.image;
-
-      // Container resource fields
-      if (gpuRequest.trim()) provider_config.gpu_request = gpuRequest.trim();
-      else delete provider_config.gpu_request;
-      if (ipcMode.trim()) provider_config.ipc_mode = ipcMode.trim();
-      else delete provider_config.ipc_mode;
-      if (shmSize.trim()) provider_config.shm_size = shmSize.trim();
-      else delete provider_config.shm_size;
-      if (memoryLimit.trim()) provider_config.memory_limit = memoryLimit.trim();
-      else delete provider_config.memory_limit;
-      if (cpuLimit.trim()) provider_config.cpu_limit = cpuLimit.trim();
-      else delete provider_config.cpu_limit;
-      if (containerPort.trim())
-        provider_config.container_port = containerPort.trim();
-      else delete provider_config.container_port;
-
-      const updated = await runtimes.update(id, {
-        name: editName !== rt.name ? editName : undefined,
-        generic_config,
-        provider_config,
-      });
-      setRt(updated); // use response directly — avoids race with DB commit
       setEditing(false);
       setLogs("");
       setHealth(null);
@@ -587,96 +663,68 @@ export default function RuntimeDetailPage() {
                 onChange={(e) => setEditName(e.target.value)}
                 fullWidth
               />
-              <VllmEngineArgsPanel
-                values={engineArgs}
-                onChange={setEngineArgs}
-                version={engineArgs["enforce-eager"] ? "0.6.6" : "0.7.3"}
-                modelName={model?.display_name}
-              />
 
-              {/* Container Resources */}
-              <Button
-                size="small"
-                startIcon={<MemoryIcon />}
-                endIcon={
-                  resourcesOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />
-                }
-                onClick={() => setResourcesOpen(!resourcesOpen)}
-                sx={{ alignSelf: "flex-start" }}
-              >
-                Container Resources
-              </Button>
-              <Collapse in={resourcesOpen}>
-                <Stack spacing={2} sx={{ pl: 1 }}>
-                  <Stack direction="row" spacing={2}>
-                    <FormControl size="small" sx={{ minWidth: 140 }}>
-                      <InputLabel>GPU</InputLabel>
-                      <Select
-                        label="GPU"
-                        value={gpuRequest}
-                        onChange={(e) => setGpuRequest(e.target.value)}
-                      >
-                        <MenuItem value="">
-                          <em>Default</em>
-                        </MenuItem>
-                        <MenuItem value="all">all</MenuItem>
-                        <MenuItem value="0">0</MenuItem>
-                        <MenuItem value="0,1">0,1</MenuItem>
-                        <MenuItem value="0,1,2,3">0,1,2,3</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <FormControl size="small" sx={{ minWidth: 140 }}>
-                      <InputLabel>IPC Mode</InputLabel>
-                      <Select
-                        label="IPC Mode"
-                        value={ipcMode}
-                        onChange={(e) => setIpcMode(e.target.value)}
-                      >
-                        <MenuItem value="">
-                          <em>Default</em>
-                        </MenuItem>
-                        <MenuItem value="host">host</MenuItem>
-                        <MenuItem value="private">private</MenuItem>
-                        <MenuItem value="shareable">shareable</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <TextField
-                      label="SHM Size"
-                      size="small"
-                      placeholder="e.g. 1g"
-                      value={shmSize}
-                      onChange={(e) => setShmSize(e.target.value)}
-                      sx={{ width: 120 }}
-                    />
-                  </Stack>
-                  <Stack direction="row" spacing={2}>
-                    <TextField
-                      label="Memory Limit"
-                      size="small"
-                      placeholder="e.g. 32g"
-                      value={memoryLimit}
-                      onChange={(e) => setMemoryLimit(e.target.value)}
-                      sx={{ width: 140 }}
-                    />
-                    <TextField
-                      label="CPU Limit"
-                      size="small"
-                      placeholder="e.g. 8"
-                      value={cpuLimit}
-                      onChange={(e) => setCpuLimit(e.target.value)}
-                      sx={{ width: 120 }}
-                    />
-                    <TextField
-                      label="Container Port"
-                      size="small"
-                      placeholder="8000"
-                      value={containerPort}
-                      onChange={(e) => setContainerPort(e.target.value)}
-                      sx={{ width: 140 }}
-                    />
-                  </Stack>
-                </Stack>
-              </Collapse>
+              {isRemoteProvider ? (
+                <>
+                  {/* Remote provider fields */}
+                  <TextField
+                    label={t("llm_common.model")}
+                    size="small"
+                    value={editRemoteModel}
+                    onChange={(e) => setEditRemoteModel(e.target.value)}
+                    fullWidth
+                    helperText="Model identifier used by the remote provider"
+                  />
+                  <TextField
+                    label={t("llm_providers.endpoint_url")}
+                    size="small"
+                    value={editEndpointUrl}
+                    onChange={(e) => setEditEndpointUrl(e.target.value)}
+                    fullWidth
+                    placeholder="https://api.example.com/v1"
+                  />
+                  <TextField
+                    label={t("llm_providers.api_key")}
+                    size="small"
+                    type="password"
+                    value={editApiKey}
+                    onChange={(e) => setEditApiKey(e.target.value)}
+                    fullWidth
+                    placeholder="Leave blank to keep current key"
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Local provider fields */}
+                  <VllmEngineArgsPanel
+                    values={engineArgs}
+                    onChange={setEngineArgs}
+                    version={engineArgs["enforce-eager"] ? "0.6.6" : "0.7.3"}
+                    modelName={model?.display_name}
+                  />
+
+                  {/* Container Resources */}
+                  <Button
+                    size="small"
+                    startIcon={<MemoryIcon />}
+                    endIcon={
+                      resourcesOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                    }
+                    onClick={() => setResourcesOpen(!resourcesOpen)}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Container Resources
+                  </Button>
+                  <Collapse in={resourcesOpen}>
+                    <Box sx={{ pl: 1 }}>
+                      <ContainerResourcesPanel
+                        values={containerRes}
+                        onChange={updateRes}
+                      />
+                    </Box>
+                  </Collapse>
+                </>
+              )}
             </Stack>
           </CardContent>
           <Stack
@@ -695,7 +743,9 @@ export default function RuntimeDetailPage() {
               disabled={saving}
               onClick={handleSaveAndRestart}
             >
-              {t("llm_runtime_detail.save_and_restart")}
+              {isRemoteProvider
+                ? t("common.save", "Save")
+                : t("llm_runtime_detail.save_and_restart")}
             </Button>
           </Stack>
         </Card>
@@ -829,6 +879,19 @@ export default function RuntimeDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Deployment / runtime error — always visible until resolved */}
+      {rt.status === "error" &&
+        (cmdTimeline?.command?.error_message || rt.status_message) && (
+          <Alert severity="error" variant="outlined">
+            <Typography variant="body2" fontWeight="bold" gutterBottom>
+              {isNodeDeployment ? "Deployment failed" : "Runtime error"}
+            </Typography>
+            <Typography variant="body2">
+              {cmdTimeline?.command?.error_message || rt.status_message}
+            </Typography>
+          </Alert>
+        )}
+
       {/* Node deployment progress */}
       {isNodeDeployment && cmdTimeline && (
         <Card variant="outlined">
@@ -836,7 +899,11 @@ export default function RuntimeDetailPage() {
             <Typography variant="subtitle2" sx={{ mb: 2 }}>
               Node Deployment
             </Typography>
-            <NodeDeploymentProgress timeline={cmdTimeline} />
+            <NodeDeploymentProgress
+              timeline={cmdTimeline}
+              runtimeStatus={rt.status}
+              statusMessage={rt.status_message}
+            />
           </CardContent>
         </Card>
       )}

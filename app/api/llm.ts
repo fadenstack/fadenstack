@@ -115,6 +115,7 @@ export interface Runtime {
   desired_state: string;
   placement_explain_json: Record<string, unknown> | null;
   last_command_id: string | null;
+  status_message: string | null;
   created_at: string;
   updated_at: string;
 }
