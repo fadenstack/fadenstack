@@ -539,10 +539,55 @@ if [ -n "$SUDO_BIN" ]; then
   }}
 fi
 
-if [ -n "$SUDO_BIN" ]; then
-  $SUDO_BIN install -m 0644 "$WORKDIR/deploy/systemd/llmport-agent.service" /etc/systemd/system/llmport-agent.service
+# Render the systemd service template by replacing @@PLACEHOLDER@@ values
+SVC_USER="$(id -un)"
+SVC_GROUP="$(id -gn)"
+HOME_DIR="$(eval echo ~"$SVC_USER")"
+STATE_DIR="$HOME_DIR/.local/share/llmport-agent"
+[ "$(id -u)" -eq 0 ] && STATE_DIR="/var/lib/llmport-agent"
+CONFIG_DIR="$HOME_DIR/.config/llmport-agent"
+MODEL_STORE="/srv/llm-port/models"
+PROTECT_HOME="yes"
+RW_PATHS="$MODEL_STORE $STATE_DIR"
+case "$STATE_DIR" in "$HOME_DIR"*) PROTECT_HOME="read-only"; RW_PATHS="$RW_PATHS $CONFIG_DIR" ;; esac
+case "$MODEL_STORE" in "$HOME_DIR"*) PROTECT_HOME="read-only" ;; esac
+USER_ENV_FILE="$CONFIG_DIR/agent.env"
+
+# Find the agent binary for ExecStart
+AGENT_BIN=""
+if [ -x "$WORKDIR/.venv/bin/llmport-agent" ]; then
+  AGENT_BIN="$WORKDIR/.venv/bin/llmport-agent"
+elif command -v llmport-agent >/dev/null 2>&1; then
+  AGENT_BIN="$(command -v llmport-agent)"
 else
-  install -m 0644 "$WORKDIR/deploy/systemd/llmport-agent.service" /etc/systemd/system/llmport-agent.service
+  AGENT_BIN="/usr/local/bin/llmport-agent"
+fi
+
+TMP_SVC="$(mktemp)"
+sed -e "s|@@USER@@|$SVC_USER|g" \
+    -e "s|@@GROUP@@|$SVC_GROUP|g" \
+    -e "s|@@PROTECT_HOME@@|$PROTECT_HOME|g" \
+    -e "s|@@READ_WRITE_PATHS@@|$RW_PATHS|g" \
+    -e "s|@@USER_ENV_FILE@@|$USER_ENV_FILE|g" \
+    -e "s|^ExecStart=.*|ExecStart=$AGENT_BIN run|" \
+    "$WORKDIR/deploy/systemd/llmport-agent.service" > "$TMP_SVC"
+
+if [ -n "$SUDO_BIN" ]; then
+  $SUDO_BIN install -m 0644 "$TMP_SVC" /etc/systemd/system/llmport-agent.service
+else
+  install -m 0644 "$TMP_SVC" /etc/systemd/system/llmport-agent.service
+fi
+rm -f "$TMP_SVC"
+
+# Ensure state and model directories exist with correct ownership
+if [ -n "$SUDO_BIN" ]; then
+  $SUDO_BIN mkdir -p "$STATE_DIR" || true
+  $SUDO_BIN chown "$SVC_USER:$SVC_GROUP" "$STATE_DIR" || true
+  $SUDO_BIN mkdir -p "$MODEL_STORE" || true
+  $SUDO_BIN chown "$SVC_USER:$SVC_GROUP" "$MODEL_STORE" || true
+else
+  mkdir -p "$STATE_DIR" || true
+  mkdir -p "$MODEL_STORE" || true
 fi
 
 # Derive Loki URL from backend (same host, port 3100)
