@@ -60,6 +60,7 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
+import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -202,6 +203,12 @@ export const NAV: NavEntry[] = [
     labelKey: "nav.observability_group",
     icon: <InsightsIcon />,
     children: [
+      {
+        to: "/admin/observability",
+        labelKey: "nav.cost_dashboard",
+        icon: <MonetizationOnIcon />,
+        permission: "observability:read",
+      },
       {
         to: "/admin/security-map",
         labelKey: "nav.data_residency",
@@ -469,6 +476,8 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/dashboard")) return t("dashboard.title");
   if (pathname.startsWith("/admin/security-map"))
     return t("nav.data_residency");
+  if (pathname.startsWith("/admin/observability"))
+    return "Cost Observability";
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");

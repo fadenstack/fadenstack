@@ -52,6 +52,8 @@ export default [
     ]),
     // Security map
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
+    // Observability dashboard (cost, usage, performance)
+    route("/admin/observability", "pages/admin/observability/ObservabilityPage.tsx"),
     // User profile
     route("/admin/profile", "pages/admin/ProfilePage.tsx"),
     // Chat routes — guarded by the chat-guard layout that checks module status
