@@ -69,7 +69,12 @@ function fmtPct(v: number | null | undefined): string {
 }
 
 type RangeKey = "7d" | "14d" | "30d" | "90d";
-const RANGES: Record<RangeKey, number> = { "7d": 7, "14d": 14, "30d": 30, "90d": 90 };
+const RANGES: Record<RangeKey, number> = {
+  "7d": 7,
+  "14d": 14,
+  "30d": 30,
+  "90d": 90,
+};
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -94,7 +99,11 @@ export default function ObservabilityPage() {
     try {
       const [s, ts, p] = await Promise.all([
         observability.summary(start, end),
-        observability.timeseries(start, end, RANGES[range] <= 7 ? "hour" : "day"),
+        observability.timeseries(
+          start,
+          end,
+          RANGES[range] <= 7 ? "hour" : "day",
+        ),
         observability.performance(start, end),
       ]);
       setSummary(s);
@@ -121,35 +130,50 @@ export default function ObservabilityPage() {
           {loading ? (
             <Skeleton variant="rounded" height={100} />
           ) : (
-            <StatCard label="Estimated Spend" value={fmtCost(summary?.estimated_total_cost)} />
+            <StatCard
+              label={t("observability.estimated_spend")}
+              value={fmtCost(summary?.estimated_total_cost)}
+            />
           )}
         </Grid>
         <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
           {loading ? (
             <Skeleton variant="rounded" height={100} />
           ) : (
-            <StatCard label="Total Requests" value={fmtNum(summary?.total_requests)} />
+            <StatCard
+              label={t("observability.total_requests")}
+              value={fmtNum(summary?.total_requests)}
+            />
           )}
         </Grid>
         <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
           {loading ? (
             <Skeleton variant="rounded" height={100} />
           ) : (
-            <StatCard label="Total Tokens" value={fmtNum(summary?.total_tokens)} />
+            <StatCard
+              label={t("observability.total_tokens")}
+              value={fmtNum(summary?.total_tokens)}
+            />
           )}
         </Grid>
         <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
           {loading ? (
             <Skeleton variant="rounded" height={100} />
           ) : (
-            <StatCard label="Avg Latency" value={fmtMs(perf?.avg_latency_ms)} />
+            <StatCard
+              label={t("observability.avg_latency")}
+              value={fmtMs(perf?.avg_latency_ms)}
+            />
           )}
         </Grid>
         <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
           {loading ? (
             <Skeleton variant="rounded" height={100} />
           ) : (
-            <StatCard label="Error Rate" value={fmtPct(perf?.error_rate)} />
+            <StatCard
+              label={t("observability.error_rate")}
+              value={fmtPct(perf?.error_rate)}
+            />
           )}
         </Grid>
       </Grid>
@@ -161,13 +185,16 @@ export default function ObservabilityPage() {
           <Card>
             <CardContent>
               <Typography variant="subtitle2" gutterBottom>
-                Cost Over Time
+                {t("observability.cost_over_time")}
               </Typography>
               {loading ? (
                 <Skeleton variant="rounded" height={250} />
               ) : timeseries.length === 0 ? (
-                <Typography color="text.secondary" sx={{ py: 8, textAlign: "center" }}>
-                  No data for this period
+                <Typography
+                  color="text.secondary"
+                  sx={{ py: 8, textAlign: "center" }}
+                >
+                  {t("observability.no_data")}
                 </Typography>
               ) : (
                 <LineChart
@@ -180,7 +207,9 @@ export default function ObservabilityPage() {
                   ]}
                   series={[
                     {
-                      data: timeseries.map((b) => Number(b.estimated_total_cost) || 0),
+                      data: timeseries.map(
+                        (b) => Number(b.estimated_total_cost) || 0,
+                      ),
                       label: "Cost ($)",
                       color: theme.palette.primary.main,
                       area: true,
@@ -197,13 +226,16 @@ export default function ObservabilityPage() {
           <Card>
             <CardContent>
               <Typography variant="subtitle2" gutterBottom>
-                Request Throughput
+                {t("observability.request_throughput")}
               </Typography>
               {loading ? (
                 <Skeleton variant="rounded" height={250} />
               ) : timeseries.length === 0 ? (
-                <Typography color="text.secondary" sx={{ py: 8, textAlign: "center" }}>
-                  No data for this period
+                <Typography
+                  color="text.secondary"
+                  sx={{ py: 8, textAlign: "center" }}
+                >
+                  {t("observability.no_data")}
                 </Typography>
               ) : (
                 <LineChart
@@ -232,7 +264,7 @@ export default function ObservabilityPage() {
           <Card>
             <CardContent>
               <Typography variant="subtitle2" gutterBottom>
-                Latency Percentiles
+                {t("observability.latency_percentiles")}
               </Typography>
               {loading || !perf ? (
                 <Skeleton variant="rounded" height={200} />
@@ -262,26 +294,33 @@ export default function ObservabilityPage() {
           <Card>
             <CardContent>
               <Typography variant="subtitle2" gutterBottom>
-                Spend by Model
+                {t("observability.spend_by_model")}
               </Typography>
               {loading || !summary ? (
                 <Skeleton variant="rounded" height={200} />
               ) : summary.by_model.length === 0 ? (
-                <Typography color="text.secondary" sx={{ py: 6, textAlign: "center" }}>
-                  No data
+                <Typography
+                  color="text.secondary"
+                  sx={{ py: 6, textAlign: "center" }}
+                >
+                  {t("observability.no_data_short")}
                 </Typography>
               ) : (
                 <BarChart
                   height={200}
                   xAxis={[
                     {
-                      data: summary.by_model.slice(0, 10).map((m) => m.model_alias),
+                      data: summary.by_model
+                        .slice(0, 10)
+                        .map((m) => m.model_alias),
                       scaleType: "band",
                     },
                   ]}
                   series={[
                     {
-                      data: summary.by_model.slice(0, 10).map((m) => Number(m.estimated_total_cost) || 0),
+                      data: summary.by_model
+                        .slice(0, 10)
+                        .map((m) => Number(m.estimated_total_cost) || 0),
                       label: "Cost ($)",
                       color: theme.palette.info.main,
                     },
@@ -298,25 +337,39 @@ export default function ObservabilityPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="subtitle2" gutterBottom>
-              Top Users
+              {t("observability.top_users")}
             </Typography>
             <Box sx={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left", padding: 8 }}>User</th>
-                    <th style={{ textAlign: "right", padding: 8 }}>Requests</th>
-                    <th style={{ textAlign: "right", padding: 8 }}>Tokens</th>
-                    <th style={{ textAlign: "right", padding: 8 }}>Est. Cost</th>
+                    <th style={{ textAlign: "left", padding: 8 }}>
+                      {t("observability.col_user")}
+                    </th>
+                    <th style={{ textAlign: "right", padding: 8 }}>
+                      {t("observability.col_requests")}
+                    </th>
+                    <th style={{ textAlign: "right", padding: 8 }}>
+                      {t("observability.col_tokens")}
+                    </th>
+                    <th style={{ textAlign: "right", padding: 8 }}>
+                      {t("observability.col_est_cost")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.top_users.slice(0, 10).map((u) => (
                     <tr key={u.user_id}>
                       <td style={{ padding: 8 }}>{u.user_id}</td>
-                      <td style={{ textAlign: "right", padding: 8 }}>{fmtNum(u.total_requests)}</td>
-                      <td style={{ textAlign: "right", padding: 8 }}>{fmtNum(u.total_tokens)}</td>
-                      <td style={{ textAlign: "right", padding: 8 }}>{fmtCost(u.estimated_total_cost)}</td>
+                      <td style={{ textAlign: "right", padding: 8 }}>
+                        {fmtNum(u.total_requests)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: 8 }}>
+                        {fmtNum(u.total_tokens)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: 8 }}>
+                        {fmtCost(u.estimated_total_cost)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -331,8 +384,13 @@ export default function ObservabilityPage() {
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h5">Cost Observability</Typography>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
+        <Typography variant="h5">{t("observability.title")}</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           {/* Range selector */}
           {(Object.keys(RANGES) as RangeKey[]).map((k) => (
@@ -345,12 +403,12 @@ export default function ObservabilityPage() {
               onClick={() => setRange(k)}
             />
           ))}
-          <Tooltip title="Refresh">
+          <Tooltip title={t("observability.refresh")}>
             <IconButton onClick={loadOverview} size="small">
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Export CSV">
+          <Tooltip title={t("observability.export_csv")}>
             <IconButton
               size="small"
               component="a"
@@ -371,9 +429,9 @@ export default function ObservabilityPage() {
 
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Overview" />
-        <Tab label="Requests" />
-        <Tab label="Pricing" />
+        <Tab label={t("observability.tab_overview")} />
+        <Tab label={t("observability.tab_requests")} />
+        <Tab label={t("observability.tab_pricing")} />
       </Tabs>
 
       {tab === 0 && overviewContent}

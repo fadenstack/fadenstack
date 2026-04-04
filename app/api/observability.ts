@@ -158,10 +158,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function qs(params: Record<string, string | number | boolean | undefined | null>): string {
+function qs(
+  params: Record<string, string | number | boolean | undefined | null>,
+): string {
   const parts: string[] = [];
   for (const [k, v] of Object.entries(params)) {
-    if (v != null && v !== "") parts.push(`${k}=${encodeURIComponent(String(v))}`);
+    if (v != null && v !== "")
+      parts.push(`${k}=${encodeURIComponent(String(v))}`);
   }
   return parts.length ? `?${parts.join("&")}` : "";
 }
@@ -174,7 +177,9 @@ export const observability = {
   },
 
   timeseries(start: string, end: string, granularity = "day") {
-    return request<TimeseriesBucket[]>(`/timeseries${qs({ start, end, granularity })}`);
+    return request<TimeseriesBucket[]>(
+      `/timeseries${qs({ start, end, granularity })}`,
+    );
   },
 
   performance(start: string, end: string) {
@@ -184,7 +189,13 @@ export const observability = {
   requests(
     start: string,
     end: string,
-    opts?: { page?: number; limit?: number; model_alias?: string; user_id?: string; status_code?: number },
+    opts?: {
+      page?: number;
+      limit?: number;
+      model_alias?: string;
+      user_id?: string;
+      status_code?: number;
+    },
   ) {
     return request<PaginatedRequests>(
       `/requests${qs({ start, end, ...opts })}`,
@@ -207,6 +218,14 @@ export const observability = {
     return request<PricingEntry[]>("/pricing");
   },
 
+  modelNames(q = "") {
+    return request<string[]>(`/model-names${qs({ q })}`);
+  },
+
+  providerNames(q = "") {
+    return request<string[]>(`/provider-names${qs({ q })}`);
+  },
+
   createPricing(data: PricingCreate) {
     return request<PricingEntry>("/pricing", {
       method: "POST",
@@ -222,7 +241,9 @@ export const observability = {
   },
 
   deactivatePricing(id: string) {
-    return request<void>(`/pricing/${encodeURIComponent(id)}`, { method: "DELETE" });
+    return request<void>(`/pricing/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
   },
 
   pricingHistory(provider: string, model: string) {

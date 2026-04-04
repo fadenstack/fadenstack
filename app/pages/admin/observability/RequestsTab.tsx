@@ -2,6 +2,7 @@
  * Requests tab — paginated log of gateway requests with cost detail.
  */
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   observability,
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export default function RequestsTab({ start, end }: Props) {
+  const { t } = useTranslation();
   const [data, setData] = useState<PaginatedRequests | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,20 +90,26 @@ export default function RequestsTab({ start, end }: Props) {
       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
         <TextField
           size="small"
-          label="Model"
+          label={t("observability.filter_model")}
           value={modelFilter}
-          onChange={(e) => { setModelFilter(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setModelFilter(e.target.value);
+            setPage(1);
+          }}
           sx={{ width: 200 }}
         />
         <TextField
           size="small"
-          label="User ID"
+          label={t("observability.filter_user_id")}
           value={userFilter}
-          onChange={(e) => { setUserFilter(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setUserFilter(e.target.value);
+            setPage(1);
+          }}
           sx={{ width: 200 }}
         />
         <Button variant="outlined" size="small" onClick={load}>
-          Search
+          {t("observability.search")}
         </Button>
       </Stack>
 
@@ -117,7 +125,7 @@ export default function RequestsTab({ start, end }: Props) {
         </Box>
       ) : !data || data.items.length === 0 ? (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-          No requests found in this time range.
+          {t("observability.no_requests")}
         </Typography>
       ) : (
         <>
@@ -126,13 +134,19 @@ export default function RequestsTab({ start, end }: Props) {
               <TableHead>
                 <TableRow>
                   <TableCell />
-                  <TableCell>Time</TableCell>
-                  <TableCell>Model</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Latency</TableCell>
-                  <TableCell align="right">Tokens</TableCell>
-                  <TableCell align="right">Est. Cost</TableCell>
-                  <TableCell>User</TableCell>
+                  <TableCell>{t("observability.col_time")}</TableCell>
+                  <TableCell>{t("observability.col_model")}</TableCell>
+                  <TableCell>{t("observability.col_status")}</TableCell>
+                  <TableCell align="right">
+                    {t("observability.col_latency")}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t("observability.col_tokens")}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t("observability.col_est_cost")}
+                  </TableCell>
+                  <TableCell>{t("observability.col_user")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -141,7 +155,9 @@ export default function RequestsTab({ start, end }: Props) {
                     key={row.id}
                     row={row}
                     expanded={expanded === row.id}
-                    onToggle={() => setExpanded(expanded === row.id ? null : row.id)}
+                    onToggle={() =>
+                      setExpanded(expanded === row.id ? null : row.id)
+                    }
                   />
                 ))}
               </TableBody>
@@ -159,8 +175,12 @@ export default function RequestsTab({ start, end }: Props) {
             </Stack>
           )}
 
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-            {data.total} total requests
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 1, display: "block" }}
+          >
+            {t("observability.total_requests_count", { count: data.total })}
           </Typography>
         </>
       )}
@@ -179,6 +199,7 @@ function RequestRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <TableRow hover sx={{ cursor: "pointer" }} onClick={onToggle}>
@@ -187,38 +208,96 @@ function RequestRow({
             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
         </TableCell>
-        <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(row.created_at)}</TableCell>
+        <TableCell sx={{ whiteSpace: "nowrap" }}>
+          {fmtDate(row.created_at)}
+        </TableCell>
         <TableCell>{row.model_alias ?? "—"}</TableCell>
         <TableCell>
-          <Chip label={row.status_code} size="small" color={statusColor(row.status_code)} />
+          <Chip
+            label={row.status_code}
+            size="small"
+            color={statusColor(row.status_code)}
+          />
         </TableCell>
         <TableCell align="right">{row.latency_ms} ms</TableCell>
         <TableCell align="right">{row.total_tokens ?? "—"}</TableCell>
         <TableCell align="right">{fmtCost(row.estimated_total_cost)}</TableCell>
-        <TableCell sx={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>
+        <TableCell
+          sx={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}
+        >
           {row.user_id}
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell colSpan={8} sx={{ p: 0, borderBottom: expanded ? undefined : "none" }}>
+        <TableCell
+          colSpan={8}
+          sx={{ p: 0, borderBottom: expanded ? undefined : "none" }}
+        >
           <Collapse in={expanded} unmountOnExit>
             <Box sx={{ p: 2, bgcolor: "action.hover" }}>
               <Stack direction="row" spacing={4} flexWrap="wrap">
-                <Detail label="Request ID" value={row.request_id} />
-                <Detail label="Trace ID" value={row.trace_id ?? "—"} />
-                <Detail label="Provider" value={row.provider_instance_id ?? "—"} />
-                <Detail label="Endpoint" value={row.endpoint} />
-                <Detail label="Stream" value={row.stream != null ? String(row.stream) : "—"} />
-                <Detail label="TTFT" value={row.ttft_ms != null ? `${row.ttft_ms} ms` : "—"} />
-                <Detail label="Prompt Tokens" value={String(row.prompt_tokens ?? "—")} />
-                <Detail label="Completion Tokens" value={String(row.completion_tokens ?? "—")} />
-                <Detail label="Cached Tokens" value={String(row.cached_tokens ?? "—")} />
-                <Detail label="Input Cost" value={fmtCost(row.estimated_input_cost)} />
-                <Detail label="Output Cost" value={fmtCost(row.estimated_output_cost)} />
-                <Detail label="Total Cost" value={fmtCost(row.estimated_total_cost)} />
-                <Detail label="Currency" value={row.currency ?? "—"} />
-                <Detail label="Estimate Status" value={row.cost_estimate_status ?? "—"} />
-                {row.error_code && <Detail label="Error" value={row.error_code} />}
+                <Detail
+                  label={t("observability.request_id")}
+                  value={row.request_id}
+                />
+                <Detail
+                  label={t("observability.trace_id")}
+                  value={row.trace_id ?? "—"}
+                />
+                <Detail
+                  label={t("observability.provider")}
+                  value={row.provider_instance_id ?? "—"}
+                />
+                <Detail
+                  label={t("observability.endpoint")}
+                  value={row.endpoint}
+                />
+                <Detail
+                  label={t("observability.stream")}
+                  value={row.stream != null ? String(row.stream) : "—"}
+                />
+                <Detail
+                  label={t("observability.ttft")}
+                  value={row.ttft_ms != null ? `${row.ttft_ms} ms` : "—"}
+                />
+                <Detail
+                  label={t("observability.prompt_tokens")}
+                  value={String(row.prompt_tokens ?? "—")}
+                />
+                <Detail
+                  label={t("observability.completion_tokens")}
+                  value={String(row.completion_tokens ?? "—")}
+                />
+                <Detail
+                  label={t("observability.cached_tokens")}
+                  value={String(row.cached_tokens ?? "—")}
+                />
+                <Detail
+                  label={t("observability.input_cost")}
+                  value={fmtCost(row.estimated_input_cost)}
+                />
+                <Detail
+                  label={t("observability.output_cost")}
+                  value={fmtCost(row.estimated_output_cost)}
+                />
+                <Detail
+                  label={t("observability.total_cost")}
+                  value={fmtCost(row.estimated_total_cost)}
+                />
+                <Detail
+                  label={t("observability.currency")}
+                  value={row.currency ?? "—"}
+                />
+                <Detail
+                  label={t("observability.estimate_status")}
+                  value={row.cost_estimate_status ?? "—"}
+                />
+                {row.error_code && (
+                  <Detail
+                    label={t("observability.error")}
+                    value={row.error_code}
+                  />
+                )}
               </Stack>
             </Box>
           </Collapse>
