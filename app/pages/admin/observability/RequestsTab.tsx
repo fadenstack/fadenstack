@@ -8,6 +8,7 @@ import {
   observability,
   type PaginatedRequests,
   type RequestLog,
+  type ToolCallLog,
 } from "~/api/observability";
 
 import Alert from "@mui/material/Alert";
@@ -26,9 +27,13 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+
+import PipelineGraph from "~/components/PipelineGraph";
 
 function statusColor(code: number) {
   if (code >= 200 && code < 300) return "success" as const;
@@ -200,6 +205,27 @@ function RequestRow({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const [detailTab, setDetailTab] = useState(0);
+  const [toolCalls, setToolCalls] = useState<ToolCallLog[] | null>(null);
+  const [toolCallsLoading, setToolCallsLoading] = useState(false);
+
+  // Fetch tool calls when the pipeline tab is first opened
+  useEffect(() => {
+    if (
+      expanded &&
+      detailTab === 1 &&
+      toolCalls === null &&
+      !toolCallsLoading
+    ) {
+      setToolCallsLoading(true);
+      observability
+        .toolCalls(row.request_id)
+        .then(setToolCalls)
+        .catch(() => setToolCalls([]))
+        .finally(() => setToolCallsLoading(false));
+    }
+  }, [expanded, detailTab, toolCalls, toolCallsLoading, row.request_id]);
+
   return (
     <>
       <TableRow hover sx={{ cursor: "pointer" }} onClick={onToggle}>
@@ -234,71 +260,146 @@ function RequestRow({
           sx={{ p: 0, borderBottom: expanded ? undefined : "none" }}
         >
           <Collapse in={expanded} unmountOnExit>
-            <Box sx={{ p: 2, bgcolor: "action.hover" }}>
-              <Stack direction="row" spacing={4} flexWrap="wrap">
-                <Detail
-                  label={t("observability.request_id")}
-                  value={row.request_id}
+            <Box sx={{ bgcolor: "action.hover" }}>
+              <Tabs
+                value={detailTab}
+                onChange={(_, v) => setDetailTab(v)}
+                sx={{ px: 2, minHeight: 36 }}
+                TabIndicatorProps={{ sx: { height: 2 } }}
+              >
+                <Tab
+                  label={t("observability.tab_details", "Details")}
+                  sx={{ minHeight: 36, textTransform: "none", fontSize: 13 }}
                 />
-                <Detail
-                  label={t("observability.trace_id")}
-                  value={row.trace_id ?? "—"}
+                <Tab
+                  label={t("observability.tab_pipeline", "Pipeline")}
+                  sx={{ minHeight: 36, textTransform: "none", fontSize: 13 }}
                 />
-                <Detail
-                  label={t("observability.provider")}
-                  value={row.provider_instance_id ?? "—"}
-                />
-                <Detail
-                  label={t("observability.endpoint")}
-                  value={row.endpoint}
-                />
-                <Detail
-                  label={t("observability.stream")}
-                  value={row.stream != null ? String(row.stream) : "—"}
-                />
-                <Detail
-                  label={t("observability.ttft")}
-                  value={row.ttft_ms != null ? `${row.ttft_ms} ms` : "—"}
-                />
-                <Detail
-                  label={t("observability.prompt_tokens")}
-                  value={String(row.prompt_tokens ?? "—")}
-                />
-                <Detail
-                  label={t("observability.completion_tokens")}
-                  value={String(row.completion_tokens ?? "—")}
-                />
-                <Detail
-                  label={t("observability.cached_tokens")}
-                  value={String(row.cached_tokens ?? "—")}
-                />
-                <Detail
-                  label={t("observability.input_cost")}
-                  value={fmtCost(row.estimated_input_cost)}
-                />
-                <Detail
-                  label={t("observability.output_cost")}
-                  value={fmtCost(row.estimated_output_cost)}
-                />
-                <Detail
-                  label={t("observability.total_cost")}
-                  value={fmtCost(row.estimated_total_cost)}
-                />
-                <Detail
-                  label={t("observability.currency")}
-                  value={row.currency ?? "—"}
-                />
-                <Detail
-                  label={t("observability.estimate_status")}
-                  value={row.cost_estimate_status ?? "—"}
-                />
-                {row.error_code && (
-                  <Detail
-                    label={t("observability.error")}
-                    value={row.error_code}
-                  />
-                )}
-              </Stack>
+              </Tabs>
+
+              {/* Details tab */}
+              {detailTab === 0 && (
+                <Box sx={{ p: 2 }}>
+                  <Stack direction="row" spacing={4} flexWrap="wrap">
+                    <Detail
+                      label={t("observability.request_id")}
+                      value={row.request_id}
+                    />
+                    <Detail
+                      label={t("observability.trace_id")}
+                      value={row.trace_id ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.provider")}
+                      value={row.provider_instance_id ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.endpoint")}
+                      value={row.endpoint}
+                    />
+                    <Detail
+                      label={t("observability.stream")}
+                      value={row.stream != null ? String(row.stream) : "—"}
+                    />
+                    <Detail
+                      label={t("observability.ttft")}
+                      value={row.ttft_ms != null ? `${row.ttft_ms} ms` : "—"}
+                    />
+                    <Detail
+                      label={t("observability.prompt_tokens")}
+                      value={String(row.prompt_tokens ?? "—")}
+                    />
+                    <Detail
+                      label={t("observability.completion_tokens")}
+                      value={String(row.completion_tokens ?? "—")}
+                    />
+                    <Detail
+                      label={t("observability.cached_tokens")}
+                      value={String(row.cached_tokens ?? "—")}
+                    />
+                    <Detail
+                      label={t("observability.input_cost")}
+                      value={fmtCost(row.estimated_input_cost)}
+                    />
+                    <Detail
+                      label={t("observability.output_cost")}
+                      value={fmtCost(row.estimated_output_cost)}
+                    />
+                    <Detail
+                      label={t("observability.total_cost")}
+                      value={fmtCost(row.estimated_total_cost)}
+                    />
+                    <Detail
+                      label={t("observability.currency")}
+                      value={row.currency ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.estimate_status")}
+                      value={row.cost_estimate_status ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.session_id")}
+                      value={row.session_id ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.finish_reason")}
+                      value={row.finish_reason ?? "—"}
+                    />
+                    <Detail
+                      label={t("observability.retry_count")}
+                      value={String(row.retry_count ?? 0)}
+                    />
+                    <Detail
+                      label={t("observability.mcp_tool_calls")}
+                      value={String(row.mcp_tool_call_count ?? 0)}
+                    />
+                    <Detail
+                      label={t("observability.mcp_iterations")}
+                      value={String(row.mcp_tool_loop_iterations ?? 0)}
+                    />
+                    {row.skills_used && row.skills_used.length > 0 && (
+                      <Detail
+                        label={t("observability.skills_used")}
+                        value={row.skills_used.map((s) => s.name).join(", ")}
+                      />
+                    )}
+                    {row.rag_context && (
+                      <Detail
+                        label={t("observability.rag_context")}
+                        value={`${row.rag_context.chunk_count} chunks (top_k=${row.rag_context.top_k})`}
+                      />
+                    )}
+                    {row.error_code && (
+                      <Detail
+                        label={t("observability.error")}
+                        value={row.error_code}
+                      />
+                    )}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* Pipeline graph tab */}
+              {detailTab === 1 && (
+                <Box sx={{ p: 2 }}>
+                  {toolCallsLoading ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        py: 4,
+                      }}
+                    >
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : (
+                    <PipelineGraph
+                      request={row}
+                      toolCalls={toolCalls ?? undefined}
+                    />
+                  )}
+                </Box>
+              )}
             </Box>
           </Collapse>
         </TableCell>

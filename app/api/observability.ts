@@ -87,6 +87,34 @@ export interface RequestLog {
   cost_estimate_status: string | null;
   cached_tokens: number | null;
   stream: boolean | null;
+  session_id: string | null;
+  finish_reason: string | null;
+  retry_count: number | null;
+  skills_used: Array<{
+    skill_id: string;
+    name: string;
+    slug: string;
+    version: string;
+  }> | null;
+  rag_context: {
+    chunk_count: number;
+    collection_ids?: string[];
+    top_k: number;
+  } | null;
+  mcp_tool_call_count: number | null;
+  mcp_tool_loop_iterations: number | null;
+  created_at: string;
+}
+
+export interface ToolCallLog {
+  id: string;
+  request_id: string;
+  iteration: number;
+  tool_name: string;
+  mcp_server: string | null;
+  latency_ms: number;
+  is_error: boolean;
+  error_message: string | null;
   created_at: string;
 }
 
@@ -204,6 +232,12 @@ export const observability = {
 
   requestDetail(requestId: string) {
     return request<RequestLog>(`/requests/${encodeURIComponent(requestId)}`);
+  },
+
+  toolCalls(requestId: string) {
+    return request<ToolCallLog[]>(
+      `/requests/${encodeURIComponent(requestId)}/tool-calls`,
+    );
   },
 
   sessionCost(sessionId: string) {

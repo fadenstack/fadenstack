@@ -66,7 +66,13 @@ export default function ProvidersPage() {
       return { providersList: p, runtimesList: r, modelsList: m };
     },
     [],
-    { initialValue: { providersList: [] as Provider[], runtimesList: [] as Runtime[], modelsList: [] as Model[] } },
+    {
+      initialValue: {
+        providersList: [] as Provider[],
+        runtimesList: [] as Runtime[],
+        modelsList: [] as Model[],
+      },
+    },
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -96,13 +102,20 @@ export default function ProvidersPage() {
     () =>
       providersList.map((p) => {
         const rt = runtimeByProvider.get(p.id) ?? null;
-        return { provider: p, runtime: rt, model: rt ? modelMap.get(rt.model_id) ?? null : null };
+        return {
+          provider: p,
+          runtime: rt,
+          model: rt ? (modelMap.get(rt.model_id) ?? null) : null,
+        };
       }),
     [providersList, runtimeByProvider, modelMap],
   );
 
   // ── Runtime actions ──────────────────────────────────────────────
-  async function handleRuntimeAction(runtimeId: string, action: "start" | "stop" | "restart") {
+  async function handleRuntimeAction(
+    runtimeId: string,
+    action: "start" | "stop" | "restart",
+  ) {
     setActionLoading(`${runtimeId}-${action}`);
     try {
       await runtimes[action](runtimeId);
@@ -133,7 +146,8 @@ export default function ProvidersPage() {
     try {
       const payload: UpdateProviderPayload = { name: editName.trim() };
       if (editTarget.target === "remote_endpoint") {
-        payload.endpoint_url = editEndpointUrl.trim();
+        if (editEndpointUrl.trim())
+          payload.endpoint_url = editEndpointUrl.trim();
         if (editApiKey.trim()) payload.api_key = editApiKey.trim();
         payload.remote_model = editRemoteModel.trim() || null;
       }
@@ -223,7 +237,9 @@ export default function ProvidersPage() {
       key: "status",
       label: t("common.status"),
       sortable: true,
-      sortValue: (r) => r.runtime?.status ?? (r.provider.target === "remote_endpoint" ? "remote" : ""),
+      sortValue: (r) =>
+        r.runtime?.status ??
+        (r.provider.target === "remote_endpoint" ? "remote" : ""),
       render: (r) =>
         r.runtime ? (
           <RuntimeStatusChip value={r.runtime.status} />
@@ -244,7 +260,11 @@ export default function ProvidersPage() {
         const url = r.runtime?.endpoint_url ?? r.provider.endpoint_url;
         return url ? (
           <Stack direction="row" spacing={0.5} alignItems="center">
-            <Typography variant="body2" fontFamily="monospace" fontSize="0.75rem">
+            <Typography
+              variant="body2"
+              fontFamily="monospace"
+              fontSize="0.75rem"
+            >
               {url}
             </Typography>
             <IconButton
@@ -329,7 +349,12 @@ export default function ProvidersPage() {
                   e.stopPropagation();
                   setEditTarget(r.provider);
                   setEditName(r.provider.name);
-                  setEditEndpointUrl(r.provider.endpoint_url ?? "");
+                  setEditEndpointUrl(
+                    r.provider.endpoint_url &&
+                      !r.provider.endpoint_url.startsWith("litellm://")
+                      ? r.provider.endpoint_url
+                      : "",
+                  );
                   setEditApiKey("");
                   setEditRemoteModel(r.provider.remote_model ?? "");
                 }}
@@ -396,46 +421,56 @@ export default function ProvidersPage() {
         submitLabel={t("common.save")}
         cancelLabel={t("common.cancel")}
         submitDisabled={
-          !editName.trim()
-          || (editTarget?.target === "remote_endpoint" && !editEndpointUrl.trim())
+          !editName.trim() ||
+          (editTarget?.target === "remote_endpoint" &&
+            !editEndpointUrl.trim() &&
+            !editTarget.litellm_provider)
         }
         onSubmit={() => void handleUpdate()}
         onClose={() => setEditTarget(null)}
         maxWidth={editTarget?.target === "remote_endpoint" ? "sm" : "xs"}
       >
+        <TextField
+          label={t("common.name")}
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          required
+          autoFocus
+          fullWidth
+        />
+        {editTarget?.target === "remote_endpoint" && (
+          <Stack spacing={2} sx={{ mt: 2 }}>
             <TextField
-              label={t("common.name")}
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              required
-              autoFocus
+              label={t("llm_providers.endpoint_url")}
+              value={editEndpointUrl}
+              onChange={(e) => setEditEndpointUrl(e.target.value)}
+              required={!editTarget?.litellm_provider}
+              fullWidth
+              helperText={
+                editTarget?.litellm_provider
+                  ? t(
+                      "llm_providers.endpoint_url_help_optional",
+                      "Optional — leave empty for hosted providers like Gemini, Anthropic, etc.",
+                    )
+                  : undefined
+              }
+            />
+            <TextField
+              label={t("llm_providers.api_key")}
+              type="password"
+              value={editApiKey}
+              onChange={(e) => setEditApiKey(e.target.value)}
+              fullWidth
+              helperText={t("llm_providers.api_key_help")}
+            />
+            <TextField
+              label={t("llm_common.model")}
+              value={editRemoteModel}
+              onChange={(e) => setEditRemoteModel(e.target.value)}
               fullWidth
             />
-            {editTarget?.target === "remote_endpoint" && (
-              <Stack spacing={2} sx={{ mt: 2 }}>
-                <TextField
-                  label={t("llm_providers.endpoint_url")}
-                  value={editEndpointUrl}
-                  onChange={(e) => setEditEndpointUrl(e.target.value)}
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label={t("llm_providers.api_key")}
-                  type="password"
-                  value={editApiKey}
-                  onChange={(e) => setEditApiKey(e.target.value)}
-                  fullWidth
-                  helperText={t("llm_providers.api_key_help")}
-                />
-                <TextField
-                  label={t("llm_common.model")}
-                  value={editRemoteModel}
-                  onChange={(e) => setEditRemoteModel(e.target.value)}
-                  fullWidth
-                />
-              </Stack>
-            )}
+          </Stack>
+        )}
       </FormDialog>
     </>
   );

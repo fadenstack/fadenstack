@@ -217,16 +217,19 @@ export default function ModelsPage() {
     return (
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
         {instances.map((inst) => {
-          const isRemote = inst.execution_target === "node";
+          const isNode = inst.execution_target === "node";
+          const isRemote = inst.execution_target === "remote";
           const isCloud = inst.provider_type === "cloud";
           const label = isCloud
             ? inst.provider_name
-            : isRemote
+            : isNode
               ? (inst.node_host ?? "Remote")
-              : "Local";
+              : isRemote
+                ? "Remote"
+                : "Local";
           const icon = isCloud ? (
             <CloudIcon fontSize="small" />
-          ) : isRemote ? (
+          ) : isNode || isRemote ? (
             <DnsIcon fontSize="small" />
           ) : (
             <ComputerIcon fontSize="small" />
@@ -618,10 +621,10 @@ export default function ModelsPage() {
                   endIcon={<OpenInNewIcon fontSize="small" />}
                   onClick={() => {
                     setInUseModel(null);
-                    navigate(`/admin/llm/providers/${inst.provider_id}`);
+                    navigate(`/admin/llm/runtimes/${inst.runtime_id}`);
                   }}
                 >
-                  {t("llm_models.go_to_provider")}
+                  {t("llm_models.go_to_runtime")}
                 </Button>
               </Stack>
             ))}

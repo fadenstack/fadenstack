@@ -22,6 +22,9 @@ import {
   type ContainerResourceValues,
 } from "~/components/ContainerResourcesPanel";
 
+import Accordion from "@mui/material/Accordion";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import AccordionDetails from "@mui/material/AccordionDetails";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -37,6 +40,7 @@ import Alert from "@mui/material/Alert";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Stepper from "@mui/material/Stepper";
 import Step from "@mui/material/Step";
@@ -625,6 +629,25 @@ export default function RuntimeDetailPage() {
           {rt.name}
         </Typography>
         <RuntimeStatusChip value={rt.status} />
+        {!editing && (isRunning || rt.status === "error") && health && (
+          <Tooltip title={health.detail || ""} arrow>
+            {health.healthy ? (
+              <Chip
+                icon={<FavoriteIcon />}
+                label={t("llm_runtime_detail.healthy")}
+                color="success"
+                size="small"
+              />
+            ) : (
+              <Chip
+                icon={<HeartBrokenIcon />}
+                label={t("llm_runtime_detail.unhealthy")}
+                color="error"
+                size="small"
+              />
+            )}
+          </Tooltip>
+        )}
         <Stack direction="row" spacing={1}>
           {isStopped && (
             <Button
@@ -937,31 +960,50 @@ export default function RuntimeDetailPage() {
             />
           </Stack>
           {rt.placement_explain_json && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Placement Explainability
-              </Typography>
-              <Box
-                component="pre"
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{
+                mt: 2,
+                bgcolor: "transparent",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: "8px !important",
+                "&::before": { display: "none" },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
                 sx={{
-                  m: 0,
-                  mt: 0.75,
-                  p: 1.25,
-                  borderRadius: 1,
-                  bgcolor: "background.default",
-                  border: 1,
-                  borderColor: "divider",
-                  fontSize: "0.76rem",
-                  fontFamily: "monospace",
-                  overflow: "auto",
-                  maxHeight: 300,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
+                  minHeight: 36,
+                  px: 1.5,
+                  "& .MuiAccordionSummary-content": { my: 0.5 },
                 }}
               >
-                {JSON.stringify(rt.placement_explain_json, null, 2)}
-              </Box>
-            </Box>
+                <Typography variant="caption" color="text.secondary">
+                  Placement Explainability
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 1.5, pt: 0, pb: 1.5 }}>
+                <Box
+                  component="pre"
+                  sx={{
+                    m: 0,
+                    p: 1.25,
+                    borderRadius: 1,
+                    bgcolor: "background.default",
+                    fontSize: "0.76rem",
+                    fontFamily: "monospace",
+                    overflow: "auto",
+                    maxHeight: 300,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {JSON.stringify(rt.placement_explain_json, null, 2)}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           )}
         </CardContent>
       </Card>
@@ -991,51 +1033,6 @@ export default function RuntimeDetailPage() {
               runtimeStatus={rt.status}
               statusMessage={rt.status_message}
             />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Health card */}
-      {!editing && (isRunning || rt.status === "error") && (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={2}
-              flexWrap="wrap"
-            >
-              {health ? (
-                <>
-                  {health.healthy ? (
-                    <Chip
-                      icon={<FavoriteIcon />}
-                      label={t("llm_runtime_detail.healthy")}
-                      color="success"
-                      size="small"
-                    />
-                  ) : (
-                    <Chip
-                      icon={<HeartBrokenIcon />}
-                      label={t("llm_runtime_detail.unhealthy")}
-                      color="error"
-                      size="small"
-                    />
-                  )}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ wordBreak: "break-word", minWidth: 0 }}
-                  >
-                    {health.detail}
-                  </Typography>
-                </>
-              ) : (
-                <Typography variant="body2" color="text.disabled">
-                  {t("llm_runtime_detail.health_unavailable")}
-                </Typography>
-              )}
-            </Stack>
           </CardContent>
         </Card>
       )}
