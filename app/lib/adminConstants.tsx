@@ -59,6 +59,8 @@ import ForumIcon from "@mui/icons-material/Forum";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import BuildIcon from "@mui/icons-material/Build";
+import TuneIcon from "@mui/icons-material/Tune";
+import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -202,6 +204,12 @@ export const NAV: NavEntry[] = [
     icon: <InsightsIcon />,
     children: [
       {
+        to: "/admin/observability",
+        labelKey: "nav.cost_dashboard",
+        icon: <MonetizationOnIcon />,
+        permission: "observability:read",
+      },
+      {
         to: "/admin/security-map",
         labelKey: "nav.data_residency",
         icon: <MapIcon />,
@@ -283,6 +291,12 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.nodes",
         icon: <SettingsRemoteIcon />,
         permission: "system.nodes:read",
+      },
+      {
+        to: "/admin/nodes/profiles",
+        labelKey: "nav.node_profiles",
+        icon: <TuneIcon />,
+        permission: "system.node_profiles:read",
       },
       {
         to: "/admin/scheduler",
@@ -462,6 +476,8 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/dashboard")) return t("dashboard.title");
   if (pathname.startsWith("/admin/security-map"))
     return t("nav.data_residency");
+  if (pathname.startsWith("/admin/observability"))
+    return "Cost Observability";
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");
@@ -481,6 +497,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/llm/runtimes"))
     return t("llm_providers.title");
   if (pathname.startsWith("/admin/nodes/onboarding")) return "Node Onboarding";
+  if (pathname.startsWith("/admin/nodes/profiles")) return "Node Profiles";
   if (pathname.startsWith("/admin/nodes")) return "Node Fleet";
   if (pathname.startsWith("/admin/llm/jobs")) return t("scheduler.title");
   if (pathname.startsWith("/admin/scheduler")) return t("scheduler.title");

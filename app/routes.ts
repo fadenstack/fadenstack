@@ -39,6 +39,7 @@ export default [
     route("/admin/llm/runtimes", "pages/admin/llm/RuntimesPage.tsx"),
     route("/admin/llm/runtimes/:id", "pages/admin/llm/RuntimeDetailPage.tsx"),
     route("/admin/nodes", "pages/admin/nodes/NodeFleetPage.tsx"),
+    route("/admin/nodes/profiles", "pages/admin/nodes/NodeProfilesPage.tsx"),
     route("/admin/nodes/:id", "pages/admin/nodes/NodeDetailPage.tsx"),
     route("/admin/scheduler", "pages/admin/SchedulerPage.tsx"),
     route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
@@ -51,6 +52,8 @@ export default [
     ]),
     // Security map
     route("/admin/security-map", "pages/admin/SecurityMapPage.tsx"),
+    // Observability dashboard (cost, usage, performance)
+    route("/admin/observability", "pages/admin/observability/ObservabilityPage.tsx"),
     // User profile
     route("/admin/profile", "pages/admin/ProfilePage.tsx"),
     // Chat routes — guarded by the chat-guard layout that checks module status

@@ -24,6 +24,7 @@ import {
   type PullProgressEvent,
 } from "~/api/admin";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
+import { observability } from "~/api/observability";
 import { HfModelSearch } from "~/components/HfModelSearch";
 
 import Accordion from "@mui/material/Accordion";
@@ -136,6 +137,10 @@ export function ProviderWizardDialog({
   const [testMessage, setTestMessage] = useState("");
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
+  // Pricing step (remote only)
+  const [pricingInputPrice, setPricingInputPrice] = useState(0);
+  const [pricingOutputPrice, setPricingOutputPrice] = useState(0);
+
   // Node deployment target (local Docker providers)
   const [nodeList, setNodeList] = useState<ManagedNode[]>([]);
   const [nodesLoading, setNodesLoading] = useState(false);
@@ -203,6 +208,8 @@ export function ProviderWizardDialog({
       setTestStatus("idle");
       setTestMessage("");
       setDiscoveredModels([]);
+      setPricingInputPrice(0);
+      setPricingOutputPrice(0);
       setSelectedNodeId("");
       setModelSource("sync_from_server");
       setHfRepoId("");
@@ -455,7 +462,10 @@ export function ProviderWizardDialog({
           t("llm_providers.wizard_step_basics"),
           t("llm_providers.wizard_step_runtime"),
         ]
-      : [t("llm_providers.wizard_step_basics")];
+      : [
+          t("llm_providers.wizard_step_basics"),
+          t("observability.wizard_step_pricing"),
+        ];
   const isLast = step >= steps.length - 1;
   const localImageReady =
     imageStatus === "available" || imageStatus === "pulled";
@@ -523,6 +533,24 @@ export function ProviderWizardDialog({
       const newProv = await providers.create(provPayload);
       newProvId = newProv.id;
 
+      // If user set pricing during wizard, create price catalog entry
+      if (
+        target === "remote_endpoint" &&
+        (pricingInputPrice > 0 || pricingOutputPrice > 0)
+      ) {
+        try {
+          await observability.createPricing({
+            provider: litellmProvider || name,
+            model: remoteModel.trim(),
+            input_price_per_1k: pricingInputPrice,
+            output_price_per_1k: pricingOutputPrice,
+            currency: "USD",
+          });
+        } catch {
+          /* best-effort — provider was created, pricing can be added later */
+        }
+      }
+
       if (target === "local_docker") {
         // Merge legacy-GPU flag into engine args
         const mergedArgs = { ...engineArgs };
@@ -541,12 +569,18 @@ export function ProviderWizardDialog({
           provider_config.engine_args = mergedArgs;
 
         // Container resource fields
-        if (containerRes.gpuRequest.trim()) provider_config.gpu_request = containerRes.gpuRequest.trim();
-        if (containerRes.ipcMode.trim()) provider_config.ipc_mode = containerRes.ipcMode.trim();
-        if (containerRes.shmSize.trim()) provider_config.shm_size = containerRes.shmSize.trim();
-        if (containerRes.memoryLimit.trim()) provider_config.memory_limit = containerRes.memoryLimit.trim();
-        if (containerRes.cpuLimit.trim()) provider_config.cpu_limit = containerRes.cpuLimit.trim();
-        if (containerRes.containerPort.trim()) provider_config.container_port = containerRes.containerPort.trim();
+        if (containerRes.gpuRequest.trim())
+          provider_config.gpu_request = containerRes.gpuRequest.trim();
+        if (containerRes.ipcMode.trim())
+          provider_config.ipc_mode = containerRes.ipcMode.trim();
+        if (containerRes.shmSize.trim())
+          provider_config.shm_size = containerRes.shmSize.trim();
+        if (containerRes.memoryLimit.trim())
+          provider_config.memory_limit = containerRes.memoryLimit.trim();
+        if (containerRes.cpuLimit.trim())
+          provider_config.cpu_limit = containerRes.cpuLimit.trim();
+        if (containerRes.containerPort.trim())
+          provider_config.container_port = containerRes.containerPort.trim();
 
         // Backward-compat: also populate generic_config with commonly-used fields
         const generic_config: Record<string, unknown> = {};
@@ -903,6 +937,39 @@ export function ProviderWizardDialog({
                 )}
               </>
             )}
+          </>
+        )}
+
+        {/* ── Step 2: Pricing (remote endpoint only) ────────── */}
+        {step === 1 && target === "remote_endpoint" && (
+          <>
+            <Typography variant="h6">
+              {t("observability.wizard_pricing_heading")}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t("observability.wizard_pricing_description")}
+            </Typography>
+            <TextField
+              label={t("observability.wizard_pricing_input")}
+              type="number"
+              value={pricingInputPrice}
+              onChange={(e) => setPricingInputPrice(Number(e.target.value))}
+              size="small"
+              fullWidth
+              inputProps={{ step: 0.000001, min: 0 }}
+            />
+            <TextField
+              label={t("observability.wizard_pricing_output")}
+              type="number"
+              value={pricingOutputPrice}
+              onChange={(e) => setPricingOutputPrice(Number(e.target.value))}
+              size="small"
+              fullWidth
+              inputProps={{ step: 0.000001, min: 0 }}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {t("observability.wizard_pricing_skip_hint")}
+            </Typography>
           </>
         )}
 
