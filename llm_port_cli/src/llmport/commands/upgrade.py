@@ -297,16 +297,9 @@ def upgrade_cmd(
     console.print(f"\n[bold cyan]Step {step}: Health check…[/bold cyan]")
 
     from llmport.core.bootstrap import wait_for_backend  # noqa: PLC0415
+    from llmport.core.edge import console_url  # noqa: PLC0415
 
-    http_port = 80
-    if env_path.exists():
-        existing = read_env_file(env_path)
-        port_str = existing.get("LLM_PORT_HTTP_PORT", "80")
-        try:
-            http_port = int(port_str)
-        except ValueError:
-            pass
-    backend_url = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
+    backend_url = console_url(shared_dir, read_env_file(env_path) if env_path.exists() else {})
 
     console.print("  [dim]Waiting for backend to become healthy…[/dim]")
     if wait_for_backend(backend_url, timeout=120):

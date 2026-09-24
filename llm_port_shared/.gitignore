@@ -4,3 +4,8 @@
 rabbitmq/definitions.json
 # Backups made by llmport backup / upgrade: database dumps and .env copies.
 backups/
+# The edge certificate and key nginx serves HTTPS with (docs/installing.md,
+# "Enabling HTTPS"); only tls/README.md is tracked.
+tls/*.crt
+tls/*.key
+tls/*.pem

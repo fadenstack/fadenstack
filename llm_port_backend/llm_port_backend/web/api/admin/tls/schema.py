@@ -42,4 +42,7 @@ class TlsActivateResponseDTO(BaseModel):
 
     activated: bool
     paths: dict[str, str]
+    # Whether nginx was restarted here, so HTTPS is already on. When it was
+    # not (no such container), the operator restarts the proxy.
+    proxy_restarted: bool = False
     restart_required: bool = True

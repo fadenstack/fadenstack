@@ -15,6 +15,7 @@ from pathlib import Path
 import httpx
 
 from llmport.core.console import console, error, success, warning
+from llmport.core.edge import verify_for
 
 
 def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
@@ -23,7 +24,7 @@ def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
     health_url = f"{base_url}/api/health"
     while time.monotonic() < deadline:
         try:
-            resp = httpx.get(health_url, timeout=5)
+            resp = httpx.get(health_url, timeout=5, verify=verify_for(base_url))
             if resp.status_code == 200:  # noqa: PLR2004
                 return True
         except httpx.HTTPError:
@@ -35,7 +36,7 @@ def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
 def check_needs_bootstrap(base_url: str) -> bool | None:
     """Return True if the system needs bootstrap, False if already done, None on error."""
     try:
-        resp = httpx.get(f"{base_url}/api/bootstrap/status", timeout=10)
+        resp = httpx.get(f"{base_url}/api/bootstrap/status", timeout=10, verify=verify_for(base_url))
         if resp.status_code == 200:  # noqa: PLR2004
             return resp.json().get("needs_bootstrap", False)
     except httpx.HTTPError:
@@ -65,6 +66,7 @@ def run_bootstrap(
             f"{base_url}/api/bootstrap",
             json=payload,
             timeout=30,
+            verify=verify_for(base_url),
         )
     except httpx.HTTPError as exc:
         error(f"Could not reach backend: {exc}")

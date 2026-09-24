@@ -148,14 +148,18 @@ class Settings(BaseSettings):
     # (no TLS). Set to False for TLS-protected collectors.
     opentelemetry_insecure: bool = True
 
-    # ── Edge TLS material output paths ─────────────────────────────────
-    # Where the admin "TLS activate" endpoint writes decrypted edge cert
-    # material so the API process can pick it up at restart. Must be on
-    # a volume the API container also mounts.
+    # ── Edge TLS material ──────────────────────────────────────────────
+    # Where the admin "TLS activate" endpoint writes the decrypted edge
+    # certificate and key: the install's ./tls directory, which nginx
+    # mounts read-only and serves HTTPS from whenever it holds both
+    # (llm_port_shared/nginx/select-config.sh, docker-compose.yaml).
     tls_edge_material_dir: str = "/etc/llmport/tls"
     tls_edge_cert_basename: str = "edge.crt"
     tls_edge_key_basename: str = "edge.key"
     tls_edge_chain_basename: str = "edge-chain.pem"
+    # The container that terminates TLS, restarted when material is
+    # activated or removed so the switch needs no operator step.
+    tls_edge_proxy_container: str = "llm-port-nginx"
 
     # LLM Server settings
     # Defaults to the standard HuggingFace cache in the user's home so

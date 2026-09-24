@@ -10,12 +10,16 @@ Material lifecycle
 2. **Test** (``POST /admin/tls/test``) — re-runs the same validation
    against the most recently uploaded material without writing to disk.
 3. **Activate** (``POST /admin/tls/activate``) — decrypts the secrets
-   and writes them to ``settings.tls_edge_material_dir``. The API
-   process picks them up at next restart via ``__main__.py``.
+   and writes them to ``settings.tls_edge_material_dir``: the install's
+   ``./tls`` directory, which nginx mounts read-only and serves HTTPS
+   from whenever it holds a certificate and key
+   (``llm_port_shared/nginx/select-config.sh``). nginx is then restarted
+   so the switch happens at once; without the container (a checkout run
+   outside compose) the answer says a restart is still needed.
 4. **Status** (``GET /admin/tls/status``) — reports whether material
    is uploaded and/or activated, plus parsed cert metadata.
 5. **Delete** (``DELETE /admin/tls``) — removes the secret rows and the
-   on-disk files.
+   on-disk files, and restarts nginx, which goes back to plain HTTP.
 
 All endpoints require superuser AND active root mode.
 """
@@ -42,10 +46,12 @@ from llm_port_backend.db.dao.audit_dao import AuditDAO
 from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
 from llm_port_backend.db.models.containers import AuditResult
 from llm_port_backend.db.models.users import User
+from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.services.system_settings.crypto import SettingsCrypto
 from llm_port_backend.settings import settings
 from llm_port_backend.web.api.admin.dependencies import (
     audit_action,
+    get_docker,
     get_root_mode_active,
     require_superuser,
 )
@@ -232,11 +238,34 @@ def _activated_paths() -> dict[str, str]:
 def _write_pem_secure(path: Path, content: str, *, mode: int) -> None:
     """Write *content* to *path* with explicit permission bits (0o600 for keys)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    # O_BINARY: without it Windows' C runtime opens in text mode and turns
+    # every newline into CRLF, so a PEM written on a dev box read back changed.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0)
+    fd = os.open(str(path), flags, mode)
     try:
         os.write(fd, content.encode("utf-8"))
     finally:
         os.close(fd)
+
+
+async def _restart_edge_proxy(docker: DockerService) -> bool:
+    """Restart nginx so it picks the material up, or drops it.
+
+    nginx chooses between plain HTTP and HTTPS when it starts
+    (``llm_port_shared/nginx/select-config.sh``), so this restart is the
+    whole switch. Best-effort: without the container -- a checkout run
+    outside compose, a proxy run elsewhere -- the caller reports that a
+    restart is still needed; the material is in place either way.
+    """
+    wanted = settings.tls_edge_proxy_container
+    try:
+        for item in await docker.list_containers(all_=True):
+            if any(name.lstrip("/") == wanted for name in item.get("Names", [])):
+                await docker.restart(str(item.get("Id", "")))
+                return True
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not restart the edge proxy container %s", wanted)
+    return False
 
 
 # ── routes ───────────────────────────────────────────────────────────────────
@@ -301,7 +330,7 @@ async def tls_upload(
             "tls.upload",
             "tls",
             "edge",
-            AuditResult.FAILURE,
+            AuditResult.DENY,
             user.id,
             "high",
             audit_dao,
@@ -316,7 +345,7 @@ async def tls_upload(
         "tls.upload",
         "tls",
         "edge",
-        AuditResult.SUCCESS,
+        AuditResult.ALLOW,
         user.id,
         "high",
         audit_dao,
@@ -351,8 +380,9 @@ async def tls_activate(
     _root: Annotated[bool, Depends(get_root_mode_active)],
     audit_dao: AuditDAO = Depends(),
     dao: SystemSettingsDAO = Depends(),
+    docker: DockerService = Depends(get_docker),
 ) -> TlsActivateResponseDTO:
-    """Materialise the uploaded PEMs to disk for the API process to load."""
+    """Write the uploaded PEMs where nginx serves them from, and restart nginx."""
     cert_pem = await _load_secret(dao, _SECRET_KEY_CERT)
     key_pem = await _load_secret(dao, _SECRET_KEY_KEY)
     if cert_pem is None or key_pem is None:
@@ -373,17 +403,20 @@ async def tls_activate(
     _write_pem_secure(Path(paths["key"]), key_pem, mode=0o600)
     if chain_pem:
         _write_pem_secure(Path(paths["chain"]), chain_pem, mode=0o644)
+    restarted = await _restart_edge_proxy(docker)
     await audit_action(
         "tls.activate",
         "tls",
         "edge",
-        AuditResult.SUCCESS,
+        AuditResult.ALLOW,
         user.id,
         "high",
         audit_dao,
-        metadata_json=json.dumps({"paths": paths}),
+        metadata_json=json.dumps({"paths": paths, "proxy_restarted": restarted}),
     )
-    return TlsActivateResponseDTO(activated=True, paths=paths, restart_required=True)
+    return TlsActivateResponseDTO(
+        activated=True, paths=paths, proxy_restarted=restarted, restart_required=not restarted,
+    )
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
@@ -392,8 +425,9 @@ async def tls_delete(
     _root: Annotated[bool, Depends(get_root_mode_active)],
     audit_dao: AuditDAO = Depends(),
     dao: SystemSettingsDAO = Depends(),
+    docker: DockerService = Depends(get_docker),
 ) -> None:
-    """Remove uploaded secrets and on-disk activated material."""
+    """Remove uploaded secrets and on-disk material; nginx goes back to plain HTTP."""
     # Best-effort delete on each scope.
     for key in (_SECRET_KEY_CERT, _SECRET_KEY_KEY, _SECRET_KEY_CHAIN):
         row = await dao.get_secret(key)
@@ -405,11 +439,12 @@ async def tls_delete(
             Path(path).unlink(missing_ok=True)
         except OSError:
             logger.exception("Failed to remove activated TLS file %s", path)
+    await _restart_edge_proxy(docker)
     await audit_action(
         "tls.delete",
         "tls",
         "edge",
-        AuditResult.SUCCESS,
+        AuditResult.ALLOW,
         user.id,
         "high",
         audit_dao,

@@ -55,7 +55,8 @@ def _env(path: Path) -> dict[str, str]:
 
 def test_a_release_carries_the_deployment_and_nothing_an_install_made() -> None:
     shipped = {rel for _path, rel in _hook().bundle_files(SHARED)}
-    assert {"docker-compose.yaml", "nginx/nginx.conf", "initdb/01-init.sql",
+    assert {"docker-compose.yaml", "nginx/nginx.conf", "nginx/nginx-tls.conf", "nginx/locations.conf",
+            "nginx/select-config.sh", "tls/README.md", "initdb/01-init.sql",
             "clickhouse/config.d/system-logs.xml", "prometheus/prometheus.yml"} <= shipped
     for never in (".env", ".bootstrap-credentials", "rabbitmq/definitions.json", "prometheus/targets.json",
                   "docker-compose.dev.yaml", "base/Dockerfile"):

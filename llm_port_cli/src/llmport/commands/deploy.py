@@ -151,6 +151,7 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     import httpx  # noqa: PLC0415
 
     from llmport.core.console import error, success  # noqa: PLC0415
+    from llmport.core.edge import verify_for  # noqa: PLC0415
 
     password = click.prompt(f"  Password for {email}", hide_input=True, show_default=False)
     try:
@@ -158,6 +159,7 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
             f"{backend_url.rstrip('/')}/api/auth/jwt/login",
             data={"username": email, "password": password},
             timeout=15,
+            verify=verify_for(backend_url),
         )
         if resp.status_code == 200:  # noqa: PLR2004
             token = resp.json().get("access_token", "")
@@ -548,18 +550,10 @@ def deploy_cmd(
     console.print("\n[bold cyan]Step 6: Initial admin setup…[/bold cyan]")
 
     from llmport.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
+    from llmport.core.edge import console_url  # noqa: PLC0415
 
-    http_port = 80
-    if env_path.exists():
-        try:
-            for line in env_path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line.startswith("LLM_PORT_HTTP_PORT="):
-                    http_port = int(line.split("=", 1)[1].strip().strip('"').strip("'"))
-                    break
-        except Exception:  # noqa: BLE001
-            pass
-    backend_url = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
+    # HTTPS as soon as the install holds a certificate: plain HTTP only redirects then.
+    backend_url = console_url(shared_dir, read_env_file(env_path) if env_path.exists() else {})
     console.print("  [dim]Waiting for backend to become healthy…[/dim]")
     creds = None
     if wait_for_backend(backend_url):
@@ -696,7 +690,7 @@ def deploy_cmd(
     table.add_column("Service", style="bold")
     table.add_column("URL")
 
-    base = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
+    base = backend_url
     endpoints = [
         ("Application", base),
         ("API Docs", f"{base}/api/docs"),
