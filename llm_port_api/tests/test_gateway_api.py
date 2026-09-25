@@ -24,7 +24,6 @@ from llm_port_api.services.gateway.errors import GatewayError
 from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from llm_port_api.services.gateway.observability import GatewayTraceContext
 from llm_port_api.services.gateway.pii_client import PIIClient, SanitizeResult
-from llm_port_api.services.gateway.proxy import UpstreamProxy
 from llm_port_api.services.gateway.routing import RouterService
 from llm_port_api.services.registry import service_registry
 
@@ -585,16 +584,21 @@ async def test_stream_fallback_to_local_logs_final_provider(
     async def fake_sanitize(self: PIIClient, **kwargs: object) -> SanitizeResult:  # noqa: ARG001
         raise RuntimeError("pii service down")
 
-    async def fake_stream_post(
-        self: UpstreamProxy, **kwargs: object,
-    ) -> AsyncIterator[bytes]:
+    async def fake_completion(self: LLMAdapter, **kwargs: object) -> AsyncIterator[bytes]:
+        # A stream goes through the adapter. UpstreamProxy.stream_post was
+        # faked here and never called: the "stream" was the error event of a
+        # failed connection to local-upstream.local, logged as a success.
         assert kwargs.get("base_url") == "http://local-upstream.local"
-        yield b'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1,"model":"qwen3-32b","choices":[{"index":0,"delta":{"content":"Hel"},"finish_reason":null}]}\n\n'
-        yield b'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1,"model":"qwen3-32b","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}}\n\n'
-        yield b"data: [DONE]\n\n"
+
+        async def events() -> AsyncIterator[bytes]:
+            yield b'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1,"model":"qwen3-32b","choices":[{"index":0,"delta":{"content":"Hel"},"finish_reason":null}]}\n\n'
+            yield b'data: {"id":"chatcmpl_1","object":"chat.completion.chunk","created":1,"model":"qwen3-32b","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}}\n\n'
+            yield b"data: [DONE]\n\n"
+
+        return events()
 
     monkeypatch.setattr(PIIClient, "sanitize", fake_sanitize)
-    monkeypatch.setattr(UpstreamProxy, "stream_post", fake_stream_post)
+    monkeypatch.setattr(LLMAdapter, "completion", fake_completion)
 
     try:
         response = await client.post(
@@ -611,6 +615,7 @@ async def test_stream_fallback_to_local_logs_final_provider(
 
     assert response.status_code == 200
     assert response.headers["x-provider-instance-id"] == str(local_id)
+    assert '"content":"Hel"' in response.text
     assert "data: [DONE]" in response.text
     rows = (await db_session.execute(select(LLMGatewayRequestLog))).scalars().all()
     assert rows[-1].provider_instance_id == local_id

@@ -63,7 +63,31 @@ def _replayed_exchange(msg: Any) -> list[dict[str, Any]]:
     if msg.role != "assistant" or not isinstance(record, dict):
         return []
     exchange = record.get("exchange")
-    return [m for m in exchange if isinstance(m, dict)] if isinstance(exchange, list) else []
+    if not isinstance(exchange, list):
+        return []
+    return [_parseable(m) for m in exchange if isinstance(m, dict)]
+
+
+def _parseable(message: dict[str, Any]) -> dict[str, Any]:
+    """*message* with each tool call's arguments as JSON vLLM can parse.
+
+    vLLM parses them for the chat template and refuses the request when it
+    cannot; one malformed call kept in the history would refuse every later
+    turn of the chat.
+    """
+    calls = message.get("tool_calls")
+    if not isinstance(calls, list):
+        return message
+    fixed = []
+    for call in calls:
+        function = dict(call.get("function") or {})
+        try:
+            parsed = json.loads(function.get("arguments") or "{}")
+        except (TypeError, ValueError):
+            parsed = {}
+        function["arguments"] = json.dumps(parsed if isinstance(parsed, dict) else {})
+        fixed.append({**call, "function": function})
+    return {**message, "tool_calls": fixed}
 
 
 def _estimate_tokens(content: str | list[Any]) -> int:

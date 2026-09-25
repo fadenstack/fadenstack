@@ -484,8 +484,38 @@ def _without_replayed_tools(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[str, Any]:
-    """The model's tool-calling turn, as it goes back to the model with the results."""
-    return {"role": "assistant", "content": content, "tool_calls": calls}
+    """The model's tool-calling turn, as it goes back to the model with the results.
+
+    Each call carries the arguments the tool was run with, as JSON. A model
+    that wrote them malformed (``{"a": 17, "b": }``) had them sent back as
+    written, and vLLM, which parses them for the chat template, refused the
+    next round: the chat got an error for a reply, and with the exchange kept
+    in the history every later turn of it would have been refused too.
+    """
+    return {
+        "role": "assistant",
+        "content": content,
+        "tool_calls": [
+            {**call, "function": {**(call.get("function") or {}), "arguments": _json_arguments(call)}}
+            for call in calls
+        ],
+    }
+
+
+def _json_arguments(call: dict[str, Any]) -> str:
+    """A call's arguments as the tool got them, in JSON: ``{}`` when malformed."""
+    return json.dumps(_tool_arguments(call))
+
+
+def _stream_outcome(stats: StreamStats, status_code: int, error_code: str | None) -> tuple[int, str | None]:
+    """A stream's status and error code for the log, counting an error event.
+
+    The model's server refused (a 400 from vLLM, say) and the client got
+    that event inside a 200: it is logged as the failure it was.
+    """
+    if stats.error and status_code == 200:
+        return 502, "upstream_refused"
+    return status_code, error_code
 
 
 def _mcp_server(name: str) -> str | None:
@@ -987,6 +1017,9 @@ class GatewayService:
                     # Response has already started; terminate stream gracefully.
                     closing = True
                 finally:
+                    stream_status_code, stream_error_code = _stream_outcome(
+                        stats, stream_status_code, stream_error_code,
+                    )
                     # Finished even when the client has gone: see _to_the_end.
                     # The closing [DONE] waits only for the saved reply, which a
                     # client can see (the chat page reloads the session there);

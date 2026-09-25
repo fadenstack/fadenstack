@@ -15,6 +15,9 @@ class StreamStats:
 
     ttft_ms: int | None = None
     usage: Usage = field(default_factory=lambda: Usage(None, None, None))
+    #: The error an event carried in place of the answer, when one did: the
+    #: upstream refused, and the client got that event with a 200.
+    error: str | None = None
 
 
 async def wrap_sse_stream(
@@ -62,6 +65,9 @@ def _extract_usage_from_chunk(chunk: bytes, stats: StreamStats) -> None:
             parsed: dict[str, Any] = json.loads(payload)
         except json.JSONDecodeError:
             continue
+        if isinstance(parsed, dict) and parsed.get("error") and not parsed.get("choices"):
+            error = parsed["error"]
+            stats.error = str(error.get("message") if isinstance(error, dict) else error)[:500]
         usage = usage_from_payload(parsed)
         if usage.total_tokens is not None:
             stats.usage = usage
