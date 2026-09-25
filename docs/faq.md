@@ -64,6 +64,11 @@ service. There is nothing to approve:
 Deleting a machine in **Machines** revokes its membership. For that machine
 the same line asks to join again, as it did the first time.
 
+After upgrading LLM.Port, do this on each machine: a release can expect a
+newer agent than the machines run. If the server keeps its own agent builds
+in `agent-binaries/`, replace those first -- see
+[Update the machines' agents](upgrading.md#update-the-machines-agents).
+
 ### The Add a machine panel lists several addresses. Which one do I use?
 
 Use the one the machine can reach. A workstation running LLM.Port usually has
@@ -337,3 +342,15 @@ at all. Run the same install line again to upgrade them.
 The model's copies write log lines when something happens (starting,
 stopping, an error), not for every request. Ray records each request in its
 proxy log, which is not sent to LLM.Port.
+
+### The browser console shows "Cannot read properties of undefined (reading 'keys')".
+
+It comes from Grafana, in the dashboard panel on the console's front page,
+not from LLM.Port. Grafana (11.5 and later) calls the browser's `caches`
+API, which browsers only offer on a secure page: HTTPS, or `localhost`.
+Opened over plain HTTP at the server's address, `caches` is missing and
+Grafana logs this error. Every Grafana page does it, its own login page
+included, and the dashboard still renders and updates.
+
+It goes away when the console is served over HTTPS, or opened as
+`http://localhost` on the server itself.
