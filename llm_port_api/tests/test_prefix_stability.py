@@ -31,7 +31,7 @@ from llm_port_api.services.gateway.service import GatewayService
 from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
 from llm_port_api.services.registry import service_registry
 from llm_port_api.settings import settings
-from tests.test_gateway_pipeline_combined import ALIAS, _model_answers, _Observability, _seed, _token
+from tests.test_gateway_pipeline_combined import ALIAS, _model_answers, _Observability, _seed, _session, _token
 from tests.test_llm_adapter_direct import _event, _stream
 
 REFUSED = "Conversation roles must alternate user/assistant/user/assistant/..."
@@ -239,3 +239,35 @@ async def test_a_refused_whole_answer_goes_again_up_front(monkeypatch: pytest.Mo
     assert isinstance(result, CompletionResult)
     assert result.status_code == 200
     assert sent == [[m["content"] for m in LATE_SYSTEM], UP_FRONT]
+
+
+# ── A chat's reply is capped when the request sets no cap ────────
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("with_session", "asked", "sent"),
+    [
+        (True, None, 4096),  # the chat page: capped
+        (True, 200, 200),  # a chat that set its own: kept
+        (False, None, None),  # the API without a session: OpenAI's meaning
+    ],
+)
+async def test_a_chat_reply_is_capped_unless_it_sets_its_own(
+    with_session: bool, asked: int | None, sent: int | None,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A looping model ran one chat reply to 31,136 tokens in 212 s."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    sent_payloads: list[dict[str, Any]] = []
+    _model_answers(monkeypatch, "ok", sent_payloads)
+    body: dict[str, Any] = {"model": ALIAS, "messages": [{"role": "user", "content": "hi"}]}
+    if with_session:
+        body["session_id"] = str(await _session(db_session))
+    if asked is not None:
+        body["max_tokens"] = asked
+
+    r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json=body)
+    assert r.status_code == 200
+    assert sent_payloads[0].get("max_tokens") == sent

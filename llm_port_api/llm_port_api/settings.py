@@ -214,6 +214,9 @@ class Settings(BaseSettings):
     # a turn's tool exchange is kept with its reply, and one GitHub response
     # can be tens of kilobytes.
     session_tool_result_max_chars: int = 4000
+    # The longest reply a chat gets when the request sets no max_tokens (the
+    # chat page sets none). None: no cap.
+    session_max_output_tokens: int | None = 4096
 
     # Chat file attachments
     chat_file_store_root: str = "/data/llm-port/chat-files"

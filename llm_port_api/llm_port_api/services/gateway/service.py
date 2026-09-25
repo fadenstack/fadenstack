@@ -502,6 +502,20 @@ def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[st
     }
 
 
+def _cap_output(payload: dict[str, Any]) -> None:
+    """Cap a chat's reply at ``session_max_output_tokens`` when it sets no cap.
+
+    The chat page sets none, and a model that loops ran to its context limit:
+    one reply of 31,136 tokens took 212 s of a model slot, and at 146 KB it
+    pushed the rest of the chat's history out of every later turn (dev
+    stack, 2026-09-26). Only a chat with a session gets it; an API request
+    without one keeps OpenAI's meaning, no cap.
+    """
+    cap = settings.session_max_output_tokens
+    if cap and "max_tokens" not in payload and "max_completion_tokens" not in payload:
+        payload["max_tokens"] = cap
+
+
 def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
     """The MCP tools whose server is set to allow personal data."""
     return {t.get("qualified_name") for t in mcp_tools or [] if t.get("pii_mode") == "allow"}
@@ -1595,6 +1609,7 @@ class GatewayService:
         )
 
         payload["messages"] = assembled.messages
+        _cap_output(payload)
         if req is not None:
             req.attachments = [
                 attachment_search.SearchableFile(id=str(a.id), filename=a.filename, text=a.extracted_text or "")
