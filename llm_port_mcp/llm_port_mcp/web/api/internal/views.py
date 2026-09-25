@@ -99,16 +99,15 @@ async def get_tool_catalog(
     """
     dao = MCPDao(session)
     tools = await dao.list_tools_by_tenant(tenant_id, enabled_only=True)
+    pii_modes = await dao.server_pii_modes(tenant_id)
     version = await _get_catalog_version(request, tenant_id)
 
     entries = []
     for tool in tools:
-        if tool.openai_schema_json is None:
+        # A disabled server's tools are not offered: a call to one is refused.
+        pii_mode = pii_modes.get(tool.server_id)
+        if tool.openai_schema_json is None or pii_mode is None:
             continue
-
-        # Fetch server to get pii_mode
-        server = await dao.get_server(tool.server_id)
-        pii_mode = server.pii_mode if server else "redact"
 
         entries.append(
             ToolCatalogEntry(

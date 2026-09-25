@@ -52,6 +52,21 @@ class MCPDao:
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def server_pii_modes(self, tenant_id: str) -> dict[uuid.UUID, str]:
+        """Each enabled server's PII mode, by id -- one query, no tools loaded.
+
+        The catalog needs only this per tool. It fetched the whole server for
+        every tool, and a server loads all its tools with it: 48 GitHub tools
+        were 48 queries of 48 tools on every chat turn.
+        """
+        result = await self.session.execute(
+            select(MCPServerModel.id, MCPServerModel.pii_mode).where(
+                MCPServerModel.tenant_id == tenant_id,
+                MCPServerModel.enabled.is_(True),
+            ),
+        )
+        return {row.id: row.pii_mode for row in result}
+
     async def list_enabled_servers(self) -> list[MCPServerModel]:
         """List all enabled servers (for startup connection)."""
         return await self.list_servers(enabled=True)

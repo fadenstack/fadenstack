@@ -36,7 +36,7 @@ from tests.test_gateway_knowledge_tools import (
     _say,
     _tool_names,
 )
-from tests.test_gateway_pipeline_combined import _Observability, _seed, _session, _token
+from tests.test_gateway_pipeline_combined import _install_pii, _Observability, _pii, _seed, _session, _token
 
 SEARCH = "mcp.github.search_repositories"
 CREATE = "mcp.github.create_repository"
@@ -46,8 +46,11 @@ SERVICE_TOKEN = "service-token"
 class _MCP:
     """The MCP service, as the gateway reaches it: a catalog and tool calls."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch, *names: str) -> None:
+    def __init__(
+        self, monkeypatch: pytest.MonkeyPatch, *names: str, pii_mode: str = "redact",
+    ) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.catalog_fetches = 0
         mcp = self
         catalog = [
             {
@@ -57,6 +60,7 @@ class _MCP:
                     "function": {"name": name, "description": name, "parameters": {"type": "object"}},
                 },
                 "realm": "mcp_remote",
+                "pii_mode": pii_mode,
             }
             for name in names
         ]
@@ -72,6 +76,7 @@ class _MCP:
             return 1
 
         async def tool_catalog(self: MCPClient, tenant_id: str) -> ToolCatalog:
+            mcp.catalog_fetches += 1
             return ToolCatalog(version=1, tools=catalog)
 
         async def call_tool(self: MCPClient, **kwargs: Any) -> ToolCallResult:
@@ -81,6 +86,13 @@ class _MCP:
         monkeypatch.setattr(MCPClient, "get_catalog_version", version)
         monkeypatch.setattr(MCPClient, "get_tool_catalog", tool_catalog)
         monkeypatch.setattr(MCPClient, "call_tool", call_tool)
+
+
+@pytest.fixture(autouse=True)
+def _pii_off_after() -> Any:
+    """The registry is global: a test that switches PII on switches it off."""
+    yield
+    service_registry.configure("pii", enabled=False, url=None)
 
 
 async def _switch_off(db: AsyncSession, sid: uuid.UUID, *tool_ids: str) -> None:
@@ -310,3 +322,39 @@ def test_a_long_tool_result_is_kept_cut(monkeypatch: pytest.MonkeyPatch) -> None
     assert record is not None
     assert record["exchange"][1]["content"] == "0123456789 [truncated]"
     assert _exchange_record([]) is None
+
+
+# ── The catalog, cached; personal data for a server that allows it ─
+
+
+@pytest.mark.anyio
+async def test_the_catalog_is_fetched_once_while_its_version_holds(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cache built per request held nothing: every turn fetched it all."""
+    await _ready(fastapi_app, db_session)
+    mcp = _MCP(monkeypatch, SEARCH)
+    _Model(monkeypatch, _say("a"), _say("b"))
+    sid = await _session(db_session)
+
+    await _ask(client, session_id=str(sid))
+    await _ask(client, session_id=str(sid))
+    assert mcp.catalog_fetches == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("pii_mode", "sent"), [("allow", "Alice said hi"), ("redact", "[PERSON_1] said hi")])
+async def test_a_server_that_allows_personal_data_gets_the_values(
+    pii_mode: str, sent: str,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Under tokenize mode the tool got the tokens: get-sum was called with b="[DATE_TIME_1]"."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=_pii("tokenize_reversible"), node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    _install_pii(monkeypatch)
+    mcp = _MCP(monkeypatch, "mcp.everything.echo", pii_mode=pii_mode)
+    _Model(monkeypatch, _call("mcp.everything.echo", {"message": "[PERSON_1] said hi"}), _say("done"))
+    sid = await _session(db_session)
+
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Echo: Alice said hi"}])
+    assert [call["arguments"]["message"] for call in mcp.calls] == [sent]

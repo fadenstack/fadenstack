@@ -6,6 +6,7 @@ execute tool calls via the MCP service's internal API.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -21,6 +22,36 @@ class ToolCatalog:
 
     version: int
     tools: list[dict[str, Any]]
+
+
+def _catalog_version(data: dict[str, Any]) -> int:
+    """The catalog version the MCP service sends, as ``catalog_version``.
+
+    It was read as ``version``, always 0 -- and the tool cache takes 0 for
+    "unknown" and fetches the whole catalog, so every chat turn did.
+    """
+    return int(data.get("catalog_version", data.get("version", 0)) or 0)
+
+
+def _content_text(content: Any) -> str:
+    """An MCP result's content as the model reads it: the text of its parts.
+
+    It went to the model as ``str()`` of the parts list --
+    "[{'type': 'text', 'text': 'The sum of 17 and 25 is 42.'}]" -- a
+    Python repr, twice the tokens, and not what the tool said.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return "" if content is None else json.dumps(content)
+    return "\n".join(_part_text(part) for part in content)
+
+
+def _part_text(part: Any) -> str:
+    """A content part's text, or the part itself as JSON when it is not text."""
+    if isinstance(part, dict) and part.get("type") == "text" and isinstance(part.get("text"), str):
+        return part["text"]
+    return json.dumps(part)
 
 
 def _reason(response: httpx.Response) -> str:
@@ -84,7 +115,7 @@ class MCPClient:
             resp.raise_for_status()
             data = resp.json()
             return ToolCatalog(
-                version=data.get("version", 0),
+                version=_catalog_version(data),
                 tools=data.get("tools", []),
             )
         except Exception:
@@ -104,7 +135,7 @@ class MCPClient:
                 timeout=5.0,
             )
             resp.raise_for_status()
-            return resp.json().get("version", 0)
+            return _catalog_version(resp.json())
         except Exception:
             logger.debug("MCP catalog version check failed", exc_info=True)
             return 0
@@ -140,7 +171,7 @@ class MCPClient:
             resp.raise_for_status()
             data = resp.json()
             return ToolCallResult(
-                content=str(data.get("content", "")),
+                content=_content_text(data.get("content")),
                 is_error=data.get("is_error", False),
                 redaction_summary=data.get("redaction_summary"),
             )

@@ -502,6 +502,23 @@ def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[st
     }
 
 
+def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
+    """The MCP tools whose server is set to allow personal data."""
+    return {t.get("qualified_name") for t in mcp_tools or [] if t.get("pii_mode") == "allow"}
+
+
+def _mcp_arguments(req: _Prepared, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """A tool's arguments, with the values tokenize mode took out when its server allows them.
+
+    A server set to allow personal data got the tokens: "add 17 and
+    [DATE_TIME_1]" called get-sum with b="[DATE_TIME_1]". A server set to
+    redact or block still gets the tokens.
+    """
+    if req.token_mapping and name in req.mcp_pii_allowed:
+        return _restored(arguments, req.token_mapping)
+    return arguments
+
+
 def _json_arguments(call: dict[str, Any]) -> str:
     """A call's arguments as the tool got them, in JSON: ``{}`` when malformed."""
     return json.dumps(_tool_arguments(call))
@@ -595,6 +612,8 @@ class _Prepared:
     #: The tools the gateway ran, for the audit log, and in how many rounds.
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     tool_iterations: int = 0
+    #: The MCP tools whose server is set to allow personal data.
+    mcp_pii_allowed: set[str] = field(default_factory=set)
     #: What the model and the tools said to each other, round by round (the
     #: assistant's tool_calls turn, then the tool answers), as the model saw it.
     tool_exchange: list[dict[str, Any]] = field(default_factory=list)
@@ -1185,6 +1204,7 @@ class GatewayService:
         req.payload = payload
         if mcp_tools and req.session_id:
             mcp_tools = await self._switched_on(mcp_tools, auth, req.session_id)
+        req.mcp_pii_allowed = _allowing_personal_data(mcp_tools)
 
         req.pii_policy = _resolve_pii_policy(
             policy, session_override=await self._session_pii_override(req.session_id, auth),
@@ -1936,7 +1956,7 @@ class GatewayService:
             return None
 
         async def run(call: dict[str, Any], name: str) -> tuple[dict[str, Any], dict[str, Any]]:
-            arguments = _tool_arguments(call)
+            arguments = _mcp_arguments(req, name, _tool_arguments(call))
             started = time.perf_counter()
             row: dict[str, Any] = {"iteration": iteration, "tool_name": name, "mcp_server": None}
             if name in knowledge.NAMES:

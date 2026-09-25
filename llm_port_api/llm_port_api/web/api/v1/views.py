@@ -98,7 +98,7 @@ def get_gateway_service(
             http_client=request.app.state.http_client,
             service_token=settings.mcp_service_token,
         )
-        mcp_tool_cache = MCPToolCache(mcp_client)
+        mcp_tool_cache = _shared_tool_cache(request, mcp_client)
 
     # Skills client (optional - when Skills module is enabled in registry)
     skills_client: SkillsClient | None = None
@@ -165,6 +165,18 @@ def get_gateway_service(
     return service
 
 
+def _shared_tool_cache(request: Request, mcp_client: MCPClient) -> MCPToolCache:
+    """The app's one MCP tool cache.
+
+    It was built per request, so it held nothing: every chat turn fetched the
+    whole catalog from the MCP service (~90 ms idle with 13 tools).
+    """
+    cache = getattr(request.app.state, "mcp_tool_cache", None)
+    if cache is None:
+        cache = request.app.state.mcp_tool_cache = MCPToolCache(mcp_client)
+    return cache
+
+
 @router.get("/v1/models")
 async def list_models(
     auth: AuthContext = Depends(get_auth_context),
@@ -207,14 +219,13 @@ async def get_tool_catalog(
     mcp_tool_cache = None
     mcp_url = service_registry.get_url("mcp")
     if mcp_url and settings.mcp_service_token:
-        from llm_port_api.services.gateway.mcp_tool_cache import MCPToolCache  # noqa: PLC0415
 
         mcp_client = MCPClient(
             base_url=mcp_url,
             http_client=request.app.state.http_client,
             service_token=settings.mcp_service_token,
         )
-        mcp_tool_cache = MCPToolCache(mcp_client)
+        mcp_tool_cache = _shared_tool_cache(request, mcp_client)
 
     service = ToolAvailabilityService(
         dao=dao,
@@ -255,14 +266,13 @@ async def get_available_tools(
     mcp_tool_cache = None
     mcp_url = service_registry.get_url("mcp")
     if mcp_url and settings.mcp_service_token:
-        from llm_port_api.services.gateway.mcp_tool_cache import MCPToolCache  # noqa: PLC0415
 
         mcp_client = MCPClient(
             base_url=mcp_url,
             http_client=request.app.state.http_client,
             service_token=settings.mcp_service_token,
         )
-        mcp_tool_cache = MCPToolCache(mcp_client)
+        mcp_tool_cache = _shared_tool_cache(request, mcp_client)
 
     service = ToolAvailabilityService(
         dao=dao,
