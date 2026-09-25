@@ -23,6 +23,29 @@ class ToolCatalog:
     tools: list[dict[str, Any]]
 
 
+def _reason(response: httpx.Response) -> str:
+    """The MCP service's ``detail``, or the status text."""
+    try:
+        detail = response.json().get("detail")
+    except (ValueError, AttributeError):
+        detail = None
+    return detail if isinstance(detail, str) and detail else response.reason_phrase
+
+
+def _failure_for_model(qualified_name: str, status: int, reason: str) -> str:
+    """What the model is told, so it can do better than apologise.
+
+    It was told "MCP tool call failed: 404" -- for a tool it had made up
+    (release VM, 2026-09-25) -- and could not tell that from an outage.
+    """
+    if status == 404 and reason == "Tool not found.":
+        return (
+            f"There is no tool named '{qualified_name}'. "
+            "Call only the tools you were given."
+        )
+    return f"Tool '{qualified_name}' failed: {reason}"
+
+
 @dataclass(slots=True)
 class ToolCallResult:
     """Result of executing an MCP tool call."""
@@ -122,13 +145,15 @@ class MCPClient:
                 redaction_summary=data.get("redaction_summary"),
             )
         except httpx.HTTPStatusError as exc:
+            reason = _reason(exc.response)
             logger.warning(
-                "MCP tool call failed: %s %s",
+                "MCP tool call failed: %s %s %s",
                 qualified_name,
                 exc.response.status_code,
+                reason,
             )
             return ToolCallResult(
-                content=f"MCP tool call failed: {exc.response.status_code}",
+                content=_failure_for_model(qualified_name, exc.response.status_code, reason),
                 is_error=True,
             )
         except Exception:

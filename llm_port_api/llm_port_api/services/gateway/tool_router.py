@@ -236,6 +236,19 @@ class ToolRouter:
                 executor="ToolRouter",
             )
 
+        # Switched off in this chat: not offered, and not run when the model
+        # names it anyway (from an earlier turn, or a guess). It used to run.
+        overrides = await self._dao.get_session_tool_overrides(session_id)
+        if any(o.tool_id == tool_id and not o.enabled for o in overrides):
+            return ToolCallResult(
+                call_id=call_id,
+                tool_id=tool_id,
+                content=f"Tool '{tool_id}' is switched off in this chat.",
+                is_error=True,
+                realm=realm,
+                executor="ToolRouter",
+            )
+
         # Policy engine check
         if self._cfg.policy_engine is not None:
             decision = await self._cfg.policy_engine.evaluate(

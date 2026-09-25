@@ -46,6 +46,7 @@ from llm_port_api.services.gateway.usage import (
     usage_from_payload,
 )
 from llm_port_api.services.gateway.file_store import FileStore
+from llm_port_api.services.gateway.tool_availability import ToolAvailabilityService
 from llm_port_api.services.gateway.tool_router import ToolRouter
 from llm_port_api.settings import settings
 
@@ -1078,6 +1079,8 @@ class GatewayService:
                 ),
             })
         req.payload = payload
+        if mcp_tools and req.session_id:
+            mcp_tools = await self._switched_on(mcp_tools, auth, req.session_id)
 
         req.pii_policy = _resolve_pii_policy(
             policy, session_override=await self._session_pii_override(req.session_id, auth),
@@ -1579,6 +1582,32 @@ class GatewayService:
             )
 
     # ── MCP tool helpers ─────────────────────────────────────────────────────
+
+    async def _switched_on(
+        self,
+        mcp_tools: list[dict[str, Any]],
+        auth: AuthContext,
+        session_id: str,
+    ) -> list[dict[str, Any]]:
+        """The MCP tools a chat has on: what its tool panel shows as enabled.
+
+        The model was given every tool in the tenant, whatever the chat had
+        switched off or its execution mode allowed: 48 GitHub tools, ~14.7k
+        prompt tokens a turn, with one of them left on (release VM,
+        2026-09-25).
+        """
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            return mcp_tools
+        catalog = await ToolAvailabilityService(dao=self.dao).get_available_tools(
+            session_id=sid,
+            tenant_id=auth.tenant_id,
+            include_disabled=False,
+            mcp_catalog=mcp_tools,
+        )
+        on = {tool.tool_id for tool in catalog.tools}
+        return [tool for tool in mcp_tools if tool.get("qualified_name") in on]
 
     @staticmethod
     def _merge_mcp_tools(

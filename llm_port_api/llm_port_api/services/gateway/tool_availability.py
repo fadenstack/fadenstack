@@ -119,8 +119,13 @@ class ToolAvailabilityService:
         tenant_id: str,
         include_disabled: bool = True,
         include_unavailable: bool = True,
+        mcp_catalog: list[dict[str, Any]] | None = None,
     ) -> ToolAvailabilityResponse:
-        """Return the merged effective tool catalog for a session."""
+        """Return the merged effective tool catalog for a session.
+
+        *mcp_catalog* is the MCP catalog when the caller has it already (a
+        chat request does); it is fetched otherwise.
+        """
 
         # 1. Resolve execution mode
         execution_mode = await self._dao.get_session_execution_mode(session_id)
@@ -135,7 +140,9 @@ class ToolAvailabilityService:
         override_map: dict[str, bool] = {o.tool_id: o.enabled for o in overrides}
 
         # 4. Gather raw tools from all sources
-        raw_tools = await self._gather_tools(tenant_id, session_id=session_id)
+        raw_tools = await self._gather_tools(
+            tenant_id, session_id=session_id, mcp_catalog=mcp_catalog,
+        )
 
         # 5. Compute effective state for each tool
         allowed_realms = _MODE_ALLOWED_REALMS.get(mode_str, set())
@@ -209,14 +216,22 @@ class ToolAvailabilityService:
             tools=entries,
         )
 
-    async def _gather_tools(self, tenant_id: str, session_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
+    async def _gather_tools(
+        self,
+        tenant_id: str,
+        session_id: uuid.UUID | None = None,
+        mcp_catalog: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """Collect tools from all registered sources into a flat list."""
         tools: list[dict[str, Any]] = []
 
         # MCP tools
-        if self._mcp_tool_cache is not None:
+        if mcp_catalog is not None or self._mcp_tool_cache is not None:
             try:
-                catalog = await self._mcp_tool_cache.get_tools(tenant_id)
+                catalog = mcp_catalog
+                if catalog is None:
+                    assert self._mcp_tool_cache is not None  # noqa: S101
+                    catalog = await self._mcp_tool_cache.get_tools(tenant_id)
                 for entry in catalog:
                     qualified_name = entry.get("qualified_name", "")
                     openai_tool = entry.get("openai_tool", {})
