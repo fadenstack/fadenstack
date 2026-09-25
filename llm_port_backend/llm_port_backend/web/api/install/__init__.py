@@ -24,7 +24,9 @@ connected office alike.
 Either way the digest comes from here, so the verification is identical and
 the source really is the only difference.  That is also what makes preferring
 the release safe: a download that does not match the build this deployment
-expects is refused, wherever it came from.
+expects is refused, wherever it came from.  The one exception is a local copy
+that is not this version's build at all -- left from before an upgrade -- which
+is set aside for the release when the release's own digest says so.
 """
 
 from __future__ import annotations
@@ -33,14 +35,16 @@ import hashlib
 import ipaddress
 import logging
 import socket
+import time
 from pathlib import Path
 
+import httpx
 import psutil
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse, Response
-
 from yarl import URL
 
+from llm_port_backend.services.tls import default_httpx_verify
 from llm_port_backend.settings import DEFAULT_AGENT_BINARY_DIR, settings
 
 log = logging.getLogger(__name__)
@@ -116,11 +120,47 @@ def local_binary(platform: str) -> Path | None:
 
 
 def binary_digest(path: Path) -> str:
+    """The sha256 of the file at *path*, as the install script checks it."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+#: (version, build) -> (digest or None, monotonic expiry). An answer is kept an
+#: hour, a failure to get one a few minutes: an offline server asks rarely.
+_published_digests: dict[tuple[str, str], tuple[str | None, float]] = {}
+_DIGEST_TTL_SEC = 3600.0
+_NO_DIGEST_TTL_SEC = 300.0
+
+
+async def published_digest(build: str) -> str | None:
+    """The digest the release publishes for this version's *build*; None when it cannot be read.
+
+    The release workflow puts ``<binary>.sha256`` beside each binary. Only
+    asked when this server holds its own copy, to find out whether that copy
+    is this version's build (see :func:`install_plan`).
+    """
+    key = (AGENT_VERSION, build)
+    cached = _published_digests.get(key)
+    if cached is not None and cached[1] > time.monotonic():
+        return cached[0]
+    digest: str | None = None
+    url = RELEASE_URL.format(version=AGENT_VERSION, platform=build) + ".sha256"
+    try:
+        async with httpx.AsyncClient(
+            verify=default_httpx_verify(), timeout=3.0, follow_redirects=True,
+        ) as client:
+            resp = await client.get(url)
+        if resp.status_code == 200:
+            first = resp.text.split()[0] if resp.text.split() else ""
+            digest = first.lower() if len(first) == 64 else None
+    except httpx.HTTPError:
+        digest = None
+    ttl = _DIGEST_TTL_SEC if digest else _NO_DIGEST_TTL_SEC
+    _published_digests[key] = (digest, time.monotonic() + ttl)
+    return digest
 
 
 def _origin(request: Request) -> str:
@@ -467,11 +507,40 @@ async def install_plan(request: Request, platform: str = "linux-x86_64") -> dict
     # The digest is this backend's own copy either way. A release that does
     # not match it is not the build this deployment expects and the script
     # refuses it -- which is the point of pinning: the source stops mattering.
+    #
+    # Unless the copy is not this version's build at all. Nothing replaces
+    # it when the server is upgraded, so after an upgrade the pin held
+    # machines on the agent before: the new release failed the check ("does
+    # not match the expected digest") and the update stopped there, and a
+    # machine without internet got the old copy from the fallback. Where the
+    # release's own digest can be read and the copy is not that build, the
+    # copy is set aside. With no internet the copy stays authoritative: it is
+    # all there is.
+    local_digest = binary_digest(local)
+    # A build in a checkout's dist/ is what a developer just made: it differs
+    # from the release by construction, and is the one they meant to test.
+    checkout = _source_checkout_binary_dir()
+    from_checkout = checkout is not None and local.parent == checkout
+    published = None if from_checkout else await published_digest(build)
+    if published is not None and published != local_digest:
+        log.warning(
+            "The agent copy %s is not agent %s's build (sha256 %s, release %s); "
+            "machines are sent the release. Replace it with the release's %s, or delete it.",
+            local, AGENT_VERSION, local_digest[:12], published[:12], build,
+        )
+        return {
+            "platform": build,
+            "url": release_url,
+            "fallback_url": None,
+            "sha256": published,
+            "source": "release",
+            "reason": f"This server's copy of the agent is not {AGENT_VERSION}'s build; using the release.",
+        }
     return {
         "platform": build,
         "url": release_url,
         "fallback_url": f"{_origin(request)}/api/install/binary/{build}",
-        "sha256": binary_digest(local),
+        "sha256": local_digest,
         "source": "release+backend",
     }
 

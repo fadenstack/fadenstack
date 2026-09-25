@@ -15,6 +15,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -117,6 +118,7 @@ async def test_plan_serves_the_local_copy_when_there_is_one(
     binary = tmp_path / "llmport-agent-linux-aarch64"
     binary.write_bytes(b"not really a binary, but it hashes")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+    monkeypatch.setattr(install_api, "published_digest", _no_published_digest)  # an offline server
 
     r = await client.get("/api/install/plan", params={"platform": "linux-aarch64"})
     body = r.json()
@@ -124,6 +126,107 @@ async def test_plan_serves_the_local_copy_when_there_is_one(
     assert "/api/install/binary/linux-aarch64" in body["fallback_url"]
     assert body["url"].startswith("https://github.com/")
     assert body["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
+
+
+async def _no_published_digest(_build: str) -> None:
+    return None
+
+
+@pytest.mark.anyio()
+async def test_a_local_copy_from_an_older_version_is_set_aside(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Nothing replaces the server's copy when the server is upgraded.
+
+    The upgraded release VM kept a 0.1.12 build while expecting 0.1.13. The
+    plan pinned the old digest, so the 0.1.13 release failed the install
+    script's check and the update stopped -- and a machine without internet
+    got the 0.1.12 copy from the fallback.
+    """
+    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary.write_bytes(b"agent 0.1.12")
+    release = hashlib.sha256(b"agent 0.1.13").hexdigest()
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+
+    async def _release_digest(_build: str) -> str:
+        return release
+
+    monkeypatch.setattr(install_api, "published_digest", _release_digest)
+    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
+    assert (body["source"], body["sha256"], body["fallback_url"]) == ("release", release, None)
+    assert install_api.AGENT_VERSION in body["reason"]
+
+
+@pytest.mark.anyio()
+async def test_a_developers_own_build_is_never_set_aside(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A build in the checkout's dist/ differs from the release by construction."""
+    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary.write_bytes(b"agent 0.1.13, built just now")
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+    monkeypatch.setattr(install_api, "_source_checkout_binary_dir", lambda: tmp_path)
+
+    async def _must_not_ask(_build: str) -> str:
+        raise AssertionError("a developer's build is not compared with the release")
+
+    monkeypatch.setattr(install_api, "published_digest", _must_not_ask)
+    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
+    assert body["source"] == "release+backend"
+    assert body["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
+
+
+@pytest.mark.anyio()
+async def test_a_local_copy_of_this_version_is_still_served(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary.write_bytes(b"agent 0.1.13")
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+
+    async def _same(_build: str) -> str:
+        return hashlib.sha256(b"agent 0.1.13").hexdigest()
+
+    monkeypatch.setattr(install_api, "published_digest", _same)
+    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
+    assert body["source"] == "release+backend"
+    assert body["fallback_url"]
+
+
+@pytest.mark.anyio()
+async def test_the_published_digest_is_read_from_the_release_and_remembered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_api._published_digests.clear()
+    asked: list[str] = []
+    digest = "ab" * 32
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        asked.append(str(request.url))
+        if "aarch64" in str(request.url):
+            return httpx.Response(200, text=f"{digest}  llmport-agent-linux-aarch64\n")
+        raise httpx.ConnectError("no route", request=request)
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        install_api.httpx, "AsyncClient",
+        lambda **kw: real(transport=httpx.MockTransport(_handler), follow_redirects=True),
+    )
+    assert await install_api.published_digest("linux-aarch64") == digest
+    assert await install_api.published_digest("linux-aarch64") == digest
+    assert len(asked) == 1, "asked once, then remembered"
+    assert asked[0].endswith(f"node-agent-v{install_api.AGENT_VERSION}/llmport-agent-linux-aarch64.sha256")
+    assert await install_api.published_digest("linux-x86_64") is None, "an offline server has no answer"
+    install_api._published_digests.clear()
 
 
 @pytest.mark.anyio()
