@@ -37,6 +37,7 @@ from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapt
 from llm_port_api.services.gateway.observability import GatewayTraceContext
 from llm_port_api.services.gateway.pii_client import PIIClient, SanitizeResult
 from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
+from llm_port_api.services.gateway.usage_group import UsageGroupResolver
 from llm_port_api.services.registry import service_registry
 from llm_port_api.settings import settings
 
@@ -283,6 +284,63 @@ async def test_a_skill_reaches_the_model_when_the_skills_module_is_on(
         "model": ALIAS, "messages": [{"role": "user", "content": "hi"}],
     })
     assert any("Answer in five words." in (m.get("content") or "") for m in sent[0]["messages"])
+
+
+@pytest.mark.anyio
+async def test_the_skills_a_user_picks_are_asked_for_with_their_groups(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The chat's picker sends ``skills``; the model never sees the field.
+
+    They are resolved among the skills the user can see, which takes the
+    groups they are in: a skill shared with a group reaches its members.
+    """
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    service_registry.configure("skills", enabled=True, url="http://skills.local")
+    monkeypatch.setattr(settings, "skills_service_token", "t")
+
+    async def memberships(user_id: str) -> tuple[str, ...]:
+        return ("g-eng", "g-ops")
+
+    fastapi_app.state.group_membership_resolver = UsageGroupResolver(memberships)
+    asked: list[dict[str, Any]] = []
+
+    async def resolve(self: SkillsClient, **kwargs: Any) -> SkillResolveResult:
+        asked.append(kwargs)
+        return SkillResolveResult(skills=[ResolvedSkill(
+            skill_id="s1", name="Review", slug="code-review", version=3, body_markdown="Find bugs.",
+            priority=1, score=1001, content_sha256="ab" * 32, matched_by="explicit",
+        )])
+
+    async def record(self: SkillsClient, **_: Any) -> None: ...
+
+    monkeypatch.setattr(SkillsClient, "resolve_skills", resolve)
+    monkeypatch.setattr(SkillsClient, "record_usage", record)
+    sent: list[dict[str, Any]] = []
+    _model_answers(monkeypatch, "ok", sent)
+
+    r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+        "model": ALIAS, "skills": ["code-review", 7, " "], "messages": [{"role": "user", "content": "hi"}],
+    })
+    assert r.status_code == 200
+    assert asked[0]["requested"] == ["code-review"]
+    assert asked[0]["group_ids"] == ("g-eng", "g-ops")
+    assert "skills" not in sent[0]
+    assert any("Find bugs." in (m.get("content") or "") for m in sent[0]["messages"])
+
+
+def test_the_audit_log_names_the_exact_version_a_chat_used() -> None:
+    from llm_port_api.services.gateway.service import _skills_used  # noqa: PLC0415
+
+    used = _skills_used([ResolvedSkill(
+        skill_id="s1", name="Review", slug="code-review", version=3, body_markdown="b",
+        priority=1, score=1, content_sha256="cd" * 32, matched_by="trigger",
+    )])
+    assert used == [{
+        "skill_id": "s1", "name": "Review", "slug": "code-review", "version": 3,
+        "content_sha256": "cd" * 32, "matched_by": "trigger",
+    }]
 
 
 @pytest.mark.anyio

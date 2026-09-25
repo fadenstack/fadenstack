@@ -30,6 +30,11 @@ class ResolvedSkill:
     preferred_tools: list[str] | None = None
     forbidden_tools: list[str] | None = None
     knowledge_sources: list[str] | None = None
+    #: The version's content hash, for the audit log: what the model was told
+    #: is exactly this stored version.
+    content_sha256: str | None = None
+    #: Why the request got it: ``explicit``, ``always``, ``trigger``, ``assignment``.
+    matched_by: str | None = None
 
 
 @dataclass(slots=True)
@@ -58,6 +63,8 @@ class SkillsClient:
         *,
         tenant_id: str,
         user_id: str | None = None,
+        group_ids: list[str] | tuple[str, ...] | None = None,
+        requested: list[str] | None = None,
         assistant_id: str | None = None,
         workspace_id: str | None = None,
         project_id: str | None = None,
@@ -69,11 +76,16 @@ class SkillsClient:
     ) -> SkillResolveResult:
         """Resolve matching skills for a gateway request context.
 
-        Calls ``POST /api/internal/skills/resolve``.
+        Calls ``POST /api/internal/skills/resolve``. The service resolves among
+        the skills *user_id* can see: their own, the tenant's, and the ones
+        shared with them or one of *group_ids*. *requested* names skills the
+        user asked for (slug or id), which come whatever their triggers say.
         """
         body: dict[str, Any] = {
             "tenant_id": tenant_id,
             "user_id": user_id,
+            "group_ids": list(group_ids or []),
+            "requested": list(requested or []),
             "assistant_id": assistant_id,
             "workspace_id": workspace_id,
             "project_id": project_id,
@@ -105,6 +117,8 @@ class SkillsClient:
                     preferred_tools=s.get("preferred_tools"),
                     forbidden_tools=s.get("forbidden_tools"),
                     knowledge_sources=s.get("knowledge_sources"),
+                    content_sha256=s.get("content_sha256"),
+                    matched_by=s.get("matched_by"),
                 )
                 for s in data.get("skills", [])
             ]

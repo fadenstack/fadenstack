@@ -659,11 +659,22 @@ def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) ->
 
 
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
-    """The skills a request used, for the audit log."""
+    """The skills a request used, for the audit log.
+
+    With the version's content hash: versions are never deleted or changed,
+    so the entry names exactly what the model was told.
+    """
     if not skills:
         return None
     return [
-        {"skill_id": str(s.skill_id), "name": s.name, "slug": s.slug, "version": s.version}
+        {
+            "skill_id": str(s.skill_id),
+            "name": s.name,
+            "slug": s.slug,
+            "version": s.version,
+            "content_sha256": s.content_sha256,
+            "matched_by": s.matched_by,
+        }
         for s in skills
     ]
 
@@ -686,6 +697,8 @@ class _Prepared:
     group_id: str | None = None  # the user's usage group, for attribution
     project_id: str | None = None  # the session's chat project, for attribution
     skills: list[ResolvedSkill] = field(default_factory=list)
+    #: Skills the user asked for by name (the chat's skill picker).
+    requested_skills: list[str] = field(default_factory=list)
     rag_context: dict[str, Any] | None = None
     trace_context: Any = None
     released: bool = False
@@ -756,7 +769,8 @@ class GatewayService:
         mcp_tool_cache: MCPToolCache | None = None,
         skills_client: SkillsClient | None = None,
         tool_router: ToolRouter | None = None,
-        usage_groups: UsageGroupResolver | None = None,
+        usage_groups: UsageGroupResolver[str] | None = None,
+        group_memberships: UsageGroupResolver[tuple[str, ...]] | None = None,
     ) -> None:
         self.dao = dao
         self.router = router
@@ -774,6 +788,7 @@ class GatewayService:
         self.skills_client = skills_client
         self.tool_router = tool_router
         self.usage_groups = usage_groups
+        self.group_memberships = group_memberships
         self.stream_buffer: StreamBuffer | None = None
 
     async def list_models(self, auth: AuthContext) -> dict[str, Any]:
@@ -808,6 +823,7 @@ class GatewayService:
         payload: dict[str, Any],
         request_id: str,
         session_id: str | None = None,
+        skills: list[str] | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -831,7 +847,7 @@ class GatewayService:
         if rerank is not None:
             candidates = _rerank_routes(model_alias, candidates)
 
-        req = _Prepared(payload=payload)
+        req = _Prepared(payload=payload, requested_skills=list(skills or []))
         result: UpstreamResult | None = None
         error_code: str | None = None
         status_code = 500
@@ -1034,6 +1050,7 @@ class GatewayService:
         payload: dict[str, Any],
         request_id: str,
         session_id: str | None = None,
+        skills: list[str] | None = None,
     ) -> StreamingGatewayResponse:
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
@@ -1052,7 +1069,7 @@ class GatewayService:
         )
         _check_kind("/v1/chat/completions", model_alias, candidates)
 
-        req = _Prepared(payload=payload)
+        req = _Prepared(payload=payload, requested_skills=list(skills or []))
         stream_started = False
         stats: StreamStats | None = None
         pre_stream_status_code = 500
@@ -1289,7 +1306,9 @@ class GatewayService:
         (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
             self._inject_session_context(payload, auth, session_id, req=req if searchable else None)
             if chat else _value((payload, None, None)),
-            self._resolve_skills(question, auth, session_id) if chat else _value([]),
+            self._resolve_skills(question, auth, session_id, req.requested_skills)
+            if chat
+            else _value([]),
             self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
         )
@@ -1749,17 +1768,25 @@ class GatewayService:
         question: str,
         auth: AuthContext,
         session_id: str | None = None,
+        requested: list[str] | None = None,
     ) -> list[ResolvedSkill]:
         """The skills that apply to *question*, for ``_prepare`` to put in.
 
         Resolved while the session loads, so the session id is the one the
-        request named; the skills service does not use it to resolve.
+        request named; the skills service does not use it to resolve. It
+        resolves among the skills the user can see, which takes their groups:
+        a skill shared with a group reaches its members.
         """
         if not self.skills_client:
             return []
+        groups: tuple[str, ...] = ()
+        if self.group_memberships is not None:
+            groups = await self.group_memberships.resolve(auth.user_id) or ()
         result = await self.skills_client.resolve_skills(
             tenant_id=auth.tenant_id,
             user_id=auth.user_id,
+            group_ids=groups,
+            requested=requested,
             session_id=session_id,
             user_query=question or None,
         )
@@ -1803,6 +1830,7 @@ class GatewayService:
                 version=skill.version,
                 session_id=session_id,
                 user_id=auth.user_id,
+                matched_by=skill.matched_by,
             )
 
     # ── MCP tool helpers ─────────────────────────────────────────────────────

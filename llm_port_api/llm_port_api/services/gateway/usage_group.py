@@ -7,6 +7,9 @@ cached in-process for a few minutes, a miss is one indexed query on the
 backend database over a small connection pool, concurrent misses for one user
 share a single query, and any failure resolves to ``None`` (unattributed)
 rather than failing the request.
+
+The same cache answers which groups a user is in, for the skills a chat may
+use: a skill shared with a group reaches its members (``memberships``).
 """
 
 from __future__ import annotations
@@ -15,19 +18,26 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from typing import Any, Generic, TypeVar
 
 import asyncpg
 
 logger = logging.getLogger(__name__)
 
-Fetch = Callable[[str], Awaitable[str | None]]
+V = TypeVar("V")
+
+Fetch = Callable[[str], Awaitable[Any]]
 Close = Callable[[], Awaitable[None]]
 
 _SQL = 'SELECT usage_group_id::text FROM "user" WHERE id = $1::uuid'
+_MEMBERSHIPS_SQL = "SELECT group_id::text FROM user_groups WHERE user_id = $1::uuid ORDER BY 1"
 
 
-class UsageGroupResolver:
-    """``user_id -> usage group id`` with a TTL cache in front of ``fetch``."""
+class UsageGroupResolver(Generic[V]):
+    """``user_id -> value`` with a TTL cache in front of ``fetch``.
+
+    The value is the usage group id, or (``memberships``) the user's groups.
+    """
 
     def __init__(
         self,
@@ -45,11 +55,11 @@ class UsageGroupResolver:
         self._max = max_entries
         self._clock = clock
         self._close = close
-        self._cache: dict[str, tuple[str | None, float]] = {}
-        self._inflight: dict[str, asyncio.Future[str | None]] = {}
+        self._cache: dict[str, tuple[V | None, float]] = {}
+        self._inflight: dict[str, asyncio.Future[V | None]] = {}
 
-    async def resolve(self, user_id: str) -> str | None:
-        """The user's usage group id, or ``None`` when unattributed or unknown."""
+    async def resolve(self, user_id: str) -> V | None:
+        """The user's value, or ``None`` when unattributed, unknown or failed."""
         now = self._clock()
         hit = self._cache.get(user_id)
         if hit is not None and hit[1] > now:
@@ -59,7 +69,7 @@ class UsageGroupResolver:
         if pending is not None:
             return await pending
 
-        fut: asyncio.Future[str | None] = asyncio.get_running_loop().create_future()
+        fut: asyncio.Future[V | None] = asyncio.get_running_loop().create_future()
         self._inflight[user_id] = fut
         try:
             try:
@@ -85,7 +95,7 @@ class UsageGroupResolver:
         if self._close is not None:
             await self._close()
 
-    def _remember(self, user_id: str, value: str | None, expires_at: float) -> None:
+    def _remember(self, user_id: str, value: V | None, expires_at: float) -> None:
         if len(self._cache) >= self._max and user_id not in self._cache:
             now = self._clock()
             for key in [k for k, (_, exp) in self._cache.items() if exp <= now]:
@@ -110,6 +120,12 @@ class BackendUserGroups:
         pool = await self._get_pool()
         return await pool.fetchval(_SQL, user_id, timeout=self._timeout)
 
+    async def memberships(self, user_id: str) -> tuple[str, ...]:
+        """The ids of the groups *user_id* is in."""
+        pool = await self._get_pool()
+        rows = await pool.fetch(_MEMBERSHIPS_SQL, user_id, timeout=self._timeout)
+        return tuple(row[0] for row in rows)
+
     async def close(self) -> None:
         if self._pool is not None:
             await self._pool.close()
@@ -128,14 +144,27 @@ class BackendUserGroups:
         return self._pool
 
 
-def build_usage_group_resolver(settings: object) -> UsageGroupResolver | None:
-    """A resolver over the backend database, or ``None`` when none is configured."""
+def build_user_resolvers(
+    settings: object,
+) -> tuple[UsageGroupResolver[str] | None, UsageGroupResolver[tuple[str, ...]] | None]:
+    """``(usage group, group memberships)`` resolvers over the backend database.
+
+    Both ``None`` when no backend database is configured. They share one small
+    pool; closing the first closes it.
+    """
     backend_db = getattr(settings, "backend_db_base", "")
     if not backend_db:
-        return None
+        return None, None
     dsn = (
         f"postgresql://{settings.db_user}:{settings.db_pass}"  # type: ignore[attr-defined]
         f"@{settings.db_host}:{settings.db_port}/{backend_db}"  # type: ignore[attr-defined]
     )
     fetch = BackendUserGroups(dsn)
-    return UsageGroupResolver(fetch, close=fetch.close)
+    usage: UsageGroupResolver[str] = UsageGroupResolver(fetch, close=fetch.close)
+    # A minute, not five: being taken out of a group takes away the skills
+    # shared with it, and that should not wait long.
+    groups: UsageGroupResolver[tuple[str, ...]] = UsageGroupResolver(
+        fetch.memberships,
+        ttl_sec=60.0,
+    )
+    return usage, groups
