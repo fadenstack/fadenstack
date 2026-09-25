@@ -14,6 +14,7 @@ from llm_port_backend.db.dao.groups_dao import GroupDAO
 from llm_port_backend.db.dependencies import get_db_session
 from llm_port_backend.db.models.groups import Group
 from llm_port_backend.db.models.users import User
+from llm_port_backend.services.skills.client import forget_principal
 from llm_port_backend.web.api.admin.dependencies import require_superuser
 from llm_port_backend.web.api.admin.groups.schema import (
     CreateGroupRequest,
@@ -134,6 +135,7 @@ async def delete_group(
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
     await group_dao.delete_group(group_id)
+    await forget_principal("group", str(group_id))
 
 
 # ── Group members ─────────────────────────────────────────────────────
