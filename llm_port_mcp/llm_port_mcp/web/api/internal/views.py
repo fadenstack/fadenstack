@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from llm_port_mcp.db.session import get_db_session
+from llm_port_mcp.services.arguments import coerce_to_schema
 from llm_port_mcp.services.connection_manager import MCPConnectionManager
 from llm_port_mcp.services.dao import MCPDao
 from llm_port_mcp.services.privacy_proxy import PrivacyProxy
@@ -170,14 +171,17 @@ async def call_tool(
             detail="Server not connected.",
         )
 
+    # A number or boolean the model quoted, in its declared type
+    arguments = coerce_to_schema(body.arguments, tool.raw_schema_json)
+
     # Privacy proxy
-    sanitized_args = body.arguments
+    sanitized_args = arguments
     redaction_summary = None
     effective_pii_mode = body.pii_mode_override or server.pii_mode
     proxy = _get_privacy_proxy(request)
     if proxy is not None:
         decision = await proxy.check(
-            arguments=body.arguments,
+            arguments=arguments,
             pii_mode=effective_pii_mode,
         )
         if not decision.allowed:
