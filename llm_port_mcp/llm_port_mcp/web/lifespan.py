@@ -20,6 +20,8 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 )
 
 from llm_port_mcp.db import crypto
+from llm_port_mcp.db.connection_budget import check_connection_budget
+from llm_port_mcp.db.session import engine
 from llm_port_mcp.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -165,6 +167,15 @@ async def lifespan_setup(
 
     # Encryption
     crypto.configure(settings.encryption_key)
+
+    await check_connection_budget(
+        engine,
+        service="MCP",
+        env_prefix="LLM_PORT_MCP_",
+        workers=settings.workers_count,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
 
     # Cache
     _init_cache(app)

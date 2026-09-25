@@ -18,6 +18,8 @@ from prometheus_fastapi_instrumentator.instrumentation import (
     PrometheusFastApiInstrumentator,
 )
 
+from llm_port_skills.db.connection_budget import check_connection_budget
+from llm_port_skills.db.session import engine
 from llm_port_skills.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -89,6 +91,14 @@ async def lifespan_setup(
     """Application startup and shutdown lifecycle."""
     app.middleware_stack = None
 
+    await check_connection_budget(
+        engine,
+        service="skills",
+        env_prefix="LLM_PORT_SKILLS_",
+        workers=settings.workers_count,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
     _init_cache(app)
     setup_opentelemetry(app)
     setup_prometheus(app)

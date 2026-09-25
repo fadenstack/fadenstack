@@ -23,6 +23,7 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 )
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from llm_port_api.db.connection_budget import check_connection_budget
 from llm_port_api.services.gateway.file_store import LocalFileStore
 from llm_port_api.services.gateway.observability import GatewayObservability
 from llm_port_api.services.gateway.pricing import PricingService
@@ -271,6 +272,14 @@ async def lifespan_setup(
                 await asyncio.sleep(5)
 
     _setup_db(app)
+    await check_connection_budget(
+        app.state.db_engine,
+        service="the gateway",
+        env_prefix="LLM_PORT_API_",
+        workers=settings.workers_count,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
     _setup_gateway_observability(app)
     _setup_service_registry(app)
     # Pricing service: load cache from DB, start background refresh

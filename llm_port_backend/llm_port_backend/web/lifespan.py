@@ -32,6 +32,7 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from taskiq.instrumentation import TaskiqInstrumentor
 
+from llm_port_backend.db.connection_budget import check_connection_budget
 from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
 from llm_port_backend.services.llm.service import LLMService
@@ -882,6 +883,16 @@ async def lifespan_setup(
                 await asyncio.sleep(5)
 
     _setup_db(app)
+    if not broker.is_worker_process:
+        # The web workers' pools; the taskiq worker is its own process count.
+        await check_connection_budget(
+            app.state.db_engine,
+            service="the backend",
+            env_prefix="LLM_PORT_BACKEND_",
+            workers=settings.workers_count,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+        )
     await _ensure_api_secret_read_grants(app)
 
     # Load DB-backed runtime settings before services that need them
