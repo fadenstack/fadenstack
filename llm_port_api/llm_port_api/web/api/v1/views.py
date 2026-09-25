@@ -147,7 +147,7 @@ def get_gateway_service(
         dao=dao,
         router=router_service,
         proxy=proxy,
-        adapter=LLMAdapter(),
+        adapter=LLMAdapter(http_client=request.app.state.http_client),
         limiter=limiter,
         audit=audit,
         observability=observability,

@@ -155,6 +155,10 @@ class Settings(BaseSettings):
     litellm_drop_params: bool = True
     litellm_request_timeout: float = 60.0
     litellm_verbose: bool = False
+    # A streamed chat to a vLLM engine goes straight to it, its events passed
+    # through, instead of through LiteLLM (see LLMAdapter._stream_direct).
+    # False sends it through LiteLLM as before.
+    vllm_direct_stream: bool = True
 
     # Langfuse observability
     langfuse_enabled: bool = False

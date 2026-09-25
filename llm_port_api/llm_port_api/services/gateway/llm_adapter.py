@@ -14,13 +14,43 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
 import litellm
 
 from llm_port_api.db.crypto import decrypt_value
 from llm_port_api.db.models.gateway import ProviderType
 from llm_port_api.services.gateway.ssl_helpers import build_ssl_kwargs
+from llm_port_api.settings import settings
 
 logger = logging.getLogger(__name__)
+
+#: The OpenAI chat parameters a request may carry on to the model.
+_OPENAI_PARAMS = (
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "stop",
+    "presence_penalty",
+    "frequency_penalty",
+    "logit_bias",
+    "user",
+    "tools",
+    "tool_choice",
+    "response_format",
+    "seed",
+    "n",
+)
+#: What the body of a direct streamed chat is made of.
+_DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", *_OPENAI_PARAMS})
+_DONE = b"data: [DONE]\n\n"
+
+
+def _sse(data: dict[str, Any]) -> bytes:
+    return f"data: {json.dumps(data)}\n\n".encode()
+
+
+def _is_done(event: str) -> bool:
+    return event.replace(" ", "") == "data:[DONE]"
 
 # ── Provider type → LiteLLM provider prefix mapping ──────────────────
 _PROVIDER_PREFIX: dict[str, str] = {
@@ -153,7 +183,14 @@ def _upstream_kwargs(
 
 
 class LLMAdapter:
-    """Provider-agnostic adapter backed by LiteLLM."""
+    """Provider-agnostic adapter backed by LiteLLM.
+
+    A streamed chat to a vLLM engine is the exception: given *http_client*, it
+    goes straight to the engine (see :meth:`_stream_direct`).
+    """
+
+    def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
+        self._http = http_client
 
     async def completion(
         self,
@@ -202,52 +239,125 @@ class LLMAdapter:
         )
 
         # Pass through supported OpenAI params
-        for key in (
-            "temperature",
-            "top_p",
-            "max_tokens",
-            "stop",
-            "presence_penalty",
-            "frequency_penalty",
-            "logit_bias",
-            "user",
-            "tools",
-            "tool_choice",
-            "response_format",
-            "seed",
-            "n",
-        ):
+        for key in _OPENAI_PARAMS:
             if key in payload:
                 kwargs[key] = payload[key]
 
         # Merge extra_params (custom headers, api_version, etc.)
+        extra_headers: dict[str, Any] = {}
+        litellm_only: dict[str, Any] = {}
         if extra_params:
-            extra_headers = extra_params.pop("extra_headers", None)
-            if extra_headers and isinstance(extra_headers, dict):
-                kwargs["extra_headers"] = extra_headers
+            given_headers = extra_params.pop("extra_headers", None)
+            if given_headers and isinstance(given_headers, dict):
+                kwargs["extra_headers"] = given_headers
+                extra_headers = given_headers
             # Remaining params go directly to litellm
+            litellm_only = dict(extra_params)
             kwargs.update(extra_params)
 
         # Apply per-provider TLS overrides (CA bundle / mTLS).  When the
         # provider has nothing configured this is a no-op and LiteLLM
         # inherits the global default set in lifespan.
+        tls: dict[str, Any] = {}
         if instance_id is not None:
-            kwargs.update(
-                build_ssl_kwargs(
-                    instance_id=instance_id,
-                    ssl_verify_mode=ssl_verify_mode,
-                    ssl_ca_bundle_pem=ssl_ca_bundle_pem,
-                    ssl_client_cert_pem=ssl_client_cert_pem,
-                    ssl_client_key_pem=ssl_client_key_pem,
-                ),
+            tls = build_ssl_kwargs(
+                instance_id=instance_id,
+                ssl_verify_mode=ssl_verify_mode,
+                ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+                ssl_client_cert_pem=ssl_client_cert_pem,
+                ssl_client_key_pem=ssl_client_key_pem,
             )
+            kwargs.update(tls)
 
         if stream:
             # Request token usage in the final streaming chunk (OpenAI-compatible).
             kwargs["stream_options"] = {"include_usage": True}
+            if self._goes_direct(provider_type, kwargs, tls=tls, litellm_only=litellm_only):
+                return self._stream_direct(kwargs, extra_headers)
             return self._stream_completion(**kwargs)
 
         return await self._non_stream_completion(**kwargs)
+
+    def _goes_direct(
+        self,
+        provider_type: ProviderType,
+        kwargs: dict[str, Any],
+        *,
+        tls: dict[str, Any],
+        litellm_only: dict[str, Any],
+    ) -> bool:
+        """Whether a streamed chat can skip LiteLLM: vLLM, as a plain OpenAI server.
+
+        Everything LiteLLM would do differently keeps LiteLLM: per-provider
+        TLS and the default outbound CA bundle are LiteLLM settings, and extra
+        params beyond headers are LiteLLM call arguments. Remote OpenAI APIs
+        stay too: LiteLLM rewrites some of their parameters per model.
+        """
+        if self._http is None or not settings.vllm_direct_stream:
+            return False
+        if provider_type != ProviderType.VLLM or tls or litellm_only:
+            return False
+        base = str(kwargs.get("api_base") or "")
+        if not base:
+            return False
+        return not (base.startswith("https://") and settings.tls_outbound_default_ca_bundle)
+
+    async def _stream_direct(
+        self, kwargs: dict[str, Any], extra_headers: dict[str, Any],
+    ) -> AsyncIterator[bytes]:
+        """Stream a chat from vLLM as the engine sends it, event by event.
+
+        Through LiteLLM every token became pydantic objects and was dumped back
+        to JSON, and LiteLLM's per-chunk ``async for`` over the OpenAI SDK's
+        stream abandoned one async generator per token (each one a
+        ``call_soon_threadsafe`` when collected): about 60 % of the gateway's
+        CPU at 16 users (py-spy, 2026-09-25). vLLM already sends OpenAI's
+        format, so its events go on untouched. They are only re-cut at event
+        boundaries: a network read can split one event or carry several, and
+        every step after this one -- PII restore, usage, the saved reply --
+        reads whole events.
+        """
+        assert self._http is not None  # noqa: S101 - _goes_direct checked it
+        url = f"{str(kwargs['api_base']).rstrip('/')}/chat/completions"
+        body = {key: value for key, value in kwargs.items() if key in _DIRECT_BODY_KEYS}
+        body["model"] = str(kwargs["model"]).removeprefix("openai/")
+        headers = {"Authorization": f"Bearer {kwargs.get('api_key') or 'EMPTY'}", **extra_headers}
+        timeout = httpx.Timeout(connect=10.0, read=settings.litellm_request_timeout, write=10.0, pool=10.0)
+        closed = False
+        request = self._http.stream("POST", url, json=body, headers=headers, timeout=timeout)
+        try:
+            async with request as response:
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
+                    logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
+                    yield _sse(_error_payload("server_error", f"upstream {response.status_code}: {detail}"))
+                    yield _DONE
+                    return
+                lines: list[str] = []
+                async for line in response.aiter_lines():
+                    if line:
+                        if not line.startswith(":"):  # a comment keeps the connection alive
+                            lines.append(line)
+                        continue
+                    if not lines:
+                        continue
+                    event = "\n".join(lines)
+                    lines = []
+                    yield f"{event}\n\n".encode()
+                    if _is_done(event):
+                        closed = True
+                        break
+                if lines and not closed:
+                    event = "\n".join(lines)
+                    yield f"{event}\n\n".encode()
+                    closed = _is_done(event)
+        except httpx.HTTPError as exc:
+            logger.exception("Direct vLLM stream failed")
+            yield _sse(_error_payload("server_error", str(exc) or type(exc).__name__))
+            yield _DONE
+            return
+        if not closed:
+            yield _DONE
 
     async def _non_stream_completion(self, **kwargs: Any) -> CompletionResult:
         """Execute a non-streaming completion."""
