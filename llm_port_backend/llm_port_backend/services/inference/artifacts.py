@@ -291,6 +291,67 @@ class ModelArtifactCoordinator:
             return (now - updated).total_seconds() < _FAILED_RETRY_BACKOFF_SEC
         return False
 
+    async def _payload_to_send(
+        self,
+        model: LLMModel,
+        readiness: ArtifactReadiness,
+        *,
+        fetch_to_server: bool,
+    ) -> dict[str, Any] | None:
+        """The SYNC_MODEL payload for *model*, or None with *readiness* saying why not."""
+        from llm_port_backend.services.inference.server_copy import (  # noqa: PLC0415
+            download_under_way,
+            ensure_server_copy,
+        )
+
+        # Halfway through a download the folder already holds files, and
+        # sending them had both machines refuse "Invalid blob hash" for a
+        # partial blob, attempt after attempt, until the download finished
+        # (the release VM, Qwen3-0.6B). Wait for it instead.
+        downloading = await download_under_way(self.session, model)
+        if downloading is not None:
+            readiness.waiting_on = downloading
+            return None
+
+        sync_payload = build_model_sync_payload(model, source="sync_from_server")
+        if sync_payload is None:
+            readiness.blockers.append(f"Model {model.id} has no repository or cache manifest to sync")
+            return None
+
+        if not model_sync_carries_files(sync_payload):
+            # Nothing to send because the server does not have it. The
+            # deployment names the model, so fetch it rather than stall.
+            copy = (
+                await ensure_server_copy(self.session, model)
+                if fetch_to_server
+                else None
+            )
+            if copy is None:
+                pass  # falls through to the refusal below
+            elif copy.waiting is not None:
+                readiness.waiting_on = copy.waiting
+                return None
+            elif copy.blocker is not None:
+                readiness.blockers.append(copy.blocker)
+                return None
+            # Refusing here is the whole point.  Sending it would have every
+            # node reject it and be marked FAILED, which reads as "both
+            # machines are broken" when the machines are fine and this server
+            # simply has no copy to send.  Name the server, and say what would
+            # fix it.
+            store = settings.model_store_root
+            readiness.blockers.append(
+                f"This server has no local copy of {model.hf_repo_id} to send "
+                f"(looked in {store}). Import or download the model here first, "
+                f"then sync it to the cluster."
+            )
+            log.warning(
+                "Not issuing SYNC_MODEL for %s: no local files under %s",
+                model.hf_repo_id, store,
+            )
+            return None
+        return sync_payload
+
     async def ensure(
         self,
         *,
@@ -313,46 +374,8 @@ class ModelArtifactCoordinator:
         if readiness.all_ready:
             return readiness
 
-        sync_payload = build_model_sync_payload(model, source="sync_from_server")
+        sync_payload = await self._payload_to_send(model, readiness, fetch_to_server=fetch_to_server)
         if sync_payload is None:
-            readiness.blockers.append(f"Model {model.id} has no repository or cache manifest to sync")
-            return readiness
-
-        if not model_sync_carries_files(sync_payload):
-            # Nothing to send because the server does not have it. The
-            # deployment names the model, so fetch it rather than stall.
-            from llm_port_backend.services.inference.server_copy import (  # noqa: PLC0415
-                ensure_server_copy,
-            )
-
-            copy = (
-                await ensure_server_copy(self.session, model)
-                if fetch_to_server
-                else None
-            )
-            if copy is None:
-                pass  # falls through to the refusal below
-            elif copy.waiting is not None:
-                readiness.waiting_on = copy.waiting
-                return readiness
-            elif copy.blocker is not None:
-                readiness.blockers.append(copy.blocker)
-                return readiness
-            # Refusing here is the whole point.  Sending it would have every
-            # node reject it and be marked FAILED, which reads as "both
-            # machines are broken" when the machines are fine and this server
-            # simply has no copy to send.  Name the server, and say what would
-            # fix it.
-            store = settings.model_store_root
-            readiness.blockers.append(
-                f"This server has no local copy of {model.hf_repo_id} to send "
-                f"(looked in {store}). Import or download the model here first, "
-                f"then sync it to the cluster."
-            )
-            log.warning(
-                "Not issuing SYNC_MODEL for %s: no local files under %s",
-                model.hf_repo_id, store,
-            )
             return readiness
 
         gw = (

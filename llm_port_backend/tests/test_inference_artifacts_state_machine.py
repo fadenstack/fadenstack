@@ -96,6 +96,39 @@ async def test_in_flight_sync_is_not_reset_to_pending(dbsession: AsyncSession) -
 
 
 @pytest.mark.anyio()
+async def test_a_model_still_downloading_here_is_not_sent(
+    dbsession: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What the release VM did with Qwen3-0.6B.
+
+    The pass after the one that started the download found the partial blob
+    in the folder and sent it; both machines refused "Invalid blob hash",
+    attempt after attempt, until the download finished.
+    """
+    from llm_port_backend.db.models.llm import DownloadJob, DownloadJobStatus
+    from llm_port_backend.settings import settings
+
+    monkeypatch.setattr(settings, "model_store_root", str(tmp_path))
+    env, model, nodes = await _environment(dbsession, nodes=2)
+    blobs = tmp_path / f"models--{model.hf_repo_id.replace('/', '--')}" / "blobs"
+    blobs.mkdir(parents=True)
+    (blobs / "0a1b2c3d").write_bytes(b"config")
+    (blobs / "f47f7117.incomplete").write_bytes(b"half the weights")
+    dbsession.add(DownloadJob(model_id=model.id, status=DownloadJobStatus.RUNNING, progress=40))
+    await dbsession.flush()
+
+    readiness = await ModelArtifactCoordinator(dbsession, gateway=NodeCommandGateway(dbsession)).ensure(
+        model=model, environment=env, fetch_to_server=True,
+    )
+    await dbsession.flush()
+
+    assert readiness.waiting_on is not None
+    assert "(40%)" in readiness.waiting_on
+    for node in nodes:
+        assert await _commands_for(dbsession, node.id) == []
+
+
+@pytest.mark.anyio()
 async def test_failed_sync_is_retried_after_backoff(
     dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:

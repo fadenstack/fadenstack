@@ -39,7 +39,12 @@ def server_has_files(hf_repo_id: str) -> bool:
     """
     model_dir = model_cache_dir(hf_repo_id)
     blobs = model_dir / "blobs" if model_dir is not None else None
-    return bool(blobs is not None and blobs.is_dir() and any(p.is_file() for p in blobs.iterdir()))
+    return bool(blobs is not None and blobs.is_dir() and any(_complete_blob(p) for p in blobs.iterdir()))
+
+
+def _complete_blob(entry: Path) -> bool:
+    """A finished blob: a download under way keeps its part as ``<hash>.incomplete``."""
+    return entry.is_file() and not entry.name.endswith(".incomplete")
 
 
 def resolve_blob_hash(fpath: Path, blobs_dir_resolved: Path) -> str | None:
@@ -79,7 +84,7 @@ def build_cache_manifest(model_dir: Path) -> dict[str, Any]:
     blobs: list[dict[str, Any]] = []
     if blobs_dir.is_dir():
         for entry in sorted(blobs_dir.iterdir()):
-            if entry.is_file():
+            if _complete_blob(entry):
                 blobs.append({"hash": entry.name, "size": entry.stat().st_size})
 
     # ── Refs ─────────────────────────────────────────────────

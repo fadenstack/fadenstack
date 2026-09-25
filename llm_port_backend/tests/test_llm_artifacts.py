@@ -13,6 +13,7 @@ from llm_port_backend.services.llm.artifacts import (
     manifest_digest,
     model_cache_dir,
     resolve_blob_hash,
+    server_has_files,
 )
 
 
@@ -130,6 +131,26 @@ def test_build_cache_manifest_from_directory(tmp_path: Path) -> None:
     assert manifest["refs"][0]["commit"] == "1234abcd"
     assert "manifest_sha256" in manifest
     assert len(manifest["manifest_sha256"]) == 64
+
+
+def test_a_partial_download_is_not_a_blob(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A download under way keeps its part as ``<hash>.incomplete``.
+
+    Listed as a blob, it was sent to the machines, and the file server
+    refused the name: "Invalid blob hash".
+    """
+    from llm_port_backend.settings import settings
+
+    monkeypatch.setattr(settings, "model_store_root", str(tmp_path))
+    blobs_dir = tmp_path / "models--org--half" / "blobs"
+    blobs_dir.mkdir(parents=True)
+    (blobs_dir / "f47f7117.incomplete").write_bytes(b"half a file")
+    assert not server_has_files("org/half")
+    assert build_cache_manifest(blobs_dir.parent)["blobs"] == []
+
+    (blobs_dir / "0a1b2c3d").write_bytes(b"done")
+    assert server_has_files("org/half")
+    assert [b["hash"] for b in build_cache_manifest(blobs_dir.parent)["blobs"]] == ["0a1b2c3d"]
 
 
 def test_build_model_sync_payload_behaviors(tmp_path: Path) -> None:

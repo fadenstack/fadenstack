@@ -55,6 +55,18 @@ def _waiting_message(model: LLMModel, progress: int | None) -> str:
     )
 
 
+async def download_under_way(session: AsyncSession, model: LLMModel) -> str | None:
+    """What to show while this server is still downloading *model*, else None.
+
+    The model's folder holds files by then, the partial ones named
+    ``<hash>.incomplete``, so it must not be read as a copy to send.
+    """
+    job = await _latest_job(session, model.id)
+    if job is not None and job.status in _ACTIVE:
+        return _waiting_message(model, job.progress)
+    return None
+
+
 async def ensure_server_copy(session: AsyncSession, model: LLMModel) -> ServerCopy:
     """Start or follow the server-side download of *model*.
 

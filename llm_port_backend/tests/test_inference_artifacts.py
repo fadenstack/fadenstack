@@ -172,7 +172,11 @@ async def test_coordinator_ensure_issues_commands() -> None:
     coordinator._dao.list_for_nodes = AsyncMock(return_value=[])
 
     fake_payload = {"model_id": str(model.id), "blobs": [{"hash": "b1"}]}
-    with patch("llm_port_backend.services.inference.artifacts.build_model_sync_payload", return_value=fake_payload):
+    with (
+        patch("llm_port_backend.services.inference.artifacts.build_model_sync_payload", return_value=fake_payload),
+        # No download of it under way on this server (the session is a mock).
+        patch("llm_port_backend.services.inference.server_copy.download_under_way", AsyncMock(return_value=None)),
+    ):
         res = await coordinator.ensure(model=model, environment=env, gateway=gateway_mock)
 
     assert not res.all_ready
