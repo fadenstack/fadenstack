@@ -299,3 +299,37 @@ def test_strict_pack_with_multi_node_topology_is_rejected() -> None:
         )
 
 
+
+
+# ── Prefix-aware routing between copies ──────────────────────────────────────
+
+PREFIX_ROUTER = "ray.serve.llm.request_router.PrefixCacheAffinityRouter"
+
+
+@pytest.mark.parametrize(
+    ("scale", "desired_state", "routed"),
+    [
+        ({"replicas": 2}, "active", True),
+        ({"autoscale": {"min_replicas": 1, "max_replicas": 3}}, "active", True),
+        ({"replicas": 1}, "active", False),
+        ({"replicas": 2}, "stopped", False),
+    ],
+    ids=["two-copies", "may-scale-to-three", "one-copy", "stopped"],
+)
+def test_more_than_one_copy_routes_a_chat_to_the_copy_holding_its_prefix(
+    scale: dict, desired_state: str, routed: bool,
+) -> None:
+    """Serve's default router sent every other turn to a copy without its KV cache."""
+    doc = compile_deployment(
+        spec_data=_base_spec(scale=scale),
+        model_display_name="meta-llama/Llama-3-8B",
+        model_source="remote",
+        desired_state=desired_state,
+    )
+    router = doc["llm_configs"][0]["deployment_config"].get("request_router_config")
+    if not routed:
+        assert router is None
+        return
+    assert router["request_router_class"] == PREFIX_ROUTER
+    # Balances again past this queue difference; the tree is kept bounded.
+    assert router["request_router_kwargs"] == {"imbalanced_threshold": 10, "do_eviction": True}

@@ -290,6 +290,24 @@ DEFAULT_LOGGING_CONFIG: dict[str, Any] = {
 }
 
 
+def _prefix_affinity_router() -> dict[str, Any]:
+    """Send a chat to the copy that already holds its history in its KV cache.
+
+    Serve's default router picks two copies at random and takes the less
+    busy one, so with two copies every other turn of a conversation landed
+    on a copy that had never seen it and recomputed the whole history --
+    half the prefix-cache hits gone (chat plan, Phase 1). Ray's prefix-aware
+    router follows the prompt's prefix while the copies' queues stay within
+    ``imbalanced_threshold`` of each other; past that it balances as before.
+    Its default threshold is infinite (never balance) and its prefix tree
+    grows without end unless eviction is on, so both are set.
+    """
+    return {
+        "request_router_class": "ray.serve.llm.request_router.PrefixCacheAffinityRouter",
+        "request_router_kwargs": {"imbalanced_threshold": 10, "do_eviction": True},
+    }
+
+
 def _deployment_config(
     *,
     replicas: int,
@@ -637,6 +655,8 @@ def compile_spec(
         upscale_delay_s=(scale.autoscale.scale_up_timeout if scale.autoscale else None),
         downscale_delay_s=(scale.autoscale.scale_down_timeout if scale.autoscale else None),
     )
+    if not stopped and max(replicas, max_replicas or 0) > 1:
+        deployment_config["request_router_config"] = _prefix_affinity_router()
 
     effective_accelerator = _accelerator_type(accelerator_type)
 
