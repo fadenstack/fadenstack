@@ -62,7 +62,7 @@ import re
 import shlex
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -79,6 +79,8 @@ class Flavor:
     hardware_target: str
     #: The catalogue entry in bundles.py this manifest feeds (for the hint).
     bundle: str
+    #: What the image is for, when no earlier manifest recorded it.
+    target_hardware: dict = field(default_factory=dict, compare=False, hash=False)
 
 
 FLAVORS: dict[str, Flavor] = {
@@ -97,6 +99,7 @@ FLAVORS: dict[str, Flavor] = {
         runtime_id="llmport-ray-vllm-x86_64-ray2.58",
         hardware_target="generic x86_64 NVIDIA",
         bundle="bundle-generic-x86_64-nvidia-v1",
+        target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},
     ),
 }
 
@@ -202,6 +205,37 @@ def inspect_image(tag: str) -> dict:
     }
 
 
+def base_image_of(flavor: Flavor) -> dict:
+    """The image *flavor*'s Dockerfile builds on, as the local Docker knows it.
+
+    Read from the last ``FROM`` line, then from the base image the build just
+    pulled: its digest, architecture and OS. Empty when the Dockerfile names
+    none; without a local copy, only the repository and tag.
+    """
+    ref = ""
+    for line in (HERE / flavor.dockerfile).read_text(encoding="utf-8").splitlines():
+        words = line.split()
+        if words and words[0].upper() == "FROM":
+            ref = next((w for w in words[1:] if not w.startswith("--")), "")
+    if not ref:
+        return {}
+    repository, tag = (ref.rsplit(":", 1) if ":" in ref.rsplit("/", 1)[-1] else (ref, "latest"))
+    base: dict = {"repository": repository, "tag": tag}
+    try:
+        entry = json.loads(_run(["docker", "image", "inspect", ref]))[0]
+    except (BuildError, ValueError, IndexError):
+        return base
+    for repo_digest in entry.get("RepoDigests") or []:
+        name, _, digest = repo_digest.partition("@")
+        if name in (repository, f"docker.io/library/{repository}", f"library/{repository}"):
+            base["digest"] = digest
+            break
+    for key, value in (("architecture", entry.get("Architecture")), ("os", entry.get("Os"))):
+        if value:
+            base[key] = value
+    return base
+
+
 def read_stack_versions(tag: str, *, platform: str | None = None) -> dict:
     """Ask the helper inside the image what it actually has.
 
@@ -297,9 +331,11 @@ def write_manifest(
         "rootfs_layers": identity["rootfs_layers"],
         "repo_digest": identity.get("repo_digest"),
         # What the image is built on and for carries over; it is not read
-        # from the image (the base's digest is not recorded in it).
-        "base_image": previous.get("base_image", {}),
-        "target_hardware": previous.get("target_hardware", {}),
+        # from the image (the base's digest is not recorded in it). With no
+        # earlier record -- the x86_64 manifest never had one -- the base is
+        # read from the Dockerfile and the base image the build pulled.
+        "base_image": previous.get("base_image") or base_image_of(flavor),
+        "target_hardware": previous.get("target_hardware") or dict(flavor.target_hardware),
         "stack_components": stack,
         "machine": arch.get("machine") or identity.get("architecture"),
         "arch_list": arch.get("arch_list", []),
