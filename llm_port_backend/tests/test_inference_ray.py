@@ -897,6 +897,10 @@ async def deployment_env(dbsession: AsyncSession) -> tuple[InferenceDeployment, 
         head_node_id=node.id,
         # Deployments only act on a ready environment (F40).
         status=EnvironmentStatus.READY.value,
+        # The model has no copy on this server, and these tests are about
+        # running it, not fetching it: let the engine download it, so the
+        # preparation gate does not start a server download first.
+        config_json={"artifacts": {"allow_remote_fetch": True}},
     )
     dbsession.add(env)
     await dbsession.flush()  # env.id must exist before membership rows reference it

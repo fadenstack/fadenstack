@@ -272,6 +272,30 @@ describe("HostModelDialog", () => {
     expect(create.mock.calls[0][0].spec).toMatchObject({ resources: { replica: { gpus: 1 } } });
   });
 
+  it("a listed model whose files are not on this server says it is downloaded first", async () => {
+    // What a takeover leaves: a catalogue entry for a model only the machines
+    // have. The wizard said "this server already keeps this model", and the
+    // deployment failed on the machines for want of the files.
+    const listed: Model = { ...LOCAL, id: "listed-1", display_name: "Qwen3-8B", source: "huggingface", hf_repo_id: "Qwen/Qwen3-8B" };
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    vi.spyOn(marketplaceApi, "detail").mockResolvedValue({
+      ...DETAIL,
+      clusters: [PAIR],
+      local: { model_id: "listed-1", status: "available", deployments: 0, on_server: false },
+    });
+    renderDialog({ models: [listed], clusterId: PAIR.environment_id, lockCluster: true });
+
+    await userEvent.click(screen.getByTestId("host-kept-listed-1"));
+    await userEvent.click(screen.getByTestId("host-next"));
+    await waitFor(() => expect(screen.getByTestId("host-next")).toBeEnabled());
+    await userEvent.click(screen.getByTestId("host-next"));
+    await userEvent.click(screen.getByTestId("host-next"));
+    expect(screen.getByTestId("host-download-note")).toHaveTextContent("16.4 GB");
+    expect(screen.queryByText(/already keeps this model/)).not.toBeInTheDocument();
+    // Its revision is the catalogue entry's, not one to pick here.
+    expect(screen.queryByTestId("host-revision")).not.toBeInTheDocument();
+  });
+
   it("deploys a model the server keeps from a local path, without asking the Hub", async () => {
     vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
     const detail = vi.spyOn(marketplaceApi, "detail");

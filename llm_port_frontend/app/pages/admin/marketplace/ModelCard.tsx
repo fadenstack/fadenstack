@@ -195,7 +195,9 @@ export function ModelCard({ model, onOpen, onHost, canHost }: ModelCardProps) {
                   ? t("marketplace.local_downloading")
                   : model.local.deployments > 0
                     ? t("marketplace.local_deployed", { count: model.local.deployments })
-                    : t("marketplace.local_kept")
+                    : model.local.on_server
+                      ? t("marketplace.local_kept")
+                      : t("marketplace.local_listed")
               }
               data-testid={`local-${model.repo_id}`}
             />

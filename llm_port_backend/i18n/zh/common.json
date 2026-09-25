@@ -2425,6 +2425,7 @@
     "verified": "已在此测试",
     "verified_help": "{{date}} 在 {{on}} 上提供过服务",
     "local_kept": "本服务器上",
+    "local_listed": "已登记，未下载",
     "local_downloading": "正在下载",
     "local_deployed_one": "已部署 {{count}} 次",
     "local_deployed_other": "已部署 {{count}} 次",

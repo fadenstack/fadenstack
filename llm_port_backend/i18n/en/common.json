@@ -2423,6 +2423,7 @@
     "verified": "Tested here",
     "verified_help": "Served on {{on}} on {{date}}",
     "local_kept": "On this server",
+    "local_listed": "Listed, not downloaded",
     "local_downloading": "Downloading",
     "local_deployed_one": "Deployed {{count}} time",
     "local_deployed_other": "Deployed {{count}} times",

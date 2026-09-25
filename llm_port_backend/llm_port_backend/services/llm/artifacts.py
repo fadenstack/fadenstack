@@ -31,6 +31,17 @@ def model_cache_dir(hf_repo_id: str) -> Path | None:
     return model_dir if model_dir.is_dir() else None
 
 
+def server_has_files(hf_repo_id: str) -> bool:
+    """Whether this server holds any of *hf_repo_id*'s files.
+
+    A catalogue entry is not a copy: a takeover adds one for a model only
+    the machines have, and an import can leave an empty folder behind.
+    """
+    model_dir = model_cache_dir(hf_repo_id)
+    blobs = model_dir / "blobs" if model_dir is not None else None
+    return bool(blobs is not None and blobs.is_dir() and any(p.is_file() for p in blobs.iterdir()))
+
+
 def resolve_blob_hash(fpath: Path, blobs_dir_resolved: Path) -> str | None:
     """Determine which blob a snapshot file refers to.
 

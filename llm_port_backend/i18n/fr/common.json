@@ -2425,6 +2425,7 @@
     "verified": "Testé ici",
     "verified_help": "Servi sur {{on}} le {{date}}",
     "local_kept": "Sur ce serveur",
+    "local_listed": "Référencé, non téléchargé",
     "local_downloading": "Téléchargement",
     "local_deployed_one": "Déployé {{count}} fois",
     "local_deployed_other": "Déployé {{count}} fois",

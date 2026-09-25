@@ -384,12 +384,6 @@ def _scaling_message(
     return message
 
 
-def _is_downloading(model: Any) -> bool:
-    """Whether this server is downloading *model* now."""
-    status = getattr(model, "status", None)
-    return str(getattr(status, "value", status) or "").lower() == "downloading"
-
-
 @dataclass
 class _DeploymentFacts:
     """Resolved inputs for one reconcile pass (all None on failure)."""
@@ -746,15 +740,24 @@ class RayDeploymentManager:
             # again.
             gateway = _gateway(node_control)
             coordinator = ModelArtifactCoordinator(session, gateway=gateway)
-            # A model this server is downloading right now is on its way here,
-            # not something to fetch elsewhere: wait for it, then copy it to
-            # the machines. Deciding on ``offline_only`` alone let a model
-            # hosted from the marketplace -- downloaded as it is deployed --
-            # "fall back to remote source" at once, and Ray failed it three
-            # times with "Cannot find an appropriate cached snapshot folder"
-            # (the runtime is air-gapped, above).
-            server_downloading = _is_downloading(facts.model)
-            server_only = offline_only or (server_downloading and not allow_remote_fetch)
+            # A model this server lacks is fetched here, then copied to the
+            # machines -- the only way it reaches them: SYNC_MODEL carries
+            # files from this server, and the runtime is air-gapped (above).
+            # Only an environment that lets the engine download
+            # (``allow_remote_fetch``) is left to fetch it itself.
+            #
+            # This used to fetch only a model already downloading here. Any
+            # other model with no copy on this server "fell back to remote
+            # source", and Ray failed it three times with "Cannot find an
+            # appropriate cached snapshot folder": on the release VM, a model
+            # whose catalogue entry a takeover had added, while the wizard
+            # said the server kept it.
+            #
+            # Not for a model that serves already: whatever it loads from, it
+            # is running, and a health check must neither start a download
+            # for it nor turn it back to "preparing".
+            serving = deployment.phase in (DeploymentPhase.RUNNING.value, DeploymentPhase.DEGRADED.value)
+            server_only = offline_only or (not allow_remote_fetch and not serving)
             # Keep what ``ensure`` decided. It is the call that knows whether a
             # sync could actually be issued, and it refuses with a sentence
             # naming the model and the directory it looked in -- "this server

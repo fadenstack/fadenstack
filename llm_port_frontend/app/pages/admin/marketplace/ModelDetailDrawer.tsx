@@ -264,7 +264,9 @@ function DetailBody({ detail }: { detail: MarketDetail }) {
                 ? t("marketplace.local_downloading")
                 : detail.local.deployments > 0
                   ? t("marketplace.local_deployed", { count: detail.local.deployments })
-                  : t("marketplace.local_kept")
+                  : detail.local.on_server
+                    ? t("marketplace.local_kept")
+                    : t("marketplace.local_listed")
               : t("marketplace.detail.not_on_server")
           }
         />

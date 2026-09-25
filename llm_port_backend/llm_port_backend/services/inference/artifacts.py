@@ -302,10 +302,10 @@ class ModelArtifactCoordinator:
         """Evaluate readiness and issue SYNC_MODEL commands for non-ready nodes.
 
         ``fetch_to_server`` starts the server-side download of a model the
-        server lacks. Only an offline-only cluster needs that: one that may
-        reach the internet has its machines fetch the model themselves, which
-        is faster than going through the server and must not be replaced by
-        a wait for it.
+        server lacks. A cluster's machines cannot fetch one themselves:
+        SYNC_MODEL carries files from this server, and the runtime is
+        air-gapped. So a deployment asks for it unless its environment lets
+        the engine download (``allow_remote_fetch``).
 
         Idempotent: does not re-issue commands already in flight for the desired digest.
         """

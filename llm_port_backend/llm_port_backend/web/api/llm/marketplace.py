@@ -43,11 +43,16 @@ async def _hub(session: AsyncSession) -> HubClient:
 
 
 async def _local(session: AsyncSession) -> dict[str, dict[str, Any]]:
-    """The models this server keeps, by repository: status and how many deployments use each."""
+    """The models this server keeps, by repository.
+
+    Each with its status, how many deployments use it, and whether its files
+    are here (``on_server``): a catalogue entry alone is not a copy.
+    """
     from sqlalchemy import func, select  # noqa: PLC0415
 
     from llm_port_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
     from llm_port_backend.db.models.llm import LLMModel, ModelStatus  # noqa: PLC0415
+    from llm_port_backend.services.llm.artifacts import server_has_files  # noqa: PLC0415
 
     counts = dict((await session.execute(
         select(InferenceDeployment.model_id, func.count()).group_by(InferenceDeployment.model_id),
@@ -65,8 +70,9 @@ async def _local(session: AsyncSession) -> dict[str, dict[str, Any]]:
                 "deployments": int(counts.get(model.id, 0)),
                 "_rank": rank,
             }
-    for entry in kept.values():
+    for repo_id, entry in kept.items():
         entry.pop("_rank", None)
+        entry["on_server"] = server_has_files(repo_id)
     return kept
 
 

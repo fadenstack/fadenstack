@@ -139,7 +139,9 @@ async def test_deployment_phase_progression_pending_preparing_applying_running(
         status=EnvironmentStatus.READY.value,
         config_json={
             "runtime_bundle_id": "bundle-dgx-spark-gb10-v1",
-            "artifacts": {"offline_only": False},
+            # The engine may download: the only case left to fall back to a
+            # remote source (see test_a_model_the_server_lacks_is_fetched_here).
+            "artifacts": {"offline_only": False, "allow_remote_fetch": True},
         },
     )
     dbsession.add(env)
@@ -177,7 +179,7 @@ async def test_deployment_phase_progression_pending_preparing_applying_running(
     # reported the readiness from *before* the attempt, so the deployment sat
     # on "Copying the model" waiting for a copy that nothing had started.
     #
-    # With remote fetch allowed (``offline_only: False``) that refusal is not
+    # With remote fetch allowed (``allow_remote_fetch``) that refusal is not
     # fatal -- the node fetches the model itself -- so the honest outcome is
     # to stop waiting and get on with applying.
     await manager.reconcile_deployment(dbsession, dep, node_control=fake_control)
@@ -522,6 +524,67 @@ async def test_a_model_the_server_is_downloading_is_waited_for(
     assert not any(
         c["command_type"] == NodeCommandType.RUN_SERVE_APP.value for c in fake_control.issued
     )
+
+
+@pytest.mark.anyio
+async def test_a_model_the_server_lacks_is_fetched_here(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A catalogue model this server has no copy of is downloaded here first.
+
+    On the release VM a takeover had added Qwen3-0.6B to the catalogue without
+    its files. Deploying it "fell back to remote source" -- the environment
+    was not offline-only -- and Ray failed it three times with "Cannot find an
+    appropriate cached snapshot folder": the runtime is air-gapped, and the
+    machines cannot fetch a model themselves.
+    """
+    from llm_port_backend.db.models.llm import DownloadJob
+    from llm_port_backend.services.llm import tasks as llm_tasks
+
+    cp = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:8]}", driver="ray")
+    dbsession.add(cp)
+    await dbsession.flush()
+    node = InfraNode(
+        agent_id=f"head-{uuid.uuid4().hex[:8]}", host="10.0.0.3", status="healthy",
+        capabilities_json=dict(DGX_SPARK_PLATFORM),
+    )
+    dbsession.add(node)
+    await dbsession.flush()
+    env = InferenceEnvironment(  # the default: neither offline-only nor letting the engine download
+        control_plane_id=cp.id, name=f"env-{uuid.uuid4().hex[:8]}", head_node_id=node.id,
+        status=EnvironmentStatus.READY.value, config_json={"runtime_bundle_id": "bundle-dgx-spark-gb10-v1"},
+    )
+    dbsession.add(env)
+    await dbsession.flush()
+    dbsession.add(InferenceEnvironmentNode(environment_id=env.id, node_id=node.id, role="head"))
+    model = LLMModel(
+        display_name="Qwen3-0.6B", source=ModelSource.HUGGINGFACE, status=ModelStatus.AVAILABLE,
+        hf_repo_id=f"org/not-on-this-server-{uuid.uuid4().hex[:6]}",
+    )
+    dbsession.add(model)
+    await dbsession.flush()
+    dep = InferenceDeployment(
+        environment_id=env.id, model_id=model.id, name=f"dep-{uuid.uuid4().hex[:8]}",
+        spec_json=_spec(), phase=DeploymentPhase.PENDING.value,
+    )
+    dbsession.add(dep)
+    await dbsession.commit()
+
+    started: list[dict[str, Any]] = []
+
+    async def _kiq(**kwargs: Any) -> None:
+        started.append(kwargs)
+
+    monkeypatch.setattr(llm_tasks.download_model_task, "kiq", _kiq)
+    fake_control = _FakeNodeControlService()
+    await RayDeploymentManager().reconcile_deployment(dbsession, dep, node_control=fake_control)
+
+    assert [s["hf_repo_id"] for s in started] == [model.hf_repo_id], "the server downloads it"
+    assert dep.phase == DeploymentPhase.PREPARING.value, dep.phase_message
+    assert f"Downloading {model.hf_repo_id} to the LLM.Port server" in (dep.phase_message or "")
+    assert (await dbsession.get(DownloadJob, uuid.UUID(started[0]["job_id"]))) is not None
+    assert not any(c["command_type"] == NodeCommandType.RUN_SERVE_APP.value for c in fake_control.issued), (
+        "nothing is handed to Ray until the model can be copied to the machines")
 
 
 @pytest.mark.anyio

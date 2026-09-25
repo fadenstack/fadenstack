@@ -356,6 +356,39 @@ async def test_search_and_detail_answer_with_fit(authed: FastAPI, client: AsyncC
 
 
 @pytest.mark.anyio
+async def test_a_catalogue_entry_is_not_a_copy_on_this_server(
+    authed: FastAPI, client: AsyncClient, dbsession: AsyncSession, fake_hub: dict[str, Any],
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A takeover adds a catalogue entry for a model only the machines have.
+
+    The wizard read the entry as "this server already keeps this model", and
+    the deployment failed on the machines for want of the files.
+    """
+    from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+    from llm_port_backend.settings import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "model_store_root", str(tmp_path))
+    dbsession.add(LLMModel(display_name="Qwen3-8B", source=ModelSource.HUGGINGFACE,
+                           status=ModelStatus.AVAILABLE, hf_repo_id="Qwen/Qwen3-8B"))
+    await dbsession.commit()
+
+    r = await client.get("/api/llm/marketplace/models/Qwen/Qwen3-8B")
+    assert r.status_code == 200, r.text
+    assert r.json()["local"]["status"] == "available"
+    assert r.json()["local"]["on_server"] is False
+
+    blobs = tmp_path / "models--Qwen--Qwen3-8B" / "blobs"
+    blobs.mkdir(parents=True)
+    r = await client.get("/api/llm/marketplace/models/Qwen/Qwen3-8B")
+    assert r.json()["local"]["on_server"] is False, "an empty folder is not a copy"
+
+    (blobs / "0123abcd").write_bytes(b"weights")
+    r = await client.get("/api/llm/marketplace/models/Qwen/Qwen3-8B")
+    assert r.json()["local"]["on_server"] is True
+
+
+@pytest.mark.anyio
 async def test_offline_is_an_answer_not_an_error(authed: FastAPI, client: AsyncClient, dbsession: AsyncSession,
                                                  fake_hub: dict[str, Any]) -> None:
     fake_hub["online"] = False

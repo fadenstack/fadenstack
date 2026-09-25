@@ -293,7 +293,10 @@ export function HostModelDialog({
 
   const model = detail?.model;
   const title = repo ?? kept?.display_name ?? t("hosting.title_generic");
-  const willDownload = !kept && !(detail?.local && detail.local.status !== "failed");
+  // The server's files decide it, not the catalogue: a takeover adds an entry
+  // for a model only the machines have, and this used to say the server kept it.
+  // A model added from a local path has no repository to download from.
+  const willDownload = kept && !kept.hf_repo_id ? false : !detail?.local?.on_server;
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth>
@@ -455,7 +458,7 @@ export function HostModelDialog({
                 </Stack>
               </Paper>
 
-              {willDownload && (
+              {willDownload && !kept && (
                 <TextField
                   label={t("hosting.revision_label")}
                   value={revision}

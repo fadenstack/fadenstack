@@ -82,7 +82,7 @@ describe("MarketplacePage", () => {
             blurb: "marketplace.blurb.tiny_verified",
             verified: { on: "DGX Spark pair (2 × GB10)", date: "2026-09-21" },
           },
-          local: { model_id: "m1", status: "available", deployments: 1 },
+          local: { model_id: "m1", status: "available", deployments: 1, on_server: true },
         }),
         model("openai/gpt-oss-120b", {
           params_b: 120,

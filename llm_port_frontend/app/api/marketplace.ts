@@ -42,6 +42,8 @@ export interface LocalCopy {
   model_id: string;
   status: "available" | "downloading" | "failed" | string;
   deployments: number;
+  /** Whether the files are on this server: a catalogue entry alone is not a copy. */
+  on_server: boolean;
 }
 
 export interface MarketModel {
