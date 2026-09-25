@@ -36,6 +36,7 @@ import {
   getLlmGraphTopology,
   getLlmGraphTraces,
   openLlmGraphTraceStream,
+  traceStreamAvailable,
   type GraphEdge,
   type GraphNode,
   type TraceEvent,
@@ -48,6 +49,8 @@ import {
 const TRACE_FETCH_LIMIT = 100;
 const MAX_TRACE_ROWS = 2000;
 const FLUSH_INTERVAL_MS = 200;
+/** How often newer traces are fetched where the server has no live stream. */
+const TRACE_POLL_MS = 5000;
 const ROW_HEIGHT = 32;
 
 /* ------------------------------------------------------------------ */
@@ -133,9 +136,14 @@ export default function GraphPage() {
   const [streamPaused, setStreamPaused] = useState(false);
   const queueRef = useRef<TraceEvent[]>([]);
   const seenEventIdsRef = useRef<Set<number>>(new Set());
-  const lastEventIdRef = useRef<number | undefined>(undefined);
+  /** The server's cursor, kept as its string: the ids are past a number's precision. */
+  const lastEventIdRef = useRef<string | undefined>(undefined);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  /** Whether the server streams traces: null until a stream has failed once. */
+  const streamAvailableRef = useRef<boolean | null>(null);
+  /** Bumped on every close, so a late answer for a closed stream is dropped. */
+  const streamGenRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef(true);
@@ -249,6 +257,7 @@ export default function GraphPage() {
   /* ================================================================ */
 
   const closeStream = useCallback(() => {
+    streamGenRef.current += 1;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -262,17 +271,52 @@ export default function GraphPage() {
   const connectStream = useCallback(() => {
     if (streamPaused) return;
     closeStream();
+    const gen = streamGenRef.current;
+    const again = (delay: number) => {
+      reconnectTimerRef.current = window.setTimeout(connectStream, delay);
+    };
+
+    if (streamAvailableRef.current === false) {
+      // No live stream here (it is an Enterprise feature): fetch what is newer
+      // than the last row. Reconnecting instead failed every 10 s for as long
+      // as the page was open, and the table never moved.
+      void getLlmGraphTraces(TRACE_FETCH_LIMIT, lastEventIdRef.current)
+        .then((snap) => {
+          if (gen !== streamGenRef.current) return;
+          queueRef.current.push(...snap.items);
+          lastEventIdRef.current = snap.next_cursor ?? lastEventIdRef.current;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (gen === streamGenRef.current) again(TRACE_POLL_MS);
+        });
+      return;
+    }
+
     const source = openLlmGraphTraceStream(
-      (event) => {
+      (event, cursor) => {
         reconnectAttemptRef.current = 0;
+        streamAvailableRef.current = true;
         queueRef.current.push(event);
-        lastEventIdRef.current = event.event_id;
+        lastEventIdRef.current = cursor;
       },
       () => {
         closeStream();
-        reconnectAttemptRef.current += 1;
-        const delay = Math.min(10_000, 1000 * 2 ** reconnectAttemptRef.current);
-        reconnectTimerRef.current = window.setTimeout(connectStream, delay);
+        const failedGen = streamGenRef.current;
+        const backOff = () => {
+          reconnectAttemptRef.current += 1;
+          again(Math.min(10_000, 1000 * 2 ** reconnectAttemptRef.current));
+        };
+        if (streamAvailableRef.current !== null) {
+          backOff();
+          return;
+        }
+        void traceStreamAvailable().then((available) => {
+          if (failedGen !== streamGenRef.current) return;
+          streamAvailableRef.current = available;
+          if (available) backOff();
+          else connectStream();
+        });
       },
       lastEventIdRef.current,
     );
@@ -293,9 +337,7 @@ export default function GraphPage() {
             fresh.push(item);
           }
         }
-        if (snap.items.length > 0) {
-          lastEventIdRef.current = snap.items[snap.items.length - 1].event_id;
-        }
+        lastEventIdRef.current = snap.next_cursor ?? undefined;
         setTraceRows((prev) => [...prev, ...fresh].slice(-MAX_TRACE_ROWS));
       } catch {
         /* ignore seed errors silently; SSE will retry */

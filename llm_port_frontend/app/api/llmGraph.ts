@@ -47,6 +47,11 @@ export interface TraceEvent {
 
 export interface TraceSnapshotResponse {
   items: TraceEvent[];
+  /**
+   * Where to carry on from. A string on purpose: an event id is about 1.8e21,
+   * past what a JavaScript number holds exactly, so ``event_id`` itself comes
+   * back rounded and sent as ``1.79e+21``, which the server refuses.
+   */
   next_cursor: string | null;
 }
 
@@ -86,12 +91,12 @@ export function getLlmGraphTopology(): Promise<TopologyResponse> {
 
 export function getLlmGraphTraces(
   limit = 100,
-  afterEventId?: number,
+  afterEventId?: string,
 ): Promise<TraceSnapshotResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
   if (afterEventId !== undefined) {
-    params.set("after_event_id", String(afterEventId));
+    params.set("after_event_id", afterEventId);
   }
   return request<TraceSnapshotResponse>(`/traces?${params.toString()}`);
 }
@@ -100,20 +105,39 @@ export function getLlmDataUsage(): Promise<DataUsageSummary> {
   return request<DataUsageSummary>("/data-usage");
 }
 
+/**
+ * Whether this server streams traces. Without the Enterprise plugin the stream
+ * answers 402, which an EventSource cannot see: it only reports an error.
+ */
+export async function traceStreamAvailable(): Promise<boolean> {
+  const controller = new AbortController();
+  try {
+    const res = await fetch(`${BASE}/traces/stream`, { credentials: "include", signal: controller.signal });
+    return res.status !== 402;
+  } catch {
+    return true;
+  } finally {
+    // An open stream is only a yes; it is not read here.
+    controller.abort();
+  }
+}
+
 export function openLlmGraphTraceStream(
-  onEvent: (event: TraceEvent) => void,
+  onEvent: (event: TraceEvent, cursor: string) => void,
   onError: (error: Event) => void,
-  cursor?: number,
+  cursor?: string,
 ): EventSource {
   const params = new URLSearchParams();
   if (cursor !== undefined) {
-    params.set("cursor", String(cursor));
+    params.set("cursor", cursor);
   }
   const url = `${BASE}/traces/stream${params.toString() ? `?${params.toString()}` : ""}`;
   const source = new EventSource(url, { withCredentials: true });
   source.addEventListener("trace", (raw) => {
-    const data = JSON.parse((raw as MessageEvent<string>).data) as TraceEvent;
-    onEvent(data);
+    const message = raw as MessageEvent<string>;
+    const data = JSON.parse(message.data) as TraceEvent;
+    // The event's ``id:`` line is its id exactly; ``data.event_id`` is rounded.
+    onEvent(data, message.lastEventId || String(data.event_id));
   });
   source.addEventListener("ping", () => {
     // keep-alive event
