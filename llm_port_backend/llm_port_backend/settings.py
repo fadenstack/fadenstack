@@ -105,8 +105,13 @@ class Settings(BaseSettings):
     db_pass: str = "llm_port_backend"  # noqa: S105
     db_base: str = "llm_port_backend"
     db_echo: bool = False
-    db_pool_size: int = max(5, _CPU_COUNT * 3)
-    db_max_overflow: int = max(10, _CPU_COUNT * 3)
+    # Per process, not per CPU. Every uvicorn worker of every service holds
+    # its own pool, and all of them share one Postgres (max_connections 100
+    # by default). Sized from the CPU count, one gateway worker on a
+    # 64-thread host could open 384 connections and locked every other
+    # service out (2026-09-25). 5 kept + 10 on demand is SQLAlchemy's default.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
     # PostgreSQL TLS
     # disable | prefer | require | verify-ca | verify-full
     db_ssl_mode: str = "disable"

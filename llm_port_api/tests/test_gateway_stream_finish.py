@@ -22,11 +22,12 @@ from typing import Any
 
 import pytest
 from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from llm_port_api.db.models.gateway import LLMGatewayRequestLog, ProviderType
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter
+from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from llm_port_api.services.gateway.service import _BACKGROUND, GatewayService, _split_done
 from tests.test_gateway_pipeline_combined import (
     ALIAS,
@@ -194,6 +195,45 @@ async def test_a_client_that_leaves_before_the_end_does_not_stop_the_saving(
     assert ANSWER.startswith(history[1][1]) and "coolant" in history[1][1], "what had streamed is kept"
     assert await _logged(db_session, sid) == 1
     assert all(task.done() for task in _BACKGROUND), "nothing left running"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_the_model_is_called_with_no_transaction_holding_a_connection(
+    stream: bool, fastapi_app: FastAPI, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The request's session used to stay in its transaction through the model call.
+
+    Each concurrent answer then pinned one pooled connection, "idle in
+    transaction", until the response was over: at 64 streams the gateway held 59
+    and Postgres refused every other service.
+    """
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    sid = await _session(db_session)
+    open_at_call: list[bool] = []
+
+    async def completion(self: LLMAdapter, **kwargs: Any) -> Any:
+        open_at_call.append(db_session.in_transaction())
+        if kwargs.get("stream"):
+            async def pieces() -> Any:
+                yield _chunk(ANSWER)
+                yield b"data: [DONE]\n\n"
+            return pieces()
+        return CompletionResult(status_code=200, payload={
+            "id": "c", "object": "chat.completion", "model": ALIAS,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": ANSWER}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        })
+
+    monkeypatch.setattr(LLMAdapter, "completion", completion)
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=5.0) as client:
+        r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+            "model": ALIAS, "stream": stream, "session_id": str(sid), "messages": [{"role": "user", "content": "hi"}],
+        })
+    assert r.status_code == 200
+    assert open_at_call == [False]
 
 
 @pytest.mark.parametrize(

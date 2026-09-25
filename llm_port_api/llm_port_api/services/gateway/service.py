@@ -1131,6 +1131,22 @@ class GatewayService:
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
         req.egress_payload = egress
+        # The model call is next, and it lasts seconds.
+        await self._release_request_connection()
+
+    async def _release_request_connection(self) -> None:
+        """End the request session's transaction, so it holds no pooled connection.
+
+        What the request read or wrote so far is committed here rather than by
+        ``get_db_session`` after the response. A session left in its
+        transaction kept a connection "idle in transaction" for the whole model
+        call: at 64 concurrent streams the gateway held 59 connections, and
+        Postgres (100) refused every other service. Later reads and writes
+        open a new transaction only for as long as they need it.
+        """
+        session = self.dao.session
+        if session.in_transaction():
+            await session.commit()
 
     async def _release(self, req: _Prepared) -> None:
         """Give the request's model slot back, once."""
@@ -1703,6 +1719,9 @@ class GatewayService:
                 answers = await self._run_tool_calls(
                     req, calls.calls(), iteration=iteration, auth=auth, request_id=request_id,
                 )
+                # The tool router reads the session's policy; the next round is
+                # another model call.
+                await self._release_request_connection()
                 if answers is not None:
                     req.tool_iterations = iteration + 1
                     turn = _assistant_turn("".join(said) or None, calls.calls())
