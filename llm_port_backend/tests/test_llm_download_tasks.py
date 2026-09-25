@@ -277,6 +277,63 @@ def test_progress_follows_the_bytes_not_the_file_count(monkeypatch: pytest.Monke
     assert reported[-1] == 85
 
 
+def test_only_what_vllm_reads_is_downloaded(monkeypatch: pytest.MonkeyPatch, tmp_path: object) -> None:
+    """HuggingFaceTB/SmolLM2-360M-Instruct: a 724 MB model in 4.4 GB of files."""
+    sizes = {
+        "model.safetensors": 724_000_000, "config.json": 1, "generation_config.json": 1,
+        "tokenizer.json": 1, "tokenizer_config.json": 1, "vocab.json": 1, "merges.txt": 1,
+        "special_tokens_map.json": 1, "README.md": 1, ".gitattributes": 1,
+        "onnx/model.onnx": 1_450_000_000, "onnx/model_fp16.onnx": 725_000_000,
+        "runs/Oct31_09-01-58/events.out.tfevents.1730365788.0": 9_000, "training_args.bin": 7_000,
+    }
+    seen: list[str] = []
+    _fake_hub(monkeypatch, sizes, seen)
+    reported: list[int] = []
+
+    tasks_mod._run_download_sync("org/m", "main", str(tmp_path), None, reported.append)  # noqa: SLF001
+
+    assert "model.safetensors" in seen and "tokenizer.json" in seen and "config.json" in seen
+    assert not [n for n in seen if n.startswith(("onnx/", "runs/")) or n == "training_args.bin"]
+    assert reported[-1] == 85, "progress counts the files fetched, not the ones left out"
+
+
+@pytest.mark.parametrize(
+    ("names", "fetched"),
+    [
+        pytest.param(
+            ["model.safetensors", "pytorch_model.bin", "config.json"],
+            ["model.safetensors", "config.json"],
+            id="the same weights again in PyTorch's format",
+        ),
+        pytest.param(
+            ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors", "model.safetensors.index.json",
+             "original/model--00001-of-00002.safetensors", "metal/model.bin", "config.json"],
+            ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors", "model.safetensors.index.json",
+             "config.json"],
+            id="gpt-oss: a second copy for another runtime",
+        ),
+        pytest.param(
+            ["pytorch_model.bin", "optimizer.pt", "config.json", "tokenizer.model"],
+            ["pytorch_model.bin", "config.json", "tokenizer.model"],
+            id="PyTorch weights only, without the training state",
+        ),
+        pytest.param(
+            ["model-q4_k_m.gguf", "model-q8_0.gguf", "README.md"],
+            ["model-q4_k_m.gguf", "model-q8_0.gguf", "README.md"],
+            id="a layout it does not know is fetched whole",
+        ),
+        pytest.param(
+            ["model.safetensors", "modules.json", "1_Pooling/config.json", "openvino/openvino_model.xml",
+             "checkpoint-500/model.safetensors"],
+            ["model.safetensors", "modules.json", "1_Pooling/config.json"],
+            id="an embedding model keeps its pooling config",
+        ),
+    ],
+)
+def test_files_to_fetch(names: list[str], fetched: list[str]) -> None:
+    assert tasks_mod.files_to_fetch(names) == fetched
+
+
 def test_a_canceled_download_stops_before_the_next_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     import threading
 

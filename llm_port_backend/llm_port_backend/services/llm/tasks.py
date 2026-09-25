@@ -19,6 +19,48 @@ class DownloadCanceled(Exception):
     """The download job was canceled while it ran."""
 
 
+#: Weights in a format vLLM loads, at the top of a repository.
+_WEIGHTS = (".safetensors", ".bin", ".pt", ".pth")
+#: The same weights exported for other runtimes.
+_EXPORTS = (".onnx", ".onnx_data", ".gguf", ".h5", ".msgpack", ".ot", ".tflite", ".mlmodel")
+#: Folders of such exports, of a second copy for another runtime, or of a training run.
+_OTHER_FOLDERS = frozenset({"onnx", "openvino", "coreml", "gguf", "tflite", "metal", "original", "runs"})
+#: What a training run leaves beside the model.
+_TRAINING_STATE = ("training_args.bin", "optimizer.", "scheduler.", "rng_state", "events.out.tfevents")
+
+
+def files_to_fetch(names: list[str]) -> list[str]:
+    """The files of a repository that a copy on this server is for: what vLLM reads.
+
+    Repositories carry much else. HuggingFaceTB/SmolLM2-360M-Instruct is a
+    724 MB model in 4.4 GB of files: eight ONNX exports, TensorBoard runs and
+    the training state. All of it was downloaded, then copied to every
+    machine, over the release VM's 100 Mbit/s link.
+
+    Only a layout this knows is filtered: weights vLLM loads at the top of
+    the repository. Anything else (a GGUF-only repository, say) is fetched
+    whole, as before.
+    """
+    def training_state(name: str) -> bool:
+        return name.rsplit("/", 1)[-1].startswith(_TRAINING_STATE)
+
+    top_weights = [n for n in names if "/" not in n and n.endswith(_WEIGHTS) and not training_state(n)]
+    if not top_weights:
+        return list(names)
+    safetensors = any(n.endswith(".safetensors") for n in top_weights)
+    keep = []
+    for name in names:
+        folder = name.split("/", 1)[0] if "/" in name else ""
+        if folder in _OTHER_FOLDERS or folder.startswith("checkpoint-"):
+            continue
+        if name.lower().endswith(_EXPORTS) or training_state(name):
+            continue
+        if safetensors and name.endswith((".bin", ".pt", ".pth")):
+            continue  # the same weights again, in PyTorch's format
+        keep.append(name)
+    return keep
+
+
 async def _resolve_hf_token() -> str | None:
     """The token this server uses: the stored one, else ``LLM_PORT_BACKEND_HF_TOKEN``, else anonymous."""
     from llm_port_backend.services.llm import hf_token  # noqa: PLC0415
@@ -63,9 +105,11 @@ def _run_download_sync(
     api = HfApi(token=hf_token)
     repo_info = api.model_info(hf_repo_id, revision=hf_revision, files_metadata=True)
 
-    siblings = repo_info.siblings or []
+    listed = repo_info.siblings or []
+    wanted = set(files_to_fetch([s.rfilename for s in listed]))
+    siblings = [s for s in listed if s.rfilename in wanted]
     total_files = len(siblings)
-    if total_files == 0:
+    if not listed:
         # Fall back to snapshot_download if we can't enumerate files
         from huggingface_hub import snapshot_download  # noqa: PLC0415
 
@@ -79,10 +123,11 @@ def _run_download_sync(
         return snapshot_dir
 
     log.info(
-        "Downloading %d files for %s (rev %s)",
+        "Downloading %d files for %s (rev %s); %d others are not for vLLM",
         total_files,
         hf_repo_id,
         hf_revision,
+        len(listed) - total_files,
     )
 
     total_bytes = sum(int(getattr(s, "size", 0) or 0) for s in siblings)
