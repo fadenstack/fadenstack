@@ -73,7 +73,9 @@ The line installs the node agent from the server itself, or from the
 project's GitHub releases when the server has no copy. For machines without
 internet access, put the agent builds in `~/llm-port/agent-binaries/`
 (`llmport-agent-linux-x86_64`, `llmport-agent-linux-aarch64`, from the
-[releases page](https://github.com/llm-port/llm-port-core/releases)).
+[releases page](https://github.com/llm-port/llm-port-core/releases)), and
+replace them with the new release's builds whenever you upgrade -- see
+[Update the machines' agents](upgrading.md#update-the-machines-agents).
 
 ## Upgrade
 

@@ -64,13 +64,37 @@ it.
    baked into the backend, so this comes before core.
 3. `release-core.ps1`.
 4. `release-cli.ps1` with the same version as core: `llmport deploy` pulls the
-   images tagged with the CLI's own version.
+   images tagged with the CLI's own version. It must also be above every CLI
+   already on PyPI, or `pipx install llmport-cli` keeps choosing the older one
+   (this is why 0.0.3 was followed by 0.3.0: the CLI was at 0.2.9).
+5. Upgrade a test install to the release and update its machines' agents, as
+   [Upgrading](upgrading.md) describes.
+
+Run each script on its own, one after another. Each pushes its own tag.
+GitHub starts no workflow at all for a push that brings more than three new
+tags, so tags made by hand and pushed together with `git push --tags` build
+nothing.
+
+The CI runs are public: `https://api.github.com/repos/llm-port/llm-port-core/actions/runs`
+lists them without signing in, and `.../actions/runs/<id>/jobs` shows each
+job and the step that failed. The logs themselves need a GitHub sign-in.
+
+What releasing 0.3.0 found, and fixed in the scripts:
+
+- `release-core.ps1` and `release-node-agent.ps1` rewrote every line ending in
+  `version = "..."`, so the backend's ruff `target-version` and mypy
+  `python_version` were set to the release number, breaking both tools. They
+  now change only the package's own `version` line, as `release-cli.ps1`
+  always did.
+- `release-node-agent.ps1` did not update the agent's `uv.lock`, which kept
+  the previous version until the next `uv run` changed it. It regenerates it
+  now.
 
 ## Repository settings the workflows use
 
 | Name | Kind | Needed for |
 |---|---|---|
-| `PYPI_API_TOKEN` | secret | the CLI on PyPI; the agent's PyPI upload is skipped without it |
+| `PYPI_API_TOKEN` | secret | the CLI on PyPI; the agent's PyPI upload is skipped without it. It must be allowed to upload both `llmport-cli` and `llmport-agent`: for 0.3.0 the CLI published and the agent's upload failed, most likely a token scoped to the CLI alone (the agent's binaries, which installs use, were released regardless) |
 | `NGC_API_KEY` | secret, optional | only if NVIDIA's base image for the GB10 runtime stops being public |
 | `RUNTIME_RUNNER_GB10`, `RUNTIME_RUNNER_X86_64` | variables, optional | larger runners, if a runtime image build runs out of disk on the standard ones |
 

@@ -1,8 +1,9 @@
 # Upgrading LLM.Port
 
 How to move an installation to a newer version, keeping its data. Written
-from upgrading a real installation -- a 13 September build on an Ubuntu VM,
-to the `ray` branch -- and every problem that upgrade hit is in
+from upgrading a real installation twice -- a 13 September build on an
+Ubuntu VM to the `ray` branch, then that VM to release 0.3.0 while it ran a
+model on two DGX Spark machines -- and every problem those upgrades hit is in
 [If the upgrade stops](#if-the-upgrade-stops).
 
 ## What `llmport upgrade` does
@@ -32,10 +33,21 @@ It upgrades the installation the CLI is configured for
    out; only what changed is downloaded. A failed pull stops nothing:
    services are already up, and `llmport runtime-images` retries it.
    `--runtime-images x86_64` (or `aarch64`, `none`) limits it, and is
-   remembered.
+   remembered. A release whose runtime images are not published yet says so
+   here (see [Runtime images "on no registry"](#runtime-images-on-no-registry)).
 
 The new version comes from the CLI (published images) or from the
 checkout (source), so put that in place first.
+
+Which of the two an install is depends on how it was made, not on where the
+CLI came from: `llmport deploy` from the published CLI marks the install
+(`.llmport-release`), and only a marked install pulls published images. An
+install made from a checkout keeps building from it, even with the published
+CLI -- so its checkout has to be at the new release too. `llmport upgrade
+--dry-run` says which it is: `Release: 0.3.0 -> 0.3.1 (pull published
+images)`, or `Build images: yes`.
+
+Machines are updated separately: see [Update the machines' agents](#update-the-machines-agents).
 
 ## Before you start
 
@@ -83,12 +95,22 @@ Local edits are kept in the stash (`git stash list`); re-apply them with
 
 ### 2. Update the CLI
 
-The upgrade logic is in the CLI, so update it before running it:
+The upgrade logic is in the CLI, so update it before running it -- either
+the published CLI of the release you checked out, or the one in the checkout:
 
 ```bash
-uv tool install --force ~/llm-port-core/llm_port_cli
+uv tool install --force llmport-cli==0.3.0            # the published CLI
+uv tool install --force ~/llm-port-core/llm_port_cli  # or: from the checkout
 llmport --version
 ```
+
+Either way the install builds its images from the checkout; the dry run
+says `Build images: yes`.
+
+![Updating the CLI to 0.3.0 and the dry run](images/upgrading/01-update-the-cli.png)
+
+(`LLMPORT_CONFIG` points the CLI at this VM's install; one with a single
+install doesn't need it.)
 
 ### 3. Upgrade
 
@@ -97,8 +119,13 @@ llmport upgrade --dry-run   # what it would do
 llmport upgrade -y
 ```
 
-On an 8-core VM the image builds took about 15 minutes and the rest a few
-minutes.
+![llmport upgrade from backup to the runtime images](images/upgrading/02-llmport-upgrade.png)
+
+On an 8-core VM the first upgrade from a 13 September build took about 15
+minutes for the image builds and a few minutes for the rest. The next one, to
+0.3.0, took 2 minutes 49 seconds in all: Docker's build cache still held the
+layers whose sources had not changed. The two warnings at the end are
+expected for 0.3.0 (see [Runtime images "on no registry"](#runtime-images-on-no-registry)).
 
 ## Check it
 
@@ -107,18 +134,95 @@ llmport status                          # every service running; healthy where i
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost/api/health   # 200
 ```
 
-Then sign in to the console. What the upgraded VM showed:
+![llmport status after the upgrade](images/upgrading/03-llmport-status.png)
+
+Then sign in to the console. What the VM showed after the upgrade to 0.3.0
+(25 September):
 
 - All 18 services up (the two migrators exit once they have run).
-- The database migrations ran from the 13 September versions to the
-  current ones (backend `us3rpr3f0001` to `h1br1dsrch`, gateway
-  `5j6k7l8m9n0p` to `6k7l8m9n0p1q`).
-- Every row kept: users, providers, models, runtimes, the enrolled
-  machine, the gateway's routes. The only additions were the permissions
-  new features need (99 to 114).
-- ClickHouse's old diagnostic logs dropped; the disk at 51%.
+- The database migrations ran forward: backend `h1br1dsrch` to `r3s1d3nc3`,
+  gateway `6k7l8m9n0p1q` to `7l8m9n0p1q2r`.
+- Every row kept, compared table by table before and after: users,
+  providers, models, runtimes, both machines and their credentials, the
+  cluster and its deployment, settings and secrets, the gateway's routes.
+  The request log had one more row -- the test chat.
+- The model kept serving throughout. The cluster on the two DGX Spark
+  machines is run by the machines, not by the server, so restarting the
+  server's services did not touch it: the deployment was observed, not
+  applied again (generation 1 of 1, one copy ready), and chat through the
+  upgraded gateway answered.
+
+![The deployment still serving after the upgrade](images/upgrading/04-still-serving.png)
+
+Some pages show what the new version changed. The data residency map, for
+example, placed providers by how they were added: the model served by the
+DGX pair on the LAN counted as **Cloud**, and the one LLM.Port runs on its
+own cluster counted nowhere. After the upgrade it places them by where they
+are -- both on your machines, and the setup is air-gapped:
+
+![The data residency map before the upgrade: Cloud Only](images/upgrading/05-residency-before.png)
+
+![The same install after the upgrade: Air-Gapped](images/upgrading/06-residency-after.png)
+
+The upgrade from the 13 September build, the first time round, showed the
+same: every row kept (the only additions were the permissions new features
+need, 99 to 114), and ClickHouse's old diagnostic logs dropped, taking the
+disk to 51%.
+
+## Update the machines' agents
+
+A release can expect a newer node agent than the machines run -- 0.3.0
+expects agent 0.1.13. The server doesn't update its machines; each one is
+updated by running its install line again, on the machine:
+
+```bash
+curl -fsSLO http://<server>/api/install/llmport-agent.sh && sh llmport-agent.sh --join http://<server> --user
+```
+
+Use the line from **Machines → Add a machine**, as you ran it the first time
+(the DGX pair's agents run as user services, hence `--user`). The script
+downloads the agent the server now expects, checks it, sees the machine is
+already a member -- nothing to approve -- and restarts the agent on the new
+build.
+
+![Updating a machine's agent: verified, already a member, restarted](images/upgrading/07-update-an-agent.png)
+
+A running model is not interrupted: the agent is only the machine's link to
+the server, and the cluster's containers keep running while it restarts. On
+the VM's DGX pair both agents went from 0.1.12 to 0.1.13 this way, and chat
+answered throughout. The machine's page shows the version it runs:
+
+![A machine on agent 0.1.13](images/upgrading/08-agent-version.png)
+
+**If the server keeps its own agent builds** -- `agent-binaries/` in the
+install, for machines without internet -- replace them with the new release's
+builds after the upgrade (`llmport-agent-linux-x86_64` and
+`-linux-aarch64` from the release, with their `.sha256` files to check them).
+Nothing replaces them for you, and the server's copy is what the install line
+checks the download against. On the VM, 0.3.0 kept a 0.1.12 copy from an
+earlier test, so the 0.1.13 download would have stopped with
+`the download does not match the expected digest` -- and a machine without
+internet would have been given the 0.1.12 copy. From the release after 0.3.0,
+a server that can reach GitHub notices a copy that is not the expected
+version's build, sets it aside for the release, and says so in its log.
 
 ## If the upgrade stops
+
+### Runtime images "on no registry"
+
+```
+⚠ llmport-ray-runtime-x86_64:2.58.0 (x86_64): this release names a build that is on no registry.
+```
+
+The release names runtime images that were never published, so there is
+nothing to pull. 0.3.0 does this for both kinds: its runtime images are built
+and published (`runtime-v2.58.0-1`) but not yet certified on their hardware,
+so the manifests it carries still name the local builds they were made
+from. The upgrade is not affected -- the services are up by then -- and
+clusters that already run keep their images. A new machine gets its image
+from a cluster peer that has it, or you load one on the server with
+`docker load -i <file>`. A release that carries certified manifests names the
+published images, and this step pulls them.
 
 ### Settings missing after an earlier upgrade
 
