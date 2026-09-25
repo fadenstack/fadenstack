@@ -713,7 +713,19 @@ class NodeControlService:
         await get_command_notifier().notify(self._dao.session, node_id)
         return command
 
-    async def list_commands_for_dispatch(self, *, node_id: uuid.UUID, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_commands_for_dispatch(
+        self, *, node_id: uuid.UUID, limit: int = 50, unacked: bool = False,
+    ) -> list[dict[str, Any]]:
+        """The queued commands for *node_id*, marked dispatched.
+
+        With *unacked*, also those sent before and never acknowledged: only
+        for a new connection, as the old one may have lost them. Re-sent on
+        every frame of a live connection, a command went out twice whenever
+        the loop turned before its ack came back, and the agent held the copy
+        behind the running command. On the DGX pair a model copy ran nine
+        minutes; the agent then refused the copy as expired, and that refusal
+        was recorded over the copy's success.
+        """
         commands = await self._dao.list_pending_commands(node_id=node_id, limit=limit)
         items: list[dict[str, Any]] = []
         for command in commands:
@@ -725,6 +737,8 @@ class NodeControlService:
                     message="Command dispatched to stream session.",
                     payload_json=None,
                 )
+            elif not unacked:
+                continue
             items.append(self.serialize_command(command))
         return items
 
@@ -737,14 +751,15 @@ class NodeControlService:
         re-send because the agent deduplicates: an already-executed command
         is replayed from its persisted result store.
         """
-        items = await self.list_commands_for_dispatch(node_id=node_id, limit=limit)
+        items = await self.list_commands_for_dispatch(node_id=node_id, limit=limit, unacked=True)
         try:
             inflight = await self._dao.list_inflight_commands(node_id=node_id, limit=limit)
         except Exception:  # pragma: no cover - defensive; DAO unavailable in some tests
             log.exception("list_inflight_commands failed for node %s", node_id)
             return items
+        sent = {item["id"] for item in items}
         for command in inflight:
-            if not self._command_is_overdue(command):
+            if str(command.id) in sent or not self._command_is_overdue(command):
                 continue
             log.info(
                 "Re-dispatching overdue in-flight command %s (%s, status=%s)",
@@ -1098,6 +1113,20 @@ class NodeControlService:
                 command_id=command.id,
                 phase="duplicate",
                 message="Delivered twice; the agent replayed its result. The first result stands.",
+                payload_json=None,
+            )
+            return
+        if payload.get("error_code") == "command_expired" and command.status in {
+            NodeCommandStatus.SUCCEEDED.value,
+            NodeCommandStatus.FAILED.value,
+        }:
+            # The agent refused a second delivery of a command it had already
+            # run, as too old. That says nothing about the run: recorded over
+            # it, a model copy that finished was reported as failed.
+            await self._dao.append_command_event(
+                command_id=command.id,
+                phase="duplicate",
+                message="Delivered twice; the agent refused the second as expired. The first result stands.",
                 payload_json=None,
             )
             return
