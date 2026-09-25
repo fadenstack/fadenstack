@@ -94,7 +94,7 @@ What releasing 0.3.0 found, and fixed in the scripts:
 
 | Name | Kind | Needed for |
 |---|---|---|
-| `PYPI_API_TOKEN` | secret | the CLI on PyPI; the agent's PyPI upload is skipped without it. It must be allowed to upload both `llmport-cli` and `llmport-agent`: for 0.3.0 the CLI published and the agent's upload failed, most likely a token scoped to the CLI alone (the agent's binaries, which installs use, were released regardless) |
+| `PYPI_API_TOKEN` | secret | `llmport-cli` and `llmport-agent` on PyPI -- both release workflows use this one secret; the agent's upload is skipped without it. A PyPI token covers one project or the whole account, so for both it must be an account-wide token. It uploaded agent 0.1.6-0.1.8 from this repository in April; for 0.3.0 the CLI published and the agent's upload failed, which a token replaced since by one scoped to `llmport-cli` would explain (the agent's binaries, which installs use, were released regardless). A failed upload now shows PyPI's reason as a public annotation on the run |
 | `NGC_API_KEY` | secret, optional | only if NVIDIA's base image for the GB10 runtime stops being public |
 | `RUNTIME_RUNNER_GB10`, `RUNTIME_RUNNER_X86_64` | variables, optional | larger runners, if a runtime image build runs out of disk on the standard ones |
 
