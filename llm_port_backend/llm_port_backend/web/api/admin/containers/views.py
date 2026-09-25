@@ -153,12 +153,21 @@ def _container_summary_from_docker(
     if not isinstance(raw_networks, dict):
         raw_networks = {}
     network_names = list(raw_networks.keys())
+    # Docker's list gives State and Status as strings and Image as the name;
+    # its inspect -- what create returns -- nests State and gives the image's
+    # sha256 as Image. Creating a container answered 500 after creating and
+    # starting it, so the console said it had failed (2026-09-25).
+    state = raw.get("State", "")
+    status = raw.get("Status", "")
+    if isinstance(state, dict):
+        state = status = state.get("Status", "")
+    image = (raw.get("Config") or {}).get("Image") or raw.get("Image", "")
     return ContainerSummaryDTO(
         id=raw.get("Id", ""),
         name=name,
-        image=raw.get("Image", ""),
-        status=raw.get("Status", ""),
-        state=raw.get("State", ""),
+        image=image,
+        status=status,
+        state=state,
         created=str(raw.get("Created", "")),
         ports=ports,
         networks=network_names,
