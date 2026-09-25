@@ -388,77 +388,108 @@ class SkillDao:
         )
         result = await self._session.execute(q)
         candidates = list(result.scalars().all())
-
-        scored: list[tuple[SkillModel, int]] = []
-        for skill in candidates:
-            score = skill.priority
-
-            # Assignment matching
-            for assignment in skill.assignments:
-                if not assignment.enabled:
-                    continue
-                matched = False
-                if (
-                    assignment.target_type == "assistant"
-                    and assignment.target_id == assistant_id
-                ):
-                    matched = True
-                elif (
-                    assignment.target_type == "workspace"
-                    and assignment.target_id == workspace_id
-                ):
-                    matched = True
-                elif (
-                    assignment.target_type == "project"
-                    and assignment.target_id == project_id
-                ):
-                    matched = True
-                elif assignment.target_type == "global":
-                    matched = True
-                elif assignment.target_type == "tenant":
-                    matched = True
-
-                if matched:
-                    score += 50
-                    if assignment.priority_override is not None:
-                        score = assignment.priority_override
-
-            # Trigger matching
-            triggers = skill.trigger_rules or {}
-            if user_query:
-                keywords = triggers.get("keywords", [])
-                for kw in keywords:
-                    if kw.lower() in user_query.lower():
-                        score += 30
-
-            if file_types:
-                trigger_file_types = triggers.get("file_types", [])
-                for ft in trigger_file_types:
-                    if ft in file_types:
-                        score += 30
-
-            if tags:
-                skill_tags = skill.tags or []
-                for t in tags:
-                    if t in skill_tags:
-                        score += 20
-
-            scored.append((skill, score))
-
-        # Sort by score descending, take top N
-        scored.sort(key=lambda x: x[1], reverse=True)
-        top = scored[:max_results]
+        top = rank_skills(
+            candidates,
+            assistant_id=assistant_id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            user_query=user_query,
+            file_types=file_types,
+            tags=tags,
+            max_results=max_results,
+        )
 
         # Fetch current version bodies
         results: list[tuple[SkillModel, SkillVersionModel, int]] = []
         for skill, score in top:
-            if score <= skill.priority:
-                # No trigger/assignment match — skip unless it's
-                # a global/tenant scope with base priority
-                if skill.scope not in ("global", "tenant"):
-                    continue
             version = await self.get_current_version_body(skill.id)
             if version:
                 results.append((skill, version, score))
 
         return results
+
+
+_ALWAYS_SCOPES = ("global", "tenant")
+
+
+def _score(
+    skill: SkillModel,
+    *,
+    assistant_id: str | None,
+    workspace_id: str | None,
+    project_id: str | None,
+    user_query: str | None,
+    file_types: list[str] | None,
+    tags: list[str] | None,
+) -> int:
+    """How well *skill* fits the request: its priority, plus what matched."""
+    score = skill.priority
+    targets = {
+        "assistant": assistant_id,
+        "workspace": workspace_id,
+        "project": project_id,
+    }
+    for assignment in skill.assignments:
+        if not assignment.enabled:
+            continue
+        kind = assignment.target_type
+        if kind in ("global", "tenant") or (
+            kind in targets and assignment.target_id == targets[kind]
+        ):
+            score += 50
+            if assignment.priority_override is not None:
+                score = assignment.priority_override
+    triggers = skill.trigger_rules or {}
+    if user_query:
+        query = user_query.lower()
+        keywords = triggers.get("keywords", [])
+        score += 30 * sum(1 for kw in keywords if kw.lower() in query)
+    if file_types:
+        wanted = triggers.get("file_types", [])
+        score += 30 * sum(1 for ft in wanted if ft in file_types)
+    if tags:
+        score += 20 * sum(1 for t in tags if t in (skill.tags or []))
+    return score
+
+
+def rank_skills(
+    candidates: list[SkillModel],
+    *,
+    assistant_id: str | None = None,
+    workspace_id: str | None = None,
+    project_id: str | None = None,
+    user_query: str | None = None,
+    file_types: list[str] | None = None,
+    tags: list[str] | None = None,
+    max_results: int = 3,
+) -> list[tuple[SkillModel, int]]:
+    """The skills that apply, best first, at most *max_results*.
+
+    A skill applies when something matched it -- an assignment, a keyword, a
+    file type, a tag -- or when its scope is global or tenant. Those that do
+    not apply were ranked with the rest and dropped after the cut: three
+    unmatched workspace skills of higher priority took every place, and a
+    global skill never reached a chat (dev stack, 2026-09-26).
+    """
+    scored = [
+        (
+            skill,
+            _score(
+                skill,
+                assistant_id=assistant_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                user_query=user_query,
+                file_types=file_types,
+                tags=tags,
+            ),
+        )
+        for skill in candidates
+    ]
+    applying = [
+        (skill, score)
+        for skill, score in scored
+        if score > skill.priority or skill.scope in _ALWAYS_SCOPES
+    ]
+    applying.sort(key=lambda pair: pair[1], reverse=True)
+    return applying[:max_results]
