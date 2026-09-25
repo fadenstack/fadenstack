@@ -34,6 +34,7 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "LANGFUSE_ENCRYPTION_KEY",
     "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY",
     "LLM_PORT_API_ENCRYPTION_KEY",
+    "LLM_PORT_MCP_ENCRYPTION_KEY",
     "USERS_SECRET",
     # Inter-service auth tokens — each downstream service has one shared
     # value across (api → service), (backend → service), (service receiver).
@@ -232,6 +233,9 @@ def default_env_vars(
         "LLM_PORT_SKILLS_SERVICE_TOKEN": skills_service_token,
         "LLM_PORT_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
         "LLM_PORT_RAG_SERVICE_TOKEN": rag_service_token,
+        # Encrypts the credentials MCP stores. Without it the compose file
+        # falls back to a fixed dev key, the same for every install.
+        "LLM_PORT_MCP_ENCRYPTION_KEY": _random_secret(),
         # Langfuse initial admin seeding (populated during bootstrap)
         "LANGFUSE_INIT_USER_EMAIL": "",
         "LANGFUSE_INIT_USER_PASSWORD": "",
@@ -339,6 +343,81 @@ def write_env_file(
     # Always write LF line endings — .env is consumed by Linux containers.
     output_path.write_bytes("\n".join(lines).encode("utf-8"))
     return output_path
+
+
+def set_module_env(
+    env_path: Path,
+    *,
+    enable: list[str] | tuple[str, ...] = (),
+    disable: list[str] | tuple[str, ...] = (),
+) -> list[str]:
+    """Switch modules on or off in an install's ``.env``, changing nothing else.
+
+    Enabling writes the module's settings (its ``*_ENABLED`` switches and its
+    URLs) and gives every secret it needs a random value when the file has
+    none; a token group missing only some of its keys takes the value the
+    others hold. Disabling sets its switches to false and keeps its secrets:
+    data may already be encrypted with them. Returns the keys it set, never
+    their values.
+
+    ``llmport module enable`` used to record the module in llmport.yaml
+    only. Its containers started, but the gateway and the backend kept the
+    compose file's ``*_ENABLED=false`` and answered "MCP module is not
+    enabled.", and MCP encrypted with the compose file's fixed dev key.
+    """
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    where = _key_lines(lines)
+    current = {key: lines[number].partition("=")[2].strip() for key, number in where.items()}
+    changes = {**_enabling(current, enable), **_disabling(current, disable)}
+    if not changes:
+        return []
+    appended = [f"{key}={value}" for key, value in changes.items() if key not in where]
+    for key, value in changes.items():
+        if key in where:
+            lines[where[key]] = f"{key}={value}"
+    if appended:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines += ["# ── Modules (llmport module enable) ──", *appended]
+    # LF, like write_env_file: the file is read by Linux containers.
+    env_path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+    return list(changes)
+
+
+def _key_lines(lines: list[str]) -> dict[str, int]:
+    """Which line of an ``.env`` sets each key."""
+    where: dict[str, int] = {}
+    for number, line in enumerate(lines):
+        text = line.strip()
+        if text and not text.startswith("#") and "=" in text:
+            where[text.partition("=")[0].strip()] = number
+    return where
+
+
+def _enabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
+    """The settings and missing secrets that switch *names* on."""
+    from llmport.core.registry import MODULES  # noqa: PLC0415
+
+    changes: dict[str, str] = {}
+    for name in names:
+        module = MODULES[name]
+        changes.update({key: value for key, value in module.env_vars if current.get(key) != value})
+        for group in module.secret_groups:
+            value = next((current[key] for key in group if current.get(key)), None) or _random_secret()
+            changes.update({key: value for key in group if not current.get(key)})
+    return changes
+
+
+def _disabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
+    """The switches that turn *names* off; their secrets stay."""
+    from llmport.core.registry import MODULES  # noqa: PLC0415
+
+    return {
+        key: "false"
+        for name in names
+        for key, _value in MODULES[name].env_vars
+        if key.endswith("_ENABLED") and current.get(key) != "false"
+    }
 
 
 def _timestamp() -> str:

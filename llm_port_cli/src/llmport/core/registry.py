@@ -85,6 +85,10 @@ class ModuleInfo:
     dev_links: tuple[tuple[str, str], ...] = ()
     #: What it imports that its lock file cannot carry: (import name, wheel).
     extra_wheels: tuple[tuple[str, str], ...] = ()
+    #: The secrets it needs in an install's ``.env``. Each group gets one
+    #: random value, shared by every key in it: a token the gateway, the
+    #: backend and the module itself all hold.
+    secret_groups: tuple[tuple[str, ...], ...] = ()
 
 
 MODULES: dict[str, ModuleInfo] = {
@@ -98,6 +102,9 @@ MODULES: dict[str, ModuleInfo] = {
         env_vars=(
             ("LLM_PORT_API_PII_ENABLED", "true"),
             ("LLM_PORT_API_PII_SERVICE_URL", "http://llm-port-pii:8000"),
+            # The compose file defaults it to false, which the console's
+            # module switch then cannot see past.
+            ("LLM_PORT_BACKEND_PII_ENABLED", "true"),
         ),
         dev_dir="llm_port_pii",
         backend_url_suffix="/api",
@@ -130,6 +137,16 @@ MODULES: dict[str, ModuleInfo] = {
         # credentials in llm_mcp, which outlive a regenerated .env.
         dev_settings=(("ENCRYPTION_KEY", "dev-mcp-encryption-key-change-me-32b"),),
         dev_links=(("PII_SERVICE_URL", "pii"),),
+        # Its own key in an install: the compose file falls back to the dev
+        # key above, the same for every install that has none.
+        secret_groups=(
+            ("LLM_PORT_MCP_ENCRYPTION_KEY",),
+            (
+                "LLM_PORT_API_MCP_SERVICE_TOKEN",
+                "LLM_PORT_BACKEND_MCP_SERVICE_TOKEN",
+                "LLM_PORT_MCP_SERVICE_TOKEN",
+            ),
+        ),
     ),
     "skills": ModuleInfo(
         name="skills",
@@ -148,6 +165,13 @@ MODULES: dict[str, ModuleInfo] = {
         database="llm_skills",
         redis_base=4,
         dev_service_token="dev-skills-service-token",
+        secret_groups=(
+            (
+                "LLM_PORT_API_SKILLS_SERVICE_TOKEN",
+                "LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN",
+                "LLM_PORT_SKILLS_SERVICE_TOKEN",
+            ),
+        ),
     ),
 }
 
