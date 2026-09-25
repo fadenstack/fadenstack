@@ -45,6 +45,7 @@ from llm_port_backend.db.models.inference import (
     InferenceEnvironmentNode,
 )
 from llm_port_backend.db.models.node_control import InfraNode
+from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus
 from llm_port_backend.services.inference.registry import registry
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only, avoids a runtime cycle
@@ -459,11 +460,13 @@ async def _sync_member_status(
         # DEAD one, in no fixed order.  Any live record wins -- letting the
         # last one win showed a serving worker as dropped out whenever the
         # stale record happened to come after it.
+        # The record is read the way cluster health reads it: the in-container
+        # helper says ``alive``, the host-SDK path says ``state: ALIVE``.
         alive_by_address: dict[str, bool] = {}
         for entry in ray_nodes:
             if not isinstance(entry, dict):
                 continue
-            alive = bool(entry.get("alive"))
+            alive = RayClusterStatus._record_is_alive(entry)  # noqa: SLF001
             for key in ("node_ip", "node_manager_address", "node_name"):
                 value = entry.get(key)
                 if value:

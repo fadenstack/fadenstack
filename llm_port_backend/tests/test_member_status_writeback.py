@@ -197,6 +197,38 @@ async def test_a_restarted_raylets_dead_record_does_not_hide_the_live_one(
     assert worker_member.member_status == "alive"
 
 
+@pytest.mark.anyio()
+async def test_records_from_the_host_sdk_path_are_read_by_state(
+    dbsession: AsyncSession,
+) -> None:
+    """The host-SDK probe says ``state: ALIVE``, with no ``alive`` key.
+
+    Read as ``alive`` alone, every node of such a cluster was dead.
+    """
+    head = await _node(dbsession, "10.250.10.71")
+    worker = await _node(dbsession, "10.250.10.49")
+    head_record = _ray_node("10.100.0.2", alive=True, head=True)
+    worker_record = _ray_node("10.100.0.1", alive=False)
+    for record, state in ((head_record, "ALIVE"), (worker_record, "DEAD")):
+        del record["alive"]
+        record["state"] = state
+    env, _ = await _environment(
+        dbsession,
+        ray_nodes=[head_record, worker_record],
+        bindings={
+            str(head.id): {"ip": "10.100.0.2"},
+            str(worker.id): {"ip": "10.100.0.1"},
+        },
+    )
+    head_member = await _member(dbsession, env, head, "head")
+    worker_member = await _member(dbsession, env, worker, "worker")
+
+    await _sync_member_status(_Ctx(dbsession), env)
+
+    assert head_member.member_status == "alive"
+    assert worker_member.member_status == "dead"
+
+
 # ── matching Ray's nodes to ours ─────────────────────────────────────────
 
 
