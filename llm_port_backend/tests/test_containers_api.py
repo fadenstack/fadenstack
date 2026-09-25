@@ -22,12 +22,22 @@ from llm_port_backend.web.api.admin.dependencies import get_docker
 _FAKE_ID = "abc123def456" * 3  # 36-char fake container ID
 
 
-def _make_superuser() -> User:
-    user = MagicMock(spec=User)
-    user.id = uuid.uuid4()
-    user.is_active = True
-    user.is_superuser = True
-    user.is_verified = True
+async def _make_superuser(dbsession: AsyncSession) -> User:
+    """A superuser that exists in the database.
+
+    What these endpoints write -- root sessions, registered containers -- points
+    at the user with a foreign key, so a mock user id failed every insert.
+    """
+    user = User(
+        id=uuid.uuid4(),
+        email=f"root-{uuid.uuid4().hex[:8]}@example.com",
+        hashed_password="not-a-real-hash",
+        is_active=True,
+        is_superuser=True,
+        is_verified=True,
+    )
+    dbsession.add(user)
+    await dbsession.flush()
     return user
 
 
@@ -72,8 +82,8 @@ def _mock_docker(extra: dict[str, Any] | None = None) -> MagicMock:
 
 
 @pytest.fixture()
-def superuser() -> User:
-    return _make_superuser()
+async def superuser(dbsession: AsyncSession) -> User:
+    return await _make_superuser(dbsession)
 
 
 @pytest.fixture()
@@ -166,6 +176,29 @@ async def test_tenant_app_lifecycle_start_allowed(
 # ──────────────────────────────────────────────────────────────────────────────
 # Lifecycle: SYSTEM_CORE — exec denied without root mode
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+async def test_exec_reaches_the_container(
+    authed_app: FastAPI,
+    client: AsyncClient,
+    dbsession: AsyncSession,
+    mock_docker: MagicMock,
+) -> None:
+    """POST .../exec was taken by the lifecycle route and answered 400 "Unknown action 'exec'"."""
+    reg_url = authed_app.url_path_for("register_container", container_id=_FAKE_ID)
+    await client.put(
+        reg_url,
+        json={
+            "container_class": ContainerClass.TENANT_APP.value,
+            "owner_scope": "ws-1",
+            "policy": ContainerPolicy.FREE.value,
+        },
+    )
+    exec_url = authed_app.url_path_for("container_exec", container_id=_FAKE_ID)
+    resp = await client.post(exec_url, json={"cmd": ["/bin/sh"], "workdir": "/"})
+    assert resp.status_code == status.HTTP_200_OK, resp.text
+    assert resp.json()["exec_id"] == "exec-id-123"
+    mock_docker.create_exec.assert_awaited_once_with(_FAKE_ID, cmd=["/bin/sh"], workdir="/")
 
 
 async def test_system_core_exec_denied_without_root(

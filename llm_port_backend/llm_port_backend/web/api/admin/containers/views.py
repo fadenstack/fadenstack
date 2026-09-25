@@ -320,6 +320,55 @@ async def get_container(
     )
 
 
+# Before the lifecycle route: POST /{container_id}/{action} matches
+# /{container_id}/exec too, and registered first it answered every exec
+# with 400 "Unknown action 'exec'".
+@router.post("/{container_id}/exec", response_model=ExecTokenDTO, name="container_exec")
+async def container_exec(
+    container_id: str,
+    body: ExecTokenRequest,
+    user: User = Depends(require_permission("containers", "exec")),
+    docker: DockerService = Depends(get_docker),
+    entry: Any = Depends(get_registry_entry),
+    enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
+    root_mode: bool = Depends(get_root_mode_active),
+    audit_dao: AuditDAO = Depends(),
+) -> ExecTokenDTO:
+    """
+    Create an exec session and return its ID.
+
+    The client should use the returned exec_id with a websocket connection.
+    """
+    try:
+        enforcer.enforce(Action.EXEC, entry.container_class, entry.policy, root_mode)
+    except HTTPException:
+        await audit_action(
+            action="container.exec",
+            target_type="container",
+            target_id=container_id,
+            result=AuditResult.DENY,
+            actor_id=user.id,
+            severity=_severity(root_mode),
+            audit_dao=audit_dao,
+        )
+        raise
+
+    exec_id = await docker.create_exec(container_id, cmd=body.cmd, workdir=body.workdir)
+
+    await audit_action(
+        action="container.exec",
+        target_type="container",
+        target_id=container_id,
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        severity="high",  # exec is always high-severity
+        audit_dao=audit_dao,
+        metadata_json=json.dumps({"cmd": body.cmd}),
+    )
+
+    return ExecTokenDTO(exec_id=exec_id)
+
+
 @router.post(
     "/{container_id}/{action}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -418,52 +467,6 @@ async def container_logs(
             yield line
 
     return StreamingResponse(_log_stream(), media_type="text/plain")
-
-
-@router.post("/{container_id}/exec", response_model=ExecTokenDTO, name="container_exec")
-async def container_exec(
-    container_id: str,
-    body: ExecTokenRequest,
-    user: User = Depends(require_permission("containers", "exec")),
-    docker: DockerService = Depends(get_docker),
-    entry: Any = Depends(get_registry_entry),
-    enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
-    root_mode: bool = Depends(get_root_mode_active),
-    audit_dao: AuditDAO = Depends(),
-) -> ExecTokenDTO:
-    """
-    Create an exec session and return its ID.
-
-    The client should use the returned exec_id with a websocket connection.
-    """
-    try:
-        enforcer.enforce(Action.EXEC, entry.container_class, entry.policy, root_mode)
-    except HTTPException:
-        await audit_action(
-            action="container.exec",
-            target_type="container",
-            target_id=container_id,
-            result=AuditResult.DENY,
-            actor_id=user.id,
-            severity=_severity(root_mode),
-            audit_dao=audit_dao,
-        )
-        raise
-
-    exec_id = await docker.create_exec(container_id, cmd=body.cmd, workdir=body.workdir)
-
-    await audit_action(
-        action="container.exec",
-        target_type="container",
-        target_id=container_id,
-        result=AuditResult.ALLOW,
-        actor_id=user.id,
-        severity="high",  # exec is always high-severity
-        audit_dao=audit_dao,
-        metadata_json=json.dumps({"cmd": body.cmd}),
-    )
-
-    return ExecTokenDTO(exec_id=exec_id)
 
 
 @router.delete(
