@@ -16,6 +16,7 @@ budget (ordered by priority):
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -49,6 +50,20 @@ class AssembledContext:
     #: Files too long to include, for the model to search (``attachment_search``).
     searchable: list[ChatAttachment] = field(default_factory=list)
     total_token_estimate: int = 0
+
+
+def _replayed_exchange(msg: Any) -> list[dict[str, Any]]:
+    """The tool calls and results that led to a saved reply, to put before it.
+
+    With the reply's text alone the model saw tool requests answered without
+    tools, and stopped calling them after a turn or two. Only an assistant
+    reply carries them (``tool_call_json`` = ``{"exchange": [...]}``).
+    """
+    record = getattr(msg, "tool_call_json", None)
+    if msg.role != "assistant" or not isinstance(record, dict):
+        return []
+    exchange = record.get("exchange")
+    return [m for m in exchange if isinstance(m, dict)] if isinstance(exchange, list) else []
 
 
 def _estimate_tokens(content: str | list[Any]) -> int:
@@ -176,13 +191,18 @@ class ContextAssembler:
         # the question follows from -- were the ones left out.
         kept: list[dict[str, Any]] = []
         for msg in reversed(recent):
-            msg_tokens = msg.token_estimate or _estimate_tokens(msg.content)
+            exchange = _replayed_exchange(msg)
+            msg_tokens = (msg.token_estimate or _estimate_tokens(msg.content)) + sum(
+                _estimate_tokens(json.dumps(m)) for m in exchange
+            )
             if msg_tokens > budget:
                 break
             kept.append({
                 "role": msg.role,
                 "content": msg.content,
             })
+            # Before the reply, newest first like the rest: reversed below.
+            kept.extend(reversed(exchange))
             total_tokens += msg_tokens
             budget -= msg_tokens
         result.messages.extend(reversed(kept))

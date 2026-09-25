@@ -210,6 +210,10 @@ class Settings(BaseSettings):
     # moved everything after it, and vLLM's prefix cache recomputed the
     # history.
     session_skills_position: Literal["prefix", "tail"] = "tail"
+    # A tool result replayed with the history is cut to this many characters:
+    # a turn's tool exchange is kept with its reply, and one GitHub response
+    # can be tens of kilobytes.
+    session_tool_result_max_chars: int = 4000
 
     # Chat file attachments
     chat_file_store_root: str = "/data/llm-port/chat-files"

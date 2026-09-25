@@ -247,3 +247,66 @@ async def test_a_hyphenated_mcp_tool_is_called_by_its_name(
 
     assert (await _ask(client, session_id=str(sid))).status_code == 200
     assert [call["qualified_name"] for call in mcp.calls] == ["mcp.everything.get-sum"]
+
+
+# ── The tool exchange stays with the reply ────────────────────────
+
+
+def _roles(messages: list[dict[str, Any]]) -> list[str]:
+    return [
+        f"assistant+calls({m['tool_calls'][0]['function']['name']})" if m.get("tool_calls") else m["role"]
+        for m in messages if m["role"] != "system"
+    ]
+
+
+@pytest.mark.anyio
+async def test_the_next_turn_sees_the_tool_call_and_its_result(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the reply's text alone, chats stopped calling tools from their third turn."""
+    await _ready(fastapi_app, db_session)
+    _MCP(monkeypatch, "mcp.everything.get-sum")
+    model = _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 17, "b": 25}), _say("It is 42."), _say("ok"))
+    sid = await _session(db_session)
+
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Add 17 and 25."}])
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "And now?"}])
+
+    second_turn = model.sent[2]["messages"]
+    assert _roles(second_turn) == [
+        "user", "assistant+calls(mcp.everything.get-sum)", "tool", "assistant", "user",
+    ]
+    tool = next(m for m in second_turn if m["role"] == "tool")
+    call = next(m for m in second_turn if m.get("tool_calls"))
+    assert tool["tool_call_id"] == call["tool_calls"][0]["id"]
+
+
+@pytest.mark.anyio
+async def test_a_turn_without_tools_gets_the_history_without_them(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A template may refuse tool messages in a request that offers no tools."""
+    await _ready(fastapi_app, db_session)
+    _MCP(monkeypatch, "mcp.everything.get-sum")
+    model = _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 1, "b": 2}), _say("3"), _say("ok"))
+    sid = await _session(db_session)
+
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Add 1 and 2."}])
+    await _switch_off(db_session, sid, "mcp.everything.get-sum")
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Thanks."}])
+
+    assert _roles(model.sent[2]["messages"]) == ["user", "assistant", "user"]
+
+
+def test_a_long_tool_result_is_kept_cut(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One GitHub response can be tens of kilobytes; the history keeps the start."""
+    from llm_port_api.services.gateway.service import _exchange_record  # noqa: PLC0415
+
+    monkeypatch.setattr(settings, "session_tool_result_max_chars", 10)
+    record = _exchange_record([
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "c1"}]},
+        {"role": "tool", "tool_call_id": "c1", "content": "0123456789abcdef"},
+    ])
+    assert record is not None
+    assert record["exchange"][1]["content"] == "0123456789 [truncated]"
+    assert _exchange_record([]) is None

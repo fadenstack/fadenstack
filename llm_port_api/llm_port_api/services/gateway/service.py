@@ -438,6 +438,51 @@ def _restored(value: Any, mapping: dict[str, str]) -> Any:
     return value
 
 
+def _exchange_record(exchange: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """A turn's tool exchange as the reply keeps it, each tool answer capped.
+
+    The saved history held the final text only, never the tool calls and
+    results that led to it, so the model saw tool requests answered in plain
+    text and stopped calling tools: on the dev stack every chat called one on
+    its first turn and none from its third (2026-09-26). The context
+    assembler replays this before the reply.
+
+    Kept as the model saw it -- tokens and redactions of a PII policy in
+    place, never the values put back -- since the PII scan reads message
+    content and not a tool call's arguments.
+    """
+    if not exchange:
+        return None
+    cap = settings.session_tool_result_max_chars
+    kept: list[dict[str, Any]] = []
+    for message in exchange:
+        content = message.get("content")
+        long_answer = message.get("role") == "tool" and isinstance(content, str) and len(content) > cap
+        kept.append({**message, "content": content[:cap] + " [truncated]"} if long_answer else message)
+    return {"exchange": kept}
+
+
+def _replayed_tool_message(message: dict[str, Any]) -> bool:
+    """Whether *message* is part of a tool exchange: a tool answer, or the calls."""
+    role = message.get("role")
+    return role == "tool" or (role == "assistant" and bool(message.get("tool_calls")))
+
+
+def _without_replayed_tools(payload: dict[str, Any]) -> dict[str, Any]:
+    """*payload* without the tool exchanges its history replays, when it offers no tools.
+
+    A chat template may refuse tool messages in a request without tools. Only
+    the history -- what comes before the last user message -- is touched: a
+    client running its own tools sends its calls and results after it.
+    """
+    if payload.get("tools"):
+        return payload
+    messages = list(payload.get("messages") or [])
+    last_user = max((i for i, m in enumerate(messages) if m.get("role") == "user"), default=-1)
+    kept = [m for i, m in enumerate(messages) if i > last_user or not _replayed_tool_message(m)]
+    return payload if len(kept) == len(messages) else {**payload, "messages": kept}
+
+
 def _assistant_turn(content: str | None, calls: list[dict[str, Any]]) -> dict[str, Any]:
     """The model's tool-calling turn, as it goes back to the model with the results."""
     return {"role": "assistant", "content": content, "tool_calls": calls}
@@ -520,6 +565,9 @@ class _Prepared:
     #: The tools the gateway ran, for the audit log, and in how many rounds.
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     tool_iterations: int = 0
+    #: What the model and the tools said to each other, round by round (the
+    #: assistant's tool_calls turn, then the tool answers), as the model saw it.
+    tool_exchange: list[dict[str, Any]] = field(default_factory=list)
     #: How a streamed answer ended.
     finish_reason: str | None = None
 
@@ -759,6 +807,7 @@ class GatewayService:
                 model_alias=model_alias,
                 provider_instance_id=req.instance_id,
                 trace_id=req.trace_id,
+                tool_exchange=req.tool_exchange,
             )
 
             # Best effort, and the client need not wait for it.
@@ -1155,6 +1204,7 @@ class GatewayService:
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
+        egress = _without_replayed_tools(egress)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
@@ -1713,6 +1763,7 @@ class GatewayService:
                 break
             req.tool_iterations = iteration + 1
             turn = _assistant_turn(message.get("content"), message["tool_calls"])
+            req.tool_exchange.extend([turn, *answers])
             payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
             result = await self._complete(req, payload)
         return result
@@ -1782,6 +1833,7 @@ class GatewayService:
                 if answers is not None:
                     req.tool_iterations = iteration + 1
                     turn = _assistant_turn("".join(said) or None, calls.calls())
+                    req.tool_exchange.extend([turn, *answers])
                     payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
                     continue
             if calls:
@@ -1976,6 +2028,7 @@ class GatewayService:
         model_alias: str | None = None,
         provider_instance_id: str | None = None,
         trace_id: str | None = None,
+        tool_exchange: list[dict[str, Any]] | None = None,
     ) -> None:
         """Store the assistant's response message in the session."""
         if not session_id_str or not self.session_dao:
@@ -2020,6 +2073,7 @@ class GatewayService:
             ),
             token_estimate=tokens,
             trace_id=trace_id,
+            tool_call_json=_exchange_record(tool_exchange),
         )
 
     async def _finish_stream(
@@ -2061,6 +2115,7 @@ class GatewayService:
                     provider_instance_id=req.instance_id,
                     trace_id=req.trace_id,
                     token_estimate=stats.usage.completion_tokens if stats is not None else None,
+                    tool_exchange=req.tool_exchange,
                 )
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
@@ -2149,6 +2204,7 @@ class GatewayService:
         provider_instance_id: str | None = None,
         trace_id: str | None = None,
         token_estimate: int | None = None,
+        tool_exchange: list[dict[str, Any]] | None = None,
     ) -> None:
         """Store the accumulated streaming assistant response in the session.
 
@@ -2184,6 +2240,7 @@ class GatewayService:
                 ),
                 token_estimate=token_estimate,
                 trace_id=trace_id,
+                tool_call_json=_exchange_record(tool_exchange),
             )
             fresh_session.add(msg)
             await fresh_session.commit()
