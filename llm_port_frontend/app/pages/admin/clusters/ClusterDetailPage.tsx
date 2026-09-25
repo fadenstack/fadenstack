@@ -612,7 +612,15 @@ export default function ClusterDetailPage() {
       </Card>
 
       {/* --- models it runs that no deployment here owns ------------------- */}
-      <StrayModelsCard environmentId={id!} onTakenOver={() => void deployments.refresh()} />
+      {/* Both: taking over can add the model to the catalogue, and without
+          it the new row read "unknown model" until the page was reloaded. */}
+      <StrayModelsCard
+        environmentId={id!}
+        onTakenOver={() => {
+          void deployments.refresh();
+          void models.refresh();
+        }}
+      />
 
       {/* --- advanced ---------------------------------------------------- */}
       {/* Unmounted while collapsed: "behind Advanced" should mean the
