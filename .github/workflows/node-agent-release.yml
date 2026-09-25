@@ -123,7 +123,8 @@ jobs:
 
   pypi:
     # Optional: only when the repository has a PyPI token. The binaries above
-    # are what installs use; this must never hold them back.
+    # are what installs use; this must never hold them back. The token is the
+    # CLI's (PYPI_API_TOKEN), so it must be allowed to upload llmport-agent too.
     needs: [version, release]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/node-agent-v')
@@ -140,7 +141,16 @@ jobs:
       - name: Build and upload
         if: env.TWINE_PASSWORD != ''
         working-directory: ${{ env.AGENT_DIR }}
+        shell: bash
         run: |
+          set -o pipefail
           pip install --upgrade build twine
           python -m build
-          twine upload dist/*
+          # PyPI's reason becomes an annotation: the job log needs a GitHub
+          # sign-in, annotations are public (the 0.1.13 upload failed with
+          # nothing but "exit code 1" readable). --skip-existing lets a
+          # release be run again once the version is on PyPI.
+          if ! twine upload --non-interactive --skip-existing dist/* 2>&1 | tee twine.log; then
+            echo "::error title=PyPI refused llmport-agent::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
+            exit 1
+          fi

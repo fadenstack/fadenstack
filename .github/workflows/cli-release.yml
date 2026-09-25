@@ -14,7 +14,8 @@
 # (cli-v* tags still publish the CLI alone, for a CLI-only fix; the images of
 # the version it pins must already exist.)
 #
-# Prerequisite: a repository secret PYPI_API_TOKEN scoped to llmport-cli.
+# Prerequisite: a repository secret PYPI_API_TOKEN that may upload llmport-cli
+# and llmport-agent -- node-agent-release.yml publishes the agent with it too.
 
 name: Release CLI
 
@@ -137,9 +138,15 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        shell: bash
         run: |
+          set -o pipefail
           pip install --upgrade twine
-          twine upload dist/*
+          # PyPI's reason as a public annotation; the log needs a sign-in.
+          if ! twine upload --non-interactive dist/* 2>&1 | tee twine.log; then
+            echo "::error title=PyPI refused llmport-cli::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
