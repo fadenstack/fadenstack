@@ -453,7 +453,12 @@ async def _sync_member_status(
             or {}
         )
 
-        # Every address a Ray node might be reported under -> alive?
+        # Every address a Ray node might be reported under -> alive?  Ray keeps
+        # the record of every raylet that ever ran, so a machine whose raylet
+        # was restarted appears twice under one address: the live record and a
+        # DEAD one, in no fixed order.  Any live record wins -- letting the
+        # last one win showed a serving worker as dropped out whenever the
+        # stale record happened to come after it.
         alive_by_address: dict[str, bool] = {}
         for entry in ray_nodes:
             if not isinstance(entry, dict):
@@ -462,7 +467,8 @@ async def _sync_member_status(
             for key in ("node_ip", "node_manager_address", "node_name"):
                 value = entry.get(key)
                 if value:
-                    alive_by_address[str(value).strip()] = alive
+                    address = str(value).strip()
+                    alive_by_address[address] = alive_by_address.get(address, False) or alive
 
         members = (
             await session.execute(

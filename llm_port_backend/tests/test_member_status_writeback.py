@@ -163,6 +163,40 @@ async def test_a_node_ray_reports_dead_is_recorded_dead(
     assert worker_member.member_status == "dead"
 
 
+@pytest.mark.anyio()
+async def test_a_restarted_raylets_dead_record_does_not_hide_the_live_one(
+    dbsession: AsyncSession,
+) -> None:
+    """Ray keeps the record of every raylet that ever ran on an address.
+
+    The DGX worker's raylet was restarted once, so the cluster reported its
+    fabric address twice: live, then DEAD. The last record won and a worker
+    serving traffic was shown as dropped out. This is the order the live
+    cluster returned them in.
+    """
+    head = await _node(dbsession, "10.250.10.71")
+    worker = await _node(dbsession, "10.250.10.49")
+    env, _ = await _environment(
+        dbsession,
+        ray_nodes=[
+            _ray_node("10.100.0.1", alive=True),
+            _ray_node("10.100.0.2", alive=True, head=True),
+            _ray_node("10.100.0.1", alive=False),
+        ],
+        bindings={
+            str(head.id): {"ip": "10.100.0.2"},
+            str(worker.id): {"ip": "10.100.0.1"},
+        },
+    )
+    head_member = await _member(dbsession, env, head, "head")
+    worker_member = await _member(dbsession, env, worker, "worker")
+
+    await _sync_member_status(_Ctx(dbsession), env)
+
+    assert head_member.member_status == "alive"
+    assert worker_member.member_status == "alive"
+
+
 # ── matching Ray's nodes to ours ─────────────────────────────────────────
 
 
