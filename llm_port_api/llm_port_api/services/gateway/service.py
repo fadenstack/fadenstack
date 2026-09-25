@@ -281,6 +281,47 @@ def _in_background(step: Awaitable[Any]) -> None:
     task.add_done_callback(_BACKGROUND.discard)
 
 
+async def _to_the_end(step: Awaitable[Any], *, until: asyncio.Event | None = None) -> None:
+    """Start *step*, which goes on to its end even if this task is cancelled.
+
+    A streamed response's last work ran in the response's own task, and
+    Starlette cancels that task when the client disconnects. The step now runs
+    in a task of its own, kept referenced until it is done; a cancelled caller
+    stops waiting for it but does not stop it. The caller waits for the whole
+    step, or only until *until* is set.
+    """
+    task = asyncio.ensure_future(step)
+    _BACKGROUND.add(task)
+    task.add_done_callback(_BACKGROUND.discard)
+    if until is None:
+        await asyncio.shield(task)
+        return
+    # Set by the step itself; the task is watched too, so a step that dies
+    # before setting it cannot leave the caller waiting.
+    waiter = asyncio.ensure_future(until.wait())
+    try:
+        await asyncio.shield(asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED))
+    finally:
+        waiter.cancel()
+
+
+#: The event that closes an OpenAI-style stream.
+_DONE_EVENT = b"data: [DONE]\n\n"
+_DONE_MARK = re.compile(rb"data:[ \t]*\[DONE\]")
+
+
+def _split_done(chunk: bytes) -> tuple[bytes, bool]:
+    """Split the closing ``[DONE]`` event off *chunk*: (what came before it, whether it was there).
+
+    Chunks are the upstream's bytes as they arrived, so the last content and
+    the ``[DONE]`` can share one; nothing follows ``[DONE]``.
+    """
+    found = _DONE_MARK.search(chunk)
+    if found is None:
+        return chunk, False
+    return chunk[: found.start()], True
+
+
 async def _together(*steps: Awaitable[Any]) -> list[Any]:
     """Await *steps* side by side; their results, in order.
 
@@ -852,87 +893,55 @@ class GatewayService:
                 stream_status_code = 200
                 stream_error_code: str | None = None
                 accumulated_content: list[str] = []
+                closing = False
                 try:
                     async for chunk in wrapped_stream:
+                        # The closing [DONE] is held back until the answer is
+                        # saved and the request logged. A client that stops at
+                        # [DONE] and closes -- as the OpenAI SDKs do -- had
+                        # Starlette cancel that work half way: the reply and
+                        # the usage row were lost for every such request.
+                        piece, seen = _split_done(chunk)
+                        closing = closing or seen
+                        if not piece:
+                            continue
                         # Collect assistant content for persistence
-                        _accumulate_stream_content(chunk, accumulated_content)
+                        _accumulate_stream_content(piece, accumulated_content)
                         # Push to reconnection buffer
                         if _sbuf and _sbuf_sid:
-                            _sbuf.push(_sbuf_sid, chunk)
-                        yield chunk
+                            _sbuf.push(_sbuf_sid, piece)
+                        yield piece
                 except Exception as exc:
                     stream_status_code = 502
                     stream_error_code = "upstream_stream_failed"
                     del exc
                     # Response has already started; terminate stream gracefully.
-                    yield b"data: [DONE]\n\n"
+                    closing = True
                 finally:
-                    # The model is done: its slot first, then what is saved.
-                    # It was given back last, after the session write, the
-                    # skills calls and the audit row.
-                    await self._release(req)
-                    # Persist the assistant response in the session
-                    if req.session_id and accumulated_content:
-                        try:
-                            await self._persist_stream_assistant_response(
-                                session_id_str=req.session_id,
-                                content="".join(accumulated_content),
-                                model_alias=model_alias,
-                                provider_instance_id=req.instance_id,
-                                trace_id=req.trace_id,
-                                token_estimate=stats.usage.completion_tokens if stats is not None else None,
-                            )
-                        except Exception:
-                            logger.warning("Failed to persist streamed assistant response", exc_info=True)
-                    # Best effort, and nothing need wait for it.
-                    _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
-                    final_error_code = stream_error_code or req.fallback_error_code
-                    await self.audit.log(
+                    # Finished even when the client has gone: see _to_the_end.
+                    # The closing [DONE] waits only for the saved reply, which a
+                    # client can see (the chat page reloads the session there);
+                    # the audit row and the trace follow on their own.
+                    saved = asyncio.Event()
+                    await _to_the_end(self._finish_stream(
+                        req,
+                        auth=auth,
                         request_id=request_id,
-                        trace_id=req.trace_id,
-                        tenant_id=auth.tenant_id,
-                        user_id=auth.user_id,
-                        model_alias=model_alias,
-                        provider_instance_id=req.instance_id,
                         endpoint=endpoint,
+                        model_alias=model_alias,
+                        session_id=session_id,
+                        started=started,
+                        stats=stats,
+                        content="".join(accumulated_content),
                         status_code=stream_status_code,
-                        latency_ms=int((time.perf_counter() - started) * 1000),
-                        ttft_ms=stats.ttft_ms if stats is not None else None,
-                        prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
-                        completion_tokens=stats.usage.completion_tokens if stats is not None else None,
-                        total_tokens=stats.usage.total_tokens if stats is not None else None,
-                        error_code=final_error_code,
-                        stream=True,
-                        provider_name=(
-                            req.decision.candidate.litellm_provider
-                            if req.decision is not None else None
-                        ),
-                        session_id=req.session_id or session_id,
-                        group_id=req.group_id,
-                        project_id=req.project_id,
-                        finish_reason=req.finish_reason,
-                        retry_count=0,
-                        skills_used=_skills_used(req.skills),
-                        rag_context=req.rag_context,
-                        mcp_tool_call_count=len(req.tool_calls),
-                        mcp_tool_loop_iterations=req.tool_iterations,
-                        tool_calls=req.tool_calls,
-                    )
-                    if req.trace_context is not None:
-                        self.observability.finalize_stream(
-                            req.trace_context,
-                            status_code=stream_status_code,
-                            latency_ms=int((time.perf_counter() - started) * 1000),
-                            ttft_ms=stats.ttft_ms if stats is not None else None,
-                            prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
-                            completion_tokens=stats.usage.completion_tokens if stats is not None else None,
-                            total_tokens=stats.usage.total_tokens if stats is not None else None,
-                            provider_instance_id=req.instance_id,
-                            error_code=final_error_code,
-                        )
-                    # Mark stream buffer as finished for reconnection
-                    if _sbuf and _sbuf_sid:
-                        _sbuf.finish(_sbuf_sid)
+                        error_code=stream_error_code,
+                        closing=closing,
+                        stream_buffer=_sbuf,
+                        buffer_session_id=_sbuf_sid,
+                        saved=saved,
+                    ), until=saved)
+                if closing:
+                    yield _DONE_EVENT
 
             return StreamingGatewayResponse(
                 stream=_stream_with_finalize(),
@@ -1936,6 +1945,124 @@ class GatewayService:
             token_estimate=tokens,
             trace_id=trace_id,
         )
+
+    async def _finish_stream(
+        self,
+        req: _Prepared,
+        *,
+        auth: AuthContext,
+        request_id: str,
+        endpoint: str,
+        model_alias: str,
+        session_id: str | None,
+        started: float,
+        stats: Any,
+        content: str,
+        status_code: int,
+        error_code: str | None,
+        closing: bool,
+        stream_buffer: Any,
+        buffer_session_id: str | None,
+        saved: asyncio.Event,
+    ) -> None:
+        """What a streamed answer owes once it has ended: the slot, the reply, the audit row, the trace.
+
+        *saved* is set once the reply is stored, whether or not that worked.
+        Each step stands alone: one failing does not skip the ones after it.
+        """
+        # The model is done: its slot first, then what is saved. It was given
+        # back last, after the session write, the skills calls and the audit row.
+        try:
+            await self._release(req)
+        except Exception:
+            logger.warning("Failed to release the model slot", exc_info=True)
+        if req.session_id and content:
+            try:
+                await self._persist_stream_assistant_response(
+                    session_id_str=req.session_id,
+                    content=content,
+                    model_alias=model_alias,
+                    provider_instance_id=req.instance_id,
+                    trace_id=req.trace_id,
+                    token_estimate=stats.usage.completion_tokens if stats is not None else None,
+                )
+            except Exception:
+                logger.warning("Failed to persist streamed assistant response", exc_info=True)
+        saved.set()
+        # Best effort, and nothing need wait for it.
+        _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
+        final_error_code = error_code or req.fallback_error_code
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        try:
+            await self._audit_on_own_session(
+                request_id=request_id,
+                trace_id=req.trace_id,
+                tenant_id=auth.tenant_id,
+                user_id=auth.user_id,
+                model_alias=model_alias,
+                provider_instance_id=req.instance_id,
+                endpoint=endpoint,
+                status_code=status_code,
+                latency_ms=latency_ms,
+                ttft_ms=stats.ttft_ms if stats is not None else None,
+                prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
+                completion_tokens=stats.usage.completion_tokens if stats is not None else None,
+                total_tokens=stats.usage.total_tokens if stats is not None else None,
+                error_code=final_error_code,
+                stream=True,
+                provider_name=(
+                    req.decision.candidate.litellm_provider
+                    if req.decision is not None else None
+                ),
+                session_id=req.session_id or session_id,
+                group_id=req.group_id,
+                project_id=req.project_id,
+                finish_reason=req.finish_reason,
+                retry_count=0,
+                skills_used=_skills_used(req.skills),
+                rag_context=req.rag_context,
+                mcp_tool_call_count=len(req.tool_calls),
+                mcp_tool_loop_iterations=req.tool_iterations,
+                tool_calls=req.tool_calls,
+            )
+        except Exception:
+            logger.warning("Failed to write the request log", exc_info=True)
+        if req.trace_context is not None:
+            try:
+                self.observability.finalize_stream(
+                    req.trace_context,
+                    status_code=status_code,
+                    latency_ms=latency_ms,
+                    ttft_ms=stats.ttft_ms if stats is not None else None,
+                    prompt_tokens=stats.usage.prompt_tokens if stats is not None else None,
+                    completion_tokens=stats.usage.completion_tokens if stats is not None else None,
+                    total_tokens=stats.usage.total_tokens if stats is not None else None,
+                    provider_instance_id=req.instance_id,
+                    error_code=final_error_code,
+                )
+            except Exception:
+                logger.warning("Failed to finalize the stream's trace", exc_info=True)
+        # Mark stream buffer as finished for reconnection; a replay ends as
+        # the live stream does.
+        if stream_buffer and buffer_session_id:
+            if closing:
+                stream_buffer.push(buffer_session_id, _DONE_EVENT)
+            stream_buffer.finish(buffer_session_id)
+
+    async def _audit_on_own_session(self, **fields: Any) -> None:
+        """Write the request log row on a session of its own, and commit it.
+
+        The request's session is committed and closed by its dependency once
+        the response is over; a stream's end can come after that, and a client
+        leaving cancelled the flush it was in, which failed that final commit
+        too (``PendingRollbackError``) and lost the row.
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+        async with AsyncSession(self.dao.session.bind, expire_on_commit=False) as own:
+            audit = AuditService(GatewayDAO(own), pricing_service=self.audit.pricing_service)
+            await audit.log(**fields)
+            await own.commit()
 
     async def _persist_stream_assistant_response(
         self,
