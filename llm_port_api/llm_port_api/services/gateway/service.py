@@ -463,6 +463,21 @@ def _insert_after_system(payload: dict[str, Any], message: dict[str, Any]) -> di
     return {**payload, "messages": messages}
 
 
+def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
+    """*payload* with *message* after the history, just before the last user message.
+
+    Where a turn's own context goes: what changes from turn to turn sits
+    after what does not, so the prefix vLLM caches stays the same. With no
+    user message it goes where the system messages end.
+    """
+    messages = list(payload.get("messages") or [])
+    at = next((i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"), None)
+    if at is None:
+        return _insert_after_system(payload, message)
+    messages.insert(at, message)
+    return {**payload, "messages": messages}
+
+
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
     """The skills a request used, for the audit log."""
     if not skills:
@@ -1069,8 +1084,11 @@ class GatewayService:
             self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
         )
+        insert_skill = (
+            _insert_before_question if settings.session_skills_position == "tail" else _insert_after_system
+        )
         for skill in req.skills:  # each after the last: they keep their order
-            payload = _insert_after_system(payload, {
+            payload = insert_skill(payload, {
                 "role": "system",
                 "content": (
                     f"=== ACTIVE SKILL: {skill.name} (v{skill.version}) ===\n"
@@ -1290,11 +1308,17 @@ class GatewayService:
     def _inject_datetime_context(
         egress_payload: dict[str, Any],
     ) -> dict[str, Any]:
-        """Prepend a system message with the current date/time.
+        """Prepend a system message with the current date.
 
         Ensures the model knows "today's" date so it can reason about
         recency, scheduled events, etc.  Inserted as the very first
         system message so it doesn't displace user-provided prompts.
+
+        The date, not the time: it is the first thing the model reads, and
+        vLLM reuses its cache only for an identical prefix. With the minute
+        in it, every turn a minute after the last recomputed the whole
+        history -- 2 to 3 times the time to the first token at 4k to 10k
+        tokens on qwen-chat (2026-09-25).
         """
         messages = egress_payload.get("messages")
         if not isinstance(messages, list):
@@ -1303,8 +1327,8 @@ class GatewayService:
         now = datetime.now(timezone.utc)
         # %-d (no zero-pad) is a GNU/POSIX extension that raises
         # ValueError on Windows; zero-padded %d works everywhere.
-        date_str = now.strftime("%A, %B %d, %Y, %H:%M UTC")
-        prompt = f"Current date and time: {date_str}."
+        date_str = now.strftime("%A, %B %d, %Y")
+        prompt = f"Current date: {date_str}."
         date_msg: dict[str, str] = {"role": "system", "content": prompt}
 
         new_messages = [date_msg, *messages]

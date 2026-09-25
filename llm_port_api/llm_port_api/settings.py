@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from yarl import URL
@@ -204,6 +204,12 @@ class Settings(BaseSettings):
     session_summarizer_model: str | None = None
     session_fact_extraction_enabled: bool = False
     session_fact_extraction_model: str | None = None
+    # Where the skills resolved for a turn go: after the history, just before
+    # the question ("tail"), or before the history ("prefix"). They are
+    # resolved per turn from the question, so in the prefix a different set
+    # moved everything after it, and vLLM's prefix cache recomputed the
+    # history.
+    session_skills_position: Literal["prefix", "tail"] = "tail"
 
     # Chat file attachments
     chat_file_store_root: str = "/data/llm-port/chat-files"

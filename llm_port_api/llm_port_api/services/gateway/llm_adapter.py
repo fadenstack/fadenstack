@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any
 
@@ -43,6 +45,74 @@ _OPENAI_PARAMS = (
 #: What the body of a direct streamed chat is made of.
 _DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", *_OPENAI_PARAMS})
 _DONE = b"data: [DONE]\n\n"
+
+
+# Models whose chat template refused a system message after the conversation
+# had begun: theirs go up front from then on (see _late_system_refused).
+_SYSTEM_FIRST: set[str] = set()
+_TEMPLATE_REFUSAL = re.compile(r"template|roles? must alternate|system (role|message)", re.IGNORECASE)
+
+
+def _system_first(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    """*messages* with each system message after the leading ones moved up to them.
+
+    None when there is none to move. The order among the moved messages, and
+    among the others, is kept.
+    """
+    lead = 0
+    while lead < len(messages) and messages[lead].get("role") == "system":
+        lead += 1
+    late = [m for m in messages[lead:] if m.get("role") == "system"]
+    if not late:
+        return None
+    rest = [m for m in messages[lead:] if m.get("role") != "system"]
+    return [*messages[:lead], *late, *rest]
+
+
+def _late_system_refused(
+    status: int, detail: str, messages: list[dict[str, Any]],
+) -> list[dict[str, Any]] | None:
+    """The messages to try again with, when a template refused a late system message.
+
+    The gateway puts a turn's skills after the history, so the prefix vLLM
+    caches stays the same (``session_skills_position``). Qwen's and Llama 3's
+    templates take a system message anywhere; one that does not answers 400
+    with the template's error. That request then goes again with its system
+    messages up front.
+    """
+    if status != 400 or not _TEMPLATE_REFUSAL.search(detail):
+        return None
+    return _system_first(messages)
+
+
+def _remember_system_first(model: str) -> None:
+    """Send *model*'s system messages up front from now on; say so once."""
+    if model not in _SYSTEM_FIRST:
+        _SYSTEM_FIRST.add(model)
+        logger.warning(
+            "%s's chat template refuses a system message after the conversation has begun; "
+            "its skills go before the history from now on",
+            model,
+        )
+
+
+async def _whole_events(response: httpx.Response) -> AsyncIterator[str]:
+    """The engine's server-sent events, each whole, however the network cut them.
+
+    A read can split one event or carry several; the steps after the stream
+    -- PII restore, usage, the saved reply -- read whole events.
+    """
+    lines: list[str] = []
+    async for line in response.aiter_lines():
+        if line:
+            if not line.startswith(":"):  # a comment keeps the connection alive
+                lines.append(line)
+            continue
+        if lines:
+            yield "\n".join(lines)
+            lines = []
+    if lines:
+        yield "\n".join(lines)
 
 
 def _sse(data: dict[str, Any]) -> bytes:
@@ -269,6 +339,9 @@ class LLMAdapter:
             )
             kwargs.update(tls)
 
+        if str(kwargs["model"]) in _SYSTEM_FIRST:
+            kwargs["messages"] = _system_first(kwargs["messages"]) or kwargs["messages"]
+
         if stream:
             # Request token usage in the final streaming chunk (OpenAI-compatible).
             kwargs["stream_options"] = {"include_usage": True}
@@ -276,7 +349,12 @@ class LLMAdapter:
                 return self._stream_direct(kwargs, extra_headers)
             return self._stream_completion(**kwargs)
 
-        return await self._non_stream_completion(**kwargs)
+        result = await self._non_stream_completion(**kwargs)
+        moved = _late_system_refused(result.status_code, json.dumps(result.payload), kwargs["messages"])
+        if moved is not None:
+            _remember_system_first(str(kwargs["model"]))
+            result = await self._non_stream_completion(**{**kwargs, "messages": moved})
+        return result
 
     def _goes_direct(
         self,
@@ -324,33 +402,35 @@ class LLMAdapter:
         headers = {"Authorization": f"Bearer {kwargs.get('api_key') or 'EMPTY'}", **extra_headers}
         timeout = httpx.Timeout(connect=10.0, read=settings.litellm_request_timeout, write=10.0, pool=10.0)
         closed = False
-        request = self._http.stream("POST", url, json=body, headers=headers, timeout=timeout)
+        retried = False
         try:
-            async with request as response:
-                if response.status_code >= 400:
-                    detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
-                    logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
-                    yield _sse(_error_payload("server_error", f"upstream {response.status_code}: {detail}"))
-                    yield _DONE
-                    return
-                lines: list[str] = []
-                async for line in response.aiter_lines():
-                    if line:
-                        if not line.startswith(":"):  # a comment keeps the connection alive
-                            lines.append(line)
-                        continue
-                    if not lines:
-                        continue
-                    event = "\n".join(lines)
-                    lines = []
-                    yield f"{event}\n\n".encode()
-                    if _is_done(event):
-                        closed = True
-                        break
-                if lines and not closed:
-                    event = "\n".join(lines)
-                    yield f"{event}\n\n".encode()
-                    closed = _is_done(event)
+            while True:
+                request = self._http.stream("POST", url, json=body, headers=headers, timeout=timeout)
+                async with request as response:
+                    if response.status_code >= 400:
+                        detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
+                        moved = None if retried else _late_system_refused(
+                            response.status_code, detail, body["messages"],
+                        )
+                        if moved is not None:
+                            # Refused before a byte went to the client: again,
+                            # with the system messages up front.
+                            _remember_system_first(str(kwargs["model"]))
+                            body = {**body, "messages": moved}
+                            retried = True
+                            continue
+                        logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
+                        refusal = f"upstream {response.status_code}: {detail}"
+                        yield _sse(_error_payload("server_error", refusal))
+                        yield _DONE
+                        return
+                    async with aclosing(_whole_events(response)) as events:
+                        async for event in events:
+                            yield f"{event}\n\n".encode()
+                            if _is_done(event):
+                                closed = True
+                                break
+                break
         except httpx.HTTPError as exc:
             logger.exception("Direct vLLM stream failed")
             yield _sse(_error_payload("server_error", str(exc) or type(exc).__name__))
@@ -391,7 +471,14 @@ class LLMAdapter:
     async def _stream_completion(self, **kwargs: Any) -> AsyncIterator[bytes]:
         """Execute a streaming completion, yielding SSE-encoded bytes."""
         try:
-            response = await litellm.acompletion(**kwargs)
+            try:
+                response = await litellm.acompletion(**kwargs)
+            except litellm.exceptions.BadRequestError as refused:
+                moved = _late_system_refused(400, str(refused), kwargs.get("messages") or [])
+                if moved is None:
+                    raise
+                _remember_system_first(str(kwargs["model"]))
+                response = await litellm.acompletion(**{**kwargs, "messages": moved})
         except Exception as exc:
             # Pre-stream failure — yield the error as an SSE event so the
             # client receives a structured error instead of a broken stream.

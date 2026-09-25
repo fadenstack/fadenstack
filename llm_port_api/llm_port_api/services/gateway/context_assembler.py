@@ -312,38 +312,54 @@ class ContextAssembler:
         session_id: uuid.UUID,
         project_id: uuid.UUID | None,
     ) -> list[MemoryFact]:
-        """Gather active facts from all relevant scopes."""
+        """Gather active facts from all relevant scopes.
+
+        User, then project, then session facts, each scope in the order of
+        its keys. They are part of the prompt's prefix, which vLLM caches only
+        while it stays identical: newest first, one new fact reordered the
+        block and everything after it. Sorted here, not in SQL, because the
+        key is stored encrypted.
+        """
         from llm_port_api.db.models.gateway import MemoryFactScope  # noqa: PLC0415
+
+        def in_key_order(scoped: list[MemoryFact]) -> list[MemoryFact]:
+            return sorted(scoped, key=lambda fact: (fact.key, str(fact.id)))
 
         facts: list[MemoryFact] = []
 
         # User-level facts
         facts.extend(
-            await self.dao.list_active_facts(
-                tenant_id=tenant_id,
-                user_id=user_id,
-                scope=MemoryFactScope.USER,
+            in_key_order(
+                await self.dao.list_active_facts(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    scope=MemoryFactScope.USER,
+                ),
             ),
         )
 
         # Project-level facts
         if project_id:
             facts.extend(
-                await self.dao.list_active_facts(
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    scope=MemoryFactScope.PROJECT,
-                    project_id=project_id,
+                in_key_order(
+                    await self.dao.list_active_facts(
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                        scope=MemoryFactScope.PROJECT,
+                        project_id=project_id,
+                    ),
                 ),
             )
 
         # Session-level facts
         facts.extend(
-            await self.dao.list_active_facts(
-                tenant_id=tenant_id,
-                user_id=user_id,
-                scope=MemoryFactScope.SESSION,
-                session_id=session_id,
+            in_key_order(
+                await self.dao.list_active_facts(
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    scope=MemoryFactScope.SESSION,
+                    session_id=session_id,
+                ),
             ),
         )
 
