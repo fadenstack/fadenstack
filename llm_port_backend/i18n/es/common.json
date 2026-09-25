@@ -1977,6 +1977,18 @@
       "remove_title": "¿Quitar esta máquina?",
       "remove_message": "{{name}} saldrá del clúster. Su parte de cualquier modelo en ejecución se detiene.",
       "page_title": "Clúster"
+    },
+    "stray": {
+      "title": "Modelos que se ejecutan aquí sin despliegue",
+      "description": "Un despliegue eliminado mientras su clúster no era accesible deja su modelo en ejecución: ocupa GPU y sigue respondiendo en el gateway. Busque estos modelos y tome uno para gestionarlo de nuevo: conservarlo o eliminarlo correctamente.",
+      "check": "Buscarlos",
+      "checking": "Consultando el clúster...",
+      "none": "Cada modelo de este clúster tiene aquí su despliegue.",
+      "taken": "Tomado como {{name}}. Ahora es un despliegue normal de este clúster.",
+      "col_model": "Modelo",
+      "col_running": "Copias en ejecución",
+      "col_alias": "Nombre en el gateway",
+      "take_over": "Tomar el control"
     }
   },
   "inference": {

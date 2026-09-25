@@ -30,6 +30,7 @@ import {
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { HostModelDialog } from "~/components/hosting/HostModelDialog";
 import { useAsyncData } from "~/lib/useAsyncData";
+import StrayModelsCard from "./StrayModelsCard";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -609,6 +610,9 @@ export default function ClusterDetailPage() {
           </AsyncSection>
         </CardContent>
       </Card>
+
+      {/* --- models it runs that no deployment here owns ------------------- */}
+      <StrayModelsCard environmentId={id!} onTakenOver={() => void deployments.refresh()} />
 
       {/* --- advanced ---------------------------------------------------- */}
       {/* Unmounted while collapsed: "behind Advanced" should mean the

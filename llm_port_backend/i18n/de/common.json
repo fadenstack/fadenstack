@@ -1977,6 +1977,18 @@
       "remove_title": "Diese Maschine entfernen?",
       "remove_message": "{{name}} verlässt den Cluster. Ihr Anteil an laufenden Modellen wird beendet.",
       "page_title": "Cluster"
+    },
+    "stray": {
+      "title": "Modelle, die hier ohne Deployment laufen",
+      "description": "Ein Deployment, das gelöscht wurde, während sein Cluster nicht erreichbar war, lässt sein Modell weiterlaufen: Es belegt GPUs und antwortet weiter am Gateway. Suchen Sie nach solchen Modellen und übernehmen Sie eines, um es wieder zu verwalten -- behalten oder sauber löschen.",
+      "check": "Danach suchen",
+      "checking": "Cluster wird gefragt...",
+      "none": "Jedes Modell dieses Clusters hat hier sein Deployment.",
+      "taken": "Übernommen als {{name}}. Es ist jetzt ein normales Deployment dieses Clusters.",
+      "col_model": "Modell",
+      "col_running": "Laufende Kopien",
+      "col_alias": "Name am Gateway",
+      "take_over": "Übernehmen"
     }
   },
   "inference": {

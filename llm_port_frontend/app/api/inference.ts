@@ -587,6 +587,18 @@ export interface TakeOverResult {
   deployments: { deployment_id: string; name: string; alias: string; model: string; notes: string[] }[];
 }
 
+/** Models a managed cluster runs that no deployment here owns, read from Ray. */
+export interface StrayModels {
+  models: FoundClusterApp[];
+  /** Why the cluster could not be asked, when it could not. */
+  error: string | null;
+}
+
+export interface StrayTakeOverResult {
+  environment_id: string;
+  deployments: TakeOverResult["deployments"];
+}
+
 // ---------------------------------------------------------------------------
 // Transport
 // ---------------------------------------------------------------------------
@@ -860,6 +872,17 @@ export const inferenceApi = {
     return request<TakeOverResult>("/found-clusters/take-over", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  /** Asks the cluster's head what it serves; takes seconds. */
+  strayModels(environmentId: string) {
+    return request<StrayModels>(`/environments/${enc(environmentId)}/stray-models`);
+  },
+  takeOverStrayModels(environmentId: string, appNames: string[], aliases: Record<string, string>) {
+    return request<StrayTakeOverResult>(`/environments/${enc(environmentId)}/stray-models/take-over`, {
+      method: "POST",
+      body: JSON.stringify({ app_names: appNames, aliases }),
     });
   },
 };

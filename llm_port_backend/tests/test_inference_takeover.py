@@ -356,3 +356,96 @@ async def test_the_token_is_sealed_before_the_command_result_is_stored(dbsession
     await dbsession.refresh(stored)
     assert unseal_token(stored.result_json["cluster_token_sealed"]) == "plain-secret"
     assert (await dao.list_command_events(command_id=cmd.id))[-1].phase == "duplicate"
+
+
+# ── Models a managed cluster runs that no deployment here owns ──────────
+
+STRAY = "llmport-a34b195a-d92a-4bc8-9d74-6b7aa7919b4a"
+STRAY_SOURCE = "/root/.cache/huggingface/models--Qwen--Qwen3-0.6B/snapshots/c1899de289a04d12100db370d81485cdf75e47ca"
+
+
+def _stray_app() -> dict[str, Any]:
+    """The app the release VM's DGX pair ran for a day after its deployment was deleted."""
+    config = {**RUNNING, "model_loading_config": {
+        "model_id": "Qwen3-0.6B", "model_source": STRAY_SOURCE, "tokenizer_source": None}}
+    return {
+        "name": STRAY, "route_prefix": f"/{STRAY}", "status": "RUNNING",
+        "deployments": [{"name": "LLMServer:Qwen3-0_6B", "status": "HEALTHY", "running_replicas": 1},
+                        {"name": "OpenAiIngress", "status": "HEALTHY", "running_replicas": 1}],
+        "llm_configs": [config],
+    }
+
+
+async def _managed_pair(dbsession: AsyncSession, head: InfraNode, monkeypatch: pytest.MonkeyPatch) -> InferenceEnvironment:
+    """dgx-pair, managed here with qwen-chat, as the release VM has it."""
+    _answering(monkeypatch, _Machine(_doc()))
+    await takeover.take_over(dbsession, None, node_id=head.id, name="dgx-pair", aliases={APP: "qwen-chat"})
+    return (await dbsession.execute(select(InferenceEnvironment).where(InferenceEnvironment.name == "dgx-pair"))).scalar_one()
+
+
+def _both() -> dict[str, Any]:
+    return _doc(apps=[*_doc()["apps"], _stray_app()])
+
+
+@pytest.mark.anyio
+async def test_a_managed_clusters_stray_model_is_listed(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Finding clusters never looks at a managed cluster's machines: this model was invisible."""
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    _answering(monkeypatch, _Machine(_both()))
+
+    found = await takeover.stray_models(dbsession, None, env.id)
+
+    assert [m["app_name"] for m in found["models"]] == [STRAY], "qwen-chat has its deployment; only the stray is listed"
+    assert found["models"][0]["model_id"] == "Qwen3-0.6B" and found["models"][0]["running_copies"] == 1
+
+
+@pytest.mark.anyio
+async def test_a_stray_model_is_taken_over_into_its_cluster_as_it_runs(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    machine = _answering(monkeypatch, _Machine(_both()))
+
+    result = await takeover.take_over_models(
+        dbsession, None, environment_id=env.id, app_names=[STRAY], aliases={STRAY: "qwen3-0.6b"},
+    )
+
+    dep = await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("llmport-")))
+    assert dep is not None and dep.environment_id == env.id, "into the cluster it runs on, under its own id"
+    assert dep.phase == DeploymentPhase.RUNNING.value and dep.generation == dep.observed_generation
+    assert dep.observed_status_json["applied_head"] == "ray-head", "recorded as applied: nothing restarts"
+    assert dep.spec_json["service"]["alias"] == "qwen3-0.6b"
+    assert STRAY in machine.asked[-1]["verify"] and machine.asked[-1]["hand_over_token"] is False, (
+        "checked against what runs; the cluster's token is already here")
+    assert result["deployments"][0]["deployment_id"] == STRAY.removeprefix("llmport-")
+    assert (await takeover.stray_models(dbsession, None, env.id))["models"] == [], "and it is no longer a stray"
+
+
+@pytest.mark.anyio
+async def test_a_stray_model_that_would_restart_is_not_taken(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    _answering(monkeypatch, _Machine(_both(), equal=False))
+    with pytest.raises(takeover.TakeoverError, match=r"would restart Qwen3-0\.6B"):
+        await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[STRAY])
+    assert await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("llmport-"))) is None
+
+
+@pytest.mark.anyio
+async def test_only_a_stray_model_of_llm_ports_can_be_taken(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    env = await _managed_pair(dbsession, head, monkeypatch)
+    _answering(monkeypatch, _Machine(_both()))
+    with pytest.raises(takeover.TakeoverError, match=r"runs no model of LLM\.Port's called someone-elses-app"):
+        await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=["someone-elses-app"])
+    with pytest.raises(takeover.TakeoverError, match="already has its deployment"):
+        await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[APP])
+

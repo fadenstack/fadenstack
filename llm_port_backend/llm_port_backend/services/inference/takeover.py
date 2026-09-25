@@ -228,6 +228,27 @@ def _running_copies(app: dict[str, Any]) -> int:
     )
 
 
+def _app_view(
+    recovered: RecoveredDeployment, app: dict[str, Any], existing_deployments: set[str],
+) -> dict[str, Any]:
+    """A served model as the console lists it for taking over."""
+    return {
+        "app_name": recovered.app_name,
+        "deployment_id": recovered.deployment_id,
+        "model_id": recovered.model_id,
+        "model_source": recovered.model_source,
+        "hf_repo_id": recovered.hf_repo_id,
+        "copies": _replicas(recovered.spec),
+        "gpus_per_copy": ((recovered.spec.get("resources") or {}).get("replica") or {}).get("gpus"),
+        "engine": (recovered.spec.get("engine") or {}).get("config") or {},
+        "status": app.get("status"),
+        "running_copies": _running_copies(app),
+        "suggested_alias": recovered.model_id.lower(),
+        "notes": recovered.notes,
+        "already_known": recovered.deployment_id in existing_deployments,
+    }
+
+
 def view(
     doc: dict[str, Any],
     *,
@@ -262,21 +283,7 @@ def view(
         if recovered is None:
             other_apps.append(str(app.get("name")))
             continue
-        apps.append({
-            "app_name": recovered.app_name,
-            "deployment_id": recovered.deployment_id,
-            "model_id": recovered.model_id,
-            "model_source": recovered.model_source,
-            "hf_repo_id": recovered.hf_repo_id,
-            "copies": _replicas(recovered.spec),
-            "gpus_per_copy": ((recovered.spec.get("resources") or {}).get("replica") or {}).get("gpus"),
-            "engine": (recovered.spec.get("engine") or {}).get("config") or {},
-            "status": app.get("status"),
-            "running_copies": _running_copies(app),
-            "suggested_alias": recovered.model_id.lower(),
-            "notes": recovered.notes,
-            "already_known": recovered.deployment_id in existing_deployments,
-        })
+        apps.append(_app_view(recovered, app, existing_deployments))
 
     blockers: list[str] = []
     head = next((m for m in members if m["role"] == "head"), None)
@@ -517,12 +524,9 @@ async def take_over(
     from sqlalchemy import select  # noqa: PLC0415
 
     from llm_port_backend.db.models.inference import (  # noqa: PLC0415
-        DeploymentDesiredState,
-        DeploymentPhase,
         EnvironmentDesiredState,
         EnvironmentNodeRole,
         EnvironmentStatus,
-        InferenceDeployment,
         InferenceEnvironment,
         InferenceEnvironmentNode,
     )
@@ -558,39 +562,8 @@ async def take_over(
         raise TakeoverError(" ".join(seen["blockers"]))
 
     # 2. What this server would deploy for each model, and whether that is it.
-    plans = []
-    for app in doc.get("apps") or []:
-        alias = aliases.get(str(app.get("name")))
-        recovered = recover_deployment(app, alias=alias)
-        if recovered is None:
-            continue
-        alias = alias or recovered.model_id.lower()
-        recovered.spec.setdefault("service", {})["alias"] = alias
-        model = await _model_for(session, recovered)
-        plans.append((recovered, model, serving_args(recovered, model), alias, app))
-    checked = await client.describe_cluster(
-        node_id=node_id,
-        verify={recovered.app_name: args for recovered, _m, args, _a, _app in plans},
-        hand_over_token=True,
-    )
-    if not checked or not checked.get("attached"):
-        raise TakeoverError((checked or {}).get("error") or "The machine did not answer the check.")
-    by_app = {a.get("name"): a for a in checked.get("apps") or []}
-    differ = []
-    for recovered, *_rest in plans:
-        verdict = (by_app.get(recovered.app_name) or {}).get("verify") or {}
-        if not verdict.get("equal"):
-            detail = verdict.get("error") or "; ".join(
-                f"{d['path']}: running {d.get('running')!r}, would deploy {d.get('candidate')!r}"
-                for d in (verdict.get("diff") or [])[:5]
-            ) or "no answer"
-            differ.append(f"{recovered.model_id} ({detail})")
-    if differ:
-        await session.rollback()
-        raise TakeoverError(
-            "Taking over would restart " + "; ".join(differ)
-            + ": what this server would deploy is not exactly what runs. Nothing was changed."
-        )
+    plans = await _plans_for(session, doc.get("apps") or [], aliases)
+    checked = await _confirmed_unchanged(session, client, node_id, plans, hand_over_token=True)
     sealed = checked.get("cluster_token_sealed")
     token = unseal_token(sealed) if sealed else None
     if not token:
@@ -686,7 +659,83 @@ async def take_over(
         environment.capabilities_json = {}
 
     # 4. The models, under their own ids, recorded as applied on this head.
-    head_ray_id = head.get("runtime_node_id")
+    taken = await _record_deployments(
+        session, environment_id=environment.id, plans=plans, head_ray_id=head.get("runtime_node_id"), now=now,
+    )
+    wake_reconciler_after_commit(session)
+    await session.commit()
+    return {
+        "environment_id": str(environment.id),
+        "name": name,
+        "control_plane": plane.name,
+        "members": seen["members"],
+        "deployments": taken,
+    }
+
+
+async def _plans_for(session: Any, apps: list[dict[str, Any]], aliases: dict[str, str]) -> list[tuple]:
+    """For each of LLM.Port's apps: what this server would deploy for it, and under which alias."""
+    plans = []
+    for app in apps:
+        alias = aliases.get(str(app.get("name")))
+        recovered = recover_deployment(app, alias=alias)
+        if recovered is None:
+            continue
+        alias = alias or recovered.model_id.lower()
+        recovered.spec.setdefault("service", {})["alias"] = alias
+        model = await _model_for(session, recovered)
+        plans.append((recovered, model, serving_args(recovered, model), alias, app))
+    return plans
+
+
+async def _confirmed_unchanged(
+    session: Any, client: Any, node_id: Any, plans: list[tuple], *, hand_over_token: bool = False,
+) -> dict[str, Any]:
+    """Have the machine check each rebuilt configuration against what runs; refuse on any difference.
+
+    Recorded as applied, a configuration that differs from what runs would be
+    redeployed by the reconciler -- a restart. Nothing is recorded then.
+    """
+    checked = await client.describe_cluster(
+        node_id=node_id,
+        verify={recovered.app_name: args for recovered, _m, args, _a, _app in plans},
+        hand_over_token=hand_over_token,
+    )
+    if not checked or not checked.get("attached"):
+        raise TakeoverError((checked or {}).get("error") or "The machine did not answer the check.")
+    by_app = {a.get("name"): a for a in checked.get("apps") or []}
+    differ = []
+    for recovered, *_rest in plans:
+        verdict = (by_app.get(recovered.app_name) or {}).get("verify") or {}
+        if not verdict.get("equal"):
+            detail = verdict.get("error") or "; ".join(
+                f"{d['path']}: running {d.get('running')!r}, would deploy {d.get('candidate')!r}"
+                for d in (verdict.get("diff") or [])[:5]
+            ) or "no answer"
+            differ.append(f"{recovered.model_id} ({detail})")
+    if differ:
+        await session.rollback()
+        raise TakeoverError(
+            "Taking over would restart " + "; ".join(differ)
+            + ": what this server would deploy is not exactly what runs. Nothing was changed."
+        )
+    return checked
+
+
+async def _record_deployments(
+    session: Any, *, environment_id: Any, plans: list[tuple], head_ray_id: Any, now: Any,
+) -> list[dict[str, Any]]:
+    """Record each model under its own id, as applied on the head that runs it."""
+    import uuid as _uuid  # noqa: PLC0415
+
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+        DeploymentDesiredState,
+        DeploymentPhase,
+        InferenceDeployment,
+    )
+
     taken = []
     names = set((await session.execute(select(InferenceDeployment.name))).scalars())
     for recovered, model, args, alias, app in plans:
@@ -694,7 +743,7 @@ async def take_over(
         names.add(deployment_name)
         session.add(InferenceDeployment(
             id=_uuid.UUID(recovered.deployment_id),
-            environment_id=environment.id,
+            environment_id=environment_id,
             model_id=model.id,
             name=deployment_name,
             spec_json=recovered.spec,
@@ -723,12 +772,93 @@ async def take_over(
             "model": recovered.model_id,
             "notes": recovered.notes,
         })
+    return taken
+
+
+# ---------------------------------------------------------------------------
+# Models a managed cluster runs that no deployment here owns
+# ---------------------------------------------------------------------------
+#
+# A deployment deleted while its cluster could not be reached -- or, before
+# 4aa631a, any deleted deployment -- leaves its app running: it holds GPUs,
+# and its gateway route goes on answering, while nothing here shows it. The
+# release VM's DGX pair ran one for a day. Finding clusters to take over
+# never looks at a managed cluster's machines, so these were invisible.
+
+
+async def _managed_cluster(session: Any, environment_id: Any) -> Any:
+    from llm_port_backend.db.models.inference import InferenceEnvironment  # noqa: PLC0415
+
+    env = await session.get(InferenceEnvironment, environment_id)
+    if env is None:
+        raise TakeoverError("There is no such cluster.")
+    if env.head_node_id is None:
+        raise TakeoverError(f"{env.name} has no head machine to ask.")
+    return env
+
+
+async def stray_models(session: Any, gateway: Any, environment_id: Any) -> dict[str, Any]:
+    """The models *environment_id*'s cluster runs that no deployment here owns, read from Ray."""
+    env = await _managed_cluster(session, environment_id)
+    doc = await _client(gateway).describe_cluster(node_id=env.head_node_id, budget_sec=60)
+    if not doc or not doc.get("attached"):
+        error = (doc or {}).get("error") or "The head machine did not describe its cluster."
+        return {"models": [], "error": error}
+    existing = await _deployment_ids(session)
+    models = []
+    for app in doc.get("apps") or []:
+        recovered = recover_deployment(app)
+        if recovered is not None and recovered.deployment_id not in existing:
+            models.append(_app_view(recovered, app, existing))
+    return {"models": models, "error": None}
+
+
+async def take_over_models(
+    session: Any,
+    gateway: Any,
+    *,
+    environment_id: Any,
+    app_names: list[str],
+    aliases: dict[str, str] | None = None,
+    user_id: Any = None,
+) -> dict[str, Any]:
+    """Take over models a managed cluster runs without a deployment here, as they run.
+
+    As for a whole cluster: nothing is recorded unless the machine confirms
+    that what this server would deploy is exactly what runs. Taken over, a
+    model is an ordinary deployment -- kept, scaled, or deleted from the
+    console, which removes its app and its gateway route.
+    """
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+
+    env = await _managed_cluster(session, environment_id)
+    if not app_names:
+        raise TakeoverError("Choose the models to take over.")
+    client = _client(gateway)
+    doc = await client.describe_cluster(node_id=env.head_node_id)
+    if not doc or not doc.get("attached"):
+        raise TakeoverError((doc or {}).get("error") or "The head machine did not describe its cluster.")
+    running = {str(a.get("name")): a for a in doc.get("apps") or []}
+    existing = await _deployment_ids(session)
+    chosen = []
+    for app_name in app_names:
+        app = running.get(app_name)
+        recovered = recover_deployment(app) if app is not None else None
+        if recovered is None:
+            raise TakeoverError(f"{env.name} runs no model of LLM.Port's called {app_name}.")
+        if recovered.deployment_id in existing:
+            raise TakeoverError(f"{app_name} already has its deployment here.")
+        chosen.append(app)
+    plans = await _plans_for(session, chosen, dict(aliases or {}))
+    await _confirmed_unchanged(session, client, env.head_node_id, plans)
+    head_ray_id = next(
+        (n.get("node_id") for n in doc.get("nodes") or [] if n.get("is_head") and n.get("alive")), None,
+    )
+    taken = await _record_deployments(
+        session, environment_id=env.id, plans=plans, head_ray_id=head_ray_id, now=datetime.now(tz=UTC),
+    )
     wake_reconciler_after_commit(session)
     await session.commit()
-    return {
-        "environment_id": str(environment.id),
-        "name": name,
-        "control_plane": plane.name,
-        "members": seen["members"],
-        "deployments": taken,
-    }
+    return {"environment_id": str(env.id), "deployments": taken, "by": str(user_id) if user_id else None}

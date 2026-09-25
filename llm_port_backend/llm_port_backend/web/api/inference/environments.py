@@ -9,10 +9,16 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from llm_port_backend.db.dependencies import get_db_session
 from llm_port_backend.db.models.users import User
+from llm_port_backend.services.inference import takeover
 from llm_port_backend.services.inference.artifacts import ArtifactReadiness
 from llm_port_backend.services.inference.planner import InferenceEnvironmentPlan
 from llm_port_backend.services.inference.service import (
@@ -39,6 +45,7 @@ from llm_port_backend.web.api.inference.observability import (
     resolve_driver_for_environment,
     unsupported,
 )
+from llm_port_backend.web.api.inference.found_clusters import _gateway as _command_gateway
 from llm_port_backend.web.api.rbac import require_permission
 
 router = APIRouter()
@@ -386,3 +393,54 @@ async def get_environment_metrics(
         )
     except ObservabilityUnsupported as exc:
         raise unsupported(exc)
+
+
+# ── Models the cluster runs that no deployment here owns ─────────────────
+
+
+class TakeOverModelsRequest(BaseModel):
+    """Which of a cluster's stray models to take over, and their gateway names."""
+
+    #: The Ray apps to take over, as the list names them (``llmport-<id>``).
+    app_names: list[str] = Field(min_length=1)
+    #: The name each is offered under at the gateway, by app name; the
+    #: model's own name, lower-cased, where none is given.
+    aliases: dict[str, str] = Field(default_factory=dict)
+
+
+@router.get("/{environment_id}/stray-models")
+async def list_stray_models(
+    environment_id: uuid.UUID,
+    request: Request,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Models this cluster runs that no deployment here owns, read from Ray by the head's agent.
+
+    Left behind by a deployment deleted while the cluster could not be
+    reached: they hold GPUs and answer at the gateway, and nothing else
+    shows them.
+    """
+    try:
+        return await takeover.stray_models(session, _command_gateway(request), environment_id)
+    except takeover.TakeoverError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/stray-models/take-over", status_code=status.HTTP_201_CREATED)
+async def take_over_stray_models(
+    environment_id: uuid.UUID,
+    body: TakeOverModelsRequest,
+    request: Request,
+    user: User = Depends(require_permission("inference.deployments", "create")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Take them over as they run -- nothing restarts -- as ordinary deployments of this cluster."""
+    try:
+        return await takeover.take_over_models(
+            session, _command_gateway(request),
+            environment_id=environment_id, app_names=body.app_names, aliases=body.aliases, user_id=user.id,
+        )
+    except takeover.TakeoverError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+

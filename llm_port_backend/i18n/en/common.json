@@ -1975,6 +1975,18 @@
       "remove_title": "Remove this machine?",
       "remove_message": "{{name}} will leave the cluster. Its share of any running model stops.",
       "page_title": "Cluster"
+    },
+    "stray": {
+      "title": "Models running here without a deployment",
+      "description": "A deployment deleted while its cluster could not be reached leaves its model running: it holds GPUs and still answers at the gateway. Look for such models and take one over to manage it again -- keep it, or delete it properly.",
+      "check": "Look for them",
+      "checking": "Asking the cluster...",
+      "none": "Every model this cluster runs has its deployment here.",
+      "taken": "Taken over as {{name}}. It is an ordinary deployment of this cluster now.",
+      "col_model": "Model",
+      "col_running": "Copies running",
+      "col_alias": "Name at the gateway",
+      "take_over": "Take over"
     }
   },
   "inference": {

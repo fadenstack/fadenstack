@@ -1977,6 +1977,18 @@
       "remove_title": "Retirer cette machine ?",
       "remove_message": "{{name}} quittera le cluster. Sa part de tout modèle en cours s'arrête.",
       "page_title": "Cluster"
+    },
+    "stray": {
+      "title": "Modèles qui tournent ici sans déploiement",
+      "description": "Un déploiement supprimé alors que son cluster était injoignable laisse son modèle tourner : il occupe des GPU et répond toujours sur la passerelle. Recherchez ces modèles et reprenez-en un pour le gérer à nouveau : le garder, ou le supprimer proprement.",
+      "check": "Les rechercher",
+      "checking": "Interrogation du cluster...",
+      "none": "Chaque modèle de ce cluster a ici son déploiement.",
+      "taken": "Repris sous le nom {{name}}. C'est désormais un déploiement ordinaire de ce cluster.",
+      "col_model": "Modèle",
+      "col_running": "Copies en cours",
+      "col_alias": "Nom sur la passerelle",
+      "take_over": "Reprendre"
     }
   },
   "inference": {
