@@ -132,14 +132,18 @@ async def test_graph_traces_snapshot(client: AsyncClient, authed_app: FastAPI) -
     assert body["items"][0]["event_id"] == 42
 
 
-async def test_graph_stream_respects_last_event_id_header(client: AsyncClient, authed_app: FastAPI) -> None:
+async def test_graph_stream_is_left_to_the_observability_plugin(client: AsyncClient, authed_app: FastAPI) -> None:
+    """The live trace stream is Enterprise: core answers 402 and names the plugin.
+
+    This test expected the stream itself, from before streaming moved to the
+    Observability Pro plugin, and failed ever since.
+    """
     service = authed_app.dependency_overrides[get_llm_graph_service]()  # type: ignore[call-arg]
     url = authed_app.url_path_for("stream_traces")
-    async with client.stream("GET", url, headers={"Last-Event-ID": "41"}) as response:
-        assert response.status_code == status.HTTP_200_OK
-        text = await response.aread()
-        assert b"event: trace" in text
-    assert service.cursor_seen == 41
+    response = await client.get(url, headers={"Last-Event-ID": "41"})
+    assert response.status_code == status.HTTP_402_PAYMENT_REQUIRED
+    assert "Observability Pro" in response.json()["detail"]
+    assert service.cursor_seen is None, "core never reads the trace store for it"
 
 
 def test_usage_is_attributed_to_the_provider_each_instance_serves() -> None:
