@@ -24,15 +24,23 @@ class RootSessionDAO:
         scope: str = "all",
         duration_seconds: int = 600,
     ) -> RootSession:
-        """Start a new root session."""
+        """Start a new root session.
+
+        The start time is set here, not left to the column's server default:
+        that is only filled in once the row is written and read back, and the
+        caller answers with it straight away -- starting root mode failed
+        with a 500 ("start_time: Input should be a valid datetime").
+        """
         session = RootSession(
             id=uuid.uuid4(),
             actor_id=actor_id,
+            start_time=datetime.now(tz=UTC),
             reason=reason,
             scope=scope,
             duration_seconds=duration_seconds,
         )
         self.session.add(session)
+        await self.session.flush()
         return session
 
     async def get_active(self, actor_id: uuid.UUID) -> RootSession | None:

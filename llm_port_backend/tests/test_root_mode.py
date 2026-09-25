@@ -13,18 +13,28 @@ from llm_port_backend.db.models.users import User, current_active_user
 from llm_port_backend.web.api.admin.dependencies import get_docker
 
 
-def _make_superuser() -> User:
-    user = MagicMock(spec=User)
-    user.id = uuid.uuid4()
-    user.is_active = True
-    user.is_superuser = True
-    user.is_verified = True
+async def _make_superuser(dbsession: AsyncSession) -> User:
+    """A superuser that exists in the database.
+
+    What these endpoints write -- root sessions, registered containers -- points
+    at the user with a foreign key, so a mock user id failed every insert.
+    """
+    user = User(
+        id=uuid.uuid4(),
+        email=f"root-{uuid.uuid4().hex[:8]}@example.com",
+        hashed_password="not-a-real-hash",
+        is_active=True,
+        is_superuser=True,
+        is_verified=True,
+    )
+    dbsession.add(user)
+    await dbsession.flush()
     return user
 
 
 @pytest.fixture()
-def superuser() -> User:
-    return _make_superuser()
+async def superuser(dbsession: AsyncSession) -> User:
+    return await _make_superuser(dbsession)
 
 
 @pytest.fixture()
