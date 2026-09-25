@@ -17,5 +17,9 @@ export default defineConfig({
     include: ["app/**/*.test.{ts,tsx}"],
     css: false,
     restoreMocks: true,
+    // A page rendered in jsdom takes a second or two alone and several when
+    // every file runs at once (a worker per core): page tests failed on the
+    // default 5 s in full runs and passed alone.
+    testTimeout: 20_000,
   },
 });
