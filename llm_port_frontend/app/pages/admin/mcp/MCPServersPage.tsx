@@ -16,6 +16,13 @@ import {
   type PIIMode,
   type DiscoveredServer,
 } from "~/api/mcp";
+import {
+  NO_EDITS,
+  SecretPairsEditor,
+  toSecretMap,
+  type SecretEdits,
+} from "./SecretPairsEditor";
+import { isHttp, splitCommand } from "./serverForm";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -81,7 +88,13 @@ export default function MCPServersPage() {
   const [newUrl, setNewUrl] = useState("");
   const [newCommand, setNewCommand] = useState("");
   const [newPiiMode, setNewPiiMode] = useState<PIIMode>("redact");
+  const [newTimeout, setNewTimeout] = useState(60);
+  const [newHeaders, setNewHeaders] = useState<SecretEdits>(NO_EDITS);
+  const [newEnv, setNewEnv] = useState<SecretEdits>(NO_EDITS);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  // Registered, but the connect failed: the server is kept, in "error".
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<MCPServerSummary | null>(
@@ -120,31 +133,43 @@ export default function MCPServersPage() {
     setNewUrl("");
     setNewCommand("");
     setNewPiiMode("redact");
+    setNewTimeout(60);
+    setNewHeaders(NO_EDITS);
+    setNewEnv(NO_EDITS);
+    setCreateError(null);
     setCreateOpen(true);
   }
 
   async function handleCreate() {
     setCreating(true);
-    setError(null);
+    setCreateError(null);
+    setNotice(null);
     try {
-      await registerServer({
+      const server = await registerServer({
         name: newName,
         transport: newTransport,
         tool_prefix:
           newPrefix || newName.toLowerCase().replace(/[^a-z0-9]/g, "_"),
-        ...(newTransport === "sse" || newTransport === "streamable_http"
-          ? { url: newUrl }
-          : {}),
-        ...(newTransport === "stdio"
-          ? { command_json: newCommand.split(/\s+/).filter(Boolean) }
-          : {}),
+        ...(isHttp(newTransport)
+          ? { url: newUrl.trim(), headers: toSecretMap(newHeaders) }
+          : { command: splitCommand(newCommand), env: toSecretMap(newEnv) }),
         pii_mode: newPiiMode,
+        timeout_sec: newTimeout,
         auto_discover: true,
       });
       setCreateOpen(false);
+      if (server.warnings?.length) {
+        setNotice(
+          t("mcp.registered_not_connected", {
+            name: server.name,
+            reason: server.warnings.join(" "),
+          }),
+        );
+      }
       await load();
     } catch (err: unknown) {
-      setError(
+      // In the dialog, where it can be corrected: a name or prefix taken.
+      setCreateError(
         err instanceof Error ? err.message : t("common.create_failed"),
       );
     } finally {
@@ -199,7 +224,9 @@ export default function MCPServersPage() {
       setScanResults(result.discovered);
       setScanDone(true);
     } catch (err: unknown) {
-      setScanError(err instanceof Error ? err.message : "Scan failed");
+      setScanError(
+        err instanceof Error ? err.message : t("mcp.scan_failed", "Scan failed"),
+      );
     } finally {
       setScanning(false);
     }
@@ -214,13 +241,21 @@ export default function MCPServersPage() {
         .replace(/[^a-z0-9]/g, "_")
         .replace(/_+/g, "_")
         .replace(/^_|_$/g, "");
-      await registerServer({
+      const registered = await registerServer({
         name: server.server_name,
         transport: "streamable_http",
         tool_prefix: prefix || `mcp_${server.port}`,
         url: server.url,
         auto_discover: true,
       });
+      if (registered.warnings?.length) {
+        setNotice(
+          t("mcp.registered_not_connected", {
+            name: registered.name,
+            reason: registered.warnings.join(" "),
+          }),
+        );
+      }
       // Mark as registered in scan results
       setScanResults((prev) =>
         prev.map((s) =>
@@ -278,11 +313,13 @@ export default function MCPServersPage() {
       sortable: true,
       sortValue: (s) => s.status,
       render: (s) => (
-        <Chip
-          size="small"
-          label={s.status}
-          color={STATUS_COLOR[s.status] ?? "default"}
-        />
+        <Tooltip title={s.last_error ?? ""}>
+          <Chip
+            size="small"
+            label={s.status}
+            color={STATUS_COLOR[s.status] ?? "default"}
+          />
+        </Tooltip>
       ),
       minWidth: 120,
     },
@@ -290,8 +327,8 @@ export default function MCPServersPage() {
       key: "tools",
       label: t("mcp.tool_count", "Tools"),
       sortable: true,
-      sortValue: (s) => s.tool_count,
-      render: (s) => <Typography>{s.tool_count}</Typography>,
+      sortValue: (s) => s.discovered_tools,
+      render: (s) => <Typography>{s.discovered_tools}</Typography>,
       minWidth: 80,
     },
     {
@@ -353,6 +390,11 @@ export default function MCPServersPage() {
           {error}
         </Alert>
       )}
+      {notice && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
 
       <DataTable
         title={t("mcp.servers_title", "MCP Servers")}
@@ -394,13 +436,13 @@ export default function MCPServersPage() {
         cancelLabel={t("common.cancel", "Cancel")}
         submitDisabled={
           !newName.trim() ||
-          ((newTransport === "sse" || newTransport === "streamable_http") &&
-            !newUrl.trim())
+          (isHttp(newTransport) ? !newUrl.trim() : !newCommand.trim())
         }
         onSubmit={handleCreate}
         onClose={() => setCreateOpen(false)}
       >
         <Stack spacing={2} sx={{ mt: 1 }}>
+          {createError && <Alert severity="error">{createError}</Alert>}
           <TextField
             label={t("mcp.server_name", "Server Name")}
             value={newName}
@@ -419,11 +461,13 @@ export default function MCPServersPage() {
             fullWidth
             disabled={creating}
           >
-            <MenuItem value="streamable_http">Streamable HTTP</MenuItem>
+            <MenuItem value="streamable_http">
+              {t("mcp.transport_streamable_http")}
+            </MenuItem>
             <MenuItem value="sse">{t("mcp.transport_sse")}</MenuItem>
             <MenuItem value="stdio">{t("mcp.transport_stdio")}</MenuItem>
           </TextField>
-          {(newTransport === "sse" || newTransport === "streamable_http") && (
+          {isHttp(newTransport) && (
             <TextField
               label={t("mcp.server_url", "Server URL")}
               value={newUrl}
@@ -479,6 +523,37 @@ export default function MCPServersPage() {
             <MenuItem value="redact">{t("mcp.pii_redact")}</MenuItem>
             <MenuItem value="block">{t("mcp.pii_block")}</MenuItem>
           </TextField>
+          <TextField
+            label={t("mcp.timeout_sec")}
+            type="number"
+            value={newTimeout}
+            onChange={(e) => setNewTimeout(Number(e.target.value))}
+            fullWidth
+            disabled={creating}
+            inputProps={{ min: 5, max: 600 }}
+            helperText={t("mcp.timeout_help")}
+          />
+          {isHttp(newTransport) ? (
+            <SecretPairsEditor
+              label={t("mcp.headers")}
+              help={t("mcp.headers_help")}
+              edits={newHeaders}
+              onChange={setNewHeaders}
+              namePlaceholder="Authorization"
+              valuePlaceholder="Bearer …"
+              addLabel={t("mcp.add_header")}
+            />
+          ) : (
+            <SecretPairsEditor
+              label={t("mcp.env")}
+              help={t("mcp.env_help")}
+              edits={newEnv}
+              onChange={setNewEnv}
+              namePlaceholder="API_KEY"
+              valuePlaceholder="…"
+              addLabel={t("mcp.add_env")}
+            />
+          )}
         </Stack>
       </FormDialog>
 
@@ -486,10 +561,7 @@ export default function MCPServersPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title={t("mcp.delete_server", "Delete Server")}
-        message={t(
-          "mcp.delete_confirm",
-          `Are you sure you want to delete "${deleteTarget?.name}"? This will remove all associated tools.`,
-        )}
+        message={t("mcp.delete_confirm", { name: deleteTarget?.name ?? "" })}
         confirmLabel={t("common.delete", "Delete")}
         loading={deleting}
         onConfirm={confirmDelete}

@@ -301,7 +301,8 @@
     "move_failed": "Le déplacement a échoué.",
     "copy_failed": "Impossible de copier dans le presse-papiers.",
     "login_failed": "La connexion a échoué.",
-    "sso_failed": "L'authentification unique a échoué : {{error}}"
+    "sso_failed": "L'authentification unique a échoué : {{error}}",
+    "undo": "Rétablir"
   },
   "containers": {
     "title": "Conteneurs",
@@ -1457,7 +1458,30 @@
     "transport_stdio": "Stdio (commande)",
     "pii_allow": "Autoriser (aucun filtrage)",
     "pii_redact": "Masquer (retirer les données personnelles)",
-    "pii_block": "Bloquer (rejeter si des données personnelles sont trouvées)"
+    "pii_block": "Bloquer (rejeter si des données personnelles sont trouvées)",
+    "transport_streamable_http": "Streamable HTTP",
+    "scan_failed": "L'analyse a échoué.",
+    "test_failed": "Le test a échoué.",
+    "registered_not_connected": "\"{{name}}\" est enregistré, mais la connexion a échoué : {{reason}} Ouvrez-le pour corriger l'URL ou les identifiants.",
+    "timeout_sec": "Délai d'attente (secondes)",
+    "timeout_help": "Durée maximale de la connexion et de chaque appel d'outil : de 5 à 600 secondes.",
+    "headers": "En-têtes",
+    "headers_help": "Envoyés avec chaque requête vers ce serveur, p. ex. Authorization: Bearer <token>. Stockés chiffrés et jamais réaffichés. Toute personne qui utilise les outils de ce serveur les utilise.",
+    "add_header": "Ajouter un en-tête",
+    "env": "Variables d'environnement",
+    "env_help": "Transmises à la commande, p. ex. une clé d'API. Stockées chiffrées et jamais réaffichées.",
+    "add_env": "Ajouter une variable",
+    "secret_name": "Nom",
+    "secret_value": "Valeur",
+    "secret_set": "défini",
+    "secret_replaced": "remplacé ci-dessous",
+    "secret_will_be_removed": "sera supprimé",
+    "secret_replace": "Remplacer",
+    "last_error": "La dernière tentative de connexion a échoué",
+    "tools_found": "Outils trouvés : {{count}}",
+    "none_set": "Aucun",
+    "edit_server": "Modifier {{name}}",
+    "edit_reconnects": "L'enregistrement reconnecte le serveur et redécouvre ses outils. Un en-tête ou une variable non modifié ici conserve sa valeur."
   },
   "skills": {
     "list_title": "Compétences",

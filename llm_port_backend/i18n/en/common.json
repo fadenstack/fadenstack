@@ -301,7 +301,8 @@
     "move_failed": "Move failed.",
     "copy_failed": "Could not copy to the clipboard.",
     "login_failed": "Sign-in failed.",
-    "sso_failed": "Single sign-on failed: {{error}}"
+    "sso_failed": "Single sign-on failed: {{error}}",
+    "undo": "Undo"
   },
   "containers": {
     "title": "Containers",
@@ -1455,7 +1456,30 @@
     "transport_stdio": "Stdio (command)",
     "pii_allow": "Allow (no filtering)",
     "pii_redact": "Redact (remove personal data)",
-    "pii_block": "Block (reject if personal data is found)"
+    "pii_block": "Block (reject if personal data is found)",
+    "transport_streamable_http": "Streamable HTTP",
+    "scan_failed": "Scan failed.",
+    "test_failed": "Test failed.",
+    "registered_not_connected": "\"{{name}}\" is registered but could not be connected: {{reason}} Open it to correct the URL or credentials.",
+    "timeout_sec": "Timeout (seconds)",
+    "timeout_help": "How long connecting and each tool call may take: 5 to 600 seconds.",
+    "headers": "Headers",
+    "headers_help": "Sent with every request to this server, e.g. Authorization: Bearer <token>. Stored encrypted and never shown again. Everyone who uses this server's tools uses these.",
+    "add_header": "Add header",
+    "env": "Environment variables",
+    "env_help": "Passed to the command, e.g. an API key. Stored encrypted and never shown again.",
+    "add_env": "Add variable",
+    "secret_name": "Name",
+    "secret_value": "Value",
+    "secret_set": "set",
+    "secret_replaced": "replaced below",
+    "secret_will_be_removed": "will be removed",
+    "secret_replace": "Replace",
+    "last_error": "The last connection attempt failed",
+    "tools_found": "Tools found: {{count}}",
+    "none_set": "None",
+    "edit_server": "Edit {{name}}",
+    "edit_reconnects": "Saving reconnects the server and discovers its tools again. A header or variable not changed here keeps its value."
   },
   "skills": {
     "list_title": "Skills",

@@ -306,7 +306,8 @@
     "move_failed": "移动失败。",
     "copy_failed": "无法复制到剪贴板。",
     "login_failed": "登录失败。",
-    "sso_failed": "单点登录失败：{{error}}"
+    "sso_failed": "单点登录失败：{{error}}",
+    "undo": "撤销"
   },
   "containers": {
     "title": "容器",
@@ -1296,7 +1297,30 @@
     "transport_stdio": "Stdio（命令）",
     "pii_allow": "允许（不过滤）",
     "pii_redact": "脱敏（移除个人数据）",
-    "pii_block": "阻止（发现个人数据时拒绝）"
+    "pii_block": "阻止（发现个人数据时拒绝）",
+    "transport_streamable_http": "Streamable HTTP",
+    "scan_failed": "扫描失败。",
+    "test_failed": "测试失败。",
+    "registered_not_connected": "\"{{name}}\" 已注册，但无法连接：{{reason}} 请打开它以修正 URL 或凭据。",
+    "timeout_sec": "超时（秒）",
+    "timeout_help": "连接和每次工具调用允许的最长时间：5 到 600 秒。",
+    "headers": "请求头",
+    "headers_help": "随发往此服务器的每个请求一起发送，例如 Authorization: Bearer <token>。加密存储，之后不再显示。所有使用此服务器工具的人都共用这些值。",
+    "add_header": "添加请求头",
+    "env": "环境变量",
+    "env_help": "传递给命令，例如 API 密钥。加密存储，之后不再显示。",
+    "add_env": "添加变量",
+    "secret_name": "名称",
+    "secret_value": "值",
+    "secret_set": "已设置",
+    "secret_replaced": "将在下方替换",
+    "secret_will_be_removed": "将被删除",
+    "secret_replace": "替换",
+    "last_error": "上一次连接尝试失败",
+    "tools_found": "发现的工具：{{count}}",
+    "none_set": "无",
+    "edit_server": "编辑 {{name}}",
+    "edit_reconnects": "保存后会重新连接服务器并重新发现其工具。此处未更改的请求头或变量将保留原值。"
   },
   "skills": {
     "list_title": "技能",

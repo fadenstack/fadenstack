@@ -306,7 +306,8 @@
     "move_failed": "Verschieben fehlgeschlagen.",
     "copy_failed": "Kopieren in die Zwischenablage fehlgeschlagen.",
     "login_failed": "Anmeldung fehlgeschlagen.",
-    "sso_failed": "Single Sign-on fehlgeschlagen: {{error}}"
+    "sso_failed": "Single Sign-on fehlgeschlagen: {{error}}",
+    "undo": "Rückgängig"
   },
   "containers": {
     "title": "Container",
@@ -1296,7 +1297,30 @@
     "transport_stdio": "Stdio (Befehl)",
     "pii_allow": "Zulassen (keine Filterung)",
     "pii_redact": "Schwärzen (personenbezogene Daten entfernen)",
-    "pii_block": "Blockieren (ablehnen, wenn personenbezogene Daten gefunden werden)"
+    "pii_block": "Blockieren (ablehnen, wenn personenbezogene Daten gefunden werden)",
+    "transport_streamable_http": "Streamable HTTP",
+    "scan_failed": "Scan fehlgeschlagen.",
+    "test_failed": "Test fehlgeschlagen.",
+    "registered_not_connected": "\"{{name}}\" ist registriert, konnte aber nicht verbunden werden: {{reason}} Öffnen Sie den Server, um die URL oder die Zugangsdaten zu korrigieren.",
+    "timeout_sec": "Zeitlimit (Sekunden)",
+    "timeout_help": "Wie lange der Verbindungsaufbau und jeder Werkzeugaufruf dauern dürfen: 5 bis 600 Sekunden.",
+    "headers": "Header",
+    "headers_help": "Werden mit jeder Anfrage an diesen Server gesendet, z.B. Authorization: Bearer <token>. Verschlüsselt gespeichert und nie wieder angezeigt. Alle, die die Werkzeuge dieses Servers nutzen, verwenden sie.",
+    "add_header": "Header hinzufügen",
+    "env": "Umgebungsvariablen",
+    "env_help": "Werden an den Befehl übergeben, z.B. ein API-Schlüssel. Verschlüsselt gespeichert und nie wieder angezeigt.",
+    "add_env": "Variable hinzufügen",
+    "secret_name": "Name",
+    "secret_value": "Wert",
+    "secret_set": "gesetzt",
+    "secret_replaced": "wird unten ersetzt",
+    "secret_will_be_removed": "wird entfernt",
+    "secret_replace": "Ersetzen",
+    "last_error": "Der letzte Verbindungsversuch ist fehlgeschlagen",
+    "tools_found": "Gefundene Werkzeuge: {{count}}",
+    "none_set": "Keine",
+    "edit_server": "{{name}} bearbeiten",
+    "edit_reconnects": "Beim Speichern wird der Server neu verbunden und seine Werkzeuge werden erneut erkannt. Ein Header oder eine Variable, die hier nicht geändert wird, behält ihren Wert."
   },
   "skills": {
     "list_title": "Fähigkeiten",

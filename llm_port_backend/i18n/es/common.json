@@ -306,7 +306,8 @@
     "move_failed": "Falló el traslado.",
     "copy_failed": "No se pudo copiar al portapapeles.",
     "login_failed": "Falló el inicio de sesión.",
-    "sso_failed": "Falló el inicio de sesión único: {{error}}"
+    "sso_failed": "Falló el inicio de sesión único: {{error}}",
+    "undo": "Deshacer"
   },
   "containers": {
     "title": "Containers",
@@ -1296,7 +1297,30 @@
     "transport_stdio": "Stdio (comando)",
     "pii_allow": "Permitir (sin filtrado)",
     "pii_redact": "Ocultar (eliminar datos personales)",
-    "pii_block": "Bloquear (rechazar si se encuentran datos personales)"
+    "pii_block": "Bloquear (rechazar si se encuentran datos personales)",
+    "transport_streamable_http": "Streamable HTTP",
+    "scan_failed": "El escaneo falló.",
+    "test_failed": "La prueba falló.",
+    "registered_not_connected": "\"{{name}}\" está registrado, pero no se pudo conectar: {{reason}} Ábralo para corregir la URL o las credenciales.",
+    "timeout_sec": "Tiempo de espera (segundos)",
+    "timeout_help": "Cuánto pueden tardar la conexión y cada llamada a una herramienta: de 5 a 600 segundos.",
+    "headers": "Encabezados",
+    "headers_help": "Se envían con cada solicitud a este servidor, p. ej. Authorization: Bearer <token>. Se guardan cifrados y no se vuelven a mostrar. Todos los que usan las herramientas de este servidor los usan.",
+    "add_header": "Añadir encabezado",
+    "env": "Variables de entorno",
+    "env_help": "Se pasan al comando, p. ej. una clave de API. Se guardan cifradas y no se vuelven a mostrar.",
+    "add_env": "Añadir variable",
+    "secret_name": "Nombre",
+    "secret_value": "Valor",
+    "secret_set": "definido",
+    "secret_replaced": "se reemplaza abajo",
+    "secret_will_be_removed": "se eliminará",
+    "secret_replace": "Reemplazar",
+    "last_error": "El último intento de conexión falló",
+    "tools_found": "Herramientas encontradas: {{count}}",
+    "none_set": "Ninguno",
+    "edit_server": "Editar {{name}}",
+    "edit_reconnects": "Al guardar, el servidor se vuelve a conectar y se descubren de nuevo sus herramientas. Un encabezado o una variable que no se cambie aquí conserva su valor."
   },
   "skills": {
     "list_title": "Habilidades",
