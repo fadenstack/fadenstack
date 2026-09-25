@@ -65,7 +65,8 @@ export interface UseChatStreamReturn {
   lastResponseMs: number | null;
   /** Get response time for a specific message id, if tracked. */
   getResponseMs: (msgId: string) => number | null;
-  send: (text: string, model: string, files?: File[]) => Promise<void>;
+  /** ``skills``: the slugs picked for the chat, sent with the message. */
+  send: (text: string, model: string, files?: File[], skills?: string[]) => Promise<void>;
   /** Retry the last failed request. */
   retry: () => Promise<void>;
   stop: () => void;
@@ -101,6 +102,7 @@ export function useChatStream({
     text: string;
     model: string;
     files?: File[];
+    skills?: string[];
   } | null>(null);
 
   // Load existing messages for the current session
@@ -199,9 +201,9 @@ export function useChatStream({
   }, []);
 
   const send = useCallback(
-    async (text: string, model: string, files?: File[]) => {
+    async (text: string, model: string, files?: File[], skills?: string[]) => {
       setError(null);
-      lastSendRef.current = { text, model, files };
+      lastSendRef.current = { text, model, files, skills };
       let sid = sessionIdRef.current;
 
       try {
@@ -265,6 +267,8 @@ export function useChatStream({
           session_id: sid,
           model,
           messages: [{ role: "user", content: text }],
+          // The gateway takes them off before the model sees the request.
+          ...(skills && skills.length > 0 ? { skills } : {}),
         });
         abortRef.current = abort;
 
@@ -359,7 +363,7 @@ export function useChatStream({
       }
     }
 
-    await send(last.text, model, last.files);
+    await send(last.text, model, last.files, last.skills);
   }, [send]);
 
   return {

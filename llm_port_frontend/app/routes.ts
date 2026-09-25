@@ -17,6 +17,9 @@ export default [
     // the sidebar, languages, policies and models in the same instant the
     // first message went out -- ten requests competing with the reply.
     route("/chat/:sessionId?", "pages/chat/ChatPage.tsx"),
+    // The skills a user owns, is shared or can see -- outside the admin pages.
+    route("/skills", "pages/skills/MySkillsPage.tsx"),
+    route("/skills/:id", "pages/skills/MySkillPage.tsx"),
   ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
@@ -109,7 +112,6 @@ export default [
     // Skills routes — guarded by module status
     layout("routes/skills-guard.tsx", [
       route("/admin/skills", "pages/admin/skills/SkillsListPage.tsx"),
-      route("/admin/skills/create", "pages/admin/skills/CreateSkillPage.tsx"),
       route("/admin/skills/:id", "pages/admin/skills/SkillDetailPage.tsx"),
     ]),
   ]),

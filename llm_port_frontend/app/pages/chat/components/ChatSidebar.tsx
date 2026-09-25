@@ -34,6 +34,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
+import ExtensionIcon from "@mui/icons-material/Extension";
 import { useTranslation } from "react-i18next";
 import {
   DndContext,
@@ -77,6 +78,8 @@ interface Props {
   currentUserEmail: string;
   onLogout: () => void;
   onProfileOpen: () => void;
+  /** Open the user's skills page; no entry when skills are off. */
+  onSkillsOpen?: () => void;
 }
 
 export default function ChatSidebar({
@@ -97,6 +100,7 @@ export default function ChatSidebar({
   currentUserEmail,
   onLogout,
   onProfileOpen,
+  onSkillsOpen,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -457,6 +461,19 @@ export default function ChatSidebar({
             {t("profile.manage_profile", { defaultValue: "Profile" })}
           </ListItemText>
         </MenuItem>
+        {onSkillsOpen && (
+          <MenuItem
+            onClick={() => {
+              setUserMenuAnchor(null);
+              onSkillsOpen();
+            }}
+          >
+            <ListItemIcon>
+              <ExtensionIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>{t("skills.my_title")}</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem
           onClick={() => {
             setUserMenuAnchor(null);

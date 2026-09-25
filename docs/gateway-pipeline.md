@@ -18,8 +18,8 @@ the DGX pair.
 | # | Step | What it does |
 |---|---|---|
 | 1 | Limits and routing | Checks rate limits, finds the routes for the model name, and refuses a request of the wrong kind (a chat request to an embedding model) |
-| 2 | Three lookups, side by side | **Session** loads the chat's history, memory and attachments, and saves the new user message. **Skills** finds the skills that apply. **Tools** fetches the MCP tool list |
-| 3 | Assembly | The skills are added as system messages, to this request only, so they never become history |
+| 2 | Three lookups, side by side | **Session** loads the chat's history, memory and attachments, and saves the new user message. **Skills** finds the skills that apply, among the ones the user can see: their own, the ones shared with them or their groups, and the organization's (see [skills](skills.md)). **Tools** fetches the MCP tool list |
+| 3 | Assembly | The skills are added as system messages, to this request only, so they never become history. The audit log records each one's version and content hash |
 | 4 | PII | Scans everything that is about to leave: the message and the history |
 | 5 | Model slot | Taken only now, when nothing else is left to wait for |
 | 6 | Tool rounds | When the model calls a tool the gateway runs (knowledge search, MCP), the gateway runs it, scans the result through PII, and asks the model again |
