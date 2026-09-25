@@ -91,7 +91,7 @@ multi_line_output = 3
 src_paths = ["llm_port_backend",]
 
 [tool.mypy]
-python_version = "0.3.0"
+python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 allow_subclassing_any = true
@@ -121,7 +121,7 @@ env = [
 ]
 
 [tool.ruff]
-target-version = "0.3.0"
+target-version = "py312"
 # List of enabled rulsets.
 # See https://docs.astral.sh/ruff/rules/ for more information.
 lint.select = [ "E",     # Error
