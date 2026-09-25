@@ -104,7 +104,9 @@ async def discover_tools(
         result.removed = len(existing_tools)
 
     # Update server discovery timestamp
-    await dao.update_server(server_id, last_discovery_at=now, status="active")
+    await dao.update_server(
+        server_id, last_discovery_at=now, status="active", last_error=None,
+    )
 
     await session.commit()
 

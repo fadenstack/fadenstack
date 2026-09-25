@@ -84,13 +84,16 @@ class MCPDao:
         self,
         server_id: uuid.UUID,
         status: str,
+        *,
+        last_error: str | None = None,
     ) -> None:
-        """Update only the server status field."""
+        """Set the server status, and why when it is an error (cleared otherwise)."""
         await self.session.execute(
             update(MCPServerModel)
             .where(MCPServerModel.id == server_id)
             .values(
                 status=status,
+                last_error=last_error,
                 updated_at=datetime.now(timezone.utc),
             ),
         )

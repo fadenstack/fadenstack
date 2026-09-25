@@ -14,6 +14,7 @@ from llm_port_mcp.db.session import get_db_session
 from llm_port_mcp.services.connection_manager import MCPConnectionManager
 from llm_port_mcp.services.dao import MCPDao
 from llm_port_mcp.services.discovery import discover_tools
+from llm_port_mcp.services.transport.base import MCPConnectError, describe_failure
 from llm_port_mcp.web.api.admin.schemas import (
     DiscoveredServer,
     RegisterServerRequest,
@@ -65,6 +66,46 @@ def _tool_to_response(tool: Any) -> ToolResponse:
     )
 
 
+def _target(server: Any) -> str:
+    """What a failure message names: the URL, or the command."""
+    return server.url or " ".join(server.command_json or []) or server.name
+
+
+def _reason(exc: Exception, server: Any) -> str:
+    """Why connecting to or discovering *server* failed, for the operator."""
+    if isinstance(exc, MCPConnectError):
+        return str(exc)
+    return describe_failure(exc, _target(server))
+
+
+def _merged(
+    stored: dict[str, str] | None,
+    changes: dict[str, str | None],
+) -> dict[str, str] | None:
+    """Apply an update to headers or env: set, remove with null, keep the rest."""
+    merged = dict(stored or {})
+    for key, value in changes.items():
+        if value is None:
+            merged.pop(key, None)
+        else:
+            merged[key] = value
+    return merged or None
+
+
+async def _record_failure(
+    dao: MCPDao,
+    session: AsyncSession,
+    server: Any,
+    exc: Exception,
+) -> str:
+    """Set the server to "error" with the reason, and return the reason."""
+    reason = _reason(exc, server)
+    logger.warning("MCP server %s: %s", server.name, reason)
+    await dao.update_server_status(server.id, "error", last_error=reason)
+    await session.commit()
+    return reason
+
+
 def _server_to_response(
     server: Any,
     *,
@@ -86,11 +127,14 @@ def _server_to_response(
         timeout_sec=server.timeout_sec,
         heartbeat_interval_sec=server.heartbeat_interval_sec,
         tenant_id=server.tenant_id,
+        header_names=sorted(server.headers_json_encrypted or {}),
+        env_names=sorted(server.env_json_encrypted or {}),
         discovered_tools=len(tools),
         has_settings=server.settings_schema_json is not None,
         created_at=server.created_at,
         updated_at=server.updated_at,
         last_discovery_at=server.last_discovery_at,
+        last_error=server.last_error,
         tools=tools,
         warnings=warnings or [],
     )
@@ -207,14 +251,10 @@ async def register_server(
                 except Exception:
                     logger.debug("No settings schema from %s", body.url)
         except Exception as exc:
-            logger.warning(
-                "Failed to connect/discover server %s: %s",
-                server.name,  # type: ignore[union-attr]
-                exc,
-            )
-            warnings.append(f"Connection/discovery failed: {exc}")
-            await dao.update_server_status(server.id, "error")  # type: ignore[arg-type]
-            await session.commit()
+            # Registered all the same, in "error" with the reason, so the
+            # operator can fix the URL or a header and refresh.
+            reason = await _record_failure(dao, session, server, exc)
+            warnings.append(reason)
 
     # Reload to get tools
     server = await dao.get_server(server.id)  # type: ignore[arg-type]
@@ -287,9 +327,13 @@ async def update_server(
     if body.args is not None:
         update_data["args_json"] = body.args
     if body.headers is not None:
-        update_data["headers_json_encrypted"] = body.headers
+        update_data["headers_json_encrypted"] = _merged(
+            server.headers_json_encrypted, body.headers,
+        )
     if body.env is not None:
-        update_data["env_json_encrypted"] = body.env
+        update_data["env_json_encrypted"] = _merged(
+            server.env_json_encrypted, body.env,
+        )
 
     if update_data:
         server = await dao.update_server(server_id, **update_data)
@@ -305,9 +349,17 @@ async def update_server(
         server = await dao.get_server(server_id)
         if server and server.enabled:
             try:
-                await manager.restart(server)
-            except Exception:
-                logger.warning("Reconnect failed for %s", server_id, exc_info=True)
+                adapter = await manager.restart(server)
+                # Discovered again: a corrected URL or token should show
+                # its tools, and clear the error, without another step.
+                await discover_tools(
+                    server_id=server.id,
+                    tenant_id=server.tenant_id,
+                    adapter=adapter,
+                    session=session,
+                )
+            except Exception as exc:
+                await _record_failure(dao, session, server, exc)
 
     await _increment_catalog_version(request, server.tenant_id)  # type: ignore[union-attr]
     server = await dao.get_server(server_id)
@@ -349,23 +401,19 @@ async def refresh_server(
         raise HTTPException(status_code=404, detail="Server not found.")
 
     manager = _connection_manager(request)
-    adapter = manager.get(str(server_id))
-    if adapter is None:
-        # Try to connect first
-        try:
-            adapter = await manager.start(server)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Cannot connect to server: {exc}",
-            ) from exc
-
-    await discover_tools(
-        server_id=server.id,
-        tenant_id=server.tenant_id,
-        adapter=adapter,
-        session=session,
-    )
+    try:
+        adapter = manager.get(str(server_id)) or await manager.start(server)
+        await discover_tools(
+            server_id=server.id,
+            tenant_id=server.tenant_id,
+            adapter=adapter,
+            session=session,
+        )
+    except Exception as exc:
+        # A 502 that says why, and the server left in "error" with the same
+        # reason: an upstream 401 used to come back as a bare 500.
+        reason = await _record_failure(dao, session, server, exc)
+        raise HTTPException(status_code=502, detail=reason) from exc
     await _increment_catalog_version(request, server.tenant_id)
 
     # Refresh settings schema from remote

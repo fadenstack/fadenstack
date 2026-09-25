@@ -6,7 +6,6 @@ connect to servers that expose a ``StreamableHTTPServerTransport`` endpoint.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 from contextlib import AsyncExitStack
 from typing import Any
@@ -19,6 +18,7 @@ from llm_port_mcp.services.transport.base import (
     GenericMCPServer,
     MCPServerConfig,
     MCPToolDescriptor,
+    failed_connect,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,12 @@ class StreamableHTTPMCPServer(GenericMCPServer):
                 ClientSession(read_stream, write_stream),
             )
             await session.initialize()
-        except Exception:
-            # Clean up the exit stack before propagating so the MCP SDK's
-            # internal task-group / cancel-scope is torn down in the same
-            # task that created it — avoids the anyio RuntimeError.
-            with contextlib.suppress(Exception):
-                await stack.aclose()
-            raise
+        except BaseException as error:  # failed_connect tells failure from cancellation
+            # Torn down in the task that opened it; see failed_connect.
+            failure = await failed_connect(stack, error, self.config.url)
+            if failure is None:
+                raise
+            raise failure from failure.__cause__
 
         # Only persist state after a fully successful connect.
         self._exit_stack = stack

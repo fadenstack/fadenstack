@@ -13,6 +13,7 @@ from llm_port_mcp.services.transport.base import (
     GenericMCPServer,
     MCPServerConfig,
     MCPToolDescriptor,
+    failed_connect,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,18 +33,27 @@ class SSEMCPServer(GenericMCPServer):
             msg = "SSE transport requires 'url'"
             raise ValueError(msg)
 
-        self._exit_stack = AsyncExitStack()
-        read_stream, write_stream = await self._exit_stack.enter_async_context(
-            sse_client(
-                url=self.config.url,
-                headers=self.config.headers or {},
-                timeout=self.config.timeout_sec,
-            ),
-        )
-        self._session = await self._exit_stack.enter_async_context(
-            ClientSession(read_stream, write_stream),
-        )
-        await self._session.initialize()
+        stack = AsyncExitStack()
+        try:
+            read_stream, write_stream = await stack.enter_async_context(
+                sse_client(
+                    url=self.config.url,
+                    headers=self.config.headers or {},
+                    timeout=self.config.timeout_sec,
+                ),
+            )
+            session = await stack.enter_async_context(
+                ClientSession(read_stream, write_stream),
+            )
+            await session.initialize()
+        except BaseException as error:  # failed_connect tells failure from cancellation
+            failure = await failed_connect(stack, error, self.config.url)
+            if failure is None:
+                raise
+            raise failure from failure.__cause__
+        # Kept only once connected: a failed connect left a half-open stack.
+        self._exit_stack = stack
+        self._session = session
         logger.info(
             "SSE MCP server connected: %s (url=%s)",
             self.config.name,

@@ -22,6 +22,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from llm_port_mcp.db.crypto import EncryptedJSON
+
 
 class Base(DeclarativeBase):
     """Shared declarative base for MCP models."""
@@ -90,8 +92,15 @@ class MCPServerModel(Base):
         JSONB, nullable=True, default=list
     )
     working_dir: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    headers_json_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
-    env_json_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Encrypted at rest with LLM_PORT_MCP_ENCRYPTION_KEY: they carry bearer
+    # tokens and API keys. They were plain Text despite the names; the type
+    # still reads the plain JSON written before.
+    headers_json_encrypted: Mapped[dict[str, str] | None] = mapped_column(
+        EncryptedJSON("mcp-server-headers"), nullable=True,
+    )
+    env_json_encrypted: Mapped[dict[str, str] | None] = mapped_column(
+        EncryptedJSON("mcp-server-env"), nullable=True,
+    )
     tool_prefix: Mapped[str] = mapped_column(String(128), nullable=False)
     pii_mode: Mapped[str] = mapped_column(
         String(32),
@@ -125,6 +134,8 @@ class MCPServerModel(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    #: Why the last connect or discovery failed; cleared when one succeeds.
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ── Provider settings (dynamic, proxied from remote MCP server) ──
     settings_schema_json: Mapped[dict[str, Any] | None] = mapped_column(

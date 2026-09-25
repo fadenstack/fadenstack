@@ -40,8 +40,11 @@ class UpdateServerRequest(BaseModel):
     command: list[str] | None = None
     args: list[str] | None = None
     working_dir: str | None = None
-    headers: dict[str, str] | None = None
-    env: dict[str, str] | None = None
+    #: Merged into what is stored: a value sets the key, null removes it, a
+    #: key left out stays. Values are never sent back, so nobody has to
+    #: re-enter a token to change something else.
+    headers: dict[str, str | None] | None = None
+    env: dict[str, str | None] | None = None
     tool_prefix: str | None = None
     pii_mode: str | None = Field(default=None, pattern=r"^(allow|redact|block)$")
     timeout_sec: int | None = Field(default=None, ge=5, le=600)
@@ -93,11 +96,16 @@ class ServerResponse(BaseModel):
     timeout_sec: int
     heartbeat_interval_sec: int
     tenant_id: str
+    #: Which headers and environment variables are set; never their values.
+    header_names: list[str] = Field(default_factory=list)
+    env_names: list[str] = Field(default_factory=list)
     discovered_tools: int = 0
     has_settings: bool = False
     created_at: datetime
     updated_at: datetime
     last_discovery_at: datetime | None = None
+    #: Why the last connect or discovery failed, when it did.
+    last_error: str | None = None
     tools: list[ToolResponse] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

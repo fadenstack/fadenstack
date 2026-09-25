@@ -13,6 +13,7 @@ from llm_port_mcp.services.transport.base import (
     GenericMCPServer,
     MCPServerConfig,
     MCPToolDescriptor,
+    failed_connect,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,14 +69,24 @@ class StdioMCPServer(GenericMCPServer):
             cwd=self.config.working_dir,
         )
 
-        self._exit_stack = AsyncExitStack()
-        read_stream, write_stream = await self._exit_stack.enter_async_context(
-            stdio_client(params),
-        )
-        self._session = await self._exit_stack.enter_async_context(
-            ClientSession(read_stream, write_stream),
-        )
-        await self._session.initialize()
+        stack = AsyncExitStack()
+        try:
+            read_stream, write_stream = await stack.enter_async_context(
+                stdio_client(params),
+            )
+            session = await stack.enter_async_context(
+                ClientSession(read_stream, write_stream),
+            )
+            await session.initialize()
+        except BaseException as error:  # failed_connect tells failure from cancellation
+            target = " ".join(self.config.command)
+            failure = await failed_connect(stack, error, target)
+            if failure is None:
+                raise
+            raise failure from failure.__cause__
+        # Kept only once connected: a failed connect left a half-open stack.
+        self._exit_stack = stack
+        self._session = session
         logger.info(
             "Stdio MCP server connected: %s (command=%s)",
             self.config.name,
