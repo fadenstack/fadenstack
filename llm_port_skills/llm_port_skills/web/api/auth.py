@@ -1,34 +1,38 @@
-"""Shared auth dependencies for the Skills service."""
+"""Who a request to the skills service acts for.
+
+The backend calls with the shared service token and says who the user is in
+headers: their id, their groups, and what RBAC lets them do with skills.
+Those headers are believed only next to the service token -- anyone else who
+reaches the service would otherwise be whoever they claimed.
+
+Every call used to come in as user "service" of tenant "default": the
+service could not tell users apart, so it stored no owner and resolved the
+same skills for everyone.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hmac
 from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from llm_port_skills.services.access import KNOWN_CAPS, Principal
 from llm_port_skills.settings import settings
 
-# ── JWT-based auth (for admin endpoints) ──────────────────────────────
-
-
-@dataclass(frozen=True)
-class AuthContext:
-    """Authenticated request context extracted from JWT."""
-
-    user_id: str
-    tenant_id: str
-    raw_claims: dict[str, Any]
-
+HEADER_USER = "x-llm-port-user"
+HEADER_GROUPS = "x-llm-port-groups"
+HEADER_CAPS = "x-llm-port-caps"
+HEADER_TENANT = "x-llm-port-tenant"
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _verify_token(token: str) -> dict[str, Any]:
     if not settings.jwt_secret:
-        raise HTTPException(status_code=500, detail="JWT secret not configured.")
+        raise HTTPException(status_code=401, detail="Invalid token.")
     try:
         decode_opts: dict[str, Any] = {
             "algorithms": [settings.jwt_algorithm],
@@ -44,36 +48,58 @@ def _verify_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid JWT token.") from exc
 
 
-async def get_auth_context(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> AuthContext:
-    """FastAPI dependency — validates JWT or service bearer token.
+def _split(value: str | None) -> frozenset[str]:
+    if not value:
+        return frozenset()
+    return frozenset(part.strip() for part in value.split(",") if part.strip())
 
-    When the Backend admin proxy forwards a request it sends the
-    shared ``service_token`` instead of a user JWT.  We accept that
-    as a trusted internal call and synthesize an AuthContext.
+
+def principal_from_headers(request: Request) -> Principal:
+    """The user the trusted caller acts for, as its headers say."""
+    return Principal(
+        tenant_id=(request.headers.get(HEADER_TENANT) or "default").strip()
+        or "default",
+        user_id=(request.headers.get(HEADER_USER) or "").strip() or None,
+        group_ids=_split(request.headers.get(HEADER_GROUPS)),
+        caps=_split(request.headers.get(HEADER_CAPS)) & KNOWN_CAPS,
+    )
+
+
+def _is_service_token(token: str | None) -> bool:
+    return bool(
+        token
+        and settings.service_token
+        and hmac.compare_digest(token.encode(), settings.service_token.encode()),
+    )
+
+
+async def get_principal(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> Principal:
+    """FastAPI dependency: the ``Principal`` a request acts for.
+
+    - Service token: the user the headers name, with their capabilities.
+    - A user's own JWT (when a JWT secret is configured): that user, with no
+      capabilities -- they see what is visible to them and nothing more,
+      since only the backend knows their RBAC.
+    - No service token configured (development): the headers, as the
+      internal API also trusts every caller then.
     """
     token = credentials.credentials if credentials else None
+    if _is_service_token(token):
+        return principal_from_headers(request)
+    if not settings.service_token and not token:
+        return principal_from_headers(request)
     if not token:
         raise HTTPException(status_code=401, detail="Missing Authorization header.")
-
-    # Allow trusted service-token from the backend proxy.
-    if settings.service_token and token == settings.service_token:
-        return AuthContext(
-            user_id="service",
-            tenant_id="default",
-            raw_claims={},
-        )
 
     claims = _verify_token(token)
     user_id = str(claims.get("sub", "")).strip()
     if not user_id:
         raise HTTPException(status_code=401, detail="JWT missing subject.")
     tenant_id = str(claims.get("tenant_id", "default")).strip() or "default"
-    return AuthContext(user_id=user_id, tenant_id=tenant_id, raw_claims=claims)
-
-
-# ── Service-token auth (for internal endpoints) ──────────────────────
+    return Principal(tenant_id=tenant_id, user_id=user_id)
 
 
 async def verify_service_token(request: Request) -> None:
@@ -83,6 +109,5 @@ async def verify_service_token(request: Request) -> None:
     auth_header = request.headers.get("authorization", "")
     if not auth_header.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing service token.")
-    token = auth_header[7:]
-    if token != settings.service_token:
+    if not _is_service_token(auth_header[7:]):
         raise HTTPException(status_code=403, detail="Invalid service token.")
