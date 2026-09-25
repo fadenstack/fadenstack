@@ -123,12 +123,13 @@ service can open at its peak, workers × (connections kept + opened on demand):
 | Gateway | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
 | Backend | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
 | Backend worker | 2 × (6 + 6) = 24 | 2 × (5 + 5) = 20 |
-| PII | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
+| PII | none | none |
 | MCP | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
 | Skills | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
 | **Core** | **72** | **100** |
-| **Core + PII + MCP + skills** | **126** | **170** |
+| **Core + PII + MCP + skills** | **102** | **130** |
 
+PII has pool settings but opens no connection: its database layer is unused.
 Langfuse's web and worker containers use the same Postgres with pools of their
 own, not counted here.
 
@@ -147,8 +148,8 @@ at least 5, and as many again on demand), so the peak grows with the square of
 the workers: on a server with 16 physical cores, 4 workers each, one service
 alone can open 96. The settings per service are `<PREFIX>WORKERS_COUNT`,
 `<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`, with the prefixes
-`LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_PII_`, `LLM_PORT_MCP_` and
-`LLM_PORT_SKILLS_`; the backend worker takes the backend's.
+`LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and `LLM_PORT_SKILLS_`;
+the backend worker takes the backend's.
 
 ## What grows with what
 
@@ -157,7 +158,7 @@ alone can open 96. The settings per service are `<PREFIX>WORKERS_COUNT`,
 | Users chatting at once | Gateway and backend CPU (first); Postgres connections and CPU |
 | The PII module | 0.8 GB memory; 42 ms of CPU per chat turn |
 | MCP tools, skills | About 170 MB each; 11 and 17 ms per chat turn |
-| Gateway, backend or PII workers | 10 to 12 Postgres connections each at their peak (see [Database connections](#database-connections)) |
+| Gateway or backend workers | 10 to 12 Postgres connections each at their peak (see [Database connections](#database-connections)) |
 | Models hosted | Disk (model store); nothing on the server's CPU or memory |
 | GPU machines | Nothing measurable on the server; a runtime image per architecture on disk |
 | Tracing (Langfuse) | ClickHouse disk and CPU; not yet measured under chat load |

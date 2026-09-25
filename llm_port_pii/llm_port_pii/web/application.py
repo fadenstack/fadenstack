@@ -4,7 +4,6 @@ from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI
-from fastapi.responses import UJSONResponse
 from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -58,7 +57,9 @@ def get_app() -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url="/api/openapi.json",
-        default_response_class=UJSONResponse,
+        # FastAPI's own JSON: it serializes a declared response model
+        # directly, and warns that UJSONResponse is deprecated -- a warning
+        # the tests turn into a failure.
     )
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated

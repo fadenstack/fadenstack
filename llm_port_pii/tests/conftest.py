@@ -1,20 +1,14 @@
-import uuid
 from typing import Any, AsyncGenerator
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from httpx import ASGITransport, AsyncClient
 
-from llm_port_pii.db.dependencies import get_db_session
-from llm_port_pii.db.utils import create_database, drop_database
-from llm_port_pii.settings import settings
 from llm_port_pii.web.application import get_app
+
+# No database: the service opens none (its DB layer is unused template code,
+# and no install gives it credentials). The fixtures created one, so every
+# API test failed on a login the service never needs.
 
 
 @pytest.fixture(scope="session")
@@ -27,73 +21,14 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.fixture(scope="session")
-async def _engine() -> AsyncGenerator[AsyncEngine, None]:
-    """
-    Create engine and databases.
-
-    :yield: new engine.
-    """
-    from llm_port_pii.db.meta import meta
-    from llm_port_pii.db.models import load_all_models
-
-    load_all_models()
-
-    await create_database()
-
-    engine = create_async_engine(str(settings.db_url))
-    async with engine.begin() as conn:
-        await conn.run_sync(meta.create_all)
-
-    try:
-        yield engine
-    finally:
-        await engine.dispose()
-        await drop_database()
-
-
 @pytest.fixture
-async def dbsession(
-    _engine: AsyncEngine,
-) -> AsyncGenerator[AsyncSession, None]:
-    """
-    Get session to database.
-
-    Fixture that returns a SQLAlchemy session with a SAVEPOINT, and the rollback to it
-    after the test completes.
-
-    :param _engine: current engine.
-    :yields: async session.
-    """
-    connection = await _engine.connect()
-    trans = await connection.begin()
-
-    session_maker = async_sessionmaker(
-        connection,
-        expire_on_commit=False,
-    )
-    session = session_maker()
-
-    try:
-        yield session
-    finally:
-        await session.close()
-        await trans.rollback()
-        await connection.close()
-
-
-@pytest.fixture
-def fastapi_app(
-    dbsession: AsyncSession,
-) -> FastAPI:
+def fastapi_app() -> FastAPI:
     """
     Fixture for creating FastAPI app.
 
-    :return: fastapi app with mocked dependencies.
+    :return: fastapi app.
     """
-    application = get_app()
-    application.dependency_overrides[get_db_session] = lambda: dbsession
-    return application
+    return get_app()
 
 
 @pytest.fixture
@@ -107,5 +42,6 @@ async def client(
     :param fastapi_app: the application.
     :yield: client for the app.
     """
-    async with AsyncClient(app=fastapi_app, base_url="http://test", timeout=2.0) as ac:
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=2.0) as ac:
         yield ac
