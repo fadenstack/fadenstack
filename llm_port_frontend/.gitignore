@@ -8,3 +8,7 @@
 e2e/.auth/
 test-results/
 playwright-report/
+
+# The chat load kit, copied in from llm-port-dev/chat/load to run (its home);
+# holds a signed-in session in .auth/ and raw results.
+e2e-load/

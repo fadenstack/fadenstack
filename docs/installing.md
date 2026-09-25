@@ -9,8 +9,9 @@ GPUs join afterwards, each through a one-line install from the console.
 ## What you need
 
 - **A Linux server, x86_64.** The published images are x86_64 only. The server
-  needs no GPU; the models run on the machines you add. The test install uses
-  8 cores, 7 GB of memory and 100 GB of disk.
+  needs no GPU; the models run on the machines you add. At least 4 cores,
+  6 GB of memory (8 GB with the PII, MCP and skills modules) and 60 GB of disk;
+  what each part needs is in [System requirements](system-requirements.md).
 - **Docker Engine 24 or later with Compose v2**, and your user in the
   `docker` group.
 - **Python 3.12 or later**, with `pipx` or `uv` to install the CLI.
