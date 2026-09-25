@@ -160,11 +160,13 @@ def test_matched_skills_rank_by_score_and_are_cut_at_the_limit() -> None:
 
 def test_a_workspace_assignment_applies_only_there() -> None:
     assigned = _skill(
-        "assigned", priority=20, assignments=[_Assignment("workspace", "w1")]
+        "assigned",
+        priority=20,
+        assignments=[_Assignment("workspace", "w1")],
     )
     here = RequestContext(user_id="u", workspace_id="w1")
     elsewhere = RequestContext(user_id="u", workspace_id="w2")
     assert _slugs(choose([assigned], here, max_results=3, max_explicit=5)) == [
-        "assigned"
+        "assigned",
     ]
     assert choose([assigned], elsewhere, max_results=3, max_explicit=5) == []
