@@ -389,14 +389,17 @@ class GatewayDAO:
         session_id: uuid.UUID,
         overrides: list[tuple[str, bool]],
     ) -> list[SessionToolOverride]:
-        """Upsert a batch of per-tool enable/disable overrides."""
+        """Upsert a batch of per-tool enable/disable overrides.
+
+        A tool named twice takes its last value. It was inserted twice, and
+        the second row broke the (session, tool) key: the request answered
+        500 and changed nothing.
+        """
         existing = await self.get_session_tool_overrides(session_id)
         by_tool: dict[str, SessionToolOverride] = {o.tool_id: o for o in existing}
-        result: list[SessionToolOverride] = []
         for tool_id, enabled in overrides:
             if tool_id in by_tool:
                 by_tool[tool_id].enabled = enabled
-                result.append(by_tool[tool_id])
             else:
                 row = SessionToolOverride(
                     session_id=session_id,
@@ -404,9 +407,10 @@ class GatewayDAO:
                     enabled=enabled,
                 )
                 self.session.add(row)
-                result.append(row)
+                by_tool[tool_id] = row
         await self.session.flush()
-        return result
+        named = dict.fromkeys(tool_id for tool_id, _ in overrides)
+        return [by_tool[tool_id] for tool_id in named]
 
     async def delete_session_tool_override(
         self,

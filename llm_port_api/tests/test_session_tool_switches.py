@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from llm_port_api.db.dao.gateway_dao import GatewayDAO
 from llm_port_api.db.models.gateway import (
     ChatSession,
     ExecutionMode,
@@ -35,7 +36,7 @@ from tests.test_gateway_knowledge_tools import (
     _say,
     _tool_names,
 )
-from tests.test_gateway_pipeline_combined import _Observability, _seed, _session
+from tests.test_gateway_pipeline_combined import _Observability, _seed, _session, _token
 
 SEARCH = "mcp.github.search_repositories"
 CREATE = "mcp.github.create_repository"
@@ -197,3 +198,52 @@ async def test_any_other_failure_carries_the_service_reason() -> None:
             qualified_name=CREATE, arguments={}, tenant_id="tenant-a", request_id="r1",
         )
     assert result.content == f"Tool '{CREATE}' failed: Tool is disabled."
+
+
+@pytest.mark.anyio
+async def test_a_tool_named_twice_in_one_update_takes_the_last_value(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+) -> None:
+    """It was inserted twice: the request answered 500 and switched nothing."""
+    sid = await _session(db_session)
+    r = await client.patch(
+        f"/v1/sessions/{sid}/tool-policy",
+        headers={"Authorization": f"Bearer {_token()}"},
+        json={"tool_overrides": [
+            {"tool_id": SEARCH, "enabled": True},
+            {"tool_id": CREATE, "enabled": False},
+            {"tool_id": SEARCH, "enabled": False},
+        ]},
+    )
+    assert r.status_code == 200
+    rows = await GatewayDAO(db_session).get_session_tool_overrides(sid)
+    assert sorted((o.tool_id, o.enabled) for o in rows) == [(CREATE, False), (SEARCH, False)]
+
+
+@pytest.mark.parametrize(
+    ("called", "runs"),
+    [
+        ("mcp.everything.get-sum", "mcp.everything.get-sum"),  # was cut to "mcp.everything.get"
+        ("knowledge_search<|channel|>commentary", "knowledge_search"),  # what some models append
+        ("mcp.github.search_repositories", "mcp.github.search_repositories"),
+    ],
+)
+def test_a_tool_is_run_by_its_whole_name(called: str, runs: str) -> None:
+    """Hyphens are part of a name; a model's appended markup is not."""
+    from llm_port_api.services.gateway.service import _tool_name  # noqa: PLC0415
+
+    assert _tool_name({"function": {"name": called}}) == runs
+
+
+@pytest.mark.anyio
+async def test_a_hyphenated_mcp_tool_is_called_by_its_name(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The MCP service is asked for the tool the model named, whole."""
+    await _ready(fastapi_app, db_session)
+    mcp = _MCP(monkeypatch, "mcp.everything.get-sum")
+    _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 17, "b": 25}), _say("42"))
+    sid = await _session(db_session)
+
+    assert (await _ask(client, session_id=str(sid))).status_code == 200
+    assert [call["qualified_name"] for call in mcp.calls] == ["mcp.everything.get-sum"]

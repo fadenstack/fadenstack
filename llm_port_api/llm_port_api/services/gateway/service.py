@@ -404,7 +404,11 @@ def _with_tools(payload: dict[str, Any], tools: list[dict[str, Any]]) -> dict[st
     return out
 
 
-_TOOL_NAME = re.compile(r"^[\w.]+")
+# A name as tools are named -- letters, digits, "_", "." and "-" -- up to what
+# some models append ("knowledge_search<|channel|>commentary"). Without "-",
+# "mcp.everything.get-sum" was cut to "mcp.everything.get": every hyphenated
+# MCP tool failed as unknown (dev stack load test, 2026-09-26).
+_TOOL_NAME = re.compile(r"^[\w.-]+")
 
 
 def _tool_name(call: dict[str, Any]) -> str:
