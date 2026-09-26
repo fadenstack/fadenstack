@@ -64,7 +64,13 @@
     "clusters": "集群",
     "deployments": "部署",
     "admin": "管理面板",
-    "marketplace": "模型市场"
+    "marketplace": "模型市场",
+    "open_navigation": "打开导航",
+    "close_navigation": "关闭导航",
+    "navigation": "导航",
+    "button_side": "菜单按钮",
+    "side_left": "左侧",
+    "side_right": "右侧"
   },
   "auth": {
     "logout": "退出登录",

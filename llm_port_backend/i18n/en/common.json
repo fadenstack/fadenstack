@@ -64,7 +64,13 @@
     "clusters": "Clusters",
     "deployments": "Deployments",
     "admin": "Admin panel",
-    "marketplace": "Model marketplace"
+    "marketplace": "Model marketplace",
+    "open_navigation": "Open navigation",
+    "close_navigation": "Close navigation",
+    "navigation": "Navigation",
+    "button_side": "Menu button",
+    "side_left": "Left",
+    "side_right": "Right"
   },
   "auth": {
     "logout": "Logout",

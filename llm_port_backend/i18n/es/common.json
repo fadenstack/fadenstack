@@ -64,7 +64,13 @@
     "clusters": "Clústeres",
     "deployments": "Despliegues",
     "admin": "Panel de administración",
-    "marketplace": "Mercado de modelos"
+    "marketplace": "Mercado de modelos",
+    "open_navigation": "Abrir navegación",
+    "close_navigation": "Cerrar navegación",
+    "navigation": "Navegación",
+    "button_side": "Botón de menú",
+    "side_left": "Izquierda",
+    "side_right": "Derecha"
   },
   "auth": {
     "logout": "Cerrar sesion",

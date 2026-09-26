@@ -60,6 +60,8 @@ export interface AdminTopbarProps {
   onRootFormOpen: () => void;
   onRootDeactivate: () => void;
   onLogout: () => void;
+  /** Set on a phone, where there is no sidebar: the logo opens the navigation. */
+  onOpenNav?: () => void;
 }
 
 export function AdminTopbar({
@@ -82,6 +84,7 @@ export function AdminTopbar({
   onRootFormOpen,
   onRootDeactivate,
   onLogout,
+  onOpenNav,
 }: AdminTopbarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -99,6 +102,20 @@ export function AdminTopbar({
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar variant="dense" sx={{ justifyContent: "flex-end", gap: 1.5 }}>
+        {onOpenNav && (
+          <IconButton
+            onClick={onOpenNav}
+            aria-label={t("nav.open_navigation")}
+            sx={{ mr: "auto", width: 36, height: 36, p: 0.5, borderRadius: 1.5 }}
+          >
+            <Box
+              component="img"
+              src="/icon_color.png"
+              alt=""
+              sx={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 1 }}
+            />
+          </IconButton>
+        )}
         <Tooltip title={t("chat.title", { defaultValue: "Chat" })} arrow>
           <IconButton
             size="small"
@@ -283,7 +300,8 @@ export function AdminTopbar({
                   color="error"
                   size="small"
                   variant="filled"
-                  sx={{ fontWeight: 700 }}
+                  // On a phone the red Deactivate button says it alone.
+                  sx={{ fontWeight: 700, display: { xs: "none", sm: "inline-flex" } }}
                 />
                 <Button
                   size="small"

@@ -1,6 +1,9 @@
 /**
  * Admin layout — wraps all /admin/* routes with a collapsible sidebar,
  * top bar, root-mode controls, and help wizard.
+ *
+ * On a phone the sidebar is an overlay opened from a floating button in the
+ * bottom corner of the user's hand (or from the logo in the top bar).
  */
 import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
@@ -15,8 +18,11 @@ import i18n from "~/i18n";
 
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 
 import { useNavOrder } from "~/lib/useNavOrder";
+import { useNavHand } from "~/lib/useNavHand";
 import {
   NAV,
   ALL_NAV_IDS,
@@ -30,6 +36,7 @@ import {
 } from "~/lib/adminConstants";
 import { AdminTopbar } from "~/components/AdminTopbar";
 import { AdminSidebar } from "~/components/AdminSidebar";
+import { MobileNavButton } from "~/components/MobileNavButton";
 import { RootModeDialog } from "~/components/RootModeDialog";
 import { ProductTourDialog } from "~/components/ProductTourDialog";
 import {
@@ -104,6 +111,17 @@ function AdminLayoutInner() {
 
   /* Drawer open/collapsed state */
   const [drawerOpen, setDrawerOpen] = useState(true);
+
+  /* Phone navigation: an overlay panel instead of the side rail */
+  const theme = useTheme();
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [navHand, setNavHand] = useNavHand();
+  useEffect(() => {
+    // Whatever navigated (a link in the panel, the back button, a page's own
+    // link), the panel is done.
+    setMobileNavOpen(false);
+  }, [location.pathname, location.search, isPhone]);
 
   /* ── DnD: nav reordering ────────────────────────────────────────── */
   const { order, setOrder, resetOrder } = useNavOrder(
@@ -387,7 +405,15 @@ function AdminLayoutInner() {
   }
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <Box
+      sx={{
+        display: "flex",
+        height: "100vh",
+        // A phone's 100vh reaches behind the browser's toolbar.
+        "@supports (height: 100dvh)": { height: "100dvh" },
+        overflow: "hidden",
+      }}
+    >
       <AdminSidebar
         drawerOpen={drawerOpen}
         setDrawerOpen={setDrawerOpen}
@@ -396,7 +422,24 @@ function AdminLayoutInner() {
         order={order}
         setOrder={setOrder}
         resetOrder={resetOrder}
+        mobile={
+          isPhone
+            ? {
+                open: mobileNavOpen,
+                onClose: () => setMobileNavOpen(false),
+                hand: navHand,
+                onHandChange: setNavHand,
+              }
+            : undefined
+        }
       />
+      {isPhone && (
+        <MobileNavButton
+          hand={navHand}
+          open={mobileNavOpen}
+          onOpen={() => setMobileNavOpen(true)}
+        />
+      )}
 
       <Box
         sx={{
@@ -433,6 +476,7 @@ function AdminLayoutInner() {
           onRootFormOpen={() => setShowRootForm(true)}
           onRootDeactivate={handleDeactivateRoot}
           onLogout={handleLogout}
+          onOpenNav={isPhone ? () => setMobileNavOpen(true) : undefined}
         />
 
         <RootModeDialog
@@ -501,7 +545,16 @@ function AdminLayoutInner() {
           onClose={() => setPageHelpOpen(false)}
         />
 
-        <Box sx={{ flexGrow: 1, minHeight: 0, overflow: "auto", p: 3 }}>
+        <Box
+          sx={{
+            flexGrow: 1,
+            minHeight: 0,
+            overflow: "auto",
+            p: { xs: 2, sm: 3 },
+            // Room under the last row for the floating menu button.
+            pb: { xs: "calc(96px + env(safe-area-inset-bottom, 0px))", sm: 3 },
+          }}
+        >
           <Outlet
             context={{
               rootModeActive: isRootActive,

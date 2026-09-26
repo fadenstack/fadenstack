@@ -1,5 +1,9 @@
 /**
  * AdminSidebar — collapsible MUI Drawer with drag-and-drop nav reordering.
+ *
+ * On a phone (`mobile` set) it is an overlay instead, sliding in from the side
+ * of the hand the user picked: always expanded, 48 px rows, no reordering, and
+ * a page picked closes it.
  */
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router";
@@ -9,6 +13,9 @@ import Box from "@mui/material/Box";
 import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
 import Drawer from "@mui/material/Drawer";
+import SwipeableDrawer from "@mui/material/SwipeableDrawer";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -20,6 +27,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import CloseIcon from "@mui/icons-material/Close";
+import FrontHandOutlinedIcon from "@mui/icons-material/FrontHandOutlined";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
@@ -27,6 +36,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 import AppBrand from "~/components/AppBrand";
 import { usePendingJoins } from "~/lib/usePendingJoins";
+import type { NavHand } from "~/lib/useNavHand";
 
 import {
   DndContext,
@@ -152,6 +162,16 @@ function DroppableZone({
 
 /* ── Props ─────────────────────────────────────────────────────────── */
 
+/** The id of the navigation panel, for the controls that open it. */
+export const ADMIN_NAV_ID = "admin-navigation";
+
+export interface MobileNavProps {
+  open: boolean;
+  onClose: () => void;
+  hand: NavHand;
+  onHandChange: (hand: NavHand) => void;
+}
+
 export interface AdminSidebarProps {
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
@@ -162,17 +182,25 @@ export interface AdminSidebarProps {
     React.SetStateAction<{ mainIds: string[]; pinnedIds: string[] }>
   >;
   resetOrder: () => void;
+  /** Set on a phone: render as an overlay panel instead of a side rail. */
+  mobile?: MobileNavProps;
 }
 
 export function AdminSidebar({
-  drawerOpen,
+  drawerOpen: railOpen,
   setDrawerOpen,
   mainVisible,
   pinnedVisible,
   order,
   setOrder,
   resetOrder,
+  mobile,
 }: AdminSidebarProps) {
+  // The phone panel always shows labels.
+  const drawerOpen = mobile ? true : railOpen;
+  // Rows a thumb can hit, and a page picked on a phone closes the panel.
+  const touchRow = mobile ? { minHeight: 48 } : {};
+  const onPick = mobile?.onClose;
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -293,9 +321,11 @@ export function AdminSidebar({
             <ListItemButton
               component={NavLink}
               to={entry.to}
+              onClick={onPick}
               data-tour-id={`sidebar.${entry.id}`}
               sx={{
                 ...linkButtonSx,
+                ...touchRow,
                 justifyContent: drawerOpen ? "initial" : "center",
               }}
             >
@@ -346,7 +376,11 @@ export function AdminSidebar({
                 if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0)
                   return;
                 e.preventDefault();
-                if (drawerOpen) {
+                if (mobile) {
+                  // Open the list only: navigating would close the panel
+                  // before the user could pick a page in it.
+                  toggleGroup(entry.labelKey);
+                } else if (drawerOpen) {
                   toggleGroup(entry.labelKey);
                   if (!isGroupExpanded && defaultTo) navigate(defaultTo);
                 } else {
@@ -357,6 +391,7 @@ export function AdminSidebar({
               }}
               sx={{
                 ...linkButtonSx,
+                ...touchRow,
                 justifyContent: drawerOpen ? "initial" : "center",
                 ...(isGroupActive && !drawerOpen
                   ? {
@@ -416,7 +451,8 @@ export function AdminSidebar({
                   <ListItemButton
                     component={NavLink}
                     to={child.to}
-                    sx={{ ...linkButtonSx, py: 0.5 }}
+                    onClick={onPick}
+                    sx={{ ...linkButtonSx, py: 0.5, ...touchRow }}
                   >
                     <ListItemIcon
                       sx={{ minWidth: 36, color: "text.secondary" }}
@@ -449,21 +485,8 @@ export function AdminSidebar({
     );
   }
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: currentDrawerWidth,
-        flexShrink: 0,
-        transition: "width 225ms cubic-bezier(0.4,0,0.2,1)",
-        "& .MuiDrawer-paper": {
-          width: currentDrawerWidth,
-          boxSizing: "border-box",
-          overflowX: "hidden",
-          transition: "width 225ms cubic-bezier(0.4,0,0.2,1)",
-        },
-      }}
-    >
+  const content = (
+    <>
       {/* Logo / brand */}
       <Box
         sx={{
@@ -477,7 +500,7 @@ export function AdminSidebar({
       >
         <IconButton
           size="small"
-          onClick={() => setDrawerOpen((o: boolean) => !o)}
+          onClick={() => (mobile ? mobile.onClose() : setDrawerOpen((o: boolean) => !o))}
           sx={{
             width: 40,
             height: 40,
@@ -500,6 +523,15 @@ export function AdminSidebar({
           />
         </IconButton>
         {drawerOpen && <AppBrand />}
+        {mobile && (
+          <IconButton
+            onClick={mobile.onClose}
+            aria-label={t("nav.close_navigation")}
+            sx={{ ml: "auto", width: 44, height: 44 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        )}
       </Box>
 
       {/* Nav items — with drag-and-drop reordering */}
@@ -529,7 +561,7 @@ export function AdminSidebar({
                 <SortableNavItem
                   key={entry.id}
                   id={entry.id}
-                  disabled={!drawerOpen}
+                  disabled={!drawerOpen || Boolean(mobile)}
                   drawerOpen={drawerOpen}
                 >
                   {renderNavEntry(entry)}
@@ -574,7 +606,7 @@ export function AdminSidebar({
                 <SortableNavItem
                   key={entry.id}
                   id={entry.id}
-                  disabled={!drawerOpen}
+                  disabled={!drawerOpen || Boolean(mobile)}
                   drawerOpen={drawerOpen}
                 >
                   {renderNavEntry(entry)}
@@ -617,7 +649,10 @@ export function AdminSidebar({
         </DragOverlay>
       </DndContext>
 
-      {/* Collapse / reset row */}
+      {/* Collapse / reset row; on a phone, which side the menu button is on */}
+      {mobile ? (
+        <HandPicker hand={mobile.hand} onChange={mobile.onHandChange} />
+      ) : (
       <Box
         sx={{
           display: "flex",
@@ -644,6 +679,89 @@ export function AdminSidebar({
           </IconButton>
         )}
       </Box>
+      )}
+    </>
+  );
+
+  if (mobile) {
+    return (
+      <SwipeableDrawer
+        anchor={mobile.hand}
+        open={mobile.open}
+        onClose={mobile.onClose}
+        onOpen={() => {}}
+        // The button opens it; an edge swipe would fight horizontal scrolling
+        // and the browser's own back gesture. Swiping it shut still works.
+        disableSwipeToOpen
+        ModalProps={{ keepMounted: true }}
+        slotProps={{
+          paper: {
+            id: ADMIN_NAV_ID,
+            role: "dialog",
+            "aria-label": t("nav.navigation"),
+            sx: {
+              width: "min(300px, 85vw)",
+              boxSizing: "border-box",
+              overflowX: "hidden",
+              pb: "env(safe-area-inset-bottom, 0px)",
+              // Rounded on the edge that faces the page: a sheet over it.
+              ...(mobile.hand === "right"
+                ? { borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }
+                : { borderTopRightRadius: 16, borderBottomRightRadius: 16 }),
+            },
+          },
+        }}
+      >
+        {content}
+      </SwipeableDrawer>
+    );
+  }
+
+  return (
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: currentDrawerWidth,
+        flexShrink: 0,
+        transition: "width 225ms cubic-bezier(0.4,0,0.2,1)",
+        "& .MuiDrawer-paper": {
+          width: currentDrawerWidth,
+          boxSizing: "border-box",
+          overflowX: "hidden",
+          transition: "width 225ms cubic-bezier(0.4,0,0.2,1)",
+        },
+      }}
+    >
+      {content}
     </Drawer>
+  );
+}
+
+/** Left or right: moves the menu button (and this panel) to that side. */
+function HandPicker({ hand, onChange }: { hand: NavHand; onChange: (hand: NavHand) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Box sx={{ px: 2, pt: 1, pb: 1.5, borderTop: 1, borderColor: "divider" }}>
+      <Typography id="nav-hand-label" variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+        {t("nav.button_side")}
+      </Typography>
+      <ToggleButtonGroup
+        exclusive
+        fullWidth
+        size="small"
+        value={hand}
+        onChange={(_e, value: NavHand | null) => value && onChange(value)}
+        aria-labelledby="nav-hand-label"
+      >
+        <ToggleButton value="left" sx={{ minHeight: 44, gap: 1, textTransform: "none" }}>
+          <FrontHandOutlinedIcon fontSize="small" sx={{ transform: "scaleX(-1)" }} />
+          {t("nav.side_left")}
+        </ToggleButton>
+        <ToggleButton value="right" sx={{ minHeight: 44, gap: 1, textTransform: "none" }}>
+          <FrontHandOutlinedIcon fontSize="small" />
+          {t("nav.side_right")}
+        </ToggleButton>
+      </ToggleButtonGroup>
+    </Box>
   );
 }
