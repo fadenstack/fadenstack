@@ -344,9 +344,14 @@ export function SkillSettingsFields({
         fullWidth
         helperText={t("skills.csv_hint")}
       />
-      {/* File-type triggers are kept (import, export, the API) but not
-          offered: the gateway does not yet tell the resolver which files a
-          chat carries, so they would never fire. */}
+      <TextField
+        label={t("skills.trigger_file_types")}
+        value={values.fileTypes}
+        onChange={(e) => onChange("fileTypes", e.target.value)}
+        disabled={readOnly}
+        fullWidth
+        helperText={t("skills.trigger_file_types_hint")}
+      />
 
       <Typography variant="subtitle2" sx={{ pt: 1 }}>
         {t("skills.tools_title")}

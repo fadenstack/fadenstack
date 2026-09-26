@@ -1480,7 +1480,7 @@
     "status_pending_hint": "v{{latest}} enthält Änderungen, die Chats noch nicht erhalten; v{{live}} ist live.",
     "tools_title": "Werkzeuge und Wissen",
     "triggers_title": "Auslöser",
-    "triggers_hint": "Eine Fähigkeit, die kommt, wenn sie passt, kommt, wenn eine Nachricht eines dieser Wörter enthält.",
+    "triggers_hint": "Eine Fähigkeit, die kommt, wenn sie passt, kommt, wenn eine Nachricht eines dieser Wörter enthält oder der Chat Dateien dieser Typen hat.",
     "trigger_keywords": "Stichwörter",
     "trigger_file_types": "Dateitypen",
     "trigger_file_types_hint": "z. B. pdf, xlsx",

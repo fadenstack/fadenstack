@@ -35,6 +35,9 @@ class ResolvedSkill:
     content_sha256: str | None = None
     #: Why the request got it: ``explicit``, ``always``, ``trigger``, ``assignment``.
     matched_by: str | None = None
+    #: The folder's other files: ``{path, size, kind, executable, text}``;
+    #: ``text`` only when asked for inline and it fit.
+    files: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)
@@ -73,6 +76,7 @@ class SkillsClient:
         file_types: list[str] | None = None,
         tags: list[str] | None = None,
         max_skills: int = 3,
+        inline_files_chars: int = 0,
     ) -> SkillResolveResult:
         """Resolve matching skills for a gateway request context.
 
@@ -94,6 +98,7 @@ class SkillsClient:
             "file_types": file_types or [],
             "tags": tags or [],
             "max_skills": max_skills,
+            "inline_files_chars": inline_files_chars,
         }
         try:
             resp = await self._http.post(
@@ -119,6 +124,7 @@ class SkillsClient:
                     knowledge_sources=s.get("knowledge_sources"),
                     content_sha256=s.get("content_sha256"),
                     matched_by=s.get("matched_by"),
+                    files=s.get("files") or None,
                 )
                 for s in data.get("skills", [])
             ]
@@ -126,6 +132,30 @@ class SkillsClient:
         except Exception:
             logger.exception("Skills resolve failed")
             return SkillResolveResult()
+
+    async def read_file(
+        self,
+        *,
+        skill_id: str,
+        version: int,
+        path: str,
+        tenant_id: str,
+    ) -> dict[str, Any]:
+        """One file of a resolved skill's version: ``{path, size, kind, text}``.
+
+        Calls ``GET /api/internal/skills/{id}/versions/{n}/file``; raises when
+        the service refuses (the model is told why).
+        """
+        resp = await self._http.get(
+            f"{self._base}/api/internal/skills/{skill_id}/versions/{version}/file",
+            params={"tenant_id": tenant_id, "path": path},
+            headers=self._headers,
+            timeout=10.0,
+        )
+        if resp.status_code == 404:
+            raise ValueError(f"{path} could not be found in the skill.")
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
 
     async def record_usage(
         self,

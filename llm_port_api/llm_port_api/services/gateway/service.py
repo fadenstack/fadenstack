@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
 import re
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Any
 
 from llm_port_api.db.dao.gateway_dao import GatewayDAO
@@ -17,7 +19,7 @@ from llm_port_api.db.models.gateway import ProviderType
 from llm_port_api.services.gateway.audit import AuditService
 from llm_port_api.services.gateway.usage_group import UsageGroupResolver
 from llm_port_api.services.gateway.auth import AuthContext
-from llm_port_api.services.gateway import attachment_search, knowledge, system_tools
+from llm_port_api.services.gateway import attachment_search, knowledge, skill_files, system_tools
 from llm_port_api.services.gateway.errors import GatewayError
 from llm_port_api.services.gateway.llm_adapter import LLMAdapter
 from llm_port_api.services.gateway.observability import (
@@ -409,7 +411,7 @@ def _tool_definition_name(tool: dict[str, Any]) -> str:
 
 
 #: The gateway's tools offered after the MCP tools.
-_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME}
+_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
 
 
 def _with_mcp_tools(payload: dict[str, Any], mcp_tools: list[dict[str, Any]]) -> dict[str, Any]:
@@ -445,7 +447,7 @@ def _skills_allow(skills: list[ResolvedSkill], name: str) -> bool:
 
 
 #: Names the gateway's own tools answer to.
-_GATEWAY_TOOLS = system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME}
+_GATEWAY_TOOLS = system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
 
 
 def _short(name: str) -> str:
@@ -658,6 +660,20 @@ def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) ->
     return {**payload, "messages": messages}
 
 
+def _file_types(names: list[tuple[str, str]]) -> list[str]:
+    """File types as skill triggers name them ("pdf"), from names and media types."""
+    types: set[str] = set()
+    for filename, content_type in names:
+        suffix = PurePosixPath((filename or "").replace("\\", "/")).suffix.lower().lstrip(".")
+        if suffix:
+            types.add(suffix)
+            continue
+        guessed = mimetypes.guess_extension((content_type or "").split(";")[0].strip())
+        if guessed:
+            types.add(guessed.lstrip(".").lower())
+    return sorted(types)
+
+
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
     """The skills a request used, for the audit log.
 
@@ -699,6 +715,8 @@ class _Prepared:
     skills: list[ResolvedSkill] = field(default_factory=list)
     #: Skills the user asked for by name (the chat's skill picker).
     requested_skills: list[str] = field(default_factory=list)
+    #: Whether the model was offered ``read_skill_file``.
+    skill_files: bool = False
     rag_context: dict[str, Any] | None = None
     trace_context: Any = None
     released: bool = False
@@ -924,9 +942,10 @@ class GatewayService:
                     code="upstream_request_failed",
                 )
             # The tools the gateway runs: its own, knowledge, attached files,
-            # MCP, the tool router's.
+            # skill files, MCP, the tool router's.
             if endpoint == "/v1/chat/completions" and (
-                req.system_tools or req.knowledge or req.attachments or self.mcp_client or self.tool_router
+                req.system_tools or req.knowledge or req.attachments or req.skill_files
+                or self.mcp_client or self.tool_router
             ):
                 result = await self._tool_loop(req, result, auth=auth, request_id=request_id)
 
@@ -1094,7 +1113,7 @@ class GatewayService:
             )
 
             if (
-                req.system_tools or req.knowledge or req.attachments
+                req.system_tools or req.knowledge or req.attachments or req.skill_files
                 or (mcp_tools_injected and (self.mcp_client or self.tool_router))
             ):
                 # Rounds: the answer's text streams as it comes, and the tools
@@ -1303,10 +1322,22 @@ class GatewayService:
         searchable = chat and payload.get("tool_choice") != "none" and all(
             knowledge.calls_tools(c) for c in candidates
         )
+        # The files the chat has, for skills that come in on a file type. Read
+        # before the lookups below: the session step uses the same database
+        # session, which cannot run two queries at once.
+        file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
         (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
             self._inject_session_context(payload, auth, session_id, req=req if searchable else None)
             if chat else _value((payload, None, None)),
-            self._resolve_skills(question, auth, session_id, req.requested_skills)
+            self._resolve_skills(
+                question,
+                auth,
+                session_id,
+                req.requested_skills,
+                file_types=file_types,
+                # A model that cannot call read_skill_file gets the files inline.
+                inline_files_chars=0 if searchable else skill_files.INLINE_CHARS,
+            )
             if chat
             else _value([]),
             self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
@@ -1318,11 +1349,7 @@ class GatewayService:
         for skill in req.skills:  # each after the last: they keep their order
             payload = insert_skill(payload, {
                 "role": "system",
-                "content": (
-                    f"=== ACTIVE SKILL: {skill.name} (v{skill.version}) ===\n"
-                    f"{skill.body_markdown}\n"
-                    f"=== END SKILL ==="
-                ),
+                "content": skill_files.skill_block(skill, as_tool=searchable),
             })
         req.payload = payload
         if mcp_tools:
@@ -1390,6 +1417,11 @@ class GatewayService:
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
+        # A skill's own files are always readable: offered after the
+        # constraints, which would otherwise take the tool away again.
+        if chat and searchable and skill_files.has_files(req.skills):
+            egress = _with_tools(egress, skill_files.TOOLS)
+            req.skill_files = True
         egress = _without_replayed_tools(egress)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
@@ -1769,6 +1801,9 @@ class GatewayService:
         auth: AuthContext,
         session_id: str | None = None,
         requested: list[str] | None = None,
+        *,
+        file_types: list[str] | None = None,
+        inline_files_chars: int = 0,
     ) -> list[ResolvedSkill]:
         """The skills that apply to *question*, for ``_prepare`` to put in.
 
@@ -1789,8 +1824,31 @@ class GatewayService:
             requested=requested,
             session_id=session_id,
             user_query=question or None,
+            file_types=file_types,
+            inline_files_chars=inline_files_chars,
         )
         return result.skills
+
+    async def _chat_file_types(self, auth: AuthContext, session_id: str | None) -> list[str]:
+        """The types of the files a chat has ("pdf", "xlsx"), for skill triggers.
+
+        The gateway never said which files a chat had, so a skill set to come
+        in on a file type never did.
+        """
+        if not session_id or self.session_dao is None:
+            return []
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            return []
+        try:
+            names = await self.session_dao.attachment_names(
+                session_id=sid, tenant_id=auth.tenant_id, user_id=auth.user_id,
+            )
+        except Exception:  # a missing trigger must not fail the chat
+            logger.warning("Reading the chat's file types failed", exc_info=True)
+            return []
+        return _file_types(names)
 
     def _apply_skill_tool_constraints(
         self,
@@ -1929,6 +1987,7 @@ class GatewayService:
         elif (
             (name in knowledge.NAMES and req.knowledge)
             or (name == attachment_search.NAME and req.attachments)
+            or (name == skill_files.NAME and req.skill_files)
             or (routed and name.startswith(("client.", "server.")))
         ):
             return None
@@ -2189,6 +2248,11 @@ class GatewayService:
                 if req.token_mapping:
                     arguments = _restored(arguments, req.token_mapping)
                 content, is_error = attachment_search.AttachmentSearch(req.attachments).run(arguments)
+            elif name == skill_files.NAME:
+                # A file of a skill resolved for this request, and no other.
+                assert self.skills_client is not None  # noqa: S101
+                reader = skill_files.SkillFiles(self.skills_client, req.skills, tenant_id=auth.tenant_id)
+                content, is_error = await reader.run(arguments)
             elif router_session is not None:
                 assert self.tool_router is not None  # noqa: S101
                 await self._keep_found(req)  # the router reads the chat's switches

@@ -1641,7 +1641,7 @@
     "status_pending_hint": "v{{latest}} contient des modifications que les chats ne reçoivent pas encore ; v{{live}} est en service.",
     "tools_title": "Outils et connaissances",
     "triggers_title": "Déclencheurs",
-    "triggers_hint": "Une compétence qui vient quand elle correspond le fait quand un message contient l'un de ces mots.",
+    "triggers_hint": "Une compétence qui vient quand elle correspond le fait quand un message contient l'un de ces mots, ou que le chat a des fichiers de ces types.",
     "trigger_keywords": "Mots-clés",
     "trigger_file_types": "Types de fichiers",
     "trigger_file_types_hint": "p. ex. pdf, xlsx",

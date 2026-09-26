@@ -674,3 +674,119 @@ async def test_deleting_takes_the_versions_with_it(client: AsyncClient) -> None:
     assert (
         await client.get(f"/api/skills/{skill['id']}", headers=ALICE)
     ).status_code == 404
+
+
+# ── Files and file types, for chats ───────────────────────────────────
+
+
+async def _with_files(client: AsyncClient) -> dict[str, Any]:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(
+            "sheets/SKILL.md",
+            "---\nname: sheets\ndescription: Spreadsheets. Use for xlsx.\n---\n"
+            "Read references/formulas.md when a formula is involved.",
+        )
+        z.writestr(
+            "sheets/llmport.yaml",
+            "activation: auto\ntrigger_rules:\n  file_types: [xlsx]\n",
+        )
+        z.writestr("sheets/references/formulas.md", "SUMIF sums what matches.")
+        z.writestr("sheets/references/long.md", "x" * 5000)
+        z.writestr("sheets/scripts/check.py", "print('ok')")
+        z.writestr("sheets/assets/logo.png", b"\x89PNG\x00\x01")
+    resp = await client.post(
+        "/api/skills/import",
+        files={"file": ("sheets.zip", buf.getvalue(), "application/zip")},
+        data={"publish": "true"},
+        headers=ALICE,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def test_a_file_type_trigger_fires_when_the_chat_has_such_a_file(
+    client: AsyncClient,
+) -> None:
+    await _with_files(client)
+    assert await _resolve(client, "alice", user_query="sum column B") == []
+    assert await _resolve(
+        client,
+        "alice",
+        user_query="sum column B",
+        file_types=["xlsx"],
+    ) == ["sheets"]
+
+
+async def test_a_resolved_skill_lists_its_files_and_inlines_what_fits(
+    client: AsyncClient,
+) -> None:
+    await _with_files(client)
+    resp = await client.post(
+        "/api/internal/skills/resolve",
+        json={
+            "tenant_id": "default",
+            "user_id": "alice",
+            "requested": ["sheets"],
+            "inline_files_chars": 1000,
+        },
+    )
+    [skill] = resp.json()["skills"]
+    files = {f["path"]: f for f in skill["files"]}
+    assert set(files) == {
+        "references/formulas.md",
+        "references/long.md",
+        "scripts/check.py",
+        "assets/logo.png",
+    }
+    assert files["references/formulas.md"]["text"] == "SUMIF sums what matches."
+    assert files["references/long.md"]["text"] is None  # over the budget
+    assert files["scripts/check.py"]["text"] is None  # scripts are listed only
+    assert files["assets/logo.png"]["kind"] == "binary"
+
+    resp = await client.post(
+        "/api/internal/skills/resolve",
+        json={"tenant_id": "default", "user_id": "alice", "requested": ["sheets"]},
+    )
+    assert all(f["text"] is None for f in resp.json()["skills"][0]["files"])
+
+
+async def test_a_chat_reads_a_file_of_the_published_version_only(
+    client: AsyncClient,
+) -> None:
+    skill = await _with_files(client)
+    url = f"/api/internal/skills/{skill['id']}/versions/1/file"
+    resp = await client.get(
+        url,
+        params={"tenant_id": "default", "path": "references/long.md"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["text"] == "x" * 5000
+    resp = await client.get(
+        url,
+        params={"tenant_id": "default", "path": "assets/logo.png"},
+    )
+    assert resp.json() == {
+        "path": "assets/logo.png",
+        "size": 6,
+        "kind": "binary",
+        "text": None,
+    }
+    missing = await client.get(url, params={"tenant_id": "default", "path": "nope.md"})
+    assert missing.status_code == 404
+    other_tenant = await client.get(
+        url,
+        params={"tenant_id": "t2", "path": "references/long.md"},
+    )
+    assert other_tenant.status_code == 404
+
+    await client.post(
+        f"/api/skills/{skill['id']}/versions",
+        json={"body_markdown": "v2"},
+        headers=ALICE,
+    )
+    draft = await client.get(
+        f"/api/internal/skills/{skill['id']}/versions/2/file",
+        params={"tenant_id": "default", "path": "references/long.md"},
+    )
+    assert draft.status_code == 404  # not published, so no chat has it

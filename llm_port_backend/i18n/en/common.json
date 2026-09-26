@@ -1639,7 +1639,7 @@
     "status_pending_hint": "v{{latest}} has changes chats do not get yet; v{{live}} is live.",
     "tools_title": "Tools and knowledge",
     "triggers_title": "Triggers",
-    "triggers_hint": "A skill that comes in when it matches does so when a message contains one of these words.",
+    "triggers_hint": "A skill that comes in when it matches does so when a message contains one of these words, or the chat has files of these types.",
     "trigger_keywords": "Keywords",
     "trigger_file_types": "File types",
     "trigger_file_types_hint": "e.g. pdf, xlsx",

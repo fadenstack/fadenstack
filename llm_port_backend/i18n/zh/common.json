@@ -1480,7 +1480,7 @@
     "status_pending_hint": "v{{latest}} 有聊天尚未使用的更改；当前使用 v{{live}}。",
     "tools_title": "工具与知识",
     "triggers_title": "触发条件",
-    "triggers_hint": "匹配时使用的技能，会在消息包含这些词之一时使用。",
+    "triggers_hint": "匹配时使用的技能，会在消息包含这些词之一、或聊天中有这些类型的文件时使用。",
     "trigger_keywords": "关键词",
     "trigger_file_types": "文件类型",
     "trigger_file_types_hint": "例如 pdf、xlsx",

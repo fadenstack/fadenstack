@@ -5,14 +5,17 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from llm_port_skills.db.models.skill import SkillModel, SkillVisibility
 from llm_port_skills.db.session import get_db_session
+from llm_port_skills.services import bundle as fmt
 from llm_port_skills.services.access import Principal
 from llm_port_skills.services.dao import SkillDao
+from llm_port_skills.services.errors import NotFoundError
 from llm_port_skills.services.resolve import RequestContext
 from llm_port_skills.web.api.auth import verify_service_token
 
@@ -41,6 +44,20 @@ class SkillResolveRequest(BaseModel):
     file_types: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     max_skills: int = Field(default=3, ge=0, le=10)
+    #: How many characters of the skills' files to send along, for a model
+    #: that cannot call ``read_skill_file``; 0 sends only the list.
+    inline_files_chars: int = Field(default=0, ge=0, le=200_000)
+
+
+class SkillFileRef(BaseModel):
+    """A file in a resolved skill's folder."""
+
+    path: str
+    size: int
+    kind: str
+    executable: bool
+    #: The file's text, when the request asked for files inline and it fit.
+    text: str | None = None
 
 
 class ResolvedSkill(BaseModel):
@@ -60,6 +77,9 @@ class ResolvedSkill(BaseModel):
     preferred_tools: list[str] | None = None
     forbidden_tools: list[str] | None = None
     knowledge_sources: list[str] | None = None
+    #: The folder's other files (references/, assets/, ...): the model reads
+    #: them when the instructions call for it.
+    files: list[SkillFileRef] = Field(default_factory=list)
 
 
 class SkillResolveResponse(BaseModel):
@@ -77,6 +97,16 @@ class SkillUsageRequest(BaseModel):
     session_id: str | None = None
     user_id: str | None = None
     matched_by: str | None = None
+
+
+class SkillFileResponse(BaseModel):
+    """One file of a skill version, for the model."""
+
+    path: str
+    size: int
+    kind: str
+    #: ``None`` for a binary file, which cannot be given to a model as text.
+    text: str | None
 
 
 class PrincipalRemovedResponse(BaseModel):
@@ -119,6 +149,7 @@ async def resolve_skills(
         ctx,
         max_results=body.max_skills,
     )
+    budget = [body.inline_files_chars]
     return SkillResolveResponse(
         skills=[
             ResolvedSkill(
@@ -135,9 +166,69 @@ async def resolve_skills(
                 preferred_tools=r.version.manifest.get("preferred_tools"),
                 forbidden_tools=r.version.manifest.get("forbidden_tools"),
                 knowledge_sources=r.version.manifest.get("knowledge_sources"),
+                files=_file_refs(r.version.files or {}, budget),
             )
             for r in resolved
         ],
+    )
+
+
+def _file_refs(
+    files: dict[str, dict[str, str]], budget: list[int],
+) -> list[SkillFileRef]:
+    """A version's files, with the text of those that fit in *budget*.
+
+    *budget* is shared by every skill of the request (a one-item list, so it
+    goes down as files are taken). Scripts are listed, not inlined.
+    """
+    refs: list[SkillFileRef] = []
+    for info in fmt.describe_files(files):
+        text = None
+        entry = files[info["path"]]
+        if (
+            "text" in entry
+            and not info["executable"]
+            and len(entry["text"]) <= budget[0]
+        ):
+            text = entry["text"]
+            budget[0] -= len(text)
+        refs.append(SkillFileRef(**info, text=text))
+    return refs
+
+
+@router.get(
+    "/skills/{skill_id}/versions/{version}/file",
+    response_model=SkillFileResponse,
+)
+async def read_skill_file(
+    skill_id: uuid.UUID,
+    version: int,
+    tenant_id: str = Query(...),
+    path: str = Query(..., min_length=1, max_length=512),
+    session: AsyncSession = Depends(get_db_session),
+) -> SkillFileResponse:
+    """One file of a skill's published version, for a chat that was given it.
+
+    The gateway asks only for files of the skills it resolved for the
+    request, so the user could see them; this checks the tenant and that the
+    version is the published one -- the one a chat can have been given.
+    """
+    skill = await session.get(SkillModel, skill_id)
+    visible = skill is not None and (
+        skill.tenant_id == tenant_id or skill.visibility == SkillVisibility.GLOBAL.value
+    )
+    if not visible or skill is None or skill.published_version != version:
+        raise NotFoundError("Skill not found.")
+    found = await SkillDao(session).require_version(skill.id, version)
+    entry = (found.files or {}).get(path)
+    if entry is None:
+        raise NotFoundError(f"The skill has no file {path}.")
+    raw = fmt.file_bytes(entry)
+    return SkillFileResponse(
+        path=path,
+        size=len(raw),
+        kind="text" if "text" in entry else "binary",
+        text=entry.get("text"),
     )
 
 

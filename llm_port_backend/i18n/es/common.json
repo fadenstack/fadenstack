@@ -1480,7 +1480,7 @@
     "status_pending_hint": "v{{latest}} tiene cambios que los chats aún no reciben; v{{live}} está en uso.",
     "tools_title": "Herramientas y conocimiento",
     "triggers_title": "Disparadores",
-    "triggers_hint": "Una habilidad que entra cuando encaja lo hace cuando un mensaje contiene una de estas palabras.",
+    "triggers_hint": "Una habilidad que entra cuando encaja lo hace cuando un mensaje contiene una de estas palabras o el chat tiene archivos de estos tipos.",
     "trigger_keywords": "Palabras clave",
     "trigger_file_types": "Tipos de archivo",
     "trigger_file_types_hint": "p. ej. pdf, xlsx",

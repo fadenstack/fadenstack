@@ -91,7 +91,7 @@ stop reaching their chats within a minute.
 | Setting | The skill comes into a chat |
 |---|---|
 | When picked | Only when picked (`$name` or the skills menu) |
-| When it matches | When a message contains one of its trigger keywords (as whole words), and whenever it is picked |
+| When it matches | When a message contains one of its trigger keywords (as whole words), or the chat has a file of one of its trigger types (its own files and its project's), and whenever it is picked |
 | Always | In every chat of everyone who sees it. A private one: only its owner's chats, never the chats of people it is shared with |
 
 A skill the whole organization sees can be **Always** only if an
@@ -145,8 +145,13 @@ either; a skill from anywhere else imports as it is, and an older llm.port
   for export but not applied: llm.port's tool lists are in `llmport.yaml`.
 - Nothing in llm.port runs a skill's scripts. They are kept so the skill can
   be exported to agents that do, and the editor marks them.
-- The chat gets the `SKILL.md` instructions. Files in `references/` and
-  `assets/` are stored and exported, not sent to the model.
+- The chat gets the `SKILL.md` instructions, and the skill's other files
+  when it needs them. A model that calls tools sees the files listed with the
+  skill and reads one with `read_skill_file` (only files of the skills in
+  that chat, in parts of 20 000 characters). A model that does not call tools
+  gets the small text files inline, up to 12 000 characters in all, and the
+  rest named as not included. Scripts are listed, never inlined; binary files
+  cannot be read.
 
 ## Permissions
 
