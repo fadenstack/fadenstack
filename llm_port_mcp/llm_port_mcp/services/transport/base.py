@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 from mcp.shared.exceptions import McpError
+
+
+logger = logging.getLogger(__name__)
 
 
 class MCPConnectError(RuntimeError):
@@ -49,6 +54,96 @@ def describe_failure(cause: BaseException, target: str) -> str:
     else:
         message = f"{target}: {type(cause).__name__}: {cause}"
     return message
+
+
+class OwnedConnection:
+    """An MCP connection opened, kept and closed by one task of its own.
+
+    The SDK's clients run their transport in an anyio task group, and a task
+    group must be left by the task that entered it. The service opened each
+    connection in whichever task connected it -- the app's startup, a
+    request -- and closed it from another. When the transport failed (the
+    server restarted, a stream dropped), the SDK cancelled the task that had
+    opened it, which could never leave the task group: anyio retried that
+    cancellation on every turn of the event loop, and the MCP service used a
+    whole core, doing nothing, until it restarted (VM, 2026-09-26). Here the
+    owner task opens the connection and waits; other tasks use the session;
+    a failure ends only the owner, which closes the connection itself, and
+    the heartbeat connects again.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._task: asyncio.Task[None] | None = None
+        self._close = asyncio.Event()
+        #: Set once the connection is gone: closed, or failed.
+        self.closed = False
+
+    async def open(
+        self,
+        enter: Callable[[AsyncExitStack], Awaitable[Any]],
+        target: str,
+    ) -> Any:
+        """Open the connection in its own task; what *enter* returned (the session).
+
+        A failure is raised here, as :func:`failed_connect` words it; a
+        cancellation of the caller stops the owner too.
+        """
+        ready: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
+        self._task = asyncio.create_task(
+            self._own(enter, target, ready), name=f"mcp-connection:{self.name}",
+        )
+        try:
+            return await ready
+        except asyncio.CancelledError:
+            self._task.cancel()
+            raise
+
+    async def _own(
+        self,
+        enter: Callable[[AsyncExitStack], Awaitable[Any]],
+        target: str,
+        ready: asyncio.Future[Any],
+    ) -> None:
+        stack = AsyncExitStack()
+        try:
+            try:
+                session = await enter(stack)
+            except BaseException as error:  # failure, or cancellation: failed_connect
+                failure = await failed_connect(stack, error, target)
+                if not ready.done():
+                    if failure is None:
+                        ready.cancel()
+                    else:
+                        ready.set_exception(failure)
+                return
+            ready.set_result(session)
+            await self._close.wait()
+        except BaseException:  # the transport failed and cancelled its owner
+            logger.info("MCP connection to %s ended", self.name)
+        finally:
+            self.closed = True
+            try:
+                await stack.aclose()  # in the task that opened it
+            except BaseException:
+                logger.debug(
+                    "Closing the connection to %s raised", self.name, exc_info=True,
+                )
+
+    async def close(self, timeout: float = 10.0) -> None:
+        """Close the connection: its owner leaves it, in its own task."""
+        self._close.set()
+        task = self._task
+        if task is None or task.done():
+            return
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout)
+        except TimeoutError:
+            task.cancel()
+        except BaseException:
+            logger.debug(
+                "Closing the connection to %s raised", self.name, exc_info=True,
+            )
 
 
 def _first_cause(error: BaseException) -> BaseException | None:

@@ -13,7 +13,7 @@ from llm_port_mcp.services.transport.base import (
     GenericMCPServer,
     MCPServerConfig,
     MCPToolDescriptor,
-    failed_connect,
+    OwnedConnection,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class SSEMCPServer(GenericMCPServer):
 
     def __init__(self, config: MCPServerConfig) -> None:
         super().__init__(config)
-        self._exit_stack: AsyncExitStack | None = None
+        self._connection: OwnedConnection | None = None
         self._session: ClientSession | None = None
 
     async def connect(self) -> None:
@@ -33,11 +33,12 @@ class SSEMCPServer(GenericMCPServer):
             msg = "SSE transport requires 'url'"
             raise ValueError(msg)
 
-        stack = AsyncExitStack()
-        try:
+        url = self.config.url
+
+        async def enter(stack: AsyncExitStack) -> ClientSession:
             read_stream, write_stream = await stack.enter_async_context(
                 sse_client(
-                    url=self.config.url,
+                    url=url,
                     headers=self.config.headers or {},
                     timeout=self.config.timeout_sec,
                 ),
@@ -46,14 +47,12 @@ class SSEMCPServer(GenericMCPServer):
                 ClientSession(read_stream, write_stream),
             )
             await session.initialize()
-        except BaseException as error:  # failed_connect tells failure from cancellation
-            failure = await failed_connect(stack, error, self.config.url)
-            if failure is None:
-                raise
-            raise failure from failure.__cause__
-        # Kept only once connected: a failed connect left a half-open stack.
-        self._exit_stack = stack
-        self._session = session
+            return session
+
+        # Opened and closed by a task of its own; see OwnedConnection.
+        connection = OwnedConnection(self.config.name)
+        self._session = await connection.open(enter, url)
+        self._connection = connection
         logger.info(
             "SSE MCP server connected: %s (url=%s)",
             self.config.name,
@@ -62,9 +61,9 @@ class SSEMCPServer(GenericMCPServer):
 
     async def disconnect(self) -> None:
         """Close the SSE connection."""
-        if self._exit_stack is not None:
-            await self._exit_stack.aclose()
-            self._exit_stack = None
+        if self._connection is not None:
+            await self._connection.close()
+            self._connection = None
             self._session = None
         logger.info("SSE MCP server disconnected: %s", self.config.name)
 
@@ -72,6 +71,8 @@ class SSEMCPServer(GenericMCPServer):
         """Check if the SSE session is alive."""
         if self._session is None:
             return "disconnected"
+        if self._connection is not None and self._connection.closed:
+            return "error"  # the transport failed: the heartbeat connects again
         try:
             await self._session.send_ping()
             return "active"
