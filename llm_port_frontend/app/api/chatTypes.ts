@@ -39,9 +39,12 @@ export interface ChatMessage {
   tool_call_json: unknown | null;
   model_alias: string | null;
   provider_instance_id: string | null;
+  /** The message's own size in tokens (a reply's completion tokens). */
   token_estimate: number | null;
   trace_id: string | null;
   created_at: string;
+  /** What a reply's request used, as logged by the gateway (null if unknown). */
+  usage?: TokenUsage | null;
 }
 
 export interface ChatAttachment {

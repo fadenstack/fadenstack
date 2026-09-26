@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
 import Avatar from "@mui/material/Avatar";
-import type { ChatSession, TokenUsage } from "~/api/chatTypes";
+import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import type { InitialMessageState } from "./ChatWelcome";
 import { useChatStream } from "../hooks/useChatStream";
@@ -119,19 +119,6 @@ export default function ChatWindow({
     send(text, selectedModel, files);
   };
 
-  // Parse token_estimate from message for display
-  const usageFromMessage = (
-    tokenEstimate: number | null,
-    modelAlias: string | null,
-  ): TokenUsage | null => {
-    if (!tokenEstimate) return null;
-    return {
-      prompt_tokens: 0,
-      completion_tokens: tokenEstimate,
-      total_tokens: tokenEstimate,
-    };
-  };
-
   return (
     <Box
       sx={{
@@ -184,11 +171,8 @@ export default function ChatWindow({
               role={msg.role}
               content={msg.content}
               modelAlias={msg.model_alias}
-              usage={
-                msg.role === "assistant"
-                  ? usageFromMessage(msg.token_estimate, msg.model_alias)
-                  : null
-              }
+              usage={msg.role === "assistant" ? (msg.usage ?? null) : null}
+              replyTokens={msg.role === "assistant" ? msg.token_estimate : null}
               responseMs={
                 msg.role === "assistant" ? getResponseMs(msg.id) : null
               }

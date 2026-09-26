@@ -26,6 +26,8 @@ interface Props {
   content: string;
   modelAlias?: string | null;
   usage?: TokenUsage | null;
+  /** The reply's own size, shown when its request's usage is not known. */
+  replyTokens?: number | null;
   responseMs?: number | null;
   streaming?: boolean;
   traceId?: string | null;
@@ -38,6 +40,7 @@ export default function MessageBubble({
   content,
   modelAlias,
   usage,
+  replyTokens,
   responseMs,
   streaming = false,
   traceId,
@@ -201,7 +204,11 @@ export default function MessageBubble({
                   : `${responseMs}ms`}
               </Typography>
             )}
-            {usage && <TokenUsageBadge usage={usage} />}
+            {usage ? (
+              <TokenUsageBadge usage={usage} />
+            ) : (
+              replyTokens != null && <TokenUsageBadge replyTokens={replyTokens} />
+            )}
             {/* Info icon with model details */}
             <Tooltip
               title={

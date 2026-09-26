@@ -1951,7 +1951,9 @@
     "token_detail": "提示词：{{prompt}} · 补全：{{completion}} · 总计：{{total}}",
     "no_models": "无可用模型",
     "no_models_hint": "当前没有可用模型。请在管理面板中配置提供商和模型别名。",
-    "session_actions": "聊天操作"
+    "session_actions": "聊天操作",
+    "token_reply_only": "回复：{{completion}} 个令牌",
+    "show_more": "显示更多（{{remaining}}）"
   },
   "module_recommend": {
     "apply": "应用",

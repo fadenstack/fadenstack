@@ -1753,7 +1753,9 @@
     "system_prompt": "System prompt",
     "system_prompt_hint": "System prompt is prepended to every message in this project. Use it to define the project context, persona, or constraints.",
     "system_prompt_placeholder": "You are a helpful assistant that specialises in…",
-    "session_actions": "Chat actions"
+    "session_actions": "Chat actions",
+    "token_reply_only": "Reply: {{completion}} tokens",
+    "show_more": "Show more ({{remaining}})"
   },
   "mcp": {
     "servers_title": "MCP Servers",

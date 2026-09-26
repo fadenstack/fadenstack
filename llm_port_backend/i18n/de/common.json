@@ -1951,7 +1951,9 @@
     "token_detail": "Prompt: {{prompt}} · Completion: {{completion}} · Gesamt: {{total}}",
     "no_models": "Keine Modelle",
     "no_models_hint": "Es sind keine Modelle verfügbar. Konfigurieren Sie im Admin-Bereich einen Provider und einen Modell-Alias.",
-    "session_actions": "Chat-Aktionen"
+    "session_actions": "Chat-Aktionen",
+    "token_reply_only": "Antwort: {{completion}} Tokens",
+    "show_more": "Mehr anzeigen ({{remaining}})"
   },
   "module_recommend": {
     "apply": "Übernehmen",

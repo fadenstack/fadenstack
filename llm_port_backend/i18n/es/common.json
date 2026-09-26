@@ -1951,7 +1951,9 @@
     "token_detail": "Prompt: {{prompt}} · Completion: {{completion}} · Total: {{total}}",
     "no_models": "Sin modelos",
     "no_models_hint": "No hay modelos disponibles. Configura un proveedor y un alias de modelo en el panel de administración.",
-    "session_actions": "Acciones del chat"
+    "session_actions": "Acciones del chat",
+    "token_reply_only": "Respuesta: {{completion}} tokens",
+    "show_more": "Mostrar más ({{remaining}})"
   },
   "module_recommend": {
     "apply": "Aplicar",

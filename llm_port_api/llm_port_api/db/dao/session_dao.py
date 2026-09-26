@@ -14,6 +14,7 @@ from llm_port_api.db.models.gateway import (
     ChatMessage,
     ChatProject,
     ChatSession,
+    LLMGatewayRequestLog,
     MemoryFact,
     MemoryFactScope,
     MemoryFactStatus,
@@ -280,6 +281,38 @@ class SessionDAO:
             query = query.limit(limit)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def message_usage(
+        self, *, session_id: uuid.UUID, trace_ids: list[str],
+    ) -> dict[str, dict[str, int]]:
+        """The token usage the gateway logged for these replies, by trace id.
+
+        A reply stores only its own size (``token_estimate``, the completion
+        tokens -- what the context assembler budgets with). What its request
+        used is in the request log; this finds it through the session (an
+        indexed column) and takes the latest row per trace, as the debug
+        panel does. Replies with no logged counts are left out.
+        """
+        if not trace_ids:
+            return {}
+        log = LLMGatewayRequestLog
+        rows = await self.session.execute(
+            select(log.trace_id, log.prompt_tokens, log.completion_tokens, log.total_tokens)
+            .where(log.session_id == str(session_id), log.trace_id.in_(trace_ids))
+            .order_by(log.trace_id, log.created_at.desc())
+            .distinct(log.trace_id),
+        )
+        usage: dict[str, dict[str, int]] = {}
+        for trace_id, prompt, completion, total in rows.all():
+            if prompt is None and completion is None and total is None:
+                continue
+            prompt, completion = prompt or 0, completion or 0
+            usage[trace_id] = {
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "total_tokens": total if total is not None else prompt + completion,
+            }
+        return usage
 
     async def get_recent_messages(
         self, *, session_id: uuid.UUID, limit: int = 20,

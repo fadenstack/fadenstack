@@ -75,6 +75,14 @@ class SessionDTO(BaseModel):
 # ── Messages ──────────────────────────────────────────────────────
 
 
+class TokenUsageDTO(BaseModel):
+    """What a reply's request used, from the gateway's request log."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
 class MessageDTO(BaseModel):
     id: uuid.UUID
     session_id: uuid.UUID
@@ -87,6 +95,8 @@ class MessageDTO(BaseModel):
     token_estimate: int | None
     trace_id: str | None
     created_at: datetime
+    #: A reply's request usage (set by the messages list; null when unknown).
+    usage: TokenUsageDTO | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

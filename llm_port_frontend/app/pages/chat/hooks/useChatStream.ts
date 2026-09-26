@@ -154,8 +154,9 @@ export function useChatStream({
               tool_call_json: null,
               model_alias: null,
               provider_instance_id: null,
-              token_estimate: finalUsage?.total_tokens ?? null,
+              token_estimate: finalUsage?.completion_tokens ?? null,
               trace_id: traceId,
+              usage: finalUsage,
               created_at: new Date().toISOString(),
             };
             setMessages((prev) => [...prev, assistantMsg]);
@@ -306,8 +307,9 @@ export function useChatStream({
           tool_call_json: null,
           model_alias: model || null,
           provider_instance_id: null,
-          token_estimate: finalUsage?.total_tokens ?? null,
+          token_estimate: finalUsage?.completion_tokens ?? null,
           trace_id: traceId,
+          usage: finalUsage,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);

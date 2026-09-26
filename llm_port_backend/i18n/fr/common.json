@@ -1755,7 +1755,9 @@
     "system_prompt": "Prompt système",
     "system_prompt_hint": "Le prompt système est ajouté avant chaque message dans ce projet. Utilisez-le pour définir le contexte, la persona ou les contraintes.",
     "system_prompt_placeholder": "Vous êtes un assistant utile spécialisé dans…",
-    "session_actions": "Actions du chat"
+    "session_actions": "Actions du chat",
+    "token_reply_only": "Réponse : {{completion}} jetons",
+    "show_more": "Afficher plus ({{remaining}})"
   },
   "mcp": {
     "servers_title": "Serveurs MCP",

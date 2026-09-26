@@ -20,6 +20,7 @@ from llm_port_api.services.gateway.session_schemas import (
     SessionDTO,
     SessionUpdateRequest,
     SummaryDTO,
+    TokenUsageDTO,
 )
 
 router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
@@ -301,7 +302,17 @@ async def list_messages(
         )
 
     messages = await dao.list_messages(session_id=session_id, limit=limit)
-    data = [MessageDTO.model_validate(m).model_dump(mode="json") for m in messages]
+    # A reply shows what its request used, as it did while it streamed.
+    usage = await dao.message_usage(
+        session_id=session_id,
+        trace_ids=[m.trace_id for m in messages if m.role == "assistant" and m.trace_id],
+    )
+    data = []
+    for m in messages:
+        dto = MessageDTO.model_validate(m)
+        if m.role == "assistant" and m.trace_id in usage:
+            dto.usage = TokenUsageDTO(**usage[m.trace_id])
+        data.append(dto.model_dump(mode="json"))
     return JSONResponse(status_code=200, content={"data": data})
 
 
