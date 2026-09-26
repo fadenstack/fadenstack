@@ -122,14 +122,14 @@ service can open at its peak, workers × (connections kept + opened on demand):
 
 | Service | `llmport deploy`, 8 cores (the VM) | Compose file alone |
 |---|---|---|
-| Gateway | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
-| Backend | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
-| Backend worker | 2 × (6 + 6) = 24 | 2 × (5 + 5) = 20 |
+| Gateway | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
+| Backend | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
+| Backend worker | 2 × (5 + 5) = 20 | 2 × (5 + 5) = 20 |
 | PII | none | none |
 | MCP | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
 | Skills | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
-| **Core** | **72** | **100** |
-| **Core + PII + MCP + skills** | **102** | **130** |
+| **Core** | **60** | **100** |
+| **Core + PII + MCP + skills** | **90** | **130** |
 
 PII has pool settings but opens no connection: its database layer is unused.
 Langfuse's web and worker containers use the same Postgres with pools of their
@@ -146,13 +146,14 @@ The check sees one service at a time, so add the table up for the whole
 install: every configuration above fits in the shared compose file's 250. A
 Postgres of your own at its default of 100 does not fit a core install from the
 compose file alone (100) or any install with the optional modules.
-`llmport deploy` also sizes each pool by the worker count (3 kept per worker,
-at least 5, and as many again on demand), so the peak grows with the square of
-the workers: on a server with 16 physical cores, 4 workers each, one service
-alone can open 96. The settings per service are `<PREFIX>WORKERS_COUNT`,
-`<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`, with the prefixes
-`LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and `LLM_PORT_SKILLS_`;
-the backend worker takes the backend's.
+`llmport deploy` sizes the services with `llmport tune`, as `upgrade` does:
+workers by the CPU share, pools the same for every worker (5 kept, 5 on
+demand), and `POSTGRES_MAX_CONNECTIONS` in `.env` as the peaks above added up,
+plus 100 for Langfuse, migrations and backups, at least 250, in steps of 50:
+250 at 8 physical cores, 350 at 32, 500 at 64. The settings per service are
+`<PREFIX>WORKERS_COUNT`, `<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`,
+with the prefixes `LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and
+`LLM_PORT_SKILLS_`; the backend worker takes the backend's.
 
 ## What grows with what
 

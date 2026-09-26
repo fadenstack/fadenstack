@@ -41,6 +41,9 @@ def up_cmd(
         env_vars = default_env_vars(profiles=cfg.profiles)
         write_env_file(env_path, env_vars, preserve_secrets=True)
         success(f"Environment file written to {env_path}")
+        from llmport.core.tune import tune_env  # noqa: PLC0415
+
+        tune_env(env_path)
 
     ctx = build_context_from_config(cfg)
 

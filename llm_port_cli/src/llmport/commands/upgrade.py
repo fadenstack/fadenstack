@@ -233,6 +233,10 @@ def upgrade_cmd(
 
             pin_release(env_path)
         success(".env refreshed (existing settings kept).")
+        # Sized again, as deploy does: what ``llmport tune`` last chose.
+        from llmport.core.tune import tune_env  # noqa: PLC0415
+
+        tune_env(env_path)
         # RabbitMQ makes its users from definitions.json on every start; the
         # services log in with the passwords in .env. Written only by deploy,
         # the file kept an older install's passwords, and after an upgrade

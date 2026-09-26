@@ -12,6 +12,7 @@ and other workloads.
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 
@@ -30,11 +31,33 @@ HEAVY_SERVICES = ("backend", "api", "pii")
 LIGHT_SERVICES: tuple[str, ...] = ()
 ALL_SERVICES = HEAVY_SERVICES + LIGHT_SERVICES
 
-# Services that use a PostgreSQL connection pool.
-DB_SERVICES = ("backend", "api", "pii")
+# Services whose PostgreSQL pool the CLI sizes. PII has pool settings but
+# opens no connection: its database layer is unused.
+DB_SERVICES = ("backend", "api")
 
 # Services that use a RabbitMQ connection pool.
 RABBIT_SERVICES = ("backend", "api")
+
+# ── Pools: per worker process, whatever the number of workers ─────
+# Each worker process keeps its own pools. They were sized by the worker
+# count too -- 3 connections per worker, as many again on demand -- so what a
+# service could open grew with the square of its workers: 24 at 8 cores, 96 at
+# 16, 384 at 32, per service, past any Postgres.
+DB_POOL_PER_WORKER = 5
+DB_OVERFLOW_PER_WORKER = {"dev": 10, "prod": 5}
+RABBIT_POOL_PER_WORKER = 2
+RABBIT_CHANNELS_PER_WORKER = 10
+
+# ── Postgres connections ──────────────────────────────────────────
+#: Processes of the backend worker container (taskiq's default), each with
+#: the backend's pool.
+BACKEND_TASK_WORKERS = 2
+#: Services with pools the CLI does not size: 1 worker x (5 + 10).
+UNTUNED_CONNECTIONS = {"mcp": 15, "skills": 15}
+#: Langfuse's web and worker, migrations, backups, psql.
+CONNECTION_HEADROOM = 100
+#: The shared compose file's default; tuning never goes below it.
+MIN_MAX_CONNECTIONS = 250
 
 
 # ── System snapshot ───────────────────────────────────────────────
@@ -99,9 +122,28 @@ class TuneProfile:
         """Number of CPU cores allocated to the control plane."""
         return max(1, int(self.system.physical_cores * self.resource_pct))
 
+    def db_connections(self) -> dict[str, int]:
+        """What each database client can open at its peak: workers x (kept + on demand)."""
+        per_worker = {svc: self.db_pool_size[svc] + self.db_max_overflow[svc] for svc in DB_SERVICES}
+        peaks = {svc: self.workers[svc] * per_worker[svc] for svc in DB_SERVICES}
+        peaks["backend-worker"] = BACKEND_TASK_WORKERS * per_worker["backend"]
+        peaks.update(UNTUNED_CONNECTIONS)
+        return peaks
+
+    @property
+    def max_connections(self) -> int:
+        """Postgres ``max_connections`` for them all, with headroom, in steps of 50."""
+        needed = sum(self.db_connections().values()) + CONNECTION_HEADROOM
+        return max(MIN_MAX_CONNECTIONS, math.ceil(needed / 50) * 50)
+
     def to_env_dict(self) -> dict[str, str]:
         """Flatten into a dict of ``LLM_PORT_*`` env var → value."""
-        env: dict[str, str] = {}
+        env: dict[str, str] = {
+            "POSTGRES_MAX_CONNECTIONS": str(self.max_connections),
+            # What deploy and upgrade tune with again.
+            "LLMPORT_TUNE_PROFILE": self.profile,
+            "LLMPORT_TUNE_RESOURCE_PCT": str(self.resource_pct),
+        }
 
         for svc in ALL_SERVICES:
             pfx = self._ENV_PREFIX[svc]
@@ -149,35 +191,20 @@ def calculate_tune_profile(
     sys = system or detect_system()
     tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct)
 
-    if profile == "dev":
-        # Dev: keep things light — 1-2 workers, small pools.
-        for svc in HEAVY_SERVICES:
-            tp.workers[svc] = min(sys.physical_cores, 2)
-        for svc in LIGHT_SERVICES:
-            tp.workers[svc] = 1
-        for svc in DB_SERVICES:
-            tp.db_pool_size[svc] = 5
-            tp.db_max_overflow[svc] = 10
-        for svc in RABBIT_SERVICES:
-            tp.rabbit_pool_size[svc] = 2
-            tp.rabbit_channel_pool_size[svc] = 10
-    else:
-        # Prod: scale within the CPU budget (resource_pct of total).
-        budget = tp.budget_cores  # e.g. 2 for 8 cores @ 25%
+    # Workers: dev keeps things light (1-2); prod scales within the CPU
+    # budget (resource_pct of the physical cores, e.g. 2 of 8 at 25 %).
+    workers = min(sys.physical_cores, 2) if profile == "dev" else tp.budget_cores
+    for svc in HEAVY_SERVICES:
+        tp.workers[svc] = max(1, workers)
+    for svc in LIGHT_SERVICES:
+        tp.workers[svc] = 1
 
-        for svc in HEAVY_SERVICES:
-            tp.workers[svc] = max(1, budget)
-        for svc in LIGHT_SERVICES:
-            tp.workers[svc] = 1
-
-        for svc in DB_SERVICES:
-            w = tp.workers[svc]
-            tp.db_pool_size[svc] = max(5, w * 3)
-            tp.db_max_overflow[svc] = tp.db_pool_size[svc]
-
-        for svc in RABBIT_SERVICES:
-            w = tp.workers[svc]
-            tp.rabbit_pool_size[svc] = max(2, w)
-            tp.rabbit_channel_pool_size[svc] = tp.rabbit_pool_size[svc] * 2
+    # Pools: the same per worker process, whatever the number of workers.
+    for svc in DB_SERVICES:
+        tp.db_pool_size[svc] = DB_POOL_PER_WORKER
+        tp.db_max_overflow[svc] = DB_OVERFLOW_PER_WORKER.get(profile, DB_OVERFLOW_PER_WORKER["prod"])
+    for svc in RABBIT_SERVICES:
+        tp.rabbit_pool_size[svc] = RABBIT_POOL_PER_WORKER
+        tp.rabbit_channel_pool_size[svc] = RABBIT_CHANNELS_PER_WORKER
 
     return tp
