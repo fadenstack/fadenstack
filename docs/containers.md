@@ -6,14 +6,28 @@ small service your models call. They do not manage the GPU machines; their
 runtimes are deployments (see [Deploying models](model-marketplace.md)).
 
 Everything below was taken on the test install (Ubuntu VM, `ray` at `a9d1714`,
-2026-09-26; the create form and editing at `1892550`).
+2026-09-26; the create form and editing at `1892550`; the state tiles on the
+development install at `4544c24`).
 
 ---
 
 ## The list
 
 **Containers → Containers** lists every container on the server, the ones
-LLM.Port runs included:
+LLM.Port runs included. Four tiles above the list count them:
+
+![The state tiles above the list](images/dashboard/05-containers-tiles.png)
+
+| Tile | Counts |
+|---|---|
+| Running | Running containers, of all listed |
+| Not running | Exited, created or paused |
+| Unhealthy | Running, but failing their health check |
+| Restarting | Restarting, often in a crash loop |
+
+Each tile is also a filter: select it to list only those containers, select
+it again to list all. The **Class** filter still applies, and the counts
+follow it.
 
 ![The containers on the server](images/containers/01-containers-list.png)
 

@@ -31,6 +31,17 @@ Then open `http://<server>`, sign in, and add the machines with GPUs from
 **Machines → Add a machine**. See [Installing LLM.Port](docs/installing.md),
 and [Upgrading LLM.Port](docs/upgrading.md) for upgrades.
 
+## Documentation
+
+| | |
+| --- | --- |
+| Setting up | [Installing](docs/installing.md) · [Upgrading](docs/upgrading.md) · [System requirements](docs/system-requirements.md) |
+| Using it | [The chat](docs/chat.md) · [Skills](docs/skills.md) · [The admin dashboard](docs/dashboard.md) |
+| GPU machines and models | [Adding a machine](docs/onboarding-a-node.md) · [Hosting a model from the marketplace](docs/model-marketplace.md) · [vLLM you already run](docs/found-vllm.md) · [Taking over clusters](docs/taking-over-clusters.md) · [When something fails](docs/resilience.md) · [FAQ](docs/faq.md) |
+| The server | [Containers](docs/containers.md) · [MCP servers](docs/mcp-servers.md) |
+| How it works | [The gateway's chat pipeline](docs/gateway-pipeline.md) · [RAG Lite search](docs/rag-lite-search.md) |
+| Maintainers | [Releasing](docs/releasing.md) · [Onboarding friction](docs/onboarding-friction.md) |
+
 ## Docker Images
 
 The images are published to the GitHub Container Registry:

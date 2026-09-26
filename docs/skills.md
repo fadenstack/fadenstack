@@ -20,6 +20,8 @@ Skills are an optional module (`llmport module enable skills`, or
 - Or press the **skills button** next to the input and tick the skills you
   want.
 
+![Typing $test lists the matching skills](images/chat/04-skill-picker.png)
+
 A picked skill shows as a chip above the input and is used for every message
 in that chat until you take it off. Other skills come in on their own when
 they are set to (see [When a skill is used](#when-a-skill-is-used)).
