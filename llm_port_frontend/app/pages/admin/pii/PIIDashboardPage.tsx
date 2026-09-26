@@ -3,66 +3,61 @@
  *
  * Shows total scans, detection rate, entity-type breakdown, daily volume,
  * and operation/source distribution.  **No raw PII data is displayed.**
+ *
+ * Built from the dashboard's kit (components/dashboard/kit): tiles, the
+ * chart style and ranked bars, so it reads like the admin dashboard.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchPIIStats, type PIIStats } from "~/api/pii";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import CircularProgress from "@mui/material/CircularProgress";
-import Grid from "@mui/material/Grid";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import IconButton from "@mui/material/IconButton";
+import Skeleton from "@mui/material/Skeleton";
+import Tooltip from "@mui/material/Tooltip";
 import { useTheme } from "@mui/material/styles";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-import { BarChart } from "@mui/x-charts/BarChart";
-import { PieChart } from "@mui/x-charts/PieChart";
-import { LineChart } from "@mui/x-charts/LineChart";
+import {
+  FULL_ROW,
+  PageHeader,
+  PanelGrid,
+  RankedBars,
+  StatGrid,
+  StatTile,
+  TimeSeriesChart,
+  WidgetCard,
+  WidgetEmpty,
+  type RankedBar,
+} from "~/components/dashboard/kit";
 
-/* ── Stat card ─────────────────────────────────────────────────────── */
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  detail?: string;
-  color?: string;
+/** Counts by name as ranked bars, longest first, measured against the largest. */
+function ranked(counts: Record<string, number>, lang: string, color?: string): RankedBar[] {
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const top = entries[0]?.[1] ?? 0;
+  const fmt = new Intl.NumberFormat(lang);
+  return entries.map(([label, value]) => ({
+    key: label,
+    label,
+    share: top ? value / top : 0,
+    valueLabel: fmt.format(value),
+    color,
+  }));
 }
-
-function StatCard({ label, value, detail, color }: StatCardProps) {
-  return (
-    <Card variant="outlined" sx={{ height: "100%" }}>
-      <CardContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          {label}
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: color ?? "inherit" }}>
-          {value}
-        </Typography>
-        {detail && (
-          <Typography variant="caption" color="text.secondary">
-            {detail}
-          </Typography>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ── Main component ────────────────────────────────────────────────── */
 
 export default function PIIDashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
+  const lang = i18n.language;
   const [stats, setStats] = useState<PIIStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     fetchPIIStats()
       .then((d) => { if (!cancelled) setStats(d); })
       .catch((e) => { if (!cancelled) setError(e.message); })
@@ -70,157 +65,133 @@ export default function PIIDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  useEffect(() => load(), [load]);
 
-  if (error) {
-    return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
-  }
-
-  if (!stats) return null;
-
-  /* ── Derived chart data ──────────────────────────────────────────── */
-
-  const entityPieData = Object.entries(stats.entity_type_breakdown)
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, value], i) => ({ id: i, value, label }));
-
-  const opBarLabels = Object.keys(stats.operation_breakdown);
-  const opBarValues = Object.values(stats.operation_breakdown);
-
-  const srcBarLabels = Object.keys(stats.source_breakdown);
-  const srcBarValues = Object.values(stats.source_breakdown);
-
-  const dailyDates = stats.daily_volume.map((d) => d.date);
-  const dailyCounts = stats.daily_volume.map((d) => d.count);
-  const dailyPII = stats.daily_volume.map((d) => d.pii_count);
-
-  const detectionPct = (stats.detection_rate * 100).toFixed(1);
+  const num = new Intl.NumberFormat(lang);
+  const pending = loading && !stats;
+  const status = { loading: pending, hasData: Boolean(stats) };
+  const day = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short" });
+  const detection = stats ? stats.detection_rate : null;
+  const breakdowns: { key: string; title: string; counts: Record<string, number> | undefined; color: string }[] = [
+    {
+      key: "entity",
+      title: t("pii_dashboard.entity_breakdown", "Entity Type Breakdown"),
+      counts: stats?.entity_type_breakdown,
+      color: theme.palette.dashboard.health.degraded,
+    },
+    {
+      key: "operation",
+      title: t("pii_dashboard.by_operation", "By Operation"),
+      counts: stats?.operation_breakdown,
+      color: theme.palette.dashboard.residency.machines,
+    },
+    {
+      key: "source",
+      title: t("pii_dashboard.by_source", "By Source"),
+      counts: stats?.source_breakdown,
+      color: theme.palette.dashboard.residency.private,
+    },
+  ];
 
   return (
-    <Box sx={{ p: 0 }}>
-      {/* ── Top-line KPI cards ──────────────────────────────────────── */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard
-            label={t("pii_dashboard.total_scans", "Total Scans")}
-            value={stats.total_scans.toLocaleString()}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard
-            label={t("pii_dashboard.with_pii", "With PII Detected")}
-            value={stats.total_with_pii.toLocaleString()}
-            color={stats.total_with_pii > 0 ? theme.palette.warning.main : undefined}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard
-            label={t("pii_dashboard.total_entities", "Entities Found")}
-            value={stats.total_entities.toLocaleString()}
-          />
-        </Grid>
-        <Grid size={{ xs: 6, sm: 3 }}>
-          <StatCard
-            label={t("pii_dashboard.detection_rate", "Detection Rate")}
-            value={`${detectionPct}%`}
-            color={Number(detectionPct) > 50 ? theme.palette.error.main : undefined}
-          />
-        </Grid>
-      </Grid>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 2 }}>
+      <PageHeader
+        title={t("pii_dashboard.title", "PII Dashboard")}
+        subtitle={t("pii_dashboard.subtitle")}
+        actions={
+          <Tooltip title={t("common.refresh", "Refresh")}>
+            <IconButton onClick={load} aria-label={t("common.refresh", "Refresh")}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        }
+      />
 
-      {/* ── Daily volume line chart ────────────────────────────────── */}
-      {stats.daily_volume.length > 0 && (
-        <Card variant="outlined" sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-              {t("pii_dashboard.daily_volume", "Daily Scan Volume")}
-            </Typography>
-            <LineChart
-              xAxis={[{ scaleType: "band", data: dailyDates, label: t("pii_dashboard.date") }]}
-              series={[
-                { data: dailyCounts, label: t("pii_dashboard.total", "Total"), color: theme.palette.primary.main },
-                { data: dailyPII, label: t("pii_dashboard.pii_detected_label", "PII Detected"), color: theme.palette.warning.main },
-              ]}
-              height={280}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Entity-type breakdown + operation/source bars ──────────── */}
-      <Grid container spacing={2}>
-        {/* Pie chart: entity types */}
-        {entityPieData.length > 0 && (
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card variant="outlined" sx={{ height: "100%" }}>
-              <CardContent>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                  {t("pii_dashboard.entity_breakdown", "Entity Type Breakdown")}
-                </Typography>
-                <PieChart
-                  series={[
-                    {
-                      data: entityPieData,
-                      innerRadius: 40,
-                      highlightScope: { fade: "global", highlight: "item" },
-                    },
-                  ]}
-                  height={280}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
-        {/* Bar chart: operations */}
-        {opBarLabels.length > 0 && (
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Card variant="outlined" sx={{ height: "100%" }}>
-              <CardContent>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                  {t("pii_dashboard.by_operation", "By Operation")}
-                </Typography>
-                <BarChart
-                  xAxis={[{ scaleType: "band", data: opBarLabels }]}
-                  series={[{ data: opBarValues, color: theme.palette.info.main }]}
-                  height={240}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
-        {/* Bar chart: source */}
-        {srcBarLabels.length > 0 && (
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Card variant="outlined" sx={{ height: "100%" }}>
-              <CardContent>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                  {t("pii_dashboard.by_source", "By Source")}
-                </Typography>
-                <BarChart
-                  xAxis={[{ scaleType: "band", data: srcBarLabels }]}
-                  series={[{ data: srcBarValues, color: theme.palette.secondary.main }]}
-                  height={240}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
-
-      {/* ── Empty state ────────────────────────────────────────────── */}
-      {stats.total_scans === 0 && (
-        <Alert severity="info" sx={{ mt: 3 }}>
+      {error && <Alert severity="error">{error}</Alert>}
+      {stats && stats.total_scans === 0 && (
+        <Alert severity="info">
           {t("pii_dashboard.no_data", "No PII scan data yet. Events will appear as the gateway processes requests with PII policies enabled.")}
         </Alert>
       )}
+
+      <PanelGrid columns={3}>
+        <Box sx={FULL_ROW}>
+          <WidgetCard
+            title={t("pii_dashboard.summary")}
+            status={status}
+            skeleton={
+              <StatGrid>
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} variant="rounded" height={96} />
+                ))}
+              </StatGrid>
+            }
+          >
+            {stats && (
+              <StatGrid>
+                <StatTile label={t("pii_dashboard.total_scans", "Total Scans")} value={num.format(stats.total_scans)} />
+                <StatTile
+                  label={t("pii_dashboard.with_pii", "With PII Detected")}
+                  value={num.format(stats.total_with_pii)}
+                  tone={stats.total_with_pii > 0 ? "warning" : "default"}
+                />
+                <StatTile label={t("pii_dashboard.total_entities", "Entities Found")} value={num.format(stats.total_entities)} />
+                <StatTile
+                  label={t("pii_dashboard.detection_rate", "Detection Rate")}
+                  value={detection == null ? null : `${(detection * 100).toFixed(1)} %`}
+                  tone={detection != null && detection > 0.5 ? "error" : "default"}
+                />
+              </StatGrid>
+            )}
+          </WidgetCard>
+        </Box>
+
+        <Box sx={FULL_ROW}>
+          <WidgetCard
+            title={t("pii_dashboard.daily_volume", "Daily Scan Volume")}
+            status={status}
+            skeleton={<Skeleton variant="rounded" height={220} />}
+            empty={stats && stats.daily_volume.length === 0 ? <WidgetEmpty message={t("pii_dashboard.no_volume")} /> : undefined}
+          >
+            {stats && (
+              <TimeSeriesChart
+                x={stats.daily_volume.map((d) => d.date)}
+                xFormat={(v) => day.format(new Date(v))}
+                series={[
+                  {
+                    id: "total",
+                    label: t("pii_dashboard.total", "Total"),
+                    data: stats.daily_volume.map((d) => d.count),
+                    color: theme.palette.dashboard.residency.machines,
+                  },
+                  {
+                    id: "pii",
+                    label: t("pii_dashboard.pii_detected_label", "PII Detected"),
+                    data: stats.daily_volume.map((d) => d.pii_count),
+                    color: theme.palette.dashboard.health.degraded,
+                  },
+                ]}
+                ariaLabel={t("pii_dashboard.daily_volume", "Daily Scan Volume")}
+                height={220}
+              />
+            )}
+          </WidgetCard>
+        </Box>
+
+        {breakdowns.map((b) => {
+          const items = b.counts ? ranked(b.counts, lang, b.color) : [];
+          return (
+            <WidgetCard
+              key={b.key}
+              title={b.title}
+              status={status}
+              empty={stats && items.length === 0 ? <WidgetEmpty message={t("pii_dashboard.no_breakdown")} /> : undefined}
+            >
+              <RankedBars items={items} barWidth={80} />
+            </WidgetCard>
+          );
+        })}
+      </PanelGrid>
     </Box>
   );
 }

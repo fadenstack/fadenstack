@@ -1443,7 +1443,11 @@
     "by_operation": "By Operation",
     "by_source": "By Source",
     "no_data": "No PII scan data yet. Events will appear as the gateway processes requests with PII policies enabled.",
-    "date": "Date"
+    "date": "Date",
+    "subtitle": "What the PII filter found in requests, as counts only",
+    "summary": "Summary",
+    "no_volume": "No scans in this period.",
+    "no_breakdown": "Nothing to break down yet."
   },
   "pii_log": {
     "title": "PII Activity Log",

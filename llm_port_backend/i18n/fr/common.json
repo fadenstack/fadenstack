@@ -1445,7 +1445,11 @@
     "by_operation": "Par opération",
     "by_source": "Par source",
     "no_data": "Aucune donnée d'analyse PII pour le moment. Les événements apparaîtront lorsque la passerelle traitera des requêtes avec les politiques PII activées.",
-    "date": "Date"
+    "date": "Date",
+    "subtitle": "Ce que le filtre PII a trouvé dans les requêtes, en nombres uniquement",
+    "summary": "Résumé",
+    "no_volume": "Aucune analyse sur cette période.",
+    "no_breakdown": "Rien à détailler pour l'instant."
   },
   "pii_log": {
     "title": "Journal d'activité PII",

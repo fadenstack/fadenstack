@@ -1311,7 +1311,11 @@
     "by_operation": "Por Operacion",
     "by_source": "Por Fuente",
     "no_data": "Aun no hay datos de escaneo PII. Los eventos aparecaran cuando el gateway procese solicitudes con politicas PII habilitadas.",
-    "date": "Fecha"
+    "date": "Fecha",
+    "subtitle": "Lo que el filtro PII encontró en las solicitudes, solo como recuentos",
+    "summary": "Resumen",
+    "no_volume": "No hay análisis en este periodo.",
+    "no_breakdown": "Aún no hay nada que desglosar."
   },
   "pii_log": {
     "title": "Registro de Actividad PII",

@@ -1311,7 +1311,11 @@
     "by_operation": "Nach Operation",
     "by_source": "Nach Quelle",
     "no_data": "Noch keine PII-Scandaten. Ereignisse erscheinen, wenn das Gateway Anfragen mit aktivierten PII-Richtlinien verarbeitet.",
-    "date": "Datum"
+    "date": "Datum",
+    "subtitle": "Was der PII-Filter in Anfragen gefunden hat, nur als Anzahlen",
+    "summary": "Übersicht",
+    "no_volume": "Keine Scans in diesem Zeitraum.",
+    "no_breakdown": "Noch nichts aufzuschlüsseln."
   },
   "pii_log": {
     "title": "PII-Aktivitaetsprotokoll",

@@ -1311,7 +1311,11 @@
     "by_operation": "按操作",
     "by_source": "按来源",
     "no_data": "暂无 PII 扫描数据。启用 PII 策略后，网关处理请求时将显示事件。",
-    "date": "日期"
+    "date": "日期",
+    "subtitle": "PII 过滤器在请求中发现的内容，仅显示计数",
+    "summary": "概览",
+    "no_volume": "此期间没有扫描。",
+    "no_breakdown": "暂无可细分的数据。"
   },
   "pii_log": {
     "title": "PII 活动日志",
