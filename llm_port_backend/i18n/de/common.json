@@ -240,7 +240,86 @@
     "node_ram": "RAM",
     "node_gpu_vram": "GPU VRAM",
     "gpu_rescan": "GPUs neu erkennen",
-    "gpu_rescan_failed": "Erneute GPU-Erkennung fehlgeschlagen"
+    "gpu_rescan_failed": "Erneute GPU-Erkennung fehlgeschlagen",
+    "subtitle": "Ihre KI-Plattform auf einen Blick",
+    "done": "Fertig",
+    "retry": "Erneut versuchen",
+    "widget_failed": "Dieses Widget konnte nicht geladen werden.",
+    "partial": "Unvollständig",
+    "refresh_failed": "Nicht aktualisiert",
+    "refresh_failed_detail": "Die letzte Aktualisierung ist fehlgeschlagen; angezeigt werden die vorherigen Werte. Zum erneuten Versuch klicken.",
+    "as_of": "Stand {{ago}}",
+    "updated": "Aktualisiert {{ago}}",
+    "customize_drag": "{{name}} verschieben",
+    "customize_size": "Größe von {{name}}",
+    "size": {
+      "S": "Klein",
+      "M": "Mittel",
+      "L": "Groß",
+      "XL": "Volle Breite"
+    },
+    "move_up": "Nach oben",
+    "move_down": "Nach unten",
+    "move_up_named": "{{name}} nach oben",
+    "move_down_named": "{{name}} nach unten",
+    "show_named": "{{name}} anzeigen",
+    "hide_named": "{{name}} ausblenden",
+    "requires_module": "Erfordert das Modul {{module}}",
+    "requires_rag_pro": "Erfordert RAG Pro",
+    "checking_modules": "Module werden geprüft …",
+    "layout_conflict": "Ihr Layout wurde auf einem anderen Gerät geändert.",
+    "keep_mine": "Meines behalten",
+    "keep_theirs": "OK",
+    "layout_save_failed": "Ihr Layout konnte nicht gespeichert werden. Es wird bei Ihrer nächsten Änderung erneut versucht.",
+    "system_state": {
+      "ok": "System in Ordnung",
+      "degraded": "System beeinträchtigt",
+      "error": "System ausgefallen"
+    },
+    "gpu_count": "{{count}} GPUs",
+    "widgets": {
+      "capacity": {
+        "title": "Lokale KI-Kapazität",
+        "description": "Maschinen und GPUs, ihr Zustand und ihre Auslastung",
+        "link": "Maschinen"
+      },
+      "platform_health": {
+        "title": "Plattformzustand",
+        "description": "Abhängigkeiten, Module und Datenbank"
+      },
+      "server_resources": {
+        "title": "Serverressourcen",
+        "description": "CPU, Arbeitsspeicher, Festplatte und GPU dieses Servers",
+        "subtitle": "Die Maschine, auf der die Plattform läuft"
+      },
+      "top_containers": {
+        "title": "Top-Container",
+        "description": "Container mit der höchsten CPU- und Speichernutzung",
+        "link": "Container"
+      },
+      "grafana": {
+        "title": "Grafana",
+        "description": "Das Grafana-Übersichtsdashboard"
+      }
+    },
+    "health": {
+      "overall": "Gesamt",
+      "dependencies": "Abhängigkeiten",
+      "modules": "Module",
+      "postgres": "Postgres",
+      "all_up": "Alle {{count}} erreichbar",
+      "some_down": "Ausgefallen: {{names}}",
+      "modules_healthy": "{{healthy}} / {{enabled}} in Ordnung",
+      "unreachable": "Nicht erreichbar",
+      "of_connections": "von {{max}} Verbindungen",
+      "connections": "Verbindungen",
+      "near_limit": "nahe am Limit",
+      "system": {
+        "healthy": "In Ordnung",
+        "degraded": "Beeinträchtigt",
+        "down": "Ausgefallen"
+      }
+    }
   },
   "errors": {
     "oops": "Hoppla!",

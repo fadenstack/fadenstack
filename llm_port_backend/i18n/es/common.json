@@ -240,7 +240,86 @@
     "node_ram": "RAM",
     "node_gpu_vram": "GPU VRAM",
     "gpu_rescan": "Volver a detectar GPU",
-    "gpu_rescan_failed": "Falló la nueva detección de GPU"
+    "gpu_rescan_failed": "Falló la nueva detección de GPU",
+    "subtitle": "Tu plataforma de IA de un vistazo",
+    "done": "Listo",
+    "retry": "Reintentar",
+    "widget_failed": "No se pudo cargar este widget.",
+    "partial": "Parcial",
+    "refresh_failed": "Sin actualizar",
+    "refresh_failed_detail": "La última actualización falló; se muestran las cifras anteriores. Haz clic para reintentar.",
+    "as_of": "a {{ago}}",
+    "updated": "Actualizado {{ago}}",
+    "customize_drag": "Arrastrar {{name}}",
+    "customize_size": "Tamaño de {{name}}",
+    "size": {
+      "S": "Pequeño",
+      "M": "Mediano",
+      "L": "Grande",
+      "XL": "Ancho completo"
+    },
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "move_up_named": "Subir {{name}}",
+    "move_down_named": "Bajar {{name}}",
+    "show_named": "Mostrar {{name}}",
+    "hide_named": "Ocultar {{name}}",
+    "requires_module": "Requiere el módulo {{module}}",
+    "requires_rag_pro": "Requiere RAG Pro",
+    "checking_modules": "Comprobando módulos…",
+    "layout_conflict": "Tu diseño se cambió en otro dispositivo.",
+    "keep_mine": "Mantener el mío",
+    "keep_theirs": "Aceptar",
+    "layout_save_failed": "No se pudo guardar tu diseño. Se volverá a intentar con tu próximo cambio.",
+    "system_state": {
+      "ok": "Sistema en buen estado",
+      "degraded": "Sistema degradado",
+      "error": "Sistema caído"
+    },
+    "gpu_count": "{{count}} GPU",
+    "widgets": {
+      "capacity": {
+        "title": "Capacidad de IA local",
+        "description": "Máquinas y GPU, su estado y su carga",
+        "link": "Máquinas"
+      },
+      "platform_health": {
+        "title": "Estado de la plataforma",
+        "description": "Dependencias, módulos y base de datos"
+      },
+      "server_resources": {
+        "title": "Recursos del servidor",
+        "description": "CPU, memoria, disco y GPU de este servidor",
+        "subtitle": "La máquina en la que se ejecuta la plataforma"
+      },
+      "top_containers": {
+        "title": "Contenedores principales",
+        "description": "Contenedores que más CPU y memoria usan",
+        "link": "Contenedores"
+      },
+      "grafana": {
+        "title": "Grafana",
+        "description": "El panel de resumen de Grafana"
+      }
+    },
+    "health": {
+      "overall": "General",
+      "dependencies": "Dependencias",
+      "modules": "Módulos",
+      "postgres": "Postgres",
+      "all_up": "Las {{count}} activas",
+      "some_down": "Caídas: {{names}}",
+      "modules_healthy": "{{healthy}} / {{enabled}} en buen estado",
+      "unreachable": "Inaccesible",
+      "of_connections": "de {{max}} conexiones",
+      "connections": "conexiones",
+      "near_limit": "cerca del límite",
+      "system": {
+        "healthy": "En buen estado",
+        "degraded": "Degradado",
+        "down": "Caído"
+      }
+    }
   },
   "errors": {
     "oops": "Ups!",

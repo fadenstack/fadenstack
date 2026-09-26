@@ -201,6 +201,9 @@ export const NAV: NavEntry[] = [
     to: "/admin/dashboard",
     labelKey: "nav.dashboard",
     icon: <DashboardIcon />,
+    // Every dashboard endpoint requires a superuser; anyone else would get a
+    // page of 403s.
+    superuserOnly: true,
   },
   {
     id: "observability",

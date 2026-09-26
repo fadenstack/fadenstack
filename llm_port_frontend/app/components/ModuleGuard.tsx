@@ -32,7 +32,8 @@ interface ModuleGuardProps {
 
 export default function ModuleGuard({
   module,
-  redirectTo = "/admin/dashboard",
+  // /admin sends superusers to the dashboard and everyone else to /chat.
+  redirectTo = "/admin",
   redirect = false,
   children,
 }: ModuleGuardProps) {

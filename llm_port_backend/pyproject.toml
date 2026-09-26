@@ -43,6 +43,7 @@ dependencies = [
   "hf-xet >=1.1.0,<2",
   "httpx >=0.28.1,<1",
   "psutil >=6.0.0,<7",
+  "tzdata >=2025.2",  # zoneinfo data: Windows has no system tz database, and dashboard windows follow the viewer's zone
   "cryptography >=50.0.0",  # >=50.0.0: clears PYSEC-2026-35/36/3552/3553/3554
   "pynvml>=12.0.0,<13",
   "pdfplumber >=0.11.0,<1",

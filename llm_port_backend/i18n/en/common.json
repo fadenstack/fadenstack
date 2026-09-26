@@ -240,7 +240,86 @@
     "node_ram": "RAM",
     "node_gpu_vram": "GPU VRAM",
     "gpu_rescan": "Re-detect GPUs",
-    "gpu_rescan_failed": "GPU rescan failed"
+    "gpu_rescan_failed": "GPU rescan failed",
+    "subtitle": "Your AI platform at a glance",
+    "done": "Done",
+    "retry": "Retry",
+    "widget_failed": "This widget could not load.",
+    "partial": "Partial",
+    "refresh_failed": "Not refreshed",
+    "refresh_failed_detail": "The last refresh failed; these are the previous figures. Click to retry.",
+    "as_of": "as of {{ago}}",
+    "updated": "Updated {{ago}}",
+    "customize_drag": "Drag {{name}}",
+    "customize_size": "Size of {{name}}",
+    "size": {
+      "S": "Small",
+      "M": "Medium",
+      "L": "Large",
+      "XL": "Full width"
+    },
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "move_up_named": "Move {{name}} up",
+    "move_down_named": "Move {{name}} down",
+    "show_named": "Show {{name}}",
+    "hide_named": "Hide {{name}}",
+    "requires_module": "Requires the {{module}} module",
+    "requires_rag_pro": "Requires RAG Pro",
+    "checking_modules": "Checking modules…",
+    "layout_conflict": "Your layout was changed on another device.",
+    "keep_mine": "Keep mine",
+    "keep_theirs": "OK",
+    "layout_save_failed": "Your layout could not be saved. It will be retried with your next change.",
+    "system_state": {
+      "ok": "System healthy",
+      "degraded": "System degraded",
+      "error": "System down"
+    },
+    "gpu_count": "{{count}} GPUs",
+    "widgets": {
+      "capacity": {
+        "title": "Local AI capacity",
+        "description": "Machines and GPUs, their health and load",
+        "link": "Machines"
+      },
+      "platform_health": {
+        "title": "Platform health",
+        "description": "Dependencies, modules and the database"
+      },
+      "server_resources": {
+        "title": "Server resources",
+        "description": "CPU, memory, disk and GPU of this server",
+        "subtitle": "The machine the platform runs on"
+      },
+      "top_containers": {
+        "title": "Top containers",
+        "description": "Containers using the most CPU and memory",
+        "link": "Containers"
+      },
+      "grafana": {
+        "title": "Grafana",
+        "description": "The Grafana overview dashboard"
+      }
+    },
+    "health": {
+      "overall": "Overall",
+      "dependencies": "Dependencies",
+      "modules": "Modules",
+      "postgres": "Postgres",
+      "all_up": "All {{count}} up",
+      "some_down": "Down: {{names}}",
+      "modules_healthy": "{{healthy}} / {{enabled}} healthy",
+      "unreachable": "Unreachable",
+      "of_connections": "of {{max}} connections",
+      "connections": "connections",
+      "near_limit": "near limit",
+      "system": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "down": "Down"
+      }
+    }
   },
   "common": {
     "name": "Name",

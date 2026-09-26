@@ -1,0 +1,251 @@
+/**
+ * The widget grid: a 12-column flow whose rows fill themselves, so hiding a
+ * widget never leaves a hole (spec §7.1). DOM order is the layout order --
+ * no `grid-auto-flow: dense`, which reorders what is seen but not what a
+ * keyboard or screen reader walks through.
+ *
+ * In Customize mode each widget gets a bar: drag handle (fine pointers),
+ * size, move up / down, show / hide. Every control is 44 px on touch.
+ */
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import type { WidgetSize } from "~/api/dashboard";
+import { SIZE_COLUMNS } from "~/lib/dashboardLayoutModel";
+import type { WidgetDefinition } from "./types";
+
+export interface GridItem {
+  def: WidgetDefinition;
+  size: WidgetSize;
+  hidden: boolean;
+  available: boolean;
+  /** Why it is unavailable ("Requires the MCP module"). */
+  reason?: string;
+}
+
+interface DashboardGridProps {
+  items: GridItem[];
+  editMode: boolean;
+  onReorder: (activeId: string, overId: string) => void;
+  onMove: (id: string, delta: -1 | 1) => void;
+  onToggle: (id: string) => void;
+  onSize: (id: string, size: WidgetSize) => void;
+  renderWidget: (item: GridItem) => ReactNode;
+}
+
+export const GRID_GAP_PX = 12;
+
+/** Touch devices get 44 px targets; a mouse can do with less. */
+export const TOUCH_TARGET = { "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 } } as const;
+
+function basis(columns: number): string {
+  return columns === 12 ? "100%" : `calc(${(columns / 12) * 100}% - ${GRID_GAP_PX}px)`;
+}
+
+export default function DashboardGrid({
+  items,
+  editMode,
+  onReorder,
+  onMove,
+  onToggle,
+  onSize,
+  renderWidget,
+}: DashboardGridProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const shown = editMode ? items : items.filter((i) => i.available && !i.hidden);
+  const movable = items.filter((i) => i.available).map((i) => i.def.id);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={shown.map((i) => i.def.id)} strategy={rectSortingStrategy}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: `${GRID_GAP_PX}px`, alignItems: "stretch" }}>
+          {shown.map((item) => (
+            <SortableWidget
+              key={item.def.id}
+              item={item}
+              editMode={editMode}
+              first={movable[0] === item.def.id}
+              last={movable[movable.length - 1] === item.def.id}
+              onMove={onMove}
+              onToggle={onToggle}
+              onSize={onSize}
+            >
+              {item.available && !(editMode && item.hidden) ? renderWidget(item) : null}
+            </SortableWidget>
+          ))}
+        </Box>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+interface SortableWidgetProps {
+  item: GridItem;
+  editMode: boolean;
+  first: boolean;
+  last: boolean;
+  onMove: (id: string, delta: -1 | 1) => void;
+  onToggle: (id: string) => void;
+  onSize: (id: string, size: WidgetSize) => void;
+  children: ReactNode;
+}
+
+function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize, children }: SortableWidgetProps) {
+  const { t } = useTranslation();
+  const { def, size, hidden, available, reason } = item;
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: def.id, disabled: !editMode || !available });
+  // In Customize, a hidden or unavailable widget is only its bar: on a row of
+  // its own, so the widgets that are shown keep the widths they really have.
+  const collapsed = editMode && (hidden || !available);
+  const cols = collapsed ? SIZE_COLUMNS.XL : SIZE_COLUMNS[size];
+  const title = t(def.titleKey);
+
+  return (
+    <Box
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      sx={{
+        flexGrow: 1,
+        flexShrink: 1,
+        minWidth: 0,
+        flexBasis: { xs: basis(cols.xs), sm: basis(cols.sm), md: basis(cols.md), lg: basis(cols.lg) },
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.5,
+      }}
+    >
+      {editMode && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          gap={0.25}
+          sx={{
+            px: 0.5,
+            borderRadius: 1,
+            minHeight: 44,
+            bgcolor: hidden || !available ? "action.disabledBackground" : "action.hover",
+          }}
+        >
+          <IconButton
+            ref={setActivatorNodeRef}
+            {...listeners}
+            {...attributes}
+            size="small"
+            disabled={!available}
+            aria-label={t("dashboard.customize_drag", { name: title })}
+            sx={{
+              cursor: "grab",
+              display: "none",
+              "@media (pointer: fine)": { display: "inline-flex" },
+            }}
+          >
+            <DragIndicatorIcon fontSize="small" />
+          </IconButton>
+          <Typography
+            variant="body2"
+            noWrap
+            sx={{ flexGrow: 1, pl: 0.5, fontWeight: 600, color: hidden || !available ? "text.disabled" : "text.primary" }}
+          >
+            {title}
+            {!available && reason && (
+              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                {reason}
+              </Typography>
+            )}
+          </Typography>
+          {available && def.sizes.length > 1 && (
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={size}
+              onChange={(_, value: WidgetSize | null) => value && onSize(def.id, value)}
+              aria-label={t("dashboard.customize_size", { name: title })}
+            >
+              {def.sizes.map((s) => (
+                <ToggleButton key={s} value={s} aria-label={t(`dashboard.size.${s}`)} sx={{ px: 1, ...TOUCH_TARGET }}>
+                  {s}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          )}
+          <Tooltip title={t("dashboard.move_up")}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!available || first}
+                onClick={() => onMove(def.id, -1)}
+                aria-label={t("dashboard.move_up_named", { name: title })}
+                sx={TOUCH_TARGET}
+              >
+                <ArrowUpwardIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={t("dashboard.move_down")}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!available || last}
+                onClick={() => onMove(def.id, 1)}
+                aria-label={t("dashboard.move_down_named", { name: title })}
+                sx={TOUCH_TARGET}
+              >
+                <ArrowDownwardIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={hidden ? t("dashboard.show_section") : t("dashboard.hide_section")}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!available}
+                onClick={() => onToggle(def.id)}
+                aria-label={t(hidden ? "dashboard.show_named" : "dashboard.hide_named", { name: title })}
+                sx={TOUCH_TARGET}
+              >
+                {hidden ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      )}
+      {children && <Box sx={{ flexGrow: 1, minWidth: 0 }}>{children}</Box>}
+    </Box>
+  );
+}

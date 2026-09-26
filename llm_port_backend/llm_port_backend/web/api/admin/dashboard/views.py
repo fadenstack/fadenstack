@@ -26,10 +26,11 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     GrafanaPanelDTO,
     GrafanaPanelsDTO,
 )
+from llm_port_backend.web.api.admin.dashboard.caching import no_store
 from llm_port_backend.web.api.admin.dependencies import get_docker, require_superuser
 from llm_port_backend.services.tls import default_httpx_verify
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(no_store)])
 
 _REQUEST_COUNTER_NAMES = {
     "http_requests_total",
@@ -469,3 +470,10 @@ async def grafana_panels(
         open_dashboard_url=f"{clean_url}/d/{dashboard_uid}/{dashboard_slug}?orgId=1",
         panels=panels,
     )
+
+
+# The redesigned dashboard's endpoints, one module each. Included here so they
+# share this router's prefix, tag and no-store dependency.
+from llm_port_backend.web.api.admin.dashboard.layout import router as _layout_router  # noqa: E402
+
+router.include_router(_layout_router)

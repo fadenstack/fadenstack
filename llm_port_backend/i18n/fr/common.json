@@ -240,7 +240,86 @@
     "node_ram": "RAM",
     "node_gpu_vram": "GPU VRAM",
     "gpu_rescan": "Redétecter les GPU",
-    "gpu_rescan_failed": "La redétection des GPU a échoué"
+    "gpu_rescan_failed": "La redétection des GPU a échoué",
+    "subtitle": "Votre plateforme d'IA en un coup d'œil",
+    "done": "Terminé",
+    "retry": "Réessayer",
+    "widget_failed": "Ce widget n'a pas pu être chargé.",
+    "partial": "Partiel",
+    "refresh_failed": "Non actualisé",
+    "refresh_failed_detail": "La dernière actualisation a échoué ; ce sont les valeurs précédentes. Cliquez pour réessayer.",
+    "as_of": "au {{ago}}",
+    "updated": "Actualisé {{ago}}",
+    "customize_drag": "Déplacer {{name}}",
+    "customize_size": "Taille de {{name}}",
+    "size": {
+      "S": "Petit",
+      "M": "Moyen",
+      "L": "Grand",
+      "XL": "Pleine largeur"
+    },
+    "move_up": "Monter",
+    "move_down": "Descendre",
+    "move_up_named": "Monter {{name}}",
+    "move_down_named": "Descendre {{name}}",
+    "show_named": "Afficher {{name}}",
+    "hide_named": "Masquer {{name}}",
+    "requires_module": "Nécessite le module {{module}}",
+    "requires_rag_pro": "Nécessite RAG Pro",
+    "checking_modules": "Vérification des modules…",
+    "layout_conflict": "Votre disposition a été modifiée sur un autre appareil.",
+    "keep_mine": "Garder la mienne",
+    "keep_theirs": "OK",
+    "layout_save_failed": "Votre disposition n'a pas pu être enregistrée. Nouvel essai à votre prochaine modification.",
+    "system_state": {
+      "ok": "Système opérationnel",
+      "degraded": "Système dégradé",
+      "error": "Système hors service"
+    },
+    "gpu_count": "{{count}} GPU",
+    "widgets": {
+      "capacity": {
+        "title": "Capacité d'IA locale",
+        "description": "Machines et GPU, leur état et leur charge",
+        "link": "Machines"
+      },
+      "platform_health": {
+        "title": "État de la plateforme",
+        "description": "Dépendances, modules et base de données"
+      },
+      "server_resources": {
+        "title": "Ressources du serveur",
+        "description": "CPU, mémoire, disque et GPU de ce serveur",
+        "subtitle": "La machine sur laquelle tourne la plateforme"
+      },
+      "top_containers": {
+        "title": "Conteneurs les plus actifs",
+        "description": "Les conteneurs qui consomment le plus de CPU et de mémoire",
+        "link": "Conteneurs"
+      },
+      "grafana": {
+        "title": "Grafana",
+        "description": "Le tableau de bord de synthèse Grafana"
+      }
+    },
+    "health": {
+      "overall": "Global",
+      "dependencies": "Dépendances",
+      "modules": "Modules",
+      "postgres": "Postgres",
+      "all_up": "Les {{count}} sont actives",
+      "some_down": "Hors service : {{names}}",
+      "modules_healthy": "{{healthy}} / {{enabled}} opérationnels",
+      "unreachable": "Injoignable",
+      "of_connections": "sur {{max}} connexions",
+      "connections": "connexions",
+      "near_limit": "proche de la limite",
+      "system": {
+        "healthy": "Opérationnel",
+        "degraded": "Dégradé",
+        "down": "Hors service"
+      }
+    }
   },
   "common": {
     "name": "Nom",

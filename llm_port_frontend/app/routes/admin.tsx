@@ -502,7 +502,14 @@ function AdminLayoutInner() {
         />
 
         <Box sx={{ flexGrow: 1, minHeight: 0, overflow: "auto", p: 3 }}>
-          <Outlet context={{ rootModeActive: isRootActive, can: hasPermission }} />
+          <Outlet
+            context={{
+              rootModeActive: isRootActive,
+              can: hasPermission,
+              isSuperuser,
+              userEmail: currentUserEmail,
+            }}
+          />
         </Box>
       </Box>
     </Box>

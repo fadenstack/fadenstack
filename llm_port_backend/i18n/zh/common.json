@@ -240,7 +240,86 @@
     "node_ram": "RAM",
     "node_gpu_vram": "GPU VRAM",
     "gpu_rescan": "重新检测 GPU",
-    "gpu_rescan_failed": "重新检测 GPU 失败"
+    "gpu_rescan_failed": "重新检测 GPU 失败",
+    "subtitle": "一览您的 AI 平台",
+    "done": "完成",
+    "retry": "重试",
+    "widget_failed": "此小组件无法加载。",
+    "partial": "部分数据",
+    "refresh_failed": "未刷新",
+    "refresh_failed_detail": "上次刷新失败，显示的是之前的数据。点击重试。",
+    "as_of": "截至{{ago}}",
+    "updated": "更新于{{ago}}",
+    "customize_drag": "拖动 {{name}}",
+    "customize_size": "{{name}} 的大小",
+    "size": {
+      "S": "小",
+      "M": "中",
+      "L": "大",
+      "XL": "全宽"
+    },
+    "move_up": "上移",
+    "move_down": "下移",
+    "move_up_named": "上移 {{name}}",
+    "move_down_named": "下移 {{name}}",
+    "show_named": "显示 {{name}}",
+    "hide_named": "隐藏 {{name}}",
+    "requires_module": "需要 {{module}} 模块",
+    "requires_rag_pro": "需要 RAG Pro",
+    "checking_modules": "正在检查模块…",
+    "layout_conflict": "您的布局已在另一台设备上更改。",
+    "keep_mine": "保留我的",
+    "keep_theirs": "确定",
+    "layout_save_failed": "无法保存您的布局。将在您下次更改时重试。",
+    "system_state": {
+      "ok": "系统正常",
+      "degraded": "系统降级",
+      "error": "系统故障"
+    },
+    "gpu_count": "{{count}} 个 GPU",
+    "widgets": {
+      "capacity": {
+        "title": "本地 AI 容量",
+        "description": "机器和 GPU 的健康状况与负载",
+        "link": "机器"
+      },
+      "platform_health": {
+        "title": "平台健康状况",
+        "description": "依赖项、模块和数据库"
+      },
+      "server_resources": {
+        "title": "服务器资源",
+        "description": "本服务器的 CPU、内存、磁盘和 GPU",
+        "subtitle": "运行平台的机器"
+      },
+      "top_containers": {
+        "title": "资源占用最高的容器",
+        "description": "CPU 和内存占用最高的容器",
+        "link": "容器"
+      },
+      "grafana": {
+        "title": "Grafana",
+        "description": "Grafana 概览仪表板"
+      }
+    },
+    "health": {
+      "overall": "总体",
+      "dependencies": "依赖项",
+      "modules": "模块",
+      "postgres": "Postgres",
+      "all_up": "全部 {{count}} 项正常",
+      "some_down": "故障：{{names}}",
+      "modules_healthy": "{{healthy}} / {{enabled}} 正常",
+      "unreachable": "无法访问",
+      "of_connections": "/ {{max}} 个连接",
+      "connections": "个连接",
+      "near_limit": "接近上限",
+      "system": {
+        "healthy": "正常",
+        "degraded": "降级",
+        "down": "故障"
+      }
+    }
   },
   "errors": {
     "oops": "哎呀！",

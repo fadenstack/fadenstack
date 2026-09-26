@@ -5,13 +5,14 @@ from __future__ import annotations
 import copy
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from llm_port_backend.db.dependencies import get_db_session
 from llm_port_backend.db.models.user_preferences import UserPreference
 from llm_port_backend.db.models.users import User, current_active_user
+from llm_port_backend.services.dashboard.layout import PREFERENCES_KEY as DASHBOARD_PREFERENCES_KEY
 from llm_port_backend.web.api.admin.users.schema import (
     UserPreferencesRead,
     UserPreferencesUpdate,
@@ -66,6 +67,13 @@ async def update_preferences(
     session: AsyncSession = Depends(get_db_session),
 ) -> UserPreferencesRead:
     """Merge-update the current user's preferences."""
+    if DASHBOARD_PREFERENCES_KEY in payload.preferences:
+        # The dashboard layout carries a revision that only its own endpoint
+        # keeps; a merge here would overwrite it without checking it.
+        raise HTTPException(
+            status_code=422,
+            detail="The dashboard layout is saved through /api/admin/dashboard/layout.",
+        )
     pref = await _get_or_create(session, user.id)
     pref.preferences = _deep_merge(pref.preferences, payload.preferences)
     await session.commit()
