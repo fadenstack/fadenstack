@@ -269,7 +269,14 @@ class SessionDAO:
         limit: int | None = None,
         after_message_id: uuid.UUID | None = None,
     ) -> list[ChatMessage]:
-        """List messages in chronological order, optionally after a given message."""
+        """List messages in chronological order, optionally after a given message.
+
+        Oldest first *before* the limit: the first ``limit`` messages (after
+        ``after_message_id``) -- the order the summarizer reads a session in.
+        For the latest N (the chat's history window) use
+        :meth:`get_recent_messages`; do not add a newest-first variant here
+        (see the MERGE NOTE at the messages endpoint in web/api/v1/sessions.py).
+        """
         query = select(ChatMessage).where(ChatMessage.session_id == session_id)
         if after_message_id is not None:
             subq = select(ChatMessage.created_at).where(

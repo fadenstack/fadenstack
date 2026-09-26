@@ -301,7 +301,16 @@ async def list_messages(
             code="session_not_found",
         )
 
-    messages = await dao.list_messages(session_id=session_id, limit=limit)
+    # The chat opens on a session's LATEST `limit` messages, in chronological
+    # order: get_recent_messages (newest N, returned oldest-first). This used
+    # list_messages, which is oldest-first before the limit -- so a chat past
+    # 100 messages reopened at its beginning with its newest turns missing.
+    #
+    # MERGE NOTE (branch dashboard-redesign, 2026-09-26): one fix only. If the
+    # branch being merged fixes this too, keep this call to the existing
+    # get_recent_messages -- do not add a second newest-first query here or
+    # in list_messages (which stays oldest-first for the summarizer).
+    messages = await dao.get_recent_messages(session_id=session_id, limit=limit)
     # A reply shows what its request used, as it did while it streamed.
     usage = await dao.message_usage(
         session_id=session_id,
