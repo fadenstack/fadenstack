@@ -8,7 +8,9 @@ import { useAsyncData } from "~/lib/useAsyncData";
 import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
+import Stack from "@mui/material/Stack";
 import DeleteIcon from "@mui/icons-material/Delete";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 export default function ChatSessionsPage() {
   const { t } = useTranslation();
@@ -58,7 +60,17 @@ export default function ChatSessionsPage() {
       sortable: true,
       sortValue: (r) => r.title ?? "",
       searchValue: (r) => r.title ?? "",
-      render: (r) => r.title || t("chat_admin.untitled_session"),
+      render: (r) =>
+        r.title_encrypted ? (
+          <Tooltip title={t("chat_admin.title_encrypted_hint")}>
+            <Stack direction="row" alignItems="center" gap={0.5} sx={{ color: "text.secondary" }}>
+              <LockOutlinedIcon sx={{ fontSize: 16 }} />
+              {t("chat_admin.title_encrypted")}
+            </Stack>
+          </Tooltip>
+        ) : (
+          r.title || t("chat_admin.untitled_session")
+        ),
     },
     {
       key: "user_id",

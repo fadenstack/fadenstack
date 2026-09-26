@@ -25,6 +25,9 @@ from llm_port_backend.web.api.admin.dependencies import require_superuser
 
 logger = logging.getLogger(__name__)
 
+#: Fernet tokens start with this (version byte 0x80, base64).
+_FERNET_PREFIX = "gAAAAA"
+
 router = APIRouter()
 
 
@@ -125,6 +128,11 @@ async def list_sessions(
         for k in ("created_at", "updated_at"):
             if row.get(k):
                 row[k] = row[k].isoformat()
+        # The gateway encrypts titles like the messages (a title is the start
+        # of the first one); the backend has no key and shows no ciphertext.
+        if isinstance(row.get("title"), str) and row["title"].startswith(_FERNET_PREFIX):
+            row["title"] = None
+            row["title_encrypted"] = True
     return {"data": rows}
 
 

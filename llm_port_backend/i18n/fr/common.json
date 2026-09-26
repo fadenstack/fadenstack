@@ -1746,7 +1746,9 @@
     "extraction_failed": "échec",
     "extraction_skipped": "ignorée",
     "scope_session": "session",
-    "scope_project": "projet"
+    "scope_project": "projet",
+    "title_encrypted": "Chiffré",
+    "title_encrypted_hint": "Les titres de chat sont chiffrés comme les messages ; seule la personne qui les a écrits les voit."
   },
   "chat": {
     "title": "Conversation",

@@ -26,6 +26,7 @@ from llm_port_api.services.gateway.observability import (
 from llm_port_api.services.gateway.mcp_client import MCPClient
 from llm_port_api.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from llm_port_api.services.gateway.pii_client import PIIClient
+from llm_port_api.services.gateway.session_titles import title_from_message
 from llm_port_api.services.gateway.pii_policy import PIIPolicy, parse_pii_policy
 from llm_port_api.services.gateway.pii_restore import (
     redact_tokens,
@@ -1617,6 +1618,7 @@ class GatewayService:
             ]
 
         # Persist only genuinely new user/system messages
+        first_user_text: str | None = None
         for msg in current_messages:
             if msg.get("role") in ("user", "system"):
                 content = msg.get("content", "")
@@ -1634,6 +1636,14 @@ class GatewayService:
                     content=content,
                     content_parts_json=content_parts_json,
                 )
+                if msg["role"] == "user" and first_user_text is None:
+                    first_user_text = content
+
+        # A session created without a title (the API, the SDK, a script) is
+        # named from its first message, as the chat page names the ones it
+        # creates; untitled, it stayed "Untitled chat" for good.
+        if sess.title is None and first_user_text:
+            sess.title = title_from_message(first_user_text)
 
         # Commit user messages immediately so they survive if the
         # streaming response is interrupted (e.g. page reload).

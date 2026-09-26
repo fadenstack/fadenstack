@@ -539,7 +539,9 @@ class ChatSession(Base):
         ForeignKey("chat_project.id", ondelete="CASCADE"),
         nullable=True,
     )
-    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Encrypted at rest like the messages: a title is the start of the first
+    # one. Rows from before read as they were (EncryptedText passes plaintext).
+    title: Mapped[str | None] = mapped_column(EncryptedText("chat-title"), nullable=True)
     status: Mapped[SessionStatus] = mapped_column(
         SAEnum(
             SessionStatus,

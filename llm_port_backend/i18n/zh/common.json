@@ -1612,7 +1612,9 @@
     "extraction_failed": "失败",
     "extraction_skipped": "已跳过",
     "scope_session": "会话",
-    "scope_project": "项目"
+    "scope_project": "项目",
+    "title_encrypted": "已加密",
+    "title_encrypted_hint": "聊天标题与消息一样加密存储，只有撰写者本人可见。"
   },
   "mcp": {
     "servers_title": "MCP 服务器",

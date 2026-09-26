@@ -1612,7 +1612,9 @@
     "extraction_failed": "fehlgeschlagen",
     "extraction_skipped": "übersprungen",
     "scope_session": "Sitzung",
-    "scope_project": "Projekt"
+    "scope_project": "Projekt",
+    "title_encrypted": "Verschlüsselt",
+    "title_encrypted_hint": "Chat-Titel sind wie die Nachrichten verschlüsselt; nur die Person, die sie geschrieben hat, sieht sie."
   },
   "mcp": {
     "servers_title": "MCP-Server",
