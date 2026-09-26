@@ -174,3 +174,91 @@ export const dashboardData = {
     return request<TrafficSeriesResponse>(`/traffic/series${query({ range, granularity: "day", tz })}`);
   },
 };
+
+// ── Capacity and attention ──────────────────────────────────────────
+
+/** A machine's reported state. Never derived from load. */
+export type MachineHealth = "ok" | "degraded" | "error" | "maintenance" | "offline" | "stale";
+export const MACHINE_HEALTH: MachineHealth[] = ["ok", "degraded", "error", "maintenance", "offline", "stale"];
+
+export interface CapacityGpu {
+  index: number;
+  util_pct: number | null;
+  vram_allocated_pct: number | null;
+  temp_c: number | null;
+}
+
+export interface CapacityMachine {
+  id: string;
+  name: string;
+  health: MachineHealth;
+  last_seen: string | null;
+  cpu_pct: number | null;
+  gpu_util_pct: number | null;
+  vram_allocated_pct: number | null;
+  gpus: CapacityGpu[];
+}
+
+export interface CapacityGroup {
+  kind: "cluster" | "unassigned";
+  id: string | null;
+  name: string | null;
+  status: string | null;
+  observed_at: string | null;
+  stale: boolean;
+  machines_total: number;
+  machines_online: number;
+  gpus_total: number | null;
+  gpus_free: number | null;
+  health_counts: Record<MachineHealth, number>;
+  load_histogram: { gpu_util: number[]; vram_allocated: number[] };
+  exceptions: { id: string; name: string; health: MachineHealth }[];
+  machines: CapacityMachine[] | null;
+  next_cursor: string | null;
+}
+
+export interface CapacityResponse {
+  generated_at: string;
+  totals: {
+    clusters: number;
+    clusters_healthy: number;
+    machines: number;
+    machines_online: number;
+    gpus: number;
+    gpus_free: number | null;
+    gpus_free_unknown_clusters: number;
+  };
+  groups: CapacityGroup[];
+  machines_included: boolean;
+}
+
+export type Severity = "critical" | "warning" | "info";
+
+export interface AttentionItem {
+  id: string;
+  code: string;
+  severity: Severity;
+  category: string;
+  params: Record<string, string | number | null>;
+  since: string | null;
+  link: string | null;
+}
+
+export interface AttentionResponse {
+  generated_at: string;
+  items: AttentionItem[];
+  counts: Record<Severity, number>;
+  rule_errors: string[];
+}
+
+export const dashboardFleet = {
+  capacity(group?: string, cursor?: string) {
+    const params: Record<string, string> = {};
+    if (group) params.group = group;
+    if (cursor) params.cursor = cursor;
+    return request<CapacityResponse>(`/capacity${Object.keys(params).length ? query(params) : ""}`);
+  },
+  attention() {
+    return request<AttentionResponse>("/attention");
+  },
+};

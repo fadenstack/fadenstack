@@ -274,13 +274,15 @@
     "system_state": {
       "ok": "系统正常",
       "degraded": "系统降级",
-      "error": "系统故障"
+      "error": "系统故障",
+      "critical": "严重问题：{{count}}",
+      "warning": "警告：{{count}}"
     },
     "gpu_count": "{{count}} 个 GPU",
     "widgets": {
       "capacity": {
         "title": "本地 AI 容量",
-        "description": "机器和 GPU 的健康状况与负载",
+        "description": "集群、机器和 GPU：健康状况与负载",
         "link": "机器"
       },
       "platform_health": {
@@ -317,6 +319,11 @@
         "subtitle_7d": "最近 7 天每日请求数",
         "subtitle_30d": "最近 30 天每日请求数",
         "link": "可观测性"
+      },
+      "attention": {
+        "title": "需要关注",
+        "description": "平台当前的问题",
+        "subtitle": "平台当前的问题"
       }
     },
     "health": {
@@ -425,7 +432,131 @@
     },
     "refreshing": "正在刷新…",
     "refresh_tooltip": "更新于{{ago}} · 每 {{seconds}} 秒刷新一次。点击立即刷新。",
-    "refresh_failed_tooltip": "上次刷新失败。点击重试。"
+    "refresh_failed_tooltip": "上次刷新失败。点击重试。",
+    "machine_health": {
+      "ok": "正常",
+      "degraded": "降级",
+      "error": "错误",
+      "maintenance": "维护中",
+      "offline": "离线",
+      "stale": "未上报"
+    },
+    "capacity": {
+      "clusters": "正常集群",
+      "machines": "在线机器",
+      "gpus": "GPU",
+      "gpus_free": "空闲 GPU",
+      "free_partial": "部分集群尚未观测到，实际可能更多。",
+      "color_by": "着色依据",
+      "color_health": "健康",
+      "color_gpu_util": "GPU",
+      "color_vram_allocated": "显存",
+      "unassigned": "不在集群中",
+      "online": "{{online}}/{{total}} 在线",
+      "gpus_line": "GPU：{{total}} 个中 {{free}} 个空闲",
+      "gpus_total_line": "GPU：{{total}}",
+      "as_of": "截至{{ago}}",
+      "load_more": "加载更多",
+      "seen": "上次在线{{ago}}",
+      "never_seen": "从未在线",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "vram_allocated": "已分配显存",
+      "gpu_short": "GPU {{value}}",
+      "vram_short": "显存 {{value}}",
+      "needs_look": "需要检查：{{names}}",
+      "other_groups": "其他分组：{{count}}",
+      "group_aria": "{{name}}：{{total}} 台机器中 {{online}} 台在线。{{problems}}。显示机器。",
+      "list_title": "{{name}}：机器",
+      "empty": "尚无机器。",
+      "add_machine": "添加机器",
+      "load_legend": "GPU 利用率",
+      "vram_legend": "已分配显存",
+      "no_data": "无数据",
+      "all_healthy": "全部正常"
+    },
+    "attention": {
+      "all_clear": "一切正常",
+      "all_clear_detail": "目前没有需要处理的事项。",
+      "partial": "部分检查未能运行。",
+      "show_all": "显示全部（{{count}}）",
+      "show_fewer": "收起",
+      "severity": {
+        "critical": "严重",
+        "warning": "警告",
+        "info": "信息"
+      },
+      "states": {
+        "degraded": "降级",
+        "failed": "失败",
+        "error": "出错"
+      },
+      "node_offline": {
+        "title": "{{node}} 已离线",
+        "detail": "其代理未连接。"
+      },
+      "node_unhealthy": {
+        "title": "{{node}} 报告：{{state}}",
+        "detail": "打开该机器查看详情。"
+      },
+      "node_telemetry_stale": {
+        "title": "{{node}} 已停止上报",
+        "detail": "超过 45 秒没有心跳。"
+      },
+      "node_join_pending": {
+        "title": "等待加入的机器：{{count}}",
+        "detail": "请在“机器”页面批准或拒绝。"
+      },
+      "gpu_temperature_high": {
+        "title": "{{node}} 上的 GPU {{gpu}} 温度为 {{temp}} °C",
+        "detail": "请检查散热和气流。"
+      },
+      "cluster_degraded": {
+        "title": "集群 {{cluster}} 状态：{{state}}",
+        "detail": "打开集群查看详情。",
+        "detail_message": "{{message}}"
+      },
+      "deployment_failed": {
+        "title": "部署 {{deployment}} 状态：{{state}}",
+        "detail": "打开其集群查看详情。",
+        "detail_message": "{{message}}"
+      },
+      "runtime_unhealthy": {
+        "title": "运行时 {{name}} 出错",
+        "detail": "提供方：{{provider}}",
+        "detail_message": "{{message}}"
+      },
+      "provider_unreachable": {
+        "title": "{{provider}} 无响应",
+        "detail": "在 {{name}} 恢复响应之前，请求不会路由到它。",
+        "detail_message": "{{message}}"
+      },
+      "model_job_failed": {
+        "title": "模型下载失败（24 小时）：{{count}}",
+        "detail": "打开模型市场重试。"
+      },
+      "gateway_error_spike": {
+        "title": "网关服务器错误：{{rate}} %",
+        "detail": "最近 {{minutes}} 分钟内有 {{errors}} 个错误。"
+      },
+      "dependency_down": {
+        "title": "{{name}} 已宕机",
+        "detail": "平台无法连接到它。",
+        "detail_message": "{{message}}"
+      },
+      "disk_low": {
+        "title": "磁盘空间不足：剩余 {{free}} %",
+        "detail": "位于运行平台的服务器上。"
+      },
+      "container_restarting": {
+        "title": "正在重启的容器：{{count}}",
+        "detail": "打开“容器”查看是哪些。"
+      },
+      "rag_job_failed": {
+        "title": "文档导入失败（24 小时）：{{count}}",
+        "detail": "打开“文档”重试。"
+      }
+    }
   },
   "errors": {
     "oops": "哎呀！",

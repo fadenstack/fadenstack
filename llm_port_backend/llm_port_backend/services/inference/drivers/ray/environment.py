@@ -36,6 +36,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
@@ -1672,6 +1673,9 @@ class RayEnvironmentManager:
             # ``None`` keeps the last snapshot: a status change on a hunch
             # (a health check that has to look twice) is not a measurement.
             observed["cluster"] = cluster.model_dump()
+            # When it was taken: a reader (the dashboard's capacity) shows its
+            # age and marks it stale, rather than passing it off as live.
+            observed["cluster_observed_at"] = datetime.now(tz=UTC).isoformat()
             observed["conditions"] = build_environment_conditions(cluster, expected_nodes)
         environment.observed_status_json = observed
         # The cluster page shows ``status_message`` when a cluster needs

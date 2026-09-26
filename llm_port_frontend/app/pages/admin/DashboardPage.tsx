@@ -26,7 +26,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import { preferences } from "~/api/preferences";
 import CustomizeDialog from "~/components/dashboard/CustomizeDialog";
 import DashboardGrid, { TOUCH_TARGET, type GridItem } from "~/components/dashboard/DashboardGrid";
-import { OVERVIEW_REFRESH_MS, useOverview } from "~/components/dashboard/queries";
+import { OVERVIEW_REFRESH_MS, useAttention, useOverview } from "~/components/dashboard/queries";
 import RefreshRing from "~/components/dashboard/RefreshRing";
 import { WIDGETS } from "~/components/dashboard/registry";
 import type { WidgetDefinition } from "~/components/dashboard/types";
@@ -99,6 +99,8 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
   const [editMode, setEditMode] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const overview = useOverview({ refreshToken });
+  // Shared with the Needs attention widget: fetched once.
+  const attention = useAttention({ refreshToken });
 
   const items: GridItem[] = useMemo(() => {
     if (!layout) return [];
@@ -143,7 +145,12 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
           </Typography>
         </Box>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <SystemPill status={overview.data?.system_status} badge={overview.data?.system_badge} />
+          <SystemPill
+            status={overview.data?.system_status}
+            badge={overview.data?.system_badge}
+            critical={attention.data?.counts.critical}
+            warning={attention.data?.counts.warning}
+          />
           {isPhone ? (
             <>
               <Tooltip title={t("dashboard.customize")}>
@@ -259,12 +266,32 @@ function unavailableReason(
   return null;
 }
 
-/** Overall system state from the overview; the word is always there, not just a colour. */
-function SystemPill({ status, badge }: { status?: string; badge?: string }) {
+/**
+ * Overall state: the attention list's worst severity, or the overview's own
+ * verdict when nothing needs attention. The word is always there, not just a
+ * colour. (The overview alone only knows this host and its database; with the
+ * clusters down it would still say "healthy".)
+ */
+function SystemPill({
+  status,
+  badge,
+  critical,
+  warning,
+}: {
+  status?: string;
+  badge?: string;
+  critical?: number;
+  warning?: number;
+}) {
   const { t } = useTranslation();
   const theme = useTheme();
-  if (!status) return <Skeleton variant="rounded" width={140} height={28} />;
-  const tone = badge === "red" ? "error" : badge === "yellow" ? "degraded" : "ok";
+  if (!status && critical === undefined) return <Skeleton variant="rounded" width={140} height={28} />;
+  const tone = critical ? "error" : warning ? "degraded" : badge === "red" ? "error" : badge === "yellow" ? "degraded" : "ok";
+  const label = critical
+    ? t("dashboard.system_state.critical", { count: critical })
+    : warning
+      ? t("dashboard.system_state.warning", { count: warning })
+      : t(`dashboard.system_state.${tone}`);
   const color = theme.palette.dashboard.health[tone];
   return (
     <Box
@@ -284,7 +311,7 @@ function SystemPill({ status, badge }: { status?: string; badge?: string }) {
       }}
     >
       <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color }} />
-      {t(`dashboard.system_state.${tone}`)}
+      {label}
     </Box>
   );
 }

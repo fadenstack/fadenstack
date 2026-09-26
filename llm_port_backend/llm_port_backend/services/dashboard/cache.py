@@ -50,8 +50,15 @@ class FactCache:
         key: Hashable,
         ttl: float,
         compute: Callable[[], Awaitable[T]],
+        *,
+        serve_stale: bool = False,
     ) -> T:
         """Return the fresh value under *key*, computing it once if there is none.
+
+        With *serve_stale*, an expired value is returned at once while one
+        refresh runs in the background: only the first caller ever waits.
+        For figures that take a probe to get (a dependency's health), where
+        a value a few seconds old is better than a slow answer.
 
         *compute* must not use anything tied to the calling request (its DB
         session, say): it may outlive that request and serve another.
@@ -66,6 +73,8 @@ class FactCache:
             task = asyncio.get_running_loop().create_task(self._run(key, ttl, compute))
             task.add_done_callback(_retrieve_exception)
             self._inflight[key] = task
+        if serve_stale and entry is not None:
+            return entry[1]  # type: ignore[no-any-return]
         return await asyncio.shield(task)  # type: ignore[no-any-return]
 
     async def _run(self, key: Hashable, ttl: float, compute: Callable[[], Awaitable[T]]) -> T:

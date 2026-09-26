@@ -15,7 +15,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.dashboard import traffic
+from llm_port_backend.services.dashboard import attention as attention_rules
+from llm_port_backend.services.dashboard import capacity as capacity_service
+from llm_port_backend.services.dashboard import platform, traffic
 from llm_port_backend.services.dashboard.cache import FactCache
 from llm_port_backend.services.dashboard.timewindows import Window
 
@@ -23,6 +25,8 @@ from llm_port_backend.services.dashboard.timewindows import Window
 TTL_ATTRIBUTION = 30.0
 TTL_TOTALS = 20.0
 TTL_WIDE = 60.0
+#: Machine and cluster state changes with every heartbeat (~15 s).
+TTL_FLEET = 15.0
 
 #: Figures are computed for a "now" floored to this many seconds, so windows
 #: that end now stay the same cache key between polls a few seconds apart.
@@ -50,9 +54,11 @@ class Facts:
         gateway_factory: Callable[[], AsyncSession] | None,
         now: datetime,
         tz: ZoneInfo,
+        docker: Any = None,
         tenant: str = "default",
     ) -> None:
         self.cache = cache
+        self.docker = docker
         self._backend = backend_factory
         self._gateway = gateway_factory
         self.now = now
@@ -69,10 +75,18 @@ class Facts:
     def _key(self, *parts: Any) -> tuple[Any, ...]:
         return (self._tenant, *parts)
 
-    async def _on_gateway(self, query: Callable[[AsyncSession], Any]) -> Any:
+    async def on_gateway(self, query: Callable[[AsyncSession], Any]) -> Any:
+        """Run *query* in a session of its own on the gateway DB."""
         if self._gateway is None:
             raise GatewayUnavailableError("gateway database not configured")
         async with self._gateway() as session:
+            return await query(session)
+
+    async def on_backend(self, query: Callable[[AsyncSession], Any]) -> Any:
+        """Run *query* in a session of its own on the backend DB."""
+        if self._backend is None:
+            raise RuntimeError("backend database not configured")
+        async with self._backend() as session:
             return await query(session)
 
     async def attribution(self) -> traffic.Attribution:
@@ -91,7 +105,7 @@ class Facts:
         return await self.cache.get_or_compute(
             self._key("totals", window.start, window.end, latency),
             TTL_TOTALS,
-            lambda: self._on_gateway(lambda s: traffic.totals(s, window, latency=latency)),
+            lambda: self.on_gateway(lambda s: traffic.totals(s, window, latency=latency)),
         )
 
     async def instances(self, window: Window) -> list[traffic.InstanceRow]:
@@ -99,7 +113,7 @@ class Facts:
         return await self.cache.get_or_compute(
             self._key("instances", window.start, window.end),
             TTL_TOTALS,
-            lambda: self._on_gateway(lambda s: traffic.by_instance(s, window)),
+            lambda: self.on_gateway(lambda s: traffic.by_instance(s, window)),
         )
 
     async def spend(self, window: Window) -> list[traffic.SpendRow]:
@@ -107,7 +121,7 @@ class Facts:
         return await self.cache.get_or_compute(
             self._key("spend", window.start, window.end),
             TTL_WIDE,
-            lambda: self._on_gateway(lambda s: traffic.spend(s, window)),
+            lambda: self.on_gateway(lambda s: traffic.spend(s, window)),
         )
 
     async def day_buckets(self, window: Window) -> list[tuple[str, traffic.InstanceRow]]:
@@ -115,7 +129,7 @@ class Facts:
         return await self.cache.get_or_compute(
             self._key("days", window.start, window.end, self.tz.key),
             TTL_WIDE,
-            lambda: self._on_gateway(lambda s: traffic.day_buckets(s, window, self.tz)),
+            lambda: self.on_gateway(lambda s: traffic.day_buckets(s, window, self.tz)),
         )
 
     async def hour_buckets(self, window: Window) -> list[tuple[datetime, traffic.InstanceRow]]:
@@ -123,5 +137,37 @@ class Facts:
         return await self.cache.get_or_compute(
             self._key("hours", window.start, window.end),
             TTL_WIDE,
-            lambda: self._on_gateway(lambda s: traffic.hour_buckets(s, window)),
+            lambda: self.on_gateway(lambda s: traffic.hour_buckets(s, window)),
+        )
+
+    async def capacity(self) -> capacity_service.Capacity:
+        """Machines and clusters as stored (never probed)."""
+        return await self.cache.get_or_compute(
+            self._key("capacity"),
+            TTL_FLEET,
+            lambda: self.on_backend(lambda s: capacity_service.load(s, self.now)),
+        )
+
+    async def dependencies(self) -> list[platform.Dependency]:
+        """Postgres, RabbitMQ and Grafana."""
+        # A probe (Grafana answers in ~0.5 s): serve the last answer while it refreshes.
+        return await self.cache.get_or_compute(
+            self._key("dependencies"),
+            TTL_ATTRIBUTION,
+            lambda: platform.dependencies(self._backend),
+            serve_stale=True,
+        )
+
+    async def host(self) -> tuple[float | None, int | None]:
+        """(Free disk % on this server, containers restarting)."""
+
+        async def compute() -> tuple[float | None, int | None]:
+            return platform.disk_free_percent(), await platform.containers_restarting(self.docker)
+
+        return await self.cache.get_or_compute(self._key("host"), TTL_ATTRIBUTION, compute, serve_stale=True)
+
+    async def attention(self) -> tuple[list[attention_rules.Item], list[str]]:
+        """Current problems, and the rules that could not be evaluated."""
+        return await self.cache.get_or_compute(
+            self._key("attention"), TTL_FLEET, lambda: attention_rules.evaluate(self)
         )

@@ -274,13 +274,15 @@
     "system_state": {
       "ok": "Système opérationnel",
       "degraded": "Système dégradé",
-      "error": "Système hors service"
+      "error": "Système hors service",
+      "critical": "Problèmes critiques : {{count}}",
+      "warning": "Avertissements : {{count}}"
     },
     "gpu_count": "{{count}} GPU",
     "widgets": {
       "capacity": {
         "title": "Capacité d'IA locale",
-        "description": "Machines et GPU, leur état et leur charge",
+        "description": "Clusters, machines et GPU : état et charge",
         "link": "Machines"
       },
       "platform_health": {
@@ -317,6 +319,11 @@
         "subtitle_7d": "Requêtes par jour, 7 derniers jours",
         "subtitle_30d": "Requêtes par jour, 30 derniers jours",
         "link": "Observabilité"
+      },
+      "attention": {
+        "title": "À traiter",
+        "description": "Problèmes actuels de la plateforme",
+        "subtitle": "Problèmes actuels de la plateforme"
       }
     },
     "health": {
@@ -425,7 +432,131 @@
     },
     "refreshing": "Actualisation…",
     "refresh_tooltip": "Actualisé {{ago}} · toutes les {{seconds}} s. Cliquez pour actualiser maintenant.",
-    "refresh_failed_tooltip": "La dernière actualisation a échoué. Cliquez pour réessayer."
+    "refresh_failed_tooltip": "La dernière actualisation a échoué. Cliquez pour réessayer.",
+    "machine_health": {
+      "ok": "Opérationnel",
+      "degraded": "Dégradé",
+      "error": "Erreur",
+      "maintenance": "Maintenance",
+      "offline": "Hors ligne",
+      "stale": "Ne répond plus"
+    },
+    "capacity": {
+      "clusters": "Clusters opérationnels",
+      "machines": "Machines en ligne",
+      "gpus": "GPU",
+      "gpus_free": "GPU libres",
+      "free_partial": "Certains clusters n'ont pas encore été observés ; il peut y en avoir davantage.",
+      "color_by": "Colorer par",
+      "color_health": "État",
+      "color_gpu_util": "GPU",
+      "color_vram_allocated": "VRAM",
+      "unassigned": "Hors cluster",
+      "online": "{{online}}/{{total}} en ligne",
+      "gpus_line": "GPU : {{free}} libres sur {{total}}",
+      "gpus_total_line": "GPU : {{total}}",
+      "as_of": "au {{ago}}",
+      "load_more": "Charger plus",
+      "seen": "Vu {{ago}}",
+      "never_seen": "Jamais vu",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "vram_allocated": "VRAM allouée",
+      "gpu_short": "GPU {{value}}",
+      "vram_short": "VRAM {{value}}",
+      "needs_look": "À vérifier : {{names}}",
+      "other_groups": "Autres groupes : {{count}}",
+      "group_aria": "{{name}} : {{online}} machines en ligne sur {{total}}. {{problems}}. Afficher les machines.",
+      "list_title": "{{name}} : machines",
+      "empty": "Aucune machine pour l'instant.",
+      "add_machine": "Ajouter une machine",
+      "load_legend": "Utilisation GPU",
+      "vram_legend": "VRAM allouée",
+      "no_data": "Aucune donnée",
+      "all_healthy": "Toutes opérationnelles"
+    },
+    "attention": {
+      "all_clear": "Tout va bien",
+      "all_clear_detail": "Rien ne nécessite votre attention pour le moment.",
+      "partial": "Certaines vérifications n'ont pas pu s'exécuter.",
+      "show_all": "Tout afficher ({{count}})",
+      "show_fewer": "Afficher moins",
+      "severity": {
+        "critical": "Critique",
+        "warning": "Avertissement",
+        "info": "Information"
+      },
+      "states": {
+        "degraded": "dégradé",
+        "failed": "en échec",
+        "error": "en erreur"
+      },
+      "node_offline": {
+        "title": "{{node}} est hors ligne",
+        "detail": "Son agent n'est pas connecté."
+      },
+      "node_unhealthy": {
+        "title": "{{node}} signale : {{state}}",
+        "detail": "Ouvrez la machine pour plus de détails."
+      },
+      "node_telemetry_stale": {
+        "title": "{{node}} ne répond plus",
+        "detail": "Aucun signal depuis plus de 45 secondes."
+      },
+      "node_join_pending": {
+        "title": "Machines en attente d'ajout : {{count}}",
+        "detail": "Approuvez-les ou refusez-les sur la page Machines."
+      },
+      "gpu_temperature_high": {
+        "title": "GPU {{gpu}} de {{node}} à {{temp}} °C",
+        "detail": "Vérifiez le refroidissement et la circulation de l'air."
+      },
+      "cluster_degraded": {
+        "title": "Le cluster {{cluster}} est {{state}}",
+        "detail": "Ouvrez le cluster pour plus de détails.",
+        "detail_message": "{{message}}"
+      },
+      "deployment_failed": {
+        "title": "Le déploiement {{deployment}} est {{state}}",
+        "detail": "Ouvrez son cluster pour plus de détails.",
+        "detail_message": "{{message}}"
+      },
+      "runtime_unhealthy": {
+        "title": "Le runtime {{name}} est en erreur",
+        "detail": "Fournisseur : {{provider}}",
+        "detail_message": "{{message}}"
+      },
+      "provider_unreachable": {
+        "title": "{{provider}} ne répond pas",
+        "detail": "Les requêtes ne sont plus routées vers {{name}} tant qu'il ne répond pas.",
+        "detail_message": "{{message}}"
+      },
+      "model_job_failed": {
+        "title": "Téléchargements de modèles en échec (24 h) : {{count}}",
+        "detail": "Ouvrez le marketplace de modèles pour réessayer."
+      },
+      "gateway_error_spike": {
+        "title": "Erreurs serveur de la passerelle : {{rate}} %",
+        "detail": "{{errors}} erreurs au cours des {{minutes}} dernières minutes."
+      },
+      "dependency_down": {
+        "title": "{{name}} est hors service",
+        "detail": "La plateforme ne peut pas le joindre.",
+        "detail_message": "{{message}}"
+      },
+      "disk_low": {
+        "title": "Espace disque faible : {{free}} % libre",
+        "detail": "Sur le serveur qui héberge la plateforme."
+      },
+      "container_restarting": {
+        "title": "Conteneurs en redémarrage : {{count}}",
+        "detail": "Ouvrez Conteneurs pour voir lesquels."
+      },
+      "rag_job_failed": {
+        "title": "Ingestion de documents en échec (24 h) : {{count}}",
+        "detail": "Ouvrez Documents pour réessayer."
+      }
+    }
   },
   "common": {
     "name": "Nom",

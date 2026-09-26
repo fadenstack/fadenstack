@@ -274,13 +274,15 @@
     "system_state": {
       "ok": "System healthy",
       "degraded": "System degraded",
-      "error": "System down"
+      "error": "System down",
+      "critical": "Critical issues: {{count}}",
+      "warning": "Warnings: {{count}}"
     },
     "gpu_count": "{{count}} GPUs",
     "widgets": {
       "capacity": {
         "title": "Local AI capacity",
-        "description": "Machines and GPUs, their health and load",
+        "description": "Clusters, machines and GPUs: health and load",
         "link": "Machines"
       },
       "platform_health": {
@@ -317,6 +319,11 @@
         "subtitle_7d": "Requests per day, last 7 days",
         "subtitle_30d": "Requests per day, last 30 days",
         "link": "Observability"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "description": "Current problems across the platform",
+        "subtitle": "Current problems across the platform"
       }
     },
     "health": {
@@ -425,7 +432,131 @@
     },
     "refreshing": "Refreshing…",
     "refresh_tooltip": "Updated {{ago}} · refreshes every {{seconds}} s. Click to refresh now.",
-    "refresh_failed_tooltip": "The last refresh failed. Click to try again."
+    "refresh_failed_tooltip": "The last refresh failed. Click to try again.",
+    "machine_health": {
+      "ok": "Healthy",
+      "degraded": "Degraded",
+      "error": "Error",
+      "maintenance": "Maintenance",
+      "offline": "Offline",
+      "stale": "Not reporting"
+    },
+    "capacity": {
+      "clusters": "Clusters healthy",
+      "machines": "Machines online",
+      "gpus": "GPUs",
+      "gpus_free": "Free GPUs",
+      "free_partial": "Some clusters have not been observed yet, so there may be more.",
+      "color_by": "Colour by",
+      "color_health": "Health",
+      "color_gpu_util": "GPU",
+      "color_vram_allocated": "VRAM",
+      "unassigned": "Not in a cluster",
+      "online": "{{online}}/{{total}} online",
+      "gpus_line": "GPUs: {{free}} of {{total}} free",
+      "gpus_total_line": "GPUs: {{total}}",
+      "as_of": "as of {{ago}}",
+      "load_more": "Load more",
+      "seen": "Seen {{ago}}",
+      "never_seen": "Never seen",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "vram_allocated": "VRAM allocated",
+      "gpu_short": "GPU {{value}}",
+      "vram_short": "VRAM {{value}}",
+      "needs_look": "Needs a look: {{names}}",
+      "other_groups": "Other groups: {{count}}",
+      "group_aria": "{{name}}: {{online}} of {{total}} machines online. {{problems}}. Show the machines.",
+      "list_title": "{{name}}: machines",
+      "empty": "No machines yet.",
+      "add_machine": "Add a machine",
+      "load_legend": "GPU utilization",
+      "vram_legend": "VRAM allocated",
+      "no_data": "No data",
+      "all_healthy": "All healthy"
+    },
+    "attention": {
+      "all_clear": "All clear",
+      "all_clear_detail": "Nothing needs your attention right now.",
+      "partial": "Some checks could not run.",
+      "show_all": "Show all ({{count}})",
+      "show_fewer": "Show fewer",
+      "severity": {
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Information"
+      },
+      "states": {
+        "degraded": "degraded",
+        "failed": "failed",
+        "error": "in error"
+      },
+      "node_offline": {
+        "title": "{{node}} is offline",
+        "detail": "Its agent is not connected."
+      },
+      "node_unhealthy": {
+        "title": "{{node}} reports {{state}}",
+        "detail": "Open the machine for details."
+      },
+      "node_telemetry_stale": {
+        "title": "{{node}} stopped reporting",
+        "detail": "No heartbeat for more than 45 seconds."
+      },
+      "node_join_pending": {
+        "title": "Machines waiting to join: {{count}}",
+        "detail": "Approve or reject them on the Machines page."
+      },
+      "gpu_temperature_high": {
+        "title": "GPU {{gpu}} on {{node}} at {{temp}} °C",
+        "detail": "Check cooling and airflow."
+      },
+      "cluster_degraded": {
+        "title": "Cluster {{cluster}} is {{state}}",
+        "detail": "Open the cluster for details.",
+        "detail_message": "{{message}}"
+      },
+      "deployment_failed": {
+        "title": "Deployment {{deployment}} is {{state}}",
+        "detail": "Open its cluster for details.",
+        "detail_message": "{{message}}"
+      },
+      "runtime_unhealthy": {
+        "title": "Runtime {{name}} is in error",
+        "detail": "Provider: {{provider}}",
+        "detail_message": "{{message}}"
+      },
+      "provider_unreachable": {
+        "title": "{{provider}} is not answering",
+        "detail": "Requests are not routed to {{name}} until it answers again.",
+        "detail_message": "{{message}}"
+      },
+      "model_job_failed": {
+        "title": "Model downloads failed (24 h): {{count}}",
+        "detail": "Open the model marketplace to retry."
+      },
+      "gateway_error_spike": {
+        "title": "Gateway server errors: {{rate}} %",
+        "detail": "{{errors}} errors in the last {{minutes}} minutes."
+      },
+      "dependency_down": {
+        "title": "{{name}} is down",
+        "detail": "The platform cannot reach it.",
+        "detail_message": "{{message}}"
+      },
+      "disk_low": {
+        "title": "Disk space low: {{free}} % free",
+        "detail": "On the server the platform runs on."
+      },
+      "container_restarting": {
+        "title": "Containers restarting: {{count}}",
+        "detail": "Open Containers to see which."
+      },
+      "rag_job_failed": {
+        "title": "Document ingestion failed (24 h): {{count}}",
+        "detail": "Open Documents to retry."
+      }
+    }
   },
   "common": {
     "name": "Name",

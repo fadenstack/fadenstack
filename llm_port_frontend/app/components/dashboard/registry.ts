@@ -29,6 +29,15 @@ export const WIDGETS: WidgetDefinition[] = [
     component: lazy(() => import("./widgets/TrafficWidget")),
   },
   {
+    id: "attention",
+    titleKey: "dashboard.widgets.attention.title",
+    descriptionKey: "dashboard.widgets.attention.description",
+    sizes: ["S", "M"],
+    defaultSize: "S",
+    defaultVisible: always,
+    component: lazy(() => import("./widgets/AttentionWidget")),
+  },
+  {
     id: "capacity",
     titleKey: "dashboard.widgets.capacity.title",
     descriptionKey: "dashboard.widgets.capacity.description",

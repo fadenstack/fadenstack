@@ -15,8 +15,8 @@ from llm_port_backend.db.models.users import User
 from llm_port_backend.services.dashboard import kpis as kpi_service
 from llm_port_backend.services.dashboard import timewindows as tw
 from llm_port_backend.services.dashboard import traffic
-from llm_port_backend.services.dashboard.cache import get_fact_cache
-from llm_port_backend.services.dashboard.facts import Facts, GatewayUnavailableError, floored_now
+from llm_port_backend.services.dashboard.facts import Facts, GatewayUnavailableError
+from llm_port_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
 from llm_port_backend.web.api.admin.dashboard.schema import (
     DestinationDTO,
     ErrorsDTO,
@@ -36,25 +36,6 @@ router = APIRouter()
 TzParam = Annotated[str | None, Query(max_length=64, description="The viewer's IANA time zone")]
 
 
-def dashboard_now() -> datetime:
-    """The instant figures are computed for (a dependency, so tests can fix it)."""
-    return floored_now()
-
-
-def _facts(request: Request, now: datetime, tz_name: str | None) -> Facts:
-    try:
-        tz = tw.parse_tz(tz_name)
-    except tw.InvalidTimeZoneError as exc:
-        raise HTTPException(status_code=422, detail=f"Unknown time zone: {tz_name}") from exc
-    return Facts(
-        cache=get_fact_cache(request),
-        backend_factory=getattr(request.app.state, "db_session_factory", None),
-        gateway_factory=getattr(request.app.state, "llm_graph_trace_session_factory", None),
-        now=now,
-        tz=tz,
-    )
-
-
 def _require_gateway(facts: Facts) -> None:
     if not facts.has_gateway:
         raise HTTPException(status_code=503, detail="Gateway database not available")
@@ -69,7 +50,7 @@ async def get_kpis(
     tz: TzParam = None,
 ) -> KpisDTO:
     """The asked-for key metrics; unknown ids are ignored, failing ones listed as unavailable."""
-    facts = _facts(request, now, tz)
+    facts = build_facts(request, now, tz)
     wanted = [i.strip() for i in ids.split(",") if i.strip()] or list(kpi_service.KPIS)
     items, unavailable = await kpi_service.compute(wanted, facts)
     return KpisDTO(
@@ -88,7 +69,7 @@ async def get_traffic(
     tz: TzParam = None,
 ) -> TrafficDTO:
     """Requests in the window: totals, latency, residency split and the top destinations."""
-    facts = _facts(request, now, tz)
+    facts = build_facts(request, now, tz)
     _require_gateway(facts)
     current, _ = tw.window(window, now, facts.tz)
     try:
@@ -136,7 +117,7 @@ async def get_traffic_series(
     tz: TzParam = None,
 ) -> TrafficSeriesDTO:
     """Routed requests per local day (or hour), per residency class; every bucket present."""
-    facts = _facts(request, now, tz)
+    facts = build_facts(request, now, tz)
     _require_gateway(facts)
     days = 7 if range_ == "7d" else 30
     try:

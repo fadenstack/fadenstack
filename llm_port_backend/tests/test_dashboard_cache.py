@@ -109,3 +109,28 @@ async def test_the_oldest_entries_go_first_when_full() -> None:
     await cache.get_or_compute("b", 60, compute_for("b"))
 
     assert computed == ["a", "b", "c", "b"]
+
+
+async def test_serve_stale_answers_at_once_and_refreshes_in_the_background() -> None:
+    clock = _Clock()
+    cache = FactCache(clock=clock)
+    release = asyncio.Event()
+    calls = 0
+
+    async def compute() -> int:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            await release.wait()  # a slow probe
+        return calls
+
+    assert await cache.get_or_compute("deps", 10, compute, serve_stale=True) == 1  # the first caller waits
+    clock.now += 11  # expired
+
+    assert await cache.get_or_compute("deps", 10, compute, serve_stale=True) == 1  # old value, no waiting
+    assert await cache.get_or_compute("deps", 10, compute, serve_stale=True) == 1  # one refresh, not two
+    release.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert await cache.get_or_compute("deps", 10, compute, serve_stale=True) == 2
+    assert calls == 2

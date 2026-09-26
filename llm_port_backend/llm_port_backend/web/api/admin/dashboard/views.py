@@ -9,12 +9,12 @@ import time
 from collections.abc import Iterable
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, Request
 from prometheus_client import REGISTRY
 from sqlalchemy import text
 
 from llm_port_backend.db.models.users import User
+from llm_port_backend.services.dashboard import platform
 from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.settings import settings
 from llm_port_backend.web.api.admin.dashboard.schema import (
@@ -28,7 +28,6 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
 )
 from llm_port_backend.web.api.admin.dashboard.caching import no_store
 from llm_port_backend.web.api.admin.dependencies import get_docker, require_superuser
-from llm_port_backend.services.tls import default_httpx_verify
 
 router = APIRouter(dependencies=[Depends(no_store)])
 
@@ -147,18 +146,6 @@ def _prometheus_api_5xx_rate_percent() -> float:
     if total_requests <= 0:
         return 0.0
     return (error_requests / total_requests) * 100.0
-
-
-async def _tcp_health(host: str, port: int, timeout: float = 0.8) -> bool:
-    """Quick TCP-level health probe."""
-    try:
-        conn = asyncio.open_connection(host, port)
-        reader, writer = await asyncio.wait_for(conn, timeout=timeout)
-        writer.close()
-        await writer.wait_closed()
-        return True
-    except Exception:
-        return False
 
 
 async def _collect_container_stats(
@@ -391,37 +378,9 @@ async def health(
     request: Request,
     _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
 ) -> DashboardHealthDTO:
-    """Return aggregate health of key dependencies."""
-    items: list[DashboardHealthItemDTO] = []
-
-    db_ok = False
-    with contextlib.suppress(Exception):
-        async with request.app.state.db_session_factory() as session:
-            ping = await session.execute(text("SELECT 1"))
-            db_ok = int(ping.scalar_one()) == 1
-    items.append(
-        DashboardHealthItemDTO(name="postgres", status="up" if db_ok else "down"),
-    )
-
-    rabbit_ok = await _tcp_health(settings.rabbit_host, settings.rabbit_port)
-    items.append(
-        DashboardHealthItemDTO(name="rabbitmq", status="up" if rabbit_ok else "down"),
-    )
-
-    grafana_status = "unknown"
-    grafana_detail: str | None = None
-    if settings.grafana_url:
-        try:
-            async with httpx.AsyncClient(verify=default_httpx_verify(), timeout=2.0) as client:
-                resp = await client.get(str(settings.grafana_url))
-                grafana_status = "up" if resp.status_code < 500 else "degraded"
-                grafana_detail = f"http {resp.status_code}"
-        except Exception as exc:
-            grafana_status = "down"
-            grafana_detail = str(exc)
-    items.append(
-        DashboardHealthItemDTO(name="grafana", status=grafana_status, detail=grafana_detail),
-    )
+    """Return aggregate health of key dependencies (probed together, see services/dashboard/platform.py)."""
+    found = await platform.dependencies(getattr(request.app.state, "db_session_factory", None))
+    items = [DashboardHealthItemDTO(name=d.name, status=d.status, detail=d.detail) for d in found]
 
     overall = "healthy"
     statuses = [item.status for item in items]
@@ -480,3 +439,6 @@ router.include_router(_layout_router)
 from llm_port_backend.web.api.admin.dashboard.traffic import router as _traffic_router  # noqa: E402
 
 router.include_router(_traffic_router)
+from llm_port_backend.web.api.admin.dashboard.fleet import router as _fleet_router  # noqa: E402
+
+router.include_router(_fleet_router)

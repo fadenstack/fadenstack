@@ -206,3 +206,110 @@ class TrafficSeriesDTO(BaseModel):
     granularity: str
     tz: str
     buckets: list[SeriesBucketDTO]
+
+
+# ── Redesigned dashboard: capacity and attention ───────────────────
+
+
+class GpuDTO(BaseModel):
+    """One accelerator's load and temperature, as its machine last reported."""
+
+    index: int
+    util_pct: float | None = None
+    vram_allocated_pct: float | None = None
+    temp_c: float | None = None
+
+
+class MachineRefDTO(BaseModel):
+    """A machine named in a group's exceptions."""
+
+    id: str
+    name: str
+    health: str
+
+
+class MachineDTO(MachineRefDTO):
+    """A machine: its reported health, and its load (kept apart from health)."""
+
+    last_seen: datetime | None = None
+    cpu_pct: float | None = None
+    #: The busiest GPU's utilization.
+    gpu_util_pct: float | None = None
+    #: The fullest GPU's allocated VRAM (vLLM allocates ~90 % by design).
+    vram_allocated_pct: float | None = None
+    gpus: list[GpuDTO] = Field(default_factory=list)
+
+
+class LoadHistogramDTO(BaseModel):
+    """Machines per 20 % band: [0-20), [20-40), [40-60), [60-80), [80-100]."""
+
+    gpu_util: list[int]
+    vram_allocated: list[int]
+
+
+class CapacityGroupDTO(BaseModel):
+    """A cluster, or the machines in no cluster, with aggregates for large fleets."""
+
+    kind: str  # cluster | unassigned
+    id: str | None = None
+    name: str | None = None
+    status: str | None = None
+    #: When the cluster figures were observed (null: not stamped yet, or no cluster).
+    observed_at: datetime | None = None
+    stale: bool = False
+    machines_total: int
+    machines_online: int
+    gpus_total: int | None = None
+    #: Free GPUs from the stored Ray observation; null when never observed.
+    gpus_free: float | None = None
+    health_counts: dict[str, int]
+    load_histogram: LoadHistogramDTO
+    exceptions: list[MachineRefDTO] = Field(default_factory=list)
+    #: The machines; left out for large fleets unless this group was asked for.
+    machines: list[MachineDTO] | None = None
+    #: For a group asked for: the cursor of its next page, if any.
+    next_cursor: str | None = None
+
+
+class CapacityTotalsDTO(BaseModel):
+    """Counts across the whole fleet."""
+
+    clusters: int
+    clusters_healthy: int
+    machines: int
+    machines_online: int
+    gpus: int
+    gpus_free: float | None = None
+    gpus_free_unknown_clusters: int = 0
+
+
+class CapacityDTO(BaseModel):
+    """Local AI capacity."""
+
+    generated_at: datetime
+    totals: CapacityTotalsDTO
+    groups: list[CapacityGroupDTO]
+    #: Whether every group carries its machines (small fleets).
+    machines_included: bool
+
+
+class AttentionItemDTO(BaseModel):
+    """One current problem: a code and parameters the UI renders in the viewer's language."""
+
+    id: str
+    code: str
+    severity: str
+    category: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    since: datetime | None = None
+    link: str | None = None
+
+
+class AttentionDTO(BaseModel):
+    """Current problems, most severe first."""
+
+    generated_at: datetime
+    items: list[AttentionItemDTO]
+    counts: dict[str, int]
+    #: Rules that could not be evaluated this time.
+    rule_errors: list[str] = Field(default_factory=list)

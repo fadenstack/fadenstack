@@ -31,7 +31,7 @@ from llm_port_backend.services.dashboard import timewindows as tw
 from llm_port_backend.services.dashboard import traffic
 from llm_port_backend.services.dashboard.cache import FactCache
 from llm_port_backend.services.dashboard.facts import Facts
-from llm_port_backend.web.api.admin.dashboard.traffic import dashboard_now
+from llm_port_backend.web.api.admin.dashboard.common import dashboard_now
 
 pytestmark = pytest.mark.anyio()
 

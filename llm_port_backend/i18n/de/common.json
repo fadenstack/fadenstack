@@ -274,13 +274,15 @@
     "system_state": {
       "ok": "System in Ordnung",
       "degraded": "System beeinträchtigt",
-      "error": "System ausgefallen"
+      "error": "System ausgefallen",
+      "critical": "Kritische Probleme: {{count}}",
+      "warning": "Warnungen: {{count}}"
     },
     "gpu_count": "{{count}} GPUs",
     "widgets": {
       "capacity": {
         "title": "Lokale KI-Kapazität",
-        "description": "Maschinen und GPUs, ihr Zustand und ihre Auslastung",
+        "description": "Cluster, Maschinen und GPUs: Zustand und Auslastung",
         "link": "Maschinen"
       },
       "platform_health": {
@@ -317,6 +319,11 @@
         "subtitle_7d": "Anfragen pro Tag, letzte 7 Tage",
         "subtitle_30d": "Anfragen pro Tag, letzte 30 Tage",
         "link": "Observability"
+      },
+      "attention": {
+        "title": "Handlungsbedarf",
+        "description": "Aktuelle Probleme auf der Plattform",
+        "subtitle": "Aktuelle Probleme auf der Plattform"
       }
     },
     "health": {
@@ -425,7 +432,131 @@
     },
     "refreshing": "Wird aktualisiert …",
     "refresh_tooltip": "Aktualisiert {{ago}} · alle {{seconds}} s. Klicken, um jetzt zu aktualisieren.",
-    "refresh_failed_tooltip": "Die letzte Aktualisierung ist fehlgeschlagen. Klicken, um es erneut zu versuchen."
+    "refresh_failed_tooltip": "Die letzte Aktualisierung ist fehlgeschlagen. Klicken, um es erneut zu versuchen.",
+    "machine_health": {
+      "ok": "In Ordnung",
+      "degraded": "Beeinträchtigt",
+      "error": "Fehler",
+      "maintenance": "Wartung",
+      "offline": "Offline",
+      "stale": "Meldet sich nicht"
+    },
+    "capacity": {
+      "clusters": "Cluster in Ordnung",
+      "machines": "Maschinen online",
+      "gpus": "GPUs",
+      "gpus_free": "Freie GPUs",
+      "free_partial": "Einige Cluster wurden noch nicht erfasst; es können mehr sein.",
+      "color_by": "Einfärben nach",
+      "color_health": "Zustand",
+      "color_gpu_util": "GPU",
+      "color_vram_allocated": "VRAM",
+      "unassigned": "In keinem Cluster",
+      "online": "{{online}}/{{total}} online",
+      "gpus_line": "GPUs: {{free}} von {{total}} frei",
+      "gpus_total_line": "GPUs: {{total}}",
+      "as_of": "Stand {{ago}}",
+      "load_more": "Mehr laden",
+      "seen": "Gesehen {{ago}}",
+      "never_seen": "Nie gesehen",
+      "cpu": "CPU",
+      "gpu": "GPU",
+      "vram_allocated": "VRAM belegt",
+      "gpu_short": "GPU {{value}}",
+      "vram_short": "VRAM {{value}}",
+      "needs_look": "Bitte prüfen: {{names}}",
+      "other_groups": "Weitere Gruppen: {{count}}",
+      "group_aria": "{{name}}: {{online}} von {{total}} Maschinen online. {{problems}}. Maschinen anzeigen.",
+      "list_title": "{{name}}: Maschinen",
+      "empty": "Noch keine Maschinen.",
+      "add_machine": "Maschine hinzufügen",
+      "load_legend": "GPU-Auslastung",
+      "vram_legend": "VRAM belegt",
+      "no_data": "Keine Daten",
+      "all_healthy": "Alle in Ordnung"
+    },
+    "attention": {
+      "all_clear": "Alles in Ordnung",
+      "all_clear_detail": "Derzeit ist nichts zu tun.",
+      "partial": "Einige Prüfungen konnten nicht ausgeführt werden.",
+      "show_all": "Alle anzeigen ({{count}})",
+      "show_fewer": "Weniger anzeigen",
+      "severity": {
+        "critical": "Kritisch",
+        "warning": "Warnung",
+        "info": "Information"
+      },
+      "states": {
+        "degraded": "beeinträchtigt",
+        "failed": "fehlgeschlagen",
+        "error": "fehlerhaft"
+      },
+      "node_offline": {
+        "title": "{{node}} ist offline",
+        "detail": "Sein Agent ist nicht verbunden."
+      },
+      "node_unhealthy": {
+        "title": "{{node}} meldet: {{state}}",
+        "detail": "Öffnen Sie die Maschine für Details."
+      },
+      "node_telemetry_stale": {
+        "title": "{{node}} meldet sich nicht mehr",
+        "detail": "Seit über 45 Sekunden kein Heartbeat."
+      },
+      "node_join_pending": {
+        "title": "Maschinen warten auf Aufnahme: {{count}}",
+        "detail": "Genehmigen oder ablehnen auf der Seite Maschinen."
+      },
+      "gpu_temperature_high": {
+        "title": "GPU {{gpu}} auf {{node}} bei {{temp}} °C",
+        "detail": "Kühlung und Luftstrom prüfen."
+      },
+      "cluster_degraded": {
+        "title": "Cluster {{cluster}} ist {{state}}",
+        "detail": "Öffnen Sie den Cluster für Details.",
+        "detail_message": "{{message}}"
+      },
+      "deployment_failed": {
+        "title": "Deployment {{deployment}} ist {{state}}",
+        "detail": "Öffnen Sie seinen Cluster für Details.",
+        "detail_message": "{{message}}"
+      },
+      "runtime_unhealthy": {
+        "title": "Runtime {{name}} ist fehlerhaft",
+        "detail": "Provider: {{provider}}",
+        "detail_message": "{{message}}"
+      },
+      "provider_unreachable": {
+        "title": "{{provider}} antwortet nicht",
+        "detail": "Anfragen gehen nicht an {{name}}, bis es wieder antwortet.",
+        "detail_message": "{{message}}"
+      },
+      "model_job_failed": {
+        "title": "Fehlgeschlagene Modell-Downloads (24 Std.): {{count}}",
+        "detail": "Im Modell-Marktplatz erneut versuchen."
+      },
+      "gateway_error_spike": {
+        "title": "Gateway-Serverfehler: {{rate}} %",
+        "detail": "{{errors}} Fehler in den letzten {{minutes}} Minuten."
+      },
+      "dependency_down": {
+        "title": "{{name}} ist ausgefallen",
+        "detail": "Die Plattform erreicht den Dienst nicht.",
+        "detail_message": "{{message}}"
+      },
+      "disk_low": {
+        "title": "Wenig Speicherplatz: {{free}} % frei",
+        "detail": "Auf dem Server, auf dem die Plattform läuft."
+      },
+      "container_restarting": {
+        "title": "Container starten neu: {{count}}",
+        "detail": "Unter Container sehen, welche."
+      },
+      "rag_job_failed": {
+        "title": "Fehlgeschlagene Dokumentaufnahme (24 Std.): {{count}}",
+        "detail": "Unter Dokumente erneut versuchen."
+      }
+    }
   },
   "errors": {
     "oops": "Hoppla!",

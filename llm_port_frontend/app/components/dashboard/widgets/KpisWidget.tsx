@@ -75,6 +75,17 @@ const META: Partial<Record<KpiId, KpiMeta>> = {
     better: "down",
     context: (i, t, lang) => t("dashboard.kpi.error_rate_1h.context", { p95: fmtMs(i.context.p95_ms, lang) }),
   },
+  attention_open: {
+    kind: "count",
+    better: "down",
+    context: (i, t) =>
+      t("dashboard.kpi.attention_open.context", { critical: i.context.critical ?? 0, warning: i.context.warning ?? 0 }),
+  },
+  gpus_busy: {
+    kind: "share",
+    better: "neutral",
+    context: (i, t) => t("dashboard.kpi.gpus_busy.context", { machines: i.context.machines ?? 0 }),
+  },
 };
 
 export default function KpisWidget({ layout, onLayoutChange, refreshToken }: WidgetProps) {

@@ -15,6 +15,8 @@ from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from typing import Any
 
+from llm_port_backend.services.dashboard import attention as attention_rules
+from llm_port_backend.services.dashboard import capacity as capacity_service
 from llm_port_backend.services.dashboard import timewindows as tw
 from llm_port_backend.services.dashboard import traffic
 from llm_port_backend.services.dashboard.facts import Facts
@@ -85,6 +87,25 @@ async def error_rate_1h(facts: Facts) -> Kpi:
     }
 
 
+async def attention_open(facts: Facts) -> Kpi:
+    """Current problems, by severity. No trend: it is a state, not a flow."""
+    items, _failed = await facts.attention()
+    by = attention_rules.counts(items)
+    return {"value": len(items), "previous": None, "context": by}
+
+
+async def gpus_busy(facts: Facts) -> Kpi:
+    """GPUs at or above 10 % utilization, of those reporting. A load figure, not health."""
+    cap = await facts.capacity()
+    busy, reporting = capacity_service.gpus_busy(cap.machines)
+    online = sum(1 for m in cap.machines if m.health not in ("offline", "stale"))
+    return {
+        "value": busy / reporting if reporting else None,
+        "previous": None,
+        "context": {"busy": busy, "reporting": reporting, "machines": online},
+    }
+
+
 #: Every KPI this backend can compute, by id.
 KPIS: dict[str, KpiFn] = {
     "requests_today": requests_today,
@@ -92,6 +113,8 @@ KPIS: dict[str, KpiFn] = {
     "in_house_share_today": in_house_share_today,
     "spend_month": spend_month,
     "error_rate_1h": error_rate_1h,
+    "attention_open": attention_open,
+    "gpus_busy": gpus_busy,
 }
 
 
