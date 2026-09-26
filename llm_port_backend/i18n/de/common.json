@@ -324,6 +324,11 @@
         "title": "Handlungsbedarf",
         "description": "Aktuelle Probleme auf der Plattform",
         "subtitle": "Aktuelle Probleme auf der Plattform"
+      },
+      "integrations": {
+        "title": "Integrationen",
+        "description": "Provider, MCP-Server und Skills",
+        "subtitle": "Womit die Plattform verbunden ist"
       }
     },
     "health": {
@@ -489,7 +494,8 @@
       "states": {
         "degraded": "beeinträchtigt",
         "failed": "fehlgeschlagen",
-        "error": "fehlerhaft"
+        "error": "fehlerhaft",
+        "disconnected": "getrennt"
       },
       "node_offline": {
         "title": "{{node}} ist offline",
@@ -555,7 +561,22 @@
       "rag_job_failed": {
         "title": "Fehlgeschlagene Dokumentaufnahme (24 Std.): {{count}}",
         "detail": "Unter Dokumente erneut versuchen."
+      },
+      "mcp_server_error": {
+        "title": "MCP-Server {{name}} ist {{state}}",
+        "detail": "Seine Tools stehen Chats nicht zur Verfügung.",
+        "detail_message": "{{message}}"
       }
+    },
+    "integrations": {
+      "providers": "LLM-Provider",
+      "mcp": "MCP-Server",
+      "skills": "Skills",
+      "healthy_of": "{{healthy}} / {{enabled}} in Ordnung",
+      "active_of": "{{active}} / {{total}} aktiv",
+      "unreachable": "Antworten nicht: {{count}}",
+      "problems": "Mit Problemen: {{count}}",
+      "unavailable": "{{module}} konnte nicht gelesen werden."
     }
   },
   "errors": {

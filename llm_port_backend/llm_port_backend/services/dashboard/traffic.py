@@ -120,6 +120,15 @@ class Attribution:
             residency={pid: r.kind for pid, r in found.items()},
         )
 
+    @property
+    def providers(self) -> list[Any]:
+        """Every provider the backend knows."""
+        return list(self._providers.values())
+
+    def residency_of(self, provider_id: object) -> str:
+        """A provider's residency class ("unknown" when it could not be told)."""
+        return self._residency.get(str(provider_id), residency_mod.UNKNOWN)
+
     def _provider_residency(self, provider: Any | None, default: str) -> str:
         if provider is None:
             return default

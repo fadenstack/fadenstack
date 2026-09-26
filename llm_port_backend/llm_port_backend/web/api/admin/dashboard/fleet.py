@@ -22,9 +22,13 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     CapacityGroupDTO,
     CapacityTotalsDTO,
     GpuDTO,
+    IntegrationsDTO,
     LoadHistogramDTO,
     MachineDTO,
     MachineRefDTO,
+    McpSummaryDTO,
+    ProvidersSummaryDTO,
+    SkillsSummaryDTO,
 )
 from llm_port_backend.web.api.admin.dependencies import require_superuser
 
@@ -150,4 +154,21 @@ async def get_attention(
         ],
         counts=attention_rules.counts(items),
         rule_errors=failed,
+    )
+
+
+@router.get("/integrations", response_model=IntegrationsDTO, name="admin_dashboard_integrations")
+async def get_integrations(
+    request: Request,
+    _user: Annotated[User, Depends(require_superuser)],
+    now: Annotated[datetime, Depends(dashboard_now)],
+) -> IntegrationsDTO:
+    """Providers, MCP servers and skills; a module that is off has no section."""
+    found = await build_facts(request, now).integrations()
+    return IntegrationsDTO(
+        generated_at=now,
+        providers=ProvidersSummaryDTO(**found.providers),
+        mcp=McpSummaryDTO(**found.mcp) if found.mcp is not None else None,
+        skills=SkillsSummaryDTO(**found.skills) if found.skills is not None else None,
+        unavailable=found.unavailable,
     )

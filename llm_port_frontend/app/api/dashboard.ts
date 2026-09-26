@@ -262,3 +262,22 @@ export const dashboardFleet = {
     return request<AttentionResponse>("/attention");
   },
 };
+
+// ── Integrations ────────────────────────────────────────────────────
+
+export interface IntegrationsResponse {
+  generated_at: string;
+  providers: { total: number; by_residency: Record<ResidencyClass, number>; unreachable: number };
+  /** Null when the module is off. */
+  mcp: { total: number; enabled: number; healthy: number; problems: number } | null;
+  skills: { total: number; active: number } | null;
+  connectors: Record<string, number> | null;
+  /** Modules that are on but could not be read this time. */
+  unavailable: string[];
+}
+
+export const dashboardIntegrations = {
+  get() {
+    return request<IntegrationsResponse>("/integrations");
+  },
+};

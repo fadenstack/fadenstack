@@ -17,6 +17,7 @@ from llm_port_backend.db.models.users import User
 from llm_port_backend.services.dashboard import platform
 from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.settings import settings
+from llm_port_backend.web.api.admin.dashboard.caching import no_store
 from llm_port_backend.web.api.admin.dashboard.schema import (
     DashboardHealthDTO,
     DashboardHealthItemDTO,
@@ -26,7 +27,6 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     GrafanaPanelDTO,
     GrafanaPanelsDTO,
 )
-from llm_port_backend.web.api.admin.dashboard.caching import no_store
 from llm_port_backend.web.api.admin.dependencies import get_docker, require_superuser
 
 router = APIRouter(dependencies=[Depends(no_store)])

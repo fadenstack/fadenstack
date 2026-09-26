@@ -324,6 +324,11 @@
         "title": "À traiter",
         "description": "Problèmes actuels de la plateforme",
         "subtitle": "Problèmes actuels de la plateforme"
+      },
+      "integrations": {
+        "title": "Intégrations",
+        "description": "Fournisseurs, serveurs MCP et skills",
+        "subtitle": "Ce à quoi la plateforme est connectée"
       }
     },
     "health": {
@@ -489,7 +494,8 @@
       "states": {
         "degraded": "dégradé",
         "failed": "en échec",
-        "error": "en erreur"
+        "error": "en erreur",
+        "disconnected": "déconnecté"
       },
       "node_offline": {
         "title": "{{node}} est hors ligne",
@@ -555,7 +561,22 @@
       "rag_job_failed": {
         "title": "Ingestion de documents en échec (24 h) : {{count}}",
         "detail": "Ouvrez Documents pour réessayer."
+      },
+      "mcp_server_error": {
+        "title": "Le serveur MCP {{name}} est {{state}}",
+        "detail": "Ses outils ne sont pas disponibles dans les chats.",
+        "detail_message": "{{message}}"
       }
+    },
+    "integrations": {
+      "providers": "Fournisseurs LLM",
+      "mcp": "Serveurs MCP",
+      "skills": "Skills",
+      "healthy_of": "{{healthy}} / {{enabled}} opérationnels",
+      "active_of": "{{active}} / {{total}} actifs",
+      "unreachable": "Ne répondent pas : {{count}}",
+      "problems": "Avec des problèmes : {{count}}",
+      "unavailable": "Impossible de lire {{module}}."
     }
   },
   "common": {

@@ -324,6 +324,11 @@
         "title": "Needs attention",
         "description": "Current problems across the platform",
         "subtitle": "Current problems across the platform"
+      },
+      "integrations": {
+        "title": "Integrations",
+        "description": "Providers, MCP servers and skills",
+        "subtitle": "What the platform is connected to"
       }
     },
     "health": {
@@ -489,7 +494,8 @@
       "states": {
         "degraded": "degraded",
         "failed": "failed",
-        "error": "in error"
+        "error": "in error",
+        "disconnected": "disconnected"
       },
       "node_offline": {
         "title": "{{node}} is offline",
@@ -555,7 +561,22 @@
       "rag_job_failed": {
         "title": "Document ingestion failed (24 h): {{count}}",
         "detail": "Open Documents to retry."
+      },
+      "mcp_server_error": {
+        "title": "MCP server {{name}} is {{state}}",
+        "detail": "Its tools are not available to chats.",
+        "detail_message": "{{message}}"
       }
+    },
+    "integrations": {
+      "providers": "LLM providers",
+      "mcp": "MCP servers",
+      "skills": "Skills",
+      "healthy_of": "{{healthy}} / {{enabled}} healthy",
+      "active_of": "{{active}} / {{total}} active",
+      "unreachable": "Not answering: {{count}}",
+      "problems": "With problems: {{count}}",
+      "unavailable": "{{module}} could not be read."
     }
   },
   "common": {

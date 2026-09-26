@@ -313,3 +313,40 @@ class AttentionDTO(BaseModel):
     counts: dict[str, int]
     #: Rules that could not be evaluated this time.
     rule_errors: list[str] = Field(default_factory=list)
+
+
+class ProvidersSummaryDTO(BaseModel):
+    """Configured LLM providers by residency class, and remote ones not answering."""
+
+    total: int
+    by_residency: dict[str, int]
+    unreachable: int = 0
+
+
+class McpSummaryDTO(BaseModel):
+    """MCP servers: registered, enabled, active, and enabled ones with a problem."""
+
+    total: int
+    enabled: int
+    healthy: int
+    problems: int
+
+
+class SkillsSummaryDTO(BaseModel):
+    """Skills that are not archived, and those published and enabled."""
+
+    total: int
+    active: int
+
+
+class IntegrationsDTO(BaseModel):
+    """What the platform is connected to; a section is null when its module is off."""
+
+    generated_at: datetime
+    providers: ProvidersSummaryDTO
+    mcp: McpSummaryDTO | None = None
+    skills: SkillsSummaryDTO | None = None
+    #: Data connectors arrive with the Knowledge widget.
+    connectors: dict[str, int] | None = None
+    #: Modules that are on but could not be read this time.
+    unavailable: list[str] = Field(default_factory=list)

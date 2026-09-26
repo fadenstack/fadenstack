@@ -324,6 +324,11 @@
         "title": "需要关注",
         "description": "平台当前的问题",
         "subtitle": "平台当前的问题"
+      },
+      "integrations": {
+        "title": "集成",
+        "description": "提供方、MCP 服务器和技能",
+        "subtitle": "平台已连接的内容"
       }
     },
     "health": {
@@ -489,7 +494,8 @@
       "states": {
         "degraded": "降级",
         "failed": "失败",
-        "error": "出错"
+        "error": "出错",
+        "disconnected": "已断开"
       },
       "node_offline": {
         "title": "{{node}} 已离线",
@@ -555,7 +561,22 @@
       "rag_job_failed": {
         "title": "文档导入失败（24 小时）：{{count}}",
         "detail": "打开“文档”重试。"
+      },
+      "mcp_server_error": {
+        "title": "MCP 服务器 {{name}} 状态：{{state}}",
+        "detail": "其工具在聊天中不可用。",
+        "detail_message": "{{message}}"
       }
+    },
+    "integrations": {
+      "providers": "LLM 提供方",
+      "mcp": "MCP 服务器",
+      "skills": "技能",
+      "healthy_of": "{{healthy}} / {{enabled}} 正常",
+      "active_of": "{{active}} / {{total}} 已启用",
+      "unreachable": "无响应：{{count}}",
+      "problems": "有问题：{{count}}",
+      "unavailable": "无法读取 {{module}}。"
     }
   },
   "errors": {

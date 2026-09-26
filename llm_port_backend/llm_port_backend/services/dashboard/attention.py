@@ -65,7 +65,7 @@ class Item:
     id: str
     code: str
     severity: str  # critical | warning | info
-    category: str  # infrastructure | models | traffic | platform | knowledge
+    category: str  # infrastructure | models | traffic | platform | knowledge | integrations
     params: dict[str, Any] = field(default_factory=dict)
     since: datetime | None = None
     link: str | None = None
@@ -383,6 +383,27 @@ async def rag_jobs(facts: Facts) -> list[Item]:
     return await facts.on_backend(query)
 
 
+async def mcp_servers(facts: Facts) -> list[Item]:
+    """Enabled MCP servers that are degraded, disconnected or in error."""
+    if not settings.mcp_enabled:
+        return []
+    found = await facts.integrations()
+    if "mcp" in found.unavailable:
+        raise RuntimeError("MCP service unavailable")
+    return [
+        Item(
+            f"mcp_server_error:{s['id']}",
+            "mcp_server_error",
+            "warning",
+            "integrations",
+            {"name": s["name"], "state": s["status"], "message": s["message"]},
+            None,
+            "/admin/mcp/servers",
+        )
+        for s in found.mcp_problems
+    ]
+
+
 RULES: list[Rule] = [
     machines,
     join_requests,
@@ -393,6 +414,7 @@ RULES: list[Rule] = [
     dependencies,
     host,
     rag_jobs,
+    mcp_servers,
 ]
 
 

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from llm_port_backend.services.dashboard import attention as attention_rules
 from llm_port_backend.services.dashboard import capacity as capacity_service
+from llm_port_backend.services.dashboard import integrations as integrations_service
 from llm_port_backend.services.dashboard import platform, traffic
 from llm_port_backend.services.dashboard.cache import FactCache
 from llm_port_backend.services.dashboard.timewindows import Window
@@ -170,4 +171,10 @@ class Facts:
         """Current problems, and the rules that could not be evaluated."""
         return await self.cache.get_or_compute(
             self._key("attention"), TTL_FLEET, lambda: attention_rules.evaluate(self)
+        )
+
+    async def integrations(self) -> integrations_service.Integrations:
+        """Providers, MCP servers and skills (local services asked with a short timeout)."""
+        return await self.cache.get_or_compute(
+            self._key("integrations"), TTL_WIDE, lambda: integrations_service.load(self), serve_stale=True
         )

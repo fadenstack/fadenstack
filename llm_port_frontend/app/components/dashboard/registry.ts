@@ -56,6 +56,15 @@ export const WIDGETS: WidgetDefinition[] = [
     component: lazy(() => import("./widgets/UsageWidget")),
   },
   {
+    id: "integrations",
+    titleKey: "dashboard.widgets.integrations.title",
+    descriptionKey: "dashboard.widgets.integrations.description",
+    sizes: ["S", "M"],
+    defaultSize: "M",
+    defaultVisible: (profile) => profile !== "private",
+    component: lazy(() => import("./widgets/IntegrationsWidget")),
+  },
+  {
     id: "platform_health",
     titleKey: "dashboard.widgets.platform_health.title",
     descriptionKey: "dashboard.widgets.platform_health.description",

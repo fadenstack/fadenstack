@@ -3,7 +3,14 @@
  * every widget that reads, say, the overview shares one request.
  */
 import { dashboard, hardware } from "~/api/admin";
-import { dashboardData, dashboardFleet, viewerTimeZone, type TrafficWindow, type UsageRange } from "~/api/dashboard";
+import {
+  dashboardData,
+  dashboardFleet,
+  dashboardIntegrations,
+  viewerTimeZone,
+  type TrafficWindow,
+  type UsageRange,
+} from "~/api/dashboard";
 import { nodesApi } from "~/api/nodes";
 import { useDashboardQuery } from "~/lib/dashboardQuery";
 
@@ -93,6 +100,14 @@ export function useCapacity({ refreshToken, enabled }: Opts) {
 export function useAttention({ refreshToken, enabled }: Opts) {
   return useDashboardQuery("admin/dashboard/attention", () => dashboardFleet.attention(), {
     refreshMs: 30_000,
+    refreshToken,
+    enabled,
+  });
+}
+
+export function useIntegrations({ refreshToken, enabled }: Opts) {
+  return useDashboardQuery("admin/dashboard/integrations", () => dashboardIntegrations.get(), {
+    refreshMs: 120_000,
     refreshToken,
     enabled,
   });
