@@ -129,7 +129,7 @@ function Item({ item }: { item: AttentionItem }) {
     </Box>
   );
 
-  const sx = { borderRadius: 1.5, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", px: 1.25, py: 1, minHeight: 48 };
+  const sx = { borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", px: 1.25, py: 1, minHeight: 48 };
   return item.link ? (
     <ListItemButton component={RouterLink} to={item.link} sx={sx}>
       {body}

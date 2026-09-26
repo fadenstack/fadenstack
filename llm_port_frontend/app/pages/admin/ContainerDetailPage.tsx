@@ -221,7 +221,7 @@ export default function ContainerDetailPage() {
                 p: 2,
                 height: 420,
                 overflow: "auto",
-                borderRadius: 2,
+                borderRadius: 1,
               })}
             >
               <Box

@@ -494,7 +494,7 @@ export default function PipelineGraph({ request, toolCalls }: Props) {
       sx={{
         width: "100%",
         height: GRAPH_H,
-        borderRadius: 2,
+        borderRadius: 1,
         overflow: "hidden",
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: alpha(theme.palette.background.default, 0.5),

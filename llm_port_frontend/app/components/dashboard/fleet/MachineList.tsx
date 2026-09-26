@@ -43,7 +43,7 @@ export default function MachineList({ group, title, onClose }: MachineListProps)
         anchor="bottom"
         open={group !== null}
         onClose={onClose}
-        slotProps={{ paper: { sx: { maxHeight: "80vh", borderTopLeftRadius: 16, borderTopRightRadius: 16 } } }}
+        slotProps={{ paper: { sx: { maxHeight: "80vh", borderTopLeftRadius: 12, borderTopRightRadius: 12 } } }}
       >
         <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "divider", mx: "auto", mt: 1 }} aria-hidden />
         <Typography variant="subtitle1" sx={{ fontWeight: 700, px: 2, pt: 1 }}>

@@ -581,7 +581,7 @@ export function adminPageTitle(
 
 /* ── Shared link button styles ─────────────────────────────────────── */
 export const linkButtonSx = {
-  borderRadius: 2,
+  borderRadius: 1,
   "&.active": {
     bgcolor: "primary.dark",
     color: "primary.light",

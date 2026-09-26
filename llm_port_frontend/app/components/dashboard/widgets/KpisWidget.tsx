@@ -174,7 +174,7 @@ function Tile({ id, item, lang }: { id: KpiId; item?: KpiItem; lang: string }) {
     <Box
       sx={{
         p: 1.5,
-        borderRadius: 1.5,
+        borderRadius: 1,
         border: 1,
         borderColor: "divider",
         bgcolor: "dashboard.surfaceSubtle",

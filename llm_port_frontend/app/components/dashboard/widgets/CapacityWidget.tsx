@@ -159,7 +159,7 @@ function Fleet({ data, colorBy }: { data: CapacityResponse; colorBy: FleetColorB
 
 function Count({ label, value, hint }: { label: string; value: string; hint?: string }) {
   const tile = (
-    <Box sx={{ px: 1.25, py: 1, borderRadius: 1.5, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle" }}>
+    <Box sx={{ px: 1.25, py: 1, borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle" }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block" }} noWrap>
         {label}
       </Typography>

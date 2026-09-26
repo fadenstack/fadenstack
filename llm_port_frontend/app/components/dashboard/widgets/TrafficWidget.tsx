@@ -236,7 +236,7 @@ function Destinations({ destinations, routed }: { destinations: TrafficDestinati
 
 function Mini({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ px: 1.25, py: 1, borderRadius: 1.5, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle" }}>
+    <Box sx={{ px: 1.25, py: 1, borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle" }}>
       <Typography sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
       <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.4 }}>
         {label}

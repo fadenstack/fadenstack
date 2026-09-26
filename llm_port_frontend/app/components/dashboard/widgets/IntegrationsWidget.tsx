@@ -124,7 +124,7 @@ function Tile({
     <CardActionArea
       component={RouterLink}
       to={to}
-      sx={{ borderRadius: 1.5, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", p: 1.5, minHeight: 76 }}
+      sx={{ borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", p: 1.5, minHeight: 76 }}
     >
       <Stack direction="row" gap={1.25} alignItems="flex-start">
         <Box

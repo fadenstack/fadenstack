@@ -78,7 +78,7 @@ function TourTooltip({
       sx={{
         bgcolor: "background.paper",
         color: "text.primary",
-        borderRadius: 2,
+        borderRadius: 1,
         boxShadow: theme.shadows[8],
         maxWidth: 380,
         minWidth: 280,

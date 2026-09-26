@@ -23,7 +23,7 @@ export default function MachineCard({ machine }: { machine: CapacityMachine }) {
     <CardActionArea
       component={RouterLink}
       to={`/admin/nodes/${machine.id}`}
-      sx={{ borderRadius: 1.5, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", p: 1.5, height: "100%" }}
+      sx={{ borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", p: 1.5, height: "100%" }}
     >
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1 }}>
         <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: "monospace", flexGrow: 1, minWidth: 0 }} noWrap>

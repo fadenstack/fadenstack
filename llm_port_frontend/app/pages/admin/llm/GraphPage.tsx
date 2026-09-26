@@ -566,7 +566,7 @@ export default function GraphPage() {
                 overflow: "auto",
                 p: 2,
                 zIndex: 10,
-                borderRadius: 2,
+                borderRadius: 1,
                 bgcolor: "background.paper",
               }}
             >

@@ -89,7 +89,7 @@ export function ProductTourDialog({ open, onClose }: ProductTourDialogProps) {
           <Box
             sx={{
               width: "100%",
-              borderRadius: 2,
+              borderRadius: 1,
               overflow: "hidden",
               border: (theme) => `1px solid ${theme.palette.divider}`,
               bgcolor: "background.default",
