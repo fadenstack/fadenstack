@@ -192,9 +192,12 @@ async def call_tool(
         if decision.redaction_summary:
             redaction_summary = decision.redaction_summary
 
-    # Execute the tool call via the upstream MCP server
+    # Execute the tool call via the upstream MCP server; once more on a new
+    # connection when the server no longer knew the session (it restarted).
     try:
-        result = await adapter.call_tool(tool.upstream_name, sanitized_args)
+        result = await manager.call_tool(
+            str(server.id), adapter, tool.upstream_name, sanitized_args,
+        )
     except Exception as exc:
         logger.warning(
             "Tool call failed: %s on server %s: %s",
