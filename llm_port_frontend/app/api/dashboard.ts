@@ -101,3 +101,76 @@ export const dashboardLayout = {
     }
   },
 };
+
+// ── Traffic and key metrics ─────────────────────────────────────────
+
+export type ResidencyClass = "machines" | "private" | "external" | "unknown";
+export const RESIDENCY_CLASSES: ResidencyClass[] = ["machines", "private", "external", "unknown"];
+
+/** An amount in one currency; amounts in different currencies are never added. */
+export interface Money {
+  currency: string;
+  /** A decimal string ("42.18"). */
+  amount: string;
+}
+
+export interface KpiItem {
+  id: string;
+  value: number | Money[] | null;
+  previous: number | Money[] | null;
+  context: Record<string, number | null | undefined>;
+}
+
+export interface KpisResponse {
+  generated_at: string;
+  items: KpiItem[];
+  unavailable: string[];
+}
+
+export interface TrafficDestination {
+  kind: "cluster" | "this_server" | "found" | "provider" | "unknown" | "other";
+  id: string | null;
+  name: string | null;
+  residency: ResidencyClass | null;
+  requests: number;
+}
+
+export interface TrafficResponse {
+  generated_at: string;
+  window: { start: string; end: string };
+  requests: number;
+  routed: number;
+  tokens: number;
+  errors: { count: number; rate: number | null };
+  latency_ms: { p50: number | null; p95: number | null };
+  by_residency: { residency: ResidencyClass; requests: number }[];
+  by_destination: TrafficDestination[];
+}
+
+export interface SeriesBucket extends Record<ResidencyClass, number> {
+  bucket: string;
+  partial: boolean;
+}
+
+export interface TrafficSeriesResponse {
+  generated_at: string;
+  granularity: "day" | "hour";
+  tz: string;
+  buckets: SeriesBucket[];
+}
+
+function query(params: Record<string, string>): string {
+  return `?${new URLSearchParams(params).toString()}`;
+}
+
+export const dashboardData = {
+  kpis(ids: string[], tz = viewerTimeZone()) {
+    return request<KpisResponse>(`/kpis${query({ ids: ids.join(","), tz })}`);
+  },
+  traffic(window: TrafficWindow, tz = viewerTimeZone()) {
+    return request<TrafficResponse>(`/traffic${query({ window, tz })}`);
+  },
+  series(range: UsageRange, tz = viewerTimeZone()) {
+    return request<TrafficSeriesResponse>(`/traffic/series${query({ range, granularity: "day", tz })}`);
+  },
+};

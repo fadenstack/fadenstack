@@ -477,3 +477,6 @@ async def grafana_panels(
 from llm_port_backend.web.api.admin.dashboard.layout import router as _layout_router  # noqa: E402
 
 router.include_router(_layout_router)
+from llm_port_backend.web.api.admin.dashboard.traffic import router as _traffic_router  # noqa: E402
+
+router.include_router(_traffic_router)

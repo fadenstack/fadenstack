@@ -300,6 +300,23 @@
       "grafana": {
         "title": "Grafana",
         "description": "Grafana 概览仪表板"
+      },
+      "kpis": {
+        "title": "关键指标",
+        "description": "请求、用户、内部处理比例、费用等"
+      },
+      "traffic": {
+        "title": "AI 流量",
+        "description": "请求在哪里处理以及处理速度",
+        "subtitle": "请求在哪里处理",
+        "link": "查看流量"
+      },
+      "usage": {
+        "title": "用量",
+        "description": "按处理位置划分的每日请求数",
+        "subtitle_7d": "最近 7 天每日请求数",
+        "subtitle_30d": "最近 30 天每日请求数",
+        "link": "可观测性"
       }
     },
     "health": {
@@ -318,7 +335,93 @@
         "healthy": "正常",
         "degraded": "降级",
         "down": "故障"
+      },
+      "gateway_errors": "网关错误（1 小时）",
+      "error_rate": "{{rate}} · P95 {{p95}}",
+      "no_requests": "无请求"
+    },
+    "window": {
+      "label": "时间范围",
+      "today": "今天",
+      "24h": "24 小时",
+      "7d": "7 天",
+      "30d": "30 天"
+    },
+    "range": {
+      "label": "范围",
+      "7d": "7 天",
+      "30d": "30 天"
+    },
+    "residency": {
+      "machines": "我们的机器",
+      "private": "私有网络",
+      "external": "外部",
+      "unknown": "未知"
+    },
+    "kpi": {
+      "choose_title": "选择指标",
+      "choose_hint": "最多选择 {{max}} 项。",
+      "none_chosen": "未选择任何指标。",
+      "not_available": "不可用",
+      "no_spend": "无",
+      "requests_today": {
+        "label": "今日请求",
+        "context": "{{tokens}} 个令牌",
+        "baseline": "与昨天同一时间相比"
+      },
+      "active_users_today": {
+        "label": "今日活跃用户",
+        "context": "本月 {{users}} 人",
+        "baseline": "与昨天同一时间相比"
+      },
+      "in_house_share_today": {
+        "label": "内部处理",
+        "context": "{{external}} 外部 · {{unknown}} 未知",
+        "no_traffic": "尚无已路由的请求",
+        "baseline": "与昨天同一时间相比"
+      },
+      "spend_month": {
+        "label": "本月费用",
+        "context": "根据模型价格估算",
+        "unpriced": "没有价格的请求：{{count}}",
+        "baseline": "与上月同日相比"
+      },
+      "error_rate_1h": {
+        "label": "错误率（1 小时）",
+        "context": "P95 {{p95}}",
+        "baseline": "与前一小时相比"
+      },
+      "attention_open": {
+        "label": "需要关注",
+        "context": "{{critical}} 个严重 · {{warning}} 个警告",
+        "baseline": "当前未解决的问题"
+      },
+      "gpus_busy": {
+        "label": "使用中的 GPU",
+        "context": "{{machines}} 台机器在线",
+        "baseline": "利用率达到 10% 或以上的 GPU"
       }
+    },
+    "traffic": {
+      "in_house": "内部",
+      "requests": "请求",
+      "p50": "P50",
+      "p95": "P95",
+      "errors": "错误",
+      "this_server": "本服务器",
+      "other": "其他",
+      "unknown_destination": "未知（已删除）",
+      "unnamed": "未命名",
+      "unrouted": "路由前被拒绝，未计入分布：{{count}}",
+      "empty": "此期间没有请求。",
+      "empty_action": "打开聊天",
+      "donut_aria": "{{share}} 的请求在内部处理",
+      "removed_cluster": "已删除的集群"
+    },
+    "usage": {
+      "empty": "此期间没有流量。",
+      "total": "{{requests}} 个请求 · {{share}} 内部",
+      "chart_aria": "按处理位置划分的每日请求数：共 {{total}} 个，内部 {{share}}"
     }
   },
   "errors": {

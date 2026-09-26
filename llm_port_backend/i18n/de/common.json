@@ -300,6 +300,23 @@
       "grafana": {
         "title": "Grafana",
         "description": "Das Grafana-Übersichtsdashboard"
+      },
+      "kpis": {
+        "title": "Kennzahlen",
+        "description": "Anfragen, Benutzer, interner Anteil, Kosten und mehr"
+      },
+      "traffic": {
+        "title": "KI-Datenverkehr",
+        "description": "Wo Anfragen bedient wurden und wie schnell",
+        "subtitle": "Wo Anfragen bedient wurden",
+        "link": "Datenverkehr ansehen"
+      },
+      "usage": {
+        "title": "Nutzung",
+        "description": "Anfragen pro Tag, nach Ort der Bearbeitung",
+        "subtitle_7d": "Anfragen pro Tag, letzte 7 Tage",
+        "subtitle_30d": "Anfragen pro Tag, letzte 30 Tage",
+        "link": "Observability"
       }
     },
     "health": {
@@ -318,7 +335,93 @@
         "healthy": "In Ordnung",
         "degraded": "Beeinträchtigt",
         "down": "Ausgefallen"
+      },
+      "gateway_errors": "Gateway-Fehler (1 Std.)",
+      "error_rate": "{{rate}} · P95 {{p95}}",
+      "no_requests": "Keine Anfragen"
+    },
+    "window": {
+      "label": "Zeitraum",
+      "today": "Heute",
+      "24h": "24 Std.",
+      "7d": "7 T.",
+      "30d": "30 T."
+    },
+    "range": {
+      "label": "Zeitraum",
+      "7d": "7 Tage",
+      "30d": "30 Tage"
+    },
+    "residency": {
+      "machines": "Eigene Maschinen",
+      "private": "Privates Netz",
+      "external": "Extern",
+      "unknown": "Unbekannt"
+    },
+    "kpi": {
+      "choose_title": "Kennzahlen auswählen",
+      "choose_hint": "Wählen Sie bis zu {{max}}.",
+      "none_chosen": "Keine Kennzahlen ausgewählt.",
+      "not_available": "Nicht verfügbar",
+      "no_spend": "Keine",
+      "requests_today": {
+        "label": "Anfragen heute",
+        "context": "{{tokens}} Tokens",
+        "baseline": "ggü. gestern zur selben Uhrzeit"
+      },
+      "active_users_today": {
+        "label": "Aktive Benutzer heute",
+        "context": "{{users}} in diesem Monat",
+        "baseline": "ggü. gestern zur selben Uhrzeit"
+      },
+      "in_house_share_today": {
+        "label": "Intern bearbeitet",
+        "context": "{{external}} extern · {{unknown}} unbekannt",
+        "no_traffic": "Noch keine weitergeleiteten Anfragen",
+        "baseline": "ggü. gestern zur selben Uhrzeit"
+      },
+      "spend_month": {
+        "label": "Kosten diesen Monat",
+        "context": "Geschätzt aus Modellpreisen",
+        "unpriced": "Anfragen ohne Preis: {{count}}",
+        "baseline": "ggü. Vormonat bis zum selben Tag"
+      },
+      "error_rate_1h": {
+        "label": "Fehlerquote (1 Std.)",
+        "context": "P95 {{p95}}",
+        "baseline": "ggü. der Stunde davor"
+      },
+      "attention_open": {
+        "label": "Handlungsbedarf",
+        "context": "{{critical}} kritisch · {{warning}} Warnung",
+        "baseline": "Aktuell offene Probleme"
+      },
+      "gpus_busy": {
+        "label": "GPUs in Benutzung",
+        "context": "{{machines}} Maschinen online",
+        "baseline": "GPUs mit mindestens 10 % Auslastung"
       }
+    },
+    "traffic": {
+      "in_house": "intern",
+      "requests": "Anfragen",
+      "p50": "P50",
+      "p95": "P95",
+      "errors": "Fehler",
+      "this_server": "Dieser Server",
+      "other": "Sonstige",
+      "unknown_destination": "Unbekannt (entfernt)",
+      "unnamed": "Ohne Namen",
+      "unrouted": "Vor der Weiterleitung abgelehnt, nicht in der Aufteilung: {{count}}",
+      "empty": "Keine Anfragen in diesem Zeitraum.",
+      "empty_action": "Chat öffnen",
+      "donut_aria": "{{share}} der Anfragen wurden intern bearbeitet",
+      "removed_cluster": "Entfernter Cluster"
+    },
+    "usage": {
+      "empty": "Kein Datenverkehr in diesem Zeitraum.",
+      "total": "{{requests}} Anfragen · {{share}} intern",
+      "chart_aria": "Anfragen pro Tag nach Ort der Bearbeitung: insgesamt {{total}}, davon {{share}} intern"
     }
   },
   "errors": {

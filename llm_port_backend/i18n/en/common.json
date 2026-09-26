@@ -300,6 +300,23 @@
       "grafana": {
         "title": "Grafana",
         "description": "The Grafana overview dashboard"
+      },
+      "kpis": {
+        "title": "Key metrics",
+        "description": "Requests, users, in-house share, spend and more"
+      },
+      "traffic": {
+        "title": "AI traffic",
+        "description": "Where requests were served, and how fast",
+        "subtitle": "Where requests were served",
+        "link": "View traffic"
+      },
+      "usage": {
+        "title": "Usage",
+        "description": "Requests per day, by where they were served",
+        "subtitle_7d": "Requests per day, last 7 days",
+        "subtitle_30d": "Requests per day, last 30 days",
+        "link": "Observability"
       }
     },
     "health": {
@@ -318,7 +335,93 @@
         "healthy": "Healthy",
         "degraded": "Degraded",
         "down": "Down"
+      },
+      "gateway_errors": "Gateway errors (1 h)",
+      "error_rate": "{{rate}} · P95 {{p95}}",
+      "no_requests": "No requests"
+    },
+    "window": {
+      "label": "Time window",
+      "today": "Today",
+      "24h": "24 h",
+      "7d": "7 d",
+      "30d": "30 d"
+    },
+    "range": {
+      "label": "Range",
+      "7d": "7 days",
+      "30d": "30 days"
+    },
+    "residency": {
+      "machines": "Our machines",
+      "private": "Private network",
+      "external": "External",
+      "unknown": "Unknown"
+    },
+    "kpi": {
+      "choose_title": "Choose metrics",
+      "choose_hint": "Pick up to {{max}}.",
+      "none_chosen": "No metrics chosen.",
+      "not_available": "Not available",
+      "no_spend": "None",
+      "requests_today": {
+        "label": "Requests today",
+        "context": "{{tokens}} tokens",
+        "baseline": "vs. yesterday at this time"
+      },
+      "active_users_today": {
+        "label": "Active users today",
+        "context": "{{users}} this month",
+        "baseline": "vs. yesterday at this time"
+      },
+      "in_house_share_today": {
+        "label": "Kept in-house",
+        "context": "{{external}} external · {{unknown}} unknown",
+        "no_traffic": "No routed requests yet",
+        "baseline": "vs. yesterday at this time"
+      },
+      "spend_month": {
+        "label": "Spend this month",
+        "context": "Estimated from model prices",
+        "unpriced": "Requests without a price: {{count}}",
+        "baseline": "vs. last month up to the same day"
+      },
+      "error_rate_1h": {
+        "label": "Error rate (1 h)",
+        "context": "P95 {{p95}}",
+        "baseline": "vs. the hour before"
+      },
+      "attention_open": {
+        "label": "Needs attention",
+        "context": "{{critical}} critical · {{warning}} warning",
+        "baseline": "Open problems now"
+      },
+      "gpus_busy": {
+        "label": "GPUs in use",
+        "context": "{{machines}} machines online",
+        "baseline": "GPUs with utilization of 10 % or more"
       }
+    },
+    "traffic": {
+      "in_house": "in-house",
+      "requests": "Requests",
+      "p50": "P50",
+      "p95": "P95",
+      "errors": "Errors",
+      "this_server": "This server",
+      "other": "Other",
+      "unknown_destination": "Unknown (removed)",
+      "unnamed": "Unnamed",
+      "unrouted": "Rejected before routing, not in the split: {{count}}",
+      "empty": "No requests in this period.",
+      "empty_action": "Open chat",
+      "donut_aria": "{{share}} of requests were served in-house",
+      "removed_cluster": "Removed cluster"
+    },
+    "usage": {
+      "empty": "No traffic in this period.",
+      "total": "{{requests}} requests · {{share}} in-house",
+      "chart_aria": "Requests per day by where they were served: {{total}} in total, {{share}} in-house"
     }
   },
   "common": {

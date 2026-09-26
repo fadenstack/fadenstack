@@ -11,8 +11,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { useServices } from "~/lib/ServicesContext";
-import { fmtInt } from "../format";
-import { useDependencyHealth, useOverview } from "../queries";
+import { fmtInt, fmtMs, fmtShare } from "../format";
+import { useDependencyHealth, useKpis, useOverview } from "../queries";
 import type { WidgetProps } from "../types";
 import WidgetCard from "../WidgetCard";
 
@@ -22,6 +22,9 @@ export default function PlatformHealthWidget({ refreshToken }: WidgetProps) {
   const { t, i18n } = useTranslation();
   const overview = useOverview({ refreshToken });
   const deps = useDependencyHealth({ refreshToken });
+  const errors = useKpis(["error_rate_1h"], { refreshToken });
+  const errorKpi = errors.data?.items.find((i) => i.id === "error_rate_1h");
+  const errorRate = typeof errorKpi?.value === "number" ? errorKpi.value : null;
   const { services, loading: servicesLoading } = useServices();
 
   const o = overview.data;
@@ -85,6 +88,26 @@ export default function PlatformHealthWidget({ refreshToken }: WidgetProps) {
               })}
             />
           )}
+        </Cell>
+        <Cell title={t("dashboard.health.gateway_errors")} loading={errors.loading}>
+          {errors.data &&
+            (errorKpi ? (
+              <Status
+                tone={errorRate != null && errorRate >= 0.05 ? "error" : errorRate != null && errorRate >= 0.01 ? "degraded" : "ok"}
+                label={
+                  errorKpi.context.requests
+                    ? t("dashboard.health.error_rate", {
+                        rate: fmtShare(errorRate, i18n.language),
+                        p95: fmtMs(errorKpi.context.p95_ms, i18n.language),
+                      })
+                    : t("dashboard.health.no_requests")
+                }
+              />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                {t("dashboard.kpi.not_available")}
+              </Typography>
+            ))}
         </Cell>
         <Cell title={t("dashboard.health.postgres")} loading={overview.loading}>
           {o &&

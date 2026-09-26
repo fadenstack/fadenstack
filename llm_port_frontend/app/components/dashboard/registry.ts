@@ -11,6 +11,24 @@ const always = () => true;
 
 export const WIDGETS: WidgetDefinition[] = [
   {
+    id: "kpis",
+    titleKey: "dashboard.widgets.kpis.title",
+    descriptionKey: "dashboard.widgets.kpis.description",
+    sizes: ["XL"],
+    defaultSize: "XL",
+    defaultVisible: always,
+    component: lazy(() => import("./widgets/KpisWidget")),
+  },
+  {
+    id: "traffic",
+    titleKey: "dashboard.widgets.traffic.title",
+    descriptionKey: "dashboard.widgets.traffic.description",
+    sizes: ["M", "L", "XL"],
+    defaultSize: "L",
+    defaultVisible: always,
+    component: lazy(() => import("./widgets/TrafficWidget")),
+  },
+  {
     id: "capacity",
     titleKey: "dashboard.widgets.capacity.title",
     descriptionKey: "dashboard.widgets.capacity.description",
@@ -18,6 +36,15 @@ export const WIDGETS: WidgetDefinition[] = [
     defaultSize: "M",
     defaultVisible: always,
     component: lazy(() => import("./widgets/CapacityWidget")),
+  },
+  {
+    id: "usage",
+    titleKey: "dashboard.widgets.usage.title",
+    descriptionKey: "dashboard.widgets.usage.description",
+    sizes: ["M", "L", "XL"],
+    defaultSize: "M",
+    defaultVisible: always,
+    component: lazy(() => import("./widgets/UsageWidget")),
   },
   {
     id: "platform_health",

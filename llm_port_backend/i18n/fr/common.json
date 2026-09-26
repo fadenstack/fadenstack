@@ -300,6 +300,23 @@
       "grafana": {
         "title": "Grafana",
         "description": "Le tableau de bord de synthèse Grafana"
+      },
+      "kpis": {
+        "title": "Indicateurs clés",
+        "description": "Requêtes, utilisateurs, part interne, dépenses et plus"
+      },
+      "traffic": {
+        "title": "Trafic IA",
+        "description": "Où les requêtes ont été traitées, et à quelle vitesse",
+        "subtitle": "Où les requêtes ont été traitées",
+        "link": "Voir le trafic"
+      },
+      "usage": {
+        "title": "Utilisation",
+        "description": "Requêtes par jour, selon le lieu de traitement",
+        "subtitle_7d": "Requêtes par jour, 7 derniers jours",
+        "subtitle_30d": "Requêtes par jour, 30 derniers jours",
+        "link": "Observabilité"
       }
     },
     "health": {
@@ -318,7 +335,93 @@
         "healthy": "Opérationnel",
         "degraded": "Dégradé",
         "down": "Hors service"
+      },
+      "gateway_errors": "Erreurs de la passerelle (1 h)",
+      "error_rate": "{{rate}} · P95 {{p95}}",
+      "no_requests": "Aucune requête"
+    },
+    "window": {
+      "label": "Période",
+      "today": "Aujourd'hui",
+      "24h": "24 h",
+      "7d": "7 j",
+      "30d": "30 j"
+    },
+    "range": {
+      "label": "Période",
+      "7d": "7 jours",
+      "30d": "30 jours"
+    },
+    "residency": {
+      "machines": "Nos machines",
+      "private": "Réseau privé",
+      "external": "Externe",
+      "unknown": "Inconnu"
+    },
+    "kpi": {
+      "choose_title": "Choisir les indicateurs",
+      "choose_hint": "Choisissez-en jusqu'à {{max}}.",
+      "none_chosen": "Aucun indicateur choisi.",
+      "not_available": "Non disponible",
+      "no_spend": "Aucune",
+      "requests_today": {
+        "label": "Requêtes aujourd'hui",
+        "context": "{{tokens}} jetons",
+        "baseline": "par rapport à hier à la même heure"
+      },
+      "active_users_today": {
+        "label": "Utilisateurs actifs aujourd'hui",
+        "context": "{{users}} ce mois-ci",
+        "baseline": "par rapport à hier à la même heure"
+      },
+      "in_house_share_today": {
+        "label": "Traité en interne",
+        "context": "{{external}} externe · {{unknown}} inconnu",
+        "no_traffic": "Aucune requête routée pour l'instant",
+        "baseline": "par rapport à hier à la même heure"
+      },
+      "spend_month": {
+        "label": "Dépenses ce mois-ci",
+        "context": "Estimées à partir des prix des modèles",
+        "unpriced": "Requêtes sans prix : {{count}}",
+        "baseline": "par rapport au mois dernier jusqu'au même jour"
+      },
+      "error_rate_1h": {
+        "label": "Taux d'erreur (1 h)",
+        "context": "P95 {{p95}}",
+        "baseline": "par rapport à l'heure précédente"
+      },
+      "attention_open": {
+        "label": "À traiter",
+        "context": "{{critical}} critiques · {{warning}} avertissements",
+        "baseline": "Problèmes ouverts actuellement"
+      },
+      "gpus_busy": {
+        "label": "GPU utilisés",
+        "context": "{{machines}} machines en ligne",
+        "baseline": "GPU utilisés à 10 % ou plus"
       }
+    },
+    "traffic": {
+      "in_house": "en interne",
+      "requests": "Requêtes",
+      "p50": "P50",
+      "p95": "P95",
+      "errors": "Erreurs",
+      "this_server": "Ce serveur",
+      "other": "Autres",
+      "unknown_destination": "Inconnu (supprimé)",
+      "unnamed": "Sans nom",
+      "unrouted": "Refusées avant le routage, hors répartition : {{count}}",
+      "empty": "Aucune requête sur cette période.",
+      "empty_action": "Ouvrir le chat",
+      "donut_aria": "{{share}} des requêtes ont été traitées en interne",
+      "removed_cluster": "Cluster supprimé"
+    },
+    "usage": {
+      "empty": "Aucun trafic sur cette période.",
+      "total": "{{requests}} requêtes · {{share}} en interne",
+      "chart_aria": "Requêtes par jour selon le lieu de traitement : {{total}} au total, {{share}} en interne"
     }
   },
   "common": {
