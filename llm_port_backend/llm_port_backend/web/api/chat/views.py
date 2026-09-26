@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette import status as http_status
+from starlette.background import BackgroundTask
 
 from llm_port_backend.db.dao.rbac_dao import RbacDAO
 from llm_port_backend.db.models.users import User
@@ -80,10 +81,20 @@ async def chat_completions(request: Request) -> StreamingResponse | JSONResponse
     client = _client()
     try:
         if is_stream:
+            stream = await client.open_stream_chat(body, jwt)
             return StreamingResponse(
-                client.stream_chat(body, jwt),
+                stream.body,
                 media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                # The gateway's trace id rides along: the reply's info button
+                # opens the debug panel with it.
+                headers={
+                    "Cache-Control": "no-cache",
+                    "X-Accel-Buffering": "no",
+                    **stream.headers,
+                },
+                # Closes the gateway response once this one is done, also when
+                # the browser left mid-stream and the body never reached its end.
+                background=BackgroundTask(stream.aclose),
             )
         resp = await client.chat(body, jwt)
         return JSONResponse(status_code=resp.status_code, content=resp.json())

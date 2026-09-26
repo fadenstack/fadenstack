@@ -8,15 +8,17 @@ Usage::
 
     client = GatewayChatClient()
     models = await client.list_models(jwt="<token>")
-    async for chunk in client.stream_chat(payload, jwt="<token>"):
-        ...  # forward SSE bytes
+    stream = await client.open_stream_chat(payload, jwt="<token>")
+    async for chunk in stream.body:
+        ...  # forward SSE bytes (and stream.headers)
 """
 
 from __future__ import annotations
 
 import logging
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -28,6 +30,59 @@ logger = logging.getLogger(__name__)
 
 _CONNECT_TIMEOUT = 10.0
 _READ_TIMEOUT = 300.0  # 5 min for long generation
+
+#: Gateway response headers the browser needs from a streamed completion: the
+#: trace id a reply's info button opens the debug panel with.
+FORWARDED_STREAM_HEADERS = ("x-langfuse-trace-id",)
+
+
+async def _nothing() -> None:
+    return None
+
+
+@dataclass
+class GatewayStream:
+    """A streamed completion: headers to pass on, then the SSE bytes."""
+
+    headers: dict[str, str]
+    body: AsyncIterator[bytes]
+    #: Closes the gateway response; safe to call after the body finished.
+    aclose: Callable[[], Awaitable[None]] = _nothing
+
+
+def _sse_error(error: dict[str, Any]) -> bytes:
+    return f"data: {json.dumps({'error': error}, ensure_ascii=False)}\n\n".encode()
+
+
+async def _sse_events(error: dict[str, Any]) -> AsyncIterator[bytes]:
+    """An error event and the end of the stream, as the chat client reads them."""
+    yield _sse_error(error)
+    yield b"data: [DONE]\n\n"
+
+
+def _unavailable_error() -> dict[str, Any]:
+    return {
+        "message": "Gateway unavailable",
+        "type": "gateway_unavailable",
+        "code": "gateway_unavailable",
+    }
+
+
+def _http_error(resp: httpx.Response, body_bytes: bytes) -> dict[str, Any]:
+    """The gateway's error, as an SSE error object (its own when it sent one)."""
+    body_text = body_bytes.decode("utf-8", errors="replace")
+    try:
+        detail = json.loads(body_text) if body_text else {}
+    except Exception:
+        detail = {"error": {"message": body_text or resp.reason_phrase}}
+    if not isinstance(detail, dict):
+        detail = {"error": {"message": str(detail)}}
+    error_obj = dict(detail.get("error") if isinstance(detail.get("error"), dict) else {})
+    error_obj.setdefault("message", resp.reason_phrase or "Gateway request failed")
+    error_obj.setdefault("type", "gateway_error")
+    error_obj.setdefault("code", "gateway_http_error")
+    error_obj.setdefault("status", resp.status_code)
+    return error_obj
 
 # One client per event loop, shared by every chat request.
 #
@@ -101,78 +156,63 @@ class GatewayChatClient:
 
     # -- chat completions (streaming) ---------------------------------------
 
-    async def stream_chat(
+    async def open_stream_chat(
         self,
         payload: dict[str, Any],
         jwt: str,
-    ) -> AsyncIterator[bytes]:
-        """Stream SSE chunks from the gateway ``/v1/chat/completions``."""
+    ) -> GatewayStream:
+        """Start a streamed ``/v1/chat/completions`` on the gateway.
+
+        The gateway's headers are read before its body, so the proxy can pass
+        them on: a ``StreamingResponse``'s headers are fixed before its body
+        starts, and the old generator only reached the gateway once they
+        were. The trace id (``x-langfuse-trace-id``) never got to the browser,
+        and a new reply's info button did nothing until the page was
+        reloaded and the stored message brought its trace id along.
+
+        Failures do not raise: they come back as an SSE ``error`` event the
+        chat client already shows, as before.
+        """
         client = self._ensure_client()
         try:
-            async with client.stream(
+            request = client.build_request(
                 "POST",
                 "/v1/chat/completions",
                 json=payload,
                 headers=self._headers(jwt),
-            ) as resp:
-                resp.raise_for_status()
-                async for chunk in resp.aiter_bytes():
-                    yield chunk
-        except httpx.HTTPStatusError as exc:
-            body_text = ""
-            try:
-                body_bytes = await exc.response.aread()
-                body_text = body_bytes.decode("utf-8", errors="replace")
-            except Exception:
-                body_text = ""
-
-            try:
-                detail = json.loads(body_text) if body_text else {}
-            except Exception:
-                detail = {
-                    "error": {
-                        "message": body_text or str(exc),
-                        "type": "gateway_error",
-                        "code": "gateway_http_error",
-                    },
-                }
-
-            if not isinstance(detail, dict):
-                detail = {
-                    "error": {
-                        "message": str(detail),
-                        "type": "gateway_error",
-                        "code": "gateway_http_error",
-                    },
-                }
-
-            error_obj = detail.get("error") if isinstance(detail.get("error"), dict) else {}
-            error_obj = dict(error_obj)
-            error_obj.setdefault(
-                "message",
-                exc.response.reason_phrase or "Gateway request failed",
             )
-            error_obj.setdefault("type", "gateway_error")
-            error_obj.setdefault("code", "gateway_http_error")
-            error_obj.setdefault("status", exc.response.status_code)
-
-            sse_payload = json.dumps({"error": error_obj}, ensure_ascii=False)
-            yield f"data: {sse_payload}\n\n".encode("utf-8")
-            yield b"data: [DONE]\n\n"
+            resp = await client.send(request, stream=True)
         except Exception:
             logger.exception("Streaming chat proxy error")
-            sse_payload = json.dumps(
-                {
-                    "error": {
-                        "message": "Gateway unavailable",
-                        "type": "gateway_unavailable",
-                        "code": "gateway_unavailable",
-                    },
-                },
-                ensure_ascii=False,
-            )
-            yield f"data: {sse_payload}\n\n".encode("utf-8")
-            yield b"data: [DONE]\n\n"
+            return GatewayStream({}, _sse_events(_unavailable_error()))
+
+        if resp.is_error:
+            try:
+                body_bytes = await resp.aread()
+            except Exception:
+                body_bytes = b""
+            finally:
+                await resp.aclose()
+            return GatewayStream({}, _sse_events(_http_error(resp, body_bytes)))
+
+        headers = {
+            name: resp.headers[name]
+            for name in FORWARDED_STREAM_HEADERS
+            if name in resp.headers
+        }
+
+        async def body() -> AsyncIterator[bytes]:
+            try:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+            except Exception:
+                logger.exception("Streaming chat proxy error")
+                async for event in _sse_events(_unavailable_error()):
+                    yield event
+            finally:
+                await resp.aclose()
+
+        return GatewayStream(headers, body(), resp.aclose)
 
     # -- chat completions (non-streaming) -----------------------------------
 
