@@ -6,7 +6,7 @@
  * would take over scrolling, so each chat has a ⋮ menu instead and dragging
  * is off. On a phone the panel slides in from the side of the user's hand.
  */
-import { useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
@@ -55,6 +55,12 @@ import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
 import type { NavHand } from "~/lib/useNavHand";
 import { CHAT_NAV_ID } from "../ChatShellContext";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
+
+/** Chats rendered at first, and added per step as the list scrolls. With every
+ *  chat rendered at once, 3,400 of them held the page for 17 s. */
+const SESSION_STEP = 50;
+/** Chats rendered at first inside a project, and added per "Show more". */
+const PROJECT_STEP = 20;
 
 interface Props {
   open: boolean;
@@ -155,6 +161,13 @@ export default function ChatSidebar({
     },
     [sessions, onMoveSession],
   );
+
+  // How much of each list is rendered: the unassigned chats, and per project.
+  const [orphanShown, setOrphanShown] = useState(SESSION_STEP);
+  const [projectShown, setProjectShown] = useState<Record<string, number>>({});
+  // At least up to the open chat, so it is in the list.
+  const shownOf = (list: ChatSession[], base: number) =>
+    Math.max(base, list.findIndex((s) => s.id === activeSessionId) + 1);
 
   // Partition sessions by project
   const orphanSessions = sessions.filter((s) => !s.project_id);
@@ -286,6 +299,7 @@ export default function ChatSidebar({
           {projects.map((proj) => {
             const collapsed = collapsedProjects.has(proj.id);
             const projSessions = sessionsByProject.get(proj.id) ?? [];
+            const projShown = shownOf(projSessions, projectShown[proj.id] ?? PROJECT_STEP);
 
             return (
               <DroppableProjectZone
@@ -341,7 +355,7 @@ export default function ChatSidebar({
                 </ListSubheader>
                 <Collapse in={!collapsed}>
                   <List dense disablePadding>
-                    {projSessions.map((s) => (
+                    {projSessions.slice(0, projShown).map((s) => (
                       <DraggableSessionItem
                         key={s.id}
                         session={s}
@@ -355,6 +369,14 @@ export default function ChatSidebar({
                         onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
                       />
                     ))}
+                    {projSessions.length > projShown && (
+                      <ShowMore
+                        remaining={projSessions.length - projShown}
+                        onMore={() =>
+                          setProjectShown((prev) => ({ ...prev, [proj.id]: projShown + PROJECT_STEP }))
+                        }
+                      />
+                    )}
                   </List>
                 </Collapse>
               </DroppableProjectZone>
@@ -366,7 +388,7 @@ export default function ChatSidebar({
             <DroppableProjectZone projectId="__no_project__" isOver={false}>
               {projects.length > 0 && <Divider sx={{ my: 0.5 }} />}
               <List dense disablePadding>
-                {orphanSessions.map((s) => (
+                {orphanSessions.slice(0, shownOf(orphanSessions, orphanShown)).map((s) => (
                   <DraggableSessionItem
                     key={s.id}
                     session={s}
@@ -378,6 +400,13 @@ export default function ChatSidebar({
                     onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
                   />
                 ))}
+                {orphanSessions.length > shownOf(orphanSessions, orphanShown) && (
+                  <ShowMore
+                    auto
+                    remaining={orphanSessions.length - shownOf(orphanSessions, orphanShown)}
+                    onMore={() => setOrphanShown(shownOf(orphanSessions, orphanShown) + SESSION_STEP)}
+                  />
+                )}
               </List>
             </DroppableProjectZone>
           )}
@@ -540,6 +569,51 @@ export default function ChatSidebar({
     >
       {drawerContent}
     </Drawer>
+  );
+}
+
+// ── ShowMore (internal) ──────────────────────────────────────────
+
+/**
+ * Renders the next part of a long list. With ``auto`` it does so on its own
+ * when scrolled into view; it is a button either way (keyboard, and where
+ * IntersectionObserver is missing).
+ */
+function ShowMore({
+  remaining,
+  onMore,
+  auto = false,
+}: {
+  remaining: number;
+  onMore: () => void;
+  auto?: boolean;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const onMoreRef = useRef(onMore);
+  onMoreRef.current = onMore;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!auto || !el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) onMoreRef.current();
+      },
+      // A screen ahead, so the list has grown before the user gets there.
+      { rootMargin: "0px 0px 400px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [auto]);
+
+  return (
+    <ListItemButton ref={ref} onClick={onMore} sx={{ pl: 1.5, minHeight: 40 }}>
+      <ListItemText
+        primary={t("chat.show_more", { remaining, defaultValue: "Show more ({{remaining}})" })}
+        primaryTypographyProps={{ fontSize: "0.8rem", color: "text.secondary" }}
+      />
+    </ListItemButton>
   );
 }
 
