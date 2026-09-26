@@ -658,7 +658,15 @@
     "search_placeholder": "Rechercher nom, image, état…",
     "failed_load": "Échec du chargement des conteneurs.",
     "confirm_delete": "Supprimer ce conteneur ?",
-    "endpoint": "Point d'accès"
+    "endpoint": "Point d'accès",
+    "subtitle": "Tout ce que Docker exécute sur ce serveur",
+    "stats_label": "Conteneurs par état — en choisir un pour ne lister que ceux-là",
+    "stat_running": "En marche",
+    "stat_running_detail": "sur {{total}}",
+    "stat_not_running": "Arrêtés",
+    "stat_unhealthy": "En échec",
+    "stat_unhealthy_detail": "Le contrôle de santé échoue",
+    "stat_restarting": "Redémarrent"
   },
   "create_container": {
     "title": "Créer un conteneur",

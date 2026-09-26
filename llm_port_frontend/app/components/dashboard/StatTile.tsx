@@ -7,8 +7,9 @@
  * - A gap is never a zero: no value is "–", dimmed, with the reason on hover.
  * - Loading is not absence: a skeleton until the first answer.
  */
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
@@ -44,6 +45,10 @@ export interface StatTileProps {
    * small-caps label, for a strip of secondary figures (p50, p95, …).
    */
   variant?: "kpi" | "compact";
+  /** Makes the tile a toggle: a filter over the list below it. */
+  onClick?: () => void;
+  /** The toggle is on. */
+  selected?: boolean;
 }
 
 /** One line where there is room; on a phone's half-width tile, wrap rather than cut words. */
@@ -71,6 +76,8 @@ export default function StatTile({
   emptyHint,
   emptyText = "–",
   variant = "kpi",
+  onClick,
+  selected = false,
 }: StatTileProps) {
   const theme = useTheme();
   const hasValue = value !== null;
@@ -85,11 +92,32 @@ export default function StatTile({
             ? theme.palette.dashboard.health.ok
             : "text.primary";
   const shown = loading && !hasValue ? null : (value ?? emptyText);
+  const surface = {
+    ...SURFACE,
+    ...(selected ? { borderColor: "primary.main", boxShadow: `inset 0 0 0 1px ${theme.palette.primary.main}` } : {}),
+    // A toggle fills its grid cell, so tiles in a row line up.
+    ...(onClick ? { flex: 1, transition: "border-color 120ms", "&:hover": { borderColor: "primary.main" } } : {}),
+  };
+  // A toggle is a button: keyboard, focus ring, and its state for a screen reader.
+  const clickable = (node: ReactElement): ReactElement =>
+    onClick ? (
+      <ButtonBase
+        onClick={onClick}
+        aria-pressed={selected}
+        focusRipple
+        sx={{ display: "flex", alignItems: "stretch", width: "100%", height: "100%", textAlign: "left", borderRadius: 1 }}
+      >
+        {node}
+      </ButtonBase>
+    ) : (
+      node
+    );
 
   if (variant === "compact") {
     return (
       <Tooltip title={!hasValue && !loading ? (emptyHint ?? "") : ""}>
-        <Box sx={{ ...SURFACE, px: 1.25, py: 1 }}>
+        {clickable(
+        <Box sx={{ ...surface, px: 1.25, py: 1 }}>
           {shown === null ? (
             <Skeleton width={48} height={24} />
           ) : (
@@ -102,14 +130,16 @@ export default function StatTile({
           >
             {label}
           </Typography>
-        </Box>
+        </Box>,
+        )}
       </Tooltip>
     );
   }
 
   return (
     <Tooltip title={!hasValue && !loading ? (emptyHint ?? "") : ""}>
-      <Box sx={{ ...SURFACE, p: 1.5 }}>
+      {clickable(
+      <Box sx={{ ...surface, p: 1.5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1}>
           <Typography variant="caption" color="text.secondary" sx={FIT}>
             {label}
@@ -132,7 +162,8 @@ export default function StatTile({
             {detail}
           </Typography>
         )}
-      </Box>
+      </Box>,
+      )}
     </Tooltip>
   );
 }

@@ -658,7 +658,15 @@
     "search_placeholder": "Search name, image, state...",
     "failed_load": "Failed to load containers.",
     "confirm_delete": "Delete this container?",
-    "endpoint": "Endpoint"
+    "endpoint": "Endpoint",
+    "subtitle": "Everything Docker runs on this server",
+    "stats_label": "Containers by state — select one to list only those",
+    "stat_running": "Running",
+    "stat_running_detail": "of {{total}}",
+    "stat_not_running": "Not running",
+    "stat_unhealthy": "Unhealthy",
+    "stat_unhealthy_detail": "Health check failing",
+    "stat_restarting": "Restarting"
   },
   "create_container": {
     "title": "Create Container",

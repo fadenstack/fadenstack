@@ -1,6 +1,12 @@
 /**
  * Admin → Containers list page.
  * Powered by the shared DataTable with search, sort, and class filtering.
+ *
+ * Above the list, the dashboard's tiles count containers by state -- running,
+ * not running, unhealthy, restarting -- and each is a filter: click one to
+ * list just those, again to list all. The counts come from the list itself;
+ * no second request. (A strip, not a dashboard page of its own: the page is
+ * for finding a container and acting on it, and the tiles lead there.)
  */
 import { useMemo, useState } from "react";
 import {
@@ -21,7 +27,9 @@ import {
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ClassChip, StateChip } from "~/components/Chips";
 import { useAsyncData } from "~/lib/useAsyncData";
+import { PageHeader, StatGrid, StatTile } from "~/components/dashboard/kit";
 
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
@@ -55,6 +63,17 @@ const CLASS_OPTIONS: { value: string; label: string }[] = [
 /** Classes that cannot be reassigned via the inline dropdown. */
 const LOCKED_CLASSES = new Set<string>(["SYSTEM_CORE"]);
 
+/** What the state tiles filter by. */
+type StateFilter = "running" | "not_running" | "unhealthy" | "restarting";
+
+const STATE_TEST: Record<StateFilter, (c: ContainerSummary) => boolean> = {
+  running: (c) => c.state.toLowerCase() === "running",
+  not_running: (c) => !["running", "restarting"].includes(c.state.toLowerCase()),
+  // Docker says so in the status line: "Up 3 days (unhealthy)".
+  unhealthy: (c) => c.status.toLowerCase().includes("(unhealthy)"),
+  restarting: (c) => c.state.toLowerCase() === "restarting",
+};
+
 export default function ContainersPage() {
   const { t } = useTranslation();
   const { rootModeActive } = useOutletContext<AdminContext>();
@@ -73,6 +92,7 @@ export default function ContainersPage() {
     CLASS_OPTIONS.map((o) => o.value),
   );
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stateFilter, setStateFilter] = useState<StateFilter | null>(null);
 
   async function handleClassChange(
     c: ContainerSummary,
@@ -371,11 +391,41 @@ export default function ContainersPage() {
     return match?.id ?? null;
   }, [data, highlightName]);
 
+  const inClasses = data.filter((c) => filterClasses.includes(c.container_class));
+  const count = (f: StateFilter) => inClasses.filter(STATE_TEST[f]).length;
+  const firstLoad = loading && data.length === 0;
+  const tile = (f: StateFilter, tone: "default" | "warning" | "error", detail?: string) => {
+    const n = count(f);
+    return (
+      <StatTile
+        label={t(`containers.stat_${f}`)}
+        value={firstLoad ? null : String(n)}
+        detail={detail}
+        loading={firstLoad}
+        tone={n > 0 ? tone : "default"}
+        onClick={() => setStateFilter((cur) => (cur === f ? null : f))}
+        selected={stateFilter === f}
+      />
+    );
+  };
+
   return (
+    // The table fills what the tiles leave -- except on a phone, where the
+    // page scrolls instead of squeezing the table into a few rows.
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: { sm: "100%" } }}>
+      <PageHeader title={t("containers.title")} subtitle={t("containers.subtitle")} />
+      <Box role="group" aria-label={t("containers.stats_label")}>
+        <StatGrid min={150}>
+          {tile("running", "default", t("containers.stat_running_detail", { total: String(inClasses.length) }))}
+          {tile("not_running", "default")}
+          {tile("unhealthy", "error", t("containers.stat_unhealthy_detail"))}
+          {tile("restarting", "warning")}
+        </StatGrid>
+      </Box>
+      <Box sx={{ flex: { sm: 1 }, minHeight: { sm: 0 } }}>
     <DataTable
-      title={t("containers.title")}
       columns={columns}
-      rows={data.filter((c) => filterClasses.includes(c.container_class))}
+      rows={stateFilter ? inClasses.filter(STATE_TEST[stateFilter]) : inClasses}
       rowKey={(c) => c.id}
       loading={loading}
       error={error}
@@ -406,5 +456,7 @@ export default function ContainersPage() {
         },
       ]}
     />
+      </Box>
+    </Box>
   );
 }

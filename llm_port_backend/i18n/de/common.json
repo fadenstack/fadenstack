@@ -663,7 +663,15 @@
     "search_placeholder": "Nach Name, Image, Status suchen...",
     "failed_load": "Container konnten nicht geladen werden.",
     "confirm_delete": "Diesen Container loeschen?",
-    "endpoint": "Endpunkt"
+    "endpoint": "Endpunkt",
+    "subtitle": "Alles, was Docker auf diesem Server ausführt",
+    "stats_label": "Container nach Zustand — einen wählen, um nur diese zu listen",
+    "stat_running": "Läuft",
+    "stat_running_detail": "von {{total}}",
+    "stat_not_running": "Läuft nicht",
+    "stat_unhealthy": "Fehlerhaft",
+    "stat_unhealthy_detail": "Health-Check schlägt fehl",
+    "stat_restarting": "Startet neu"
   },
   "create_container": {
     "title": "Container erstellen",
