@@ -27,6 +27,21 @@ export function fmtShare(value: number | null | undefined, lang?: string, digits
   }).format(value);
 }
 
+/**
+ * A relative change for a trend badge: 0.123 -> "+12.3 %", 1.936 -> "+194 %".
+ * From ten times the baseline on it is a factor, 617.5 -> "618×": a
+ * five-digit percentage says nothing more and crowds the tile.
+ */
+export function fmtChange(delta: number, lang?: string): string {
+  const ratio = delta + 1;
+  if (ratio >= 10) {
+    return `${new Intl.NumberFormat(lang, { maximumFractionDigits: ratio >= 100 ? 0 : 1 }).format(ratio)}×`;
+  }
+  const pct = Math.abs(delta) * 100;
+  const num = new Intl.NumberFormat(lang, { maximumFractionDigits: pct >= 100 ? 0 : 1 }).format(pct);
+  return `${delta >= 0 ? "+" : "−"}${num} %`;
+}
+
 /** 14812 -> "14.8K" (or the language's own compact form). */
 export function fmtCompact(value: number | null | undefined, lang?: string): string {
   if (value == null) return "–";

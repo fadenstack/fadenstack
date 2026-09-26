@@ -23,7 +23,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import type { KpiItem, Money } from "~/api/dashboard";
 import { KPI_IDS, MAX_KPIS, type KpiId } from "~/lib/dashboardLayoutModel";
 import { TOUCH_TARGET } from "../DashboardGrid";
-import { fmtCompact, fmtMoney, fmtMs, fmtShare } from "../format";
+import { fmtChange, fmtCompact, fmtMoney, fmtMs, fmtShare } from "../format";
 import { useKpis } from "../queries";
 import type { WidgetProps } from "../types";
 import WidgetCard, { WidgetEmpty } from "../WidgetCard";
@@ -178,7 +178,7 @@ function trendOf(item: KpiItem, meta: KpiMeta, lang: string): Omit<TrendInfo, "b
     const [a, b] = [Number(now[0].amount), Number(before[0].amount)];
     if (!b) return null;
     delta = (a - b) / b;
-    text = fmtSignedPct(delta, lang);
+    text = fmtChange(delta, lang);
   } else {
     const a = item.value as number | null;
     const b = item.previous as number | null;
@@ -189,7 +189,7 @@ function trendOf(item: KpiItem, meta: KpiMeta, lang: string): Omit<TrendInfo, "b
     } else {
       if (!b) return null; // no baseline yet
       delta = (a - b) / b;
-      text = fmtSignedPct(delta, lang);
+      text = fmtChange(delta, lang);
     }
   }
   const flat = Math.abs(delta) < 0.005;
@@ -201,11 +201,6 @@ function trendOf(item: KpiItem, meta: KpiMeta, lang: string): Omit<TrendInfo, "b
         ? "good"
         : "bad";
   return { text, direction, tone };
-}
-
-function fmtSignedPct(delta: number, lang: string): string {
-  const pct = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(Math.abs(delta) * 100);
-  return `${delta >= 0 ? "+" : "−"}${pct} %`;
 }
 
 

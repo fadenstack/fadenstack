@@ -58,6 +58,9 @@ const FIT = {
   whiteSpace: { xs: "normal", sm: "nowrap" },
 } as const;
 
+/** A key-metric tile directly in a StatGrid shares its rows with the tiles beside it. */
+const TILE_CLASS = "stat-tile";
+
 const SURFACE = {
   borderRadius: 1,
   border: 1,
@@ -139,9 +142,11 @@ export default function StatTile({
   return (
     <Tooltip title={!hasValue && !loading ? (emptyHint ?? "") : ""}>
       {clickable(
-      <Box sx={{ ...surface, p: 1.5 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1}>
-          <Typography variant="caption" color="text.secondary" sx={FIT}>
+      <Box className={onClick ? undefined : TILE_CLASS} sx={{ ...surface, p: 1.5 }}>
+        {/* The label and the trend share a line where both fit; on a narrow
+            tile the trend wraps under the label rather than squeezing it. */}
+        <Stack direction="row" flexWrap="wrap" justifyContent="space-between" alignItems="baseline" alignContent="flex-start" columnGap={1}>
+          <Typography variant="caption" color="text.secondary" sx={{ ...FIT, flex: "1 1 auto" }}>
             {label}
           </Typography>
           {trend && <TrendBadge {...trend} />}
@@ -204,6 +209,9 @@ export function StatGrid({ children, min = 170, gap = 1.5 }: { children: ReactNo
         gap,
         gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: `repeat(auto-fit, minmax(${min}px, 1fr))` },
         "& > :last-of-type:nth-of-type(odd)": { gridColumn: { xs: "span 2", sm: "auto" } },
+        // Label block, value and detail are rows shared across the grid row, so
+        // the values line up when one tile's label or trend takes a second line.
+        [`& > .${TILE_CLASS}`]: { display: "grid", gridRow: "span 3", gridTemplateRows: "subgrid", rowGap: 0, alignContent: "start" },
       }}
     >
       {children}
