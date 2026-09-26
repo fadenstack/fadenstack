@@ -6,7 +6,7 @@ small service your models call. They do not manage the GPU machines; their
 runtimes are deployments (see [Deploying models](model-marketplace.md)).
 
 Everything below was taken on the test install (Ubuntu VM, `ray` at `a9d1714`,
-2026-09-26).
+2026-09-26; the create form and editing at `1892550`).
 
 ---
 
@@ -141,8 +141,12 @@ container was created with: its image, command, environment, ports, volumes,
 network and class. What its image supplies (the image's own environment
 variables, its default command) is not shown; a new image brings its own.
 
+![Editing docs-demo: its greeting changed](images/containers/12-edit-form.png)
+
 Docker cannot change these settings in a container that exists, so **Save and
 replace** replaces it, after a confirmation:
+
+![Replace docs-demo?](images/containers/13-edit-confirm.png)
 
 - a new container is made with the settings, and joins the same networks
   under the same names (other containers keep reaching it by name);
@@ -153,6 +157,8 @@ replace** replaces it, after a confirmation:
 - if the new one cannot be made or started (an image that is not on the
   server, a host port in use), the old one is put back as it was, under its
   name, running if it ran, and the page says why.
+
+![The replaced container: same name, a new ID](images/containers/14-edited.png)
 
 Class, policy and scope move to the new container. A container with a
 **locked** policy cannot be edited.

@@ -27,7 +27,10 @@ the Containers pages ([Containers](containers.md) has the whole flow). For
 ![The MCP server's container](images/mcp/01-server-container.png)
 
 A container named `mcp-...` is classified `MCP`; see
-[Classes](containers.md#classes) for what that allows.
+[Classes](containers.md#classes) for what that allows. To change it later -- a
+variable, a newer image -- edit the container
+([Editing a container](containers.md#editing-a-container)); the MCP service
+connects to the new one by itself within seconds.
 
 ---
 
