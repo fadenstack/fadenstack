@@ -1181,7 +1181,10 @@ async def _seed_rbac(app: FastAPI) -> None:
 
 
 # Core default PII policy (matches the modularization spec):
-# - All 12 built-in entity types, score threshold 0.35, English
+# - 11 of the 12 built-in entity types, score threshold 0.35, English. Not
+#   DATE_TIME: spaCy tags plain numbers as dates -- "add 17 and 25, then tell
+#   me the result" went to the model as "add 17 and <DATE_TIME>" (2026-09-26).
+#   It stays selectable for a tenant that needs dates of birth covered.
 # - Redaction mode (irreversible but safe — Core tier)
 # - Egress scanning enabled for cloud providers only
 # - Fail action: block (safe-by-default)
@@ -1209,7 +1212,6 @@ _CORE_DEFAULT_PII_POLICY: dict = {
             "IP_ADDRESS",
             "US_SSN",
             "LOCATION",
-            "DATE_TIME",
             "NRP",
             "MEDICAL_LICENSE",
             "URL",
@@ -1236,7 +1238,7 @@ async def _seed_default_settings(app: FastAPI) -> None:
                 updated_by=None,
             )
             await session.commit()
-            log.info("Seeded default PII policy (Core: redact, 12 entity types, threshold 0.35)")
+            log.info("Seeded default PII policy (Core: redact, 11 entity types, threshold 0.35)")
         else:
             log.debug("Default PII policy already configured; skipping seed.")
 
