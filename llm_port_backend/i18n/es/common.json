@@ -992,7 +992,14 @@
     "model_names_placeholder": "Escriba para buscar modelos registrados...",
     "provider_names_placeholder": "Escriba para buscar proveedores...",
     "chart_cost": "Coste ($)",
-    "chart_latency": "Latencia (ms)"
+    "chart_latency": "Latencia (ms)",
+    "subtitle": "Coste, uso y velocidad de las solicitudes que atendió el gateway",
+    "summary": "Resumen",
+    "range_label": "Periodo",
+    "tokens_split": "{{prompt}} prompt · {{completion}} respuesta",
+    "latency_total": "Latencia total",
+    "latency_ttft": "Tiempo hasta el primer token",
+    "top_user_value": "{{requests}} sol. · {{cost}}"
   },
   "llm_providers": {
     "title": "LLM Providers",

@@ -2,6 +2,7 @@
  * Observability Dashboard — cost, usage, and performance overview.
  *
  * Tabs: Overview (charts + summary), Requests (paginated log), Pricing (editor).
+ * The overview is built from the dashboard's kit (components/dashboard/kit).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,25 +18,28 @@ import {
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import Chip from "@mui/material/Chip";
-import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
-import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
-import StatCard from "~/components/dashboard/StatCard";
-import { LineChart } from "@mui/x-charts/LineChart";
-import { BarChart } from "@mui/x-charts/BarChart";
+import {
+  FULL_ROW,
+  PageHeader,
+  PanelGrid,
+  RangeToggle,
+  RankedBars,
+  StatGrid,
+  StatTile,
+  TimeSeriesChart,
+  WidgetCard,
+  WidgetEmpty,
+} from "~/components/dashboard/kit";
 
 import RequestsTab from "./RequestsTab";
 import PricingTab from "./PricingTab";
@@ -79,7 +83,7 @@ const RANGES: Record<RangeKey, number> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ObservabilityPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const [tab, setTab] = useState(0);
   const [range, setRange] = useState<RangeKey>("7d");
@@ -139,314 +143,214 @@ export default function ObservabilityPage() {
   }, [loadOverview]);
 
   // ── Overview tab ─────────────────────────────────────────────────
+  // Built from the dashboard's kit, so it reads like the dashboard: a summary
+  // of tiles, charts in the same style, rankings as bars.
+
+  const lang = i18n.language;
+  const hourly = RANGES[range] <= 7;
+  const bucketFormat = new Intl.DateTimeFormat(
+    lang,
+    hourly ? { weekday: "short", hour: "2-digit" } : { day: "numeric", month: "short" },
+  );
+  const usdCompact = new Intl.NumberFormat(lang, {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumSignificantDigits: 2,
+  });
+  const errorRate = perf?.error_rate ?? null;
+  const errorTone = errorRate == null ? "default" : errorRate > 0.05 ? "error" : errorRate > 0.01 ? "warning" : "default";
+  const models = (summary?.by_model ?? []).slice(0, 10);
+  const topModelCost = Math.max(0, ...models.map((m) => Number(m.estimated_total_cost) || 0));
+  const users = (summary?.top_users ?? []).slice(0, 10);
+  const topUserRequests = Math.max(0, ...users.map((u) => u.total_requests));
+  const seriesStatus = { loading: seriesLoading, hasData: timeseries.length > 0 };
+  const noSeries = !seriesLoading && timeseries.length === 0
+    ? <WidgetEmpty message={t("observability.no_data")} />
+    : undefined;
 
   const overviewContent = (
-    <>
-      {/* Summary cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          {summaryLoading ? (
-            <Skeleton variant="rounded" height={100} />
-          ) : (
-            <StatCard
-              label={t("observability.estimated_spend")}
-              value={fmtCost(summary?.estimated_total_cost)}
-            />
-          )}
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          {summaryLoading ? (
-            <Skeleton variant="rounded" height={100} />
-          ) : (
-            <StatCard
-              label={t("observability.total_requests")}
-              value={fmtNum(summary?.total_requests)}
-            />
-          )}
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          {summaryLoading ? (
-            <Skeleton variant="rounded" height={100} />
-          ) : (
-            <StatCard
+    <PanelGrid>
+      <Box sx={FULL_ROW}>
+        <WidgetCard
+          title={t("observability.summary")}
+          status={{ loading: summaryLoading && !summary, hasData: Boolean(summary) }}
+          skeleton={
+            <StatGrid>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} variant="rounded" height={96} />
+              ))}
+            </StatGrid>
+          }
+        >
+          <StatGrid>
+            <StatTile label={t("observability.estimated_spend")} value={fmtCost(summary?.estimated_total_cost)} />
+            <StatTile label={t("observability.total_requests")} value={fmtNum(summary?.total_requests)} />
+            <StatTile
               label={t("observability.total_tokens")}
               value={fmtNum(summary?.total_tokens)}
+              detail={
+                summary
+                  ? t("observability.tokens_split", {
+                      prompt: fmtNum(summary.total_prompt_tokens),
+                      completion: fmtNum(summary.total_completion_tokens),
+                    })
+                  : undefined
+              }
             />
-          )}
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          {summaryLoading ? (
-            <Skeleton variant="rounded" height={100} />
-          ) : (
-            <StatCard
-              label={t("observability.avg_latency")}
-              value={fmtMs(perf?.avg_latency_ms)}
-            />
-          )}
-        </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
-          {summaryLoading ? (
-            <Skeleton variant="rounded" height={100} />
-          ) : (
-            <StatCard
-              label={t("observability.error_rate")}
-              value={fmtPct(perf?.error_rate)}
-            />
-          )}
-        </Grid>
-      </Grid>
+            <StatTile label={t("observability.avg_latency")} value={perf ? fmtMs(perf.avg_latency_ms) : null} loading={perfLoading} />
+            <StatTile label={t("observability.error_rate")} value={perf ? fmtPct(errorRate) : null} tone={errorTone} loading={perfLoading} />
+          </StatGrid>
+        </WidgetCard>
+      </Box>
 
-      {/* Charts */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Cost over time */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle2" gutterBottom>
-                {t("observability.cost_over_time")}
-              </Typography>
-              {seriesLoading ? (
-                <Skeleton variant="rounded" height={250} />
-              ) : timeseries.length === 0 ? (
-                <Typography
-                  color="text.secondary"
-                  sx={{ py: 8, textAlign: "center" }}
-                >
-                  {t("observability.no_data")}
-                </Typography>
-              ) : (
-                <LineChart
-                  height={250}
-                  xAxis={[
-                    {
-                      data: timeseries.map((b) => new Date(b.bucket)),
-                      scaleType: "time",
-                    },
-                  ]}
-                  series={[
-                    {
-                      data: timeseries.map(
-                        (b) => Number(b.estimated_total_cost) || 0,
-                      ),
-                      label: t("observability.chart_cost"),
-                      color: theme.palette.primary.main,
-                      area: true,
-                    },
-                  ]}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+      <WidgetCard title={t("observability.cost_over_time")} status={seriesStatus} empty={noSeries}>
+        <TimeSeriesChart
+          x={timeseries.map((b) => new Date(b.bucket))}
+          xFormat={(v) => bucketFormat.format(new Date(v))}
+          series={[
+            {
+              id: "cost",
+              label: t("observability.chart_cost"),
+              data: timeseries.map((b) => Number(b.estimated_total_cost) || 0),
+              color: theme.palette.primary.main,
+            },
+          ]}
+          yFormat={(v) => usdCompact.format(v)}
+          yWidth={56}
+          ariaLabel={t("observability.cost_over_time")}
+          height={220}
+        />
+      </WidgetCard>
 
-        {/* Request throughput */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle2" gutterBottom>
-                {t("observability.request_throughput")}
-              </Typography>
-              {seriesLoading ? (
-                <Skeleton variant="rounded" height={250} />
-              ) : timeseries.length === 0 ? (
-                <Typography
-                  color="text.secondary"
-                  sx={{ py: 8, textAlign: "center" }}
-                >
-                  {t("observability.no_data")}
-                </Typography>
-              ) : (
-                <LineChart
-                  height={250}
-                  xAxis={[
-                    {
-                      data: timeseries.map((b) => new Date(b.bucket)),
-                      scaleType: "time",
-                    },
-                  ]}
-                  series={[
-                    {
-                      data: timeseries.map((b) => b.total_requests),
-                      label: t("inference.detail.traffic_requests"),
-                      color: theme.palette.secondary.main,
-                    },
-                  ]}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+      <WidgetCard title={t("observability.request_throughput")} status={seriesStatus} empty={noSeries}>
+        <TimeSeriesChart
+          x={timeseries.map((b) => new Date(b.bucket))}
+          xFormat={(v) => bucketFormat.format(new Date(v))}
+          series={[
+            {
+              id: "requests",
+              label: t("observability.col_requests"),
+              data: timeseries.map((b) => b.total_requests),
+              color: theme.palette.dashboard.residency.machines,
+            },
+            {
+              id: "errors",
+              label: t("observability.error"),
+              data: timeseries.map((b) => b.error_count),
+              color: theme.palette.dashboard.health.error,
+              area: false,
+            },
+          ]}
+          ariaLabel={t("observability.request_throughput")}
+          height={220}
+        />
+      </WidgetCard>
 
-        {/* Latency percentiles */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle2" gutterBottom>
-                {t("observability.latency_percentiles")}
-              </Typography>
-              {perfLoading || !perf ? (
-                <Skeleton variant="rounded" height={200} />
-              ) : (
-                <BarChart
-                  height={200}
-                  xAxis={[{ data: ["p50", "p95", "p99"], scaleType: "band" }]}
-                  series={[
-                    {
-                      data: [
-                        perf.p50_latency_ms ?? 0,
-                        perf.p95_latency_ms ?? 0,
-                        perf.p99_latency_ms ?? 0,
-                      ],
-                      label: t("observability.chart_latency"),
-                      color: theme.palette.warning.main,
-                    },
-                  ]}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Spend by model */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle2" gutterBottom>
-                {t("observability.spend_by_model")}
-              </Typography>
-              {summaryLoading || !summary ? (
-                <Skeleton variant="rounded" height={200} />
-              ) : summary.by_model.length === 0 ? (
-                <Typography
-                  color="text.secondary"
-                  sx={{ py: 6, textAlign: "center" }}
-                >
-                  {t("observability.no_data_short")}
-                </Typography>
-              ) : (
-                <BarChart
-                  height={200}
-                  xAxis={[
-                    {
-                      data: summary.by_model
-                        .slice(0, 10)
-                        .map((m) => m.model_alias),
-                      scaleType: "band",
-                    },
-                  ]}
-                  series={[
-                    {
-                      data: summary.by_model
-                        .slice(0, 10)
-                        .map((m) => Number(m.estimated_total_cost) || 0),
-                      label: t("observability.chart_cost"),
-                      color: theme.palette.info.main,
-                    },
-                  ]}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Top users table */}
-      {summary && summary.top_users.length > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="subtitle2" gutterBottom>
-              {t("observability.top_users")}
+      <WidgetCard
+        title={t("observability.latency_percentiles")}
+        status={{ loading: perfLoading && !perf, hasData: Boolean(perf) }}
+      >
+        <Stack gap={1.5}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+              {t("observability.latency_total")}
             </Typography>
-            <Box sx={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", padding: 8 }}>
-                      {t("observability.col_user")}
-                    </th>
-                    <th style={{ textAlign: "right", padding: 8 }}>
-                      {t("observability.col_requests")}
-                    </th>
-                    <th style={{ textAlign: "right", padding: 8 }}>
-                      {t("observability.col_tokens")}
-                    </th>
-                    <th style={{ textAlign: "right", padding: 8 }}>
-                      {t("observability.col_est_cost")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.top_users.slice(0, 10).map((u) => (
-                    <tr key={u.user_id}>
-                      <td style={{ padding: 8 }}>{u.user_id}</td>
-                      <td style={{ textAlign: "right", padding: 8 }}>
-                        {fmtNum(u.total_requests)}
-                      </td>
-                      <td style={{ textAlign: "right", padding: 8 }}>
-                        {fmtNum(u.total_tokens)}
-                      </td>
-                      <td style={{ textAlign: "right", padding: 8 }}>
-                        {fmtCost(u.estimated_total_cost)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Box>
-          </CardContent>
-        </Card>
+            <StatGrid min={90} gap={1}>
+              <StatTile variant="compact" label="p50" value={perf ? fmtMs(perf.p50_latency_ms) : null} />
+              <StatTile variant="compact" label="p95" value={perf ? fmtMs(perf.p95_latency_ms) : null} />
+              <StatTile variant="compact" label="p99" value={perf ? fmtMs(perf.p99_latency_ms) : null} />
+            </StatGrid>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+              {t("observability.latency_ttft")}
+            </Typography>
+            <StatGrid min={90} gap={1}>
+              <StatTile variant="compact" label="p50" value={perf ? fmtMs(perf.p50_ttft_ms) : null} />
+              <StatTile variant="compact" label="p95" value={perf ? fmtMs(perf.p95_ttft_ms) : null} />
+              <StatTile variant="compact" label="p99" value={perf ? fmtMs(perf.p99_ttft_ms) : null} />
+            </StatGrid>
+          </Box>
+        </Stack>
+      </WidgetCard>
+
+      <WidgetCard
+        title={t("observability.spend_by_model")}
+        status={{ loading: summaryLoading && !summary, hasData: Boolean(summary) }}
+        empty={summary && models.length === 0 ? <WidgetEmpty message={t("observability.no_data_short")} /> : undefined}
+      >
+        <RankedBars
+          items={models.map((m) => {
+            const cost = Number(m.estimated_total_cost) || 0;
+            return {
+              key: m.model_alias,
+              label: m.model_alias,
+              share: topModelCost ? cost / topModelCost : 0,
+              valueLabel: fmtCost(cost),
+            };
+          })}
+          barWidth={96}
+        />
+      </WidgetCard>
+
+      {users.length > 0 && (
+        <Box sx={FULL_ROW}>
+          <WidgetCard title={t("observability.top_users")}>
+            <RankedBars
+              items={users.map((u) => ({
+                key: u.user_id,
+                label: u.user_id,
+                share: topUserRequests ? u.total_requests / topUserRequests : 0,
+                valueLabel: t("observability.top_user_value", {
+                  requests: fmtNum(u.total_requests),
+                  cost: fmtCost(u.estimated_total_cost),
+                }),
+                color: theme.palette.dashboard.residency.private,
+              }))}
+              barWidth={160}
+            />
+          </WidgetCard>
+        </Box>
       )}
-    </>
+    </PanelGrid>
   );
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      {/* Header */}
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: 2 }}
-      >
-        <Typography variant="h5">{t("observability.title")}</Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {/* Range selector */}
-          {(Object.keys(RANGES) as RangeKey[]).map((k) => (
-            <Chip
-              key={k}
-              label={k}
-              size="small"
-              variant={range === k ? "filled" : "outlined"}
-              color={range === k ? "primary" : "default"}
-              onClick={() => setRange(k)}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 2 }}>
+      <PageHeader
+        title={t("observability.title")}
+        subtitle={t("observability.subtitle")}
+        actions={
+          <>
+            <RangeToggle
+              value={range}
+              options={(Object.keys(RANGES) as RangeKey[]).map((k) => ({ value: k, label: k }))}
+              onChange={setRange}
+              ariaLabel={t("observability.range_label")}
             />
-          ))}
-          <Tooltip title={t("observability.refresh")}>
-            <IconButton onClick={loadOverview} size="small">
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={t("observability.export_csv")}>
-            <IconButton
-              size="small"
-              component="a"
-              href={observability.exportCsvUrl(start, end)}
-              target="_blank"
-            >
-              <DownloadIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
+            <Tooltip title={t("observability.refresh")}>
+              <IconButton onClick={loadOverview} aria-label={t("observability.refresh")}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={t("observability.export_csv")}>
+              <IconButton
+                component="a"
+                href={observability.exportCsvUrl(start, end)}
+                target="_blank"
+                aria-label={t("observability.export_csv")}
+              >
+                <DownloadIcon />
+              </IconButton>
+            </Tooltip>
+          </>
+        }
+      />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error">{error}</Alert>}
 
-      {/* Tabs */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons={false}>
         <Tab label={t("observability.tab_overview")} />
         <Tab label={t("observability.tab_requests")} />
         <Tab label={t("observability.tab_pricing")} />

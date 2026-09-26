@@ -992,7 +992,14 @@
     "model_names_placeholder": "输入以搜索已注册的模型...",
     "provider_names_placeholder": "输入以搜索提供商...",
     "chart_cost": "成本（$）",
-    "chart_latency": "延迟（毫秒）"
+    "chart_latency": "延迟（毫秒）",
+    "subtitle": "网关所处理请求的成本、用量和速度",
+    "summary": "概览",
+    "range_label": "时间范围",
+    "tokens_split": "{{prompt}} 提示 · {{completion}} 回复",
+    "latency_total": "总延迟",
+    "latency_ttft": "首个令牌时间",
+    "top_user_value": "{{requests}} 次请求 · {{cost}}"
   },
   "llm_providers": {
     "title": "LLM 提供商",

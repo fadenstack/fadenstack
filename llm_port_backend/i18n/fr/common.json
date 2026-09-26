@@ -987,7 +987,14 @@
     "model_names_placeholder": "Tapez pour rechercher les modèles enregistrés...",
     "provider_names_placeholder": "Tapez pour rechercher les fournisseurs...",
     "chart_cost": "Coût ($)",
-    "chart_latency": "Latence (ms)"
+    "chart_latency": "Latence (ms)",
+    "subtitle": "Coût, usage et rapidité des requêtes servies par la passerelle",
+    "summary": "Résumé",
+    "range_label": "Période",
+    "tokens_split": "{{prompt}} prompt · {{completion}} réponse",
+    "latency_total": "Latence totale",
+    "latency_ttft": "Délai avant le premier jeton",
+    "top_user_value": "{{requests}} req. · {{cost}}"
   },
   "llm_providers": {
     "title": "Fournisseurs LLM",

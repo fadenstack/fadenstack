@@ -35,6 +35,8 @@ export interface TimeSeriesChartProps {
   /** A short description of the chart for screen readers. */
   ariaLabel: string;
   yFormat?: (value: number) => string;
+  /** Room for the y axis labels (px); widen it for currency. */
+  yWidth?: number;
   /** The legend of dots above (default: when there is more than one series). */
   legend?: boolean;
   /** Fixed height; default 190 (160 on a phone). The least height when filling. */
@@ -49,6 +51,7 @@ export default function TimeSeriesChart({
   stacked = false,
   ariaLabel,
   yFormat,
+  yWidth = 40,
   legend,
   height,
   fill = false,
@@ -95,7 +98,7 @@ export default function TimeSeriesChart({
               tickInterval: (_v: string | Date, index: number) => !everyOther || index % 2 === 0,
             },
           ]}
-          yAxis={[{ width: 40, valueFormatter: (v: number) => (yFormat ? yFormat(v) : compact.format(v)) }]}
+          yAxis={[{ width: yWidth, valueFormatter: (v: number) => (yFormat ? yFormat(v) : compact.format(v)) }]}
           series={series.map((s) => ({
             id: s.id,
             label: s.label,
