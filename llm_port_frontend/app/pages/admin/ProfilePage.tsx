@@ -26,10 +26,12 @@ import Typography from "@mui/material/Typography";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
 import LockResetIcon from "@mui/icons-material/LockReset";
+import PaletteIcon from "@mui/icons-material/Palette";
 import PersonIcon from "@mui/icons-material/Person";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
+import AppearanceSettings from "~/components/AppearanceSettings";
 import { adminUsers } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
 
@@ -262,6 +264,19 @@ export default function ProfilePage() {
               </Box>
             </Stack>
           </Box>
+        </CardContent>
+      </Card>
+
+      {/* ── Appearance: the accent and mode, kept in this browser ──── */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardHeader
+          avatar={<PaletteIcon />}
+          title={t("settings.appearance.title")}
+          titleTypographyProps={{ variant: "subtitle1", fontWeight: 600 }}
+        />
+        <Divider />
+        <CardContent>
+          <AppearanceSettings />
         </CardContent>
       </Card>
 

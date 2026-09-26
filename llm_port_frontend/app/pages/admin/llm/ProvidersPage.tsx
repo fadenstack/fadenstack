@@ -194,7 +194,7 @@ export default function ProvidersPage() {
             component={RouterLink}
             to={`/admin/llm/runtimes/${r.runtime.id}`}
             underline="hover"
-            color="primary.light"
+            color="accent.text"
             fontWeight={600}
             sx={{ fontSize: "0.85rem" }}
           >

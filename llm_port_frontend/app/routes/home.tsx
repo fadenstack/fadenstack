@@ -5,11 +5,14 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import { useTranslation } from "react-i18next";
+import AppBrand from "~/components/AppBrand";
+import BrandMark from "~/components/BrandMark";
+import { APP_BRANDING } from "~/branding";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "llm-port" },
-    { name: "description", content: "llm-port container management console" },
+    { title: APP_BRANDING.name },
+    { name: "description", content: "The self-hosted LLM control plane" },
   ];
 }
 
@@ -26,15 +29,10 @@ export default function Home() {
       }}
     >
       <Stack alignItems="center" spacing={3} sx={{ p: 4 }}>
-        <Box
-          component="img"
-          src="/icon_color.png"
-          alt="llm-port"
-          sx={{ width: 96, height: 96, objectFit: "contain" }}
-        />
-        <Typography variant="h4" color="text.primary">
-          {t("app.title")}
-        </Typography>
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <BrandMark size={88} title={APP_BRANDING.name} />
+          <AppBrand size={44} subtitle={t("app.subtitle")} />
+        </Stack>
         <Typography
           variant="body1"
           color="text.secondary"

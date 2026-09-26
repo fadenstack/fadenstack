@@ -157,7 +157,7 @@
     },
     "dashboard": {
       "title": "Tableau de bord",
-      "description": "Vue d'ensemble centrale du déploiement llm.port. État du système, conteneurs, utilisation des ressources et métriques clés.",
+      "description": "Vue d'ensemble centrale du déploiement Fadenstack. État du système, conteneurs, utilisation des ressources et métriques clés.",
       "action_health": "Vérifier l'état du système et la disponibilité",
       "action_containers": "Voir le nombre et l'état des conteneurs",
       "action_metrics": "Surveiller l'utilisation des ressources et les performances"
@@ -486,7 +486,7 @@
       "step4_title": "Choisir la cible",
       "step4_content": "Sélectionnez <strong>Docker — ce serveur</strong> pour exécuter le modèle localement en tant que conteneur.",
       "step5_title": "Créer et déployer",
-      "step5_content": "Cliquez sur <strong>Créer</strong>. llm.port téléchargera l’image du modèle et démarrera le conteneur automatiquement."
+      "step5_content": "Cliquez sur <strong>Créer</strong>. Fadenstack téléchargera l’image du modèle et démarrera le conteneur automatiquement."
     }
   }
 }

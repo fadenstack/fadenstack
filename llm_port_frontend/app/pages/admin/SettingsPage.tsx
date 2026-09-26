@@ -26,19 +26,21 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SearchIcon from "@mui/icons-material/Search";
 
+import AppearanceSettings from "~/components/AppearanceSettings";
 import ModulesTab from "~/components/ModulesTab";
 import {
   systemSettingsApi,
   type SystemSettingSchemaItem,
 } from "~/api/systemSettings";
 
-type SettingsTab = "general" | "modules";
+type SettingsTab = "general" | "modules" | "appearance";
 
 function getCurrentTab(
   _pathname: string,
   tabQuery: string | null,
 ): SettingsTab {
   if (tabQuery === "modules") return "modules";
+  if (tabQuery === "appearance") return "appearance";
   return "general";
 }
 
@@ -259,6 +261,7 @@ export default function SettingsPage() {
             label={t("settings.modules.title", { defaultValue: "Modules" })}
             value="modules"
           />
+          <Tab label={t("settings.appearance.title")} value="appearance" />
         </Tabs>
       </Box>
 
@@ -496,6 +499,12 @@ export default function SettingsPage() {
         )}
 
         {tab === "modules" && <ModulesTab />}
+
+        {tab === "appearance" && (
+          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 720 }}>
+            <AppearanceSettings />
+          </Paper>
+        )}
       </Box>
     </Box>
   );

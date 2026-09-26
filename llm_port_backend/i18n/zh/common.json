@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "llm-port",
+    "title": "Fadenstack",
     "subtitle": "控制台",
     "check_session": "正在检查会话..."
   },
@@ -82,7 +82,7 @@
     "back_login": "返回登录",
     "email": "邮箱",
     "password": "密码",
-    "login_title": "登录 llm-port",
+    "login_title": "登录 Fadenstack",
     "login_desc": "使用您的账户凭据访问管理仪表板。",
     "or_sso": "或使用SSO登录",
     "sign_in_with": "使用 {{provider}} 登录",
@@ -165,7 +165,7 @@
     "column_source": "来源",
     "job_node_agent": "系统日志",
     "job_ray_serve": "模型服务",
-    "job_docker": "LLM.Port 服务",
+    "job_docker": "Fadenstack 服务",
     "job_node_container": "模型容器",
     "component_ingress": "API 入口",
     "component_server": "模型服务器（{{model}}）",
@@ -715,7 +715,7 @@
     "confirm_title": "替换 {{name}}？",
     "confirm_body": "Docker 无法修改现有容器的这些设置，因此会用这些设置创建一个新容器，并在新容器运行后删除旧容器。容器会获得新的 ID，它写在卷以外的文件将会丢失。如果新容器无法创建或启动，旧容器会恢复原样。",
     "confirm_replace": "替换",
-    "compose_note": "LLM.Port 通过 compose 文件运行此容器：下一次 llmport deploy 或 upgrade 会根据 compose 文件和 .env 重新创建它，不包含这些更改。",
+    "compose_note": "Fadenstack 通过 compose 文件运行此容器：下一次 llmport deploy 或 upgrade 会根据 compose 文件和 .env 重新创建它，不包含这些更改。",
     "backend_note": "后端运行在此容器中，无法替换它。请在 .env 中修改其设置并运行 llmport upgrade。",
     "load_failed": "无法加载容器的设置。"
   },
@@ -826,7 +826,20 @@
       "skills": "技能",
       "data_residency": "数据驻留"
     },
-    "current_value": "（当前：{{value}}）"
+    "current_value": "（当前：{{value}}）",
+    "appearance": {
+      "title": "外观",
+      "accent": "强调色",
+      "accent_hint": "按钮、链接、当前页面和图表的颜色。徽标和状态颜色保持不变。",
+      "accent_nord": "Nord",
+      "accent_nord_detail": "青色，沉静",
+      "accent_aurora": "Aurora",
+      "accent_aurora_detail": "紫色，鲜明",
+      "mode": "主题",
+      "mode_dark": "深色",
+      "mode_light": "浅色",
+      "saved_here": "保存在此浏览器中。"
+    }
   },
   "users": {
     "title": "用户管理",
@@ -1237,7 +1250,7 @@
     "back": "上一步",
     "slides": {
       "welcome": {
-        "title": "欢迎使用 llm.port",
+        "title": "欢迎使用 Fadenstack",
         "description": "您的自托管 AI 平台。管理模型、与 LLM 对话、构建知识库，并在统一控制面板中运维整个 AI 基础设施。"
       },
       "chat": {
@@ -1258,7 +1271,7 @@
       },
       "mcp": {
         "title": "MCP 工具注册中心",
-        "description": "注册任意 MCP 兼容的工具服务器——本地 Sidecar 或远程端点。llm.port 自动发现工具，在每次调用前应用 PII 策略，并将它们整合为统一的受管目录。"
+        "description": "注册任意 MCP 兼容的工具服务器——本地 Sidecar 或远程端点。Fadenstack 自动发现工具，在每次调用前应用 PII 策略，并将它们整合为统一的受管目录。"
       },
       "skills": {
         "title": "技能注册中心",
@@ -1511,7 +1524,7 @@
     },
     "residency_source": {
       "override": "由管理员设置",
-      "managed": "由 LLM.Port 在您的机器上提供",
+      "managed": "由 Fadenstack 在您的机器上提供",
       "cloud_provider": "云 API：{{provider}}",
       "cloud_host": "已知云 API：{{host}}",
       "machine": "已注册机器：{{machine}}",
@@ -1795,7 +1808,7 @@
     "export_zip": "技能文件夹（.zip）",
     "export_md": "仅 SKILL.md",
     "file_script": "脚本，不会运行",
-    "file_script_hint": "保留以便导出到其他智能体。llm.port 从不运行技能中的脚本。",
+    "file_script_hint": "保留以便导出到其他智能体。Fadenstack 从不运行技能中的脚本。",
     "file_size": "{{size}} 字节",
     "files_title": "文件",
     "history_hint": "每次保存都会保留为一个版本。聊天使用已发布的版本；发布较旧的版本即可回滚。",
@@ -2050,7 +2063,7 @@
   },
   "found": {
     "title": "此机器上的 vLLM",
-    "intro": "运行 vLLM 但不是由 LLM.Port 启动的容器。路由后，它会以一个名称位于网关之后；容器本身不会被改动。",
+    "intro": "运行 vLLM 但不是由 Fadenstack 启动的容器。路由后，它会以一个名称位于网关之后；容器本身不会被改动。",
     "none": "未发现 vLLM 容器。机器大约每分钟报告一次其运行内容。",
     "not_reported": "此机器尚未报告其容器。其代理可能早于 0.1.11；重新运行安装命令即可升级。",
     "col_container": "容器",
@@ -2066,11 +2079,11 @@
     "managed_by_compose": "Docker Compose 项目 {{name}}",
     "answers": "以 {{models}} 应答",
     "not_published": "未发布",
-    "route": "通过 LLM.Port 路由",
+    "route": "通过 Fadenstack 路由",
     "routed_as": "已路由为 {{alias}}",
     "release": "停止路由",
     "paused": "容器处于 {{state}} 状态时不路由。",
-    "route_title": "通过 LLM.Port 路由 {{container}}",
+    "route_title": "通过 Fadenstack 路由 {{container}}",
     "route_explain": "此名称的请求会发往当前运行中的容器。机器上的任何内容都不会改变，您可以随时停止路由。",
     "name": "客户端使用的名称",
     "confirm_release": "停止路由 {{alias}}？容器会继续运行。"
@@ -2154,7 +2167,7 @@
   },
   "rag_runtime": {
     "title": "RAG 运行时配置",
-    "description": "嵌入和分块设置由 llm.port core 推送到 llm_port_rag。",
+    "description": "嵌入和分块设置由 Fadenstack core 推送到 llm_port_rag。",
     "failed_load": "无法加载运行时配置。",
     "failed_save": "无法保存运行时配置。",
     "saved": "运行时配置已更新。",
@@ -2298,7 +2311,7 @@
     "next": {
       "no_nodes": {
         "title": "添加第一台机器",
-        "detail": "集群由运行 LLM.Port 代理的机器组成。添加一台即可开始。",
+        "detail": "集群由运行 Fadenstack 代理的机器组成。添加一台即可开始。",
         "action": "添加机器"
       },
       "no_cluster": {
@@ -2450,7 +2463,7 @@
     },
     "found": {
       "title": "在您的机器上运行，但未在此管理",
-      "intro": "这些集群由某台 LLM.Port 服务器启动，但它已不再识别它们：服务器被重建，或从较早的备份恢复。接管一个集群即可重新在此管理，其模型全程持续提供服务。",
+      "intro": "这些集群由某台 Fadenstack 服务器启动，但它已不再识别它们：服务器被重建，或从较早的备份恢复。接管一个集群即可重新在此管理，其模型全程持续提供服务。",
       "looking": "正在查找…",
       "look_again": "重新查找",
       "retry": "重试",
@@ -2461,8 +2474,8 @@
       "checking": "正在与集群核对…",
       "gpus_per_copy": "每个副本的 GPU",
       "copies_running": "{{total}} 个中有 {{running}} 个在运行",
-      "no_models": "它没有运行由 LLM.Port 部署的模型。",
-      "other_apps": "同样在运行、并非由 LLM.Port 部署、将保持原样：{{apps}}。",
+      "no_models": "它没有运行由 Fadenstack 部署的模型。",
+      "other_apps": "同样在运行、并非由 Fadenstack 部署、将保持原样：{{apps}}。",
       "unreadable": "{{name}} 运行着集群运行时，但无法说明其提供的服务：{{error}}",
       "dialog_title": "接管 {{name}} 上的集群",
       "dialog_explain": "集群及其模型将按当前运行状态记录在此，不会重启任何内容。首先会请集群确认本服务器为每个模型部署的配置与正在运行的完全一致。如有差异，则不记录任何内容并告诉您差异所在。",
@@ -3041,7 +3054,7 @@
       "scan_none": "本服务器的模型存储中没有新内容。",
       "add_path": "从路径添加",
       "add_path_title": "从本服务器上的路径添加模型",
-      "add_path_help": "LLM.Port 服务器上存放模型文件（config.json 和权重）的文件夹。文件保留在原处，LLM.Port 永远不会删除它们。",
+      "add_path_help": "Fadenstack 服务器上存放模型文件（config.json 和权重）的文件夹。文件保留在原处，Fadenstack 永远不会删除它们。",
       "path_label": "本服务器上的文件夹",
       "name_label": "名称",
       "added": "已添加 {{name}}。",

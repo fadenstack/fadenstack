@@ -11,6 +11,8 @@ import CardContent from "@mui/material/CardContent";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import AppBrand from "~/components/AppBrand";
+import BrandMark from "~/components/BrandMark";
 
 import { auth } from "~/api/auth";
 
@@ -65,6 +67,10 @@ export default function ResetPasswordPage() {
       <Card sx={{ width: "100%", maxWidth: 460 }}>
         <CardContent sx={{ p: 4 }}>
           <Stack spacing={2.5} component="form" onSubmit={handleSubmit}>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
+              <BrandMark size={48} />
+              <AppBrand size={24} />
+            </Stack>
             <Typography variant="h5" fontWeight={700}>
               {t("auth.reset_password_title")}
             </Typography>

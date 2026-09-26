@@ -39,7 +39,7 @@ const PROFILES: ProfileOption[] = [
     titleDefault: "Private",
     descKey: "profile_select.private.description",
     descDefault:
-      "Run llm.port at home as a local consolidated gateway. Quick provider setup, chat, and optional RAG/PII.",
+      "Run Fadenstack at home as a local consolidated gateway. Quick provider setup, chat, and optional RAG/PII.",
   },
   {
     id: "team",

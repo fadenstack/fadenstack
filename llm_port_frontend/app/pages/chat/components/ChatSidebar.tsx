@@ -1,6 +1,6 @@
 /**
  * ChatSidebar — the chat's navigation, in the admin console's look: the
- * llm.Port brand at the top, a search, then two sections -- Projects (each a
+ * brand at the top, a search, then two sections -- Projects (each a
  * folder of its chats) and Chats (the rest, grouped by when they were last
  * used). Chats move between projects by drag and drop or a menu.
  *
@@ -65,7 +65,8 @@ import {
 import type { ChatSession, ChatProject } from "~/api/chatTypes";
 import AppBrand from "~/components/AppBrand";
 import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
-import { DRAWER_WIDTH_CLOSED, linkButtonSx } from "~/lib/adminConstants";
+import { DRAWER_WIDTH_CLOSED, linkButtonSx, navActiveSx } from "~/lib/adminConstants";
+import BrandMark from "~/components/BrandMark";
 import type { NavHand } from "~/lib/useNavHand";
 import { CHAT_NAV_ID } from "../ChatShellContext";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
@@ -687,15 +688,15 @@ function groupedByDate(list: ChatSession[]): [DateGroup, ChatSession[]][] {
 
 // ── Parts (internal) ─────────────────────────────────────────────
 
-/** The llm.Port logo as a button, as the admin sidebar's. */
+/** The logo as a button, as the admin sidebar's. */
 function LogoButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <IconButton
       onClick={onClick}
       aria-label={label}
-      sx={{ width: 40, height: 40, borderRadius: 1, flexShrink: 0, p: 0.5, "&:hover": { bgcolor: "action.hover" } }}
+      sx={{ width: 40, height: 40, borderRadius: 1, flexShrink: 0, p: 0, "&:hover": { bgcolor: "action.hover" } }}
     >
-      <Box component="img" src="/icon_color.png" alt="" sx={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 1 }} />
+      <BrandMark size={36} />
     </IconButton>
   );
 }
@@ -813,14 +814,7 @@ function SessionItem({ session, secondary, active, onSelect, onDelete, onMoveCli
         pl: 1.5,
         pr: 0.5,
         ...(touch ? { minHeight: 48 } : {}),
-        ...(active
-          ? {
-              bgcolor: "primary.dark",
-              color: "primary.light",
-              "& .MuiListItemIcon-root": { color: "primary.light" },
-              "&:hover": { bgcolor: "primary.dark" },
-            }
-          : {}),
+        ...(active ? { ...navActiveSx, "&:hover": { bgcolor: "accent.navActiveBg" } } : {}),
       }}
     >
       <ListItemIcon sx={{ minWidth: 28, color: "text.secondary" }}>

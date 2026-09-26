@@ -13,15 +13,7 @@ body {
   margin: 0;
 }
 
-body[data-theme="dark"] {
-  --scroll-thumb: rgba(124, 77, 255, 0.25);
-  --scroll-thumb-hover: rgba(124, 77, 255, 0.45);
-}
-
-body[data-theme="light"] {
-  --scroll-thumb: rgba(30, 64, 175, 0.25);
-  --scroll-thumb-hover: rgba(30, 64, 175, 0.42);
-}
+/* --scroll-thumb and --scroll-thumb-hover come from the theme's accent (root.tsx). */
 
 /* ── Modern thin scrollbars ────────────────────────────────────────── */
 
@@ -36,12 +28,12 @@ body[data-theme="light"] {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb, rgba(124, 77, 255, 0.25));
+  background: var(--scroll-thumb, rgba(128, 128, 128, 0.3));
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--scroll-thumb-hover, rgba(124, 77, 255, 0.45));
+  background: var(--scroll-thumb-hover, rgba(128, 128, 128, 0.5));
 }
 
 *::-webkit-scrollbar-corner {
@@ -51,7 +43,7 @@ body[data-theme="light"] {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb, rgba(124, 77, 255, 0.25)) transparent;
+  scrollbar-color: var(--scroll-thumb, rgba(128, 128, 128, 0.3)) transparent;
 }
 
 /* Let MUI handle backgrounds and colors */

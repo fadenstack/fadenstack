@@ -10,7 +10,7 @@
     },
     "containers": {
       "title": "Container",
-      "content": "Verwalten Sie die Docker-Container Ihrer llm.port-Installation. Starten, stoppen und Logs anzeigen."
+      "content": "Verwalten Sie die Docker-Container Ihrer Fadenstack-Installation. Starten, stoppen und Logs anzeigen."
     },
     "llm": {
       "title": "LLM-Anbieter",
@@ -157,7 +157,7 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Ihre zentrale Übersicht der llm.port-Installation. Systemzustand, Container-Status, Ressourcennutzung und Metriken.",
+      "description": "Ihre zentrale Übersicht der Fadenstack-Installation. Systemzustand, Container-Status, Ressourcennutzung und Metriken.",
       "action_health": "Systemzustand und Verfügbarkeit prüfen",
       "action_containers": "Container-Anzahl und Status anzeigen",
       "action_metrics": "Ressourcennutzung und Leistung überwachen"
@@ -486,7 +486,7 @@
       "step4_title": "Ziel auswählen",
       "step4_content": "Wählen Sie <strong>Docker — diesen Server</strong>, um das Modell lokal als Container auszuführen.",
       "step5_title": "Erstellen & Bereitstellen",
-      "step5_content": "Klicken Sie auf <strong>Erstellen</strong>. llm.port wird das Modellimage herunterladen und den Container automatisch starten."
+      "step5_content": "Klicken Sie auf <strong>Erstellen</strong>. Fadenstack wird das Modellimage herunterladen und den Container automatisch starten."
     }
   }
 }

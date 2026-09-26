@@ -3,14 +3,119 @@ import type { PaletteMode } from "@mui/material";
 import { grey } from "@mui/material/colors";
 
 /**
- * Colours the dashboard needs beyond MUI's roles, per mode.
+ * The console's theme: a mode (dark / light) and an accent (Nord / Aurora),
+ * from the Fadenstack tokens (brand/tokens/fadenstack-tokens.json).
  *
- * Each is derived from the palette below, and each passes 3:1 against
- * `background.paper` in its mode (checked 2026-09-26): the light mode takes the
- * darker variant wherever the main one does not (`warning.main` on white is
- * 2.4:1). The load scale is the exception by design -- a lightly used GPU is
- * meant to look faint -- and is always shown with its numbers.
+ * The accent gives `primary`, `secondary`, the residency colours and the
+ * navigation highlight. It never changes the mark (plates and thread are
+ * `palette.brand`), the status colours (`error`, `warning`, `success`,
+ * `dashboard.health`) or the backgrounds.
+ *
+ * Contrast, WCAG 2.x, checked 2026-09-27 for both accents in both modes
+ * (paper: #111827 dark, #FFFFFF light):
+ *
+ *                  main/paper  text on main  nav text  secondary  accent text  residency (machines/private/external/unknown)
+ *   Nord dark        8.14        7.72          4.95      6.52       10.44        8.14 / 10.44 / 6.52 / 3.67
+ *   Nord light       4.95        4.95          6.75      4.81        6.75        9.65 /  4.95 / 4.81 / 4.83
+ *   Aurora dark      3.69        4.81          9.34      7.44        6.14        3.69 /  6.14 / 7.44 / 3.67
+ *   Aurora light     4.81        4.81          9.34      4.16        9.34        9.34 /  4.81 / 4.16 / 4.83
+ *
+ * Every colour a chart, a bar or an outline draws on paper is at least 3:1,
+ * and every text on an accent fill at least 4.5:1. The token ramp is used as
+ * given on dark; on light a colour under 3:1 on white moves one step darker
+ * on its own ramp (Nord's cyan #22C1D3 is 2.2:1 on white, so light Nord is
+ * #0E7C86 with white text). The darker teals #0B6570 and #084C55 are the
+ * Nord ramp of the docs site. The load scale is the exception by design --
+ * a lightly used GPU is meant to look faint -- and is always shown with its
+ * numbers. `warning.main` on white is 2.4:1, so the light mode's
+ * `dashboard.health.degraded` takes a darker amber (4.24:1).
  */
+export type Accent = "nord" | "aurora";
+
+export const ACCENT_KEYS: readonly Accent[] = ["nord", "aurora"];
+export const DEFAULT_ACCENT: Accent = "nord";
+
+interface Ramp {
+  main: string;
+  light: string;
+  dark: string;
+}
+
+export interface AccentDefinition {
+  label: string;
+  /** The accent's own colour, for its swatch in Settings. */
+  swatch: string;
+  primary: Record<PaletteMode, Ramp & { contrastText: string }>;
+  secondary: Record<PaletteMode, Ramp>;
+  residency: Record<PaletteMode, DashboardPalette["residency"]>;
+}
+
+export const ACCENTS: Record<Accent, AccentDefinition> = {
+  nord: {
+    label: "Nord",
+    swatch: "#22C1D3",
+    primary: {
+      dark: { main: "#22C1D3", light: "#7DD3E8", dark: "#0E7C86", contrastText: "#06202A" },
+      light: { main: "#0E7C86", light: "#22C1D3", dark: "#0B6570", contrastText: "#FFFFFF" },
+    },
+    secondary: {
+      dark: { main: "#A78BFA", light: "#C4B5FD", dark: "#7C4DFF" },
+      light: { main: "#7C4DFF", light: "#A78BFA", dark: "#3F1DCB" },
+    },
+    residency: {
+      dark: { machines: "#22C1D3", private: "#7DD3E8", external: "#A78BFA", unknown: "#6B7280" },
+      light: { machines: "#084C55", private: "#0E7C86", external: "#7C4DFF", unknown: "#6B7280" },
+    },
+  },
+  aurora: {
+    label: "Aurora",
+    swatch: "#7C4DFF",
+    primary: {
+      dark: { main: "#7C4DFF", light: "#B47CFF", dark: "#3F1DCB", contrastText: "#FFFFFF" },
+      light: { main: "#7C4DFF", light: "#B47CFF", dark: "#3F1DCB", contrastText: "#FFFFFF" },
+    },
+    secondary: {
+      dark: { main: "#00B8D4", light: "#6EFFFF", dark: "#0088A3" },
+      light: { main: "#0088A3", light: "#00B8D4", dark: "#0B6570" },
+    },
+    residency: {
+      dark: { machines: "#7C4DFF", private: "#B47CFF", external: "#00B8D4", unknown: "#6B7280" },
+      light: { machines: "#3F1DCB", private: "#7C4DFF", external: "#0088A3", unknown: "#6B7280" },
+    },
+  },
+};
+
+export function isAccent(value: unknown): value is Accent {
+  return value === "nord" || value === "aurora";
+}
+
+/** The mark's colours per mode (brand tokens). Never follows the accent. */
+export interface BrandPalette {
+  /** The top and bottom plates, and the wordmark. */
+  plate: string;
+  /** The middle plate: der rote Faden. Never used for text or UI state. */
+  thread: string;
+}
+
+/** The mark's colours in a mode, from the brand tokens. */
+export function brandPalette(mode: PaletteMode): BrandPalette {
+  return mode === "dark"
+    ? { plate: "#F3F4F6", thread: "#FF4D6D" }
+    : { plate: "#0A0E1A", thread: "#E2325A" };
+}
+
+/** The accent where it is not a fill: text, the current page, tints. */
+export interface AccentPalette {
+  /** The accent as text or an icon on paper (at least 4.5:1). */
+  text: string;
+  /** The current page in a navigation list, and its text. */
+  navActiveBg: string;
+  navActiveText: string;
+  /** Hover and drop-target tints. */
+  hover: string;
+  tint: string;
+}
+
 export interface DashboardPalette {
   /** Where a request was served (see services/llm/residency.py). */
   residency: { machines: string; private: string; external: string; unknown: string };
@@ -32,28 +137,25 @@ export interface DashboardPalette {
 declare module "@mui/material/styles" {
   interface Palette {
     dashboard: DashboardPalette;
+    brand: BrandPalette;
+    accent: AccentPalette;
   }
   interface PaletteOptions {
     dashboard?: DashboardPalette;
+    brand?: BrandPalette;
+    accent?: AccentPalette;
   }
 }
 
-export function getAppTheme(mode: PaletteMode) {
+export function getAppTheme(mode: PaletteMode, accent: Accent = DEFAULT_ACCENT) {
   const dark = mode === "dark";
+  const tokens = ACCENTS[accent] ?? ACCENTS[DEFAULT_ACCENT];
 
   const base = createTheme({
     palette: {
       mode,
-      primary: {
-        main: "#7c4dff",
-        light: "#b47cff",
-        dark: "#3f1dcb",
-      },
-      secondary: {
-        main: "#00b8d4",
-        light: "#6effff",
-        dark: "#0088a3",
-      },
+      primary: { ...tokens.primary[mode] },
+      secondary: { ...tokens.secondary[mode] },
       background: dark
         ? {
             default: "#0a0e1a",
@@ -161,12 +263,7 @@ export function getAppTheme(mode: PaletteMode) {
 
   const { palette } = base;
   const dashboard: DashboardPalette = {
-    residency: {
-      machines: dark ? palette.primary.main : palette.primary.dark,
-      private: dark ? palette.primary.light : palette.primary.main,
-      external: dark ? palette.secondary.main : palette.secondary.dark,
-      unknown: dark ? grey[500] : grey[600],
-    },
+    residency: { ...tokens.residency[mode] },
     health: {
       ok: palette.success.main,
       degraded: dark ? palette.warning.main : "#b26a00",
@@ -179,5 +276,14 @@ export function getAppTheme(mode: PaletteMode) {
     surfaceSubtle: alpha(dark ? palette.common.white : palette.common.black, 0.03),
   };
 
-  return createTheme(base, { palette: { dashboard } });
+  const brand = brandPalette(mode);
+  const accentPalette: AccentPalette = {
+    text: dark ? palette.primary.light : palette.primary.dark,
+    navActiveBg: palette.primary.dark,
+    navActiveText: "#FFFFFF",
+    hover: alpha(palette.primary.main, 0.12),
+    tint: alpha(palette.primary.main, 0.06),
+  };
+
+  return createTheme(base, { palette: { dashboard, brand, accent: accentPalette } });
 }

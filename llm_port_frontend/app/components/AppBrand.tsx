@@ -7,26 +7,33 @@ interface AppBrandProps {
   compact?: boolean;
   /** The line under the name ("Console" by default; the chat says "Chat"). */
   subtitle?: string;
+  /** The wordmark's size in px (the sidebar's by default). */
+  size?: number;
 }
 
-export default function AppBrand({ compact = false, subtitle }: AppBrandProps) {
+/**
+ * The wordmark with its sub-line. Set in the plates' colour
+ * (palette.brand.plate): never the accent, never red.
+ */
+export default function AppBrand({ compact = false, subtitle, size }: AppBrandProps) {
   const { t } = useTranslation();
+  const fontSize = size ?? (compact ? 16 : 18);
 
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography
-        variant="h6"
+        component="div"
         noWrap
         sx={{
-          fontSize: compact ? "0.95rem" : "1rem",
-          color: "primary.light",
+          fontSize,
+          color: "brand.plate",
           lineHeight: 1.1,
-          fontFamily: APP_BRANDING.titleFontFamily,
-          letterSpacing: APP_BRANDING.titleLetterSpacing,
-          fontWeight: 700,
+          fontFamily: APP_BRANDING.wordmarkFontFamily,
+          fontWeight: APP_BRANDING.wordmarkFontWeight,
+          letterSpacing: APP_BRANDING.wordmarkLetterSpacing,
         }}
       >
-        {APP_BRANDING.title}
+        {APP_BRANDING.wordmark}
       </Typography>
       <Typography
         variant="caption"
@@ -44,4 +51,3 @@ export default function AppBrand({ compact = false, subtitle }: AppBrandProps) {
     </Box>
   );
 }
-

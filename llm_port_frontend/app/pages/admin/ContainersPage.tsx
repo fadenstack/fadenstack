@@ -155,7 +155,7 @@ export default function ContainersPage() {
             component={RouterLink}
             to={`/admin/containers/${c.id}`}
             underline="hover"
-            color="primary.light"
+            color="accent.text"
             fontWeight={600}
             sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}
           >

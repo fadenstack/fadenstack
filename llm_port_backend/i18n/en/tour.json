@@ -10,7 +10,7 @@
     },
     "containers": {
       "title": "Containers",
-      "content": "Manage the Docker containers that make up your llm.port deployment. Start, stop, and view logs."
+      "content": "Manage the Docker containers that make up your Fadenstack deployment. Start, stop, and view logs."
     },
     "llm": {
       "title": "LLM Providers",
@@ -38,7 +38,7 @@
     },
     "extensions": {
       "title": "Extensions",
-      "content": "Browse and manage MCP servers, skill plugins, and other extensions that enhance llm.port."
+      "content": "Browse and manage MCP servers, skill plugins, and other extensions that enhance Fadenstack."
     },
     "settings": {
       "title": "Settings",
@@ -157,7 +157,7 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Your central overview of the llm.port deployment. See system health, container status, resource usage, and key metrics at a glance.",
+      "description": "Your central overview of the Fadenstack deployment. See system health, container status, resource usage, and key metrics at a glance.",
       "action_health": "Check system health and service availability",
       "action_containers": "View running container counts and statuses",
       "action_metrics": "Monitor resource usage and performance metrics"
@@ -259,7 +259,7 @@
     },
     "endpoint": {
       "title": "API Endpoint",
-      "description": "Interactive API documentation for the llm.port OpenAI-compatible endpoint. Test API calls directly from the browser.",
+      "description": "Interactive API documentation for the Fadenstack OpenAI-compatible endpoint. Test API calls directly from the browser.",
       "action_docs": "Browse the OpenAPI documentation",
       "action_test": "Send test requests to the endpoint"
     },

@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "llm-port",
+    "title": "Fadenstack",
     "subtitle": "Console",
     "check_session": "Checking session..."
   },
@@ -82,7 +82,7 @@
     "back_login": "Back to Login",
     "email": "Email",
     "password": "Password",
-    "login_title": "Sign in to llm-port",
+    "login_title": "Sign in to Fadenstack",
     "login_desc": "Use your account credentials to access the admin dashboard.",
     "or_sso": "or sign in with SSO",
     "sign_in_with": "Sign in with {{provider}}",
@@ -165,7 +165,7 @@
     "column_source": "Source",
     "job_node_agent": "System log",
     "job_ray_serve": "Model serving",
-    "job_docker": "LLM.Port services",
+    "job_docker": "Fadenstack services",
     "job_node_container": "Model containers",
     "component_ingress": "API entry",
     "component_server": "Model server ({{model}})",
@@ -710,7 +710,7 @@
     "confirm_title": "Replace {{name}}?",
     "confirm_body": "Docker cannot change these settings in a container that exists, so a new container is made with them, and the old one is removed once the new one runs. The container gets a new ID, and files it wrote outside its volumes are lost. If the new one cannot be made or started, the old one is put back as it was.",
     "confirm_replace": "Replace",
-    "compose_note": "LLM.Port runs this container from its compose file: the next llmport deploy or upgrade makes it again from the compose file and .env, without these changes.",
+    "compose_note": "Fadenstack runs this container from its compose file: the next llmport deploy or upgrade makes it again from the compose file and .env, without these changes.",
     "backend_note": "The backend runs in this container and cannot replace it. Change its settings in .env and run llmport upgrade.",
     "load_failed": "Could not load the container's settings."
   },
@@ -821,7 +821,20 @@
       "skills": "Skills",
       "data_residency": "Data residency"
     },
-    "current_value": "(current: {{value}})"
+    "current_value": "(current: {{value}})",
+    "appearance": {
+      "title": "Appearance",
+      "accent": "Accent",
+      "accent_hint": "The colour of buttons, links, the current page and charts. The logo and the status colours stay as they are.",
+      "accent_nord": "Nord",
+      "accent_nord_detail": "Cyan, calm",
+      "accent_aurora": "Aurora",
+      "accent_aurora_detail": "Violet, vivid",
+      "mode": "Theme",
+      "mode_dark": "Dark",
+      "mode_light": "Light",
+      "saved_here": "Saved in this browser."
+    }
   },
   "users": {
     "title": "User Management",
@@ -1223,7 +1236,7 @@
   },
   "rag_runtime": {
     "title": "RAG Runtime Config",
-    "description": "Embedding and chunking settings are pushed from llm.port core to llm_port_rag.",
+    "description": "Embedding and chunking settings are pushed from Fadenstack core to llm_port_rag.",
     "failed_load": "Failed to load runtime config.",
     "failed_save": "Failed to save runtime config.",
     "saved": "Runtime config updated.",
@@ -1369,7 +1382,7 @@
     "back": "Back",
     "slides": {
       "welcome": {
-        "title": "Welcome to llm.port",
+        "title": "Welcome to Fadenstack",
         "description": "Your self-hosted AI platform. Manage models, chat with LLMs, build knowledge bases, and operate your entire AI infrastructure — all from a single control plane."
       },
       "chat": {
@@ -1390,7 +1403,7 @@
       },
       "mcp": {
         "title": "MCP Tool Registry",
-        "description": "Register any MCP-compliant tool server — local sidecars or remote endpoints. llm.port discovers tools automatically, applies PII policies before every call, and exposes them as a single governed catalog."
+        "description": "Register any MCP-compliant tool server — local sidecars or remote endpoints. Fadenstack discovers tools automatically, applies PII policies before every call, and exposes them as a single governed catalog."
       },
       "skills": {
         "title": "Skills Registry",
@@ -1643,7 +1656,7 @@
     },
     "residency_source": {
       "override": "Set by an administrator",
-      "managed": "Served by LLM.Port on your machines",
+      "managed": "Served by Fadenstack on your machines",
       "cloud_provider": "Cloud API: {{provider}}",
       "cloud_host": "Known cloud API: {{host}}",
       "machine": "Enrolled machine: {{machine}}",
@@ -1974,7 +1987,7 @@
     "export_zip": "Skill folder (.zip)",
     "export_md": "SKILL.md only",
     "file_script": "Script, not run",
-    "file_script_hint": "Kept for export to other agents. llm.port never runs a skill's scripts.",
+    "file_script_hint": "Kept for export to other agents. Fadenstack never runs a skill's scripts.",
     "file_size": "{{size}} bytes",
     "files_title": "Files",
     "history_hint": "Every save is kept as a version. Chats get the published one; publish an older version to roll back.",
@@ -2220,7 +2233,7 @@
   },
   "found": {
     "title": "vLLM on this machine",
-    "intro": "Containers running vLLM that LLM.Port did not start. Routing one puts it behind the gateway under a name; the container itself is not touched.",
+    "intro": "Containers running vLLM that Fadenstack did not start. Routing one puts it behind the gateway under a name; the container itself is not touched.",
     "none": "No vLLM containers found. The machine reports what it runs about once a minute.",
     "not_reported": "This machine has not reported its containers. Its agent may be older than 0.1.11; re-run the install line to upgrade it.",
     "col_container": "Container",
@@ -2236,11 +2249,11 @@
     "managed_by_compose": "Docker Compose project {{name}}",
     "answers": "Answers as {{models}}",
     "not_published": "not published",
-    "route": "Route through LLM.Port",
+    "route": "Route through Fadenstack",
     "routed_as": "Routed as {{alias}}",
     "release": "Stop routing",
     "paused": "Not routed while the container is {{state}}.",
-    "route_title": "Route {{container}} through LLM.Port",
+    "route_title": "Route {{container}} through Fadenstack",
     "route_explain": "Requests for this name go to the container as it runs now. Nothing on the machine changes, and you can stop routing at any time.",
     "name": "Name clients use",
     "confirm_release": "Stop routing {{alias}}? The container keeps running."
@@ -2296,7 +2309,7 @@
     "next": {
       "no_nodes": {
         "title": "Add your first machine",
-        "detail": "A cluster is built from machines running the LLM.Port agent. Add one to get started.",
+        "detail": "A cluster is built from machines running the Fadenstack agent. Add one to get started.",
         "action": "Add a machine"
       },
       "no_cluster": {
@@ -2448,7 +2461,7 @@
     },
     "found": {
       "title": "Running on your machines, not managed here",
-      "intro": "An LLM.Port server started these clusters and no longer knows them: it was rebuilt, or restored from an older backup. Take one over to manage it here again; its models keep serving throughout.",
+      "intro": "An Fadenstack server started these clusters and no longer knows them: it was rebuilt, or restored from an older backup. Take one over to manage it here again; its models keep serving throughout.",
       "looking": "Looking…",
       "look_again": "Look again",
       "retry": "Retry",
@@ -2459,8 +2472,8 @@
       "checking": "Checking with the cluster…",
       "gpus_per_copy": "GPUs per copy",
       "copies_running": "{{running}} of {{total}} running",
-      "no_models": "It serves no model LLM.Port deployed.",
-      "other_apps": "Also running, not deployed by LLM.Port and left as they are: {{apps}}.",
+      "no_models": "It serves no model Fadenstack deployed.",
+      "other_apps": "Also running, not deployed by Fadenstack and left as they are: {{apps}}.",
       "unreadable": "{{name}} runs the cluster runtime but could not say what it serves: {{error}}",
       "dialog_title": "Take over the cluster on {{name}}",
       "dialog_explain": "The cluster and its models are recorded here as they run; nothing restarts. First the cluster is asked to confirm that what this server would deploy for each model is exactly what runs. If anything differs, nothing is recorded and you are told what.",
@@ -3039,7 +3052,7 @@
       "scan_none": "Nothing new in this server's model store.",
       "add_path": "Add from a path",
       "add_path_title": "Add a model from a path on this server",
-      "add_path_help": "A folder on the LLM.Port server that holds a model's files: its config.json and weights. The files stay where they are and are never deleted by LLM.Port.",
+      "add_path_help": "A folder on the Fadenstack server that holds a model's files: its config.json and weights. The files stay where they are and are never deleted by Fadenstack.",
       "path_label": "Folder on this server",
       "name_label": "Name",
       "added": "Added {{name}}.",

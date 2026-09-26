@@ -32,6 +32,8 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 import AppBrand from "~/components/AppBrand";
+import BrandMark from "~/components/BrandMark";
+import { APP_BRANDING } from "~/branding";
 import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
 import { usePendingJoins } from "~/lib/usePendingJoins";
 import type { NavHand } from "~/lib/useNavHand";
@@ -63,6 +65,7 @@ import {
   DRAWER_WIDTH_CLOSED,
   NAV_BY_ID,
   linkButtonSx,
+  navActiveSx,
   type NavEntry,
 } from "~/lib/adminConstants";
 
@@ -153,7 +156,7 @@ function DroppableZone({
         ...sx,
         transition: "background-color 0.2s",
         ...(isOver
-          ? { bgcolor: "rgba(124,77,255,0.06)", borderRadius: 1 }
+          ? { bgcolor: "accent.tint", borderRadius: 1 }
           : {}),
       }}
     >
@@ -396,11 +399,7 @@ export function AdminSidebar({
                 ...touchRow,
                 justifyContent: drawerOpen ? "initial" : "center",
                 ...(isGroupActive && !drawerOpen
-                  ? {
-                      bgcolor: "primary.dark",
-                      color: "primary.light",
-                      "& .MuiListItemIcon-root": { color: "primary.light" },
-                    }
+                  ? { ...navActiveSx, "&:hover": { bgcolor: "accent.navActiveBg" } }
                   : {}),
               }}
             >
@@ -508,21 +507,11 @@ export function AdminSidebar({
             height: 40,
             borderRadius: 1,
             flexShrink: 0,
-            p: 0.5,
+            p: 0,
             "&:hover": { bgcolor: "action.hover" },
           }}
         >
-          <Box
-            component="img"
-            src="/icon_color.png"
-            alt="llm-port"
-            sx={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              borderRadius: 1,
-            }}
-          />
+          <BrandMark size={36} title={APP_BRANDING.name} />
         </IconButton>
         {drawerOpen && <AppBrand />}
         {mobile && (

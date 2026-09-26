@@ -10,7 +10,7 @@
     },
     "containers": {
       "title": "容器",
-      "content": "管理 llm.port 部署中的 Docker 容器。启动、停止和查看日志。"
+      "content": "管理 Fadenstack 部署中的 Docker 容器。启动、停止和查看日志。"
     },
     "llm": {
       "title": "LLM 供应商",
@@ -157,7 +157,7 @@
     },
     "dashboard": {
       "title": "仪表板",
-      "description": "llm.port 部署的中央概览。查看系统健康状况、容器状态、资源使用情况和关键指标。",
+      "description": "Fadenstack 部署的中央概览。查看系统健康状况、容器状态、资源使用情况和关键指标。",
       "action_health": "检查系统健康状况和服务可用性",
       "action_containers": "查看运行中的容器数量和状态",
       "action_metrics": "监控资源使用和性能指标"
@@ -486,7 +486,7 @@
       "step4_title": "选择目标",
       "step4_content": "选择 <strong>Docker — 本服务器</strong> 以容器形式本地运行模型。",
       "step5_title": "创建并部署",
-      "step5_content": "点击 <strong>创建</strong>。llm.port 将下载模型镜像并自动启动容器。"
+      "step5_content": "点击 <strong>创建</strong>。Fadenstack 将下载模型镜像并自动启动容器。"
     }
   }
 }

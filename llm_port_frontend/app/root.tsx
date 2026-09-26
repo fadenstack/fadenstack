@@ -6,22 +6,43 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { PaletteMode } from "@mui/material";
-import { ThemeProvider } from "@mui/material/styles";
+import { alpha, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
+import GlobalStyles from "@mui/material/GlobalStyles";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
-import { getAppTheme } from "./theme";
-import { ThemeModeContext } from "./theme-mode";
+import { DEFAULT_ACCENT, getAppTheme, isAccent, type Accent } from "./theme";
+import {
+  ACCENT_STORAGE_KEY,
+  MODE_STORAGE_KEY,
+  PREPAINT_CSS,
+  PREPAINT_SCRIPT,
+  ThemeModeContext,
+} from "./theme-mode";
 import i18n from "./i18n";
 
 import type { Route } from "./+types/root";
+import "@fontsource/sora/600.css";
+import "@fontsource/sora/700.css";
 import "./app.css";
 
+export const meta: Route.MetaFunction = () => [
+  { title: "Fadenstack" },
+  { name: "description", content: "The self-hosted LLM control plane" },
+  { name: "application-name", content: "Fadenstack" },
+  { name: "apple-mobile-web-app-title", content: "Fadenstack" },
+  { name: "theme-color", content: "#0A0E1A" },
+];
+
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/favicon.ico", sizes: "any" },
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+  { rel: "manifest", href: "/manifest.webmanifest" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -34,32 +55,70 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<PaletteMode>("dark");
+// The server has no layout pass; on it this is a no-op effect.
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem("llm-port-theme-mode");
-    if (stored === "light" || stored === "dark") {
-      setMode(stored);
-      return;
-    }
-    if (window.matchMedia?.("(prefers-color-scheme: light)").matches) {
-      setMode("light");
-    }
+function storedMode(): PaletteMode | null {
+  const fromHead = document.documentElement.dataset.mode;
+  if (fromHead === "light" || fromHead === "dark") return fromHead;
+  try {
+    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // Storage blocked: the default stands.
+  }
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : null;
+}
+
+function storedAccent(): Accent | null {
+  const fromHead = document.documentElement.dataset.accent;
+  if (isAccent(fromHead)) return fromHead;
+  try {
+    const stored = window.localStorage.getItem(ACCENT_STORAGE_KEY);
+    if (isAccent(stored)) return stored;
+  } catch {
+    // Storage blocked: the default stands.
+  }
+  return null;
+}
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  // The server renders the defaults; the browser takes the stored choices
+  // before its first paint (PREPAINT_SCRIPT put them on <html> already).
+  const [mode, setMode] = useState<PaletteMode>("dark");
+  const [accent, setAccent] = useState<Accent>(DEFAULT_ACCENT);
+
+  useIsomorphicLayoutEffect(() => {
+    const m = storedMode();
+    if (m) setMode(m);
+    const a = storedAccent();
+    if (a) setAccent(a);
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("llm-port-theme-mode", mode);
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+      window.localStorage.setItem(ACCENT_STORAGE_KEY, accent);
+    } catch {
+      // Storage blocked: the choice lasts for this page only.
+    }
+    const root = document.documentElement;
+    root.dataset.mode = mode;
+    root.dataset.accent = accent;
+    root.style.colorScheme = mode;
     document.body.dataset.theme = mode;
-  }, [mode]);
+  }, [mode, accent]);
 
-  const theme = useMemo(() => getAppTheme(mode), [mode]);
+  const theme = useMemo(() => getAppTheme(mode, accent), [mode, accent]);
   const themeModeValue = useMemo(
     () => ({
       mode,
       toggleMode: () => setMode((prev) => (prev === "dark" ? "light" : "dark")),
+      setMode,
+      accent,
+      setAccent,
     }),
-    [mode],
+    [mode, accent],
   );
 
   return (
@@ -67,6 +126,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: PREPAINT_SCRIPT }} />
+        <style dangerouslySetInnerHTML={{ __html: PREPAINT_CSS }} />
         <Meta />
         <Links />
       </head>
@@ -74,6 +135,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ThemeModeContext.Provider value={themeModeValue}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
+            <GlobalStyles
+              styles={{
+                // The scrollbars take the accent (app.css reads these).
+                body: {
+                  "--scroll-thumb": alpha(theme.palette.primary.main, mode === "dark" ? 0.25 : 0.3),
+                  "--scroll-thumb-hover": alpha(theme.palette.primary.main, mode === "dark" ? 0.45 : 0.5),
+                },
+              }}
+            />
             {children}
           </ThemeProvider>
         </ThemeModeContext.Provider>

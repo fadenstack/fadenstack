@@ -582,14 +582,18 @@ export function adminPageTitle(
 }
 
 /* ── Shared link button styles ─────────────────────────────────────── */
+/** The current page in a navigation list: the accent's navigation colours (theme.ts). */
+export const navActiveSx = {
+  bgcolor: "accent.navActiveBg",
+  color: "accent.navActiveText",
+  "& .MuiListItemIcon-root": { color: "accent.navActiveText" },
+};
+
 export const linkButtonSx = {
   borderRadius: 1,
-  "&.active": {
-    bgcolor: "primary.dark",
-    color: "primary.light",
-    "& .MuiListItemIcon-root": { color: "primary.light" },
-  },
   "&:hover": {
-    bgcolor: "rgba(124,77,255,0.12)",
+    bgcolor: "accent.hover",
   },
+  // Hovering the current page keeps its colours (its text is on the fill).
+  "&.active, &.active:hover": navActiveSx,
 };

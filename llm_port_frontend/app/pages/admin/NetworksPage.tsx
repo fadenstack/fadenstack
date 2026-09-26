@@ -139,7 +139,7 @@ export default function NetworksPage() {
             fontWeight={600}
             fontFamily="monospace"
             fontSize="0.85rem"
-            sx={{ color: "primary.light" }}
+            sx={{ color: "accent.text" }}
           >
             {n.name}
           </Typography>

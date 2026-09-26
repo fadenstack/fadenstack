@@ -4,8 +4,8 @@
  * desktop, it opens the navigation.
  */
 import { useTranslation } from "react-i18next";
-import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import BrandMark from "~/components/BrandMark";
 
 export function NavLogoButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
@@ -13,14 +13,9 @@ export function NavLogoButton({ onClick }: { onClick: () => void }) {
     <IconButton
       onClick={onClick}
       aria-label={t("nav.open_navigation", { ns: "common" })}
-      sx={{ width: 36, height: 36, p: 0.5, borderRadius: 1, flexShrink: 0 }}
+      sx={{ width: 40, height: 40, p: 0, borderRadius: 1, flexShrink: 0 }}
     >
-      <Box
-        component="img"
-        src="/icon_color.png"
-        alt=""
-        sx={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 1 }}
-      />
+      <BrandMark size={36} />
     </IconButton>
   );
 }
