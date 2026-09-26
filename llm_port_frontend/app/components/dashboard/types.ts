@@ -10,6 +10,12 @@ export interface WidgetProps {
   onLayoutChange: (patch: Partial<DashboardLayout>) => void;
   /** Bumped by the header's Refresh button. */
   refreshToken: number;
+  /**
+   * The row sets this widget's height (a `fit: "fill"` widget beside a
+   * content-sized one): fill it -- grow the chart, show the list items that
+   * fit -- rather than size to the content.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -26,5 +32,14 @@ export interface WidgetDefinition extends LayoutWidgetSpec {
     ragPro?: boolean;
   };
   defaultVisible: (profile: Profile) => boolean;
+  /**
+   * "content" (the default): the widget's content sets its height, and a row
+   * is as tall as its tallest such widget. "fill": a list or chart that can
+   * show more or less; beside a content widget it takes the row's height
+   * instead of setting it, so no widget in the row is left with empty space.
+   */
+  fit?: "content" | "fill";
+  /** The least height a fill widget is given (px), header included. */
+  fillMinHeight?: number;
   component: LazyExoticComponent<ComponentType<WidgetProps>>;
 }

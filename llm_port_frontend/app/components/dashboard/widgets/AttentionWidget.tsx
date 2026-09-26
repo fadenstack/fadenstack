@@ -23,6 +23,7 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import type { AttentionItem, Severity } from "~/api/dashboard";
+import { useFitCount } from "../fit";
 import { fmtAgo } from "../format";
 import { useAttention } from "../queries";
 import type { WidgetProps } from "../types";
@@ -30,15 +31,20 @@ import WidgetCard from "../WidgetCard";
 
 const SHOWN = { phone: 4, other: 6 };
 
-export default function AttentionWidget({ refreshToken }: WidgetProps) {
+export default function AttentionWidget({ refreshToken, fill = false }: WidgetProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const [all, setAll] = useState(false);
   const query = useAttention({ refreshToken });
   const items = query.data?.items ?? [];
-  const limit = isPhone ? SHOWN.phone : SHOWN.other;
-  const visible = all ? items : items.slice(0, limit);
+  // Filling the row's height: every item is laid out and those that do not
+  // fit whole are hidden. Sized to content: the first few.
+  const fitting = fill && !all;
+  const [listEl, setListEl] = useState<HTMLUListElement | null>(null);
+  const fitCount = useFitCount(fitting ? listEl : null);
+  const limit = fitting ? (fitCount ?? items.length) : isPhone ? SHOWN.phone : SHOWN.other;
+  const laidOut = all || fitting ? items : items.slice(0, limit);
 
   return (
     <WidgetCard
@@ -62,21 +68,35 @@ export default function AttentionWidget({ refreshToken }: WidgetProps) {
       }
       empty={query.data && items.length === 0 ? <AllClear /> : undefined}
     >
-      <List disablePadding sx={{ display: "grid", gap: 0.75 }}>
-        {visible.map((item) => (
-          <Item key={item.id} item={item} />
-        ))}
-      </List>
-      {items.length > limit && (
-        <Button onClick={() => setAll((v) => !v)} size="small" sx={{ mt: 1, minHeight: 44 }}>
-          {all ? t("dashboard.attention.show_fewer") : t("dashboard.attention.show_all", { count: items.length })}
-        </Button>
-      )}
+      <Box sx={fitting ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}>
+        <List
+          ref={setListEl}
+          disablePadding
+          sx={{
+            display: "grid",
+            gap: 0.75,
+            alignContent: "start",
+            // Rows keep their content's height; in a box shorter than the
+            // list, "auto" rows would shrink to the items' 48 px minimum.
+            gridAutoRows: "max-content",
+            ...(fitting ? { flex: 1, minHeight: 0, overflow: "hidden", position: "relative" } : {}),
+          }}
+        >
+          {laidOut.map((item, index) => (
+            <Item key={item.id} item={item} hidden={fitting && index >= limit} />
+          ))}
+        </List>
+        {items.length > limit && (
+          <Button onClick={() => setAll((v) => !v)} size="small" sx={{ mt: 1, minHeight: 44, alignSelf: "flex-start" }}>
+            {all ? t("dashboard.attention.show_fewer") : t("dashboard.attention.show_all", { count: items.length })}
+          </Button>
+        )}
+      </Box>
     </WidgetCard>
   );
 }
 
-function Item({ item }: { item: AttentionItem }) {
+function Item({ item, hidden = false }: { item: AttentionItem; hidden?: boolean }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const params = localise(item.params, t);
@@ -129,13 +149,23 @@ function Item({ item }: { item: AttentionItem }) {
     </Box>
   );
 
-  const sx = { borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle", px: 1.25, py: 1, minHeight: 48 };
+  const sx = {
+    borderRadius: 1,
+    border: 1,
+    borderColor: "divider",
+    bgcolor: "dashboard.surfaceSubtle",
+    px: 1.25,
+    py: 1,
+    minHeight: 48,
+    // Past what fits: kept in the layout (so the fit can be measured), not shown.
+    ...(hidden ? { visibility: "hidden" } : {}),
+  };
   return item.link ? (
-    <ListItemButton component={RouterLink} to={item.link} sx={sx}>
+    <ListItemButton component={RouterLink} to={item.link} sx={sx} aria-hidden={hidden || undefined}>
       {body}
     </ListItemButton>
   ) : (
-    <Box component="li" sx={{ ...sx, listStyle: "none", display: "flex" }}>
+    <Box component="li" sx={{ ...sx, listStyle: "none", display: "flex" }} aria-hidden={hidden || undefined}>
       {body}
     </Box>
   );

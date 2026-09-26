@@ -6,6 +6,14 @@
  *
  * In Customize mode each widget gets a bar: drag handle (fine pointers),
  * size, move up / down, show / hide. Every control is 44 px on touch.
+ *
+ * Row height: widgets in a row stretch to one height. Content widgets
+ * (tiles, the donut, gauges) set it; a fill widget (a list or chart that can
+ * show more or less) beside one takes that height instead of adding its own
+ * -- its slot is size-contained -- and fits its content to it. So a short
+ * content widget is not left with a gap under it, and nothing is cut off
+ * or scrolls inside a card. A row with no content widget (a fill widget on
+ * its own, as on a phone) sizes to content as usual.
  */
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +34,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Box from "@mui/material/Box";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import ToggleButton from "@mui/material/ToggleButton";
@@ -57,7 +67,43 @@ interface DashboardGridProps {
   onMove: (id: string, delta: -1 | 1) => void;
   onToggle: (id: string) => void;
   onSize: (id: string, size: WidgetSize) => void;
-  renderWidget: (item: GridItem) => ReactNode;
+  renderWidget: (item: GridItem, fill: boolean) => ReactNode;
+}
+
+type Breakpoint = "xs" | "sm" | "md" | "lg";
+
+function useBreakpoint(): Breakpoint {
+  const theme = useTheme();
+  const lg = useMediaQuery(theme.breakpoints.up("lg"));
+  const md = useMediaQuery(theme.breakpoints.up("md"));
+  const sm = useMediaQuery(theme.breakpoints.up("sm"));
+  return lg ? "lg" : md ? "md" : sm ? "sm" : "xs";
+}
+
+/** Rows as flex-wrap packs them: in order, a new row when the next width does not fit. */
+export function packRows(columns: number[]): number[][] {
+  const rows: number[][] = [];
+  let used = 12;
+  columns.forEach((cols, index) => {
+    if (used + cols > 12) {
+      rows.push([]);
+      used = 0;
+    }
+    rows[rows.length - 1].push(index);
+    used += cols;
+  });
+  return rows;
+}
+
+/** The widgets that fill their row: fill widgets in a row with a content widget. */
+export function fillingIds(widgets: { id: string; columns: number; fit?: "content" | "fill" }[]): Set<string> {
+  const filling = new Set<string>();
+  for (const row of packRows(widgets.map((w) => w.columns))) {
+    const members = row.map((i) => widgets[i]);
+    if (!members.some((w) => w.fit !== "fill")) continue;
+    for (const w of members) if (w.fit === "fill") filling.add(w.id);
+  }
+  return filling;
 }
 
 export const GRID_GAP_PX = 12;
@@ -84,6 +130,15 @@ export default function DashboardGrid({
   );
   const shown = editMode ? items : items.filter((i) => i.available && !i.hidden);
   const movable = items.filter((i) => i.available).map((i) => i.def.id);
+  const breakpoint = useBreakpoint();
+  const filling = fillingIds(
+    shown.map((i) => ({
+      id: i.def.id,
+      columns: (editMode && (i.hidden || !i.available) ? SIZE_COLUMNS.XL : SIZE_COLUMNS[i.size])[breakpoint],
+      // A widget shown as its Customize bar only has no content to fill with.
+      fit: editMode && (i.hidden || !i.available) ? "content" : i.def.fit,
+    })),
+  );
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -104,8 +159,9 @@ export default function DashboardGrid({
               onMove={onMove}
               onToggle={onToggle}
               onSize={onSize}
+              fill={filling.has(item.def.id)}
             >
-              {item.available && !(editMode && item.hidden) ? renderWidget(item) : null}
+              {item.available && !(editMode && item.hidden) ? renderWidget(item, filling.has(item.def.id)) : null}
             </SortableWidget>
           ))}
         </Box>
@@ -122,10 +178,12 @@ interface SortableWidgetProps {
   onMove: (id: string, delta: -1 | 1) => void;
   onToggle: (id: string) => void;
   onSize: (id: string, size: WidgetSize) => void;
+  /** Take the row's height rather than set it (see the file's comment). */
+  fill: boolean;
   children: ReactNode;
 }
 
-function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize, children }: SortableWidgetProps) {
+function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize, fill, children }: SortableWidgetProps) {
   const { t } = useTranslation();
   const { def, size, hidden, available, reason } = item;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
@@ -245,7 +303,19 @@ function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize,
           </Tooltip>
         </Stack>
       )}
-      {children && <Box sx={{ flexGrow: 1, minWidth: 0 }}>{children}</Box>}
+      {children && (
+        <Box
+          sx={{
+            flexGrow: 1,
+            minWidth: 0,
+            // Size-contained: counts as empty (bar its minimum) when the row's
+            // height is worked out, then stretches to it.
+            ...(fill ? { contain: "size", minHeight: def.fillMinHeight ?? 240 } : {}),
+          }}
+        >
+          {children}
+        </Box>
+      )}
     </Box>
   );
 }

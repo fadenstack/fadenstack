@@ -193,7 +193,7 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
           items={items}
           editMode={editMode && !isPhone}
           {...ops}
-          renderWidget={(item) => (
+          renderWidget={(item, fill) => (
             <WidgetBoundary title={t(item.def.titleKey)}>
               <Suspense fallback={<WidgetCard title={t(item.def.titleKey)} status={{ loading: true }} />}>
                 <item.def.component
@@ -201,6 +201,7 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
                   layout={layout}
                   onLayoutChange={(patch) => update((l) => ({ ...l, ...patch }))}
                   refreshToken={refreshToken}
+                  fill={fill}
                 />
               </Suspense>
             </WidgetBoundary>

@@ -14,6 +14,7 @@ import { useTheme } from "@mui/material/styles";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { RESIDENCY_CLASSES, type UsageRange } from "~/api/dashboard";
 import { TOUCH_TARGET } from "../DashboardGrid";
+import { useElementHeight } from "../fit";
 import { fmtInt, fmtShare } from "../format";
 import { useTrafficSeries } from "../queries";
 import { RESIDENCY_LABEL_KEYS, residencyColor } from "../residency";
@@ -28,10 +29,16 @@ function localDate(label: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export default function UsageWidget({ layout, onLayoutChange, refreshToken }: WidgetProps) {
+const CHART_HEIGHT = { phone: 160, other: 190 };
+
+export default function UsageWidget({ layout, onLayoutChange, refreshToken, fill = false }: WidgetProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  // Filling the row's height, the chart takes what the legend and total leave.
+  const [chartBox, chartBoxHeight] = useElementHeight<HTMLDivElement>();
+  const baseHeight = isPhone ? CHART_HEIGHT.phone : CHART_HEIGHT.other;
+  const chartHeight = fill && chartBoxHeight ? Math.max(baseHeight, chartBoxHeight) : baseHeight;
   const range = layout.usage_range;
   const query = useTrafficSeries(range, { refreshToken });
   const buckets = query.data?.buckets ?? [];
@@ -73,6 +80,7 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken }: Wi
       skeleton={<Skeleton variant="rounded" height={isPhone ? 160 : 190} />}
       empty={query.data && total === 0 ? <WidgetEmpty message={t("dashboard.usage.empty")} /> : undefined}
     >
+      <Box sx={fill ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}>
       <Stack direction="row" gap={1.5} sx={{ flexWrap: "wrap", mb: 0.5 }} component="ul" aria-hidden>
         {RESIDENCY_CLASSES.map((c) => (
           <Stack key={c} component="li" direction="row" alignItems="center" gap={0.75} sx={{ listStyle: "none" }}>
@@ -82,6 +90,8 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken }: Wi
         ))}
       </Stack>
       <Box
+        ref={fill ? chartBox : undefined}
+        sx={fill ? { flex: 1, minHeight: baseHeight, overflow: "hidden" } : undefined}
         role="img"
         aria-label={t("dashboard.usage.chart_aria", {
           total: fmtInt(total, i18n.language),
@@ -89,7 +99,7 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken }: Wi
         })}
       >
         <LineChart
-          height={isPhone ? 160 : 190}
+          height={chartHeight}
           margin={{ left: 8, right: 24, top: 8, bottom: 4 }}
           hideLegend
           skipAnimation
@@ -121,6 +131,7 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken }: Wi
           share: fmtShare(total ? inHouse / total : null, i18n.language, 0),
         })}
       </Typography>
+      </Box>
     </WidgetCard>
   );
 }
