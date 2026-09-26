@@ -76,13 +76,16 @@ class PIIEventDAO:
                 "daily_volume": [{"date": str, "count": int, "pii_count": int}],
             }
         """
-        base = select(PIIScanEvent)
+        filters = []
         if since:
-            base = base.where(PIIScanEvent.created_at >= since)
+            filters.append(PIIScanEvent.created_at >= since)
         if until:
-            base = base.where(PIIScanEvent.created_at <= until)
+            filters.append(PIIScanEvent.created_at <= until)
 
-        # Totals
+        # Totals, straight off the table. These were selected "from" a
+        # subquery of the table while naming the table's own columns, so
+        # Postgres joined the two: every event with every event -- 577 M rows
+        # for 24 k events -- and the PII dashboard never loaded.
         totals_q = select(
             func.count().label("total"),
             func.sum(case((PIIScanEvent.pii_detected.is_(True), 1), else_=0)).label(
@@ -91,7 +94,7 @@ class PIIEventDAO:
             func.coalesce(func.sum(PIIScanEvent.entities_found), 0).label(
                 "total_entities",
             ),
-        ).select_from(base.subquery())
+        ).where(*filters)
 
         row = (await self.session.execute(totals_q)).one()
         total_scans = row.total or 0
