@@ -12,6 +12,9 @@
  * log — is the caller's business, and keeping that out is what lets one
  * component serve both.
  *
+ * Its tiles are the dashboard's compact StatTile (components/dashboard/kit),
+ * so a provider's row and a deployment's page look like the dashboard.
+ *
  * The rules it enforces are the ones the rest of the product follows:
  *
  * - **A gap is never a zero.** A card with no value says so and is dimmed;
@@ -24,11 +27,7 @@
 import type { ReactNode } from "react";
 
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import Skeleton from "@mui/material/Skeleton";
-import Stack from "@mui/material/Stack";
-import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
+import { StatGrid, StatTile } from "~/components/dashboard/kit";
 
 export interface StatCardItem {
   /** Stable identity for the list. */
@@ -82,60 +81,20 @@ export function StatCardRow({
       }}
     >
       {header}
-      <Stack direction="row" flexWrap="wrap" spacing={0.5}>
-        {cards.map((card) => {
-          const hasValue = card.value !== null;
-          // A skeleton only before anything has arrived. Once a fetch has
-          // answered, "no value" is the answer and should be shown as one.
-          const pending = loading && !hasValue;
-          return (
-            <Tooltip
-              key={card.key}
-              title={hasValue || pending ? undefined : (card.emptyHint ?? "")}
-              enterDelay={500}
-            >
-              <Card
-                variant="outlined"
-                sx={{
-                  minWidth: 96,
-                  flex: "1 1 96px",
-                  borderRadius: "6px",
-                  opacity: hasValue ? 1 : 0.6,
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                    borderColor: "primary.main",
-                  },
-                }}
-              >
-                <Box sx={{ px: 1, py: 0.75 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mb: 0.25 }}
-                  >
-                    {card.label}
-                  </Typography>
-                  {pending ? (
-                    <Skeleton width={56} height={22} />
-                  ) : (
-                    <Typography
-                      variant="subtitle1"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "1.05rem",
-                        color: hasValue ? "text.primary" : "text.disabled",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {hasValue ? card.value : emptyLabel}
-                    </Typography>
-                  )}
-                </Box>
-              </Card>
-            </Tooltip>
-          );
-        })}
-      </Stack>
+      <StatGrid min={104} gap={0.75}>
+        {cards.map((card) => (
+          <StatTile
+            key={card.key}
+            variant="compact"
+            label={card.label}
+            value={card.value}
+            loading={loading}
+            emptyHint={card.emptyHint}
+            // A value that never came says so in the row's words, dimmed.
+            emptyText={emptyLabel}
+          />
+        ))}
+      </StatGrid>
     </Box>
   );
 }

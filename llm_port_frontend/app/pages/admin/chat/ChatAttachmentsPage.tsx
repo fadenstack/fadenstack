@@ -1,18 +1,15 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { chatAdmin, type ChatAttachment, type ChatStats } from "~/api/chat";
+import { StatGrid, StatTile } from "~/components/dashboard/kit";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
-import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 import DeleteIcon from "@mui/icons-material/Delete";
 
 function formatBytes(bytes: number): string {
@@ -24,7 +21,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function ChatAttachmentsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // The table and the summary cards are separate questions and answered by
   // separate queries -- the cards aggregate across every project and session,
@@ -162,39 +159,25 @@ export default function ChatAttachmentsPage() {
     },
   ];
 
+  // The dashboard's tiles: two to a row on a phone, where four cards in a
+  // row ran off the screen.
+  const num = new Intl.NumberFormat(i18n.language);
   const statCards = [
-    {
-      label: t("chat_admin.stat_projects"),
-      value: stats ? stats.total_projects : "—",
-    },
-    {
-      label: t("chat_admin.stat_sessions"),
-      value: stats ? stats.total_sessions : "—",
-    },
-    {
-      label: t("chat_admin.stat_attachments"),
-      value: stats ? stats.total_attachments : "—",
-    },
-    {
-      label: t("chat_admin.stat_storage"),
-      value: stats ? formatBytes(stats.total_attachment_bytes) : "—",
-    },
+    { label: t("chat_admin.stat_projects"), value: stats ? num.format(stats.total_projects) : null },
+    { label: t("chat_admin.stat_sessions"), value: stats ? num.format(stats.total_sessions) : null },
+    { label: t("chat_admin.stat_attachments"), value: stats ? num.format(stats.total_attachments) : null },
+    { label: t("chat_admin.stat_storage"), value: stats ? formatBytes(stats.total_attachment_bytes) : null },
   ];
 
   return (
     <>
-      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-        {statCards.map((card) => (
-          <Card key={card.label} sx={{ minWidth: 160, flex: 1 }}>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                {card.label}
-              </Typography>
-              <Typography variant="h5">{card.value}</Typography>
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
+      <Box sx={{ mb: 3 }}>
+        <StatGrid>
+          {statCards.map((card) => (
+            <StatTile key={card.label} label={card.label} value={card.value} loading={statsLoad.loading} />
+          ))}
+        </StatGrid>
+      </Box>
 
       <DataTable
         columns={columns}

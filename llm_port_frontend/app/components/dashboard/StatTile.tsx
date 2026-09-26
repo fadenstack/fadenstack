@@ -37,6 +37,8 @@ export interface StatTileProps {
   loading?: boolean;
   /** Why there is no value, on hover. */
   emptyHint?: string;
+  /** What stands for no value (default "–"). */
+  emptyText?: string;
   /**
    * "kpi" (default): label, large value, detail. "compact": value over a
    * small-caps label, for a strip of secondary figures (p50, p95, …).
@@ -67,6 +69,7 @@ export default function StatTile({
   tone = "default",
   loading = false,
   emptyHint,
+  emptyText = "–",
   variant = "kpi",
 }: StatTileProps) {
   const theme = useTheme();
@@ -81,7 +84,7 @@ export default function StatTile({
           : tone === "ok"
             ? theme.palette.dashboard.health.ok
             : "text.primary";
-  const shown = loading && !hasValue ? null : (value ?? "–");
+  const shown = loading && !hasValue ? null : (value ?? emptyText);
 
   if (variant === "compact") {
     return (
