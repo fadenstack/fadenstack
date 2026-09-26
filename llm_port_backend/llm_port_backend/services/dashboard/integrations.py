@@ -20,7 +20,7 @@ from sqlalchemy import select
 from llm_port_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
 from llm_port_backend.services.dashboard.traffic import RESIDENCY_CLASSES
 from llm_port_backend.services.mcp.client import MCPServiceClient
-from llm_port_backend.services.skills.client import SkillsServiceClient
+from llm_port_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
 from llm_port_backend.settings import settings
 
 if TYPE_CHECKING:
@@ -100,19 +100,31 @@ async def _mcp() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     )
 
 
+#: Who the dashboard asks the skills service as: a tenant admin, so the
+#: counts are the tenant's (and the global skills), never one user's view --
+#: the facts are cached per tenant and shown to every admin.
+_DASHBOARD_PRINCIPAL = SkillsPrincipal(user_id="system:dashboard", caps=("admin",))
+
+
 async def _skills() -> dict[str, Any]:
     client = SkillsServiceClient(
         base_url=settings.skills_service_url,
         service_token=settings.skills_service_token,
         timeout_sec=SERVICE_TIMEOUT_S,
     )
-    data = await client.list_skills()
-    items = data.get("items", []) if isinstance(data, dict) else list(data or [])
-    live = [s for s in items if s.get("status") != "archived"]
-    return {
-        "total": len(live),
-        "active": sum(1 for s in live if s.get("status") == "published" and s.get("enabled")),
-    }
+
+    async def count(*params: tuple[str, str]) -> int:
+        # One row is enough: only the list's ``total`` is read.
+        data = await client.get_json(
+            "/api/skills", _DASHBOARD_PRINCIPAL, params=[("view", "all"), ("limit", "1"), *params]
+        )
+        return int(data.get("total", 0))
+
+    every, archived, usable = await asyncio.gather(
+        count(), count(("status", "archived")), count(("usable", "true"))
+    )
+    # "Active" is what a chat can be given: published, enabled, with a version.
+    return {"total": every - archived, "active": usable}
 
 
 async def load(facts: Facts) -> Integrations:

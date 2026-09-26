@@ -17,7 +17,7 @@ from llm_port_backend.services.dashboard import attention as attention_rules
 from llm_port_backend.services.dashboard import integrations
 from llm_port_backend.services.dashboard.traffic import Attribution
 from llm_port_backend.services.mcp.client import MCPServiceClient
-from llm_port_backend.services.skills.client import SkillsServiceClient
+from llm_port_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
 
 pytestmark = pytest.mark.anyio()
 
@@ -89,11 +89,11 @@ async def test_mcp_and_skills_are_counted_and_a_failing_service_is_named(
             ]
         }
 
-    async def skills(_self: object, **_kw: object) -> list[dict[str, Any]]:
+    async def skills(_self: object, *_a: object, **_kw: object) -> dict[str, Any]:
         raise RuntimeError("skills service down")
 
     monkeypatch.setattr(MCPServiceClient, "list_servers", servers)
-    monkeypatch.setattr(SkillsServiceClient, "list_skills", skills)
+    monkeypatch.setattr(SkillsServiceClient, "get_json", skills)
     facts = _Facts()
 
     found = await facts.integrations()
@@ -105,6 +105,33 @@ async def test_mcp_and_skills_are_counted_and_a_failing_service_is_named(
     assert [(i.code, i.params["name"], i.params["message"]) for i in items] == [
         ("mcp_server_error", "files", "connection refused")
     ]
+
+
+async def test_skills_are_counted_for_the_whole_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(integrations.settings, "mcp_enabled", False)
+    monkeypatch.setattr(integrations.settings, "skills_enabled", True)
+    asked: list[tuple[str, SkillsPrincipal, dict[str, str]]] = []
+    totals = {"": 7, "status=archived": 2, "usable=true": 3}
+
+    async def get_json(
+        _self: object, path: str, principal: SkillsPrincipal, params: list[tuple[str, str]]
+    ) -> dict[str, Any]:
+        query = dict(params)
+        asked.append((path, principal, query))
+        key = "&".join(f"{k}={v}" for k, v in params if k not in {"view", "limit"})
+        return {"items": [], "total": totals[key], "offset": 0, "limit": 1}
+
+    monkeypatch.setattr(SkillsServiceClient, "get_json", get_json)
+
+    found = await integrations.load(_Facts())  # type: ignore[arg-type]
+
+    # Archived skills are not counted; "active" is what a chat can be given.
+    assert found.skills == {"total": 5, "active": 3}
+    assert found.unavailable == []
+    # Counts only (one row each), over everything a tenant admin sees.
+    assert {path for path, _, _ in asked} == {"/api/skills"}
+    assert all(q["view"] == "all" and q["limit"] == "1" for _, _, q in asked)
+    assert all("admin" in p.caps for _, p, _ in asked)
 
 
 async def test_non_superusers_are_refused(

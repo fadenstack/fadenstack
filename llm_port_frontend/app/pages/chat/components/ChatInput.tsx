@@ -421,7 +421,16 @@ export default function ChatInput({
         placement="top-start"
         sx={{ zIndex: theme.zIndex.modal }}
       >
-        <Paper elevation={6} sx={{ mb: 1, minWidth: { xs: "calc(100vw - 16px)", sm: 320 }, maxWidth: 480 }}>
+        {/* On a phone the width of the screen, less its gutters: sized to
+            its content, a long description would widen the page. */}
+        <Paper
+          elevation={6}
+          sx={{
+            mb: 1,
+            minWidth: { xs: "calc(100vw - 16px)", sm: 320 },
+            maxWidth: { xs: "calc(100vw - 16px)", sm: 480 },
+          }}
+        >
           <MenuList dense aria-label={t("skills.chat_picker")}>
             {matches.map((s, i) => (
               <MenuItem
