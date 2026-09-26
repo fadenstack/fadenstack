@@ -310,6 +310,19 @@ export default function ToolPanel({
         </IconButton>
       </Box>
 
+      {tools.length > 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", px: 1.5, pt: 1, lineHeight: 1.4 }}
+        >
+          {t(
+            "tools.panel.hint",
+            "Switched-on tools are offered with every message. The model can find and switch on the others when it needs them.",
+          )}
+        </Typography>
+      )}
+
       {/* Body — scrollable */}
       <Box sx={{ flex: 1, overflow: "auto", py: 0.5 }}>
         {loading && tools.length === 0 && (

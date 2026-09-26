@@ -1743,6 +1743,7 @@
     "executionMode": "Execution",
     "panel": {
       "empty": "No tools available. Check that the MCP services are set up and running.",
+      "hint": "Switched-on tools are offered with every message. The model can find and switch on the others when it needs them.",
       "refresh": "Refresh",
       "title": "Tools"
     }

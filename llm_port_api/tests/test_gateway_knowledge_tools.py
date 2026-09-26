@@ -196,7 +196,7 @@ async def test_not_offered_when_rag_lite_is_off_or_tools_are_ruled_out(
     await _ask(client, tool_choice="none")
     monkeypatch.setattr(settings, "rag_lite_enabled", False)
     await _ask(client)
-    assert [_tool_names(p) for p in model.sent] == [[], []]
+    assert [_tool_names(p) for p in model.sent] == [[], ["current_time"]]
 
 
 # ── Run by the gateway ────────────────────────────────────────────
@@ -309,7 +309,7 @@ async def test_a_tool_the_client_defined_goes_back_to_the_client(
 
     r = await _ask(client, stream=stream, tools=[WEATHER])
     assert len(model.sent) == 1, "not run by the gateway, not asked again"
-    assert _tool_names(model.sent[0]) == ["get_weather", "knowledge_search", "knowledge_open"]
+    assert _tool_names(model.sent[0]) == ["get_weather", "current_time", "knowledge_search", "knowledge_open"]
     if stream:
         _, events = _streamed(r.text)
         calls = [c["delta"]["tool_calls"] for e in events for c in e.get("choices", []) if "tool_calls" in c["delta"]]

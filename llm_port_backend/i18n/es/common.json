@@ -1620,6 +1620,7 @@
     "executionMode": "Ejecución",
     "panel": {
       "empty": "No hay herramientas disponibles. Compruebe que los servicios MCP estén configurados y en ejecución.",
+      "hint": "Las herramientas activadas se ofrecen con cada mensaje. El modelo puede encontrar y activar las demás cuando las necesite.",
       "refresh": "Actualizar",
       "title": "Herramientas"
     }

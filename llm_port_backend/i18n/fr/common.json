@@ -1715,6 +1715,7 @@
     "executionMode": "Exécution",
     "panel": {
       "empty": "Aucun outil disponible. Vérifiez que les services MCP sont configurés et en cours d'exécution.",
+      "hint": "Les outils activés sont proposés à chaque message. Le modèle peut trouver et activer les autres quand il en a besoin.",
       "refresh": "Actualiser",
       "title": "Outils"
     }

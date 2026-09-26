@@ -89,8 +89,8 @@ A stored header is **replaced** or **removed** without the others being
 entered again. Saving reconnects the server and lists its tools again.
 
 **GitHub's hosted server** (`https://api.githubcopilot.com/mcp/`) has 48 tools;
-every tool offered costs prompt tokens on every turn (all 48: about 14.7k).
-Narrow it with headers: `X-MCP-Toolsets: repos` (or `issues`,
+every tool a chat has switched on costs prompt tokens on every turn (all 48:
+about 14.7k). Narrow it with headers: `X-MCP-Toolsets: repos` (or `issues`,
 `pull_requests`, ...), `X-MCP-Tools: get_file_contents,search_repositories`,
 `X-MCP-Readonly: true`.
 
@@ -98,11 +98,34 @@ Narrow it with headers: `X-MCP-Toolsets: repos` (or `issues`,
 
 ## In a chat
 
-The chat's **Tools** panel (the wrench) lists the tools it may use, server by
-server, each with a switch. Only switched-on tools are offered to the model,
-and a tool switched off is refused even if the model names it:
+A new chat has every MCP tool switched off: each tool offered costs prompt
+tokens on every message (the 13 of `server-everything` about 1,500, GitHub's
+48 about 14,700). The model always gets LLM.Port's own tools:
+
+| Tool | What it does |
+|---|---|
+| `get_available_tools` | Searches the tools the chat may use by what they do, and switches on what it finds |
+| `current_time` | The date and time, in UTC or in a time zone (`Europe/Berlin`) |
+| `knowledge_search`, `knowledge_open` | Search the knowledge base, when RAG Lite is on |
+| `attachment_search` | Search files attached to the chat that were too long to include |
+
+An MCP tool is switched on for the chat when:
+
+- the user switches it on in the chat's **Tools** panel (the wrench);
+- the message names it: "use the get-sum tool" offers `get-sum` from the
+  start, and it stays on once the model has used it;
+- the model finds it with `get_available_tools`, or calls it by a name close
+  to its own (`get_sum`): it is offered from the next step, and stays on.
 
 ![A chat with one tool switched on](images/mcp/07-chat-tools.png)
+
+Switched-on tools are offered with every message, and the panel shows them
+on, those the model switched on too. Switching one off saves its tokens; the
+model can still switch it on again when it needs it. To keep a tool out of
+every chat, switch it off on the server's page (Discovered Tools).
+
+Tools go only to a model whose route can call tools, and not when the
+request sets `tool_choice` to `none`.
 
 The gateway runs the calls between rounds of the answer; the reply streams
 once the tools are done:
@@ -114,9 +137,11 @@ it, and they go back to the model with the history, so later turns still call
 tools (each result is kept up to 4,000 characters). The page shows the reply
 only.
 
-A small model may name a tool wrong or quote a number (`"25"`); the gateway
-tells it which tools exist, and the MCP service reads a quoted number or
-boolean in the type the tool declares.
+A small model may name a tool wrong or quote a number (`"25"`). A name close
+to a tool's (`get_sum` for `get-sum`) runs that tool; a made-up one
+(`add_numbers`) is searched for, and the model is told what it found and
+switched on. The MCP service reads a quoted number or boolean in the type the
+tool declares.
 
 ---
 

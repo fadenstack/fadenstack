@@ -1620,6 +1620,7 @@
     "executionMode": "Ausführung",
     "panel": {
       "empty": "Keine Tools verfügbar. Prüfen Sie, ob die MCP-Dienste eingerichtet sind und laufen.",
+      "hint": "Eingeschaltete Werkzeuge werden bei jeder Nachricht angeboten. Die anderen kann das Modell selbst finden und einschalten, wenn es sie braucht.",
       "refresh": "Aktualisieren",
       "title": "Tools"
     }
