@@ -36,7 +36,7 @@ dependencies = [
   "presidio-anonymizer>=2.2",
   "spacy>=3.7",
   "taskiq>=0.12.0,<1",
-  "taskiq-fastapi>=0.3.6,<1",
+  "taskiq-fastapi>=0.5.0,<1",  # >=0.5.0: starts the app by its lifespan; 0.4 called router.startup(), gone in Starlette 1.x
   "taskiq-aio-pika>=0.5.0,<1",
   "python-multipart>=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   # Transitive floors — conservative uv lock, force vulnerable transitives up to the fix:
