@@ -98,7 +98,7 @@ describe("editing a container", () => {
     expect(screen.getByRole("button", { name: "Save and replace" })).toBeDisabled();
   });
 
-  it("says that LLM.Port's own containers come back from the compose file", async () => {
+  it("says that Fadenstack's own containers come back from the compose file", async () => {
     editPage({ ...EVERYTHING, managed_by_compose: true });
     expect(await screen.findByText(/next llmport deploy or upgrade/)).toBeInTheDocument();
   });
