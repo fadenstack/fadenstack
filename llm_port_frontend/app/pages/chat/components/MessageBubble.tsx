@@ -1,5 +1,8 @@
 /**
  * MessageBubble — renders a single chat message with markdown, avatar, and token badge.
+ *
+ * On a phone the avatars go and the reply takes the full width: beside two
+ * 32 px avatars and a 75 % cap, a code block had a third of the screen.
  */
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
@@ -56,12 +59,13 @@ export default function MessageBubble({
         alignItems: "flex-start",
         gap: 1,
         mb: 1.5,
-        px: 1,
+        px: { xs: 0.5, sm: 1 },
       }}
     >
       {/* Avatar */}
       <Avatar
         sx={{
+          display: { xs: "none", sm: "flex" },
           width: 32,
           height: 32,
           mt: 0.5,
@@ -81,9 +85,9 @@ export default function MessageBubble({
 
       <Box
         sx={{
-          maxWidth: "75%",
+          maxWidth: { xs: isUser ? "85%" : "100%", sm: "75%" },
           minWidth: 60,
-          px: 2,
+          px: { xs: 1.5, sm: 2 },
           py: 1.5,
           // Chat-style radius: flat on the side closest to the avatar
           borderRadius: isUser ? "12px 4px 12px 12px" : "4px 12px 12px 12px",

@@ -24,7 +24,7 @@ function PhoneShell() {
   const [hand, setHand] = useNavHand();
   return (
     <MemoryRouter initialEntries={["/admin/dashboard"]}>
-      <MobileNavButton hand={hand} open={open} onOpen={() => setOpen(true)} />
+      <MobileNavButton hand={hand} open={open} onOpen={() => setOpen(true)} controls={ADMIN_NAV_ID} />
       <AdminSidebar
         drawerOpen={false}
         setDrawerOpen={() => {}}

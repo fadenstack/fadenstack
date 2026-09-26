@@ -2,8 +2,12 @@
  * ChatPage — main standalone chat page with sidebar, welcome, and chat window.
  *
  * Route: /chat (welcome) and /chat/:sessionId (active session).
+ *
+ * Below 900 px the sidebar is an overlay; on a phone (below 600 px) it is
+ * opened from a floating button above the composer, on the side of the hand
+ * the user picked -- the same button and choice as the admin console.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useOutletContext } from "react-router";
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
@@ -33,6 +37,8 @@ import ToolPanel from "./components/ToolPanel";
 import PiiPanel from "./components/PiiPanel";
 import { useToolPolicy } from "./hooks/useToolPolicy";
 import { useSessionPiiPolicy } from "./hooks/useSessionPiiPolicy";
+import { ChatShellContext, type ChatShell } from "./ChatShellContext";
+import { useNavHand } from "~/lib/useNavHand";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
@@ -49,6 +55,8 @@ export default function ChatPage() {
   const { t } = useTranslation("chat");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  const [navHand, setNavHand] = useNavHand();
 
   // State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -114,13 +122,19 @@ export default function ChatPage() {
   }, [sessionId, isMobile]);
 
   // Handlers
+  // Picking the chat already open changes no route, so the effect above
+  // would leave the overlay open over it.
   const handleNewChat = useCallback(() => {
     navigate("/chat");
-  }, [navigate]);
+    if (isMobile) setSidebarOpen(false);
+  }, [navigate, isMobile]);
 
   const handleSelectSession = useCallback(
-    (id: string) => navigate(`/chat/${id}`),
-    [navigate],
+    (id: string) => {
+      navigate(`/chat/${id}`);
+      if (isMobile) setSidebarOpen(false);
+    },
+    [navigate, isMobile],
   );
 
   const handleSessionCreated = useCallback(
@@ -233,8 +247,24 @@ export default function ChatPage() {
 
   const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
+  const shell = useMemo<ChatShell>(
+    () => ({
+      userEmail: user.email,
+      onProfile: () => setProfileOpen(true),
+      onLogout: handleLogout,
+      phoneNav: isPhone
+        ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
+        : null,
+    }),
+    [user.email, handleLogout, isPhone, navHand, sidebarOpen],
+  );
+
+  // A phone's 100vh reaches behind the browser's toolbar.
+  const fullHeight = { height: "100vh", "@supports (height: 100dvh)": { height: "100dvh" } };
+
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <ChatShellContext.Provider value={shell}>
+    <Box sx={{ display: "flex", ...fullHeight, overflow: "hidden" }}>
       {/* Sidebar */}
       <ChatSidebar
         open={sidebarOpen}
@@ -251,9 +281,7 @@ export default function ChatPage() {
         onMoveSession={handleMoveSession}
         width={SIDEBAR_WIDTH}
         isMobile={isMobile}
-        currentUserEmail={user.email}
-        onLogout={handleLogout}
-        onProfileOpen={() => setProfileOpen(true)}
+        phone={isPhone ? { hand: navHand, onHandChange: setNavHand } : undefined}
       />
 
       {/* Main content */}
@@ -262,7 +290,7 @@ export default function ChatPage() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          height: "100vh",
+          ...fullHeight,
           minWidth: 0,
           ml: isMobile ? 0 : `${sidebarWidth}px`,
           transition: "margin-left 0.2s ease",
@@ -311,7 +339,7 @@ export default function ChatPage() {
           ModalProps={{ keepMounted: true }}
           PaperProps={{
             sx: {
-              width: 320,
+              width: "min(320px, 100vw)",
               mt: "56px",
               height: "calc(100% - 56px)",
               display: "flex",
@@ -370,6 +398,7 @@ export default function ChatPage() {
         onClose={() => setProfileOpen(false)}
         maxWidth="sm"
         fullWidth
+        fullScreen={isPhone}
       >
         <DialogTitle
           sx={{
@@ -379,7 +408,11 @@ export default function ChatPage() {
           }}
         >
           {""}
-          <IconButton size="small" onClick={() => setProfileOpen(false)}>
+          <IconButton
+            size="small"
+            onClick={() => setProfileOpen(false)}
+            aria-label={t("common.close", { ns: "common", defaultValue: "Close" })}
+          >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -388,5 +421,6 @@ export default function ChatPage() {
         </DialogContent>
       </Dialog>
     </Box>
+    </ChatShellContext.Provider>
   );
 }

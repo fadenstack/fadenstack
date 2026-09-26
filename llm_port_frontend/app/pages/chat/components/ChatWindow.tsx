@@ -3,34 +3,24 @@
  */
 import { useEffect, useRef, useState } from "react";
 import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import { useTheme } from "@mui/material/styles";
-import MenuIcon from "@mui/icons-material/Menu";
 import ReplayIcon from "@mui/icons-material/Replay";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import LightModeIcon from "@mui/icons-material/LightMode";
-import DarkModeIcon from "@mui/icons-material/DarkMode";
-import TranslateIcon from "@mui/icons-material/Translate";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useLocation } from "react-router";
+import { useLocation } from "react-router";
 
 import Avatar from "@mui/material/Avatar";
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
 import type { ChatSession, TokenUsage } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
-import i18n from "~/i18n";
 import type { InitialMessageState } from "./ChatWelcome";
-import { useThemeMode } from "~/theme-mode";
 import { useChatStream } from "../hooks/useChatStream";
 import MessageBubble from "./MessageBubble";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
+import ChatTopbar from "./ChatTopbar";
 
 interface Props {
   sessionId: string;
@@ -67,11 +57,6 @@ export default function ChatWindow({
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const navigate = useNavigate();
-  const { mode, toggleMode } = useThemeMode();
-  const [langMenuAnchor, setLangMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
   const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -156,87 +141,16 @@ export default function ChatWindow({
         position: "relative",
       }}
     >
-      {/* Top bar */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          px: 1.5,
-          py: 1,
-          minHeight: 56,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        {!sidebarOpen && (
-          <IconButton size="small" onClick={onToggleSidebar} sx={{ mr: 1 }}>
-            <MenuIcon />
-          </IconButton>
-        )}
-        <Typography variant="body1" fontWeight={600} noWrap sx={{ flex: 1 }}>
-          {t("chat.conversation", { defaultValue: "Conversation" })}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          {isSuperuser && (
-            <Tooltip title={t("nav.admin", { defaultValue: "Admin panel" })}>
-              <IconButton size="small" onClick={() => navigate("/admin")}>
-                <AdminPanelSettingsIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title={t("language.label", { defaultValue: "Language" })}>
-            <IconButton
-              size="small"
-              onClick={(e) => setLangMenuAnchor(e.currentTarget)}
-            >
-              <TranslateIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Menu
-            anchorEl={langMenuAnchor}
-            open={Boolean(langMenuAnchor)}
-            onClose={() => setLangMenuAnchor(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            transformOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            {languages.map((lang) => (
-              <MenuItem
-                key={lang.code}
-                selected={language === lang.code}
-                onClick={() => {
-                  onLanguageChange(lang.code);
-                  void i18n
-                    .reloadResources([lang.code], ["common", "chat"])
-                    .then(() => i18n.changeLanguage(lang.code));
-                  setLangMenuAnchor(null);
-                }}
-              >
-                {lang.name}
-              </MenuItem>
-            ))}
-          </Menu>
-          <Tooltip
-            title={
-              mode === "dark"
-                ? t("theme.light", {
-                    ns: "common",
-                    defaultValue: "Switch to light mode",
-                  })
-                : t("theme.dark", {
-                    ns: "common",
-                    defaultValue: "Switch to dark mode",
-                  })
-            }
-          >
-            <IconButton size="small" onClick={toggleMode}>
-              {mode === "dark" ? (
-                <LightModeIcon fontSize="small" />
-              ) : (
-                <DarkModeIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
+      <ChatTopbar
+        title={t("chat.conversation", { defaultValue: "Conversation" })}
+        onToggleSidebar={onToggleSidebar}
+        sidebarOpen={sidebarOpen}
+        languages={languages}
+        language={language}
+        onLanguageChange={onLanguageChange}
+        isSuperuser={isSuperuser}
+        divider
+      />
 
       {/* Messages area */}
       <Box
@@ -244,7 +158,8 @@ export default function ChatWindow({
           flex: 1,
           overflowY: "auto",
           overflowX: "hidden",
-          py: 2,
+          pt: 2,
+          pb: { xs: 9, sm: 2 },
           display: "flex",
           flexDirection: "column",
         }}
@@ -312,13 +227,14 @@ export default function ChatWindow({
                   height: 32,
                   mt: 0.5,
                   bgcolor: theme.palette.error.dark,
+                  display: { xs: "none", sm: "flex" },
                 }}
               >
                 <ErrorOutlineIcon sx={{ fontSize: 18 }} />
               </Avatar>
               <Box
                 sx={{
-                  maxWidth: "75%",
+                  maxWidth: { xs: "100%", sm: "75%" },
                   minWidth: 60,
                   px: 2,
                   py: 1.5,
@@ -355,7 +271,7 @@ export default function ChatWindow({
                     color="error"
                     startIcon={<ReplayIcon />}
                     onClick={retry}
-                    sx={{ textTransform: "none", borderRadius: 2 }}
+                    sx={{ textTransform: "none" }}
                   >
                     {t("retry", { ns: "chat", defaultValue: "Retry" })}
                   </Button>

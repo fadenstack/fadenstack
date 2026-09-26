@@ -1950,7 +1950,8 @@
     "welcome_subtitle": "Starten Sie ein Gespräch, laden Sie eine Datei hoch oder probieren Sie einen dieser Vorschläge.",
     "token_detail": "Prompt: {{prompt}} · Completion: {{completion}} · Gesamt: {{total}}",
     "no_models": "Keine Modelle",
-    "no_models_hint": "Es sind keine Modelle verfügbar. Konfigurieren Sie im Admin-Bereich einen Provider und einen Modell-Alias."
+    "no_models_hint": "Es sind keine Modelle verfügbar. Konfigurieren Sie im Admin-Bereich einen Provider und einen Modell-Alias.",
+    "session_actions": "Chat-Aktionen"
   },
   "module_recommend": {
     "apply": "Übernehmen",

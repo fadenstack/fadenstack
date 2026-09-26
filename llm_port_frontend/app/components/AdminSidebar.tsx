@@ -14,8 +14,6 @@ import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
 import Drawer from "@mui/material/Drawer";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -28,13 +26,13 @@ import Typography from "@mui/material/Typography";
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import CloseIcon from "@mui/icons-material/Close";
-import FrontHandOutlinedIcon from "@mui/icons-material/FrontHandOutlined";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 import AppBrand from "~/components/AppBrand";
+import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
 import { usePendingJoins } from "~/lib/usePendingJoins";
 import type { NavHand } from "~/lib/useNavHand";
 
@@ -504,7 +502,7 @@ export function AdminSidebar({
           sx={{
             width: 40,
             height: 40,
-            borderRadius: 1.5,
+            borderRadius: 1,
             flexShrink: 0,
             p: 0.5,
             "&:hover": { bgcolor: "action.hover" },
@@ -651,7 +649,7 @@ export function AdminSidebar({
 
       {/* Collapse / reset row; on a phone, which side the menu button is on */}
       {mobile ? (
-        <HandPicker hand={mobile.hand} onChange={mobile.onHandChange} />
+        <NavHandPicker hand={mobile.hand} onChange={mobile.onHandChange} />
       ) : (
       <Box
         sx={{
@@ -699,16 +697,7 @@ export function AdminSidebar({
             id: ADMIN_NAV_ID,
             role: "dialog",
             "aria-label": t("nav.navigation"),
-            sx: {
-              width: "min(300px, 85vw)",
-              boxSizing: "border-box",
-              overflowX: "hidden",
-              pb: "env(safe-area-inset-bottom, 0px)",
-              // Rounded on the edge that faces the page: a sheet over it.
-              ...(mobile.hand === "right"
-                ? { borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }
-                : { borderTopRightRadius: 16, borderBottomRightRadius: 16 }),
-            },
+            sx: phonePanelPaperSx(mobile.hand),
           },
         }}
       >
@@ -734,34 +723,5 @@ export function AdminSidebar({
     >
       {content}
     </Drawer>
-  );
-}
-
-/** Left or right: moves the menu button (and this panel) to that side. */
-function HandPicker({ hand, onChange }: { hand: NavHand; onChange: (hand: NavHand) => void }) {
-  const { t } = useTranslation();
-  return (
-    <Box sx={{ px: 2, pt: 1, pb: 1.5, borderTop: 1, borderColor: "divider" }}>
-      <Typography id="nav-hand-label" variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
-        {t("nav.button_side")}
-      </Typography>
-      <ToggleButtonGroup
-        exclusive
-        fullWidth
-        size="small"
-        value={hand}
-        onChange={(_e, value: NavHand | null) => value && onChange(value)}
-        aria-labelledby="nav-hand-label"
-      >
-        <ToggleButton value="left" sx={{ minHeight: 44, gap: 1, textTransform: "none" }}>
-          <FrontHandOutlinedIcon fontSize="small" sx={{ transform: "scaleX(-1)" }} />
-          {t("nav.side_left")}
-        </ToggleButton>
-        <ToggleButton value="right" sx={{ minHeight: 44, gap: 1, textTransform: "none" }}>
-          <FrontHandOutlinedIcon fontSize="small" />
-          {t("nav.side_right")}
-        </ToggleButton>
-      </ToggleButtonGroup>
-    </Box>
   );
 }

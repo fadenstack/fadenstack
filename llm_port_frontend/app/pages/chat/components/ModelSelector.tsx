@@ -21,12 +21,15 @@ interface Props {
   value: string;
   onChange: (alias: string) => void;
   size?: "small" | "medium";
+  /** A borderless-label pill for a phone's composer row. */
+  compact?: boolean;
 }
 
 export default function ModelSelector({
   value,
   onChange,
   size = "small",
+  compact = false,
 }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -83,6 +86,36 @@ export default function ModelSelector({
           sx={{ fontSize: "0.75rem", height: 28, cursor: "pointer" }}
         />
       </Tooltip>
+    );
+  }
+
+  if (compact) {
+    return (
+      <Select
+        id="model-selector"
+        size="small"
+        value={models.some((m) => m.alias === value) ? value : ""}
+        onChange={handleChange}
+        displayEmpty
+        inputProps={{ "aria-label": t("chat.model", { defaultValue: "Model" }) }}
+        sx={{
+          fontSize: "0.8rem",
+          height: 32,
+          maxWidth: "100%",
+          minWidth: 0,
+          "& .MuiSelect-select": { py: 0.5, pl: 1.5, overflow: "hidden", textOverflow: "ellipsis" },
+        }}
+        MenuProps={{
+          anchorOrigin: { vertical: "top", horizontal: "left" },
+          transformOrigin: { vertical: "bottom", horizontal: "left" },
+        }}
+      >
+        {models.map((m) => (
+          <MenuItem key={m.alias} value={m.alias} sx={{ fontSize: "0.9rem", minHeight: 44 }}>
+            {m.alias}
+          </MenuItem>
+        ))}
+      </Select>
     );
   }
 

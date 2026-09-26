@@ -15,7 +15,6 @@ import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
-import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -23,22 +22,21 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ExploreIcon from "@mui/icons-material/Explore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import LogoutIcon from "@mui/icons-material/Logout";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import ReplayIcon from "@mui/icons-material/Replay";
 import SecurityIcon from "@mui/icons-material/Security";
 import TourIcon from "@mui/icons-material/Tour";
 import TranslateIcon from "@mui/icons-material/Translate";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SchoolIcon from "@mui/icons-material/School";
+
+import { NavLogoButton } from "~/components/NavLogoButton";
+import { UserMenuButton } from "~/components/UserMenuButton";
 
 export interface AdminTopbarProps {
   mode: "light" | "dark";
@@ -90,10 +88,6 @@ export function AdminTopbar({
   const navigate = useNavigate();
   const isRootActive = rootStatus?.active ?? false;
 
-  // User dropdown menu state
-  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
   // Help dropdown menu state
   const [helpMenuAnchor, setHelpMenuAnchor] = useState<HTMLElement | null>(
     null,
@@ -103,18 +97,9 @@ export function AdminTopbar({
     <AppBar position="static" elevation={0}>
       <Toolbar variant="dense" sx={{ justifyContent: "flex-end", gap: 1.5 }}>
         {onOpenNav && (
-          <IconButton
-            onClick={onOpenNav}
-            aria-label={t("nav.open_navigation")}
-            sx={{ mr: "auto", width: 36, height: 36, p: 0.5, borderRadius: 1.5 }}
-          >
-            <Box
-              component="img"
-              src="/icon_color.png"
-              alt=""
-              sx={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 1 }}
-            />
-          </IconButton>
+          <Box sx={{ mr: "auto" }}>
+            <NavLogoButton onClick={onOpenNav} />
+          </Box>
         )}
         <Tooltip title={t("chat.title", { defaultValue: "Chat" })} arrow>
           <IconButton
@@ -332,63 +317,11 @@ export function AdminTopbar({
             )}
           </>
         )}
-        {/* Just the avatar: the email took a third of the bar on a narrow
-            screen. It is in the tooltip and at the top of the menu. */}
-        <Tooltip title={t("profile.logged_in_as", { email: currentUserEmail })} arrow>
-          <IconButton
-            size="small"
-            data-tour-id="topbar.profile"
-            onClick={(e) => setUserMenuAnchor(e.currentTarget)}
-            aria-label={t("profile.logged_in_as", { email: currentUserEmail })}
-            aria-haspopup="menu"
-            aria-expanded={Boolean(userMenuAnchor)}
-            sx={{ color: "text.primary" }}
-          >
-            <AccountCircleIcon />
-          </IconButton>
-        </Tooltip>
-        <Menu
-          anchorEl={userMenuAnchor}
-          open={Boolean(userMenuAnchor)}
-          onClose={() => setUserMenuAnchor(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-          slotProps={{ paper: { sx: { minWidth: 220, maxWidth: 320 } } }}
-        >
-          {/* Who is signed in: a heading, not an action, so keyboard focus
-              starts on the first item that does something. */}
-          <Box sx={{ px: 2, pt: 1, pb: 1.25 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              {t("profile.logged_in_label")}
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: "break-all" }}>
-              {currentUserEmail}
-            </Typography>
-          </Box>
-          <Divider sx={{ mb: 0.5 }} />
-          <MenuItem
-            onClick={() => {
-              setUserMenuAnchor(null);
-              navigate("/admin/profile");
-            }}
-          >
-            <ListItemIcon>
-              <ManageAccountsIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>{t("profile.manage_profile")}</ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setUserMenuAnchor(null);
-              onLogout();
-            }}
-          >
-            <ListItemIcon>
-              <LogoutIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>{t("profile.logout")}</ListItemText>
-          </MenuItem>
-        </Menu>
+        <UserMenuButton
+          email={currentUserEmail}
+          onProfile={() => navigate("/admin/profile")}
+          onLogout={onLogout}
+        />
       </Toolbar>
     </AppBar>
   );

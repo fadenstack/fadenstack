@@ -35,7 +35,7 @@ import {
   type NavEntry,
 } from "~/lib/adminConstants";
 import { AdminTopbar } from "~/components/AdminTopbar";
-import { AdminSidebar } from "~/components/AdminSidebar";
+import { ADMIN_NAV_ID, AdminSidebar } from "~/components/AdminSidebar";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { RootModeDialog } from "~/components/RootModeDialog";
 import { ProductTourDialog } from "~/components/ProductTourDialog";
@@ -438,6 +438,7 @@ function AdminLayoutInner() {
           hand={navHand}
           open={mobileNavOpen}
           onOpen={() => setMobileNavOpen(true)}
+          controls={ADMIN_NAV_ID}
         />
       )}
 

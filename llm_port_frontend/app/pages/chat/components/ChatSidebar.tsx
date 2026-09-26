@@ -1,10 +1,13 @@
 /**
  * ChatSidebar — session list grouped by project with project CRUD.
  * Supports drag-and-drop of sessions between projects via @dnd-kit.
+ *
+ * On a touch screen there is no hover to reveal a chat's actions and a drag
+ * would take over scrolling, so each chat has a ⋮ menu instead and dragging
+ * is off. On a phone the panel slides in from the side of the user's hand.
  */
 import { useState, useCallback } from "react";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -20,16 +23,15 @@ import TextField from "@mui/material/TextField";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Collapse from "@mui/material/Collapse";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderIcon from "@mui/icons-material/Folder";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
-import LogoutIcon from "@mui/icons-material/Logout";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
-import MenuIcon from "@mui/icons-material/Menu";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
@@ -49,6 +51,9 @@ import {
 } from "@dnd-kit/core";
 
 import type { ChatSession, ChatProject } from "~/api/chatTypes";
+import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
+import type { NavHand } from "~/lib/useNavHand";
+import { CHAT_NAV_ID } from "../ChatShellContext";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
 
 interface Props {
@@ -73,10 +78,8 @@ interface Props {
   onMoveSession: (sessionId: string, projectId: string | null) => void;
   width: number;
   isMobile: boolean;
-  // User
-  currentUserEmail: string;
-  onLogout: () => void;
-  onProfileOpen: () => void;
+  /** Set on a phone: the panel comes in from this side, with the side picker. */
+  phone?: { hand: NavHand; onHandChange: (hand: NavHand) => void };
 }
 
 export default function ChatSidebar({
@@ -94,22 +97,24 @@ export default function ChatSidebar({
   onMoveSession,
   width,
   isMobile,
-  currentUserEmail,
-  onLogout,
-  onProfileOpen,
+  phone,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
+  // No hover (a touch screen): actions behind a ⋮ button, no dragging.
+  const touch = !useMediaQuery("(hover: hover)");
+  const touchButton = touch ? { width: 40, height: 40 } : {};
 
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
   );
-  // User dropdown menu state
-  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
+  // A chat's actions on a touch screen
+  const [moreAnchor, setMoreAnchor] = useState<{
+    el: HTMLElement;
+    sessionId: string;
+  } | null>(null);
   // Move-to-project menu state
   const [moveAnchor, setMoveAnchor] = useState<{
     el: HTMLElement;
@@ -206,18 +211,23 @@ export default function ChatSidebar({
           <Tooltip
             title={t("chat.new_project", { defaultValue: "New project" })}
           >
-            <IconButton size="small" onClick={() => setCreatingProject(true)}>
+            <IconButton size="small" onClick={() => setCreatingProject(true)} sx={touchButton}>
               <CreateNewFolderIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title={t("chat.new_chat", { defaultValue: "New chat" })}>
-            <IconButton size="small" onClick={onNewChat}>
+            <IconButton size="small" onClick={onNewChat} sx={touchButton}>
               <AddIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           {isMobile && (
-            <IconButton size="small" onClick={onToggle}>
-              <MenuIcon fontSize="small" />
+            <IconButton
+              size="small"
+              onClick={onToggle}
+              aria-label={t("nav.close_navigation")}
+              sx={touchButton}
+            >
+              <CloseIcon fontSize="small" />
             </IconButton>
           )}
         </Box>
@@ -313,7 +323,7 @@ export default function ChatSidebar({
                         e.stopPropagation();
                         setEditingProject(proj);
                       }}
-                      sx={{ ml: 0.5 }}
+                      sx={{ ml: 0.5, ...touchButton }}
                     >
                       <SettingsOutlinedIcon sx={{ fontSize: 14 }} />
                     </IconButton>
@@ -323,7 +333,7 @@ export default function ChatSidebar({
                         e.stopPropagation();
                         onDeleteProject(proj.id);
                       }}
-                      sx={{ ml: 0.5 }}
+                      sx={{ ml: 0.5, ...touchButton }}
                     >
                       <DeleteOutlineIcon sx={{ fontSize: 14 }} />
                     </IconButton>
@@ -341,6 +351,8 @@ export default function ChatSidebar({
                         onMoveClick={(el) =>
                           setMoveAnchor({ el, sessionId: s.id })
                         }
+                        touch={touch}
+                        onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
                       />
                     ))}
                   </List>
@@ -362,6 +374,8 @@ export default function ChatSidebar({
                     onSelect={onSelectSession}
                     onDelete={onDeleteSession}
                     onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
+                    touch={touch}
+                    onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
                   />
                 ))}
               </List>
@@ -408,67 +422,40 @@ export default function ChatSidebar({
         </DndContext>
       </Box>
 
-      {/* Bottom user section */}
-      <Divider />
-      <Box
-        sx={{
-          px: 1.5,
-          py: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        <Chip
-          icon={<AccountCircleIcon />}
-          label={currentUserEmail}
-          variant="outlined"
-          size="small"
-          onClick={(e) => setUserMenuAnchor(e.currentTarget)}
-          sx={{
-            cursor: "pointer",
-            maxWidth: "100%",
-            "& .MuiChip-label": {
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            },
-          }}
-        />
-      </Box>
+      {/* Which side the menu button is on (phone) */}
+      {phone && <NavHandPicker hand={phone.hand} onChange={phone.onHandChange} />}
 
-      {/* User dropdown menu */}
+      {/* A chat's actions on a touch screen */}
       <Menu
-        anchorEl={userMenuAnchor}
-        open={Boolean(userMenuAnchor)}
-        onClose={() => setUserMenuAnchor(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "left" }}
-        transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-        slotProps={{ paper: { sx: { minWidth: 180 } } }}
+        anchorEl={moreAnchor?.el}
+        open={!!moreAnchor}
+        onClose={() => setMoreAnchor(null)}
       >
         <MenuItem
+          sx={{ minHeight: 44 }}
           onClick={() => {
-            setUserMenuAnchor(null);
-            onProfileOpen();
+            if (moreAnchor) setMoveAnchor(moreAnchor);
+            setMoreAnchor(null);
           }}
         >
           <ListItemIcon>
-            <ManageAccountsIcon fontSize="small" />
+            <DriveFileMoveOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>
-            {t("profile.manage_profile", { defaultValue: "Profile" })}
+            {t("chat.move_to_project", { defaultValue: "Move to project" })}
           </ListItemText>
         </MenuItem>
         <MenuItem
+          sx={{ minHeight: 44 }}
           onClick={() => {
-            setUserMenuAnchor(null);
-            onLogout();
+            if (moreAnchor) onDeleteSession(moreAnchor.sessionId);
+            setMoreAnchor(null);
           }}
         >
           <ListItemIcon>
-            <LogoutIcon fontSize="small" />
+            <DeleteOutlineIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>
-            {t("profile.logout", { defaultValue: "Logout" })}
-          </ListItemText>
+          <ListItemText>{t("common.delete", { defaultValue: "Delete" })}</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -521,9 +508,18 @@ export default function ChatSidebar({
     return (
       <Drawer
         variant="temporary"
+        anchor={phone?.hand ?? "left"}
         open={open}
         onClose={onToggle}
-        sx={{ "& .MuiDrawer-paper": { width } }}
+        ModalProps={{ keepMounted: true }}
+        slotProps={{
+          paper: {
+            id: CHAT_NAV_ID,
+            role: "dialog",
+            "aria-label": t("nav.navigation"),
+            sx: phone ? phonePanelPaperSx(phone.hand) : { width },
+          },
+        }}
       >
         {drawerContent}
       </Drawer>
@@ -588,15 +584,20 @@ function DraggableSessionItem({
   onSelect,
   onDelete,
   onMoveClick,
+  touch,
+  onMoreClick,
 }: {
   session: ChatSession;
   active: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onMoveClick: (el: HTMLElement) => void;
+  touch: boolean;
+  onMoreClick: (el: HTMLElement) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: session.id,
+    disabled: touch,
   });
 
   return (
@@ -612,6 +613,8 @@ function DraggableSessionItem({
         onSelect={onSelect}
         onDelete={onDelete}
         onMoveClick={onMoveClick}
+        touch={touch}
+        onMoreClick={onMoreClick}
       />
     </Box>
   );
@@ -625,12 +628,16 @@ function SessionItem({
   onSelect,
   onDelete,
   onMoveClick,
+  touch,
+  onMoreClick,
 }: {
   session: ChatSession;
   active: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onMoveClick: (el: HTMLElement) => void;
+  touch: boolean;
+  onMoreClick: (el: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
@@ -641,7 +648,7 @@ function SessionItem({
       onClick={() => onSelect(session.id)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      sx={{ pl: session.project_id ? 3 : 1.5, pr: 1 }}
+      sx={{ pl: session.project_id ? 3 : 1.5, pr: 1, ...(touch ? { minHeight: 48 } : {}) }}
     >
       <ListItemIcon sx={{ minWidth: 28 }}>
         <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
@@ -655,7 +662,20 @@ function SessionItem({
           fontSize: "0.85rem",
         }}
       />
-      {hovered && (
+      {touch && (
+        <IconButton
+          edge="end"
+          aria-label={t("chat.session_actions", { defaultValue: "Chat actions" })}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoreClick(e.currentTarget);
+          }}
+          sx={{ width: 40, height: 40 }}
+        >
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+      )}
+      {!touch && hovered && (
         <Box sx={{ display: "flex", ml: 0.5 }}>
           <Tooltip
             title={t("chat.move_to_project", {
