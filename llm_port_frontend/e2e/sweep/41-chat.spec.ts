@@ -52,7 +52,10 @@ test.describe("a chat", () => {
     const watch = new Watch(page, new URL(baseURL!).origin);
     const first = `Sweep ${STAMP}: name one colour of the sky`;
     await page.goto("/chat");
-    await expect(sidebar(page).getByText("Today").first()).toBeVisible(); // the list has loaded
+    // The list has loaded: a date group shows ("Today" is missing just after midnight).
+    await expect(
+      sidebar(page).getByText(/^(Today|Yesterday|Previous 7 days|Previous 30 days|Older)$/).first(),
+    ).toBeVisible();
     await send(page, first);
     await page.waitForURL(/\/chat\/[0-9a-f-]{36}/);
     await replyDone(page);

@@ -68,7 +68,11 @@ export class Watch {
   };
 
   constructor(private readonly page: Page, private readonly origin: string) {
-    page.on("pageerror", (err) => this.problems.pageErrors.push(err.message.split("\n")[0]));
+    page.on("pageerror", (err) => {
+      // The embedded Grafana's own scripts throw inside its frame (their stack says so).
+      if (NOISE.some((re) => re.test(err.stack ?? ""))) return;
+      this.problems.pageErrors.push(err.message.split("\n")[0]);
+    });
     page.on("console", (msg) => {
       if (msg.type() !== "error") return;
       const text = msg.text();
