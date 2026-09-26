@@ -6,6 +6,7 @@ import {
   hardware,
   type DashboardHealth,
   type DashboardOverview,
+  type DashboardTopContainers,
   type HardwareInfo,
 } from "~/api/admin";
 import { providers as providersApi, type Provider } from "~/api/llm";
@@ -165,6 +166,8 @@ export default function DashboardPage() {
   );
 
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [topContainers, setTopContainers] =
+    useState<DashboardTopContainers | null>(null);
   const [health, setHealth] = useState<DashboardHealth | null>(null);
   const [hw, setHw] = useState<HardwareInfo | null>(null);
   const [llmProviders, setLlmProviders] = useState<Provider[]>([]);
@@ -188,6 +191,10 @@ export default function DashboardPage() {
       });
 
     const rest = [
+      dashboard
+        .topContainers()
+        .then(setTopContainers)
+        .catch(() => {}),
       dashboard
         .health()
         .then(setHealth)
@@ -673,7 +680,7 @@ export default function DashboardPage() {
         return <DataResidencyCard providers={llmProviders} />;
 
       case "top_containers":
-        return overview ? (
+        return topContainers ? (
           <Grid container spacing={1.5}>
             <Grid size={{ xs: 12, md: 6 }}>
               <Card variant="outlined">
@@ -681,13 +688,13 @@ export default function DashboardPage() {
                   <Typography variant="h6" sx={{ mb: 1 }}>
                     {t("dashboard.top_cpu")}
                   </Typography>
-                  {overview.top_cpu_containers.length === 0 ? (
+                  {topContainers.top_cpu_containers.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       {t("dashboard.no_running_stats")}
                     </Typography>
                   ) : (
                     <List dense disablePadding>
-                      {overview.top_cpu_containers.map((item) => (
+                      {topContainers.top_cpu_containers.map((item) => (
                         <ListItem key={item.container_id} disableGutters>
                           <ListItemText
                             primary={item.name}
@@ -710,13 +717,13 @@ export default function DashboardPage() {
                   <Typography variant="h6" sx={{ mb: 1 }}>
                     {t("dashboard.top_memory")}
                   </Typography>
-                  {overview.top_memory_containers.length === 0 ? (
+                  {topContainers.top_memory_containers.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       {t("dashboard.no_running_stats")}
                     </Typography>
                   ) : (
                     <List dense disablePadding>
-                      {overview.top_memory_containers.map((item) => (
+                      {topContainers.top_memory_containers.map((item) => (
                         <ListItem key={item.container_id} disableGutters>
                           <ListItemText
                             primary={item.name}

@@ -204,7 +204,9 @@ export interface DashboardOverview {
   gpu_util_percent: number | null;
   gpu_vram_used_bytes: number | null;
   gpu_vram_total_bytes: number | null;
+}
 
+export interface DashboardTopContainers {
   top_cpu_containers: DashboardTopUser[];
   top_memory_containers: DashboardTopUser[];
 }
@@ -454,6 +456,9 @@ export const rootMode = {
 export const dashboard = {
   overview() {
     return request<DashboardOverview>("/dashboard/overview");
+  },
+  topContainers() {
+    return request<DashboardTopContainers>("/dashboard/top-containers");
   },
   health() {
     return request<DashboardHealth>("/dashboard/health");

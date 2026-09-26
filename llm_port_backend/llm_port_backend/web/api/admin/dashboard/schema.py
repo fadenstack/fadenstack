@@ -68,6 +68,10 @@ class DashboardOverviewDTO(BaseModel):
     gpu_vram_used_bytes: int | None = None
     gpu_vram_total_bytes: int | None = None
 
+
+class DashboardTopContainersDTO(BaseModel):
+    """Running containers ranked by CPU and by memory usage."""
+
     top_cpu_containers: list[DashboardTopUserDTO] = Field(default_factory=list)
     top_memory_containers: list[DashboardTopUserDTO] = Field(default_factory=list)
 

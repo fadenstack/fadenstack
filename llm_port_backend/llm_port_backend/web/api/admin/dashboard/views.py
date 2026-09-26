@@ -21,6 +21,7 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     DashboardHealthDTO,
     DashboardHealthItemDTO,
     DashboardOverviewDTO,
+    DashboardTopContainersDTO,
     DashboardTopUserDTO,
     GrafanaPanelDTO,
     GrafanaPanelsDTO,
@@ -35,6 +36,9 @@ _REQUEST_COUNTER_NAMES = {
     "http_request_duration_seconds_count",
     "http_server_requests_total",
 }
+
+_STATS_CONCURRENCY = 16
+_STATS_TIMEOUT_SECONDS = 5.0
 
 
 def _to_float(value: object, default: float = 0.0) -> float:
@@ -156,6 +160,33 @@ async def _tcp_health(host: str, port: int, timeout: float = 0.8) -> bool:
         return False
 
 
+async def _collect_container_stats(
+    docker: DockerService,
+    container_ids: list[str],
+) -> dict[str, dict[str, object]]:
+    """Fetch stats for many containers concurrently.
+
+    A non-streaming Docker stats call blocks ~1-2 s while the daemon takes
+    a second CPU sample, so fetching them one after another makes the
+    dashboard scale linearly with the container count.  Containers whose
+    stats fail or time out are left out.
+    """
+    sem = asyncio.Semaphore(_STATS_CONCURRENCY)
+
+    async def _one(cid: str) -> tuple[str, dict[str, object] | None]:
+        async with sem:
+            try:
+                return cid, await asyncio.wait_for(
+                    docker.container_stats(cid),
+                    timeout=_STATS_TIMEOUT_SECONDS,
+                )
+            except Exception:
+                return cid, None
+
+    results = await asyncio.gather(*(_one(cid) for cid in container_ids))
+    return {cid: stats for cid, stats in results if stats is not None}
+
+
 def _collect_gpu_metrics() -> dict[str, float | int | None]:
     """Collect GPU utilization and VRAM usage.
 
@@ -223,8 +254,15 @@ async def overview(
     docker: DockerService = Depends(get_docker),
     _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
 ) -> DashboardOverviewDTO:
-    """Return an aggregated snapshot for the admin dashboard landing page."""
-    raw_containers = await docker.list_containers(all_=True)
+    """Return an aggregated snapshot for the admin dashboard landing page.
+
+    Per-container stats live in ``/top-containers``: Docker needs 1-2 s to
+    sample a container's CPU, which would hold back every card on the page.
+    """
+    raw_containers, host = await asyncio.gather(
+        docker.list_containers(all_=True),
+        asyncio.to_thread(_collect_host_snapshot),
+    )
     containers_total = len(raw_containers)
     containers_running = sum(1 for c in raw_containers if str(c.get("State", "")).lower() == "running")
     containers_restarting = sum(1 for c in raw_containers if str(c.get("State", "")).lower() == "restarting")
@@ -232,77 +270,7 @@ async def overview(
     restart_counts = [_to_float(c.get("RestartCount"), default=0.0) for c in raw_containers]
     restart_total = int(sum(restart_counts))
 
-    cpu_users: list[DashboardTopUserDTO] = []
-    memory_users: list[DashboardTopUserDTO] = []
-    aggregate_cpu_percent = 0.0
-    aggregate_mem_used = 0
-    aggregate_mem_limit = 0
-    aggregate_net_rx = 0
-    aggregate_net_tx = 0
-    running_containers = [c for c in raw_containers if str(c.get("State", "")).lower() == "running"]
-    for container in running_containers:
-        cid = str(container.get("Id", ""))
-        if not cid:
-            continue
-        try:
-            stats = await docker.container_stats(cid)
-        except Exception:
-            continue
-        cpu_percent = round(_docker_cpu_percent(stats), 2)
-        mem_bytes = _docker_memory_usage_bytes(stats)
-        mem_limit = int(_to_float((stats.get("memory_stats", {}) or {}).get("limit"), default=0.0))
-        networks = stats.get("networks", {}) or {}
-        if isinstance(networks, dict):
-            for iface in networks.values():
-                if isinstance(iface, dict):
-                    aggregate_net_rx += int(_to_float(iface.get("rx_bytes"), default=0.0))
-                    aggregate_net_tx += int(_to_float(iface.get("tx_bytes"), default=0.0))
-        aggregate_cpu_percent += cpu_percent
-        aggregate_mem_used += mem_bytes
-        if mem_limit > 0:
-            aggregate_mem_limit += mem_limit
-        names = container.get("Names", []) or []
-        display_name = str(names[0]).lstrip("/") if names else cid[:12]
-        cpu_users.append(
-            DashboardTopUserDTO(
-                container_id=cid,
-                name=display_name,
-                value=cpu_percent,
-                unit="%",
-            ),
-        )
-        memory_users.append(
-            DashboardTopUserDTO(
-                container_id=cid,
-                name=display_name,
-                value=float(mem_bytes),
-                unit="B",
-            ),
-        )
-
-    cpu_users = sorted(cpu_users, key=lambda item: item.value, reverse=True)[:5]
-    memory_users = sorted(memory_users, key=lambda item: item.value, reverse=True)[:5]
-
-    host = await asyncio.to_thread(_collect_host_snapshot)
     load_1, load_5, load_15 = host["load"]
-
-    cpu_percent = host["cpu_percent"]
-    if cpu_percent is None and aggregate_cpu_percent > 0:
-        cpu_percent = round(aggregate_cpu_percent, 2)
-
-    ram_used = host["ram_used"]
-    ram_total = host["ram_total"]
-    if ram_used is None and aggregate_mem_used > 0:
-        ram_used = aggregate_mem_used
-    if ram_total is None and aggregate_mem_limit > 0:
-        ram_total = aggregate_mem_limit
-
-    network_rx = host["network_rx"]
-    network_tx = host["network_tx"]
-    if network_rx is None and aggregate_net_rx > 0:
-        network_rx = aggregate_net_rx
-    if network_tx is None and aggregate_net_tx > 0:
-        network_tx = aggregate_net_tx
 
     disk = os.statvfs("/") if os.name != "nt" else None
     if disk is not None:
@@ -343,19 +311,19 @@ async def overview(
     return DashboardOverviewDTO(
         system_status=system_status,
         system_badge=badge,
-        cpu_percent=cpu_percent,
+        cpu_percent=host["cpu_percent"],
         load_1m=load_1,
         load_5m=load_5,
         load_15m=load_15,
-        ram_used_bytes=ram_used,
-        ram_total_bytes=ram_total,
+        ram_used_bytes=host["ram_used"],
+        ram_total_bytes=host["ram_total"],
         swap_used_bytes=host["swap_used"],
         swap_total_bytes=host["swap_total"],
         disk_free_bytes=disk_free,
         disk_total_bytes=disk_total,
         disk_free_percent=(float(disk_free) / float(disk_total) * 100.0) if disk_total else 0.0,
-        network_rx_bytes=network_rx,
-        network_tx_bytes=network_tx,
+        network_rx_bytes=host["network_rx"],
+        network_tx_bytes=host["network_tx"],
         containers_running=containers_running,
         containers_total=containers_total,
         containers_restarting=containers_restarting,
@@ -367,8 +335,53 @@ async def overview(
         gpu_util_percent=host.get("gpu_util_percent"),
         gpu_vram_used_bytes=host.get("gpu_vram_used_bytes"),
         gpu_vram_total_bytes=host.get("gpu_vram_total_bytes"),
-        top_cpu_containers=cpu_users,
-        top_memory_containers=memory_users,
+    )
+
+
+@router.get(
+    "/top-containers",
+    response_model=DashboardTopContainersDTO,
+    name="admin_dashboard_top_containers",
+)
+async def top_containers(
+    docker: DockerService = Depends(get_docker),
+    _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+) -> DashboardTopContainersDTO:
+    """Return the five running containers using the most CPU and memory."""
+    raw_containers = await docker.list_containers(all_=True)
+    running_containers = [c for c in raw_containers if str(c.get("State", "")).lower() == "running"]
+    running_ids = [str(c.get("Id", "")) for c in running_containers if c.get("Id")]
+    stats_by_id = await _collect_container_stats(docker, running_ids)
+
+    cpu_users: list[DashboardTopUserDTO] = []
+    memory_users: list[DashboardTopUserDTO] = []
+    for container in running_containers:
+        cid = str(container.get("Id", ""))
+        stats = stats_by_id.get(cid)
+        if stats is None:
+            continue
+        names = container.get("Names", []) or []
+        display_name = str(names[0]).lstrip("/") if names else cid[:12]
+        cpu_users.append(
+            DashboardTopUserDTO(
+                container_id=cid,
+                name=display_name,
+                value=round(_docker_cpu_percent(stats), 2),
+                unit="%",
+            ),
+        )
+        memory_users.append(
+            DashboardTopUserDTO(
+                container_id=cid,
+                name=display_name,
+                value=float(_docker_memory_usage_bytes(stats)),
+                unit="B",
+            ),
+        )
+
+    return DashboardTopContainersDTO(
+        top_cpu_containers=sorted(cpu_users, key=lambda item: item.value, reverse=True)[:5],
+        top_memory_containers=sorted(memory_users, key=lambda item: item.value, reverse=True)[:5],
     )
 
 
