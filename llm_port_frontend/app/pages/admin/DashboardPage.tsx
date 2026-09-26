@@ -16,9 +16,7 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Skeleton from "@mui/material/Skeleton";
 import Snackbar from "@mui/material/Snackbar";
-import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -27,6 +25,7 @@ import { preferences } from "~/api/preferences";
 import CustomizeDialog from "~/components/dashboard/CustomizeDialog";
 import DashboardGrid, { TOUCH_TARGET, type GridItem } from "~/components/dashboard/DashboardGrid";
 import { OVERVIEW_REFRESH_MS, useAttention, useOverview } from "~/components/dashboard/queries";
+import PageHeader from "~/components/dashboard/PageHeader";
 import RefreshRing from "~/components/dashboard/RefreshRing";
 import { WIDGETS } from "~/components/dashboard/registry";
 import type { WidgetDefinition } from "~/components/dashboard/types";
@@ -135,16 +134,11 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 2 }}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "flex-start" }} gap={1.5}>
-        <Box>
-          <Typography variant="h5" component="h1">
-            {t("dashboard.title")}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {t("dashboard.subtitle")}
-          </Typography>
-        </Box>
-        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+      <PageHeader
+        title={t("dashboard.title")}
+        subtitle={t("dashboard.subtitle")}
+        actions={
+          <>
           <SystemPill
             status={overview.data?.system_status}
             badge={overview.data?.system_badge}
@@ -183,8 +177,9 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
             failed={Boolean(overview.error)}
             onRefresh={() => setRefreshToken((n) => n + 1)}
           />
-        </Stack>
-      </Stack>
+          </>
+        }
+      />
 
       {layout === null ? (
         <GridSkeleton />

@@ -7,7 +7,6 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
@@ -20,7 +19,6 @@ import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
-import { useTheme } from "@mui/material/styles";
 import TuneIcon from "@mui/icons-material/Tune";
 import type { KpiItem, Money } from "~/api/dashboard";
 import { KPI_IDS, MAX_KPIS, type KpiId } from "~/lib/dashboardLayoutModel";
@@ -29,6 +27,7 @@ import { fmtCompact, fmtMoney, fmtMs, fmtShare } from "../format";
 import { useKpis } from "../queries";
 import type { WidgetProps } from "../types";
 import WidgetCard, { WidgetEmpty } from "../WidgetCard";
+import StatTile, { StatGrid, type TrendInfo } from "../StatTile";
 
 type Kind = "count" | "share" | "money";
 /** Which direction is good: "up" (in-house share), "down" (errors), or neither. */
@@ -114,19 +113,19 @@ export default function KpisWidget({ layout, onLayoutChange, refreshToken }: Wid
         updatedAt: query.updatedAt,
       }}
       skeleton={
-        <TileGrid>
+        <StatGrid>
           {ids.map((id) => (
             <Skeleton key={id} variant="rounded" height={104} />
           ))}
-        </TileGrid>
+        </StatGrid>
       }
       empty={ids.length === 0 ? <WidgetEmpty message={t("dashboard.kpi.none_chosen")} /> : undefined}
     >
-      <TileGrid>
+      <StatGrid>
         {ids.map((id) => (
           <Tile key={id} id={id as KpiId} item={byId.get(id)} lang={i18n.language} />
         ))}
-      </TileGrid>
+      </StatGrid>
       <KpiPicker
         open={choosing}
         chosen={ids}
@@ -140,64 +139,17 @@ export default function KpisWidget({ layout, onLayoutChange, refreshToken }: Wid
   );
 }
 
-function TileGrid({ children }: { children: React.ReactNode }) {
-  return (
-    <Box
-      sx={{
-        display: "grid",
-        gap: 1.5,
-        gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(auto-fit, minmax(170px, 1fr))" },
-        // On a phone an odd last tile spans both columns.
-        "& > :last-of-type:nth-of-type(odd)": { gridColumn: { xs: "span 2", sm: "auto" } },
-      }}
-    >
-      {children}
-    </Box>
-  );
-}
-
-/** One line where there is room; on a phone's half-width tile, wrap rather than cut words off. */
-const FIT = {
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: { xs: "normal", sm: "nowrap" },
-} as const;
-
 function Tile({ id, item, lang }: { id: KpiId; item?: KpiItem; lang: string }) {
   const { t } = useTranslation();
   const meta = META[id];
-  const label = t(`dashboard.kpi.${id}.label`);
-  const value = item && meta ? formatValue(item.value, meta.kind, lang, t) : "–";
   const trend = item && meta ? trendOf(item, meta, lang) : null;
-
   return (
-    <Box
-      sx={{
-        p: 1.5,
-        borderRadius: 1,
-        border: 1,
-        borderColor: "divider",
-        bgcolor: "dashboard.surfaceSubtle",
-        minWidth: 0,
-      }}
-    >
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1}>
-        <Typography variant="caption" color="text.secondary" sx={FIT}>
-          {label}
-        </Typography>
-        {trend && <Trend {...trend} baseline={t(`dashboard.kpi.${id}.baseline`)} />}
-      </Stack>
-      <Typography
-        component="p"
-        sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 700, lineHeight: 1.25, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
-        noWrap
-      >
-        {value}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25, ...FIT }}>
-        {item && meta ? meta.context(item, t, lang) : t("dashboard.kpi.not_available")}
-      </Typography>
-    </Box>
+    <StatTile
+      label={t(`dashboard.kpi.${id}.label`)}
+      value={item && meta ? formatValue(item.value, meta.kind, lang, t) : "–"}
+      trend={trend ? { ...trend, baseline: t(`dashboard.kpi.${id}.baseline`) } : null}
+      detail={item && meta ? meta.context(item, t, lang) : t("dashboard.kpi.not_available")}
+    />
   );
 }
 
@@ -215,13 +167,7 @@ function formatValue(
   return kind === "share" ? fmtShare(value as number, lang) : fmtCompact(value as number, lang);
 }
 
-interface TrendInfo {
-  text: string;
-  direction: "up" | "down" | "flat";
-  tone: "good" | "bad" | "neutral";
-}
-
-function trendOf(item: KpiItem, meta: KpiMeta, lang: string): TrendInfo | null {
+function trendOf(item: KpiItem, meta: KpiMeta, lang: string): Omit<TrendInfo, "baseline"> | null {
   let delta: number | null = null;
   let text = "";
   if (meta.kind === "money") {
@@ -262,28 +208,6 @@ function fmtSignedPct(delta: number, lang: string): string {
   return `${delta >= 0 ? "+" : "−"}${pct} %`;
 }
 
-function Trend({ text, direction, tone, baseline }: TrendInfo & { baseline: string }) {
-  const theme = useTheme();
-  const color =
-    tone === "good"
-      ? theme.palette.dashboard.health.ok
-      : tone === "bad"
-        ? theme.palette.dashboard.health.error
-        : theme.palette.text.secondary;
-  const arrow = direction === "up" ? "▲" : direction === "down" ? "▼" : "▬";
-  return (
-    <Tooltip title={baseline}>
-      <Typography
-        variant="caption"
-        sx={{ color, fontWeight: 700, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-        aria-label={`${text} ${baseline}`}
-      >
-        <span aria-hidden>{arrow} </span>
-        {text}
-      </Typography>
-    </Tooltip>
-  );
-}
 
 function KpiPicker({
   open,

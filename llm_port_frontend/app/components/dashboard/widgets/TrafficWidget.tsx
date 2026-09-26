@@ -9,8 +9,6 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { PieChart } from "@mui/x-charts/PieChart";
@@ -20,11 +18,13 @@ import {
   type TrafficResponse,
   type TrafficWindow,
 } from "~/api/dashboard";
-import { TOUCH_TARGET } from "../DashboardGrid";
 import { fmtCompact, fmtMs, fmtShare } from "../format";
 import { useTraffic } from "../queries";
 import { RESIDENCY_LABEL_KEYS, residencyColor } from "../residency";
 import type { WidgetProps } from "../types";
+import RangeToggle from "../RangeToggle";
+import RankedBars from "../RankedBars";
+import StatTile from "../StatTile";
 import WidgetCard, { WidgetEmpty } from "../WidgetCard";
 
 const WINDOWS: TrafficWindow[] = ["today", "24h", "7d", "30d"];
@@ -41,19 +41,12 @@ export default function TrafficWidget({ layout, onLayoutChange, refreshToken }: 
       subtitle={t("dashboard.widgets.traffic.subtitle")}
       link={{ to: "/admin/observability", label: t("dashboard.widgets.traffic.link") }}
       actions={
-        <ToggleButtonGroup
-          size="small"
-          exclusive
+        <RangeToggle
           value={window}
-          onChange={(_, value: TrafficWindow | null) => value && onLayoutChange({ traffic_window: value })}
-          aria-label={t("dashboard.window.label")}
-        >
-          {WINDOWS.map((w) => (
-            <ToggleButton key={w} value={w} sx={{ px: 1, py: 0.25, textTransform: "none", ...TOUCH_TARGET }}>
-              {t(`dashboard.window.${w}`)}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+          options={WINDOWS.map((w) => ({ value: w, label: t(`dashboard.window.${w}`) }))}
+          onChange={(value: TrafficWindow) => onLayoutChange({ traffic_window: value })}
+          ariaLabel={t("dashboard.window.label")}
+        />
       }
       status={{
         loading: query.loading,
@@ -111,10 +104,10 @@ function TrafficBody({ data }: { data: TrafficResponse }) {
         <Destinations destinations={data.by_destination} routed={data.routed} />
       </Box>
       <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-        <Mini label={t("dashboard.traffic.requests")} value={fmtCompact(data.requests, lang)} />
-        <Mini label={t("dashboard.traffic.p50")} value={fmtMs(data.latency_ms.p50, lang)} />
-        <Mini label={t("dashboard.traffic.p95")} value={fmtMs(data.latency_ms.p95, lang)} />
-        <Mini label={t("dashboard.traffic.errors")} value={fmtShare(data.errors.rate, lang)} />
+        <StatTile variant="compact" label={t("dashboard.traffic.requests")} value={fmtCompact(data.requests, lang)} />
+        <StatTile variant="compact" label={t("dashboard.traffic.p50")} value={fmtMs(data.latency_ms.p50, lang)} />
+        <StatTile variant="compact" label={t("dashboard.traffic.p95")} value={fmtMs(data.latency_ms.p95, lang)} />
+        <StatTile variant="compact" label={t("dashboard.traffic.errors")} value={fmtShare(data.errors.rate, lang)} />
       </Box>
       {unrouted > 0 && (
         <Typography variant="caption" color="text.secondary">
@@ -205,42 +198,17 @@ function Destinations({ destinations, routed }: { destinations: TrafficDestinati
   }
 
   return (
-    <Stack gap={1.25} component="ol" sx={{ listStyle: "none", m: 0, p: 0, minWidth: 0 }}>
-      {destinations.map((d) => {
+    <RankedBars
+      items={destinations.map((d) => {
         const share = routed ? d.requests / routed : 0;
-        const color = d.kind === "other" ? theme.palette.text.disabled : residencyColor(theme, d.residency);
-        return (
-          <Box
-            key={`${d.kind}:${d.id ?? ""}`}
-            component="li"
-            sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 72px 44px", gap: 1, alignItems: "center" }}
-          >
-            <Stack direction="row" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
-              <Box aria-hidden sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
-              <Typography variant="body2" noWrap sx={{ fontWeight: 600 }} title={name(d)}>
-                {name(d)}
-              </Typography>
-            </Stack>
-            <Box aria-hidden sx={{ height: 8, borderRadius: 999, bgcolor: "action.hover", overflow: "hidden" }}>
-              <Box sx={{ width: `${Math.max(share * 100, 2)}%`, height: "100%", bgcolor: color, borderRadius: 999 }} />
-            </Box>
-            <Typography variant="caption" sx={{ textAlign: "right", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-              {fmtShare(share, i18n.language, 0)}
-            </Typography>
-          </Box>
-        );
+        return {
+          key: `${d.kind}:${d.id ?? ""}`,
+          label: name(d),
+          share,
+          valueLabel: fmtShare(share, i18n.language, 0),
+          color: d.kind === "other" ? theme.palette.text.disabled : residencyColor(theme, d.residency),
+        };
       })}
-    </Stack>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <Box sx={{ px: 1.25, py: 1, borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "dashboard.surfaceSubtle" }}>
-      <Typography sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.4 }}>
-        {label}
-      </Typography>
-    </Box>
+    />
   );
 }

@@ -5,20 +5,16 @@
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
-import Stack from "@mui/material/Stack";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
-import { LineChart } from "@mui/x-charts/LineChart";
 import { RESIDENCY_CLASSES, type UsageRange } from "~/api/dashboard";
-import { TOUCH_TARGET } from "../DashboardGrid";
-import { useElementHeight } from "../fit";
 import { fmtInt, fmtShare } from "../format";
 import { useTrafficSeries } from "../queries";
 import { RESIDENCY_LABEL_KEYS, residencyColor } from "../residency";
 import type { WidgetProps } from "../types";
+import RangeToggle from "../RangeToggle";
+import TimeSeriesChart from "../TimeSeriesChart";
 import WidgetCard, { WidgetEmpty } from "../WidgetCard";
 
 const RANGES: UsageRange[] = ["7d", "30d"];
@@ -35,10 +31,7 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken, fill
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
-  // Filling the row's height, the chart takes what the legend and total leave.
-  const [chartBox, chartBoxHeight] = useElementHeight<HTMLDivElement>();
-  const baseHeight = isPhone ? CHART_HEIGHT.phone : CHART_HEIGHT.other;
-  const chartHeight = fill && chartBoxHeight ? Math.max(baseHeight, chartBoxHeight) : baseHeight;
+
   const range = layout.usage_range;
   const query = useTrafficSeries(range, { refreshToken });
   const buckets = query.data?.buckets ?? [];
@@ -55,19 +48,12 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken, fill
       subtitle={t(`dashboard.widgets.usage.subtitle_${range}`)}
       link={{ to: "/admin/observability", label: t("dashboard.widgets.usage.link") }}
       actions={
-        <ToggleButtonGroup
-          size="small"
-          exclusive
+        <RangeToggle
           value={range}
-          onChange={(_, value: UsageRange | null) => value && onLayoutChange({ usage_range: value })}
-          aria-label={t("dashboard.range.label")}
-        >
-          {RANGES.map((r) => (
-            <ToggleButton key={r} value={r} sx={{ px: 1, py: 0.25, textTransform: "none", ...TOUCH_TARGET }}>
-              {t(`dashboard.range.${r}`)}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+          options={RANGES.map((r) => ({ value: r, label: t(`dashboard.range.${r}`) }))}
+          onChange={(value: UsageRange) => onLayoutChange({ usage_range: value })}
+          ariaLabel={t("dashboard.range.label")}
+        />
       }
       status={{
         loading: query.loading,
@@ -77,54 +63,27 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken, fill
         stale: query.stale,
         updatedAt: query.updatedAt,
       }}
-      skeleton={<Skeleton variant="rounded" height={isPhone ? 160 : 190} />}
+      skeleton={<Skeleton variant="rounded" height={isPhone ? CHART_HEIGHT.phone : CHART_HEIGHT.other} />}
       empty={query.data && total === 0 ? <WidgetEmpty message={t("dashboard.usage.empty")} /> : undefined}
     >
       <Box sx={fill ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}>
-      <Stack direction="row" gap={1.5} sx={{ flexWrap: "wrap", mb: 0.5 }} component="ul" aria-hidden>
-        {RESIDENCY_CLASSES.map((c) => (
-          <Stack key={c} component="li" direction="row" alignItems="center" gap={0.75} sx={{ listStyle: "none" }}>
-            <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: residencyColor(theme, c) }} />
-            <Typography variant="caption">{t(RESIDENCY_LABEL_KEYS[c])}</Typography>
-          </Stack>
-        ))}
-      </Stack>
-      <Box
-        ref={fill ? chartBox : undefined}
-        sx={fill ? { flex: 1, minHeight: baseHeight, overflow: "hidden" } : undefined}
-        role="img"
-        aria-label={t("dashboard.usage.chart_aria", {
+      <TimeSeriesChart
+        x={buckets.map((b) => b.bucket)}
+        xFormat={(label) => dayFormat.format(localDate(String(label)))}
+        series={RESIDENCY_CLASSES.map((c) => ({
+          id: c,
+          label: t(RESIDENCY_LABEL_KEYS[c]),
+          data: buckets.map((b) => b[c]),
+          color: residencyColor(theme, c),
+        }))}
+        stacked
+        legend
+        fill={fill}
+        ariaLabel={t("dashboard.usage.chart_aria", {
           total: fmtInt(total, i18n.language),
           share: fmtShare(total ? inHouse / total : null, i18n.language, 0),
         })}
-      >
-        <LineChart
-          height={chartHeight}
-          margin={{ left: 8, right: 24, top: 8, bottom: 4 }}
-          hideLegend
-          skipAnimation
-          xAxis={[
-            {
-              scaleType: "point",
-              data: buckets.map((b) => b.bucket),
-              valueFormatter: (label: string) => dayFormat.format(localDate(label)),
-              // Every other day on a phone; the axis would crowd otherwise.
-              tickInterval: (_value: string, index: number) => !isPhone || index % 2 === 0,
-            },
-          ]}
-          yAxis={[{ width: 40, valueFormatter: (v: number) => new Intl.NumberFormat(i18n.language, { notation: "compact" }).format(v) }]}
-          series={RESIDENCY_CLASSES.map((c) => ({
-            id: c,
-            label: t(RESIDENCY_LABEL_KEYS[c]),
-            data: buckets.map((b) => b[c]),
-            color: residencyColor(theme, c),
-            area: true,
-            stack: "total",
-            showMark: false,
-            curve: "monotoneX" as const,
-          }))}
-        />
-      </Box>
+      />
       <Typography variant="caption" color="text.secondary">
         {t("dashboard.usage.total", {
           requests: fmtInt(total, i18n.language),
