@@ -15,6 +15,9 @@ import { useTheme } from "@mui/material/styles";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { useElementHeight } from "./fit";
 
+/** The least height of a chart that fills its card (px). */
+const FILL_MIN_HEIGHT = 140;
+
 export interface TimeSeries {
   id: string;
   label: string;
@@ -39,7 +42,7 @@ export interface TimeSeriesChartProps {
   yWidth?: number;
   /** The legend of dots above (default: when there is more than one series). */
   legend?: boolean;
-  /** Fixed height; default 190 (160 on a phone). The least height when filling. */
+  /** Fixed height; default 190 (160 on a phone). */
   height?: number;
   fill?: boolean;
 }
@@ -61,7 +64,7 @@ export default function TimeSeriesChart({
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const [box, boxHeight] = useElementHeight<HTMLDivElement>();
   const base = height ?? (isPhone ? 160 : 190);
-  const chartHeight = fill && boxHeight ? Math.max(base, boxHeight) : base;
+  const chartHeight = fill && boxHeight ? Math.max(FILL_MIN_HEIGHT, boxHeight) : base;
   const compact = new Intl.NumberFormat(i18n.language, { notation: "compact" });
   const showLegend = legend ?? series.length > 1;
   // A dense axis on a phone shows every other label.
@@ -83,7 +86,9 @@ export default function TimeSeriesChart({
         ref={fill ? box : undefined}
         role="img"
         aria-label={ariaLabel}
-        sx={fill ? { flex: 1, minHeight: base, overflow: "hidden" } : undefined}
+        // Filling: the chart takes what the card has left and adds nothing to
+        // the row's height itself (size-contained) beyond its least height.
+        sx={fill ? { flex: 1, minHeight: FILL_MIN_HEIGHT, overflow: "hidden", contain: "size" } : undefined}
       >
         <LineChart
           height={chartHeight}

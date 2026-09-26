@@ -36,7 +36,6 @@ export const WIDGETS: WidgetDefinition[] = [
     defaultSize: "S",
     defaultVisible: always,
     fit: "fill",
-    fillMinHeight: 260,
     component: lazy(() => import("./widgets/AttentionWidget")),
   },
   {
@@ -56,7 +55,6 @@ export const WIDGETS: WidgetDefinition[] = [
     defaultSize: "M",
     defaultVisible: always,
     fit: "fill",
-    fillMinHeight: 280,
     component: lazy(() => import("./widgets/UsageWidget")),
   },
   {

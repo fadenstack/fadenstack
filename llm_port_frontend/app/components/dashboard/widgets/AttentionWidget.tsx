@@ -79,7 +79,9 @@ export default function AttentionWidget({ refreshToken, fill = false }: WidgetPr
             // Rows keep their content's height; in a box shorter than the
             // list, "auto" rows would shrink to the items' 48 px minimum.
             gridAutoRows: "max-content",
-            ...(fitting ? { flex: 1, minHeight: 0, overflow: "hidden", position: "relative" } : {}),
+            // Filling: the list takes what the card has left (size-contained,
+            // at least one item's height) and shows the items that fit.
+            ...(fitting ? { flex: 1, minHeight: 64, overflow: "hidden", position: "relative", contain: "size" } : {}),
           }}
         >
           {laidOut.map((item, index) => (

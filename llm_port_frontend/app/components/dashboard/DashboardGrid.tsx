@@ -10,10 +10,15 @@
  * Row height: widgets in a row stretch to one height. Content widgets
  * (tiles, the donut, gauges) set it; a fill widget (a list or chart that can
  * show more or less) beside one takes that height instead of adding its own
- * -- its slot is size-contained -- and fits its content to it. So a short
- * content widget is not left with a gap under it, and nothing is cut off
- * or scrolls inside a card. A row with no content widget (a fill widget on
- * its own, as on a phone) sizes to content as usual.
+ * and fits its content to it. So a short content widget is not left with a
+ * gap under it, and nothing is cut off or scrolls inside a card. A row with
+ * no content widget (a fill widget on its own, as on a phone) sizes to
+ * content as usual.
+ *
+ * Only the part of a fill widget that can stretch -- the chart, the list --
+ * is size-contained (by the widget, with a least height). Its header, legend
+ * and totals still count, so where they wrap (a half-width card on a medium
+ * screen) the row grows to fit them rather than the card overflowing.
  */
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -159,7 +164,6 @@ export default function DashboardGrid({
               onMove={onMove}
               onToggle={onToggle}
               onSize={onSize}
-              fill={filling.has(item.def.id)}
             >
               {item.available && !(editMode && item.hidden) ? renderWidget(item, filling.has(item.def.id)) : null}
             </SortableWidget>
@@ -178,12 +182,10 @@ interface SortableWidgetProps {
   onMove: (id: string, delta: -1 | 1) => void;
   onToggle: (id: string) => void;
   onSize: (id: string, size: WidgetSize) => void;
-  /** Take the row's height rather than set it (see the file's comment). */
-  fill: boolean;
   children: ReactNode;
 }
 
-function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize, fill, children }: SortableWidgetProps) {
+function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize, children }: SortableWidgetProps) {
   const { t } = useTranslation();
   const { def, size, hidden, available, reason } = item;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
@@ -303,19 +305,7 @@ function SortableWidget({ item, editMode, first, last, onMove, onToggle, onSize,
           </Tooltip>
         </Stack>
       )}
-      {children && (
-        <Box
-          sx={{
-            flexGrow: 1,
-            minWidth: 0,
-            // Size-contained: counts as empty (bar its minimum) when the row's
-            // height is worked out, then stretches to it.
-            ...(fill ? { contain: "size", minHeight: def.fillMinHeight ?? 240 } : {}),
-          }}
-        >
-          {children}
-        </Box>
-      )}
+      {children && <Box sx={{ flexGrow: 1, minWidth: 0 }}>{children}</Box>}
     </Box>
   );
 }

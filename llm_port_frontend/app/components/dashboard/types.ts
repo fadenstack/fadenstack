@@ -37,9 +37,9 @@ export interface WidgetDefinition extends LayoutWidgetSpec {
    * is as tall as its tallest such widget. "fill": a list or chart that can
    * show more or less; beside a content widget it takes the row's height
    * instead of setting it, so no widget in the row is left with empty space.
+   * With `fill` set the widget size-contains its stretchable part (chart,
+   * list) with a least height; the rest of it counts as usual.
    */
   fit?: "content" | "fill";
-  /** The least height a fill widget is given (px), header included. */
-  fillMinHeight?: number;
   component: LazyExoticComponent<ComponentType<WidgetProps>>;
 }
