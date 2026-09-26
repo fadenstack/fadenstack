@@ -70,7 +70,9 @@
     "navigation": "Navigation",
     "button_side": "Menu button",
     "side_left": "Left",
-    "side_right": "Right"
+    "side_right": "Right",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "auth": {
     "logout": "Logout",
@@ -1776,7 +1778,24 @@
     "system_prompt_placeholder": "You are a helpful assistant that specialises in…",
     "session_actions": "Chat actions",
     "token_reply_only": "Reply: {{completion}} tokens",
-    "show_more": "Show more ({{remaining}})"
+    "show_more": "Show more ({{remaining}})",
+    "search_placeholder": "Search chats",
+    "search_clear": "Clear search",
+    "search_results": "Results: {{matches}}",
+    "section_projects": "Projects",
+    "section_chats": "Chats",
+    "no_projects": "Group related chats in a project.",
+    "no_chats": "No chats yet.",
+    "no_results": "No chats match",
+    "group_today": "Today",
+    "group_yesterday": "Yesterday",
+    "group_week": "Previous 7 days",
+    "group_month": "Previous 30 days",
+    "group_older": "Older",
+    "rename": "Rename",
+    "rename_save": "Save",
+    "rename_cancel": "Cancel",
+    "title_label": "Chat title"
   },
   "mcp": {
     "servers_title": "MCP Servers",

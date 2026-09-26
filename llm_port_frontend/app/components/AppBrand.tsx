@@ -5,9 +5,11 @@ import { APP_BRANDING } from "~/branding";
 
 interface AppBrandProps {
   compact?: boolean;
+  /** The line under the name ("Console" by default; the chat says "Chat"). */
+  subtitle?: string;
 }
 
-export default function AppBrand({ compact = false }: AppBrandProps) {
+export default function AppBrand({ compact = false, subtitle }: AppBrandProps) {
   const { t } = useTranslation();
 
   return (
@@ -37,7 +39,7 @@ export default function AppBrand({ compact = false }: AppBrandProps) {
           fontFamily: APP_BRANDING.subtitleFontFamily,
         }}
       >
-        {t("app.subtitle")}
+        {subtitle ?? t("app.subtitle")}
       </Typography>
     </Box>
   );

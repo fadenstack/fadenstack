@@ -70,7 +70,9 @@
     "navigation": "Navigation",
     "button_side": "Bouton de menu",
     "side_left": "Gauche",
-    "side_right": "Droite"
+    "side_right": "Droite",
+    "expand": "Déplier",
+    "collapse": "Replier"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -1778,7 +1780,24 @@
     "system_prompt_placeholder": "Vous êtes un assistant utile spécialisé dans…",
     "session_actions": "Actions du chat",
     "token_reply_only": "Réponse : {{completion}} jetons",
-    "show_more": "Afficher plus ({{remaining}})"
+    "show_more": "Afficher plus ({{remaining}})",
+    "search_placeholder": "Rechercher des chats",
+    "search_clear": "Effacer la recherche",
+    "search_results": "Résultats : {{matches}}",
+    "section_projects": "Projets",
+    "section_chats": "Chats",
+    "no_projects": "Regroupez les chats liés dans un projet.",
+    "no_chats": "Aucun chat pour l'instant.",
+    "no_results": "Aucun chat ne correspond",
+    "group_today": "Aujourd'hui",
+    "group_yesterday": "Hier",
+    "group_week": "7 derniers jours",
+    "group_month": "30 derniers jours",
+    "group_older": "Plus ancien",
+    "rename": "Renommer",
+    "rename_save": "Enregistrer",
+    "rename_cancel": "Annuler",
+    "title_label": "Titre du chat"
   },
   "mcp": {
     "servers_title": "Serveurs MCP",

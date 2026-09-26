@@ -29,7 +29,7 @@ import { clearCachedAccess } from "~/lib/adminConstants";
 import { patchSessionPiiPolicy } from "~/api/pii";
 import { patchSessionToolPolicy } from "~/api/tools";
 import type { InitialMessageState } from "./components/ChatWelcome";
-import ChatSidebar from "./components/ChatSidebar";
+import ChatSidebar, { CHAT_RAIL_WIDTH } from "./components/ChatSidebar";
 import ChatWelcome from "./components/ChatWelcome";
 import ChatWindow from "./components/ChatWindow";
 import ExecutionModeSelector from "./components/ExecutionModeSelector";
@@ -42,7 +42,6 @@ import { useNavHand } from "~/lib/useNavHand";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
-const SIDEBAR_COLLAPSED_WIDTH = 0;
 
 export default function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -203,7 +202,8 @@ export default function ChatPage() {
   const handleMoveSession = useCallback(
     async (sessId: string, projectId: string | null) => {
       await chatApi.updateSession(sessId, {
-        project_id: projectId ?? undefined,
+        // null takes it out of its project (undefined would change nothing).
+        project_id: projectId,
       });
       setSessions((prev) =>
         prev.map((s) =>
@@ -231,6 +231,17 @@ export default function ChatPage() {
     [],
   );
 
+  const handleRenameSession = useCallback(
+    async (title: string) => {
+      if (!sessionId) return;
+      const updated = await chatApi.updateSession(sessionId, { title });
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, title: updated.title ?? title } : s)),
+      );
+    },
+    [sessionId],
+  );
+
   const handleLogout = useCallback(async () => {
     await auth.logout();
     clearCachedAccess();
@@ -245,7 +256,12 @@ export default function ChatPage() {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }, []);
 
-  const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  // Collapsed on a desktop, the sidebar is the admin console's rail.
+  const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : CHAT_RAIL_WIDTH;
+  // The bar's menu button is for the overlay; on a desktop the rail's logo
+  // opens the sidebar.
+  const barSidebarOpen = isMobile ? sidebarOpen : true;
+  const activeSession = sessionId ? sessions.find((s) => s.id === sessionId) : undefined;
 
   const shell = useMemo<ChatShell>(
     () => ({
@@ -305,7 +321,7 @@ export default function ChatPage() {
             onSessionCreated={handleSessionCreated}
             onSessionUpdated={handleSessionUpdated}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
-            sidebarOpen={sidebarOpen}
+            sidebarOpen={barSidebarOpen}
             languages={languages}
             language={language}
             onLanguageChange={handleLanguageChange}
@@ -313,6 +329,8 @@ export default function ChatPage() {
             canDebug={canDebug}
             onToolsToggle={() => setToolDrawerOpen((o) => !o)}
             toolsOpen={toolDrawerOpen}
+            title={activeSession?.title}
+            onRename={handleRenameSession}
           />
         ) : (
           <ChatWelcome
@@ -320,7 +338,7 @@ export default function ChatPage() {
             onModelChange={setSelectedModel}
             onSessionCreated={handleSessionCreated}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
-            sidebarOpen={sidebarOpen}
+            sidebarOpen={barSidebarOpen}
             languages={languages}
             language={language}
             onLanguageChange={handleLanguageChange}

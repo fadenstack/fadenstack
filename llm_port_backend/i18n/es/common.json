@@ -70,7 +70,9 @@
     "navigation": "Navegación",
     "button_side": "Botón de menú",
     "side_left": "Izquierda",
-    "side_right": "Derecha"
+    "side_right": "Derecha",
+    "expand": "Expandir",
+    "collapse": "Contraer"
   },
   "auth": {
     "logout": "Cerrar sesion",
@@ -1974,7 +1976,24 @@
     "no_models_hint": "No hay modelos disponibles. Configura un proveedor y un alias de modelo en el panel de administración.",
     "session_actions": "Acciones del chat",
     "token_reply_only": "Respuesta: {{completion}} tokens",
-    "show_more": "Mostrar más ({{remaining}})"
+    "show_more": "Mostrar más ({{remaining}})",
+    "search_placeholder": "Buscar chats",
+    "search_clear": "Borrar búsqueda",
+    "search_results": "Resultados: {{matches}}",
+    "section_projects": "Proyectos",
+    "section_chats": "Chats",
+    "no_projects": "Agrupa chats relacionados en un proyecto.",
+    "no_chats": "Aún no hay chats.",
+    "no_results": "Ningún chat coincide",
+    "group_today": "Hoy",
+    "group_yesterday": "Ayer",
+    "group_week": "Últimos 7 días",
+    "group_month": "Últimos 30 días",
+    "group_older": "Anteriores",
+    "rename": "Renombrar",
+    "rename_save": "Guardar",
+    "rename_cancel": "Cancelar",
+    "title_label": "Título del chat"
   },
   "module_recommend": {
     "apply": "Aplicar",

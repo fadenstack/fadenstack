@@ -70,7 +70,9 @@
     "navigation": "Navigation",
     "button_side": "Menü-Schaltfläche",
     "side_left": "Links",
-    "side_right": "Rechts"
+    "side_right": "Rechts",
+    "expand": "Ausklappen",
+    "collapse": "Einklappen"
   },
   "auth": {
     "logout": "Abmelden",
@@ -1974,7 +1976,24 @@
     "no_models_hint": "Es sind keine Modelle verfügbar. Konfigurieren Sie im Admin-Bereich einen Provider und einen Modell-Alias.",
     "session_actions": "Chat-Aktionen",
     "token_reply_only": "Antwort: {{completion}} Tokens",
-    "show_more": "Mehr anzeigen ({{remaining}})"
+    "show_more": "Mehr anzeigen ({{remaining}})",
+    "search_placeholder": "Chats durchsuchen",
+    "search_clear": "Suche löschen",
+    "search_results": "Treffer: {{matches}}",
+    "section_projects": "Projekte",
+    "section_chats": "Chats",
+    "no_projects": "Zusammengehörige Chats in einem Projekt bündeln.",
+    "no_chats": "Noch keine Chats.",
+    "no_results": "Keine passenden Chats",
+    "group_today": "Heute",
+    "group_yesterday": "Gestern",
+    "group_week": "Letzte 7 Tage",
+    "group_month": "Letzte 30 Tage",
+    "group_older": "Älter",
+    "rename": "Umbenennen",
+    "rename_save": "Speichern",
+    "rename_cancel": "Abbrechen",
+    "title_label": "Chat-Titel"
   },
   "module_recommend": {
     "apply": "Übernehmen",

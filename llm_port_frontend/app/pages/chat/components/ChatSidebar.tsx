@@ -1,20 +1,30 @@
 /**
- * ChatSidebar — session list grouped by project with project CRUD.
- * Supports drag-and-drop of sessions between projects via @dnd-kit.
+ * ChatSidebar — the chat's navigation, in the admin console's look: the
+ * llm.Port brand at the top, a search, then two sections -- Projects (each a
+ * folder of its chats) and Chats (the rest, grouped by when they were last
+ * used). Chats move between projects by drag and drop or a menu.
  *
- * On a touch screen there is no hover to reveal a chat's actions and a drag
- * would take over scrolling, so each chat has a ⋮ menu instead and dragging
- * is off. On a phone the panel slides in from the side of the user's hand.
+ * On a desktop it collapses to a rail (logo, new chat, search) like the admin
+ * sidebar; below 900 px it is an overlay, and on a phone it slides in from
+ * the side of the user's hand. On a touch screen there is no hover to reveal
+ * a chat's actions and a drag would take over scrolling, so each chat has a
+ * ⋮ menu instead and dragging is off.
+ *
+ * Search, for now, matches titles only, in the list already loaded: instant,
+ * no request, and titles are encrypted at rest so the database could not
+ * match them anyway. Searching what was said in chats needs its own index to
+ * stay fast -- see the note at `matches`.
  */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemIcon from "@mui/material/ListItemIcon";
-import ListSubheader from "@mui/material/ListSubheader";
 import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Tooltip from "@mui/material/Tooltip";
 import Button from "@mui/material/Button";
@@ -27,13 +37,15 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FolderIcon from "@mui/icons-material/Folder";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import SearchIcon from "@mui/icons-material/Search";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
 import { useTranslation } from "react-i18next";
@@ -51,7 +63,9 @@ import {
 } from "@dnd-kit/core";
 
 import type { ChatSession, ChatProject } from "~/api/chatTypes";
+import AppBrand from "~/components/AppBrand";
 import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
+import { DRAWER_WIDTH_CLOSED, linkButtonSx } from "~/lib/adminConstants";
 import type { NavHand } from "~/lib/useNavHand";
 import { CHAT_NAV_ID } from "../ChatShellContext";
 import ProjectSettingsDialog from "./ProjectSettingsDialog";
@@ -61,8 +75,26 @@ import ProjectSettingsDialog from "./ProjectSettingsDialog";
 const SESSION_STEP = 50;
 /** Chats rendered at first inside a project, and added per "Show more". */
 const PROJECT_STEP = 20;
+/** The collapsed desktop sidebar: the admin console's rail width. */
+export const CHAT_RAIL_WIDTH = DRAWER_WIDTH_CLOSED;
+
+const NO_PROJECT = "__no_project__";
+
+type DateGroup = "today" | "yesterday" | "week" | "month" | "older";
+
+/** When a chat was last used, as the Chats section groups it (local days). */
+export function dateGroupOf(iso: string, now: Date = new Date()): DateGroup {
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(new Date(iso))) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return "week";
+  if (days < 30) return "month";
+  return "older";
+}
 
 interface Props {
+  /** Expanded (desktop) or shown (overlay). */
   open: boolean;
   onToggle: () => void;
   sessions: ChatSession[];
@@ -83,6 +115,7 @@ interface Props {
   ) => Promise<void>;
   onMoveSession: (sessionId: string, projectId: string | null) => void;
   width: number;
+  /** Below 900 px: an overlay instead of a rail. */
   isMobile: boolean;
   /** Set on a phone: the panel comes in from this side, with the side picker. */
   phone?: { hand: NavHand; onHandChange: (hand: NavHand) => void };
@@ -110,34 +143,32 @@ export default function ChatSidebar({
   // No hover (a touch screen): actions behind a ⋮ button, no dragging.
   const touch = !useMediaQuery("(hover: hover)");
   const touchButton = touch ? { width: 40, height: 40 } : {};
+  const untitled = t("chat.untitled", { defaultValue: "Untitled chat" });
 
   const [creatingProject, setCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
-    new Set(),
-  );
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusSearchOnOpen = useRef(false);
   // A chat's actions on a touch screen
-  const [moreAnchor, setMoreAnchor] = useState<{
-    el: HTMLElement;
-    sessionId: string;
-  } | null>(null);
+  const [moreAnchor, setMoreAnchor] = useState<{ el: HTMLElement; sessionId: string } | null>(null);
   // Move-to-project menu state
-  const [moveAnchor, setMoveAnchor] = useState<{
-    el: HTMLElement;
-    sessionId: string;
-  } | null>(null);
+  const [moveAnchor, setMoveAnchor] = useState<{ el: HTMLElement; sessionId: string } | null>(null);
   // Project settings dialog state
-  const [editingProject, setEditingProject] = useState<ChatProject | null>(
-    null,
-  );
+  const [editingProject, setEditingProject] = useState<ChatProject | null>(null);
   // Drag-and-drop state
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
-  const activeDragSession = activeDragId
-    ? sessions.find((s) => s.id === activeDragId)
-    : null;
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const activeDragSession = activeDragId ? sessions.find((s) => s.id === activeDragId) : null;
+
+  // The rail's search button opens the sidebar with the search focused.
+  useEffect(() => {
+    if (open && focusSearchOnOpen.current) {
+      focusSearchOnOpen.current = false;
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
+  }, [open]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
@@ -150,20 +181,18 @@ export default function ChatSidebar({
       if (!over) return;
       const sessionId = String(active.id);
       const targetId = String(over.id);
-      // Determine the target project — "__no_project__" means remove from project
-      const projectId = targetId === "__no_project__" ? null : targetId;
-      // Find the session being dragged to check if it's already in the target
+      const projectId = targetId === NO_PROJECT ? null : targetId;
       const session = sessions.find((s) => s.id === sessionId);
-      if (!session) return;
-      const currentProjectId = session.project_id ?? null;
-      if (currentProjectId === projectId) return; // No change
+      if (!session || (session.project_id ?? null) === projectId) return;
       onMoveSession(sessionId, projectId);
     },
     [sessions, onMoveSession],
   );
 
-  // How much of each list is rendered: the unassigned chats, and per project.
+  // How much of each list is rendered: the chats, the search results, and
+  // per project.
   const [orphanShown, setOrphanShown] = useState(SESSION_STEP);
+  const [resultsShown, setResultsShown] = useState(SESSION_STEP);
   const [projectShown, setProjectShown] = useState<Record<string, number>>({});
   // At least up to the open chat, so it is in the list.
   const shownOf = (list: ChatSession[], base: number) =>
@@ -179,6 +208,16 @@ export default function ChatSidebar({
       sessionsByProject.set(s.project_id, list);
     }
   }
+  const projectName = new Map(projects.map((p) => [p.id, p.name]));
+
+  // Search: titles only, over the list already loaded. Searching what was
+  // said needs a server-side index to stay fast -- the messages are
+  // encrypted at rest, so a database LIKE cannot read them, and decrypting a
+  // user's history per keystroke would not scale. The plan: a per-user
+  // keyword index of keyed hashes (a blind index), written when a message is
+  // stored, queried by the gateway; the content itself stays encrypted.
+  const q = query.trim().toLocaleLowerCase();
+  const matches = q ? sessions.filter((s) => (s.title || untitled).toLocaleLowerCase().includes(q)) : [];
 
   const toggleProject = (id: string) => {
     setCollapsedProjects((prev) => {
@@ -197,66 +236,129 @@ export default function ChatSidebar({
     setCreatingProject(false);
   };
 
-  const drawerContent = (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        bgcolor: theme.palette.background.default,
-      }}
-    >
-      {/* Header */}
-      <Box
+  const item = (s: ChatSession, secondary?: string) => (
+    <DraggableSessionItem
+      key={s.id}
+      session={s}
+      secondary={secondary}
+      active={s.id === activeSessionId}
+      onSelect={onSelectSession}
+      onDelete={onDeleteSession}
+      onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
+      // No dragging while searching: the folders are not shown to drop on.
+      touch={touch || Boolean(q)}
+      onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
+    />
+  );
+
+  // ── The collapsed desktop rail ───────────────────────────────────
+  if (!isMobile && !open) {
+    return (
+      <Drawer
+        variant="permanent"
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          px: 1.5,
-          py: 1,
-          minHeight: 56,
+          "& .MuiDrawer-paper": {
+            width: CHAT_RAIL_WIDTH,
+            boxSizing: "border-box",
+            overflowX: "hidden",
+            borderRight: `1px solid ${theme.palette.divider}`,
+          },
         }}
       >
-        <Typography variant="h6" noWrap sx={{ fontSize: "1rem" }}>
-          {t("chat.title", { defaultValue: "Chat" })}
-        </Typography>
-        <Box>
-          <Tooltip
-            title={t("chat.new_project", { defaultValue: "New project" })}
-          >
-            <IconButton size="small" onClick={() => setCreatingProject(true)} sx={touchButton}>
-              <CreateNewFolderIcon fontSize="small" />
+        <Stack alignItems="center" gap={1} sx={{ pt: 2 }}>
+          <Tooltip title={t("nav.expand", { defaultValue: "Expand" })} placement="right" arrow>
+            <LogoButton onClick={onToggle} label={t("nav.expand", { defaultValue: "Expand" })} />
+          </Tooltip>
+          <Tooltip title={t("chat.new_chat", { defaultValue: "New chat" })} placement="right" arrow>
+            <IconButton onClick={onNewChat} aria-label={t("chat.new_chat", { defaultValue: "New chat" })}>
+              <AddIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title={t("chat.new_chat", { defaultValue: "New chat" })}>
-            <IconButton size="small" onClick={onNewChat} sx={touchButton}>
-              <AddIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          {isMobile && (
+          <Tooltip title={t("chat.search_placeholder")} placement="right" arrow>
             <IconButton
-              size="small"
-              onClick={onToggle}
-              aria-label={t("nav.close_navigation")}
-              sx={touchButton}
+              onClick={() => {
+                focusSearchOnOpen.current = true;
+                onToggle();
+              }}
+              aria-label={t("chat.search_placeholder")}
             >
-              <CloseIcon fontSize="small" />
+              <SearchIcon />
             </IconButton>
-          )}
+          </Tooltip>
+        </Stack>
+      </Drawer>
+    );
+  }
+
+  const drawerContent = (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Brand, as the admin console has it; its logo collapses the sidebar */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 2 }}>
+        <LogoButton
+          onClick={onToggle}
+          label={isMobile ? t("nav.close_navigation") : t("nav.collapse", { defaultValue: "Collapse" })}
+        />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppBrand subtitle={t("chat.title", { defaultValue: "Chat" })} />
         </Box>
+        {isMobile && (
+          <IconButton onClick={onToggle} aria-label={t("nav.close_navigation")} sx={{ width: 44, height: 44 }}>
+            <CloseIcon />
+          </IconButton>
+        )}
       </Box>
-      <Divider />
+
+      {/* New chat, and the search */}
+      <Stack gap={1} sx={{ px: 1.5, pb: 1 }}>
+        <Button
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={onNewChat}
+          sx={{ justifyContent: "flex-start", textTransform: "none", minHeight: touch ? 44 : 36 }}
+        >
+          {t("chat.new_chat", { defaultValue: "New chat" })}
+        </Button>
+        <TextField
+          inputRef={searchRef}
+          size="small"
+          fullWidth
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setResultsShown(SESSION_STEP);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setQuery("");
+          }}
+          placeholder={t("chat.search_placeholder")}
+          slotProps={{
+            htmlInput: { "aria-label": t("chat.search_placeholder") },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                </InputAdornment>
+              ),
+              endAdornment: query ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" edge="end" onClick={() => setQuery("")} aria-label={t("chat.search_clear")}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            },
+          }}
+        />
+      </Stack>
 
       {/* New-project inline form */}
       {creatingProject && (
-        <Box sx={{ px: 1.5, py: 1 }}>
+        <Box sx={{ px: 1.5, pb: 1 }}>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            placeholder={t("chat.project_name", {
-              defaultValue: "Project name",
-            })}
+            placeholder={t("chat.project_name", { defaultValue: "Project name" })}
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             onKeyDown={(e) => {
@@ -264,164 +366,161 @@ export default function ChatSidebar({
               if (e.key === "Escape") setCreatingProject(false);
             }}
           />
-          <Box
-            sx={{
-              display: "flex",
-              gap: 0.5,
-              mt: 0.5,
-              justifyContent: "flex-end",
-            }}
-          >
+          <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, justifyContent: "flex-end" }}>
             <Button size="small" onClick={() => setCreatingProject(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}
             </Button>
-            <Button
-              size="small"
-              variant="contained"
-              onClick={handleCreateProject}
-              disabled={!newProjectName.trim()}
-            >
+            <Button size="small" variant="contained" onClick={handleCreateProject} disabled={!newProjectName.trim()}>
               {t("common.create", { defaultValue: "Create" })}
             </Button>
           </Box>
         </Box>
       )}
 
-      {/* Session list with drag-and-drop */}
-      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          {/* Projects */}
-          {projects.map((proj) => {
-            const collapsed = collapsedProjects.has(proj.id);
-            const projSessions = sessionsByProject.get(proj.id) ?? [];
-            const projShown = shownOf(projSessions, projectShown[proj.id] ?? PROJECT_STEP);
-
-            return (
-              <DroppableProjectZone
-                key={proj.id}
-                projectId={proj.id}
-                isOver={false}
-              >
-                <ListSubheader
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    bgcolor: "transparent",
-                    cursor: "pointer",
-                    lineHeight: "32px",
-                    px: 1.5,
-                  }}
-                  onClick={() => toggleProject(proj.id)}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <FolderIcon sx={{ fontSize: 16 }} />
-                    <Typography variant="caption" fontWeight={600} noWrap>
-                      {proj.name}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    {collapsed ? (
-                      <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                    ) : (
-                      <ExpandLessIcon sx={{ fontSize: 16 }} />
-                    )}
+      {/* The list */}
+      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", pb: 1 }}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          {q ? (
+            <>
+              <SectionHeader label={t("chat.search_results", { matches: matches.length })} />
+              {matches.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 1 }}>
+                  {t("chat.no_results", { defaultValue: "No chats match" })}
+                </Typography>
+              ) : (
+                <List dense disablePadding>
+                  {matches
+                    .slice(0, resultsShown)
+                    .map((s) => item(s, s.project_id ? projectName.get(s.project_id) : undefined))}
+                  {matches.length > resultsShown && (
+                    <ShowMore auto remaining={matches.length - resultsShown} onMore={() => setResultsShown((n) => n + SESSION_STEP)} />
+                  )}
+                </List>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Projects */}
+              <SectionHeader
+                label={t("chat.section_projects", { defaultValue: "Projects" })}
+                action={
+                  <Tooltip title={t("chat.new_project", { defaultValue: "New project" })}>
                     <IconButton
                       size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingProject(proj);
-                      }}
-                      sx={{ ml: 0.5, ...touchButton }}
+                      onClick={() => setCreatingProject(true)}
+                      aria-label={t("chat.new_project", { defaultValue: "New project" })}
+                      sx={touchButton}
                     >
-                      <SettingsOutlinedIcon sx={{ fontSize: 14 }} />
+                      <CreateNewFolderIcon sx={{ fontSize: 18 }} />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteProject(proj.id);
-                      }}
-                      sx={{ ml: 0.5, ...touchButton }}
+                  </Tooltip>
+                }
+              />
+              {projects.length === 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 2.5, pb: 1 }}>
+                  {t("chat.no_projects", { defaultValue: "Group related chats in a project." })}
+                </Typography>
+              )}
+              {projects.map((proj) => {
+                const collapsed = collapsedProjects.has(proj.id);
+                const projSessions = sessionsByProject.get(proj.id) ?? [];
+                const projShown = shownOf(projSessions, projectShown[proj.id] ?? PROJECT_STEP);
+                return (
+                  <DroppableProjectZone key={proj.id} projectId={proj.id}>
+                    <ListItemButton
+                      onClick={() => toggleProject(proj.id)}
+                      aria-expanded={!collapsed}
+                      sx={{ ...linkButtonSx, mx: 1, mb: 0.25, pr: 0.5, ...(touch ? { minHeight: 48 } : {}) }}
                     >
-                      <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
-                  </Box>
-                </ListSubheader>
-                <Collapse in={!collapsed}>
-                  <List dense disablePadding>
-                    {projSessions.slice(0, projShown).map((s) => (
-                      <DraggableSessionItem
-                        key={s.id}
-                        session={s}
-                        active={s.id === activeSessionId}
-                        onSelect={onSelectSession}
-                        onDelete={onDeleteSession}
-                        onMoveClick={(el) =>
-                          setMoveAnchor({ el, sessionId: s.id })
-                        }
-                        touch={touch}
-                        onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
+                      <ListItemIcon sx={{ minWidth: 32, color: "text.secondary" }}>
+                        {collapsed ? <FolderIcon fontSize="small" /> : <FolderOpenIcon fontSize="small" />}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={proj.name}
+                        secondary={projSessions.length || undefined}
+                        slotProps={{
+                          primary: { noWrap: true, fontSize: "0.875rem", fontWeight: 600 },
+                          secondary: { component: "span", sx: { ml: 1, fontSize: "0.75rem" } },
+                        }}
+                        sx={{ display: "flex", alignItems: "baseline", minWidth: 0, my: 0 }}
                       />
+                      <Tooltip title={t("chat.project_settings", { defaultValue: "Project settings" })}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingProject(proj);
+                          }}
+                          sx={touchButton}
+                        >
+                          <SettingsOutlinedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t("common.delete", { defaultValue: "Delete" })}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteProject(proj.id);
+                          }}
+                          sx={touchButton}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <ExpandMoreIcon
+                        sx={{ fontSize: 18, color: "text.secondary", transform: collapsed ? "none" : "rotate(180deg)", transition: "transform 150ms" }}
+                      />
+                    </ListItemButton>
+                    <Collapse in={!collapsed}>
+                      <List dense disablePadding sx={{ pl: 2 }}>
+                        {projSessions.slice(0, projShown).map((s) => item(s))}
+                        {projSessions.length > projShown && (
+                          <ShowMore
+                            remaining={projSessions.length - projShown}
+                            onMore={() => setProjectShown((prev) => ({ ...prev, [proj.id]: projShown + PROJECT_STEP }))}
+                          />
+                        )}
+                      </List>
+                    </Collapse>
+                  </DroppableProjectZone>
+                );
+              })}
+
+              {/* Chats, by when they were last used */}
+              <DroppableProjectZone projectId={NO_PROJECT}>
+                <SectionHeader label={t("chat.section_chats", { defaultValue: "Chats" })} />
+                {orphanSessions.length === 0 ? (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 2.5, pb: 1 }}>
+                    {projects.length > 0
+                      ? t("chat.drop_here_no_project", { defaultValue: "Drop here to remove from project" })
+                      : t("chat.no_chats", { defaultValue: "No chats yet." })}
+                  </Typography>
+                ) : (
+                  <List dense disablePadding>
+                    {groupedByDate(orphanSessions.slice(0, shownOf(orphanSessions, orphanShown))).map(([group, list]) => (
+                      <Box key={group}>
+                        <Typography
+                          variant="caption"
+                          color="text.disabled"
+                          sx={{ display: "block", px: 2.5, pt: 1, pb: 0.25, fontWeight: 600 }}
+                        >
+                          {t(`chat.group_${group}`)}
+                        </Typography>
+                        {list.map((s) => item(s))}
+                      </Box>
                     ))}
-                    {projSessions.length > projShown && (
+                    {orphanSessions.length > shownOf(orphanSessions, orphanShown) && (
                       <ShowMore
-                        remaining={projSessions.length - projShown}
-                        onMore={() =>
-                          setProjectShown((prev) => ({ ...prev, [proj.id]: projShown + PROJECT_STEP }))
-                        }
+                        auto
+                        remaining={orphanSessions.length - shownOf(orphanSessions, orphanShown)}
+                        onMore={() => setOrphanShown(shownOf(orphanSessions, orphanShown) + SESSION_STEP)}
                       />
                     )}
                   </List>
-                </Collapse>
-              </DroppableProjectZone>
-            );
-          })}
-
-          {/* Unorganised sessions */}
-          {orphanSessions.length > 0 && (
-            <DroppableProjectZone projectId="__no_project__" isOver={false}>
-              {projects.length > 0 && <Divider sx={{ my: 0.5 }} />}
-              <List dense disablePadding>
-                {orphanSessions.slice(0, shownOf(orphanSessions, orphanShown)).map((s) => (
-                  <DraggableSessionItem
-                    key={s.id}
-                    session={s}
-                    active={s.id === activeSessionId}
-                    onSelect={onSelectSession}
-                    onDelete={onDeleteSession}
-                    onMoveClick={(el) => setMoveAnchor({ el, sessionId: s.id })}
-                    touch={touch}
-                    onMoreClick={(el) => setMoreAnchor({ el, sessionId: s.id })}
-                  />
-                ))}
-                {orphanSessions.length > shownOf(orphanSessions, orphanShown) && (
-                  <ShowMore
-                    auto
-                    remaining={orphanSessions.length - shownOf(orphanSessions, orphanShown)}
-                    onMore={() => setOrphanShown(shownOf(orphanSessions, orphanShown) + SESSION_STEP)}
-                  />
                 )}
-              </List>
-            </DroppableProjectZone>
-          )}
-
-          {/* Also allow dropping onto orphan zone when it's empty */}
-          {orphanSessions.length === 0 && projects.length > 0 && (
-            <DroppableProjectZone projectId="__no_project__" isOver={false}>
-              <Box sx={{ px: 1.5, py: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {t("chat.drop_here_no_project", {
-                    defaultValue: "Drop here to remove from project",
-                  })}
-                </Typography>
-              </Box>
-            </DroppableProjectZone>
+              </DroppableProjectZone>
+            </>
           )}
 
           {/* Drag overlay — floating ghost */}
@@ -442,8 +541,7 @@ export default function ChatSidebar({
               >
                 <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
                 <Typography variant="body2" noWrap sx={{ fontSize: "0.85rem" }}>
-                  {activeDragSession.title ||
-                    t("chat.untitled", { defaultValue: "Untitled chat" })}
+                  {activeDragSession.title || untitled}
                 </Typography>
               </Box>
             ) : null}
@@ -451,15 +549,22 @@ export default function ChatSidebar({
         </DndContext>
       </Box>
 
+      {/* Collapse (desktop), as the admin sidebar's foot has it */}
+      {!isMobile && (
+        <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1, pb: 0.5 }}>
+          <Tooltip title={t("nav.collapse", { defaultValue: "Collapse" })}>
+            <IconButton size="small" onClick={onToggle} aria-label={t("nav.collapse", { defaultValue: "Collapse" })}>
+              <ChevronLeftIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+
       {/* Which side the menu button is on (phone) */}
       {phone && <NavHandPicker hand={phone.hand} onChange={phone.onHandChange} />}
 
       {/* A chat's actions on a touch screen */}
-      <Menu
-        anchorEl={moreAnchor?.el}
-        open={!!moreAnchor}
-        onClose={() => setMoreAnchor(null)}
-      >
+      <Menu anchorEl={moreAnchor?.el} open={!!moreAnchor} onClose={() => setMoreAnchor(null)}>
         <MenuItem
           sx={{ minHeight: 44 }}
           onClick={() => {
@@ -470,9 +575,7 @@ export default function ChatSidebar({
           <ListItemIcon>
             <DriveFileMoveOutlinedIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>
-            {t("chat.move_to_project", { defaultValue: "Move to project" })}
-          </ListItemText>
+          <ListItemText>{t("chat.move_to_project", { defaultValue: "Move to project" })}</ListItemText>
         </MenuItem>
         <MenuItem
           sx={{ minHeight: 44 }}
@@ -489,11 +592,7 @@ export default function ChatSidebar({
       </Menu>
 
       {/* Move-to-project popover menu */}
-      <Menu
-        anchorEl={moveAnchor?.el}
-        open={!!moveAnchor}
-        onClose={() => setMoveAnchor(null)}
-      >
+      <Menu anchorEl={moveAnchor?.el} open={!!moveAnchor} onClose={() => setMoveAnchor(null)}>
         <MenuItem
           dense
           onClick={() => {
@@ -532,7 +631,8 @@ export default function ChatSidebar({
     </Box>
   );
 
-  // Mobile: temporary drawer. Desktop: persistent.
+  // Overlay below 900 px (from the hand's side on a phone); a rail-or-panel
+  // on a desktop.
   if (isMobile) {
     return (
       <Drawer
@@ -557,13 +657,13 @@ export default function ChatSidebar({
 
   return (
     <Drawer
-      variant="persistent"
-      open={open}
+      variant="permanent"
       sx={{
         "& .MuiDrawer-paper": {
           width,
           borderRight: `1px solid ${theme.palette.divider}`,
           boxSizing: "border-box",
+          overflowX: "hidden",
         },
       }}
     >
@@ -572,22 +672,56 @@ export default function ChatSidebar({
   );
 }
 
-// ── ShowMore (internal) ──────────────────────────────────────────
+/** Chats in the order given, cut into runs by when they were last used. */
+function groupedByDate(list: ChatSession[]): [DateGroup, ChatSession[]][] {
+  const now = new Date();
+  const runs: [DateGroup, ChatSession[]][] = [];
+  for (const s of list) {
+    const group = dateGroupOf(s.updated_at, now);
+    const last = runs[runs.length - 1];
+    if (last && last[0] === group) last[1].push(s);
+    else runs.push([group, [s]]);
+  }
+  return runs;
+}
+
+// ── Parts (internal) ─────────────────────────────────────────────
+
+/** The llm.Port logo as a button, as the admin sidebar's. */
+function LogoButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <IconButton
+      onClick={onClick}
+      aria-label={label}
+      sx={{ width: 40, height: 40, borderRadius: 1, flexShrink: 0, p: 0.5, "&:hover": { bgcolor: "action.hover" } }}
+    >
+      <Box component="img" src="/icon_color.png" alt="" sx={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 1 }} />
+    </IconButton>
+  );
+}
+
+/** A section's name in small caps, as the admin sidebar's "Pinned". */
+function SectionHeader({ label, action }: { label: string; action?: ReactNode }) {
+  return (
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, pt: 1.5, pb: 0.5, minHeight: 36 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, fontSize: "0.68rem" }}
+      >
+        {label}
+      </Typography>
+      {action}
+    </Stack>
+  );
+}
 
 /**
  * Renders the next part of a long list. With ``auto`` it does so on its own
  * when scrolled into view; it is a button either way (keyboard, and where
  * IntersectionObserver is missing).
  */
-function ShowMore({
-  remaining,
-  onMore,
-  auto = false,
-}: {
-  remaining: number;
-  onMore: () => void;
-  auto?: boolean;
-}) {
+function ShowMore({ remaining, onMore, auto = false }: { remaining: number; onMore: () => void; auto?: boolean }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const onMoreRef = useRef(onMore);
@@ -608,41 +742,26 @@ function ShowMore({
   }, [auto]);
 
   return (
-    <ListItemButton ref={ref} onClick={onMore} sx={{ pl: 1.5, minHeight: 40 }}>
+    <ListItemButton ref={ref} onClick={onMore} sx={{ ...linkButtonSx, mx: 1, minHeight: 40 }}>
       <ListItemText
         primary={t("chat.show_more", { remaining, defaultValue: "Show more ({{remaining}})" })}
-        primaryTypographyProps={{ fontSize: "0.8rem", color: "text.secondary" }}
+        slotProps={{ primary: { fontSize: "0.8rem", color: "text.secondary" } }}
       />
     </ListItemButton>
   );
 }
 
-// ── DroppableProjectZone (internal) ──────────────────────────────
-
-function DroppableProjectZone({
-  projectId,
-  children,
-}: {
-  projectId: string;
-  isOver: boolean;
-  children: React.ReactNode;
-}) {
-  const { setNodeRef, isOver: isOverCurrent } = useDroppable({
-    id: projectId,
-  });
+function DroppableProjectZone({ projectId, children }: { projectId: string; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: projectId });
   const theme = useTheme();
-
   return (
     <Box
       ref={setNodeRef}
       sx={{
         transition: "background-color 150ms ease",
-        bgcolor: isOverCurrent ? theme.palette.action.hover : "transparent",
+        bgcolor: isOver ? theme.palette.action.hover : "transparent",
         borderRadius: 1,
-        ...(isOverCurrent && {
-          outline: `2px dashed ${theme.palette.primary.main}`,
-          outlineOffset: -2,
-        }),
+        ...(isOver && { outline: `2px dashed ${theme.palette.primary.main}`, outlineOffset: -2 }),
       }}
     >
       {children}
@@ -650,91 +769,69 @@ function DroppableProjectZone({
   );
 }
 
-// ── DraggableSessionItem (internal) ─────────────────────────────
-
-function DraggableSessionItem({
-  session,
-  active,
-  onSelect,
-  onDelete,
-  onMoveClick,
-  touch,
-  onMoreClick,
-}: {
+interface SessionItemProps {
   session: ChatSession;
+  /** A line under the title (the project, in search results). */
+  secondary?: string;
   active: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onMoveClick: (el: HTMLElement) => void;
   touch: boolean;
   onMoreClick: (el: HTMLElement) => void;
-}) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: session.id,
-    disabled: touch,
-  });
+}
 
+function DraggableSessionItem(props: SessionItemProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: props.session.id,
+    disabled: props.touch,
+  });
   return (
-    <Box
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      sx={{ opacity: isDragging ? 0.4 : 1 }}
-    >
-      <SessionItem
-        session={session}
-        active={active}
-        onSelect={onSelect}
-        onDelete={onDelete}
-        onMoveClick={onMoveClick}
-        touch={touch}
-        onMoreClick={onMoreClick}
-      />
+    <Box ref={setNodeRef} {...listeners} {...attributes} sx={{ opacity: isDragging ? 0.4 : 1 }}>
+      <SessionItem {...props} />
     </Box>
   );
 }
 
-// ── SessionItem (internal) ───────────────────────────────────────
-
-function SessionItem({
-  session,
-  active,
-  onSelect,
-  onDelete,
-  onMoveClick,
-  touch,
-  onMoreClick,
-}: {
-  session: ChatSession;
-  active: boolean;
-  onSelect: (id: string) => void;
-  onDelete: (id: string) => void;
-  onMoveClick: (el: HTMLElement) => void;
-  touch: boolean;
-  onMoreClick: (el: HTMLElement) => void;
-}) {
+/** A chat in the list; the open one is highlighted as the admin's current page. */
+function SessionItem({ session, secondary, active, onSelect, onDelete, onMoveClick, touch, onMoreClick }: SessionItemProps) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
 
   return (
     <ListItemButton
-      selected={active}
       onClick={() => onSelect(session.id)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      sx={{ pl: session.project_id ? 3 : 1.5, pr: 1, ...(touch ? { minHeight: 48 } : {}) }}
+      aria-current={active ? "page" : undefined}
+      sx={{
+        ...linkButtonSx,
+        mx: 1,
+        mb: 0.25,
+        pl: 1.5,
+        pr: 0.5,
+        ...(touch ? { minHeight: 48 } : {}),
+        ...(active
+          ? {
+              bgcolor: "primary.dark",
+              color: "primary.light",
+              "& .MuiListItemIcon-root": { color: "primary.light" },
+              "&:hover": { bgcolor: "primary.dark" },
+            }
+          : {}),
+      }}
     >
-      <ListItemIcon sx={{ minWidth: 28 }}>
+      <ListItemIcon sx={{ minWidth: 28, color: "text.secondary" }}>
         <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
       </ListItemIcon>
       <ListItemText
-        primary={
-          session.title || t("chat.untitled", { defaultValue: "Untitled chat" })
-        }
-        primaryTypographyProps={{
-          noWrap: true,
-          fontSize: "0.85rem",
+        primary={session.title || t("chat.untitled", { defaultValue: "Untitled chat" })}
+        secondary={secondary}
+        slotProps={{
+          primary: { noWrap: true, fontSize: "0.85rem", fontWeight: active ? 600 : 400 },
+          secondary: { noWrap: true, fontSize: "0.72rem" },
         }}
+        sx={{ my: 0.25 }}
       />
       {touch && (
         <IconButton
@@ -744,24 +841,21 @@ function SessionItem({
             e.stopPropagation();
             onMoreClick(e.currentTarget);
           }}
-          sx={{ width: 40, height: 40 }}
+          sx={{ width: 40, height: 40, color: "inherit" }}
         >
           <MoreVertIcon fontSize="small" />
         </IconButton>
       )}
       {!touch && hovered && (
         <Box sx={{ display: "flex", ml: 0.5 }}>
-          <Tooltip
-            title={t("chat.move_to_project", {
-              defaultValue: "Move to project",
-            })}
-          >
+          <Tooltip title={t("chat.move_to_project", { defaultValue: "Move to project" })}>
             <IconButton
               size="small"
               onClick={(e) => {
                 e.stopPropagation();
                 onMoveClick(e.currentTarget);
               }}
+              sx={{ color: "inherit" }}
             >
               <DriveFileMoveOutlinedIcon sx={{ fontSize: 14 }} />
             </IconButton>
@@ -773,6 +867,7 @@ function SessionItem({
                 e.stopPropagation();
                 onDelete(session.id);
               }}
+              sx={{ color: "inherit" }}
             >
               <DeleteOutlineIcon sx={{ fontSize: 14 }} />
             </IconButton>

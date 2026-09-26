@@ -37,6 +37,9 @@ interface Props {
   canDebug?: boolean;
   onToolsToggle: () => void;
   toolsOpen: boolean;
+  /** The chat's title, as the sidebar lists it. */
+  title?: string | null;
+  onRename?: (title: string) => Promise<void>;
 }
 
 export default function ChatWindow({
@@ -54,6 +57,8 @@ export default function ChatWindow({
   canDebug = false,
   onToolsToggle,
   toolsOpen,
+  title,
+  onRename,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -129,7 +134,8 @@ export default function ChatWindow({
       }}
     >
       <ChatTopbar
-        title={t("chat.conversation", { defaultValue: "Conversation" })}
+        title={title || t("chat.untitled", { defaultValue: "Untitled chat" })}
+        onRename={onRename}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
         languages={languages}

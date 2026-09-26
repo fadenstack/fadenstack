@@ -70,7 +70,9 @@
     "navigation": "导航",
     "button_side": "菜单按钮",
     "side_left": "左侧",
-    "side_right": "右侧"
+    "side_right": "右侧",
+    "expand": "展开",
+    "collapse": "收起"
   },
   "auth": {
     "logout": "退出登录",
@@ -1974,7 +1976,24 @@
     "no_models_hint": "当前没有可用模型。请在管理面板中配置提供商和模型别名。",
     "session_actions": "聊天操作",
     "token_reply_only": "回复：{{completion}} 个令牌",
-    "show_more": "显示更多（{{remaining}}）"
+    "show_more": "显示更多（{{remaining}}）",
+    "search_placeholder": "搜索聊天",
+    "search_clear": "清除搜索",
+    "search_results": "结果：{{matches}}",
+    "section_projects": "项目",
+    "section_chats": "聊天",
+    "no_projects": "将相关聊天归入一个项目。",
+    "no_chats": "暂无聊天。",
+    "no_results": "没有匹配的聊天",
+    "group_today": "今天",
+    "group_yesterday": "昨天",
+    "group_week": "过去 7 天",
+    "group_month": "过去 30 天",
+    "group_older": "更早",
+    "rename": "重命名",
+    "rename_save": "保存",
+    "rename_cancel": "取消",
+    "title_label": "聊天标题"
   },
   "module_recommend": {
     "apply": "应用",
