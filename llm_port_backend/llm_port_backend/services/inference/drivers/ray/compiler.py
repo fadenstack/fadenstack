@@ -301,6 +301,14 @@ def _prefix_affinity_router() -> dict[str, Any]:
     ``imbalanced_threshold`` of each other; past that it balances as before.
     Its default threshold is infinite (never balance) and its prefix tree
     grows without end unless eviction is on, so both are set.
+
+    Only when the deployment asks for it (``replica_routing.strategy:
+    prefix_affinity``). It was every deployment's with more than one copy,
+    and under 16 concurrent chats qwen-chat's ingress, where this router
+    runs, stopped answering Serve's health checks: replaced three times in
+    ten minutes, every request in it lost, 32 of 47 turns timed out (Ray
+    2.58, DGX pair, 2026-09-26). Serve's default router took the same load
+    the night before.
     """
     return {
         "request_router_class": "ray.serve.llm.request_router.PrefixCacheAffinityRouter",
@@ -655,7 +663,8 @@ def compile_spec(
         upscale_delay_s=(scale.autoscale.scale_up_timeout if scale.autoscale else None),
         downscale_delay_s=(scale.autoscale.scale_down_timeout if scale.autoscale else None),
     )
-    if not stopped and max(replicas, max_replicas or 0) > 1:
+    prefix_affinity = spec.replica_routing is not None and spec.replica_routing.strategy == "prefix_affinity"
+    if prefix_affinity and not stopped and max(replicas, max_replicas or 0) > 1:
         deployment_config["request_router_config"] = _prefix_affinity_router()
 
     effective_accelerator = _accelerator_type(accelerator_type)

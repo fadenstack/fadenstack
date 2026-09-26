@@ -3,7 +3,7 @@
  * and at the top of its menu, not on the bar -- on a narrow screen it took a
  * third of it. Shared by the admin and chat top bars.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
@@ -24,9 +24,11 @@ export interface UserMenuButtonProps {
   onLogout: () => void;
   /** The icon size of the bar it sits in. */
   iconSize?: "small" | "medium";
+  /** More entries after the profile (the chat's "My skills"). */
+  extraItems?: { key: string; label: string; icon: ReactNode; onClick: () => void }[];
 }
 
-export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium" }: UserMenuButtonProps) {
+export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium", extraItems }: UserMenuButtonProps) {
   const { t } = useTranslation();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const label = t("profile.logged_in_as", { ns: "common", email });
@@ -76,6 +78,18 @@ export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium"
           </ListItemIcon>
           <ListItemText>{t("profile.manage_profile", { ns: "common" })}</ListItemText>
         </MenuItem>
+        {extraItems?.map((item) => (
+          <MenuItem
+            key={item.key}
+            onClick={() => {
+              setAnchor(null);
+              item.onClick();
+            }}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText>{item.label}</ListItemText>
+          </MenuItem>
+        ))}
         <MenuItem
           onClick={() => {
             setAnchor(null);

@@ -77,6 +77,27 @@ class PortBinding(BaseModel):
     container_port: str = Field(..., description="Container port/protocol, e.g. '80/tcp'.")
 
 
+class ContainerSettingsDTO(BaseModel):
+    """A container as its edit form shows it: what it was created with, not what its image supplies."""
+
+    image: str
+    name: str
+    cmd: list[str] | None = None
+    env: list[str] = Field(default_factory=list, description="KEY=VALUE strings.")
+    ports: list[PortBinding] = Field(default_factory=list)
+    volumes: list[str] = Field(default_factory=list)
+    network: str = ""
+    running: bool = False
+    container_class: ContainerClass
+    owner_scope: str
+    policy: ContainerPolicy
+    #: Made by Compose (LLM.Port's own services): the next deploy or upgrade
+    #: makes it again from the compose file and .env.
+    managed_by_compose: bool = False
+    #: The backend runs in it, and cannot replace the container it runs in.
+    backend_runs_here: bool = False
+
+
 class CreateContainerRequest(BaseModel):
     """Request body for creating a new container."""
 

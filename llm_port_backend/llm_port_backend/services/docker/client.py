@@ -27,6 +27,43 @@ def _resolve_bind_path(host_path: str) -> str:
     return resolved.replace("\\", "/")
 
 
+def _named_volume(source: str) -> bool:
+    """Whether a bind's source is a Docker volume's name rather than a host path.
+
+    Resolved as a path, ``loki_data:/loki`` became a folder under the
+    backend's working directory: Loki, edited from the console, started on an
+    empty one instead of its volume (dev stack, 2026-09-26).
+    """
+    return bool(source) and not any(c in source for c in "/\\") and source not in {".", "..", "~"}
+
+
+def resolve_binds(volumes: list[str] | None) -> list[str]:
+    """``host:container[:mode]`` binds with the host side resolved (see :func:`_resolve_bind_path`).
+
+    A named volume's source is a name, and is left as it is.
+    """
+    resolved: list[str] = []
+    for bind in volumes or []:
+        drive = len(bind) > 2 and bind[0].isalpha() and bind[1] == ":" and bind[2] in "/\\"
+        if not drive and _named_volume(bind.split(":", 1)[0]):
+            resolved.append(bind)
+            continue
+        # Split host:container[:mode] — but handle Windows drive
+        # letters like "C:\path" where the colon after the drive
+        # letter must NOT be treated as a separator.
+        parts = bind.split(":")
+        if len(parts) >= 3 and len(parts[0]) == 1 and parts[0].isalpha():
+            # e.g. "C:\foo\bar:/container/path" → ["C", "\foo\bar", "/container/path"]
+            host_part = _resolve_bind_path(f"{parts[0]}:{parts[1]}")
+            resolved.append(":".join([host_part, *parts[2:]]))
+        elif len(parts) >= 2:
+            host_part = _resolve_bind_path(parts[0])
+            resolved.append(":".join([host_part, *parts[1:]]))
+        else:
+            resolved.append(bind)
+    return resolved
+
+
 class DockerService:
     """
     Thin async wrapper around aiodocker.
@@ -196,22 +233,7 @@ class DockerService:
         if volumes:
             # Resolve host-side paths to absolute OS-native form so
             # Docker Desktop on Windows can locate them correctly.
-            resolved: list[str] = []
-            for bind in volumes:
-                # Split host:container[:mode] — but handle Windows drive
-                # letters like "C:\path" where the colon after the drive
-                # letter must NOT be treated as a separator.
-                parts = bind.split(":")
-                if len(parts) >= 3 and len(parts[0]) == 1 and parts[0].isalpha():
-                    # e.g. "C:\foo\bar:/container/path" → ["C", "\foo\bar", "/container/path"]
-                    host_part = _resolve_bind_path(f"{parts[0]}:{parts[1]}")
-                    resolved.append(":".join([host_part, *parts[2:]]))
-                elif len(parts) >= 2:
-                    host_part = _resolve_bind_path(parts[0])
-                    resolved.append(":".join([host_part, *parts[1:]]))
-                else:
-                    resolved.append(bind)
-            host_config["Binds"] = resolved
+            host_config["Binds"] = resolve_binds(volumes)
         if network:
             host_config["NetworkMode"] = network
 
@@ -250,6 +272,28 @@ class DockerService:
             await c.start()
         await c.show()
         return dict(c._container)  # noqa: SLF001
+
+    async def create_from_config(self, config: dict[str, Any], *, name: str | None = None) -> str:
+        """Create a container from a whole create body; its id. It is not started."""
+        kwargs: dict[str, Any] = {"config": config}
+        if name:
+            kwargs["name"] = name
+        c = await self.client.containers.create(**kwargs)
+        return c.id
+
+    async def rename(self, container_id: str, name: str) -> None:
+        """Give a container another name; a running one too."""
+        c = await self.client.containers.get(container_id)
+        await c.rename(name)
+
+    async def connect_with_endpoint(self, network: str, container_id: str, endpoint: dict[str, Any]) -> None:
+        """Join *network* with the endpoint settings given (aliases, a fixed address)."""
+        n = await self.client.networks.get(network)
+        await n.connect({"Container": container_id, "EndpointConfig": endpoint})
+
+    async def inspect_image(self, image: str) -> dict[str, Any]:
+        """Return full inspection data for an image (by name or id)."""
+        return await self.client.images.inspect(image)
 
     async def delete(self, container_id: str, force: bool = False) -> None:
         """Delete a container."""

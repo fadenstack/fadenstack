@@ -248,8 +248,8 @@ def default_env_vars(
         "LANGFUSE_INIT_PROJECT_SECRET_KEY": "",
     }
 
-    # Scalability tuning (auto-detect host resources for prod)
-    env.update(calculate_tune_profile("prod").to_env_dict())
+    # Worker counts and pools are not set here: deploy, upgrade and
+    # ``up --gen-env`` size them with ``llmport tune`` (core/tune.py).
 
     # Module activation
     profs = profiles or []

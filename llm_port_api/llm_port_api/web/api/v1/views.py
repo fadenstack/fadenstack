@@ -160,6 +160,7 @@ def get_gateway_service(
         skills_client=skills_client,
         tool_router=tool_router,
         usage_groups=getattr(request.app.state, "usage_group_resolver", None),
+        group_memberships=getattr(request.app.state, "group_membership_resolver", None),
     )
     service.stream_buffer = getattr(request.app.state, "stream_buffer", None)
     return service
@@ -671,6 +672,13 @@ async def create_rerank(
         )
 
 
+def _requested_skills(value: Any) -> list[str]:
+    """A request's ``skills``: slugs or ids, as strings; anything else ignored."""
+    if not isinstance(value, list):
+        return []
+    return [v.strip() for v in value if isinstance(v, str) and v.strip()][:20]
+
+
 @router.post("/v1/chat/completions", response_model=None)
 async def create_chat_completions(
     request: Request,
@@ -685,6 +693,9 @@ async def create_chat_completions(
 
         # Strip session_id from upstream payload but pass to service
         session_id = payload.pop("session_id", None)
+        # The skills the user picked for this message, by slug or id: the
+        # model never sees the field, only the skills.
+        skills = _requested_skills(payload.pop("skills", None))
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -692,6 +703,7 @@ async def create_chat_completions(
                 payload=payload,
                 request_id=request_id,
                 session_id=session_id,
+                skills=skills,
             )
             stream_response = StreamingResponse(
                 streamed.stream,
@@ -712,6 +724,7 @@ async def create_chat_completions(
             payload=payload,
             request_id=request_id,
             session_id=session_id,
+            skills=skills,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,

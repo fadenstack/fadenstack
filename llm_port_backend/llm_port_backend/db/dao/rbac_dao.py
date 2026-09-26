@@ -65,6 +65,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "chat.debug": ["read"],
         "chat.tool_policy": ["read", "update"],
         "pii.session": ["read", "strengthen", "weaken"],
+        "skills": ["read", "create", "share", "publish", "manage"],
     },
     "operator": {
         "llm.providers": ["read"],
@@ -104,6 +105,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.search": ["read"],
         "modules": ["read"],
         "pii.session": ["read", "strengthen"],
+        "skills": ["read", "create", "share"],
     },
     "viewer": {
         "llm.providers": ["read"],
@@ -137,6 +139,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["read"],
         "rag.jobs": ["read"],
         "rag.search": ["read"],
+        "skills": ["read"],
     },
     "rag_manager": {
         "rag.runtime": ["read", "update"],
@@ -168,6 +171,9 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "chat.tool_policy": ["read", "update"],
         "pii.session": ["read", "strengthen"],
         "chat.attachments": ["create", "read", "delete"],
+        # Everyone can make skills of their own from a chat and share them;
+        # making one the whole organization sees is skills:publish.
+        "skills": ["read", "create", "share"],
         "rag.runtime": ["read"],
         "rag.containers": ["create", "read", "update", "delete"],
         "rag.assets": ["create", "read", "update", "delete"],

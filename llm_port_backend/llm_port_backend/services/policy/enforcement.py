@@ -75,7 +75,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.SYSTEM_AUX, Action.PAUSE): False,
     (ContainerClass.SYSTEM_AUX, Action.UNPAUSE): False,
     (ContainerClass.SYSTEM_AUX, Action.EXEC): False,
-    (ContainerClass.SYSTEM_AUX, Action.UPDATE_CONFIG): False,
+    (ContainerClass.SYSTEM_AUX, Action.UPDATE_CONFIG): True,
     (ContainerClass.SYSTEM_AUX, Action.DELETE): False,
     (ContainerClass.SYSTEM_AUX, Action.IMAGE_PULL): True,
     (ContainerClass.SYSTEM_AUX, Action.IMAGE_PRUNE): False,
@@ -91,7 +91,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.MCP, Action.PAUSE): False,
     (ContainerClass.MCP, Action.UNPAUSE): False,
     (ContainerClass.MCP, Action.EXEC): False,
-    (ContainerClass.MCP, Action.UPDATE_CONFIG): False,
+    (ContainerClass.MCP, Action.UPDATE_CONFIG): True,
     (ContainerClass.MCP, Action.DELETE): False,
     (ContainerClass.MCP, Action.IMAGE_PULL): True,
     (ContainerClass.MCP, Action.IMAGE_PRUNE): False,
@@ -107,7 +107,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.SYSTEM_CORE, Action.PAUSE): False,
     (ContainerClass.SYSTEM_CORE, Action.UNPAUSE): False,
     (ContainerClass.SYSTEM_CORE, Action.EXEC): False,
-    (ContainerClass.SYSTEM_CORE, Action.UPDATE_CONFIG): False,
+    (ContainerClass.SYSTEM_CORE, Action.UPDATE_CONFIG): True,
     (ContainerClass.SYSTEM_CORE, Action.DELETE): False,
     (ContainerClass.SYSTEM_CORE, Action.IMAGE_PULL): True,
     (ContainerClass.SYSTEM_CORE, Action.IMAGE_PRUNE): False,
@@ -123,7 +123,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.UNTRUSTED, Action.PAUSE): False,
     (ContainerClass.UNTRUSTED, Action.UNPAUSE): False,
     (ContainerClass.UNTRUSTED, Action.EXEC): False,
-    (ContainerClass.UNTRUSTED, Action.UPDATE_CONFIG): False,
+    (ContainerClass.UNTRUSTED, Action.UPDATE_CONFIG): True,
     (ContainerClass.UNTRUSTED, Action.DELETE): False,
     (ContainerClass.UNTRUSTED, Action.IMAGE_PULL): False,
     (ContainerClass.UNTRUSTED, Action.IMAGE_PRUNE): False,
@@ -131,6 +131,10 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.UNTRUSTED, Action.STACK_UPDATE): False,
     (ContainerClass.UNTRUSTED, Action.STACK_ROLLBACK): False,
 }
+
+# Editing a container (it is replaced by one with the new settings) is
+# allowed for every class: only a LOCKED policy blocks it. It was TENANT_APP
+# only, and an MCP server's container could not get a new variable.
 
 # Root mode: all actions allowed on any class
 _ROOT_ALLOW_ALL = True

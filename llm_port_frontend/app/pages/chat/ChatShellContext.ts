@@ -20,6 +20,8 @@ export interface ChatShell {
   userEmail: string;
   onProfile: () => void;
   onLogout: () => void;
+  /** Open the user's skills page; no entry when skills are off. */
+  onSkills?: () => void;
   /** Set on a phone (below 600 px). */
   phoneNav: ChatPhoneNav | null;
 }

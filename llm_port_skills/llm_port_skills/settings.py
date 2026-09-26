@@ -66,10 +66,24 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""
 
     # ── Skills defaults ──
+    # Published skills the whole tenant sees (visibility tenant or global).
+    # People's private skills do not count against it.
     max_published_skills_per_tenant: int = 25
-    max_versions_per_skill: int = 5
+    # Skills one person may own. Versions are not limited: none is ever
+    # deleted, since the audit log names the version a chat used.
+    max_skills_per_user: int = 200
     max_assignments_per_tenant: int = 10
     default_max_resolve_results: int = 3
+    # Skills asked for by name ($slug, the chat's picker) come on top of the
+    # ones that match on their own, up to this many.
+    max_explicit_skills: int = 5
+    # Size limits. A skill's body goes into the prompt of every chat it
+    # reaches; the recommendation is under 5000 tokens.
+    max_body_chars: int = 100_000
+    max_files_per_skill: int = 64
+    max_file_bytes: int = 512 * 1024
+    max_bundle_bytes: int = 4 * 1024 * 1024
+    max_upload_bytes: int = 8 * 1024 * 1024
 
     # ── Observability ──
     # Named per service, like the backend's and gateway's. Each service clears

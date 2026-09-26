@@ -110,3 +110,25 @@ async def test_the_cache_is_bounded() -> None:
         clock.now += 1
         await resolver.resolve(f"u{i}")
     assert len(resolver._cache) <= 3  # noqa: SLF001
+
+
+@pytest.mark.anyio
+async def test_group_memberships_are_cached_like_the_usage_group() -> None:
+    calls: list[str] = []
+
+    async def memberships(user_id: str) -> tuple[str, ...]:
+        calls.append(user_id)
+        return ("g1", "g2")
+
+    resolver: UsageGroupResolver[tuple[str, ...]] = UsageGroupResolver(memberships, clock=_Clock())
+    assert await resolver.resolve("u1") == ("g1", "g2")
+    assert await resolver.resolve("u1") == ("g1", "g2")
+    assert calls == ["u1"]
+
+
+def test_without_a_backend_database_there_is_nothing_to_resolve() -> None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from llm_port_api.services.gateway.usage_group import build_user_resolvers  # noqa: PLC0415
+
+    assert build_user_resolvers(SimpleNamespace(backend_db_base="")) == (None, None)

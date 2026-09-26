@@ -28,6 +28,9 @@ import { listLanguages, type UiLanguage } from "~/api/i18n";
 import { clearCachedAccess } from "~/lib/adminConstants";
 import { patchSessionPiiPolicy } from "~/api/pii";
 import { patchSessionToolPolicy } from "~/api/tools";
+import { skillRights } from "~/api/skills";
+import CreateSkillDialog from "~/components/skills/CreateSkillDialog";
+import { useSkillsModule } from "~/lib/useSkillsModule";
 import type { InitialMessageState } from "./components/ChatWelcome";
 import ChatSidebar, { CHAT_RAIL_WIDTH } from "./components/ChatSidebar";
 import ChatWelcome from "./components/ChatWelcome";
@@ -39,6 +42,7 @@ import { useToolPolicy } from "./hooks/useToolPolicy";
 import { useSessionPiiPolicy } from "./hooks/useSessionPiiPolicy";
 import { ChatShellContext, type ChatShell } from "./ChatShellContext";
 import { useNavHand } from "~/lib/useNavHand";
+import { ChatSkillsProvider, useChatSkillsState } from "./hooks/useChatSkills";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
@@ -50,6 +54,8 @@ export default function ChatPage() {
     permissions: Set<string>;
   }>();
   const canDebug = permissions.has("*") || permissions.has("chat.debug:read");
+  const skillsAllowed = skillRights((p) => permissions.has("*") || permissions.has(p));
+  const skillsModule = useSkillsModule();
   const navigate = useNavigate();
   const { t } = useTranslation("chat");
   const theme = useTheme();
@@ -80,6 +86,12 @@ export default function ChatPage() {
   const [localToolOverrides, setLocalToolOverrides] = useState<
     Map<string, boolean>
   >(new Map());
+  const chatSkills = useChatSkillsState({
+    sessionId,
+    enabled: skillsModule.enabled && skillsAllowed.read,
+    canCreate: skillsAllowed.create,
+  });
+  const { adopt: adoptSkills } = chatSkills;
 
   const handleLocalToolOverride = useCallback(
     (toolId: string, enabled: boolean) => {
@@ -170,9 +182,11 @@ export default function ChatPage() {
       }
       // Clear local overrides now that they're persisted
       setLocalToolOverrides(new Map());
+      // The skills picked before the first message stay with the chat.
+      adoptSkills(sess.id);
       navigate(`/chat/${sess.id}`, { state: initialState });
     },
-    [navigate, executionMode, localToolOverrides, localPiiOverrides],
+    [navigate, executionMode, localToolOverrides, localPiiOverrides, adoptSkills],
   );
 
   const handleDeleteSession = useCallback(
@@ -268,17 +282,19 @@ export default function ChatPage() {
       userEmail: user.email,
       onProfile: () => setProfileOpen(true),
       onLogout: handleLogout,
+      onSkills: chatSkills.value.enabled ? () => navigate("/skills") : undefined,
       phoneNav: isPhone
         ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
         : null,
     }),
-    [user.email, handleLogout, isPhone, navHand, sidebarOpen],
+    [user.email, handleLogout, isPhone, navHand, sidebarOpen, chatSkills.value.enabled, navigate],
   );
 
   // A phone's 100vh reaches behind the browser's toolbar.
   const fullHeight = { height: "100vh", "@supports (height: 100dvh)": { height: "100dvh" } };
 
   return (
+    <ChatSkillsProvider value={chatSkills.value}>
     <ChatShellContext.Provider value={shell}>
     <Box sx={{ display: "flex", ...fullHeight, overflow: "hidden" }}>
       {/* Sidebar */}
@@ -438,7 +454,19 @@ export default function ChatPage() {
           <ProfilePage />
         </DialogContent>
       </Dialog>
+
+      {/* Create a skill: /skill, or the skills menu in the input */}
+      <CreateSkillDialog
+        open={chatSkills.createFor !== null}
+        sessionId={sessionId}
+        model={selectedModel}
+        initialGuidance={chatSkills.createFor?.guidance}
+        inChat
+        onClose={chatSkills.closeCreate}
+        onCreated={(skill, useNow) => chatSkills.created(skill, useNow)}
+      />
     </Box>
     </ChatShellContext.Provider>
+    </ChatSkillsProvider>
   );
 }

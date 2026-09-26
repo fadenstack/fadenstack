@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
+
+import anyio
+import httpx
+from mcp.shared.exceptions import McpError
 
 from llm_port_mcp.db.models.mcp import MCPServerModel
 from llm_port_mcp.services.transport.base import GenericMCPServer, MCPServerConfig
@@ -71,11 +76,27 @@ def _create_adapter(config: MCPServerConfig) -> GenericMCPServer:
     raise ValueError(msg)
 
 
+def session_gone(exc: BaseException) -> bool:
+    """Whether *exc* says the connection is gone, before a request reached the server.
+
+    A server that restarted -- its container restarted, or was replaced when
+    edited from the console -- no longer knows the session: it answers 404,
+    which the SDK reports as "Session terminated", and the request was not
+    run. A closed stream or a refused connection did not send it either. A
+    call that failed so can be sent again, on a new connection.
+    """
+    if isinstance(exc, McpError):
+        return "session terminated" in str(exc).lower()
+    gone = (anyio.ClosedResourceError, anyio.BrokenResourceError, httpx.ConnectError)
+    return isinstance(exc, gone)
+
+
 class MCPConnectionManager:
     """Owns active connections to all registered MCP servers."""
 
     def __init__(self) -> None:
         self._connections: dict[str, GenericMCPServer] = {}
+        self._reconnecting: dict[str, asyncio.Lock] = {}
 
     @property
     def active_count(self) -> int:
@@ -119,6 +140,71 @@ class MCPConnectionManager:
                     exc_info=True,
                 )
 
+    async def reconnect(
+        self,
+        server_id: str,
+        stale: GenericMCPServer | None = None,
+    ) -> GenericMCPServer | None:
+        """Connect again to a server whose session is gone: the new connection, or None.
+
+        The connection was never made again: after its server restarted, every
+        health check and tool call failed until the MCP service itself
+        restarted (an MCP server's container edited from the console, VM,
+        2026-09-26). The old connection stays registered until a new one is
+        up, so a failed attempt is tried again at the next heartbeat. When
+        *stale* is given and another caller has replaced it meanwhile, that
+        connection is returned.
+        """
+        lock = self._reconnecting.setdefault(server_id, asyncio.Lock())
+        async with lock:
+            current = self._connections.get(server_id)
+            if current is None:
+                return None
+            if stale is not None and current is not stale:
+                return current
+            fresh = _create_adapter(current.config)
+            try:
+                await fresh.connect()
+            except Exception:
+                logger.warning(
+                    "Could not reconnect to MCP server %s",
+                    current.config.name,
+                    exc_info=True,
+                )
+                return None
+            self._connections[server_id] = fresh
+            try:
+                await current.disconnect()
+            except BaseException:  # the old session is gone already
+                logger.debug(
+                    "Closing the old connection to %s failed",
+                    current.config.name,
+                    exc_info=True,
+                )
+            logger.info("Reconnected to MCP server %s", current.config.name)
+            return fresh
+
+    async def call_tool(
+        self,
+        server_id: str,
+        adapter: GenericMCPServer,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Call a tool; once more on a new connection if the session was gone.
+
+        Only then: a call that failed so was not run (see :func:`session_gone`).
+        """
+        try:
+            return await adapter.call_tool(tool_name, arguments)
+        except Exception as exc:
+            if not session_gone(exc):
+                raise
+            fresh = await self.reconnect(server_id, stale=adapter)
+            if fresh is None:
+                raise
+            return await fresh.call_tool(tool_name, arguments)
+
     async def restart(self, server: MCPServerModel) -> GenericMCPServer:
         """Disconnect and reconnect a server."""
         await self.stop(str(server.id))
@@ -155,6 +241,13 @@ class MCPConnectionManager:
                     server_id,
                     exc_info=True,
                 )
+            if status != "active":
+                fresh = await self.reconnect(server_id, stale=adapter)
+                if fresh is not None:
+                    try:
+                        status = await fresh.healthcheck()
+                    except Exception:
+                        status = "error"
 
             if redis_pool is not None:
                 try:

@@ -5,6 +5,9 @@ was given all 48 -- ~14.7k prompt tokens a turn -- because the gateway merged
 the tenant's whole MCP catalog into every request (release VM, 2026-09-25).
 A tool switched off also ran when the model named it: the tool router checked
 the execution mode and the policy, not the switch.
+
+Since then an MCP tool is off until switched on, by the user or by the model
+with get_available_tools; the system tools are always offered.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from llm_port_api.db.models.gateway import (
     SessionToolOverride,
 )
 from llm_port_api.services.gateway.mcp_client import MCPClient, ToolCallResult, ToolCatalog
+from llm_port_api.services.gateway.system_tools import FIND, TIME
 from llm_port_api.services.registry import service_registry
 from llm_port_api.settings import settings
 from tests.test_gateway_knowledge_tools import (
@@ -41,6 +45,8 @@ from tests.test_gateway_pipeline_combined import _install_pii, _Observability, _
 SEARCH = "mcp.github.search_repositories"
 CREATE = "mcp.github.create_repository"
 SERVICE_TOKEN = "service-token"
+#: What every chat on a route that calls tools is offered, with MCP tools to find.
+SYSTEM = [FIND, TIME]
 
 
 class _MCP:
@@ -48,6 +54,7 @@ class _MCP:
 
     def __init__(
         self, monkeypatch: pytest.MonkeyPatch, *names: str, pii_mode: str = "redact",
+        descriptions: dict[str, str] | None = None,
     ) -> None:
         self.calls: list[dict[str, Any]] = []
         self.catalog_fetches = 0
@@ -57,7 +64,11 @@ class _MCP:
                 "qualified_name": name,
                 "openai_tool": {
                     "type": "function",
-                    "function": {"name": name, "description": name, "parameters": {"type": "object"}},
+                    "function": {
+                        "name": name,
+                        "description": (descriptions or {}).get(name, name),
+                        "parameters": {"type": "object"},
+                    },
                 },
                 "realm": "mcp_remote",
                 "pii_mode": pii_mode,
@@ -95,12 +106,20 @@ def _pii_off_after() -> Any:
     service_registry.configure("pii", enabled=False, url=None)
 
 
-async def _switch_off(db: AsyncSession, sid: uuid.UUID, *tool_ids: str) -> None:
+async def _switch(db: AsyncSession, sid: uuid.UUID, *tool_ids: str, on: bool) -> None:
     db.add_all(
-        SessionToolOverride(session_id=sid, tool_id=tool_id, enabled=False, updated_by="user-1")
+        SessionToolOverride(session_id=sid, tool_id=tool_id, enabled=on, updated_by="user-1")
         for tool_id in tool_ids
     )
     await db.flush()
+
+
+async def _switch_on(db: AsyncSession, sid: uuid.UUID, *tool_ids: str) -> None:
+    await _switch(db, sid, *tool_ids, on=True)
+
+
+async def _switch_off(db: AsyncSession, sid: uuid.UUID, *tool_ids: str) -> None:
+    await _switch(db, sid, *tool_ids, on=False)
 
 
 async def _ready(fastapi_app: FastAPI, db: AsyncSession) -> None:
@@ -109,32 +128,49 @@ async def _ready(fastapi_app: FastAPI, db: AsyncSession) -> None:
 
 
 @pytest.mark.anyio
-async def test_the_model_gets_only_the_tools_the_chat_has_on(
+async def test_the_model_gets_the_mcp_tools_the_chat_has_on_and_no_others(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """One switched off: the other goes to the model; a chat with none off gets both."""
+    """One switched on: it goes to the model; a chat that switched none on gets the system tools only."""
     await _ready(fastapi_app, db_session)
     _MCP(monkeypatch, SEARCH, CREATE)
     model = _Model(monkeypatch, _say("a"), _say("b"))
     narrowed, untouched = await _session(db_session), await _session(db_session)
-    await _switch_off(db_session, narrowed, CREATE)
+    await _switch_on(db_session, narrowed, SEARCH)
 
     assert (await _ask(client, session_id=str(narrowed))).status_code == 200
     assert (await _ask(client, session_id=str(untouched))).status_code == 200
-    assert _tool_names(model.sent[0]) == [SEARCH]
-    assert sorted(_tool_names(model.sent[1])) == [CREATE, SEARCH]
+    assert _tool_names(model.sent[0]) == [*SYSTEM, SEARCH]
+    assert _tool_names(model.sent[1]) == SYSTEM
 
 
 @pytest.mark.anyio
-async def test_a_chat_with_every_tool_off_sends_none(
+async def test_a_request_that_rules_tools_out_gets_none(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No tools, and no tool_choice forced on the model either."""
+    """tool_choice "none": no tools, the switched-on ones included, and the choice left as it was."""
     await _ready(fastapi_app, db_session)
     _MCP(monkeypatch, SEARCH, CREATE)
     model = _Model(monkeypatch, _say("a"))
     sid = await _session(db_session)
-    await _switch_off(db_session, sid, SEARCH, CREATE)
+    await _switch_on(db_session, sid, SEARCH)
+
+    await _ask(client, session_id=str(sid), tool_choice="none")
+    assert _tool_names(model.sent[0]) == []
+    assert model.sent[0]["tool_choice"] == "none"
+
+
+@pytest.mark.anyio
+async def test_a_route_that_cannot_call_tools_gets_none(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """vLLM refuses a request that offers tools unless it was started for them."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata={"task": "chat", "tools": False})
+    fastapi_app.state.gateway_observability = _Observability()
+    _MCP(monkeypatch, SEARCH)
+    model = _Model(monkeypatch, _say("a"))
+    sid = await _session(db_session)
+    await _switch_on(db_session, sid, SEARCH)
 
     await _ask(client, session_id=str(sid))
     assert _tool_names(model.sent[0]) == []
@@ -145,36 +181,55 @@ async def test_a_chat_with_every_tool_off_sends_none(
 async def test_a_local_only_chat_gets_no_server_tools(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The execution mode filters as the panel shows it."""
+    """The execution mode filters as the panel shows it: nothing switched on, nothing to find."""
     await _ready(fastapi_app, db_session)
     _MCP(monkeypatch, SEARCH)
     model = _Model(monkeypatch, _say("a"))
     sid = await _session(db_session)
+    await _switch_on(db_session, sid, SEARCH)
     chat = await db_session.get(ChatSession, sid)
     assert chat is not None
     chat.execution_mode = ExecutionMode.LOCAL_ONLY
     await db_session.flush()
 
     await _ask(client, session_id=str(sid))
-    assert _tool_names(model.sent[0]) == []
+    assert _tool_names(model.sent[0]) == [TIME]
 
 
 @pytest.mark.anyio
-async def test_a_switched_off_tool_the_model_names_anyway_does_not_run(
+@pytest.mark.parametrize("switched_off", [False, True], ids=["never-on", "switched-off"])
+async def test_a_tool_the_model_calls_without_finding_it_is_switched_on_and_runs(
+    switched_off: bool,
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Named from an earlier turn, or guessed: refused, and the model is told."""
+    """Named from an earlier turn, or from a search's list: it may be used, so it runs and stays on."""
     await _ready(fastapi_app, db_session)
     mcp = _MCP(monkeypatch, SEARCH, CREATE)
-    model = _Model(monkeypatch, _call(CREATE, {"name": "x"}), _say("I can't create it here."))
+    model = _Model(monkeypatch, _call(CREATE, {"name": "x"}), _say("Created."))
     sid = await _session(db_session)
-    await _switch_off(db_session, sid, CREATE)
+    if switched_off:
+        await _switch_off(db_session, sid, CREATE)
 
     assert (await _ask(client, session_id=str(sid))).status_code == 200
+    assert [c["qualified_name"] for c in mcp.calls] == [CREATE]
+    assert _tool_names(model.sent[1]) == [*SYSTEM, CREATE]
+    rows = await GatewayDAO(db_session).get_session_tool_overrides(sid)
+    assert [(o.tool_id, o.enabled, o.updated_by) for o in rows] == [(CREATE, True, "model")]
+
+
+@pytest.mark.anyio
+async def test_a_tool_the_chat_cannot_use_is_refused_as_unknown(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A name outside the catalog: the MCP service is not asked."""
+    await _ready(fastapi_app, db_session)
+    mcp = _MCP(monkeypatch, SEARCH)
+    model = _Model(monkeypatch, _call("mcp.github.delete_everything", {}), _say("ok"))
+    sid = await _session(db_session)
+
+    await _ask(client, session_id=str(sid))
     assert mcp.calls == []
-    told = model.sent[1]["messages"][-1]
-    assert told["role"] == "tool"
-    assert "switched off in this chat" in told["content"]
+    assert "There is no tool named 'mcp.github.delete_everything'" in model.sent[1]["messages"][-1]["content"]
 
 
 @pytest.mark.anyio
@@ -256,6 +311,7 @@ async def test_a_hyphenated_mcp_tool_is_called_by_its_name(
     mcp = _MCP(monkeypatch, "mcp.everything.get-sum")
     _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 17, "b": 25}), _say("42"))
     sid = await _session(db_session)
+    await _switch_on(db_session, sid, "mcp.everything.get-sum")
 
     assert (await _ask(client, session_id=str(sid))).status_code == 200
     assert [call["qualified_name"] for call in mcp.calls] == ["mcp.everything.get-sum"]
@@ -280,6 +336,7 @@ async def test_the_next_turn_sees_the_tool_call_and_its_result(
     _MCP(monkeypatch, "mcp.everything.get-sum")
     model = _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 17, "b": 25}), _say("It is 42."), _say("ok"))
     sid = await _session(db_session)
+    await _switch_on(db_session, sid, "mcp.everything.get-sum")
 
     await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Add 17 and 25."}])
     await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "And now?"}])
@@ -302,10 +359,10 @@ async def test_a_turn_without_tools_gets_the_history_without_them(
     _MCP(monkeypatch, "mcp.everything.get-sum")
     model = _Model(monkeypatch, _call("mcp.everything.get-sum", {"a": 1, "b": 2}), _say("3"), _say("ok"))
     sid = await _session(db_session)
+    await _switch_on(db_session, sid, "mcp.everything.get-sum")
 
     await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Add 1 and 2."}])
-    await _switch_off(db_session, sid, "mcp.everything.get-sum")
-    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Thanks."}])
+    await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Thanks."}], tool_choice="none")
 
     assert _roles(model.sent[2]["messages"]) == ["user", "assistant", "user"]
 
@@ -355,6 +412,7 @@ async def test_a_server_that_allows_personal_data_gets_the_values(
     mcp = _MCP(monkeypatch, "mcp.everything.echo", pii_mode=pii_mode)
     _Model(monkeypatch, _call("mcp.everything.echo", {"message": "[PERSON_1] said hi"}), _say("done"))
     sid = await _session(db_session)
+    await _switch_on(db_session, sid, "mcp.everything.echo")
 
     await _ask(client, session_id=str(sid), messages=[{"role": "user", "content": "Echo: Alice said hi"}])
     assert [call["arguments"]["message"] for call in mcp.calls] == [sent]

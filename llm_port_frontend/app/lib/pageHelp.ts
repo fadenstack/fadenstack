@@ -503,17 +503,6 @@ const ROUTE_MAP: RouteMapping[] = [
 
   // ── Skills ───────────────────────────────────────────────────────
   {
-    prefix: "/admin/skills/create",
-    entry: {
-      titleKey: "page_help.skills_create.title",
-      descriptionKey: "page_help.skills_create.description",
-      actionKeys: [
-        "page_help.skills_create.action_define",
-        "page_help.skills_create.action_test",
-      ],
-    },
-  },
-  {
     prefix: "/admin/skills/",
     entry: {
       titleKey: "page_help.skill_detail.title",

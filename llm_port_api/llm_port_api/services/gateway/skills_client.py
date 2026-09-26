@@ -30,6 +30,14 @@ class ResolvedSkill:
     preferred_tools: list[str] | None = None
     forbidden_tools: list[str] | None = None
     knowledge_sources: list[str] | None = None
+    #: The version's content hash, for the audit log: what the model was told
+    #: is exactly this stored version.
+    content_sha256: str | None = None
+    #: Why the request got it: ``explicit``, ``always``, ``trigger``, ``assignment``.
+    matched_by: str | None = None
+    #: The folder's other files: ``{path, size, kind, executable, text}``;
+    #: ``text`` only when asked for inline and it fit.
+    files: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)
@@ -58,6 +66,8 @@ class SkillsClient:
         *,
         tenant_id: str,
         user_id: str | None = None,
+        group_ids: list[str] | tuple[str, ...] | None = None,
+        requested: list[str] | None = None,
         assistant_id: str | None = None,
         workspace_id: str | None = None,
         project_id: str | None = None,
@@ -66,14 +76,20 @@ class SkillsClient:
         file_types: list[str] | None = None,
         tags: list[str] | None = None,
         max_skills: int = 3,
+        inline_files_chars: int = 0,
     ) -> SkillResolveResult:
         """Resolve matching skills for a gateway request context.
 
-        Calls ``POST /api/internal/skills/resolve``.
+        Calls ``POST /api/internal/skills/resolve``. The service resolves among
+        the skills *user_id* can see: their own, the tenant's, and the ones
+        shared with them or one of *group_ids*. *requested* names skills the
+        user asked for (slug or id), which come whatever their triggers say.
         """
         body: dict[str, Any] = {
             "tenant_id": tenant_id,
             "user_id": user_id,
+            "group_ids": list(group_ids or []),
+            "requested": list(requested or []),
             "assistant_id": assistant_id,
             "workspace_id": workspace_id,
             "project_id": project_id,
@@ -82,6 +98,7 @@ class SkillsClient:
             "file_types": file_types or [],
             "tags": tags or [],
             "max_skills": max_skills,
+            "inline_files_chars": inline_files_chars,
         }
         try:
             resp = await self._http.post(
@@ -105,6 +122,9 @@ class SkillsClient:
                     preferred_tools=s.get("preferred_tools"),
                     forbidden_tools=s.get("forbidden_tools"),
                     knowledge_sources=s.get("knowledge_sources"),
+                    content_sha256=s.get("content_sha256"),
+                    matched_by=s.get("matched_by"),
+                    files=s.get("files") or None,
                 )
                 for s in data.get("skills", [])
             ]
@@ -112,6 +132,30 @@ class SkillsClient:
         except Exception:
             logger.exception("Skills resolve failed")
             return SkillResolveResult()
+
+    async def read_file(
+        self,
+        *,
+        skill_id: str,
+        version: int,
+        path: str,
+        tenant_id: str,
+    ) -> dict[str, Any]:
+        """One file of a resolved skill's version: ``{path, size, kind, text}``.
+
+        Calls ``GET /api/internal/skills/{id}/versions/{n}/file``; raises when
+        the service refuses (the model is told why).
+        """
+        resp = await self._http.get(
+            f"{self._base}/api/internal/skills/{skill_id}/versions/{version}/file",
+            params={"tenant_id": tenant_id, "path": path},
+            headers=self._headers,
+            timeout=10.0,
+        )
+        if resp.status_code == 404:
+            raise ValueError(f"{path} could not be found in the skill.")
+        resp.raise_for_status()
+        return resp.json()  # type: ignore[no-any-return]
 
     async def record_usage(
         self,

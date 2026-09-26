@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import { chatApi } from "~/api/chatClient";
+import { useChatSkills } from "../hooks/useChatSkills";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
 
@@ -40,6 +41,8 @@ export interface InitialMessageState {
   initialMessage: string;
   initialModel: string;
   initialFiles?: File[];
+  /** The skills picked before the chat had its first message. */
+  initialSkills?: string[];
 }
 
 export default function ChatWelcome({
@@ -56,6 +59,7 @@ export default function ChatWelcome({
   toolsOpen,
 }: Props) {
   const { t } = useTranslation();
+  const skills = useChatSkills();
   const theme = useTheme();
   const [sending, setSending] = useState(false);
 
@@ -89,6 +93,7 @@ export default function ChatWelcome({
         initialMessage: text,
         initialModel: selectedModel,
         initialFiles: files.length > 0 ? files : undefined,
+        initialSkills: skills.selected.length > 0 ? skills.selected : undefined,
       });
     } catch {
       setSending(false);

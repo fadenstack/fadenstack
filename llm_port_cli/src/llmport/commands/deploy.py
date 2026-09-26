@@ -3,7 +3,8 @@
 Runs the complete production flow:
   1. Pre-flight checks (Docker, Compose, disk, RAM)
   2. Locate or set up the install directory
-  3. Generate ``.env`` with random secrets and auto-tuned pool sizes
+  3. Generate ``.env`` with random secrets, and size the services for
+     this host (what ``llmport tune`` does)
   4. Enable requested modules (compose profiles)
   5. Pull pre-built container images from the registry
   6. Start all services (infra + app + modules)
@@ -33,6 +34,7 @@ from llmport.core.env_gen import default_env_vars, read_env_file, write_env_file
 from llmport.core.registry import MODULES_COMPAT as KNOWN_MODULES
 from llmport.core.rmq import write_definitions as write_rmq_definitions
 from llmport.core.settings import LlmportConfig, load_config, save_config
+from llmport.core.tune import tune_env
 
 
 def _regenerate_rmq_definitions(
@@ -445,6 +447,13 @@ def deploy_cmd(
     if release is not None:
         pin_release(env_path)
         info(f"Images: release {__version__}")
+
+    # ── 3a. Size the services for this host ───────────────────────
+    # On every deploy, not only with a new .env: an install deployed before
+    # a fix to the sizing gets it too. Profile and CPU share are what
+    # ``llmport tune`` last chose.
+    console.print("\n[bold cyan]Step 3a: Sizing the services for this host…[/bold cyan]")
+    tune_env(env_path)
 
     # ── 3b. Migrate old single-credential RabbitMQ env vars ───────
     existing = read_env_file(env_path)

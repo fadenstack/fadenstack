@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
 import re
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Any
 
 from llm_port_api.db.dao.gateway_dao import GatewayDAO
@@ -17,7 +19,7 @@ from llm_port_api.db.models.gateway import ProviderType
 from llm_port_api.services.gateway.audit import AuditService
 from llm_port_api.services.gateway.usage_group import UsageGroupResolver
 from llm_port_api.services.gateway.auth import AuthContext
-from llm_port_api.services.gateway import attachment_search, knowledge
+from llm_port_api.services.gateway import attachment_search, knowledge, skill_files, system_tools
 from llm_port_api.services.gateway.errors import GatewayError
 from llm_port_api.services.gateway.llm_adapter import LLMAdapter
 from llm_port_api.services.gateway.observability import (
@@ -405,6 +407,76 @@ def _with_tools(payload: dict[str, Any], tools: list[dict[str, Any]]) -> dict[st
     return out
 
 
+def _tool_definition_name(tool: dict[str, Any]) -> str:
+    return (tool.get("function") or {}).get("name") or ""
+
+
+#: The gateway's tools offered after the MCP tools.
+_AFTER_MCP_TOOLS = knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+
+
+def _with_mcp_tools(payload: dict[str, Any], mcp_tools: list[dict[str, Any]]) -> dict[str, Any]:
+    """*payload* offering *mcp_tools* as its MCP tools, where they stood.
+
+    They go where the first request put them, in the catalog's order, so a
+    tool switched on changes the prompt's tool list at one place only.
+    """
+    tools = [
+        t for t in payload.get("tools") or [] if not _tool_definition_name(t).startswith(MCP_TOOL_PREFIX)
+    ]
+    at = next((i for i, t in enumerate(tools) if _tool_definition_name(t) in _AFTER_MCP_TOOLS), len(tools))
+    block = [t.get("openai_tool", t) for t in mcp_tools]
+    return {**payload, "tools": [*tools[:at], *block, *tools[at:]]}
+
+
+def _switched_on(req: _Prepared) -> list[dict[str, Any]]:
+    """The MCP tools a request offers, in the catalog's order."""
+    return [t for t in req.mcp_findable if t.get("qualified_name") in req.mcp_on]
+
+
+def _skills_allow(skills: list[ResolvedSkill], name: str) -> bool:
+    """Whether the request's skills let the model use tool *name*.
+
+    A skill's ``forbidden_tools`` are out; when any skill lists
+    ``allowed_tools``, only the tools they list are in -- and the system
+    tools, which do nothing outside the gateway.
+    """
+    if any(name in (skill.forbidden_tools or ()) for skill in skills):
+        return False
+    allowed = [skill.allowed_tools for skill in skills if skill.allowed_tools]
+    return not allowed or name in system_tools.NAMES or any(name in names for names in allowed)
+
+
+#: Names the gateway's own tools answer to.
+_GATEWAY_TOOLS = system_tools.NAMES | knowledge.NAMES | {attachment_search.NAME, skill_files.NAME}
+
+
+def _short(name: str) -> str:
+    """A tool's name without its prefix, "-" and "_" and case: "getsum" for "mcp.everything.get-sum"."""
+    return re.sub(r"[-_\s]", "", name.split(".", 2)[-1] if name.startswith(MCP_TOOL_PREFIX) else name).lower()
+
+
+def _mcp_name(req: _Prepared, name: str) -> str:
+    """*name*, or the MCP tool it names without its prefix, when one tool the chat may use has that name.
+
+    A model told "use the get-sum tool" calls "get-sum", or "get_sum".
+    """
+    if name.startswith(MCP_TOOL_PREFIX) or name in _GATEWAY_TOOLS or not req.system_tools:
+        return name
+    same = [
+        qualified for t in req.mcp_findable
+        if _short(qualified := t.get("qualified_name", "")) == _short(name)
+    ]
+    return same[0] if len(same) == 1 else name
+
+
+def _uuid_or_none(value: str | None) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value) if value else None
+    except ValueError:
+        return None
+
+
 # A name as tools are named -- letters, digits, "_", "." and "-" -- up to what
 # some models append ("knowledge_search<|channel|>commentary"). Without "-",
 # "mcp.everything.get-sum" was cut to "mcp.everything.get": every hyphenated
@@ -589,12 +661,37 @@ def _insert_before_question(payload: dict[str, Any], message: dict[str, Any]) ->
     return {**payload, "messages": messages}
 
 
+def _file_types(names: list[tuple[str, str]]) -> list[str]:
+    """File types as skill triggers name them ("pdf"), from names and media types."""
+    types: set[str] = set()
+    for filename, content_type in names:
+        suffix = PurePosixPath((filename or "").replace("\\", "/")).suffix.lower().lstrip(".")
+        if suffix:
+            types.add(suffix)
+            continue
+        guessed = mimetypes.guess_extension((content_type or "").split(";")[0].strip())
+        if guessed:
+            types.add(guessed.lstrip(".").lower())
+    return sorted(types)
+
+
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
-    """The skills a request used, for the audit log."""
+    """The skills a request used, for the audit log.
+
+    With the version's content hash: versions are never deleted or changed,
+    so the entry names exactly what the model was told.
+    """
     if not skills:
         return None
     return [
-        {"skill_id": str(s.skill_id), "name": s.name, "slug": s.slug, "version": s.version}
+        {
+            "skill_id": str(s.skill_id),
+            "name": s.name,
+            "slug": s.slug,
+            "version": s.version,
+            "content_sha256": s.content_sha256,
+            "matched_by": s.matched_by,
+        }
         for s in skills
     ]
 
@@ -617,6 +714,10 @@ class _Prepared:
     group_id: str | None = None  # the user's usage group, for attribution
     project_id: str | None = None  # the session's chat project, for attribution
     skills: list[ResolvedSkill] = field(default_factory=list)
+    #: Skills the user asked for by name (the chat's skill picker).
+    requested_skills: list[str] = field(default_factory=list)
+    #: Whether the model was offered ``read_skill_file``.
+    skill_files: bool = False
     rag_context: dict[str, Any] | None = None
     trace_context: Any = None
     released: bool = False
@@ -629,6 +730,22 @@ class _Prepared:
     tool_iterations: int = 0
     #: The MCP tools whose server is set to allow personal data.
     mcp_pii_allowed: set[str] = field(default_factory=set)
+    #: The tools the client defined: its own to run.
+    client_tools: set[str] = field(default_factory=set)
+    #: Whether the system tools were offered (current_time, get_available_tools).
+    system_tools: bool = False
+    #: The MCP tools the chat may use, in the catalog's order: what
+    #: get_available_tools searches.
+    mcp_findable: list[dict[str, Any]] = field(default_factory=list)
+    #: The MCP tools switched on in the chat: offered, and run when called.
+    mcp_on: set[str] = field(default_factory=set)
+    #: MCP tools switched on this round, not yet kept with the chat.
+    mcp_found: list[str] = field(default_factory=list)
+    #: MCP tools offered because the question names them: kept on in the
+    #: chat once the model calls them.
+    mcp_picked: set[str] = field(default_factory=set)
+    #: Whether tools were switched on this round: the next offers them.
+    mcp_changed: bool = False
     #: What the model and the tools said to each other, round by round (the
     #: assistant's tool_calls turn, then the tool answers), as the model saw it.
     tool_exchange: list[dict[str, Any]] = field(default_factory=list)
@@ -671,7 +788,8 @@ class GatewayService:
         mcp_tool_cache: MCPToolCache | None = None,
         skills_client: SkillsClient | None = None,
         tool_router: ToolRouter | None = None,
-        usage_groups: UsageGroupResolver | None = None,
+        usage_groups: UsageGroupResolver[str] | None = None,
+        group_memberships: UsageGroupResolver[tuple[str, ...]] | None = None,
     ) -> None:
         self.dao = dao
         self.router = router
@@ -689,6 +807,7 @@ class GatewayService:
         self.skills_client = skills_client
         self.tool_router = tool_router
         self.usage_groups = usage_groups
+        self.group_memberships = group_memberships
         self.stream_buffer: StreamBuffer | None = None
 
     async def list_models(self, auth: AuthContext) -> dict[str, Any]:
@@ -723,6 +842,7 @@ class GatewayService:
         payload: dict[str, Any],
         request_id: str,
         session_id: str | None = None,
+        skills: list[str] | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -746,7 +866,7 @@ class GatewayService:
         if rerank is not None:
             candidates = _rerank_routes(model_alias, candidates)
 
-        req = _Prepared(payload=payload)
+        req = _Prepared(payload=payload, requested_skills=list(skills or []))
         result: UpstreamResult | None = None
         error_code: str | None = None
         status_code = 500
@@ -822,10 +942,11 @@ class GatewayService:
                     error_type="server_error",
                     code="upstream_request_failed",
                 )
-            # The tools the gateway runs: knowledge, attached files, MCP, the
-            # tool router's.
+            # The tools the gateway runs: its own, knowledge, attached files,
+            # skill files, MCP, the tool router's.
             if endpoint == "/v1/chat/completions" and (
-                req.knowledge or req.attachments or self.mcp_client or self.tool_router
+                req.system_tools or req.knowledge or req.attachments or req.skill_files
+                or self.mcp_client or self.tool_router
             ):
                 result = await self._tool_loop(req, result, auth=auth, request_id=request_id)
 
@@ -949,6 +1070,7 @@ class GatewayService:
         payload: dict[str, Any],
         request_id: str,
         session_id: str | None = None,
+        skills: list[str] | None = None,
     ) -> StreamingGatewayResponse:
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
@@ -967,7 +1089,7 @@ class GatewayService:
         )
         _check_kind("/v1/chat/completions", model_alias, candidates)
 
-        req = _Prepared(payload=payload)
+        req = _Prepared(payload=payload, requested_skills=list(skills or []))
         stream_started = False
         stats: StreamStats | None = None
         pre_stream_status_code = 500
@@ -991,7 +1113,10 @@ class GatewayService:
                 for t in (egress_payload.get("tools") or [])
             )
 
-            if req.knowledge or req.attachments or (mcp_tools_injected and (self.mcp_client or self.tool_router)):
+            if (
+                req.system_tools or req.knowledge or req.attachments or req.skill_files
+                or (mcp_tools_injected and (self.mcp_client or self.tool_router))
+            ):
                 # Rounds: the answer's text streams as it comes, and the tools
                 # run between rounds. With tools, a streamed chat used to be
                 # answered whole and then replayed: nothing reached the client
@@ -1176,6 +1301,7 @@ class GatewayService:
         """
         chat = endpoint == "/v1/chat/completions"
         payload = req.payload
+        req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
         if "rag" in payload:
             # Retrieval before the model, on every turn that asked for it, is
             # gone: the model searches when it needs to (knowledge_search).
@@ -1197,10 +1323,24 @@ class GatewayService:
         searchable = chat and payload.get("tool_choice") != "none" and all(
             knowledge.calls_tools(c) for c in candidates
         )
+        # The files the chat has, for skills that come in on a file type. Read
+        # before the lookups below: the session step uses the same database
+        # session, which cannot run two queries at once.
+        file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
         (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
             self._inject_session_context(payload, auth, session_id, req=req if searchable else None)
             if chat else _value((payload, None, None)),
-            self._resolve_skills(question, auth, session_id) if chat else _value([]),
+            self._resolve_skills(
+                question,
+                auth,
+                session_id,
+                req.requested_skills,
+                file_types=file_types,
+                # A model that cannot call read_skill_file gets the files inline.
+                inline_files_chars=0 if searchable else skill_files.INLINE_CHARS,
+            )
+            if chat
+            else _value([]),
             self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
         )
@@ -1210,16 +1350,15 @@ class GatewayService:
         for skill in req.skills:  # each after the last: they keep their order
             payload = insert_skill(payload, {
                 "role": "system",
-                "content": (
-                    f"=== ACTIVE SKILL: {skill.name} (v{skill.version}) ===\n"
-                    f"{skill.body_markdown}\n"
-                    f"=== END SKILL ==="
-                ),
+                "content": skill_files.skill_block(skill, as_tool=searchable),
             })
         req.payload = payload
-        if mcp_tools and req.session_id:
-            mcp_tools = await self._switched_on(mcp_tools, auth, req.session_id)
-        req.mcp_pii_allowed = _allowing_personal_data(mcp_tools)
+        if mcp_tools:
+            req.mcp_findable, req.mcp_on = await self._chat_tools(mcp_tools, auth, req.session_id, req.skills)
+            picked = {t.get("qualified_name", "") for t in system_tools.picked_for(req.mcp_findable, question)}
+            req.mcp_picked = picked - req.mcp_on
+            req.mcp_on |= req.mcp_picked
+        req.mcp_pii_allowed = _allowing_personal_data(req.mcp_findable)
 
         req.pii_policy = _resolve_pii_policy(
             policy, session_override=await self._session_pii_override(req.session_id, auth),
@@ -1262,8 +1401,15 @@ class GatewayService:
         if chat:
             # Inject current date/time so the model is aware of "today"
             egress = self._inject_datetime_context(egress)
-            if mcp_tools:
-                egress = self._merge_mcp_tools(egress, mcp_tools, auth.tenant_id)
+            # Tools only to a route that calls them, when the client has not
+            # ruled them out: vLLM refuses a request offering tools otherwise.
+            if self._offers_system_tools(req.decision.candidate, payload):
+                egress = _with_tools(egress, system_tools.tools(find=bool(req.mcp_findable)))
+                req.system_tools = True
+                if req.mcp_on:
+                    egress = self._merge_mcp_tools(egress, _switched_on(req), auth.tenant_id)
+            else:
+                req.mcp_on = set()
             if self._offers_knowledge(req.decision.candidate, payload):
                 egress = _with_tools(egress, knowledge.TOOLS)
                 req.knowledge = True
@@ -1272,6 +1418,11 @@ class GatewayService:
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
+        # A skill's own files are always readable: offered after the
+        # constraints, which would otherwise take the tool away again.
+        if chat and searchable and skill_files.has_files(req.skills):
+            egress = _with_tools(egress, skill_files.TOOLS)
+            req.skill_files = True
         egress = _without_replayed_tools(egress)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
@@ -1659,21 +1810,55 @@ class GatewayService:
         question: str,
         auth: AuthContext,
         session_id: str | None = None,
+        requested: list[str] | None = None,
+        *,
+        file_types: list[str] | None = None,
+        inline_files_chars: int = 0,
     ) -> list[ResolvedSkill]:
         """The skills that apply to *question*, for ``_prepare`` to put in.
 
         Resolved while the session loads, so the session id is the one the
-        request named; the skills service does not use it to resolve.
+        request named; the skills service does not use it to resolve. It
+        resolves among the skills the user can see, which takes their groups:
+        a skill shared with a group reaches its members.
         """
         if not self.skills_client:
             return []
+        groups: tuple[str, ...] = ()
+        if self.group_memberships is not None:
+            groups = await self.group_memberships.resolve(auth.user_id) or ()
         result = await self.skills_client.resolve_skills(
             tenant_id=auth.tenant_id,
             user_id=auth.user_id,
+            group_ids=groups,
+            requested=requested,
             session_id=session_id,
             user_query=question or None,
+            file_types=file_types,
+            inline_files_chars=inline_files_chars,
         )
         return result.skills
+
+    async def _chat_file_types(self, auth: AuthContext, session_id: str | None) -> list[str]:
+        """The types of the files a chat has ("pdf", "xlsx"), for skill triggers.
+
+        The gateway never said which files a chat had, so a skill set to come
+        in on a file type never did.
+        """
+        if not session_id or self.session_dao is None:
+            return []
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            return []
+        try:
+            names = await self.session_dao.attachment_names(
+                session_id=sid, tenant_id=auth.tenant_id, user_id=auth.user_id,
+            )
+        except Exception:  # a missing trigger must not fail the chat
+            logger.warning("Reading the chat's file types failed", exc_info=True)
+            return []
+        return _file_types(names)
 
     def _apply_skill_tool_constraints(
         self,
@@ -1692,31 +1877,9 @@ class GatewayService:
         tools = payload.get("tools")
         if not tools:
             return payload
-
-        # Collect constraints across all resolved skills
-        all_allowed: set[str] | None = None
-        all_forbidden: set[str] = set()
-
-        for skill in skills:
-            if skill.forbidden_tools:
-                all_forbidden.update(skill.forbidden_tools)
-            if skill.allowed_tools:
-                if all_allowed is None:
-                    all_allowed = set()
-                all_allowed.update(skill.allowed_tools)
-
-        if all_allowed is None and not all_forbidden:
+        if not any(skill.forbidden_tools or skill.allowed_tools for skill in skills):
             return payload
-
-        filtered: list[dict[str, Any]] = []
-        for tool in tools:
-            name = tool.get("function", {}).get("name", "")
-            if name in all_forbidden:
-                continue
-            if all_allowed is not None and name not in all_allowed:
-                continue
-            filtered.append(tool)
-
+        filtered = [tool for tool in tools if _skills_allow(skills, tool.get("function", {}).get("name", ""))]
         return {**payload, "tools": filtered}
 
     async def _record_skills_usage(
@@ -1735,35 +1898,39 @@ class GatewayService:
                 version=skill.version,
                 session_id=session_id,
                 user_id=auth.user_id,
+                matched_by=skill.matched_by,
             )
 
     # ── MCP tool helpers ─────────────────────────────────────────────────────
 
-    async def _switched_on(
+    async def _chat_tools(
         self,
         mcp_tools: list[dict[str, Any]],
         auth: AuthContext,
-        session_id: str,
-    ) -> list[dict[str, Any]]:
-        """The MCP tools a chat has on: what its tool panel shows as enabled.
+        session_id: str | None,
+        skills: list[ResolvedSkill],
+    ) -> tuple[list[dict[str, Any]], set[str]]:
+        """The MCP tools a chat may use, and those it has switched on.
 
         The model was given every tool in the tenant, whatever the chat had
         switched off or its execution mode allowed: 48 GitHub tools, ~14.7k
         prompt tokens a turn, with one of them left on (release VM,
-        2026-09-25).
+        2026-09-25). Now it is given the ones switched on -- none, until the
+        user or get_available_tools switches one on -- and can find the others.
+        A request without a chat session has none on.
         """
-        try:
-            sid = uuid.UUID(session_id)
-        except ValueError:
-            return mcp_tools
-        catalog = await ToolAvailabilityService(dao=self.dao).get_available_tools(
-            session_id=sid,
-            tenant_id=auth.tenant_id,
-            include_disabled=False,
-            mcp_catalog=mcp_tools,
-        )
-        on = {tool.tool_id for tool in catalog.tools}
-        return [tool for tool in mcp_tools if tool.get("qualified_name") in on]
+        sid = _uuid_or_none(session_id)
+        if sid is None:
+            usable, on = {t.get("qualified_name") for t in mcp_tools}, set()
+        else:
+            usable, on = await ToolAvailabilityService(dao=self.dao).chat_mcp_tools(
+                session_id=sid, tenant_id=auth.tenant_id, mcp_catalog=mcp_tools,
+            )
+        findable = [
+            t for t in mcp_tools
+            if t.get("qualified_name") in usable and _skills_allow(skills, t.get("qualified_name", ""))
+        ]
+        return findable, on & {t.get("qualified_name") for t in findable}
 
     @staticmethod
     def _merge_mcp_tools(
@@ -1792,6 +1959,96 @@ class GatewayService:
         return payload
 
     # ── Tools the gateway runs ───────────────────────────────────────────────
+
+    @staticmethod
+    def _offers_system_tools(candidate: Any, payload: dict[str, Any]) -> bool:
+        """Whether the model gets the system tools.
+
+        When its route answers with tool calls and the client has not ruled
+        tools out.
+        """
+        return payload.get("tool_choice") != "none" and knowledge.calls_tools(candidate)
+
+    def _run_system_tool(
+        self, req: _Prepared, name: str, arguments: dict[str, Any], *, routed: bool,
+    ) -> tuple[str, bool] | None:
+        """A system tool's answer, or the answer to a call of a tool not offered.
+
+        ``None`` for a tool to run elsewhere. The model need not find a tool
+        before it calls it: an MCP tool the chat may use is switched on and
+        run, and a name no tool has is searched for, as get_available_tools
+        would -- the 0.5B model on the dev stack invented "add_numbers" and
+        gave up when told there was no such tool, but never searched.
+        """
+        can_find = req.system_tools and bool(req.mcp_findable)
+        if name == system_tools.FIND and req.system_tools:
+            return self._find_tools(req, arguments)
+        if name == system_tools.TIME and req.system_tools:
+            return system_tools.current_time(arguments)
+        if name.startswith(MCP_TOOL_PREFIX):
+            if name in req.mcp_picked:  # offered for the question, and used: kept on
+                req.mcp_picked.discard(name)
+                req.mcp_found.append(name)
+            if name in req.mcp_on:
+                return None
+            if can_find and any(t.get("qualified_name") == name for t in req.mcp_findable):
+                self._switch_on(req, [name])
+                return None
+        elif (
+            (name in knowledge.NAMES and req.knowledge)
+            or (name == attachment_search.NAME and req.attachments)
+            or (name == skill_files.NAME and req.skill_files)
+            or (routed and name.startswith(("client.", "server.")))
+        ):
+            return None
+        # By the tool's part of an MCP name: its server's matches all of its tools.
+        query = name.split(".", 2)[-1] if name.startswith(MCP_TOOL_PREFIX) else name
+        found = system_tools.find(req.mcp_findable, {"query": query}) if can_find else []
+        self._switch_on(req, [t.get("qualified_name", "") for t in found])
+        return system_tools.unknown_tool(name, found, can_find=can_find), True
+
+    @staticmethod
+    def _find_tools(req: _Prepared, arguments: dict[str, Any]) -> tuple[str, bool]:
+        """Run get_available_tools: the tools it finds are switched on."""
+        try:
+            found = system_tools.find(req.mcp_findable, arguments)
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)}), True
+        GatewayService._switch_on(req, [tool.get("qualified_name", "") for tool in found])
+        return system_tools.found_answer(str(arguments.get("query") or ""), found, req.mcp_findable), False
+
+    @staticmethod
+    def _switch_on(req: _Prepared, names: list[str]) -> None:
+        """Switch MCP tools on: offered from the next round, and kept on in the chat."""
+        for name in names:
+            if name not in req.mcp_on:
+                req.mcp_on.add(name)
+                req.mcp_found.append(name)
+                req.mcp_changed = True
+
+    async def _keep_found(self, req: _Prepared) -> None:
+        """Keep the tools switched on this round with the chat, as if the user had.
+
+        Its tool panel shows them on, and the tool router, which reads the
+        chat's switches, runs them.
+        """
+        if not req.mcp_found:
+            return
+        found, req.mcp_found = req.mcp_found, []
+        sid = _uuid_or_none(req.session_id)
+        if sid is not None:
+            await self.dao.upsert_session_tool_overrides(
+                sid, [(name, True) for name in found], updated_by="model",
+            )
+            await self._release_request_connection()
+
+    async def _offering_found(self, req: _Prepared, payload: dict[str, Any]) -> dict[str, Any]:
+        """*payload* offering the tools switched on this round, kept with the chat."""
+        await self._keep_found(req)
+        if not req.mcp_changed:
+            return payload
+        req.mcp_changed = False
+        return _with_mcp_tools(payload, _switched_on(req))
 
     def _offers_knowledge(self, candidate: Any, payload: dict[str, Any]) -> bool:
         """Whether the model gets the knowledge tools.
@@ -1843,6 +2100,7 @@ class GatewayService:
             turn = _assistant_turn(message.get("content"), message["tool_calls"])
             req.tool_exchange.extend([turn, *answers])
             payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
+            payload = await self._offering_found(req, payload)
             result = await self._complete(req, payload)
         return result
 
@@ -1913,6 +2171,7 @@ class GatewayService:
                     turn = _assistant_turn("".join(said) or None, calls.calls())
                     req.tool_exchange.extend([turn, *answers])
                     payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
+                    payload = await self._offering_found(req, payload)
                     continue
             if calls:
                 # Tools the client defined: its to run, as in any streamed answer.
@@ -1967,24 +2226,23 @@ class GatewayService:
         """
         router_session = self._router_session(req.session_id)
 
-        def ours(name: str) -> bool:
-            if name in knowledge.NAMES:
-                return req.knowledge
-            if name == attachment_search.NAME:
-                return bool(req.attachments)
-            if router_session is not None:
-                return name.startswith(("mcp.", "client.", "server."))
-            return self.mcp_client is not None and name.startswith(MCP_TOOL_PREFIX)
-
+        # The client runs the tools it defined. The gateway answers any other
+        # call, one to a tool nobody offered too: a small model invents names
+        # ("add_numbers"), and the call went to a chat page that runs no
+        # tools, which showed an empty reply (dev stack, 2026-09-26).
         names = [_tool_name(call) for call in calls]
-        if not all(ours(name) for name in names):
+        if any(name in req.client_tools for name in names):
             return None
+        names = [_mcp_name(req, name) for name in names]
 
         async def run(call: dict[str, Any], name: str) -> tuple[dict[str, Any], dict[str, Any]]:
             arguments = _mcp_arguments(req, name, _tool_arguments(call))
             started = time.perf_counter()
             row: dict[str, Any] = {"iteration": iteration, "tool_name": name, "mcp_server": None}
-            if name in knowledge.NAMES:
+            own = self._run_system_tool(req, name, arguments, routed=router_session is not None)
+            if own is not None:
+                content, is_error = own
+            elif name in knowledge.NAMES:
                 # Searched inside LLM.Port, like the session store: with the
                 # values tokenize mode took out, or it would look for
                 # "[PERSON_1]". A tool elsewhere (MCP) gets the tokens.
@@ -2000,8 +2258,14 @@ class GatewayService:
                 if req.token_mapping:
                     arguments = _restored(arguments, req.token_mapping)
                 content, is_error = attachment_search.AttachmentSearch(req.attachments).run(arguments)
+            elif name == skill_files.NAME:
+                # A file of a skill resolved for this request, and no other.
+                assert self.skills_client is not None  # noqa: S101
+                reader = skill_files.SkillFiles(self.skills_client, req.skills, tenant_id=auth.tenant_id)
+                content, is_error = await reader.run(arguments)
             elif router_session is not None:
                 assert self.tool_router is not None  # noqa: S101
+                await self._keep_found(req)  # the router reads the chat's switches
                 routed = await self.tool_router.route(
                     tool_id=name, arguments=arguments, call_id=call.get("id", ""),
                     session_id=router_session, tenant_id=auth.tenant_id, request_id=request_id,

@@ -2,6 +2,10 @@
 
 Builds the effective tool catalog for a session by merging MCP tools
 with session execution policy and per-tool overrides.
+
+An MCP tool is off in a chat until it is switched on -- by the user, or by
+the model with get_available_tools (see ``system_tools``). They were all on,
+and every one of them went to the model on every turn.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from typing import Any
 from llm_port_api.db.dao.gateway_dao import GatewayDAO
 from llm_port_api.db.models.gateway import ExecutionMode, ToolRealm
 from llm_port_api.services.gateway.mcp_client import MCPClient
-from llm_port_api.services.gateway.mcp_tool_cache import MCPToolCache
+from llm_port_api.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from llm_port_api.services.gateway.policy_engine import PolicyAction, PolicyEngine
 from llm_port_api.services.gateway.schemas import (
     ExecutionModeEnum,
@@ -40,6 +44,11 @@ _MODE_ALLOWED_REALMS: dict[str, set[str]] = {
         ToolRealm.CLIENT_PROXIED,
     },
 }
+
+
+def _on_by_default(tool_id: str) -> bool:
+    """MCP tools start off; a connected client's own tools start on."""
+    return not tool_id.startswith(MCP_TOOL_PREFIX)
 
 
 class ToolAvailabilityService:
@@ -81,14 +90,14 @@ class ToolAvailabilityService:
             tool_id = tool["tool_id"]
             available = tool.get("available", True)
             mode_allows = realm in allowed_realms
-            effective_enabled = mode_allows and available
+            user_enabled = _on_by_default(tool_id)
+            effective_enabled = mode_allows and available and user_enabled
 
             reason = None
-            if not effective_enabled:
-                if not mode_allows:
-                    reason = f"realm_not_allowed_in_{mode_str}_mode"
-                elif not available:
-                    reason = "tool_unavailable"
+            if not mode_allows:
+                reason = f"realm_not_allowed_in_{mode_str}_mode"
+            elif not available:
+                reason = "tool_unavailable"
 
             entries.append(
                 ToolAvailabilityDTO(
@@ -99,7 +108,7 @@ class ToolAvailabilityService:
                     source=tool.get("source", "mcp"),
                     effective_enabled=effective_enabled,
                     policy_allowed=True,
-                    user_enabled=True,
+                    user_enabled=user_enabled,
                     available=available,
                     availability_reason=reason,
                 ),
@@ -166,7 +175,7 @@ class ToolAvailabilityService:
             mode_allows = realm in allowed_realms
 
             # User override
-            user_enabled = override_map.get(tool_id, True)
+            user_enabled = override_map.get(tool_id, _on_by_default(tool_id))
 
             # Availability (connectivity/health)
             available = tool.get("available", True)
@@ -176,17 +185,15 @@ class ToolAvailabilityService:
                 policy_allowed and mode_allows and user_enabled and available
             )
 
-            # Reason for unavailability
+            # Why it cannot be used. A tool switched off can be: the switch
+            # says so, and the model can switch it on.
             reason = None
-            if not effective_enabled:
-                if not policy_allowed:
-                    reason = policy_decision.reason or "denied_by_policy"
-                elif not mode_allows:
-                    reason = f"realm_not_allowed_in_{mode_str}_mode"
-                elif not user_enabled:
-                    reason = "disabled_by_user"
-                elif not available:
-                    reason = "tool_unavailable"
+            if not policy_allowed:
+                reason = policy_decision.reason or "denied_by_policy"
+            elif not mode_allows:
+                reason = f"realm_not_allowed_in_{mode_str}_mode"
+            elif not available:
+                reason = "tool_unavailable"
 
             # Apply inclusion filters
             if not include_disabled and not effective_enabled:
@@ -215,6 +222,27 @@ class ToolAvailabilityService:
             effective_catalog_version=catalog_version,
             tools=entries,
         )
+
+    async def chat_mcp_tools(
+        self,
+        *,
+        session_id: uuid.UUID,
+        tenant_id: str,
+        mcp_catalog: list[dict[str, Any]],
+    ) -> tuple[set[str], set[str]]:
+        """The MCP tools of *mcp_catalog* a chat may use, and those switched on.
+
+        One may be used when the policy and the chat's execution mode allow
+        it and it is available; switched on, it is also offered to the model.
+        """
+        catalog = await self.get_available_tools(
+            session_id=session_id, tenant_id=tenant_id, mcp_catalog=mcp_catalog,
+        )
+        usable = {
+            t.tool_id for t in catalog.tools
+            if t.tool_id.startswith(MCP_TOOL_PREFIX) and t.availability_reason is None
+        }
+        return usable, {t.tool_id for t in catalog.tools if t.tool_id in usable and t.user_enabled}
 
     async def _gather_tools(
         self,

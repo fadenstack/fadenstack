@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import Depends
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from llm_port_api.db.dependencies import get_db_session
@@ -528,6 +528,36 @@ class SessionDAO:
             .order_by(ChatAttachment.created_at.asc()),
         )
         return list(result.scalars().all())
+
+    async def attachment_names(
+        self, *, session_id: uuid.UUID, tenant_id: str, user_id: str,
+    ) -> list[tuple[str, str]]:
+        """``(filename, content_type)`` of the files a chat has: its own, its project's.
+
+        Only for the chat's owner; a chat that is not theirs has none.
+        """
+        chat = (
+            select(ChatSession.id, ChatSession.project_id)
+            .where(
+                ChatSession.id == session_id,
+                ChatSession.tenant_id == tenant_id,
+                ChatSession.user_id == user_id,
+            )
+            .subquery()
+        )
+        result = await self.session.execute(
+            select(ChatAttachment.filename, ChatAttachment.content_type).join(
+                chat,
+                or_(
+                    ChatAttachment.session_id == chat.c.id,
+                    and_(
+                        chat.c.project_id.is_not(None),
+                        ChatAttachment.project_id == chat.c.project_id,
+                    ),
+                ),
+            ),
+        )
+        return [(row[0], row[1]) for row in result.all()]
 
     async def list_attachments_for_project(
         self, *, project_id: uuid.UUID,

@@ -476,6 +476,8 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.skills_hub",
         icon: <AutoFixHighIcon />,
         module: "skills",
+        // Everyone has their own skills page (/skills); this one is all of them.
+        permission: "skills:manage",
       },
     ],
   },

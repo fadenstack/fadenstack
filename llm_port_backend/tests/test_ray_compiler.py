@@ -307,21 +307,26 @@ PREFIX_ROUTER = "ray.serve.llm.request_router.PrefixCacheAffinityRouter"
 
 
 @pytest.mark.parametrize(
-    ("scale", "desired_state", "routed"),
+    ("scale", "desired_state", "strategy", "routed"),
     [
-        ({"replicas": 2}, "active", True),
-        ({"autoscale": {"min_replicas": 1, "max_replicas": 3}}, "active", True),
-        ({"replicas": 1}, "active", False),
-        ({"replicas": 2}, "stopped", False),
+        ({"replicas": 2}, "active", "prefix_affinity", True),
+        ({"autoscale": {"min_replicas": 1, "max_replicas": 3}}, "active", "prefix_affinity", True),
+        ({"replicas": 1}, "active", "prefix_affinity", False),
+        ({"replicas": 2}, "stopped", "prefix_affinity", False),
+        # Not asked for: Serve's default router. The prefix router's ingress
+        # stopped answering health checks under 16 concurrent chats.
+        ({"replicas": 2}, "active", "default", False),
+        ({"replicas": 2}, "active", None, False),
     ],
-    ids=["two-copies", "may-scale-to-three", "one-copy", "stopped"],
+    ids=["two-copies", "may-scale-to-three", "one-copy", "stopped", "default-strategy", "not-asked"],
 )
-def test_more_than_one_copy_routes_a_chat_to_the_copy_holding_its_prefix(
-    scale: dict, desired_state: str, routed: bool,
+def test_a_deployment_that_asks_for_it_routes_a_chat_to_the_copy_holding_its_prefix(
+    scale: dict, desired_state: str, strategy: str | None, routed: bool,
 ) -> None:
     """Serve's default router sent every other turn to a copy without its KV cache."""
+    routing = {"replica_routing": {"strategy": strategy}} if strategy else {}
     doc = compile_deployment(
-        spec_data=_base_spec(scale=scale),
+        spec_data=_base_spec(scale=scale, **routing),
         model_display_name="meta-llama/Llama-3-8B",
         model_source="remote",
         desired_state=desired_state,

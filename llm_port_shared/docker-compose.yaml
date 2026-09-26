@@ -49,6 +49,12 @@ services:
     # default 64 MB /dev/shm fails them ("could not resize shared memory
     # segment"). pgvector's README asks for more.
     shm_size: 1g
+    # Every worker of every service keeps its own pool, and they all share this
+    # server: with PII, MCP and skills an install from this file alone can open
+    # about 130 connections at its peak, past Postgres' default of 100 (see
+    # docs/system-requirements.md, Database connections). A connection is a
+    # process of about 6 MB, so 250 at once is about 1.5 GB.
+    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-250}"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres} # CHANGEME

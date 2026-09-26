@@ -16,6 +16,7 @@ import Avatar from "@mui/material/Avatar";
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import type { InitialMessageState } from "./ChatWelcome";
+import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
 import MessageBubble from "./MessageBubble";
 import MessageDebugPanel from "./MessageDebugPanel";
@@ -66,6 +67,7 @@ export default function ChatWindow({
   const bottomRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const initialSentRef = useRef(false);
+  const skills = useChatSkills();
 
   const {
     messages,
@@ -100,7 +102,12 @@ export default function ChatWindow({
       // the reply twice, alongside the send.
       if (!initialSentRef.current) {
         initialSentRef.current = true;
-        send(state.initialMessage, state.initialModel, state.initialFiles);
+        send(
+          state.initialMessage,
+          state.initialModel,
+          state.initialFiles,
+          state.initialSkills,
+        );
         // Clear navigation state so a page refresh won't re-send the message.
         // Preserve React Router's internal history keys while removing user state.
         const { usr: _usr, ...rest } = (window.history.state ?? {}) as Record<
@@ -121,7 +128,7 @@ export default function ChatWindow({
   }, [messages, streamingContent]);
 
   const handleSend = (text: string, files: File[]) => {
-    send(text, selectedModel, files);
+    send(text, selectedModel, files, skills.selected);
   };
 
   return (

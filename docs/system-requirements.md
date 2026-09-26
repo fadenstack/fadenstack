@@ -11,7 +11,10 @@ is a development install on Windows with the optional modules; its CPU
 figures come from a single gateway process and are the upper end (the Windows
 event loop costs more per request than Linux's). Chat load was the model
 answering three-sentence replies to 16 users sending one turn after another
-without pause, about 8 chat turns per second.
+without pause, about 8 chat turns per second. On 2026-09-26 the VM was
+measured again with every module as a container (`ray` at `f1d98a3`, two
+workers per service as `llmport deploy` sizes them): the same 16 users made
+18 to 22 chat turns per second.
 
 ## Summary
 
@@ -55,8 +58,12 @@ system and Docker bring the machine to 4.1 GB in use.
 | Module | Memory | Note |
 |---|---|---|
 | PII | 0.8 GB | Loads its language model at start |
-| MCP | 170 MB | |
-| Skills | 160 MB | |
+| PII worker | 0.8 to 1.2 GB | Its two processes load the model too (VM) |
+| MCP | 170 MB | 65 to 110 MB on the VM |
+| Skills | 160 MB | 95 to 110 MB on the VM |
+
+On the VM, every container of an install with all modules took 4.1 to 4.5 GB
+at rest and 4.4 to 5.2 GB at its peaks under chat load.
 
 ### Under load
 
@@ -92,9 +99,27 @@ before its core was full; beyond that, answers wait. An install made with
 server's physical cores as workers each (2 on the 8-core VM); started from the
 compose file alone, they run 4.
 
-As a rule of thumb, not yet measured on Linux with several workers: a user in
-a conversation sends a turn every 30 to 60 seconds, so one chat turn per
-second is 30 to 60 people chatting at the same moment.
+On the VM (Linux, two workers per service, every module), CPU time per chat
+turn under the same load:
+
+| Component | Plain chat | With a skill | With an MCP tool call |
+|---|---|---|---|
+| Gateway | 68 ms | 70 ms | 86 ms |
+| Backend | 20 ms | 23 ms | 19 ms |
+| Postgres | 22 ms | 13 ms | 31 ms |
+| Skills | 18 ms | 24 ms | 19 ms |
+| RabbitMQ | 14 ms | 20 ms | 19 ms |
+| MCP (and the MCP server) | 4 ms | 5 ms | 23 ms |
+| PII (local model: not scanned) | 2 ms | 3 ms | 2 ms |
+| **All** | **166 ms** | **175 ms** | **216 ms** |
+
+16 users made 21.7 plain chat turns per second (first token after 0.3 s at the
+median, 0.9 s at the 95th percentile) with 3.6 of the VM's 8 cores busy on
+average: the server was not the limit at that load.
+
+As a rule of thumb: a user in a conversation sends a turn every 30 to 60
+seconds, so one chat turn per second is 30 to 60 people chatting at the same
+moment, and the 8-core VM served that load for several hundred.
 
 ## Disk
 
@@ -115,19 +140,21 @@ Plan **60 GB** for the core, one runtime architecture and a few small models;
 
 Every service keeps a pool of database connections in each of its worker
 processes, and all of them share one Postgres. Postgres accepts
-`max_connections` (100 by default) less 3 reserved for its superuser. What each
+`max_connections` less 3 reserved for its superuser: 250 in the shared compose
+file (`POSTGRES_MAX_CONNECTIONS` in `.env` changes it), 100 in a Postgres of
+your own unless you raise it. What each
 service can open at its peak, workers × (connections kept + opened on demand):
 
 | Service | `llmport deploy`, 8 cores (the VM) | Compose file alone |
 |---|---|---|
-| Gateway | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
-| Backend | 2 × (6 + 6) = 24 | 4 × (5 + 5) = 40 |
-| Backend worker | 2 × (6 + 6) = 24 | 2 × (5 + 5) = 20 |
+| Gateway | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
+| Backend | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
+| Backend worker | 2 × (5 + 5) = 20 | 2 × (5 + 5) = 20 |
 | PII | none | none |
 | MCP | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
 | Skills | 1 × (5 + 10) = 15 | 1 × (5 + 10) = 15 |
-| **Core** | **72** | **100** |
-| **Core + PII + MCP + skills** | **102** | **130** |
+| **Core** | **60** | **100** |
+| **Core + PII + MCP + skills** | **90** | **130** |
 
 PII has pool settings but opens no connection: its database layer is unused.
 Langfuse's web and worker containers use the same Postgres with pools of their
@@ -141,15 +168,17 @@ Each service checks at startup whether its own pools fit and logs the result:
 - the numbers otherwise.
 
 The check sees one service at a time, so add the table up for the whole
-install. Everything except a core install made with `llmport deploy` can go
-past the default 97: raise `max_connections` in Postgres to **250** for them.
-`llmport deploy` also sizes each pool by the worker count (3 kept per worker,
-at least 5, and as many again on demand), so the peak grows with the square of
-the workers: on a server with 16 physical cores, 4 workers each, one service
-alone can open 96. The settings per service are `<PREFIX>WORKERS_COUNT`,
-`<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`, with the prefixes
-`LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and `LLM_PORT_SKILLS_`;
-the backend worker takes the backend's.
+install: every configuration above fits in the shared compose file's 250. A
+Postgres of your own at its default of 100 does not fit a core install from the
+compose file alone (100) or any install with the optional modules.
+`llmport deploy` sizes the services with `llmport tune`, as `upgrade` does:
+workers by the CPU share, pools the same for every worker (5 kept, 5 on
+demand), and `POSTGRES_MAX_CONNECTIONS` in `.env` as the peaks above added up,
+plus 100 for Langfuse, migrations and backups, at least 250, in steps of 50:
+250 at 8 physical cores, 350 at 32, 500 at 64. The settings per service are
+`<PREFIX>WORKERS_COUNT`, `<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`,
+with the prefixes `LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and
+`LLM_PORT_SKILLS_`; the backend worker takes the backend's.
 
 ## What grows with what
 
@@ -165,7 +194,6 @@ the backend worker takes the backend's.
 
 ## Not yet measured
 
-- Linux with several gateway workers under chat load (the VM, once upgraded).
-- The optional modules as containers on Linux.
+- Where the 8-core VM saturates: 16 users kept it under half busy.
 - RAG Lite: document ingestion and search.
 - Langfuse tracing under chat load.

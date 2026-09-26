@@ -457,6 +457,10 @@ async def test_server(
 
     try:
         status = await adapter.healthcheck()
+        if status != "active":
+            # Its session may be gone -- the server restarted -- not the server.
+            adapter = await manager.reconnect(str(server_id), stale=adapter) or adapter
+            status = await adapter.healthcheck()
         tools = await adapter.list_tools()
         return {
             "status": status,

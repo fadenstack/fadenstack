@@ -86,11 +86,6 @@ from llm_port_backend.web.api.admin.mcp.views import router as mcp_router  # noq
 
 admin_router.include_router(mcp_router, prefix="/mcp", tags=["admin-mcp"])
 
-# --- Skills admin routes (always registered, 503 when module disabled) ----
-from llm_port_backend.web.api.admin.skills.views import router as skills_router  # noqa: E402
-
-admin_router.include_router(skills_router, prefix="/skills", tags=["admin-skills"])
-
 # --- Observability (cost dashboard + pricing editor) ----------------------
 from llm_port_backend.web.api.admin.observability.views import router as observability_router  # noqa: E402
 

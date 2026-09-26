@@ -18,7 +18,7 @@ from llm_port_mcp.services.transport.base import (
     GenericMCPServer,
     MCPServerConfig,
     MCPToolDescriptor,
-    failed_connect,
+    OwnedConnection,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,8 @@ class StreamableHTTPMCPServer(GenericMCPServer):
 
     def __init__(self, config: MCPServerConfig) -> None:
         super().__init__(config)
-        self._exit_stack: AsyncExitStack | None = None
+        self._connection: OwnedConnection | None = None
         self._session: ClientSession | None = None
-        self._http_client: httpx.AsyncClient | None = None
 
     async def connect(self) -> None:
         """Open a Streamable HTTP connection to the remote MCP server."""
@@ -39,8 +38,9 @@ class StreamableHTTPMCPServer(GenericMCPServer):
             msg = "Streamable HTTP transport requires 'url'"
             raise ValueError(msg)
 
-        stack = AsyncExitStack()
-        try:
+        url = self.config.url
+
+        async def enter(stack: AsyncExitStack) -> ClientSession:
             # Build an httpx client with custom headers / timeout
             http_client = await stack.enter_async_context(
                 httpx.AsyncClient(
@@ -48,30 +48,19 @@ class StreamableHTTPMCPServer(GenericMCPServer):
                     timeout=httpx.Timeout(self.config.timeout_sec, read=300),
                 ),
             )
-
-            read_stream, write_stream, _ = (
-                await stack.enter_async_context(
-                    streamable_http_client(
-                        url=self.config.url,
-                        http_client=http_client,
-                    ),
-                )
+            read_stream, write_stream, _ = await stack.enter_async_context(
+                streamable_http_client(url=url, http_client=http_client),
             )
             session = await stack.enter_async_context(
                 ClientSession(read_stream, write_stream),
             )
             await session.initialize()
-        except BaseException as error:  # failed_connect tells failure from cancellation
-            # Torn down in the task that opened it; see failed_connect.
-            failure = await failed_connect(stack, error, self.config.url)
-            if failure is None:
-                raise
-            raise failure from failure.__cause__
+            return session
 
-        # Only persist state after a fully successful connect.
-        self._exit_stack = stack
-        self._http_client = http_client
-        self._session = session
+        # Opened and closed by a task of its own; see OwnedConnection.
+        connection = OwnedConnection(self.config.name)
+        self._session = await connection.open(enter, url)
+        self._connection = connection
         logger.info(
             "Streamable HTTP MCP server connected: %s (url=%s)",
             self.config.name,
@@ -80,11 +69,10 @@ class StreamableHTTPMCPServer(GenericMCPServer):
 
     async def disconnect(self) -> None:
         """Close the Streamable HTTP connection."""
-        if self._exit_stack is not None:
-            await self._exit_stack.aclose()
-            self._exit_stack = None
+        if self._connection is not None:
+            await self._connection.close()
+            self._connection = None
             self._session = None
-            self._http_client = None
         logger.info(
             "Streamable HTTP MCP server disconnected: %s",
             self.config.name,
@@ -94,6 +82,8 @@ class StreamableHTTPMCPServer(GenericMCPServer):
         """Check if the session is alive."""
         if self._session is None:
             return "disconnected"
+        if self._connection is not None and self._connection.closed:
+            return "error"  # the transport failed: the heartbeat connects again
         try:
             await self._session.send_ping()
             return "active"

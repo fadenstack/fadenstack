@@ -16,6 +16,7 @@ from llm_port_backend.db.dependencies import get_db_session
 from llm_port_backend.db.models.groups import Group
 from llm_port_backend.db.models.rbac import Permission, Role
 from llm_port_backend.db.models.users import User, current_active_user
+from llm_port_backend.services.skills.client import forget_principal
 from llm_port_backend.web.api.admin.dependencies import require_superuser
 from llm_port_backend.web.api.admin.users.preferences import (
     router as preferences_router,
@@ -359,6 +360,7 @@ async def delete_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     await session.delete(target)
     await session.flush()
+    await forget_principal("user", str(user_id))
 
 
 # ── Self-service profile endpoints ────────────────────────────────────

@@ -3,13 +3,15 @@ from importlib import metadata
 from pathlib import Path
 
 import sentry_sdk
-from fastapi import FastAPI
-from fastapi.responses import UJSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from llm_port_skills.log import configure_logging
+from llm_port_skills.services.bundle import BundleError
+from llm_port_skills.services.errors import SkillError
 from llm_port_skills.settings import settings
 from llm_port_skills.web.api.router import api_router
 from llm_port_skills.web.lifespan import lifespan_setup
@@ -41,9 +43,22 @@ def get_app() -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url="/api/openapi.json",
-        default_response_class=UJSONResponse,
+        # FastAPI's own JSON, as in PII: UJSONResponse is deprecated, and
+        # the tests turn the warning into a failure.
     )
 
     app.include_router(router=api_router, prefix="/api")
+    app.add_exception_handler(SkillError, _skill_error)  # type: ignore[arg-type]
+    app.add_exception_handler(BundleError, _bundle_error)  # type: ignore[arg-type]
 
     return app
+
+
+async def _skill_error(_request: Request, exc: SkillError) -> JSONResponse:
+    """A refusal from the skills layer, with the status it stands for."""
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+async def _bundle_error(_request: Request, exc: BundleError) -> JSONResponse:
+    """Content that is not a skill this service can store."""
+    return JSONResponse(status_code=422, content={"detail": str(exc)})

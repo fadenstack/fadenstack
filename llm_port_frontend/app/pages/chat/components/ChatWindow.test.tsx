@@ -77,7 +77,7 @@ describe("ChatWindow on mount", () => {
   it("sends a new chat's first message once and does not reload or resume it", () => {
     renderAt({ pathname: "/chat/s1", state: { initialMessage: "hi", initialModel: "m" } });
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith("hi", "m", undefined);
+    expect(send).toHaveBeenCalledWith("hi", "m", undefined, undefined);
     expect(loadHistory).not.toHaveBeenCalled();
   });
 
