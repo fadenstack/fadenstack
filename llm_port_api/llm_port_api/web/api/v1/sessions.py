@@ -238,6 +238,19 @@ async def update_session(
     from llm_port_api.db.models.gateway import SessionStatus  # noqa: PLC0415
 
     fields = body.model_dump(exclude_unset=True)
+    # Moving a chat into a project: only one of the user's own. The move was
+    # ignored before (the field was not accepted), so a chat moved in the
+    # sidebar went back to "no project" on the next load.
+    if fields.get("project_id") is not None:
+        project = await dao.get_project(
+            project_id=fields["project_id"], tenant_id=auth.tenant_id, user_id=auth.user_id,
+        )
+        if not project:
+            raise GatewayError(
+                status_code=404,
+                message="Project not found.",
+                code="project_not_found",
+            )
     if "status" in fields and fields["status"] is not None:
         try:
             fields["status"] = SessionStatus(fields["status"])

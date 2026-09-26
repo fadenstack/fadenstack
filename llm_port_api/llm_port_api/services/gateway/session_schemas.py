@@ -56,6 +56,8 @@ class SessionUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=512)
     status: str | None = None
     metadata_json: dict[str, Any] | None = None
+    #: Move the chat into one of the caller's projects; null takes it out.
+    project_id: uuid.UUID | None = None
 
 
 class SessionDTO(BaseModel):

@@ -410,7 +410,7 @@ export const chatApi = {
 
   updateSession: (
     id: string,
-    body: Partial<{ title: string; status: string; project_id: string }>,
+    body: Partial<{ title: string; status: string; project_id: string | null }>,
   ) =>
     request<ChatSession>(`/sessions/${id}`, {
       method: "PATCH",

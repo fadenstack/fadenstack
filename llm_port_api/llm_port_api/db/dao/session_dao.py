@@ -196,7 +196,8 @@ class SessionDAO:
         user_id: str,
         **fields: object,
     ) -> ChatSession | None:
-        allowed = {"title", "status", "metadata_json"}
+        # project_id: the caller checks the project is the user's own.
+        allowed = {"title", "status", "metadata_json", "project_id"}
         updates = {k: v for k, v in fields.items() if k in allowed and v is not _UNSET}
         if not updates:
             return await self.get_session(
