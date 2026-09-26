@@ -115,7 +115,9 @@ Plan **60 GB** for the core, one runtime architecture and a few small models;
 
 Every service keeps a pool of database connections in each of its worker
 processes, and all of them share one Postgres. Postgres accepts
-`max_connections` (100 by default) less 3 reserved for its superuser. What each
+`max_connections` less 3 reserved for its superuser: 250 in the shared compose
+file (`POSTGRES_MAX_CONNECTIONS` in `.env` changes it), 100 in a Postgres of
+your own unless you raise it. What each
 service can open at its peak, workers × (connections kept + opened on demand):
 
 | Service | `llmport deploy`, 8 cores (the VM) | Compose file alone |
@@ -141,8 +143,9 @@ Each service checks at startup whether its own pools fit and logs the result:
 - the numbers otherwise.
 
 The check sees one service at a time, so add the table up for the whole
-install. Everything except a core install made with `llmport deploy` can go
-past the default 97: raise `max_connections` in Postgres to **250** for them.
+install: every configuration above fits in the shared compose file's 250. A
+Postgres of your own at its default of 100 does not fit a core install from the
+compose file alone (100) or any install with the optional modules.
 `llmport deploy` also sizes each pool by the worker count (3 kept per worker,
 at least 5, and as many again on demand), so the peak grows with the square of
 the workers: on a server with 16 physical cores, 4 workers each, one service
