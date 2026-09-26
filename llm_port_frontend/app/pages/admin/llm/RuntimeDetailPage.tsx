@@ -516,8 +516,11 @@ export default function RuntimeDetailPage() {
     };
   }, [id, healthStatus]);
 
+  // A runtime served elsewhere (a remote provider, a cluster) has no
+  // container here: its logs answered 400, shown in the log panel as JSON.
+  const hasContainer = Boolean(rt?.container_ref);
   useEffect(() => {
-    if (!id || !healthStatus) return;
+    if (!id || !healthStatus || !hasContainer) return;
     if (
       healthStatus !== "running" &&
       healthStatus !== "starting" &&
@@ -528,7 +531,7 @@ export default function RuntimeDetailPage() {
     let cancelled = false;
     runtimes
       .fetchLogs(id, 300)
-      .then((res) => res.text())
+      .then((res) => (res.ok ? res.text() : ""))
       .then((text) => {
         if (!cancelled) setLogs(text);
       })
@@ -538,7 +541,7 @@ export default function RuntimeDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, healthStatus]);
+  }, [id, healthStatus, hasContainer]);
 
   const assignedNodeId = rt?.assigned_node_id;
   const lastCommandId = rt?.last_command_id;

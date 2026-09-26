@@ -97,15 +97,19 @@ function SortableNavItem({
         transition,
         opacity: isDragging ? 0.35 : 1,
       }}
-      {...attributes}
       sx={{
         position: "relative",
         "&:hover .nav-drag-handle": { opacity: 0.5 },
       }}
     >
       {!disabled && drawerOpen && (
+        // dnd-kit's attributes (role "button", aria-disabled, a tab stop) go on
+        // the handle that drags. On the item itself they made every entry a
+        // disabled button when sorting was off -- on a phone and in the rail:
+        // announced as disabled, and refused by anything that respects that.
         <Box
           ref={setActivatorNodeRef}
+          {...attributes}
           {...listeners}
           className="nav-drag-handle"
           sx={{

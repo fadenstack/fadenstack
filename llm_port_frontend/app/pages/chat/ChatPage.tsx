@@ -43,6 +43,7 @@ import { useSessionPiiPolicy } from "./hooks/useSessionPiiPolicy";
 import { ChatShellContext, type ChatShell } from "./ChatShellContext";
 import { useNavHand } from "~/lib/useNavHand";
 import { ChatSkillsProvider, useChatSkillsState } from "./hooks/useChatSkills";
+import { mergeSessions, withSession } from "./sessionList";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
@@ -110,7 +111,8 @@ export default function ChatPage() {
         chatApi.listSessions(),
         chatApi.listProjects(),
       ]);
-      setSessions(sess);
+      // Merged, not replaced: a chat started while this loaded stays.
+      setSessions((prev) => mergeSessions(sess, prev));
       setProjects(proj);
     } catch {
       // Gateway may not be available yet
@@ -267,7 +269,7 @@ export default function ChatPage() {
   }, []);
 
   const handleSessionUpdated = useCallback((updated: ChatSession) => {
-    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setSessions((prev) => withSession(prev, updated));
   }, []);
 
   // Collapsed on a desktop, the sidebar is the admin console's rail.

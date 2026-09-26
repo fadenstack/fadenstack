@@ -786,8 +786,10 @@ function DraggableSessionItem(props: SessionItemProps) {
     id: props.session.id,
     disabled: props.touch,
   });
+  // Without dragging (a touch screen) its attributes would make the row a
+  // disabled button (aria-disabled): announced as disabled, though it opens.
   return (
-    <Box ref={setNodeRef} {...listeners} {...attributes} sx={{ opacity: isDragging ? 0.4 : 1 }}>
+    <Box ref={setNodeRef} {...listeners} {...(props.touch ? {} : attributes)} sx={{ opacity: isDragging ? 0.4 : 1 }}>
       <SessionItem {...props} />
     </Box>
   );
