@@ -12,9 +12,12 @@ interface Opts {
   enabled?: boolean;
 }
 
+/** How often the overview refreshes; the page's refresh ring counts down to it. */
+export const OVERVIEW_REFRESH_MS = 30_000;
+
 export function useOverview({ refreshToken, enabled }: Opts) {
   return useDashboardQuery("admin/dashboard/overview", () => dashboard.overview(), {
-    refreshMs: 30_000,
+    refreshMs: OVERVIEW_REFRESH_MS,
     refreshToken,
     enabled,
   });

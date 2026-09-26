@@ -21,14 +21,13 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import TuneIcon from "@mui/icons-material/Tune";
 import { preferences } from "~/api/preferences";
 import CustomizeDialog from "~/components/dashboard/CustomizeDialog";
 import DashboardGrid, { TOUCH_TARGET, type GridItem } from "~/components/dashboard/DashboardGrid";
-import { fmtAgo } from "~/components/dashboard/format";
-import { useOverview } from "~/components/dashboard/queries";
+import { OVERVIEW_REFRESH_MS, useOverview } from "~/components/dashboard/queries";
+import RefreshRing from "~/components/dashboard/RefreshRing";
 import { WIDGETS } from "~/components/dashboard/registry";
 import type { WidgetDefinition } from "~/components/dashboard/types";
 import WidgetCard from "~/components/dashboard/WidgetCard";
@@ -88,7 +87,7 @@ function useProfile(): Profile | null {
 }
 
 function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const { isModuleEnabled, loading: servicesLoading } = useServices();
@@ -100,7 +99,6 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
   const [editMode, setEditMode] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const overview = useOverview({ refreshToken });
-  useTick(10_000);
 
   const items: GridItem[] = useMemo(() => {
     if (!layout) return [];
@@ -146,25 +144,11 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
         </Box>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
           <SystemPill status={overview.data?.system_status} badge={overview.data?.system_badge} />
-          {overview.updatedAt && (
-            <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-              {t("dashboard.updated", { ago: fmtAgo(overview.updatedAt, i18n.language) })}
-            </Typography>
-          )}
           {isPhone ? (
             <>
               <Tooltip title={t("dashboard.customize")}>
                 <IconButton onClick={() => setEditMode(true)} aria-label={t("dashboard.customize")} sx={TOUCH_TARGET}>
                   <TuneIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={t("dashboard.refresh")}>
-                <IconButton
-                  onClick={() => setRefreshToken((n) => n + 1)}
-                  aria-label={t("dashboard.refresh")}
-                  sx={TOUCH_TARGET}
-                >
-                  <RefreshIcon />
                 </IconButton>
               </Tooltip>
             </>
@@ -183,11 +167,15 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
               >
                 {editMode ? t("dashboard.done") : t("dashboard.customize")}
               </Button>
-              <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => setRefreshToken((n) => n + 1)}>
-                {t("dashboard.refresh")}
-              </Button>
             </>
           )}
+          <RefreshRing
+            updatedAt={overview.updatedAt}
+            intervalMs={OVERVIEW_REFRESH_MS}
+            refreshing={overview.fetching}
+            failed={Boolean(overview.error)}
+            onRefresh={() => setRefreshToken((n) => n + 1)}
+          />
         </Stack>
       </Stack>
 
@@ -299,15 +287,6 @@ function SystemPill({ status, badge }: { status?: string; badge?: string }) {
       {t(`dashboard.system_state.${tone}`)}
     </Box>
   );
-}
-
-/** Re-render every *ms* so "updated 12 s ago" keeps counting. */
-function useTick(ms: number) {
-  const [, setN] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setN((n) => n + 1), ms);
-    return () => clearInterval(id);
-  }, [ms]);
 }
 
 function PageSkeleton() {

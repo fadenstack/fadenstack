@@ -12,8 +12,10 @@ import type { UiLanguage } from "~/api/i18n";
 import i18n from "~/i18n";
 
 import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -21,6 +23,7 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -311,26 +314,40 @@ export function AdminTopbar({
             )}
           </>
         )}
-        <Chip
-          icon={<AccountCircleIcon />}
-          label={currentUserEmail}
-          variant="outlined"
-          data-tour-id="topbar.profile"
-          onClick={(e) => setUserMenuAnchor(e.currentTarget)}
-          sx={{
-            height: 30,
-            cursor: "pointer",
-            "& .MuiChip-label": { px: 1.25 },
-          }}
-        />
+        {/* Just the avatar: the email took a third of the bar on a narrow
+            screen. It is in the tooltip and at the top of the menu. */}
+        <Tooltip title={t("profile.logged_in_as", { email: currentUserEmail })} arrow>
+          <IconButton
+            size="small"
+            data-tour-id="topbar.profile"
+            onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+            aria-label={t("profile.logged_in_as", { email: currentUserEmail })}
+            aria-haspopup="menu"
+            aria-expanded={Boolean(userMenuAnchor)}
+            sx={{ color: "text.primary" }}
+          >
+            <AccountCircleIcon />
+          </IconButton>
+        </Tooltip>
         <Menu
           anchorEl={userMenuAnchor}
           open={Boolean(userMenuAnchor)}
           onClose={() => setUserMenuAnchor(null)}
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
           transformOrigin={{ vertical: "top", horizontal: "right" }}
-          slotProps={{ paper: { sx: { minWidth: 180 } } }}
+          slotProps={{ paper: { sx: { minWidth: 220, maxWidth: 320 } } }}
         >
+          {/* Who is signed in: a heading, not an action, so keyboard focus
+              starts on the first item that does something. */}
+          <Box sx={{ px: 2, pt: 1, pb: 1.25 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              {t("profile.logged_in_label")}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: "break-all" }}>
+              {currentUserEmail}
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 0.5 }} />
           <MenuItem
             onClick={() => {
               setUserMenuAnchor(null);

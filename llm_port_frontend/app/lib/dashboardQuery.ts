@@ -85,6 +85,8 @@ export interface QueryState<T> {
   updatedAt: number | null;
   /** True when the data is older than three refresh intervals. */
   stale: boolean;
+  /** True while a request for this key is in flight. */
+  fetching: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -176,6 +178,7 @@ export function useDashboardQuery<T>(
     loading: entry.data === undefined && entry.error === undefined,
     updatedAt,
     stale: updatedAt !== null && Date.now() - updatedAt > refreshMs * 3,
+    fetching: entry.inflight !== undefined,
     refresh,
   };
 }
