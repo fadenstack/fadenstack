@@ -24,7 +24,7 @@ SSE = b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
 
 def _client(handler: httpx.MockTransport) -> GatewayChatClient:
     client = GatewayChatClient(base_url="http://gateway")
-    client._client = httpx.AsyncClient(transport=handler, base_url="http://gateway")
+    client._client = httpx.AsyncClient(transport=handler, base_url="http://gateway")  # noqa: SLF001
     return client
 
 
@@ -86,3 +86,18 @@ async def test_the_endpoint_sends_the_trace_id_header(
     assert resp.status_code == 200
     assert resp.headers["x-langfuse-trace-id"] == "trace-2"
     assert resp.content == SSE
+
+
+async def test_a_resumed_stream_brings_its_trace_id_and_no_buffer_is_empty() -> None:
+    def gateway(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/sessions/s1/stream":
+            return httpx.Response(200, headers={"x-langfuse-trace-id": "trace-3"}, content=SSE)
+        return httpx.Response(204)
+
+    client = _client(httpx.MockTransport(gateway))
+    resumed = await client.open_stream_resume("s1", "jwt")
+    nothing = await client.open_stream_resume("s2", "jwt")
+
+    assert resumed.headers == {"x-langfuse-trace-id": "trace-3"}
+    assert await _read(resumed) == SSE
+    assert (nothing.headers, await _read(nothing)) == ({}, b"")

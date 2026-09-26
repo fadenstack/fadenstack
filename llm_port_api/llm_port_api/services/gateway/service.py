@@ -1019,7 +1019,7 @@ class GatewayService:
             _sbuf = self.stream_buffer
             _sbuf_sid = req.session_id
             if _sbuf and _sbuf_sid:
-                _sbuf.start(_sbuf_sid)
+                _sbuf.start(_sbuf_sid, trace_id=req.trace_id)
 
             async def _stream_with_finalize() -> AsyncIterator[bytes]:
                 stream_status_code = 200

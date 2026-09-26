@@ -292,10 +292,16 @@ async def stream_resume(session_id: str, request: Request) -> StreamingResponse 
     jwt = _jwt_from_cookie(request)
     client = _client()
     try:
+        stream = await client.open_stream_resume(session_id, jwt)
         return StreamingResponse(
-            client.stream_resume(session_id, jwt),
+            stream.body,
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                **stream.headers,
+            },
+            background=BackgroundTask(stream.aclose),
         )
     except Exception as exc:
         return await _proxy_error(exc)

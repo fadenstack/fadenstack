@@ -173,13 +173,31 @@ class GatewayChatClient:
         Failures do not raise: they come back as an SSE ``error`` event the
         chat client already shows, as before.
         """
+        return await self._open_stream(
+            "POST", "/v1/chat/completions", jwt, json=payload,
+        )
+
+    async def open_stream_resume(self, session_id: str, jwt: str) -> GatewayStream:
+        """Reconnect to a session's in-progress (or just finished) stream.
+
+        Like :meth:`open_stream_chat`: the trace id comes back as a header.
+        No buffered stream (the gateway's 204) is an empty body.
+        """
+        return await self._open_stream(
+            "GET", f"/v1/sessions/{session_id}/stream", jwt,
+        )
+
+    async def _open_stream(
+        self,
+        method: str,
+        url: str,
+        jwt: str,
+        **kwargs: Any,
+    ) -> GatewayStream:
         client = self._ensure_client()
         try:
             request = client.build_request(
-                "POST",
-                "/v1/chat/completions",
-                json=payload,
-                headers=self._headers(jwt),
+                method, url, headers=self._headers(jwt), **kwargs,
             )
             resp = await client.send(request, stream=True)
         except Exception:
@@ -241,20 +259,6 @@ class GatewayChatClient:
         )
         resp.raise_for_status()
         return resp.json()
-
-    async def stream_resume(
-        self, session_id: str, jwt: str,
-    ) -> AsyncIterator[bytes]:
-        """Reconnect to an in-progress SSE stream."""
-        client = self._ensure_client()
-        async with client.stream(
-            "GET",
-            f"/v1/sessions/{session_id}/stream",
-            headers=self._headers(jwt),
-        ) as resp:
-            resp.raise_for_status()
-            async for chunk in resp.aiter_bytes():
-                yield chunk
 
     # -- models -------------------------------------------------------------
 

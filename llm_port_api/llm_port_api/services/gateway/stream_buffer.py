@@ -32,6 +32,8 @@ class _StreamEntry:
     new_chunk_event: asyncio.Event = field(default_factory=asyncio.Event)
     done: bool = False
     finished_at: float | None = None
+    #: The request's trace id, for a reconnecting client's debug panel.
+    trace_id: str | None = None
 
 
 class StreamBuffer:
@@ -50,12 +52,12 @@ class StreamBuffer:
 
     # ── producer API ──────────────────────────────────────────
 
-    def start(self, session_id: str) -> None:
+    def start(self, session_id: str, trace_id: str | None = None) -> None:
         """Register a new active stream for *session_id*."""
         old = self._buffers.get(session_id)
         if old and not old.done:
             logger.warning("Overwriting active stream buffer for session %s", session_id)
-        self._buffers[session_id] = _StreamEntry()
+        self._buffers[session_id] = _StreamEntry(trace_id=trace_id)
         self._ensure_cleanup()
         logger.debug("Stream buffer started for session %s", session_id)
 
@@ -90,6 +92,11 @@ class StreamBuffer:
     def has_buffer(self, session_id: str) -> bool:
         """Return True if there is any buffer (active or recently finished)."""
         return session_id in self._buffers
+
+    def trace_id(self, session_id: str) -> str | None:
+        """The trace id of the stream buffered for *session_id*, if known."""
+        entry = self._buffers.get(session_id)
+        return entry.trace_id if entry else None
 
     async def subscribe(self, session_id: str) -> AsyncSSEIterator:
         """Return an async iterator that yields buffered + live SSE chunks.

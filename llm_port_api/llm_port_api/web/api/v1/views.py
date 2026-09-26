@@ -774,11 +774,12 @@ async def stream_resume(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     subscriber = await buf.subscribe(session_id)
-    return StreamingResponse(
-        subscriber,
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    # As on the stream it resumes: the reply's info button needs it.
+    trace_id = buf.trace_id(session_id)
+    if trace_id:
+        headers["x-langfuse-trace-id"] = trace_id
+    return StreamingResponse(subscriber, media_type="text/event-stream", headers=headers)
 
 
 def _request_id(request: Request) -> str:
