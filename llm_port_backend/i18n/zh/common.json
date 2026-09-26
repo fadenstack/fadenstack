@@ -353,7 +353,18 @@
     "start_immediately": "创建后立即启动",
     "network_help": "可选 - 默认为 bridge。",
     "default_bridge": "默认（bridge）",
-    "create_start": "创建并启动"
+    "create_start": "创建并启动",
+    "edit_title": "编辑 {{name}}",
+    "back_to_container": "返回容器",
+    "start_after_saving": "保存后启动",
+    "save_replace": "保存并替换",
+    "saving": "正在替换…",
+    "confirm_title": "替换 {{name}}？",
+    "confirm_body": "Docker 无法修改现有容器的这些设置，因此会用这些设置创建一个新容器，并在新容器运行后删除旧容器。容器会获得新的 ID，它写在卷以外的文件将会丢失。如果新容器无法创建或启动，旧容器会恢复原样。",
+    "confirm_replace": "替换",
+    "compose_note": "LLM.Port 通过 compose 文件运行此容器：下一次 llmport deploy 或 upgrade 会根据 compose 文件和 .env 重新创建它，不包含这些更改。",
+    "backend_note": "后端运行在此容器中，无法替换它。请在 .env 中修改其设置并运行 llmport upgrade。",
+    "load_failed": "无法加载容器的设置。"
   },
   "images": {
     "title": "镜像",
@@ -510,7 +521,8 @@
     "exec_id_label": "Exec ID（用于 websocket 客户端）：",
     "exec_help": "为该容器创建一个 Exec 会话。返回的 Exec ID 可用于终端 websocket 客户端。",
     "start_exec": "启动 Exec (/bin/sh)",
-    "page_title": "容器详情"
+    "page_title": "容器详情",
+    "edit": "编辑"
   },
   "stacks": {
     "title": "堆栈",

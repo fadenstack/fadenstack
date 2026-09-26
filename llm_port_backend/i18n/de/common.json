@@ -353,7 +353,18 @@
     "start_immediately": "Sofort nach Erstellung starten",
     "network_help": "Optional - Standard ist bridge.",
     "default_bridge": "Standard (bridge)",
-    "create_start": "Erstellen und starten"
+    "create_start": "Erstellen und starten",
+    "edit_title": "{{name}} bearbeiten",
+    "back_to_container": "Zurück zum Container",
+    "start_after_saving": "Nach dem Speichern starten",
+    "save_replace": "Speichern und ersetzen",
+    "saving": "Wird ersetzt…",
+    "confirm_title": "{{name}} ersetzen?",
+    "confirm_body": "Docker kann diese Einstellungen an einem bestehenden Container nicht ändern. Deshalb wird ein neuer Container mit ihnen erstellt und der alte entfernt, sobald der neue läuft. Der Container erhält eine neue ID, und Dateien, die er außerhalb seiner Volumes geschrieben hat, gehen verloren. Kann der neue nicht erstellt oder gestartet werden, wird der alte wiederhergestellt, wie er war.",
+    "confirm_replace": "Ersetzen",
+    "compose_note": "LLM.Port betreibt diesen Container über seine Compose-Datei: Das nächste llmport deploy oder upgrade erstellt ihn aus der Compose-Datei und .env neu, ohne diese Änderungen.",
+    "backend_note": "Das Backend läuft in diesem Container und kann ihn nicht ersetzen. Ändern Sie seine Einstellungen in .env und führen Sie llmport upgrade aus.",
+    "load_failed": "Die Einstellungen des Containers konnten nicht geladen werden."
   },
   "images": {
     "title": "Images",
@@ -510,7 +521,8 @@
     "exec_id_label": "Exec-ID (fuer Websocket-Client):",
     "exec_help": "Erstellt eine Exec-Sitzung in diesem Container. Die Exec-ID kann mit einem Terminal-Websocket-Client genutzt werden.",
     "start_exec": "Exec starten (/bin/sh)",
-    "page_title": "Container-Details"
+    "page_title": "Container-Details",
+    "edit": "Bearbeiten"
   },
   "stacks": {
     "title": "Stacks",

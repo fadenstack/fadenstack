@@ -353,7 +353,18 @@
     "start_immediately": "Start immediately after creation",
     "network_help": "Optional - defaults to bridge.",
     "default_bridge": "Default (bridge)",
-    "create_start": "Create & Start"
+    "create_start": "Create & Start",
+    "edit_title": "Editar {{name}}",
+    "back_to_container": "Volver al contenedor",
+    "start_after_saving": "Iniciar después de guardar",
+    "save_replace": "Guardar y reemplazar",
+    "saving": "Reemplazando…",
+    "confirm_title": "¿Reemplazar {{name}}?",
+    "confirm_body": "Docker no puede cambiar estos ajustes en un contenedor existente, así que se crea uno nuevo con ellos y el anterior se elimina cuando el nuevo está en marcha. El contenedor recibe un ID nuevo y se pierden los archivos que escribió fuera de sus volúmenes. Si el nuevo no se puede crear o iniciar, el anterior se restaura tal como estaba.",
+    "confirm_replace": "Reemplazar",
+    "compose_note": "LLM.Port ejecuta este contenedor desde su archivo compose: el próximo llmport deploy o upgrade lo vuelve a crear a partir del archivo compose y de .env, sin estos cambios.",
+    "backend_note": "El backend se ejecuta en este contenedor y no puede reemplazarlo. Cambie sus ajustes en .env y ejecute llmport upgrade.",
+    "load_failed": "No se pudieron cargar los ajustes del contenedor."
   },
   "images": {
     "title": "Images",
@@ -510,7 +521,8 @@
     "exec_id_label": "Exec ID (use with your websocket client):",
     "exec_help": "Create an exec session into this container. The returned exec ID can be used with a terminal websocket client.",
     "start_exec": "Start Exec (/bin/sh)",
-    "page_title": "Detalles del Contenedor"
+    "page_title": "Detalles del Contenedor",
+    "edit": "Editar"
   },
   "stacks": {
     "title": "Stacks",

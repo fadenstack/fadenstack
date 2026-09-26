@@ -1,10 +1,15 @@
 /**
- * Admin → Create Container.
+ * Admin → Create Container, and Edit Container (/admin/containers/:id/edit).
  * Guided form to create a new Docker container with classification,
  * port bindings, environment variables, and volume binds.
+ *
+ * Editing fills the form with what the container was created with. Docker
+ * changes none of these settings in a container that exists, so saving
+ * replaces it: the backend makes a new one and removes the old one once the
+ * new one runs.
  */
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   containers,
@@ -12,6 +17,7 @@ import {
   images,
   type ContainerClass,
   type ContainerPolicy,
+  type ContainerSettings,
   type PortBinding,
 } from "~/api/admin";
 import { ClassChip, PolicyChip } from "~/components/Chips";
@@ -22,6 +28,11 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
@@ -54,10 +65,29 @@ interface VolumeRow {
 const CLASS_OPTIONS: ContainerClass[] = [
   "SYSTEM_CORE",
   "SYSTEM_AUX",
+  "MCP",
   "TENANT_APP",
   "UNTRUSTED",
 ];
 const POLICY_OPTIONS: ContainerPolicy[] = ["free", "restricted", "locked"];
+
+/** A command as the form's field shows it: an argument with spaces in quotes. */
+function joinCommand(cmd: string[] | null): string {
+  return (cmd ?? [])
+    .map((arg) =>
+      /^[^\s"']+$/.test(arg) ? arg : arg.includes('"') ? `'${arg}'` : `"${arg}"`,
+    )
+    .join(" ");
+}
+
+/** "host:container[:mode]" as the form's two fields; a Windows drive letter stays with the host. */
+function splitBind(bind: string): VolumeRow {
+  const drive = /^[A-Za-z]:/.test(bind) ? 2 : 0;
+  const at = bind.indexOf(":", drive);
+  return at < 0
+    ? { host: bind, container: "" }
+    : { host: bind.slice(0, at), container: bind.slice(at + 1) };
+}
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -75,11 +105,15 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 export default function CreateContainerPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { id } = useParams<{ id?: string }>();
+  const editing = Boolean(id);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [image, setImage] = useState("");
   const [name, setName] = useState("");
-  const [containerClass, setContainerClass] = useState<ContainerClass>("UNTRUSTED");
+  // UNTRUSTED was the default: a container of one's own that the console
+  // could then neither start, stop nor delete.
+  const [containerClass, setContainerClass] = useState<ContainerClass>("TENANT_APP");
   const [policy, setPolicy] = useState<ContainerPolicy>("free");
   const [ownerScope, setOwnerScope] = useState("platform");
   const [autoStart, setAutoStart] = useState(false);
@@ -92,6 +126,41 @@ export default function CreateContainerPage() {
   // ── Submit state ──────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // ── Editing: what the container was created with ────────────────────────
+  const [settings, setSettings] = useState<ContainerSettings | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    containers
+      .settings(id)
+      .then((s) => {
+        setSettings(s);
+        setImage(s.image);
+        setName(s.name);
+        setContainerClass(s.container_class);
+        setPolicy(s.policy);
+        setOwnerScope(s.owner_scope);
+        setAutoStart(s.running);
+        setNetwork(s.network);
+        setCmdRaw(joinCommand(s.cmd));
+        setPorts(s.ports);
+        setEnvRows(
+          s.env.map((item) => {
+            const at = item.indexOf("=");
+            return at < 0
+              ? { key: item, value: "" }
+              : { key: item.slice(0, at), value: item.slice(at + 1) };
+          }),
+        );
+        setVolumeRows(s.volumes.map(splitBind));
+      })
+      .catch((e: unknown) =>
+        setLoadError(e instanceof Error ? e.message : t("create_container.load_failed")),
+      );
+  }, [id]);
 
   // ── Network options ───────────────────────────────────────────────────────
   const [networkOptions, setNetworkOptions] = useState<{ id: string; name: string }[]>([]);
@@ -145,8 +214,14 @@ export default function CreateContainerPage() {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (editing) setConfirmOpen(true);
+    else void save();
+  }
+
+  async function save() {
+    setConfirmOpen(false);
     setSubmitError(null);
     setSubmitting(true);
     try {
@@ -165,7 +240,7 @@ export default function CreateContainerPage() {
         .filter((r) => r.host.trim() && r.container.trim())
         .map((r) => `${r.host.trim()}:${r.container.trim()}`);
 
-      const result = await containers.create({
+      const payload = {
         image: image.trim(),
         name: name.trim() || undefined,
         container_class: containerClass,
@@ -177,9 +252,11 @@ export default function CreateContainerPage() {
         cmd,
         network: network || undefined,
         volumes: validVolumes.length ? validVolumes : undefined,
-      });
+      };
+      const result =
+        editing && id ? await containers.update(id, payload) : await containers.create(payload);
 
-      // Navigate to the new container's detail page
+      // The container's page; an edited one has a new id.
       navigate(`/admin/containers/${result.id}`);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : t("common.create_failed"));
@@ -188,18 +265,49 @@ export default function CreateContainerPage() {
     }
   }
 
+  const backTo = editing ? `/admin/containers/${id}` : "/admin/containers";
+  if (editing && loadError) return <Alert severity="error">{loadError}</Alert>;
+  if (editing && !settings) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+  const cannotReplace = Boolean(settings?.backend_runs_here);
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Header */}
       <Box sx={{ flexShrink: 0, mb: 2 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Tooltip title={t("create_container.back_to_containers")}>
-            <IconButton size="small" onClick={() => navigate("/admin/containers")}>
+          <Tooltip
+            title={
+              editing
+                ? t("create_container.back_to_container")
+                : t("create_container.back_to_containers")
+            }
+          >
+            <IconButton size="small" onClick={() => navigate(backTo)}>
               <ArrowBackIcon />
             </IconButton>
           </Tooltip>
-          <Typography variant="h5">{t("create_container.title")}</Typography>
+          <Typography variant="h5">
+            {editing
+              ? t("create_container.edit_title", { name: settings?.name })
+              : t("create_container.title")}
+          </Typography>
         </Stack>
+        {settings?.backend_runs_here && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {t("create_container.backend_note")}
+          </Alert>
+        )}
+        {settings?.managed_by_compose && !settings.backend_runs_here && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            {t("create_container.compose_note")}
+          </Alert>
+        )}
       </Box>
 
       {/* Scrollable form */}
@@ -227,7 +335,7 @@ export default function CreateContainerPage() {
                           required
                           placeholder={t("create_container.image_placeholder")}
                           helperText={t("create_container.image_help")}
-                          autoFocus
+                          autoFocus={!editing}
                         />
                       )}
                     />
@@ -474,7 +582,11 @@ export default function CreateContainerPage() {
                           onChange={(e) => setAutoStart(e.target.checked)}
                         />
                       }
-                      label={t("create_container.start_immediately")}
+                      label={
+                        editing
+                          ? t("create_container.start_after_saving")
+                          : t("create_container.start_immediately")
+                      }
                     />
                     <TextField
                       select
@@ -509,26 +621,45 @@ export default function CreateContainerPage() {
                       variant="contained"
                       fullWidth
                       size="large"
-                      disabled={submitting || !image.trim()}
+                      disabled={submitting || !image.trim() || cannotReplace}
                       startIcon={submitting ? <CircularProgress size={18} /> : <RocketLaunchIcon />}
                     >
                       {submitting
-                        ? t("common.creating")
-                        : autoStart
-                          ? t("create_container.create_start")
-                          : t("create_container.title")}
+                        ? editing
+                          ? t("create_container.saving")
+                          : t("common.creating")
+                        : editing
+                          ? t("create_container.save_replace")
+                          : autoStart
+                            ? t("create_container.create_start")
+                            : t("create_container.title")}
                     </Button>
                     <Divider sx={{ my: 0.5 }} />
                     <Button
                       variant="text"
                       fullWidth
-                      onClick={() => navigate("/admin/containers")}
+                      onClick={() => navigate(backTo)}
                       disabled={submitting}
                     >
                       {t("common.cancel")}
                     </Button>
                   </Stack>
                 </Paper>
+
+                <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="sm">
+                  <DialogTitle>
+                    {t("create_container.confirm_title", { name: settings?.name })}
+                  </DialogTitle>
+                  <DialogContent>
+                    <DialogContentText>{t("create_container.confirm_body")}</DialogContentText>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setConfirmOpen(false)}>{t("common.cancel")}</Button>
+                    <Button variant="contained" onClick={() => void save()}>
+                      {t("create_container.confirm_replace")}
+                    </Button>
+                  </DialogActions>
+                </Dialog>
 
               </Stack>
             </Grid>

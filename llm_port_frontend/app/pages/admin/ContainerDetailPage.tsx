@@ -3,10 +3,11 @@
  * Shows inspect data, live logs, and exec terminal token.
  */
 import { useState, useEffect, useRef } from "react";
-import { useParams, useOutletContext } from "react-router";
+import { useNavigate, useParams, useOutletContext } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   containers,
+  canEdit,
   canExec,
   type ContainerDetail,
 } from "~/api/admin";
@@ -24,6 +25,7 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 
+import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import TerminalIcon from "@mui/icons-material/Terminal";
 
@@ -34,6 +36,7 @@ interface AdminContext {
 export default function ContainerDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { rootModeActive } = useOutletContext<AdminContext>();
   const [detail, setDetail] = useState<ContainerDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +121,15 @@ export default function ContainerDetailPage() {
               {detail.id.slice(0, 64)}
             </Typography>
           </Box>
+          {canEdit(detail.policy) && (
+            <Button
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={() => navigate(`/admin/containers/${detail.id}/edit`)}
+            >
+              {t("container_detail.edit")}
+            </Button>
+          )}
         </Stack>
 
         {/* Tabs */}

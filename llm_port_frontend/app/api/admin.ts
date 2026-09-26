@@ -60,6 +60,25 @@ export interface CreateContainerPayload {
   volumes?: string[];
 }
 
+/** A container as its edit form shows it: what it was created with, not what its image supplies. */
+export interface ContainerSettings {
+  image: string;
+  name: string;
+  cmd: string[] | null;
+  env: string[];
+  ports: PortBinding[];
+  volumes: string[];
+  network: string;
+  running: boolean;
+  container_class: ContainerClass;
+  owner_scope: string;
+  policy: ContainerPolicy;
+  /** Made by Compose: the next deploy or upgrade makes it again from the compose file. */
+  managed_by_compose: boolean;
+  /** The backend runs in it and cannot replace it. */
+  backend_runs_here: boolean;
+}
+
 export interface ExecToken {
   exec_id: string;
 }
@@ -279,6 +298,16 @@ export const containers = {
   },
   get(id: string) {
     return request<ContainerDetail>(`/containers/${id}`);
+  },
+  settings(id: string) {
+    return request<ContainerSettings>(`/containers/${id}/settings`);
+  },
+  /** Replaces the container with one made from the edits; the result has a new id. */
+  update(id: string, payload: CreateContainerPayload) {
+    return request<ContainerSummary>(`/containers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
   lifecycle(
     id: string,
@@ -832,6 +861,11 @@ export const adminAuthProviders = {
     return `${BASE}/auth-providers/${providerId}/authorize`;
   },
 };
+
+/** Every class can be edited (the container is replaced); a locked policy cannot. */
+export function canEdit(policy: ContainerPolicy): boolean {
+  return policy !== "locked";
+}
 
 export function canExec(cls: ContainerClass, rootModeActive: boolean): boolean {
   if (cls === "TENANT_APP") return true;

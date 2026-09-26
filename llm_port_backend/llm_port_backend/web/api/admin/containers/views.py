@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
+from aiodocker.exceptions import DockerError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from starlette import status
@@ -17,14 +19,17 @@ from llm_port_backend.db.models.containers import (
     ContainerPolicy,
 )
 from llm_port_backend.db.models.users import User
+from llm_port_backend.services.docker import recreate
 from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.services.policy.enforcement import Action, PolicyEnforcer
 from llm_port_backend.web.api.admin.containers.schema import (
     ContainerDetailDTO,
+    ContainerSettingsDTO,
     ContainerSummaryDTO,
     CreateContainerRequest,
     ExecTokenDTO,
     ExecTokenRequest,
+    PortBinding,
     RegisterContainerRequest,
 )
 from llm_port_backend.web.api.admin.dependencies import (
@@ -38,6 +43,7 @@ from llm_port_backend.web.api.admin.dependencies import (
 from llm_port_backend.web.api.rbac import require_permission
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -116,6 +122,32 @@ def _classify_by_name(name: str) -> tuple[ContainerClass, str]:
         if any(s in lower for s in substrings):
             return cls, scope
     return ContainerClass.UNTRUSTED, "unknown"
+
+
+def _docker_refused(exc: DockerError, doing: str) -> HTTPException:
+    """What Docker refused, as an answer: its reason, not a 500."""
+    code = exc.status if exc.status in (400, 404, 409) else status.HTTP_502_BAD_GATEWAY
+    return HTTPException(status_code=code, detail=f"{doing}: {exc.message}")
+
+
+async def _image_of(docker: DockerService, raw: dict[str, Any]) -> dict[str, Any]:
+    """The image a container was made from; empty when it is gone."""
+    try:
+        return await docker.inspect_image(raw.get("Image", ""))
+    except DockerError:
+        return {}
+
+
+def _bindings(
+    ports: list[PortBinding], old: dict[str, list[dict[str, str]]],
+) -> dict[str, list[dict[str, str]]]:
+    """The form's port bindings in Docker's form, each keeping the host address it had."""
+    bindings: dict[str, list[dict[str, str]]] = {}
+    for p in ports:
+        same = [b for b in old.get(p.container_port, []) if b.get("HostPort") == p.host_port]
+        host_ip = same[0].get("HostIp", "") if same else ""
+        bindings.setdefault(p.container_port, []).append({"HostIp": host_ip, "HostPort": p.host_port})
+    return bindings
 
 
 def _format_endpoint(ports: list[dict[str, Any]]) -> str:
@@ -329,6 +361,143 @@ async def get_container(
     )
 
 
+@router.get("/{container_id}/settings", response_model=ContainerSettingsDTO, name="container_settings")
+async def container_settings(
+    container_id: str,
+    docker: DockerService = Depends(get_docker),
+    entry: Any = Depends(get_registry_entry),
+    _user: User = Depends(require_permission("containers", "read")),
+    enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
+    root_mode: bool = Depends(get_root_mode_active),
+) -> ContainerSettingsDTO:
+    """What the container was created with, for its edit form."""
+    enforcer.enforce(Action.VIEW, entry.container_class, entry.policy, root_mode)
+    try:
+        raw = await docker.inspect_container(container_id)
+    except DockerError as exc:
+        raise _docker_refused(exc, "The container could not be read") from None
+    own = recreate.own_settings(raw, await _image_of(docker, raw))
+    labels = (raw.get("Config") or {}).get("Labels") or {}
+    return ContainerSettingsDTO(
+        image=own.image,
+        name=own.name,
+        cmd=own.cmd,
+        env=own.env,
+        ports=[
+            PortBinding(host_port=b.get("HostPort", ""), container_port=port)
+            for port, binds in own.ports.items() for b in binds
+        ],
+        volumes=own.volumes,
+        network=own.network,
+        running=own.start,
+        container_class=entry.container_class,
+        owner_scope=entry.owner_scope,
+        policy=entry.policy,
+        managed_by_compose="com.docker.compose.project" in labels,
+        backend_runs_here=raw.get("Id") == recreate.own_container_id(),
+    )
+
+
+@router.put("/{container_id}", response_model=ContainerSummaryDTO, name="update_container")
+async def update_container(
+    container_id: str,
+    body: CreateContainerRequest,
+    user: User = Depends(require_permission("containers", "update")),
+    docker: DockerService = Depends(get_docker),
+    entry: Any = Depends(get_registry_entry),
+    enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
+    root_mode: bool = Depends(get_root_mode_active),
+    registry_dao: ContainerRegistryDAO = Depends(),
+    audit_dao: AuditDAO = Depends(),
+) -> ContainerSummaryDTO:
+    """Edit a container: it is replaced by one made from its settings and the edits.
+
+    Docker changes none of the settings the form edits in a container that
+    exists. The new container has a new id; the old one is removed once the
+    new one runs, and is back as it was if the new one cannot be made.
+    """
+    try:
+        enforcer.enforce(Action.UPDATE_CONFIG, entry.container_class, entry.policy, root_mode)
+    except HTTPException:
+        await audit_action(
+            action="container.update",
+            target_type="container",
+            target_id=container_id,
+            result=AuditResult.DENY,
+            actor_id=user.id,
+            severity=_severity(root_mode),
+            audit_dao=audit_dao,
+        )
+        raise
+
+    try:
+        raw = await docker.inspect_container(container_id)
+    except DockerError as exc:
+        raise _docker_refused(exc, "The container could not be read") from None
+    if raw.get("Id") == recreate.own_container_id():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "The backend runs in this container and cannot replace it. Change its settings "
+                "in .env and run llmport upgrade."
+            ),
+        )
+    image = await _image_of(docker, raw)
+    old = recreate.own_settings(raw, image)
+    edit = recreate.ContainerEdit(
+        image=body.image,
+        name=(body.name or old.name).lstrip("/"),
+        cmd=body.cmd or None,
+        env=body.env,
+        ports=_bindings(body.ports, old.ports),
+        volumes=body.volumes,
+        network=body.network or "",
+        start=body.auto_start,
+    )
+    config, others = recreate.replacement(raw, image, edit)
+    try:
+        new = await recreate.replace(docker, raw, config, others, name=edit.name, start=edit.start)
+    except DockerError as exc:
+        raise _docker_refused(exc, "The container was not changed") from None
+
+    # The class and policy go with it to its new id.
+    new_id = new.get("Id", "")
+    try:
+        await registry_dao.delete(raw["Id"])
+        entry = await registry_dao.upsert(
+            container_id=new_id,
+            name=edit.name,
+            container_class=body.container_class,
+            owner_scope=body.owner_scope,
+            policy=body.policy,
+            created_by=entry.created_by or user.id,
+        )
+        await audit_action(
+            action="container.update",
+            target_type="container",
+            target_id=new_id,
+            result=AuditResult.ALLOW,
+            actor_id=user.id,
+            severity=_severity(root_mode),
+            audit_dao=audit_dao,
+            metadata_json=json.dumps({
+                "replaced": raw["Id"],
+                "image": [old.image, edit.image],
+                "name": [old.name, edit.name],
+                # Names only: values may be secrets.
+                "env": sorted(item.split("=", 1)[0] for item in edit.env),
+                "class": body.container_class.value,
+                "policy": body.policy.value,
+            }),
+        )
+    except Exception:
+        # Replaced all the same: listed again, it is classified by its name.
+        logger.exception(
+            "Container %s was replaced by %s; its registry entry was not moved", raw["Id"][:12], new_id[:12],
+        )
+    return _container_summary_from_docker(new, entry.container_class, entry.policy, entry.owner_scope)
+
+
 # Before the lifecycle route: POST /{container_id}/{action} matches
 # /{container_id}/exec too, and registered first it answered every exec
 # with 400 "Unknown action 'exec'".
@@ -509,7 +678,16 @@ async def delete_container(
         )
         raise
 
-    await docker.delete(container_id, force=force)
+    try:
+        await docker.delete(container_id, force=force)
+    except DockerError as exc:
+        if exc.status == status.HTTP_409_CONFLICT and not force:
+            # It answered 500: Docker refuses to remove a running container.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The container is running: stop it before you delete it.",
+            ) from None
+        raise _docker_refused(exc, "The container was not deleted") from None
     await registry_dao.delete(container_id)
 
     await audit_action(

@@ -59,7 +59,7 @@ def test_system_core_safe_allowed_admin(enforcer: PolicyEnforcer, action: Action
 
 @pytest.mark.parametrize(
     "action",
-    [Action.STOP, Action.PAUSE, Action.EXEC, Action.DELETE, Action.UPDATE_CONFIG],
+    [Action.STOP, Action.PAUSE, Action.EXEC, Action.DELETE],
 )
 def test_system_core_destructive_denied_admin(enforcer: PolicyEnforcer, action: Action) -> None:
     assert not enforcer.check(action, ContainerClass.SYSTEM_CORE, ContainerPolicy.FREE, False)
@@ -134,3 +134,17 @@ def test_enforce_raises_on_deny(enforcer: PolicyEnforcer) -> None:
     with pytest.raises(HTTPException) as exc_info:
         enforcer.enforce(Action.EXEC, ContainerClass.SYSTEM_CORE, ContainerPolicy.FREE, False)
     assert exc_info.value.status_code == 403
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Editing (the container is replaced): every class, unless LOCKED
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("container_class", list(ContainerClass))
+@pytest.mark.parametrize("root_mode", [False, True])
+def test_every_class_can_be_edited_unless_locked(
+    enforcer: PolicyEnforcer, container_class: ContainerClass, root_mode: bool,
+) -> None:
+    assert enforcer.check(Action.UPDATE_CONFIG, container_class, ContainerPolicy.FREE, root_mode)
+    assert not enforcer.check(Action.UPDATE_CONFIG, container_class, ContainerPolicy.LOCKED, root_mode)

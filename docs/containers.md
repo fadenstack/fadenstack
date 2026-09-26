@@ -39,12 +39,14 @@ A container's class decides what the console lets anyone do with it:
 | `TENANT_APP` | Containers you run | yes | yes | yes | yes |
 | `UNTRUSTED` | Anything not classified | yes | no | no | no |
 
+Every class can be **edited** (below), unless its policy is locked.
+
 A container created elsewhere is classified by its name the first time the
 list sees it: `llm-port-*` services and the infrastructure above are system
 containers, a name starting `mcp-` is `MCP`, anything else is `UNTRUSTED`.
 
 **Root mode** lifts the class limits for the admin who activates it, for
-system maintenance. A **locked** policy blocks stop, pause, exec, update and
+system maintenance. A **locked** policy blocks stop, pause, exec, edit and
 delete even then. (`restricted` is accepted but currently behaves like
 `free`.)
 
@@ -77,9 +79,9 @@ greeting on port 8088 from a one-line Node server:
   container reaches it by this name (`http://docs-demo:8080`).
 - **Command Override**: the command to run instead of the image's default,
   written as in a shell; quoted parts stay one argument.
-- **Class**: pick **`TENANT_APP`** for a container of your own. The form
-  starts on `UNTRUSTED`, which cannot be started, stopped or deleted from the
-  console.
+- **Class**: `TENANT_APP`, what the form starts on, for a container of your
+  own; `MCP` for an MCP server. `UNTRUSTED` cannot be started, stopped or
+  deleted from the console.
 - **Policy** and **Scope**: see above; `platform` is the default scope.
 
 ![Ports, environment, volumes and the network](images/containers/05-create-form-bottom.png)
@@ -119,8 +121,8 @@ allows exec (`TENANT_APP`) or root mode.
 
 ![An exec session](images/containers/09-container-exec.png)
 
-**Stop** before **Delete**: deleting a running container is refused
-(currently as an error message rather than a request to stop it first). A
+**Stop** before **Delete**: a running container is not deleted ("The
+container is running: stop it before you delete it."). A
 process that ignores the stop signal is killed after ten seconds, which shows
 as `Exited (137)`; Node and many others run as the container's first process
 do that unless the image adds an init.
@@ -129,6 +131,37 @@ do that unless the image adds an init.
 
 **Delete** asks for confirmation in a browser dialog, then removes the
 container. Its image stays under Images.
+
+---
+
+## Editing a container
+
+**Edit** on the container's page opens the create form with what the
+container was created with: its image, command, environment, ports, volumes,
+network and class. What its image supplies (the image's own environment
+variables, its default command) is not shown; a new image brings its own.
+
+Docker cannot change these settings in a container that exists, so **Save and
+replace** replaces it, after a confirmation:
+
+- a new container is made with the settings, and joins the same networks
+  under the same names (other containers keep reaching it by name);
+- what the form does not show is kept: GPU devices, restart policy, labels,
+  health check, the host address a port was bound to;
+- the old one is stopped and removed once the new one runs. The container gets
+  a **new ID**, and files it wrote outside its volumes are lost;
+- if the new one cannot be made or started (an image that is not on the
+  server, a host port in use), the old one is put back as it was, under its
+  name, running if it ran, and the page says why.
+
+Class, policy and scope move to the new container. A container with a
+**locked** policy cannot be edited.
+
+LLM.Port's own containers can be edited too, for a test or a quick fix: the
+next `llmport deploy` or `llmport upgrade` makes them again from the compose
+file and `.env`, without the edits, and the form says so. The backend's own
+container cannot be edited from the console, since the backend would stop
+itself half way: change its settings in `.env` and run `llmport upgrade`.
 
 ---
 

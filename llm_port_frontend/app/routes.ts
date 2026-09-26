@@ -24,6 +24,9 @@ export default [
     route("/admin/containers", "pages/admin/ContainersPage.tsx"),
     route("/admin/containers/new", "pages/admin/CreateContainerPage.tsx"),
     route("/admin/containers/:id", "pages/admin/ContainerDetailPage.tsx"),
+    route("/admin/containers/:id/edit", "pages/admin/CreateContainerPage.tsx", {
+      id: "admin-container-edit",
+    }),
     route("/admin/images", "pages/admin/ImagesPage.tsx"),
     route("/admin/networks", "pages/admin/NetworksPage.tsx"),
     route("/admin/stacks", "pages/admin/StacksPage.tsx"),

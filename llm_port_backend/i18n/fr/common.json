@@ -348,7 +348,18 @@
     "start_immediately": "Démarrer immédiatement après la création",
     "network_help": "Optionnel — bridge par défaut.",
     "default_bridge": "Par défaut (bridge)",
-    "create_start": "Créer et démarrer"
+    "create_start": "Créer et démarrer",
+    "edit_title": "Modifier {{name}}",
+    "back_to_container": "Retour au conteneur",
+    "start_after_saving": "Démarrer après l'enregistrement",
+    "save_replace": "Enregistrer et remplacer",
+    "saving": "Remplacement…",
+    "confirm_title": "Remplacer {{name}} ?",
+    "confirm_body": "Docker ne peut pas modifier ces paramètres sur un conteneur existant : un nouveau conteneur est donc créé avec eux, et l'ancien est supprimé dès que le nouveau tourne. Le conteneur reçoit un nouvel ID, et les fichiers qu'il a écrits hors de ses volumes sont perdus. Si le nouveau ne peut pas être créé ou démarré, l'ancien est remis tel qu'il était.",
+    "confirm_replace": "Remplacer",
+    "compose_note": "LLM.Port exécute ce conteneur à partir de son fichier compose : le prochain llmport deploy ou upgrade le recrée à partir du fichier compose et de .env, sans ces modifications.",
+    "backend_note": "Le backend tourne dans ce conteneur et ne peut pas le remplacer. Modifiez ses paramètres dans .env et exécutez llmport upgrade.",
+    "load_failed": "Impossible de charger les paramètres du conteneur."
   },
   "images": {
     "title": "Images",
@@ -505,7 +516,8 @@
     "exec_id_label": "ID d'exécution (utilisez avec votre client websocket) :",
     "exec_help": "Créer une session d'exécution dans ce conteneur. L'ID retourné peut être utilisé avec un client terminal websocket.",
     "start_exec": "Démarrer Exec (/bin/sh)",
-    "page_title": "Détails du conteneur"
+    "page_title": "Détails du conteneur",
+    "edit": "Modifier"
   },
   "stacks": {
     "title": "Piles",
