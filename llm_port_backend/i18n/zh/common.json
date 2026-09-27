@@ -1100,7 +1100,7 @@
     "select_or_type_model": "选择或输入模型…",
     "test_to_discover": "测试连接以列出其模型",
     "other_openai": "其他（兼容 OpenAI）",
-    "col_price": "价格 $/百万（输入 / 输出）",
+    "col_price": "价格 $/百万",
     "price_set": "设置价格",
     "price_edit": "修改价格",
     "price_title": "{{model}} 的价格",

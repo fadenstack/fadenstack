@@ -1095,7 +1095,7 @@
     "select_or_type_model": "Choisissez ou saisissez un modèle…",
     "test_to_discover": "Testez la connexion pour lister ses modèles",
     "other_openai": "Autre (compatible OpenAI)",
-    "col_price": "Prix $/1 M (entrée / sortie)",
+    "col_price": "Prix $/1 M",
     "price_set": "Définir le prix",
     "price_edit": "Modifier le prix",
     "price_title": "Prix de {{model}}",

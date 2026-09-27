@@ -1095,7 +1095,7 @@
     "select_or_type_model": "Select or type a model…",
     "test_to_discover": "Test the connection to list its models",
     "other_openai": "Other (OpenAI-compatible)",
-    "col_price": "Price $/1M (in / out)",
+    "col_price": "Price $/1M",
     "price_set": "Set price",
     "price_edit": "Change the price",
     "price_title": "Price of {{model}}",

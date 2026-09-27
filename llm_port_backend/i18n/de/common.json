@@ -1100,7 +1100,7 @@
     "select_or_type_model": "Modell wählen oder eingeben…",
     "test_to_discover": "Verbindung testen, um die Modelle aufzulisten",
     "other_openai": "Andere (OpenAI-kompatibel)",
-    "col_price": "Preis $/1 Mio. (ein / aus)",
+    "col_price": "Preis $/1 Mio.",
     "price_set": "Preis festlegen",
     "price_edit": "Preis ändern",
     "price_title": "Preis von {{model}}",
