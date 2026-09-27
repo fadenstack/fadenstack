@@ -22,6 +22,7 @@ from llm_port_backend.db.models.system_settings import InfraAgentStatus
 from llm_port_backend.db.models.users import User
 from llm_port_backend.services.docker.client import DockerService
 from llm_port_backend.services.nodes import NodeControlService
+from llm_port_backend.services.nodes import signing as command_signing
 from llm_port_backend.services.nodes.wakeup import get_command_notifier
 from llm_port_backend.services.system_settings import SettingsCrypto, SystemSettingsService
 from llm_port_backend.services.system_settings.executors import AgentApplyExecutor, LocalApplyExecutor
@@ -1015,6 +1016,7 @@ async def _drain_commands(
     service: NodeControlService,
     node: Any,
     session: AsyncSession,
+    signing_key: bytes | None = None,
 ) -> None:
     """Send whatever is queued for *node*, and commit the dispatch.
 
@@ -1025,7 +1027,8 @@ async def _drain_commands(
     """
     dispatch_items = await service.list_commands_for_dispatch(node_id=node.id)
     if dispatch_items:
-        await websocket.send_json({"type": "commands", "items": dispatch_items})
+        items = command_signing.sign_all(dispatch_items, signing_key)
+        await websocket.send_json({"type": "commands", "items": items})
     await session.commit()
 
 
@@ -1058,6 +1061,8 @@ async def system_node_stream(websocket: WebSocket) -> None:
         return
 
     _node_id = node.id  # cache before any commit may expire the object
+    # Signed with the credential this agent connected with, when it checks.
+    signing_key = command_signing.stream_key(websocket.headers, websocket.headers.get("authorization"))
     # Capture the real client IP for host updates.
     # Prefer X-Forwarded-For > websocket.client.host, but the
     # agent-reported advertise_host (sent in heartbeats) takes
@@ -1088,8 +1093,9 @@ async def system_node_stream(websocket: WebSocket) -> None:
                 "type": "hello_ack",
                 "session_id": str(stream_session.id),
                 "node_id": str(node.id),
-                "commands": commands,
+                "commands": command_signing.sign_all(commands, signing_key),
                 "profile": profile_payload,
+                "signs_commands": signing_key is not None,
             },
         )
         await session.commit()
@@ -1131,7 +1137,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
             if payload is None:
                 # Woken by a queued command: skip the frame handling and go
                 # straight to the drain at the bottom of the loop.
-                await _drain_commands(websocket, service, node, session)
+                await _drain_commands(websocket, service, node, session, signing_key)
                 continue
 
             seq_raw = payload.get("seq")
@@ -1144,7 +1150,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
                     # A replayed frame carries no new information, but the
                     # queue may still have work -- skipping the drain here
                     # used to cost the node a whole dispatch cycle.
-                    await _drain_commands(websocket, service, node, session)
+                    await _drain_commands(websocket, service, node, session, signing_key)
                     continue
 
             message_type = str(payload.get("type") or "").strip().lower()
@@ -1206,7 +1212,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
                     if normalized:
                         await service.record_node_events(node_id=node.id, events=normalized)
 
-            await _drain_commands(websocket, service, node, session)
+            await _drain_commands(websocket, service, node, session, signing_key)
     except WebSocketDisconnect:
         logging.getLogger(__name__).info("Node agent %s disconnected from stream.", _node_id)
         await session.rollback()

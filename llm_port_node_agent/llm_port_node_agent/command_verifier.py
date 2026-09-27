@@ -13,6 +13,11 @@ log = logging.getLogger(__name__)
 
 _MAX_COMMAND_AGE_SEC = 300  # 5 minutes
 
+#: Sent when the stream is opened: this agent checks signatures, so the backend
+#: signs every command on the connection (and says so in hello_ack).
+SIGNING_HEADER = "X-Command-Signing"
+SIGNING_SCHEME = "hmac-sha256"
+
 
 def derive_signing_key(credential: str) -> bytes:
     """Derive an HMAC signing key from the agent credential."""

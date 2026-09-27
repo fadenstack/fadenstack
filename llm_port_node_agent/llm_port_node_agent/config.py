@@ -106,6 +106,10 @@ class AgentConfig:
     #: learnt (server_trust.build_context); shared by every connection to the
     #: backend. ``None`` while verification is off.
     ssl_context: Any = None
+    #: ``auto``: refuse unsigned commands once the backend has said it signs
+    #: them; ``true``: always; ``false``: never (a backend rolled back to one
+    #: that does not sign).
+    require_signed_commands: str = "auto"
 
     @classmethod
     def from_env(cls) -> AgentConfig:
@@ -164,6 +168,9 @@ class AgentConfig:
             ),
             container_runtime=os.getenv("LLM_PORT_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("LLM_PORT_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),
+            require_signed_commands=(
+                os.getenv("LLM_PORT_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
+            ),
         )
         if not instance.verify_tls:
             log.warning("TLS verification is disabled — connections are vulnerable to MITM.")

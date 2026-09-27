@@ -14,6 +14,8 @@ from websockets.exceptions import ConnectionClosed
 from llm_port_node_agent import __version__
 from llm_port_node_agent.collectors import collect_gpu_snapshot, collect_inventory, collect_utilization
 from llm_port_node_agent.command_verifier import (
+    SIGNING_HEADER,
+    SIGNING_SCHEME,
     derive_signing_key,
     validate_command_age,
     verify_command_signature,
@@ -83,9 +85,11 @@ class StreamClient:
 
     async def run(self, *, credential: str) -> None:
         """Open stream and process commands until disconnected."""
+        # The key for this connection: the backend signs with the credential
+        # the stream was opened with, for as long as it stays open.
         self._signing_key = derive_signing_key(credential)
         ws_url = self._ws_url()
-        headers = {"Authorization": f"Bearer {credential}"}
+        headers = {"Authorization": f"Bearer {credential}", SIGNING_HEADER: SIGNING_SCHEME}
         log.info("Connecting node stream to %s", ws_url)
         async with websockets.connect(
             ws_url,
@@ -124,6 +128,10 @@ class StreamClient:
             if payload is None:
                 continue
             msg_type = str(payload.get("type") or "").strip().lower()
+            if msg_type == "hello_ack" and payload.get("signs_commands") is True and not self._state.state.commands_signed:
+                self._state.state.commands_signed = True
+                self._state.save()
+                log.info("The backend signs its commands; unsigned ones are refused from now on.")
             if msg_type in {"hello_ack", "commands"}:
                 commands = payload.get("commands") if msg_type == "hello_ack" else payload.get("items")
                 if isinstance(commands, list):
@@ -235,9 +243,14 @@ class StreamClient:
         command_type = str(command.get("command_type") or "").strip().lower()
         correlation_id = str(command.get("correlation_id") or command_id)
 
-        # Verify HMAC signature when present in command
-        if "signature" in command and not verify_command_signature(command, self._signing_key):
-            log.warning("Rejected command %s: invalid signature.", command_id)
+        # A signature is checked whenever there is one, and required once the
+        # backend has said it signs (or the operator requires it).
+        unsigned = "signature" not in command
+        if (unsigned and self._requires_signature()) or (
+            not unsigned and not verify_command_signature(command, self._signing_key)
+        ):
+            reason = "missing" if unsigned else "invalid"
+            log.warning("Rejected command %s (%s): signature %s.", command_id, command_type, reason)
             await self._send_json(
                 ws,
                 {
@@ -245,8 +258,8 @@ class StreamClient:
                     "command_id": command_id,
                     "correlation_id": correlation_id,
                     "success": False,
-                    "error_code": "signature_invalid",
-                    "error_message": "Command signature verification failed.",
+                    "error_code": f"signature_{reason}",
+                    "error_message": f"Command signature {reason}: the agent refused to run it.",
                 },
             )
             return
@@ -335,12 +348,23 @@ class StreamClient:
                 if isinstance(new_credential, str) and new_credential:
                     self._state.state.credential = new_credential
                     self._state.save()
-                    self._signing_key = derive_signing_key(new_credential)
+                    # Not the signing key: the backend keeps signing this
+                    # connection with the credential it was opened with. The
+                    # next connection uses the new one, on both sides.
                     log.info("Credential rotated successfully.")
                 else:
                     log.warning("Credential rotation response missing new credential.")
             except Exception:
                 log.warning("Credential rotation failed; continuing with current credential.", exc_info=True)
+
+    def _requires_signature(self) -> bool:
+        """Whether a command without a signature is refused."""
+        mode = getattr(self._config, "require_signed_commands", "auto")
+        if mode in {"true", "1", "yes", "on"}:
+            return True
+        if mode in {"false", "0", "no", "off"}:
+            return False
+        return bool(self._state.state.commands_signed)
 
     @staticmethod
     def _parse_message(raw: str | bytes) -> dict[str, Any] | None:
