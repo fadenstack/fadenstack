@@ -574,6 +574,14 @@
         "title": "El servidor MCP {{name}} está {{state}}",
         "detail": "Sus herramientas no están disponibles en los chats.",
         "detail_message": "{{message}}"
+      },
+      "tls_certificate_expiring": {
+        "title": "El certificado HTTPS caduca en {{days}} días",
+        "detail": "El {{until}}. llmport tls status indica cómo se renueva."
+      },
+      "tls_certificate_expired": {
+        "title": "El certificado HTTPS caducó el {{until}}",
+        "detail": "Los navegadores y las máquinas rechazan la consola. Renuévelo: llmport tls renew o llmport tls use CERT KEY."
       }
     },
     "integrations": {

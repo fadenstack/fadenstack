@@ -209,6 +209,13 @@ def reachable_origins() -> list[dict[str, str]]:
     against. A machine told to fetch the agent from ``localhost`` fetches it
     from itself and finds nothing there.
     """
+    # A deployment: the CLI noted this host's addresses and ports (tls/edge.json);
+    # from inside the container the interfaces are the container's own, and the
+    # backend's port is not the one nginx publishes.
+    noted = edge_trust.host_urls()
+    if noted:
+        return [{"url": url, "interface": "host"} for url in noted]
+
     port = settings.port
     found: list[dict[str, str]] = []
     try:
@@ -262,7 +269,7 @@ async def install_address(request: Request) -> dict[str, object]:
         # Set when HTTPS is served with a certificate of the install's own
         # authority: a new machine has to fetch the authority first and check
         # it against this before it trusts anything from here.
-        "ca_sha256": edge_trust.ca_sha256() if edge_trust.served_by_our_ca() else None,
+        "ca_sha256": edge_trust.ca_sha256() if edge_trust.needs_ca() else None,
     }
 
 

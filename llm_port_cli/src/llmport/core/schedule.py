@@ -1,13 +1,13 @@
-"""Nightly backups, scheduled for the user who runs LLM.Port -- no root.
+"""Daily jobs -- the backup, the certificate renewal -- for the user who runs LLM.Port; no root.
 
 Two ways, whichever the machine has:
 
 * a **systemd user timer** (``llmport-backup.timer``), preferred: every
-  systemd distribution has one, and ``Persistent=true`` runs a backup missed
+  systemd distribution has one, and ``Persistent=true`` runs a job missed
   while the server was off. It runs without anyone logged in only with
   *lingering* on, which is switched on for the user (as the node agent's
   installer does).
-* a **crontab line** marked with :data:`MARK`, where there is cron but no
+* a **crontab line** marked with the job's name, where there is cron but no
   usable systemd user manager.
 
 Ubuntu 26.04 server ships no cron, which is why cron is not the only way.
@@ -20,12 +20,15 @@ import shlex
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-#: Marks the crontab line this module owns.
+#: Marks the crontab line of the backup.
 MARK = "# llmport-backup"
-#: The systemd user units this module owns.
+#: The systemd user units of the backup.
 UNIT = "llmport-backup"
+#: The systemd user units (and crontab mark) of the daily ``llmport tls renew``.
+TLS_UNIT = "llmport-tls-renew"
 
 #: Scheduled jobs run with a bare PATH; docker is usually in one of these.
 _PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -51,7 +54,7 @@ def _cron() -> bool:
 
 
 def available() -> bool:
-    """Whether backups can be scheduled on this machine at all."""
+    """Whether jobs can be scheduled on this machine at all."""
     return _systemd_user() or _cron()
 
 
@@ -71,6 +74,27 @@ def _config() -> Path | None:
     return Path(value).expanduser().resolve() if value else None
 
 
+@dataclass(frozen=True)
+class Job:
+    """A command of this CLI run every day at *hour*:*minute*, appending to *log*."""
+
+    unit: str
+    description: str
+    args: tuple[str, ...]
+    hour: int
+    minute: int
+    log: Path
+
+    @property
+    def mark(self) -> str:
+        """What ends its crontab line."""
+        return f"# {self.unit}"
+
+
+def _command(job: Job) -> str:
+    return " ".join(shlex.quote(part) for part in [*_cli(), *job.args])
+
+
 # ── cron ──────────────────────────────────────────────────────────
 
 
@@ -85,13 +109,13 @@ def _write(lines: list[str]) -> None:
     subprocess.run(["crontab", "-"], input=text, text=True, check=True)  # noqa: S607
 
 
-def entry(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> str:
-    """The crontab line for a backup every day at *hour*:*minute*."""
+def job_entry(job: Job, config: Path | None) -> str:
+    """The crontab line for *job*."""
     env = f"PATH={_PATH}"
     if config is not None:
         env += f" LLMPORT_CONFIG={shlex.quote(str(config))}"
-    command = " ".join(shlex.quote(part) for part in [*_cli(), "backup", "-y", "--retain", str(retain)])
-    return f"{minute} {hour} * * * {env} {command} >> {shlex.quote(str(log))} 2>&1 {MARK}"
+    log = shlex.quote(str(job.log))
+    return f"{job.minute} {job.hour} * * * {env} {_command(job)} >> {log} 2>&1 {job.mark}"
 
 
 # ── systemd ───────────────────────────────────────────────────────
@@ -102,38 +126,37 @@ def _unit_dir() -> Path:
     return Path(base) / "systemd" / "user"
 
 
-def units(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> dict[str, str]:
-    """The service and timer unit files for a backup every day at *hour*:*minute*."""
+def job_units(job: Job, config: Path | None) -> dict[str, str]:
+    """The service and timer unit files for *job*."""
     env = [f"Environment=PATH={_PATH}"]
     if config is not None:
         env.append(f'Environment="LLMPORT_CONFIG={config}"')
-    command = " ".join(shlex.quote(part) for part in [*_cli(), "backup", "-y", "--retain", str(retain)])
     service = "\n".join([
         "[Unit]",
-        "Description=LLM.Port nightly backup",
+        f"Description={job.description}",
         "",
         "[Service]",
         "Type=oneshot",
         *env,
-        f"ExecStart={command}",
-        f"StandardOutput=append:{log}",
-        f"StandardError=append:{log}",
+        f"ExecStart={_command(job)}",
+        f"StandardOutput=append:{job.log}",
+        f"StandardError=append:{job.log}",
         "",
     ])
     timer = "\n".join([
         "[Unit]",
-        "Description=LLM.Port nightly backup",
+        f"Description={job.description}",
         "",
         "[Timer]",
-        f"OnCalendar=*-*-* {hour:02d}:{minute:02d}:00",
-        # A night the server was off is backed up when it next starts.
+        f"OnCalendar=*-*-* {job.hour:02d}:{job.minute:02d}:00",
+        # A day the server was off is caught up when it next starts.
         "Persistent=true",
         "",
         "[Install]",
         "WantedBy=timers.target",
         "",
     ])
-    return {f"{UNIT}.service": service, f"{UNIT}.timer": timer}
+    return {f"{job.unit}.service": service, f"{job.unit}.timer": timer}
 
 
 def _linger() -> bool:
@@ -146,18 +169,92 @@ def _linger() -> bool:
     return _run(["loginctl", "show-user", user, "-p", "Linger"]).stdout.strip() == "Linger=yes"
 
 
-# ── public ────────────────────────────────────────────────────────
+# ── any job ───────────────────────────────────────────────────────
+
+
+def job_current(unit: str) -> str | None:
+    """How *unit* is scheduled, if it is: the timer's time or the crontab line."""
+    enabled = ""
+    if _systemd_user():
+        enabled = _run(["systemctl", "--user", "is-enabled", f"{unit}.timer"]).stdout.strip()
+    if enabled == "enabled":
+        lines = (_unit_dir() / f"{unit}.timer").read_text().splitlines()
+        calendar = next((line for line in lines if line.startswith("OnCalendar=")), "")
+        return f"systemd timer {unit}.timer ({calendar.removeprefix('OnCalendar=')})"
+    if _cron():
+        return next((line for line in _read() if line.endswith(f"# {unit}")), None)
+    return None
+
+
+def install_job(job: Job) -> tuple[str, list[str]]:
+    """Schedule *job*, replacing an earlier schedule of it. Returns how, and warnings for the operator."""
+    config = _config()
+    warnings: list[str] = []
+    remove_job(job.unit)
+    job.log.parent.mkdir(parents=True, exist_ok=True)
+    if _systemd_user():
+        directory = _unit_dir()
+        directory.mkdir(parents=True, exist_ok=True)
+        for name, text in job_units(job, config).items():
+            (directory / name).write_text(text, encoding="utf-8")
+        _run(["systemctl", "--user", "daemon-reload"])
+        enabled = _run(["systemctl", "--user", "enable", "--now", f"{job.unit}.timer"])
+        if enabled.returncode != 0:
+            msg = f"systemctl --user enable {job.unit}.timer failed: {enabled.stderr.strip()}"
+            raise RuntimeError(msg)
+        if not _linger():
+            warnings.append(
+                f"Lingering is off for this user, so {job.unit} only runs while someone is logged in. "
+                f"Turn it on once with: sudo loginctl enable-linger {os.environ.get('USER', '<user>')}"
+            )
+        return f"systemd timer {job.unit}.timer", warnings
+    if _cron():
+        _write([*_read(), job_entry(job, config)])
+        return "crontab", warnings
+    msg = "Neither a systemd user manager nor cron is available."
+    raise RuntimeError(msg)
+
+
+def remove_job(unit: str) -> bool:
+    """Remove *unit*'s schedule, whichever way it was scheduled; whether there was one."""
+    removed = False
+    if _systemd_user():
+        timer = _unit_dir() / f"{unit}.timer"
+        if timer.exists():
+            _run(["systemctl", "--user", "disable", "--now", f"{unit}.timer"])
+            for name in (f"{unit}.timer", f"{unit}.service"):
+                (_unit_dir() / name).unlink(missing_ok=True)
+            _run(["systemctl", "--user", "daemon-reload"])
+            removed = True
+    if _cron():
+        lines = _read()
+        kept = [line for line in lines if not line.endswith(f"# {unit}")]
+        if len(kept) != len(lines):
+            _write(kept)
+            removed = True
+    return removed
+
+
+# ── the backup ────────────────────────────────────────────────────
+
+
+def _backup(*, hour: int, minute: int, retain: int, log: Path) -> Job:
+    return Job(UNIT, "LLM.Port nightly backup", ("backup", "-y", "--retain", str(retain)), hour, minute, log)
+
+
+def entry(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> str:
+    """The crontab line for a backup every day at *hour*:*minute*."""
+    return job_entry(_backup(hour=hour, minute=minute, retain=retain, log=log), config)
+
+
+def units(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> dict[str, str]:
+    """The service and timer unit files for a backup every day at *hour*:*minute*."""
+    return job_units(_backup(hour=hour, minute=minute, retain=retain, log=log), config)
 
 
 def current() -> str | None:
     """How the nightly backup is scheduled, if it is: the timer's time or the crontab line."""
-    if _systemd_user() and _run(["systemctl", "--user", "is-enabled", f"{UNIT}.timer"]).stdout.strip() == "enabled":
-        timer = _unit_dir() / f"{UNIT}.timer"
-        calendar = next((line for line in timer.read_text().splitlines() if line.startswith("OnCalendar=")), "")
-        return f"systemd timer {UNIT}.timer ({calendar.removeprefix('OnCalendar=')})"
-    if _cron():
-        return next((line for line in _read() if line.endswith(MARK)), None)
-    return None
+    return job_current(UNIT)
 
 
 def install(*, hour: int, minute: int, retain: int, log: Path) -> tuple[str, list[str]]:
@@ -165,48 +262,17 @@ def install(*, hour: int, minute: int, retain: int, log: Path) -> tuple[str, lis
 
     Returns how it is scheduled, and warnings for the operator.
     """
-    config = _config()
-    warnings: list[str] = []
-    remove()
-    if _systemd_user():
-        directory = _unit_dir()
-        directory.mkdir(parents=True, exist_ok=True)
-        for name, text in units(hour=hour, minute=minute, retain=retain, log=log, config=config).items():
-            (directory / name).write_text(text, encoding="utf-8")
-        _run(["systemctl", "--user", "daemon-reload"])
-        enabled = _run(["systemctl", "--user", "enable", "--now", f"{UNIT}.timer"])
-        if enabled.returncode != 0:
-            msg = f"systemctl --user enable {UNIT}.timer failed: {enabled.stderr.strip()}"
-            raise RuntimeError(msg)
-        if not _linger():
-            warnings.append(
-                "Lingering is off for this user, so the backup only runs while someone is logged in. "
-                f"Turn it on once with: sudo loginctl enable-linger {os.environ.get('USER', '<user>')}"
-            )
-        return f"systemd timer {UNIT}.timer", warnings
-    if _cron():
-        line = entry(hour=hour, minute=minute, retain=retain, log=log, config=config)
-        _write([*_read(), line])
-        return "crontab", warnings
-    msg = "Neither a systemd user manager nor cron is available."
-    raise RuntimeError(msg)
+    return install_job(_backup(hour=hour, minute=minute, retain=retain, log=log))
 
 
 def remove() -> bool:
     """Remove the scheduled backup, whichever way it was scheduled; whether there was one."""
-    removed = False
-    if _systemd_user():
-        timer = _unit_dir() / f"{UNIT}.timer"
-        if timer.exists():
-            _run(["systemctl", "--user", "disable", "--now", f"{UNIT}.timer"])
-            for name in (f"{UNIT}.timer", f"{UNIT}.service"):
-                (_unit_dir() / name).unlink(missing_ok=True)
-            _run(["systemctl", "--user", "daemon-reload"])
-            removed = True
-    if _cron():
-        lines = _read()
-        kept = [line for line in lines if not line.endswith(MARK)]
-        if len(kept) != len(lines):
-            _write(kept)
-            removed = True
-    return removed
+    return remove_job(UNIT)
+
+
+# ── the certificate renewal ───────────────────────────────────────
+
+
+def tls_renewal(log: Path) -> Job:
+    """``llmport tls renew`` every morning; it changes nothing until something is due."""
+    return Job(TLS_UNIT, "LLM.Port certificate renewal", ("tls", "renew"), 4, 40, log)

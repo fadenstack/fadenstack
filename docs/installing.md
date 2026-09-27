@@ -189,6 +189,39 @@ must belong to it (and have no passphrase), and it must be valid today. The
 certificate file may carry its intermediates after it. A certificate that
 names none of the server's own names or addresses is installed with a
 warning, since the console may be reached by a name only DNS knows.
+From a **private issuer** (a company CA), give its root with `--ca root.pem`
+(or `llmport deploy --tls-ca`); a root at the end of the certificate file is
+taken as well. The machines are handed that root like the install's own
+authority, so they trust the certificate without anyone copying files to
+them.
+
+### Renewing
+
+Nothing is left to remember: once HTTPS is on, `llmport tls renew` runs every
+morning (a systemd user timer, `llmport-tls-renew.timer`, or a crontab line)
+and changes nothing until something is due.
+
+- **A certificate made here** lasts 825 days and is issued again 30 days
+  before it runs out -- or as soon as the server has an address it does not
+  list. It keeps every name it had and comes from the same authority, so
+  neither the browsers nor the machines notice.
+- **Your own certificate** is taken again from the files you gave
+  `llmport tls use` whenever they change there. Point it at the files your
+  renewal tool rewrites in place (certbot's
+  `/etc/letsencrypt/live/<name>/fullchain.pem` and `privkey.pem`, acme.sh,
+  your company's tooling) and a renewal is served the next morning. Renewed
+  files that fail the checks are not taken; the old certificate stays.
+- **The authority itself** lasts ten years. When it is replaced, the old one
+  stays published beside the new one while it is valid, and the machines
+  fetch both before anything the new one signed is served.
+
+`llmport tls status` shows until when the certificate is valid and how it is
+renewed; `llmport doctor` and the console's dashboard warn before it runs out
+(the dashboard 30 days before, or 21 when it renews by itself -- then only a
+failing renewal gets that far). `llmport tls renew --force` renews now. The
+daily run exits with an error when a certificate is close to its end and
+nothing here can renew it, so `systemctl --user --failed` shows it too; its
+output is in `~/llm-port/logs/tls-renew.log`.
 
 An administrator in root mode can do the same through the console's API:
 `POST /api/admin/tls/upload` with the files, then `POST /api/admin/tls/activate`,

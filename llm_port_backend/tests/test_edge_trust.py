@@ -68,7 +68,7 @@ def test_nothing_to_trust_on_a_plain_install(tls_dir: Path) -> None:
     assert not edge_trust.https_on()
     assert edge_trust.ca_pem() is None
     assert edge_trust.ca_sha256() is None
-    assert not edge_trust.served_by_our_ca()
+    assert not edge_trust.needs_ca()
 
 
 def test_the_authority_is_offered_before_https_is_on(tls_dir: Path) -> None:
@@ -78,16 +78,16 @@ def test_the_authority_is_offered_before_https_is_on(tls_dir: Path) -> None:
     assert not edge_trust.https_on()
     assert edge_trust.ca_pem() == ca_pem
     assert edge_trust.ca_sha256() == hashlib.sha256(ca_pem).hexdigest()
-    assert not edge_trust.served_by_our_ca(), "nothing is served yet"
+    assert not edge_trust.needs_ca(), "nothing is served yet"
 
 
 def test_a_certificate_of_its_own_needs_the_authority_a_public_one_does_not(tls_dir: Path) -> None:
     _install(tls_dir, signed_by_ours=True)
     assert edge_trust.https_on()
-    assert edge_trust.served_by_our_ca()
+    assert edge_trust.needs_ca()
     _install(tls_dir, signed_by_ours=False)
     assert edge_trust.https_on()
-    assert not edge_trust.served_by_our_ca()
+    assert not edge_trust.needs_ca()
 
 
 @pytest.mark.anyio()

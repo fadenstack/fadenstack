@@ -259,6 +259,9 @@ def upgrade_cmd(
     else:
         if ca_created:
             success(f"Certificate authority for the machines made: {ca_public}")
+    from llmport.commands.tls import refresh_edge_info  # noqa: PLC0415
+
+    refresh_edge_info(shared_dir)
 
     # ── 4. Images ─────────────────────────────────────────────
     if release is not None:

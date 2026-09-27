@@ -227,6 +227,10 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     help="Intermediate certificates (PEM), unless --tls-cert already carries them.",
 )
 @click.option(
+    "--tls-ca", type=click.Path(dir_okay=False, path_type=Path), default=None,
+    help="With --tls own: a private issuer's root (PEM), given to the machines so they trust the certificate.",
+)
+@click.option(
     "--tls-name", "tls_names", multiple=True, metavar="NAME",
     help="With --tls generate: another DNS name or address the console is reached by (repeatable).",
 )
@@ -297,6 +301,7 @@ def deploy_cmd(
     tls_key: Path | None,
     tls_chain: Path | None,
     tls_names: tuple[str, ...],
+    tls_ca: Path | None,
     local_node: bool,
     local_node_host: str,
     local_node_workdir: str,
@@ -532,6 +537,7 @@ def deploy_cmd(
         key=tls_key,
         chain=tls_chain,
         names=tls_names,
+        ca=tls_ca,
     )
 
     # ── 4. Save config ────────────────────────────────────────────

@@ -404,6 +404,32 @@ async def mcp_servers(facts: Facts) -> list[Item]:
     ]
 
 
+#: Warned about this long before a certificate runs out; less when it renews by itself
+#: (llmport tls renew runs daily and acts 30 days before), which only a failing renewal reaches.
+CERT_WARNING_DAYS = 30
+CERT_WARNING_DAYS_RENEWING = 21
+CERT_CRITICAL_DAYS = 7
+
+
+async def edge_certificate(facts: Facts) -> list[Item]:
+    """The certificate HTTPS is served with: close to its end, or past it."""
+    from llm_port_backend.services import edge_trust  # noqa: PLC0415
+
+    until = edge_trust.served_until()
+    if until is None:
+        return []
+    days = (until - facts.now).total_seconds() / 86400
+    renews = (edge_trust.edge_info() or {}).get("renews") == "daily"
+    params = {"days": max(int(days), 0), "until": until.date().isoformat(), "renews": renews}
+    if days <= 0:
+        return [Item("tls_certificate_expired", "tls_certificate_expired", "critical", "platform", params, until)]
+    if days < CERT_CRITICAL_DAYS:
+        return [Item("tls_certificate_expiring", "tls_certificate_expiring", "critical", "platform", params)]
+    if days < (CERT_WARNING_DAYS_RENEWING if renews else CERT_WARNING_DAYS):
+        return [Item("tls_certificate_expiring", "tls_certificate_expiring", "warning", "platform", params)]
+    return []
+
+
 RULES: list[Rule] = [
     machines,
     join_requests,
@@ -415,6 +441,7 @@ RULES: list[Rule] = [
     host,
     rag_jobs,
     mcp_servers,
+    edge_certificate,
 ]
 
 

@@ -29,6 +29,10 @@ NAMES = ["localhost", "127.0.0.1", "::1", "box", "10.250.10.61"]
 @pytest.fixture(autouse=True)
 def fixed_machine(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tls, "machine_names", lambda: list(NAMES))
+    # Never a real timer or crontab from a test run.
+    from llmport.core import schedule
+
+    monkeypatch.setattr(schedule, "available", lambda: False)
 
 
 @pytest.fixture
@@ -50,7 +54,7 @@ def test_a_certificate_made_here_names_the_machine_and_is_signed_by_the_installs
     leaf = _load(install / "tls" / "edge.crt")
     ca = _load(made.ca_public)
     leaf.verify_directly_issued_by(ca)
-    assert made.ca_created
+    assert made.trust_changed, "the machines have an authority to fetch"
     assert made.summary.made_here
     assert set(made.summary.names) >= {"localhost", "127.0.0.1", "box", "10.250.10.61", "console.example.org"}
     assert tls.material_present(install)
@@ -71,16 +75,22 @@ def test_a_second_certificate_is_signed_by_the_same_authority(install: Path) -> 
     first = tls.generate(install)
     ca_before = (install / "tls-ca" / "ca.crt").read_bytes()
     second = tls.generate(install, ["another.name"])
-    assert not second.ca_created
+    assert not second.trust_changed
     assert (install / "tls-ca" / "ca.crt").read_bytes() == ca_before
     assert first.summary.fingerprint_sha256 != second.summary.fingerprint_sha256
     _load(install / "tls" / "edge.crt").verify_directly_issued_by(_load(install / "tls-ca" / "ca.crt"))
 
 
-def test_an_authority_about_to_expire_is_replaced(install: Path) -> None:
+def test_an_authority_about_to_expire_is_replaced_and_the_old_one_still_published(install: Path) -> None:
     tls.generate(install, now=datetime.now(UTC) - timedelta(days=tls.CA_DAYS - 100))
+    old = (install / "tls-ca" / "ca.crt").read_bytes()
     made = tls.generate(install)
-    assert made.ca_created
+    assert made.trust_changed
+    assert (install / "tls-ca" / "ca.crt").read_bytes() != old
+    assert (install / "tls-ca" / "ca-previous.crt").read_bytes() == old
+    published = x509.load_pem_x509_certificates((install / "tls" / "ca.crt").read_bytes())
+    assert len(published) == 2, "the new authority and, while it is valid, the one before"
+    assert made.summary.made_here
 
 
 @pytest.mark.parametrize("bad", ["https://box", "box:8443", "a b"])
@@ -371,11 +381,14 @@ def test_the_authority_is_made_once_and_its_public_copy_kept(install: Path) -> N
     assert public == install / "tls" / "ca.crt"
     assert public.read_bytes() == (install / "tls-ca" / "ca.crt").read_bytes()
     assert not tls.material_present(install), "making the authority serves nothing"
+    ca_before = (install / "tls-ca" / "ca.crt").read_bytes()
+    assert tls.ensure_ca(install) == (public, False), "nothing new to fetch"
     public.unlink()
-    again, created = tls.ensure_ca(install)
-    assert not created
-    assert again.read_bytes() == (install / "tls-ca" / "ca.crt").read_bytes()
-    assert not tls.generate(install).ca_created, "a certificate later is signed by the same authority"
+    again, changed = tls.ensure_ca(install)
+    assert changed, "the public copy is written again"
+    assert (install / "tls-ca" / "ca.crt").read_bytes() == ca_before, "by the same authority"
+    assert again.read_bytes() == ca_before
+    assert not tls.generate(install).trust_changed, "a certificate later is signed by the same authority"
 
 
 def test_deploy_makes_the_authority_even_with_https_off(install: Path, free_ports: None) -> None:

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -190,6 +191,71 @@ def _ask_mode(install_dir: Path, *, yes: bool) -> str | None:
     return click.prompt("  HTTPS", type=click.Choice(TLS_MODES), default="off")
 
 
+def renewal_scheduled() -> bool:
+    """Whether ``llmport tls renew`` runs by itself every day."""
+    from llmport.core import schedule  # noqa: PLC0415
+
+    try:
+        return schedule.available() and schedule.job_current(schedule.TLS_UNIT) is not None
+    except OSError:
+        return False
+
+
+def schedule_renewal(install_dir: Path) -> None:
+    """Have ``llmport tls renew`` run every morning, once HTTPS is on; say how."""
+    from llmport.core import schedule  # noqa: PLC0415
+
+    if renewal_scheduled():
+        return
+    if not schedule.available():
+        warning(
+            "No systemd user manager or cron here to renew the certificate by itself: "
+            "run llmport tls renew now and then (it only acts when something is due)."
+        )
+        return
+    try:
+        how, notes = schedule.install_job(schedule.tls_renewal(install_dir / "logs" / "tls-renew.log"))
+    except (RuntimeError, OSError) as exc:
+        warning(f"Could not schedule the renewal: {exc}. Run llmport tls renew now and then.")
+        return
+    success(f"Kept current by itself: llmport tls renew runs every morning ({how}).")
+    for note in notes:
+        warning(note)
+
+
+def unschedule_renewal() -> None:
+    """Stop the daily renewal: with HTTPS off there is nothing to renew."""
+    from llmport.core import schedule  # noqa: PLC0415
+
+    if schedule.available():
+        schedule.remove_job(schedule.TLS_UNIT)
+
+
+def refresh_edge_info(install_dir: Path) -> None:
+    """Tell the backend this host's addresses and ports (``tls/edge.json``); best effort."""
+    from llmport.core.edge import ports  # noqa: PLC0415
+
+    http_port, https_port = ports(read_env_file(install_dir / ".env"))
+    try:
+        tls.write_edge_info(
+            install_dir, http_port=http_port, https_port=https_port,
+            renews="daily" if renewal_scheduled() else "by hand",
+        )
+    except OSError as exc:
+        warning(f"Could not write {install_dir / tls.TLS_DIR / 'edge.json'}: {exc}")
+
+
+def _wait_for_machines(trust_changed: bool, *, no_restart: bool, no_wait: bool) -> None:
+    """Give connected machines time to fetch a new issuer before the proxy serves what it signed."""
+    if not trust_changed or no_restart or no_wait:
+        return
+    info(
+        f"The machines have a new issuer to trust: giving them {MACHINE_TRUST_WAIT_SEC} s to fetch it"
+        " (--no-wait skips)."
+    )
+    time.sleep(MACHINE_TRUST_WAIT_SEC)
+
+
 def _generate_step(install_dir: Path, *, yes: bool, names: tuple[str, ...]) -> Path:
     if not names and not yes:
         extra = click.prompt(
@@ -209,7 +275,13 @@ def _generate_step(install_dir: Path, *, yes: bool, names: tuple[str, ...]) -> P
 
 
 def _own_step(
-    install_dir: Path, *, yes: bool, cert: Path | None, key: Path | None, chain: Path | None
+    install_dir: Path,
+    *,
+    yes: bool,
+    cert: Path | None,
+    key: Path | None,
+    chain: Path | None,
+    ca: Path | None,
 ) -> None:
     attempts = 1 if yes else 3
     for attempt in range(attempts):
@@ -223,13 +295,19 @@ def _own_step(
                 "  Intermediate certificates (PEM, blank for none)", default="", show_default=False
             )
             chain = Path(raw_chain).expanduser() if raw_chain.strip() else None
+            raw_ca = click.prompt(
+                "  Its issuer, when it is a private one (PEM, blank for a public issuer)",
+                default="",
+                show_default=False,
+            )
+            ca = Path(raw_ca).expanduser() if raw_ca.strip() else None
         try:
-            summary = tls.use_own(install_dir, cert, key, chain)
+            summary = tls.use_own(install_dir, cert, key, chain, ca_path=ca)
         except tls.TlsError as exc:
             error(str(exc))
             if attempt + 1 == attempts:
                 sys.exit(1)
-            cert = key = chain = None
+            cert = key = chain = ca = None
             continue
         success("HTTPS on, with your certificate.")
         print_summary(summary)
@@ -248,6 +326,7 @@ def deploy_step(
     key: Path | None,
     chain: Path | None,
     names: tuple[str, ...],
+    ca: Path | None = None,
 ) -> Path | None:
     """``llmport deploy``'s ports-and-HTTPS step, before anything starts.
 
@@ -258,13 +337,31 @@ def deploy_step(
     # Made even while HTTPS stays off: the machines fetch it from the backend
     # now, so they can follow once a certificate it signed is served.
     try:
-        ca_public, ca_created = tls.ensure_ca(install_dir)
+        ca_public, changed = tls.ensure_ca(install_dir)
     except tls.TlsError as exc:
         warning(str(exc))
     else:
-        if ca_created:
+        if changed:
             info(f"Certificate authority for the machines: {ca_public}")
 
+    result = _https_step(install_dir, yes=yes, mode=mode, cert=cert, key=key, chain=chain, names=names, ca=ca)
+    if tls.material_present(install_dir):
+        schedule_renewal(install_dir)
+    refresh_edge_info(install_dir)
+    return result
+
+
+def _https_step(
+    install_dir: Path,
+    *,
+    yes: bool,
+    mode: str | None,
+    cert: Path | None,
+    key: Path | None,
+    chain: Path | None,
+    names: tuple[str, ...],
+    ca: Path | None,
+) -> Path | None:
     if mode is None and (cert or key):
         mode = "own"
     if mode is None:
@@ -273,13 +370,14 @@ def deploy_step(
         return None
     if mode == "off":
         if tls.remove(install_dir):
+            unschedule_renewal()
             info("HTTPS switched off: the certificate was removed (the install's authority is kept).")
         else:
             info("HTTPS is off.")
         return None
     if mode == "generate":
         return _generate_step(install_dir, yes=yes, names=names)
-    _own_step(install_dir, yes=yes, cert=cert, key=key, chain=chain)
+    _own_step(install_dir, yes=yes, cert=cert, key=key, chain=chain, ca=ca)
     return None
 
 
@@ -288,16 +386,28 @@ def tls_group() -> None:
     """HTTPS for the console, the API and the gateway (/v1).
 
     \b
-    llmport tls status                  what nginx serves now
+    llmport tls status                  what is served, until when, and how it is renewed
     llmport tls generate                a certificate made here for this machine
-    llmport tls use CERT KEY            your own certificate (and --chain)
+    llmport tls use CERT KEY            your own certificate (--chain, --ca for a private issuer)
+    llmport tls renew                   renew what is due (runs every morning by itself)
     llmport tls off                     back to plain HTTP
     """
 
 
+def _renewal_line(install_dir: Path, summary: tls.CertSummary) -> str:
+    left = (summary.not_after - datetime.now(UTC)).days
+    auto = "every morning by llmport tls renew" if renewal_scheduled() else "when you run llmport tls renew"
+    if summary.made_here:
+        return f"issued again {tls.RENEW_BEFORE_DAYS} days before it runs out, {auto} ({left} days left)"
+    origin = tls.source(install_dir)
+    if origin is not None:
+        return f"taken again from {origin['cert']} when it changes there, {auto} ({left} days left)"
+    return f"by hand: llmport tls use CERT KEY with the renewed files ({left} days left)"
+
+
 @tls_group.command("status")
 def status_cmd() -> None:
-    """Show whether HTTPS is on, and the certificate it uses."""
+    """Show whether HTTPS is on, the certificate, until when, and how it is renewed."""
     install_dir = _install_dir()
     try:
         summary = tls.current(install_dir)
@@ -310,9 +420,12 @@ def status_cmd() -> None:
     else:
         console.print("HTTPS is [bold green]on[/bold green]; plain HTTP redirects to it.")
         print_summary(summary)
+        console.print(f"  Renewed:     {_renewal_line(install_dir, summary)}")
         ca_public = install_dir / tls.TLS_DIR / tls.CA_PUBLIC_FILE
-        if summary.made_here and ca_public.is_file():
-            console.print(f"  Authority:   {ca_public}")
+        if ca_public.is_file():
+            console.print(f"  Machines trust: {ca_public}")
+        if (summary.not_after - datetime.now(UTC)).days < tls.EXPIRY_WARNING_DAYS:
+            warning(f"The certificate runs out on {summary.not_after:%Y-%m-%d}: llmport tls renew")
     print_addresses(install_dir)
 
 
@@ -337,21 +450,15 @@ def generate_cmd(*, names: tuple[str, ...], no_restart: bool, no_wait: bool) -> 
     except tls.TlsError as exc:
         error(str(exc))
         sys.exit(1)
-    if made.ca_created:
-        success(f"Certificate authority for this install made in {install_dir / tls.CA_DIR}")
     success("Certificate made and installed.")
     print_summary(made.summary)
-    if made.ca_created and not no_restart and not no_wait:
-        # Deploy and upgrade make the authority ahead of time; an install that
-        # has not been through either since gets it only now. Machines ask for
-        # it every minute, and once the proxy switches they could not check it.
-        info(
-            f"The authority is new: giving the machines {MACHINE_TRUST_WAIT_SEC} s to fetch it"
-            " (--no-wait skips)."
-        )
-        time.sleep(MACHINE_TRUST_WAIT_SEC)
+    # Deploy and upgrade make the authority ahead of time; an install that has
+    # not been through either since gets it only now.
+    _wait_for_machines(made.trust_changed, no_restart=no_restart, no_wait=no_wait)
     if not no_restart and not apply_to_proxy(install_dir):
         sys.exit(1)
+    schedule_renewal(install_dir)
+    refresh_edge_info(install_dir)
     print_trust_hints(install_dir, made.ca_public)
     print_addresses(install_dir)
 
@@ -364,21 +471,82 @@ def generate_cmd(*, names: tuple[str, ...], no_restart: bool, no_wait: bool) -> 
     help="The issuer's intermediate certificates (PEM), when CERT does not already carry them.",
 )
 @click.option(
+    "--ca", "ca", type=click.Path(dir_okay=False, path_type=Path), default=None,
+    help="A private issuer's root (PEM): the machines are given it, so they trust the certificate. "
+    "Not needed for a public issuer, nor when CERT's chain ends in the root.",
+)
+@click.option(
     "--no-restart", is_flag=True, help="Write the files only; the proxy picks them up when it next starts."
 )
-def use_cmd(*, cert: Path, key: Path, chain: Path | None, no_restart: bool) -> None:
-    """Serve your own certificate: CERT and KEY are PEM files (CERT may be a full chain)."""
+@click.option(
+    "--no-wait", is_flag=True,
+    help="Switch at once even when the issuer is new to the machines.",
+)
+def use_cmd(
+    *, cert: Path, key: Path, chain: Path | None, ca: Path | None, no_restart: bool, no_wait: bool
+) -> None:
+    """Serve your own certificate: CERT and KEY are PEM files (CERT may be a full chain).
+
+    The files are read again from the same place by llmport tls renew when they
+    change there, so a certificate renewed in place (certbot, acme.sh, your own
+    tooling) is served without anyone running this again.
+    """
     install_dir = _install_dir()
     try:
-        summary = tls.use_own(install_dir, cert, key, chain)
+        summary = tls.use_own(install_dir, cert, key, chain, ca_path=ca)
     except tls.TlsError as exc:
         error(str(exc))
         sys.exit(1)
     success("Certificate checked and installed.")
     print_summary(summary)
+    _wait_for_machines(summary.trust_changed, no_restart=no_restart, no_wait=no_wait)
     if not no_restart and not apply_to_proxy(install_dir):
         sys.exit(1)
+    schedule_renewal(install_dir)
+    refresh_edge_info(install_dir)
     print_addresses(install_dir)
+
+
+@tls_group.command("renew")
+@click.option(
+    "--days", type=click.IntRange(1, 365), default=tls.RENEW_BEFORE_DAYS, show_default=True,
+    help="Issue a certificate made here again once it has fewer days left than this.",
+)
+@click.option("--force", is_flag=True, help="Issue it again, or take the operator's files again, now.")
+@click.option("--no-wait", is_flag=True, help="Do not wait for the machines when their issuer changed.")
+def renew_cmd(*, days: int, force: bool, no_wait: bool) -> None:
+    """Renew what is due; changes nothing otherwise. Runs every morning by itself once HTTPS is on.
+
+    Exits 1 when a certificate runs out soon and cannot be renewed from here,
+    so a failed run shows (systemctl --user --failed).
+    """
+    install_dir = _install_dir()
+    # A rotation of the authority is published first, so machines have it
+    # before anything it signed is served.
+    try:
+        _, rotated = tls.ensure_ca(install_dir)
+    except tls.TlsError as exc:
+        warning(str(exc))
+        rotated = False
+    try:
+        result = tls.renew(install_dir, days=days, force=force)
+    except tls.TlsError as exc:
+        error(str(exc))
+        sys.exit(1)
+    stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    if result.action in ("renewed", "reimported"):
+        success(f"{stamp}  {result.message}")
+        if result.summary is not None:
+            print_summary(result.summary)
+        _wait_for_machines(result.trust_changed or rotated, no_restart=False, no_wait=no_wait)
+        if not apply_to_proxy(install_dir):
+            sys.exit(1)
+        refresh_edge_info(install_dir)
+        return
+    if result.action == "expiring":
+        warning(f"{stamp}  {result.message}")
+        sys.exit(1)
+    info(f"{stamp}  {result.message}")
 
 
 @tls_group.command("off")
@@ -392,8 +560,10 @@ def off_cmd(*, no_restart: bool) -> None:
         info("HTTPS was already off.")
         return
     success("Certificate removed.")
+    unschedule_renewal()
     if not no_restart and not apply_to_proxy(install_dir):
         sys.exit(1)
+    refresh_edge_info(install_dir)
     urls = addresses(install_dir)
     warning(
         "Machines that followed this server to HTTPS stay there: an agent never falls back to plain HTTP "

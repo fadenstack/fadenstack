@@ -121,6 +121,9 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
                 "  the port (llmport ports --http/--https; PROM_PORT, ... in .env).[/dim]"
             )
 
+    # ── HTTPS ─────────────────────────────────────────────────────
+    _https_check()
+
     # ── Verdict ───────────────────────────────────────────────────
     all_ok = (
         docker.installed
@@ -153,3 +156,31 @@ def _install_compose() -> tuple[Path | None, Path | None]:
     if bundled is not None:
         return Path(str(bundled / "docker-compose.yaml")), None
     return None, None
+
+
+def _https_check() -> None:
+    """HTTPS on or off, how long the certificate lasts, and whether it renews by itself."""
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from llmport.commands.tls import renewal_scheduled  # noqa: PLC0415
+    from llmport.core import tls  # noqa: PLC0415
+    from llmport.core.settings import load_config  # noqa: PLC0415
+
+    cfg = load_config()
+    if not cfg.install_dir:
+        return
+    try:
+        served = tls.current(Path(cfg.install_dir))
+    except tls.TlsError as exc:
+        console.print(f"\n{_check_mark(False)}  HTTPS: {exc}")
+        return
+    if served is None:
+        console.print(f"\n{_check_mark(True)}  HTTPS: off (llmport tls generate switches it on)")
+        return
+    left = (served.not_after - datetime.now(UTC)).days
+    renews = renewal_scheduled() and (served.made_here or tls.source(Path(cfg.install_dir)) is not None)
+    ok = left >= tls.EXPIRY_WARNING_DAYS or (renews and left > 0)
+    how = "renews by itself" if renews else "renewed by hand (llmport tls status)"
+    console.print(
+        f"\n{_check_mark(ok)}  HTTPS: on until [bold]{served.not_after:%Y-%m-%d}[/bold] ({left} days), {how}"
+    )

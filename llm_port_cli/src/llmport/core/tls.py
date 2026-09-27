@@ -39,6 +39,15 @@ CA_PUBLIC_FILE = "ca.crt"
 CA_DIR = "tls-ca"
 CA_CERT_FILE = "ca.crt"
 CA_KEY_FILE = "ca.key"
+#: The authority before the last rotation, published beside the new one while
+#: certificates it signed may still be served.
+CA_PREVIOUS_FILE = "ca-previous.crt"
+#: The operator's own issuers (``tls use --ca``), published to the machines too.
+ROOTS_FILE = "roots.pem"
+#: Where the operator's certificate came from, so ``tls renew`` can take the renewed one.
+SOURCE_FILE = "source.json"
+#: A certificate made here is re-issued this many days before it runs out.
+RENEW_BEFORE_DAYS = 30
 
 #: Apple's limit for certificates under an authority the user added; the others accept it.
 LEAF_DAYS = 825
@@ -69,6 +78,8 @@ class CertSummary:
     self_signed: bool
     made_here: bool = False
     warnings: list[str] = field(default_factory=list)
+    #: The machines have a new issuer to fetch before this certificate is served.
+    trust_changed: bool = False
 
 
 # ── names ─────────────────────────────────────────────────────────
@@ -200,16 +211,25 @@ def current(install_dir: Path) -> CertSummary | None:
 
 
 def _issued_by_our_ca(install_dir: Path, cert: x509.Certificate) -> bool:
-    from cryptography import x509  # noqa: PLC0415
+    """Signed by the install's authority, the current one or the one before a rotation."""
+    for name in (CA_CERT_FILE, CA_PREVIOUS_FILE):
+        for ca in _valid_certs(install_dir / CA_DIR / name, datetime.now(UTC)):
+            try:
+                cert.verify_directly_issued_by(ca)
+            except Exception:  # noqa: S112 - InvalidSignature, another key type: not this issuer
+                continue
+            return True
+    return False
 
-    ca_path = install_dir / CA_DIR / CA_CERT_FILE
-    if not ca_path.is_file():
-        return False
-    try:
-        ca = x509.load_pem_x509_certificate(ca_path.read_bytes())
-    except (ValueError, OSError):
-        return False
-    return cert.issuer == ca.subject
+
+def _issued_by_current_ca(install_dir: Path, cert: x509.Certificate) -> bool:
+    for ca in _valid_certs(install_dir / CA_DIR / CA_CERT_FILE, datetime.now(UTC)):
+        try:
+            cert.verify_directly_issued_by(ca)
+        except Exception:  # noqa: S112 - InvalidSignature, another key type: not this issuer
+            continue
+        return True
+    return False
 
 
 # ── writing ───────────────────────────────────────────────────────
@@ -283,6 +303,8 @@ def _load_or_make_ca(
         # Reused while it outlives the certificate it is about to sign.
         if cert.not_valid_after_utc > now + timedelta(days=LEAF_DAYS + 1):
             return cert, key, False
+        # Rotated: the old one stays published while what it signed may be served.
+        _write(ca_dir / CA_PREVIOUS_FILE, cert_path.read_bytes(), mode=0o644)
 
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([
@@ -324,23 +346,62 @@ def _load_or_make_ca(
     return cert, key, True
 
 
+def _valid_certs(path: Path, now: datetime) -> list[x509.Certificate]:
+    from cryptography import x509  # noqa: PLC0415
+
+    if not path.is_file():
+        return []
+    try:
+        certs = x509.load_pem_x509_certificates(path.read_bytes())
+    except ValueError:
+        return []
+    return [c for c in certs if c.not_valid_after_utc > now]
+
+
+def publish_trust(install_dir: Path, *, now: datetime | None = None) -> tuple[Path, bool]:
+    """Write what the machines are to trust into ``tls/ca.crt``: ``(path, changed)``.
+
+    The install's authority, the one before it while still valid (a rotation
+    never leaves a served certificate without its issuer), and the operator's
+    own issuers. The backend hands this file to every machine as it is.
+    """
+    from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+
+    install_dir = Path(install_dir)
+    now = now or datetime.now(UTC)
+    ca_dir = install_dir / CA_DIR
+    seen: set[bytes] = set()
+    parts: list[bytes] = []
+    for name in (CA_CERT_FILE, CA_PREVIOUS_FILE, ROOTS_FILE):
+        for cert in _valid_certs(ca_dir / name, now):
+            der = cert.public_bytes(serialization.Encoding.DER)
+            if der not in seen:
+                seen.add(der)
+                parts.append(cert.public_bytes(serialization.Encoding.PEM))
+    public = install_dir / TLS_DIR / CA_PUBLIC_FILE
+    data = b"".join(parts)
+    if not data:
+        public.unlink(missing_ok=True)
+        return public, False
+    if public.is_file() and public.read_bytes() == data:
+        return public, False
+    _write(public, data, mode=0o644)
+    return public, True
+
+
 def ensure_ca(install_dir: Path, *, now: datetime | None = None) -> tuple[Path, bool]:
-    """The install's authority, made when missing, and its public copy in ``tls/``: ``(path, created)``.
+    """The install's authority, made when missing, published in ``tls/``: ``(path, changed)``.
 
     Deploy and upgrade call this with HTTPS still off. The backend offers the
     authority to every machine (``/api/node-files/server-trust``), so they
     hold it before a certificate it signed is served: once HTTPS is on, the
     plain-HTTP address only redirects to what they could not check otherwise.
+    ``changed`` says the machines have something new to fetch.
     """
-    from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
-
     install_dir = Path(install_dir)
-    ca_cert, _key, created = _load_or_make_ca(install_dir, now or datetime.now(UTC))
-    public = install_dir / TLS_DIR / CA_PUBLIC_FILE
-    data = ca_cert.public_bytes(serialization.Encoding.PEM)
-    if not public.is_file() or public.read_bytes() != data:
-        _write(public, data, mode=0o644)
-    return public, created
+    now = now or datetime.now(UTC)
+    _load_or_make_ca(install_dir, now)
+    return publish_trust(install_dir, now=now)
 
 
 @dataclass
@@ -349,7 +410,8 @@ class Generated:
 
     summary: CertSummary
     ca_public: Path
-    ca_created: bool
+    #: The machines have a new authority to fetch before this certificate is served.
+    trust_changed: bool
 
 
 def generate(install_dir: Path, extra_names: Iterable[str] = (), *, now: datetime | None = None) -> Generated:
@@ -377,7 +439,7 @@ def generate(install_dir: Path, extra_names: Iterable[str] = (), *, now: datetim
         if extra not in names:
             names.append(extra)
 
-    ca_cert, ca_key, created = _load_or_make_ca(install_dir, now)
+    ca_cert, ca_key, _created = _load_or_make_ca(install_dir, now)
     key = ec.generate_private_key(ec.SECP256R1())
     public = key.public_key()
     loopback = ("localhost", "127.0.0.1", "::1")
@@ -415,9 +477,10 @@ def generate(install_dir: Path, extra_names: Iterable[str] = (), *, now: datetim
         ),
         None,
     )
-    ca_public = install_dir / TLS_DIR / CA_PUBLIC_FILE
-    _write(ca_public, ca_cert.public_bytes(serialization.Encoding.PEM), mode=0o644)
-    return Generated(summary=summarise(cert, made_here=True), ca_public=ca_public, ca_created=created)
+    # The served certificate is made here now: nothing to take from the operator's source.
+    (install_dir / CA_DIR / SOURCE_FILE).unlink(missing_ok=True)
+    ca_public, changed = publish_trust(install_dir, now=now)
+    return Generated(summary=summarise(cert, made_here=True), ca_public=ca_public, trust_changed=changed)
 
 
 # ── brought by the operator ───────────────────────────────────────
@@ -439,12 +502,50 @@ def _read_pem(path: Path, label: str) -> str:
     return text
 
 
+def _chains_to(leaf: x509.Certificate, chain: list[x509.Certificate], roots: list[x509.Certificate]) -> bool:
+    """Whether *leaf*, through *chain*, was issued by one of *roots*."""
+    current = leaf
+    for _ in range(len(chain) + 1):
+        for root in roots:
+            try:
+                current.verify_directly_issued_by(root)
+            except Exception:  # noqa: S112 - InvalidSignature, another key type: not this issuer
+                continue
+            return True
+        issuer = next((c for c in chain if c.subject == current.issuer and c is not current), None)
+        if issuer is None:
+            return False
+        current = issuer
+    return False
+
+
+def _sha256_file(path: Path) -> str | None:
+    import hashlib  # noqa: PLC0415
+
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def source(install_dir: Path) -> dict[str, str | None] | None:
+    """Where the served certificate was imported from, when it was the operator's."""
+    import json  # noqa: PLC0415
+
+    try:
+        data = json.loads((Path(install_dir) / CA_DIR / SOURCE_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and data.get("cert") and data.get("key") else None
+
+
 def use_own(
     install_dir: Path,
     cert_path: Path,
     key_path: Path,
     chain_path: Path | None = None,
     *,
+    ca_path: Path | None = None,
     now: datetime | None = None,
 ) -> CertSummary:
     """Check the operator's certificate and key, then install them.
@@ -454,7 +555,15 @@ def use_own(
     every client refuse the pair raise :class:`TlsError`; a certificate that
     does not name the addresses of this machine only warns, since the console
     may well be reached by a name only DNS knows.
+
+    A private issuer -- *ca_path*, or a self-signed root the chain ends in --
+    is published to the machines with the install's own authority, so they
+    trust the certificate without anyone copying files to them. Where the
+    files came from is kept, so ``tls renew`` takes the renewed ones from
+    there (certbot, acme.sh and corporate tooling renew in place).
     """
+    import json  # noqa: PLC0415
+
     from cryptography import x509  # noqa: PLC0415
     from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
     from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: PLC0415
@@ -493,11 +602,25 @@ def use_own(
         raise TlsError(f"The certificate is not valid before {cert.not_valid_before_utc:%Y-%m-%d %H:%M} UTC.")
     if cert.not_valid_after_utc < now:
         raise TlsError(f"The certificate expired on {cert.not_valid_after_utc:%Y-%m-%d}.")
+    chain: list[x509.Certificate] = []
     for index, block in enumerate(chain_blocks, start=1):
         try:
-            x509.load_pem_x509_certificate(block.encode())
+            chain.append(x509.load_pem_x509_certificate(block.encode()))
         except ValueError as exc:
             raise TlsError(f"Chain certificate #{index} cannot be read: {exc}") from exc
+
+    # The issuer the machines are to trust: given, or the root the chain ends in.
+    roots: list[x509.Certificate] = []
+    if ca_path is not None:
+        try:
+            roots = x509.load_pem_x509_certificates(_read_pem(ca_path, "Authority").encode())
+        except ValueError as exc:
+            raise TlsError(f"Authority {ca_path} cannot be read: {exc}") from exc
+        if not _chains_to(cert, chain, roots):
+            msg = f"The certificate was not issued by {ca_path}, through the chain given or directly."
+            raise TlsError(msg)
+    elif chain and chain[-1].subject == chain[-1].issuer and chain[-1] is not cert:
+        roots = [chain[-1]]
 
     summary = summarise(cert)
     reachable = [n for n in machine_names() if n not in ("localhost", "127.0.0.1", "::1")]
@@ -512,13 +635,140 @@ def use_own(
     if (summary.not_after - now).days < EXPIRY_WARNING_DAYS:
         summary.warnings.append(f"It expires on {summary.not_after:%Y-%m-%d}.")
 
+    install_dir = Path(install_dir)
     key_pem = key.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
     )
     _install(
-        Path(install_dir),
+        install_dir,
         blocks[0].encode(),
         key_pem,
         "".join(chain_blocks).encode() if chain_blocks else None,
     )
+    roots_file = install_dir / CA_DIR / ROOTS_FILE
+    if roots:
+        _write(roots_file, b"".join(r.public_bytes(serialization.Encoding.PEM) for r in roots), mode=0o644)
+    else:
+        roots_file.unlink(missing_ok=True)
+    absolute = {
+        "cert": str(Path(cert_path).expanduser().resolve()),
+        "key": str(Path(key_path).expanduser().resolve()),
+        "chain": str(Path(chain_path).expanduser().resolve()) if chain_path else None,
+        "ca": str(Path(ca_path).expanduser().resolve()) if ca_path else None,
+    }
+    _write(
+        install_dir / CA_DIR / SOURCE_FILE,
+        json.dumps({**absolute, "cert_sha256": _sha256_file(Path(absolute["cert"]))}, indent=1).encode(),
+        mode=0o600,
+    )
+    _, summary.trust_changed = publish_trust(install_dir, now=now)
     return summary
+
+
+# ── renewing ──────────────────────────────────────────────────────
+
+
+@dataclass
+class Renewal:
+    """What ``tls renew`` did, or why it did nothing."""
+
+    #: off | current | renewed | reimported | expiring
+    action: str
+    message: str
+    summary: CertSummary | None = None
+    trust_changed: bool = False
+
+
+def renew(
+    install_dir: Path, *, days: int = RENEW_BEFORE_DAYS, force: bool = False, now: datetime | None = None
+) -> Renewal:
+    """Keep the served certificate current; safe to run every day.
+
+    * Made here: issued again, by the same authority, ``days`` before it runs
+      out -- or when this machine has an address it does not list, or it was
+      signed by the authority before a rotation. It keeps every name it had.
+      Nothing changes for the machines or the browsers that trust the authority.
+    * The operator's own: taken again from the files it was imported from when
+      they changed there (a renewal by certbot and the like), after the same
+      checks as the first time. Otherwise a warning once it is close to its end.
+    """
+    install_dir = Path(install_dir)
+    now = now or datetime.now(UTC)
+    served = current(install_dir)
+    if served is None:
+        return Renewal("off", "HTTPS is off; nothing to renew.")
+    left = (served.not_after - now).days
+
+    if served.made_here:
+        reachable = [n for n in machine_names() if n not in ("localhost", "127.0.0.1", "::1")]
+        missing = [n for n in reachable if not covers(served.names, n)]
+        from cryptography import x509  # noqa: PLC0415
+
+        cert = x509.load_pem_x509_certificate((install_dir / TLS_DIR / CERT_FILE).read_bytes())
+        stale_issuer = not _issued_by_current_ca(install_dir, cert)
+        if not (force or left < days or missing or stale_issuer):
+            return Renewal("current", f"Made here, valid for {left} more days.", served)
+        why = (
+            "as asked" if force
+            else f"it had {left} days left" if left < days
+            else f"it did not list {', '.join(missing)}" if missing
+            else "the authority was renewed"
+        )
+        made = generate(install_dir, served.names, now=now)
+        return Renewal("renewed", f"Issued again ({why}).", made.summary, made.trust_changed)
+
+    origin = source(install_dir)
+    if origin is not None:
+        changed = _sha256_file(Path(str(origin["cert"]))) != origin.get("cert_sha256")
+        if force or changed:
+            try:
+                summary = use_own(
+                    install_dir,
+                    Path(str(origin["cert"])),
+                    Path(str(origin["key"])),
+                    Path(str(origin["chain"])) if origin.get("chain") else None,
+                    ca_path=Path(str(origin["ca"])) if origin.get("ca") else None,
+                    now=now,
+                )
+            except TlsError as exc:
+                why = f"The files at {origin['cert']} changed but cannot be used: {exc}"
+                return Renewal("expiring", why, served)
+            taken = f"Taken again from {origin['cert']}."
+            return Renewal("reimported", taken, summary, summary.trust_changed)
+        if left < days:
+            return Renewal(
+                "expiring",
+                f"It runs out in {left} days and {origin['cert']} still holds the same one: "
+                "renew it there, and the next run takes it.",
+                served,
+            )
+        return Renewal(
+            "current", f"Valid for {left} more days; taken from {origin['cert']} when it changes.", served
+        )
+
+    if left < days:
+        return Renewal(
+            "expiring",
+            f"It runs out in {left} days. Install the renewed one: llmport tls use CERT KEY.",
+            served,
+        )
+    return Renewal("current", f"Valid for {left} more days.", served)
+
+
+# ── what the backend is told about the front door ─────────────────
+
+
+def write_edge_info(install_dir: Path, *, http_port: int, https_port: int, renews: str) -> None:
+    """``tls/edge.json``: this host's addresses and ports, for the backend in its container.
+
+    The backend sees only the container's own interfaces, so the addresses it
+    offered a machine being added were ones no other machine could use.
+    """
+    import json  # noqa: PLC0415
+
+    hosts = [n for n in machine_names() if n not in ("localhost", "127.0.0.1", "::1")]
+    info = {"hosts": hosts, "http_port": http_port, "https_port": https_port, "renews": renews}
+    path = Path(install_dir) / TLS_DIR / "edge.json"
+    data = (json.dumps(info, indent=1) + "\n").encode()
+    if not path.is_file() or path.read_bytes() != data:
+        _write(path, data, mode=0o644)

@@ -11,3 +11,7 @@ tls/*.key
 tls/*.pem
 # The certificate authority llmport tls generate makes; its key never leaves this machine.
 tls-ca/
+# The CLI's note of this host's addresses and ports for the backend (llmport tls, ports).
+tls/edge.json
+# Output of the daily jobs (llmport tls renew).
+logs/

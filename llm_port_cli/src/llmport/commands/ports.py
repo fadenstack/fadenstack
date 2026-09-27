@@ -85,4 +85,7 @@ def ports_cmd(*, http: int | None, https: int | None, no_restart: bool) -> None:
     success(f"HTTP on port {wanted[0]}, HTTPS on port {wanted[1]} (written to {env_path}).")
     if not no_restart and not apply_to_proxy(install_dir, recreate=True):
         sys.exit(1)
+    from llmport.commands.tls import refresh_edge_info  # noqa: PLC0415
+
+    refresh_edge_info(install_dir)
     console.print("  " + "  ".join(addresses(install_dir)))
