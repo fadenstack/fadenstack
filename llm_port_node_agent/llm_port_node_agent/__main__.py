@@ -20,7 +20,8 @@ from pathlib import Path
 import psutil
 
 from llm_port_node_agent import __version__
-from llm_port_node_agent.config import AgentConfig
+from llm_port_node_agent.config import AgentConfig, _default_state_path
+from llm_port_node_agent import server_trust
 from llm_port_node_agent.service import NodeAgentService
 from llm_port_node_agent.single_instance import AlreadyRunningError, SingleInstanceLock
 
@@ -322,6 +323,7 @@ def _show_config() -> dict[str, str]:
         ("LOKI_URL", ""),
         ("LOG_LEVEL", "INFO"),
         ("VERIFY_TLS", "true"),
+        ("TLS_CA_BUNDLE", ""),
     ]
 
     for short_key, default in fields:
@@ -336,6 +338,13 @@ def _show_config() -> dict[str, str]:
     # Check critical settings
     backend_url = merged.get(f"{_ENV_PREFIX}BACKEND_URL", "")
     loki_url = merged.get(f"{_ENV_PREFIX}LOKI_URL", "")
+
+    for state_dir in _state_dirs(merged):
+        moved = server_trust.saved_address(state_dir)
+        if moved and moved.get("from") == backend_url.rstrip("/"):
+            _ok(f"The backend moved to HTTPS; the agent uses {moved['to']} (since {moved.get('at', '?')}).")
+        if (state_dir / server_trust.CA_FILE).is_file():
+            _ok(f"Trusts the backend's own authority: {state_dir / server_trust.CA_FILE}")
 
     print()
     if not backend_url:
@@ -433,6 +442,15 @@ def cmd_configure_set(pairs: list[str]) -> None:
         changed.append((short_key, value or "(unset)"))
 
     saved = _save_env_file(env)
+    if any(k == "BACKEND_URL" for k, _ in changed):
+        # The operator named the address: a move to HTTPS the agent made by
+        # itself no longer applies, whichever way this one points.
+        for state_dir in _state_dirs(env):
+            try:
+                if server_trust.forget_address(state_dir):
+                    _ok(f"Forgot the agent's own move to HTTPS ({state_dir / server_trust.ADDRESS_FILE}).")
+            except OSError:
+                pass
     for k, v in changed:
         display = v
         if k == "ENROLLMENT_TOKEN" and v and v != "(unset)":
@@ -1129,12 +1147,16 @@ async def _join_flow(config: AgentConfig) -> bool:
     return False
 
 
-def cmd_join(backend_url: str | None, user: bool | None = None) -> None:
+def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | None = None) -> None:
     """Enrol this machine by asking, rather than by carrying a token to it.
 
     ``user`` is passed on to ``start``: a user service needs no root.
+    ``ca_file`` is the backend's authority, for a backend on HTTPS with a
+    certificate of its own making (the installer's ``--ca-file``).
     """
     _banner()
+    if ca_file:
+        _install_ca_file(ca_file)
 
     merged = _effective_env()
     backend = (backend_url or merged.get(f"{_ENV_PREFIX}BACKEND_URL") or "").strip()
@@ -1196,12 +1218,54 @@ def cmd_join(backend_url: str | None, user: bool | None = None) -> None:
     cmd_start(user=user)
 
 
-def cmd_start(user: bool | None = None) -> None:
+def _state_dirs(env: dict[str, str]) -> list[Path]:
+    """Where the agent's state may be: the configured place, and this user's default."""
+    dirs: list[Path] = []
+    configured = env.get(f"{_ENV_PREFIX}STATE_PATH") or os.environ.get(f"{_ENV_PREFIX}STATE_PATH")
+    for path in (configured, _default_state_path()):
+        if path and Path(path).parent not in dirs:
+            dirs.append(Path(path).parent)
+    return dirs
+
+
+def _install_ca_file(source: str) -> Path:
+    """Keep the backend's authority next to the agent's settings, and trust it from now on.
+
+    The installer hands over the file it checked against the fingerprint the
+    console showed; it sits in a directory that is gone once the install ends.
+    """
+    src = Path(source).expanduser()
+    try:
+        data = src.read_bytes()
+    except OSError as exc:
+        _err(f"Cannot read the backend's authority {src}: {exc}")
+        sys.exit(1)
+    if b"-----BEGIN CERTIFICATE-----" not in data:
+        _err(f"{src} is not a PEM certificate.")
+        sys.exit(1)
+    target = _env_file_path().parent / f"{SERVICE_NAME}-server-ca.crt"
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        os.chmod(target, 0o644)
+    except PermissionError:
+        subprocess.run(["sudo", "install", "-m", "0644", str(src), str(target)], check=True)
+    env = _load_env_file()
+    env[f"{_ENV_PREFIX}TLS_CA_BUNDLE"] = str(target)
+    _save_env_file(env)
+    os.environ[f"{_ENV_PREFIX}TLS_CA_BUNDLE"] = str(target)
+    _ok(f"Trusting the backend's authority: {target}")
+    return target
+
+
+def cmd_start(user: bool | None = None, ca_file: str | None = None) -> None:
     """Install and start llmport-agent as a background service.
 
     ``user`` picks a ``systemd --user`` unit (no privilege needed) over the
     system unit; ``None`` decides from what this machine allows.
     """
+    if ca_file:
+        _install_ca_file(ca_file)
     _load_env_into_process()
     env_lines = _collect_env_lines()
 
@@ -1753,6 +1817,12 @@ def main() -> None:
         default=None,
         help="Run as a systemd user service afterwards: no sudo needed",
     )
+    p_join.add_argument(
+        "--ca-file",
+        default=None,
+        metavar="PEM",
+        help="The backend's certificate authority, when its HTTPS certificate is of its own making",
+    )
     sub.add_parser("run", help="Run agent in the foreground")
     p_start = sub.add_parser("start", help="Install and start as a background service")
     p_start.add_argument(
@@ -1760,6 +1830,12 @@ def main() -> None:
         action="store_true",
         default=None,
         help="Install a systemd user service instead of a system one: no sudo needed",
+    )
+    p_start.add_argument(
+        "--ca-file",
+        default=None,
+        metavar="PEM",
+        help="The backend's certificate authority, when its HTTPS certificate is of its own making",
     )
     sub.add_parser("stop", help="Stop and remove the background service")
     sub.add_parser("status", help="Show background service status")
@@ -1774,7 +1850,7 @@ def main() -> None:
     elif args.command == "scan":
         cmd_scan()
     elif args.command == "join":
-        cmd_join(args.backend, user=args.user)
+        cmd_join(args.backend, user=args.user, ca_file=args.ca_file)
     elif args.command == "init":
         cmd_init()
     elif args.command == "configure":
@@ -1785,7 +1861,7 @@ def main() -> None:
     elif args.command == "run":
         cmd_run()
     elif args.command == "start":
-        cmd_start(user=args.user)
+        cmd_start(user=args.user, ca_file=args.ca_file)
     elif args.command == "stop":
         cmd_stop()
     elif args.command == "status":

@@ -360,3 +360,50 @@ def test_other_machines_are_shown_an_address_they_can_resolve() -> None:
     assert tls_cmd.reachable_example(["https://box", "https://box.lan:8443"]) == "https://box.lan:8443"
     assert tls_cmd.reachable_example(["https://box"]) == "https://box"
     assert tls_cmd.reachable_example([]) == "https://<this server>"
+
+
+# ── the authority, ahead of HTTPS ─────────────────────────────────
+
+
+def test_the_authority_is_made_once_and_its_public_copy_kept(install: Path) -> None:
+    public, created = tls.ensure_ca(install)
+    assert created
+    assert public == install / "tls" / "ca.crt"
+    assert public.read_bytes() == (install / "tls-ca" / "ca.crt").read_bytes()
+    assert not tls.material_present(install), "making the authority serves nothing"
+    public.unlink()
+    again, created = tls.ensure_ca(install)
+    assert not created
+    assert again.read_bytes() == (install / "tls-ca" / "ca.crt").read_bytes()
+    assert not tls.generate(install).ca_created, "a certificate later is signed by the same authority"
+
+
+def test_deploy_makes_the_authority_even_with_https_off(install: Path, free_ports: None) -> None:
+    assert _step(install) is None
+    assert (install / "tls" / "ca.crt").is_file()
+    assert not tls.material_present(install)
+
+
+def test_generate_waits_for_the_machines_only_when_the_authority_is_new(
+    install: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = LlmportConfig(install_dir=str(install))
+    monkeypatch.setattr(tls_cmd, "load_config", lambda: cfg)
+    monkeypatch.setattr(tls_cmd, "apply_to_proxy", lambda *_a, **_k: True)
+    slept: list[float] = []
+    monkeypatch.setattr(tls_cmd.time, "sleep", slept.append)
+    runner = CliRunner()
+
+    assert runner.invoke(tls_cmd.tls_group, ["generate", "--no-wait"]).exit_code == 0
+    assert slept == []
+    for path in (install / "tls-ca").iterdir():
+        path.unlink()
+    result = runner.invoke(tls_cmd.tls_group, ["generate"])
+    assert result.exit_code == 0, result.output
+    assert slept == [tls_cmd.MACHINE_TRUST_WAIT_SEC]
+    assert runner.invoke(tls_cmd.tls_group, ["generate"]).exit_code == 0
+    assert slept == [tls_cmd.MACHINE_TRUST_WAIT_SEC], "an authority the machines have already is not waited for"
+
+    result = runner.invoke(tls_cmd.tls_group, ["off"])
+    assert result.exit_code == 0, result.output
+    assert "never falls back" in " ".join(result.output.split())

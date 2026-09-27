@@ -25,6 +25,7 @@ from llm_port_backend.db.dao.llm_dao import ModelDAO
 from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
 from llm_port_backend.db.models.node_control import InfraNode
 from llm_port_backend.services.docker.client import DockerService
+from llm_port_backend.services import edge_trust
 from llm_port_backend.services.inference import image_cache
 from llm_port_backend.services.nodes import NodeControlService
 from llm_port_backend.settings import settings
@@ -143,6 +144,22 @@ async def node_log_sink(
         "loki_url": agent_log_sink(
             settings.loki_base_url, settings.agent_loki_url, request.url.hostname,
         ),
+    }
+
+
+@router.get("/server-trust", name="node_server_trust")
+async def node_server_trust(_node: InfraNode = Depends(_authenticate_node)) -> dict[str, Any]:
+    """The authority this backend's certificate comes from, for the machine to keep.
+
+    Offered while HTTPS is still off as well: the machine has to hold it
+    before the switch, since afterwards the plain-HTTP address only
+    redirects to a certificate it could not otherwise check.
+    """
+    pem = edge_trust.ca_pem()
+    return {
+        "https": edge_trust.https_on(),
+        "ca_pem": pem.decode("utf-8") if pem is not None else None,
+        "ca_sha256": edge_trust.ca_sha256(),
     }
 
 

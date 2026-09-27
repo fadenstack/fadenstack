@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 import os
 import socket
+import ssl
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -100,6 +102,10 @@ class AgentConfig:
     #: Needs room for one image tar -- about 12GB for the DGX runtime -- and
     #: falls back to streaming, which cannot resume, when there is not.
     image_download_dir: str = ""
+    #: Built from the fields above plus the backend's authority the agent
+    #: learnt (server_trust.build_context); shared by every connection to the
+    #: backend. ``None`` while verification is off.
+    ssl_context: Any = None
 
     @classmethod
     def from_env(cls) -> AgentConfig:
@@ -161,4 +167,13 @@ class AgentConfig:
         )
         if not instance.verify_tls:
             log.warning("TLS verification is disabled — connections are vulnerable to MITM.")
+        from llm_port_node_agent.server_trust import build_context  # noqa: PLC0415
+
+        try:
+            instance.ssl_context = build_context(instance)
+        except (OSError, ssl.SSLError) as exc:
+            # A bundle that cannot be read would otherwise stop the agent before
+            # it says anything; connections then fail verification, with a reason.
+            log.error("TLS settings cannot be loaded (%s); only the public roots are trusted.", exc)
+            instance.ssl_context = ssl.create_default_context()
         return instance

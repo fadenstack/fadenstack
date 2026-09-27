@@ -173,6 +173,8 @@ export const nodesApi = {
       seen_as: string;
       candidates: { url: string; interface: string }[];
       request_origin_is_reachable: boolean;
+      /** Set when HTTPS is served with a certificate of the install's own authority. */
+      ca_sha256?: string | null;
     }>("/api/install/address");
   },
 

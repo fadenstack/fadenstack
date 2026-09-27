@@ -44,6 +44,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse, Response
 from yarl import URL
 
+from llm_port_backend.services import edge_trust
 from llm_port_backend.services.tls import default_httpx_verify
 from llm_port_backend.settings import DEFAULT_AGENT_BINARY_DIR, settings
 
@@ -53,7 +54,7 @@ router = APIRouter(prefix="/install", tags=["install"])
 
 #: Agent version this backend expects.  Bumping it here is what makes a fleet
 #: converge, because every fresh install reads it from the running backend.
-AGENT_VERSION = "0.1.13"
+AGENT_VERSION = "0.1.14"
 
 #: Where published binaries live when this backend has no local copy: the
 #: release .github/workflows/node-agent-release.yml makes for a
@@ -258,7 +259,29 @@ async def install_address(request: Request) -> dict[str, object]:
         "seen_as": seen_as,
         "candidates": candidates,
         "request_origin_is_reachable": usable,
+        # Set when HTTPS is served with a certificate of the install's own
+        # authority: a new machine has to fetch the authority first and check
+        # it against this before it trusts anything from here.
+        "ca_sha256": edge_trust.ca_sha256() if edge_trust.served_by_our_ca() else None,
     }
+
+
+@router.get("/ca.crt")
+async def install_ca() -> Response:
+    """The install's certificate authority, for a machine about to join.
+
+    Unauthenticated: a certificate authority's certificate is public. What
+    makes it safe to use is the fingerprint the console shows next to the
+    install line, which the line checks before trusting it.
+    """
+    pem = edge_trust.ca_pem()
+    if pem is None:
+        return Response(status_code=404)
+    return Response(
+        pem,
+        media_type="application/x-pem-file",
+        headers={"Content-Disposition": 'attachment; filename="ca.crt"'},
+    )
 
 
 def render_installer(origin: str) -> str:
@@ -281,6 +304,7 @@ def render_installer(origin: str) -> str:
 #   sudo sh llmport-agent.sh --join [{origin}]     system service
 #   sh llmport-agent.sh --join [{origin}]          no sudo: user service
 #   sh llmport-agent.sh --backend {origin} --token <token>
+#   ... --ca-file ca.crt     the backend's own authority, when its HTTPS certificate is of its making
 #
 # Run it as root and the agent becomes a system service. Run it as yourself,
 # without passwordless sudo, and it installs into ~/.local/bin and runs as a
@@ -295,6 +319,7 @@ TOKEN=""
 INSTALL_PATH="/usr/local/bin/llmport-agent"
 INSTALL_PATH_SET=0
 FORCE_USER=0
+CA_FILE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -306,11 +331,35 @@ while [ $# -gt 0 ]; do
     --token) MODE="token"; TOKEN="$2"; shift ;;
     --install-path) INSTALL_PATH="$2"; INSTALL_PATH_SET=1; shift ;;
     --user) FORCE_USER=1 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    --ca-file) CA_FILE="$2"; shift ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
 done
+
+# -- the backend's own authority --------------------------------------------
+# A backend on HTTPS with a certificate from the install's own authority. The
+# console's line fetched the authority, checked it against the fingerprint it
+# showed, and hands it over here: every request to the backend is verified
+# against it, and the agent keeps it. The release download is not, since
+# GitHub's certificate is a public one and --cacert would replace the roots.
+if [ -n "$CA_FILE" ]; then
+  if [ ! -f "$CA_FILE" ]; then
+    echo "ERROR: $CA_FILE does not exist." >&2
+    exit 1
+  fi
+  CA_FILE="$(cd "$(dirname "$CA_FILE")" && pwd)/$(basename "$CA_FILE")"
+fi
+backend_curl() {{
+  if [ -n "$CA_FILE" ]; then curl --cacert "$CA_FILE" "$@"; else curl "$@"; fi
+}}
+fetch() {{
+  case "$2" in
+    "$BACKEND"*) backend_curl -fsSL -o "$1" "$2" ;;
+    *) curl -fsSL -o "$1" "$2" ;;
+  esac
+}}
 
 # -- with what privilege ----------------------------------------------------
 # Decided once, up front, rather than discovered halfway: a run that could not
@@ -339,7 +388,7 @@ echo
 
 # The backend knows which of its builds fits this machine, and what that build
 # should hash to.  Asking it beats making the operator choose.
-PLAN=$(curl -fsSL "$BACKEND/api/install/plan?platform=$PLATFORM_KEY") || {{
+PLAN=$(backend_curl -fsSL "$BACKEND/api/install/plan?platform=$PLATFORM_KEY") || {{
   echo "ERROR: could not reach $BACKEND" >&2
   exit 1
 }}
@@ -365,14 +414,14 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 echo "  Downloading the agent..."
-if ! curl -fsSL -o "$TMP/llmport-agent" "$URL"; then
+if ! fetch "$TMP/llmport-agent" "$URL"; then
   if [ -n "$FALLBACK" ]; then
     # No internet here, or the release is unreachable. LLM.Port carries its
     # own copy, and it is a machine this node can obviously reach -- it is
     # the one it is about to enrol with.
     echo "  Could not reach $URL"
     echo "  Falling back to LLM.Port's own copy..."
-    curl -fsSL -o "$TMP/llmport-agent" "$FALLBACK" || {{
+    fetch "$TMP/llmport-agent" "$FALLBACK" || {{
       echo "ERROR: could not download the agent from either source." >&2
       exit 1
     }}
@@ -440,12 +489,18 @@ SCOPE=""
 if [ "$ROOTLESS" = 1 ]; then
   SCOPE="--user"
 fi
+# The options are all read, so the positional parameters are free to carry
+# the authority's path as one word, whatever it contains.
+set --
+if [ -n "$CA_FILE" ]; then
+  set -- --ca-file "$CA_FILE"
+fi
 if [ "$MODE" = "token" ]; then
   LLM_PORT_NODE_AGENT_BACKEND_URL="$BACKEND" \\
   LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN="$TOKEN" \\
-    $SUDO_E "$INSTALL_PATH" start $SCOPE
+    $SUDO_E "$INSTALL_PATH" start $SCOPE "$@"
 else
-  "$INSTALL_PATH" join $SCOPE "$BACKEND"
+  "$INSTALL_PATH" join $SCOPE "$@" "$BACKEND"
 fi
 """
 

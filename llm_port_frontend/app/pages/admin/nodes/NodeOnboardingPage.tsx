@@ -45,6 +45,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import { nodesApi, type NodeEnrollmentToken, type NodeJoinRequest } from "~/api/nodes";
 import { useAsyncData } from "~/lib/useAsyncData";
+import { installCommand } from "./installCommand";
 
 interface NodeOnboardingDrawerProps {
   open: boolean;
@@ -75,6 +76,8 @@ interface InstallAddress {
   seen_as: string;
   candidates: { url: string; interface: string }[];
   request_origin_is_reachable: boolean;
+  /** The install's own authority, when the certificate served is one it signed. */
+  ca_sha256?: string | null;
 }
 
 function CopyLine({ command }: { command: string }) {
@@ -255,11 +258,10 @@ export default function NodeOnboardingDrawer({
   // the operator pick, rather than printing one and being confidently wrong.
   const ambiguous = candidates.length > 1;
 
-  // One paste, not two. Still downloaded to disk before it runs -- `&&` only
-  // chains the download to the run -- so it can be read first as before.
-  const installCommand =
-    `curl -fsSLO ${origin}/api/install/llmport-agent.sh && ` +
-    `sudo sh llmport-agent.sh --join ${origin}`;
+  // Pinned to the install's own authority when the backend serves a
+  // certificate it signed (see installCommand.ts).
+  const caSha256 = address.data?.ca_sha256 ?? null;
+  const installLine = installCommand(origin, { caSha256 });
 
   async function decide(request: NodeJoinRequest, approve: boolean) {
     setBusyId(request.id);
@@ -299,10 +301,7 @@ export default function NodeOnboardingDrawer({
     onClose();
   }
 
-  const tokenCommand = token
-    ? `curl -fsSLO ${origin}/api/install/llmport-agent.sh && ` +
-      `sudo sh llmport-agent.sh --backend ${origin} --token ${token.token}`
-    : "";
+  const tokenCommand = token ? installCommand(origin, { caSha256, token: token.token }) : "";
 
   return (
     <Drawer
@@ -332,7 +331,7 @@ export default function NodeOnboardingDrawer({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t("nodes.onboard.run_this")}
       </Typography>
-      <CopyLine command={installCommand} />
+      <CopyLine command={installLine} />
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
         {t("nodes.onboard.what_happens")}
       </Typography>

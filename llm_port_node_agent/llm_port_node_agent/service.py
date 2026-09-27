@@ -28,10 +28,16 @@ from llm_port_node_agent.policy_guard import PolicyGuard
 from llm_port_node_agent.preflight import build_static_capabilities
 from llm_port_node_agent.runtimes import detect_runtime
 from llm_port_node_agent.runtime_manager import RuntimeManager
+from llm_port_node_agent.server_trust import ServerTrust
 from llm_port_node_agent.state_store import StateStore
 from llm_port_node_agent.stream_client import StreamClient
 
 log = logging.getLogger(__name__)
+
+#: How often a connected agent asks which authority the backend's certificate
+#: comes from: a new one has to be here before the backend switches to it.
+TRUST_REFRESH_SEC = 60.0
+_REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 
 
 class NodeAgentService:
@@ -40,6 +46,9 @@ class NodeAgentService:
     def __init__(self, config: AgentConfig) -> None:
         self._config = config
         self._state_store = StateStore(config.state_path)
+        # Before the client: a move to HTTPS remembered from an earlier run
+        # changes the address it is made for.
+        self._trust = ServerTrust(config)
         self._client = BackendClient(config)
         self._stream: StreamClient | None = None
         self._loki: LokiClient | None = None
@@ -164,6 +173,8 @@ class NodeAgentService:
                 asyncio.create_task(self._discover_log_sink(runtime), name="log_sink_discovery"),
             )
 
+        self._log_tasks.append(asyncio.create_task(self._trust_loop(), name="server_trust"))
+
         backoff = self._config.reconnect_min_sec
         auth_fail_streak = 0
         _MAX_AUTH_RETRIES = 3
@@ -176,6 +187,7 @@ class NodeAgentService:
                 credential = self._state_store.state.credential
                 if not credential:
                     raise RuntimeError("Credential missing after enrollment flow.")
+                await self._refresh_trust(credential)
                 await stream.run(credential=credential)
                 backoff = self._config.reconnect_min_sec
                 auth_fail_streak = 0
@@ -184,6 +196,9 @@ class NodeAgentService:
                 # clear the credential after several consecutive failures
                 # to avoid a single blip bricking the agent.
                 status = exc.response.status_code
+                if status in _REDIRECT_STATUSES and await self._follow_to_https():
+                    backoff = self._config.reconnect_min_sec
+                    continue
                 if status in {401, 403}:
                     auth_fail_streak += 1
                     if auth_fail_streak >= _MAX_AUTH_RETRIES:
@@ -217,9 +232,36 @@ class NodeAgentService:
                 raise
             except Exception:
                 log.exception("Node stream loop failed.")
+                if await self._follow_to_https():
+                    backoff = self._config.reconnect_min_sec
+                    continue
 
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, self._config.reconnect_max_sec)
+
+    async def _refresh_trust(self, credential: str) -> None:
+        """Learn the backend's authority; never in the way of connecting."""
+        try:
+            await self._trust.refresh(self._client.http, credential)
+        except Exception:  # noqa: BLE001 - an old backend, or a blip: the next round asks again
+            log.debug("Could not ask the backend which authority to trust.", exc_info=True)
+
+    async def _trust_loop(self) -> None:
+        while True:
+            await asyncio.sleep(TRUST_REFRESH_SEC)
+            credential = self._state_store.state.credential
+            if credential:
+                await self._refresh_trust(credential)
+
+    async def _follow_to_https(self) -> bool:
+        """Follow the backend to HTTPS when its plain-HTTP address redirects there."""
+        target = await self._trust.follow_to_https()
+        if target is None:
+            return False
+        # The same client object is shared (model pulls, image loads, Ray),
+        # so moving its base URL moves all of them.
+        self._client.http.base_url = target
+        return True
 
     async def close(self) -> None:
         """Close outbound HTTP resources, SDK attach, and flush state."""

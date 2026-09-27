@@ -324,6 +324,25 @@ def _load_or_make_ca(
     return cert, key, True
 
 
+def ensure_ca(install_dir: Path, *, now: datetime | None = None) -> tuple[Path, bool]:
+    """The install's authority, made when missing, and its public copy in ``tls/``: ``(path, created)``.
+
+    Deploy and upgrade call this with HTTPS still off. The backend offers the
+    authority to every machine (``/api/node-files/server-trust``), so they
+    hold it before a certificate it signed is served: once HTTPS is on, the
+    plain-HTTP address only redirects to what they could not check otherwise.
+    """
+    from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+
+    install_dir = Path(install_dir)
+    ca_cert, _key, created = _load_or_make_ca(install_dir, now or datetime.now(UTC))
+    public = install_dir / TLS_DIR / CA_PUBLIC_FILE
+    data = ca_cert.public_bytes(serialization.Encoding.PEM)
+    if not public.is_file() or public.read_bytes() != data:
+        _write(public, data, mode=0o644)
+    return public, created
+
+
 @dataclass
 class Generated:
     """A certificate made here: what it is, and the authority to trust for it."""

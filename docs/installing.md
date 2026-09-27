@@ -200,22 +200,40 @@ HTTP Strict Transport Security once you are sure HTTPS stays; 0 tells
 browsers to forget it again. The redirect from plain HTTP is temporary
 (307), so browsers do not remember it after HTTPS is switched off.
 
-**Machines you add** reach the console at the address you used. With a
-certificate their operating system does not trust (one made here, or from a
-private authority) each agent needs the authority as well. Machines added
-before the switch still hold the plain-HTTP address, which now only
-redirects, so they stay offline until they are pointed at HTTPS. On each
-machine, copy `ca.crt` over and run:
+**The machines follow by themselves** (agent 0.1.14 or later). `llmport
+deploy` and `llmport upgrade` make the install's certificate authority even
+while HTTPS is off, and every agent fetches it from the server while it is
+connected (and again every minute). When HTTPS is switched on, an agent on
+the plain-HTTP address is redirected, checks the HTTPS address against the
+authority it holds, and moves there; it remembers the move across restarts.
+Nothing has to be done on the machines. `llmport-agent show` says when an
+agent has moved.
+
+An agent never moves back by itself: plain HTTP after HTTPS would be a
+downgrade anyone between the machine and the server could force by blocking
+a port. After `llmport tls off`, point each machine back and restart it:
 
 ```bash
-llmport-agent configure --set BACKEND_URL=https://<server> \
-                        --set TLS_CA_BUNDLE=/path/to/ca.crt
+llmport-agent configure --set BACKEND_URL=http://<server>
 systemctl --user restart llmport-agent   # or: sudo systemctl restart llmport-agent
 ```
 
-Agents before 0.1.14 do not accept `TLS_CA_BUNDLE` there; add
-`LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE=/path/to/ca.crt` to the agent's
-environment file (`llmport-agent show` prints where it is) instead.
+**Machines you add** while HTTPS is on get an install line that fetches the
+authority first and checks it against the fingerprint the console shows, then
+fetches the installer verified against it and hands it to the agent
+(`--ca-file`). With a certificate from a public issuer the line is the usual
+one.
+
+**Agents before 0.1.14** do not follow. Re-run the install line on the machine
+(that updates the agent), or point it at HTTPS by hand with the authority
+copied over:
+
+```bash
+llmport-agent configure --set BACKEND_URL=https://<server>
+# 0.1.13 and earlier do not take TLS_CA_BUNDLE there: add
+# LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE=/path/to/ca.crt to the environment file
+# llmport-agent show names, then restart the agent.
+```
 
 ## Installing from source
 

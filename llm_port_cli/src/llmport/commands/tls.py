@@ -10,6 +10,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -22,6 +23,8 @@ from llmport.core.env_gen import read_env_file
 from llmport.core.settings import load_config
 
 PROXY_SERVICE = "nginx"
+#: A connected agent asks for the authority every minute (agent's TRUST_REFRESH_SEC).
+MACHINE_TRUST_WAIT_SEC = 70
 PROXY_CONTAINER = "llm-port-nginx"
 
 
@@ -113,9 +116,10 @@ def print_trust_hints(install_dir: Path, ca_public: Path) -> None:
         f"    {ca_public}\n"
         "  [dim]Browsers: import it as a trusted certificate authority (or accept the warning).\n"
         f"  API clients: curl --cacert ca.crt {example}/v1/models  ·  Python: SSL_CERT_FILE=ca.crt\n"
-        "  Machines already added still use plain HTTP, which now only redirects: point each agent at\n"
-        f"  {example} and give it the file (LLM_PORT_NODE_AGENT_BACKEND_URL,\n"
-        '  LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE; docs/installing.md, "Enabling HTTPS").[/dim]'
+        "  Machines with agent 0.1.14 or later learnt it from this server and follow it to HTTPS\n"
+        "  by themselves. Older agents stay on plain HTTP, which now only redirects: point each at\n"
+        f"  {example} and give it the file (llmport-agent configure --set BACKEND_URL=...\n"
+        '  --set TLS_CA_BUNDLE=...; docs/installing.md, "Enabling HTTPS").[/dim]'
     )
 
 
@@ -251,6 +255,15 @@ def deploy_step(
     ``--yes`` and no ``--tls``, what the install has stays as it is.
     """
     _ports_step(env_path, yes=yes, http_port=http_port, https_port=https_port)
+    # Made even while HTTPS stays off: the machines fetch it from the backend
+    # now, so they can follow once a certificate it signed is served.
+    try:
+        ca_public, ca_created = tls.ensure_ca(install_dir)
+    except tls.TlsError as exc:
+        warning(str(exc))
+    else:
+        if ca_created:
+            info(f"Certificate authority for the machines: {ca_public}")
 
     if mode is None and (cert or key):
         mode = "own"
@@ -312,7 +325,11 @@ def status_cmd() -> None:
 @click.option(
     "--no-restart", is_flag=True, help="Write the files only; the proxy picks them up when it next starts."
 )
-def generate_cmd(*, names: tuple[str, ...], no_restart: bool) -> None:
+@click.option(
+    "--no-wait", is_flag=True,
+    help="Switch at once even when the authority is new (machines that have not fetched it stay behind).",
+)
+def generate_cmd(*, names: tuple[str, ...], no_restart: bool, no_wait: bool) -> None:
     """Make a certificate for this machine, signed by the install's own authority."""
     install_dir = _install_dir()
     try:
@@ -324,6 +341,15 @@ def generate_cmd(*, names: tuple[str, ...], no_restart: bool) -> None:
         success(f"Certificate authority for this install made in {install_dir / tls.CA_DIR}")
     success("Certificate made and installed.")
     print_summary(made.summary)
+    if made.ca_created and not no_restart and not no_wait:
+        # Deploy and upgrade make the authority ahead of time; an install that
+        # has not been through either since gets it only now. Machines ask for
+        # it every minute, and once the proxy switches they could not check it.
+        info(
+            f"The authority is new: giving the machines {MACHINE_TRUST_WAIT_SEC} s to fetch it"
+            " (--no-wait skips)."
+        )
+        time.sleep(MACHINE_TRUST_WAIT_SEC)
     if not no_restart and not apply_to_proxy(install_dir):
         sys.exit(1)
     print_trust_hints(install_dir, made.ca_public)
@@ -368,6 +394,12 @@ def off_cmd(*, no_restart: bool) -> None:
     success("Certificate removed.")
     if not no_restart and not apply_to_proxy(install_dir):
         sys.exit(1)
+    urls = addresses(install_dir)
+    warning(
+        "Machines that followed this server to HTTPS stay there: an agent never falls back to plain HTTP "
+        "by itself. Point each back with: llmport-agent configure --set BACKEND_URL="
+        f"{reachable_example(urls) if urls else 'http://<this server>'}, then restart it."
+    )
     env = read_env_file(install_dir / ".env")
     if (env.get("LLM_PORT_HSTS_MAX_AGE") or "0").strip() not in ("", "0"):
         warning(

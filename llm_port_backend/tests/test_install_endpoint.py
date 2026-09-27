@@ -607,7 +607,7 @@ class TestInstallingWithoutRoot:
 
     def test_the_service_it_starts_is_a_user_one(self) -> None:
         script = _script()
-        assert '"$INSTALL_PATH" join $SCOPE "$BACKEND"' in script
+        assert '"$INSTALL_PATH" join $SCOPE "$@" "$BACKEND"' in script
         assert 'SCOPE="--user"' in script
 
 

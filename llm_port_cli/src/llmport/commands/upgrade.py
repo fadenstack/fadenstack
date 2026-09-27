@@ -248,6 +248,18 @@ def upgrade_cmd(
     else:
         warning("No .env file found — skipping env refresh.")
 
+    # The authority machines keep for when HTTPS is switched on (llmport tls):
+    # made while they can still fetch it over plain HTTP.
+    from llmport.core import tls as edge_tls  # noqa: PLC0415
+
+    try:
+        ca_public, ca_created = edge_tls.ensure_ca(shared_dir)
+    except edge_tls.TlsError as exc:
+        warning(str(exc))
+    else:
+        if ca_created:
+            success(f"Certificate authority for the machines made: {ca_public}")
+
     # ── 4. Images ─────────────────────────────────────────────
     if release is not None:
         step += 1
