@@ -12,12 +12,13 @@ const STAMP = `${Date.now().toString(36)}`;
 
 async function send(page: Page, text: string) {
   await page.getByPlaceholder(/Type a message/).fill(text);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 }
 
 /** The reply is done: no Stop button, and the composer takes text again. */
 async function replyDone(page: Page) {
-  await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0, { timeout: 120_000 });
+  // exact: a chat titled "... stops twice ..." in the sidebar is a button whose name contains "stop"
+  await expect(page.getByRole("button", { name: "Stop", exact: true })).toHaveCount(0, { timeout: 120_000 });
 }
 
 /** The chat's sidebar: the panel with the chat search (it is not a navigation landmark). */
@@ -165,7 +166,7 @@ test.describe("a chat", () => {
     await option.first().click();
     await expect(page.getByText(/Bug report triage/).first()).toBeVisible();
     await composer.fill("The export button shows an error since yesterday.");
-    await page.getByRole("button", { name: "Send" }).click();
+    await page.getByRole("button", { name: "Send", exact: true }).click();
     await page.waitForURL(/\/chat\/[0-9a-f-]{36}/);
     await replyDone(page);
     await watch.inspect();
