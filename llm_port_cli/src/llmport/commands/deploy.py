@@ -6,6 +6,7 @@ Runs the complete production flow:
   3. Generate ``.env`` with random secrets, and size the services for
      this host (what ``llmport tune`` does)
   4. Enable requested modules (compose profiles)
+     and choose the ports and whether to serve HTTPS
   5. Pull pre-built container images from the registry
   6. Start all services (infra + app + modules)
   7. Print endpoint summary
@@ -201,6 +202,35 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     ),
 )
 @click.option(
+    "--http-port", type=click.IntRange(1, 65535), default=None, help="Host port for plain HTTP (default 80)."
+)
+@click.option(
+    "--https-port", type=click.IntRange(1, 65535), default=None, help="Host port for HTTPS (default 443)."
+)
+@click.option(
+    "--tls",
+    "tls_mode",
+    type=click.Choice(["off", "generate", "own"]),
+    default=None,
+    help="HTTPS: off, generate (a certificate made here for this machine), or own (--tls-cert/--tls-key). "
+    "Default: ask; with --yes, keep what the install has.",
+)
+@click.option(
+    "--tls-cert", type=click.Path(dir_okay=False, path_type=Path), default=None,
+    help="Your certificate (PEM).",
+)
+@click.option(
+    "--tls-key", type=click.Path(dir_okay=False, path_type=Path), default=None, help="Its private key (PEM)."
+)
+@click.option(
+    "--tls-chain", type=click.Path(dir_okay=False, path_type=Path), default=None,
+    help="Intermediate certificates (PEM), unless --tls-cert already carries them.",
+)
+@click.option(
+    "--tls-name", "tls_names", multiple=True, metavar="NAME",
+    help="With --tls generate: another DNS name or address the console is reached by (repeatable).",
+)
+@click.option(
     "--skip-doctor", is_flag=True,
     help="Skip pre-flight system checks.",
 )
@@ -260,6 +290,13 @@ def deploy_cmd(
     force_env: bool,
     skip_doctor: bool,
     yes: bool,
+    http_port: int | None,
+    https_port: int | None,
+    tls_mode: str | None,
+    tls_cert: Path | None,
+    tls_key: Path | None,
+    tls_chain: Path | None,
+    tls_names: tuple[str, ...],
     local_node: bool,
     local_node_host: str,
     local_node_workdir: str,
@@ -283,6 +320,9 @@ def deploy_cmd(
         llmport deploy /opt/llm-port           # deploy to specific directory
         llmport deploy --build                 # from a source checkout: build the images
         llmport deploy --force-env             # regenerate secrets
+        llmport deploy --tls generate          # HTTPS with a certificate made here
+        llmport deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
+        llmport deploy --http-port 8080 --https-port 8443
     """
     console.print("\n[bold magenta]llm.port — Production Deployment[/bold magenta]\n")
 
@@ -475,6 +515,24 @@ def deploy_cmd(
     existing = read_env_file(env_path)
     _regenerate_rmq_definitions(shared_dir, existing, profiles)
     success("RabbitMQ definitions.json generated.")
+
+    # ── 3d. Ports and HTTPS ───────────────────────────────────────
+    # Before anything starts: nginx picks plain HTTP or HTTPS when it starts.
+    console.print("\n[bold cyan]Step 3d: Ports and HTTPS…[/bold cyan]")
+    from llmport.commands.tls import deploy_step as edge_step  # noqa: PLC0415
+
+    ca_to_trust = edge_step(
+        shared_dir,
+        env_path,
+        yes=yes,
+        http_port=http_port,
+        https_port=https_port,
+        mode=tls_mode,
+        cert=tls_cert,
+        key=tls_key,
+        chain=tls_chain,
+        names=tls_names,
+    )
 
     # ── 4. Save config ────────────────────────────────────────────
     cfg.install_dir = str(shared_dir)
@@ -733,11 +791,19 @@ def deploy_cmd(
 
     console.print(table)
 
+    from llmport.commands.tls import print_addresses, print_trust_hints  # noqa: PLC0415
+
+    print_addresses(shared_dir)
+    if ca_to_trust is not None:
+        print_trust_hints(shared_dir, ca_to_trust)
+
     console.print(
         "\n[dim]Useful commands:\n"
         "  llmport status        — container status\n"
         "  llmport logs -f       — follow logs\n"
         "  llmport module list   — show enabled modules\n"
         "  llmport down          — stop all services\n"
+        "  llmport tls status    — HTTPS and its certificate\n"
+        "  llmport ports         — the HTTP and HTTPS ports\n"
         "  llmport deploy --help — deployment options[/dim]"
     )

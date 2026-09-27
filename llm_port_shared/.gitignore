@@ -9,3 +9,5 @@ backups/
 tls/*.crt
 tls/*.key
 tls/*.pem
+# The certificate authority llmport tls generate makes; its key never leaves this machine.
+tls-ca/

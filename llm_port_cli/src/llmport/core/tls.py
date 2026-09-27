@@ -1,0 +1,505 @@
+"""The certificate nginx serves HTTPS with: made on this machine, or brought by the operator.
+
+nginx serves HTTPS whenever ``<install>/tls`` holds ``edge.crt`` and
+``edge.key`` (``nginx/select-config.sh``), with ``edge-chain.pem`` sent after
+the certificate when present. The backend's TLS admin API writes the same
+three files, so whichever wrote last is what nginx serves.
+
+A certificate made here is signed by a small certificate authority of this
+install rather than by itself. Browsers, API clients and the agents on other
+machines are told to trust the authority once (``tls/ca.crt``); a new
+certificate -- another address, a renewal -- then needs nothing new on their
+side. The authority's key stays in ``<install>/tls-ca``, which no container
+mounts.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import ipaddress
+import os
+import socket
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cryptography import x509
+    from cryptography.hazmat.primitives.asymmetric.types import CertificateIssuerPrivateKeyTypes
+
+TLS_DIR = "tls"
+CERT_FILE = "edge.crt"
+KEY_FILE = "edge.key"
+CHAIN_FILE = "edge-chain.pem"
+#: The authority's certificate, next to the material: what everyone is told to trust.
+CA_PUBLIC_FILE = "ca.crt"
+#: The authority's own files, outside every container mount.
+CA_DIR = "tls-ca"
+CA_CERT_FILE = "ca.crt"
+CA_KEY_FILE = "ca.key"
+
+#: Apple's limit for certificates under an authority the user added; the others accept it.
+LEAF_DAYS = 825
+CA_DAYS = 3650
+#: A certificate brought along that runs out sooner than this gets a warning.
+EXPIRY_WARNING_DAYS = 30
+_MAX_PEM = 64 * 1024
+
+# Interfaces whose addresses no other machine reaches this one by (loopback
+# goes by its address: "lo" as a prefix would also match "Local Area Connection").
+_VIRTUAL_INTERFACES = ("docker", "br-", "veth", "virbr", "cni", "flannel", "vethernet")
+
+
+class TlsError(Exception):
+    """The material cannot be used; the message says why and what to do."""
+
+
+@dataclass
+class CertSummary:
+    """What an operator needs to know about a certificate."""
+
+    subject: str
+    issuer: str
+    names: list[str]
+    not_before: datetime
+    not_after: datetime
+    fingerprint_sha256: str
+    self_signed: bool
+    made_here: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+
+# ── names ─────────────────────────────────────────────────────────
+
+
+def machine_names() -> list[str]:
+    """The names and addresses this machine is reached by, loopback first.
+
+    Docker's bridges and other virtual interfaces are left out: no other
+    machine reaches the console through them.
+    """
+    import psutil  # noqa: PLC0415
+
+    names = ["localhost", "127.0.0.1", "::1"]
+    host = socket.gethostname()
+    for candidate in (host, socket.getfqdn()):
+        if candidate and candidate not in names and candidate != "localhost":
+            names.append(candidate)
+    try:
+        interfaces = psutil.net_if_addrs()
+    except Exception:  # never block on inventory
+        interfaces = {}
+    for name, addresses in interfaces.items():
+        if name.lower().startswith(_VIRTUAL_INTERFACES):
+            continue
+        for address in addresses:
+            if address.family != socket.AF_INET:
+                continue
+            ip = ipaddress.ip_address(address.address)
+            if ip.is_loopback or ip.is_link_local:
+                continue
+            if address.address not in names:
+                names.append(address.address)
+    return names
+
+
+def _general_name(name: str) -> x509.GeneralName:
+    from cryptography import x509  # noqa: PLC0415
+
+    try:
+        return x509.IPAddress(ipaddress.ip_address(name))
+    except ValueError:
+        return x509.DNSName(name)
+
+
+def _cert_names(cert: x509.Certificate) -> list[str]:
+    from cryptography import x509  # noqa: PLC0415
+    from cryptography.x509.oid import ExtensionOID  # noqa: PLC0415
+
+    try:
+        ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+    except x509.ExtensionNotFound:
+        return []
+    return [str(value.value) for value in ext.value if hasattr(value, "value")]
+
+
+def covers(cert_names: Iterable[str], name: str) -> bool:
+    """Whether a certificate listing *cert_names* is valid for *name* (one-label wildcards)."""
+    wanted = name.lower().rstrip(".")
+    for entry in cert_names:
+        listed = entry.lower().rstrip(".")
+        if listed == wanted:
+            return True
+        wildcard = listed.startswith("*.") and "." in wanted and not _is_ip(wanted)
+        if wildcard and wanted.split(".", 1)[1] == listed[2:]:
+            return True
+    return False
+
+
+def _is_ip(name: str) -> bool:
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return True
+
+
+# ── reading and summarising ───────────────────────────────────────
+
+
+def _pem_blocks(text: str, kind: str = "CERTIFICATE") -> list[str]:
+    begin, end = f"-----BEGIN {kind}-----", f"-----END {kind}-----"
+    blocks: list[str] = []
+    rest = text
+    while begin in rest:
+        start = rest.index(begin)
+        stop = rest.find(end, start)
+        if stop < 0:
+            break
+        blocks.append(rest[start : stop + len(end)] + "\n")
+        rest = rest[stop + len(end) :]
+    return blocks
+
+
+def summarise(cert: x509.Certificate, *, made_here: bool = False) -> CertSummary:
+    """What :class:`CertSummary` shows of *cert*."""
+    from cryptography.hazmat.primitives import hashes  # noqa: PLC0415
+
+    return CertSummary(
+        subject=cert.subject.rfc4514_string(),
+        issuer=cert.issuer.rfc4514_string(),
+        names=_cert_names(cert),
+        not_before=cert.not_valid_before_utc,
+        not_after=cert.not_valid_after_utc,
+        fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex(),
+        self_signed=cert.subject == cert.issuer,
+        made_here=made_here,
+    )
+
+
+def material_present(install_dir: Path) -> bool:
+    """Whether the install holds what nginx serves HTTPS with."""
+    tls = Path(install_dir) / TLS_DIR
+    return (tls / CERT_FILE).is_file() and (tls / KEY_FILE).is_file()
+
+
+def current(install_dir: Path) -> CertSummary | None:
+    """The certificate nginx serves, or ``None`` while the install is plain HTTP."""
+    from cryptography import x509  # noqa: PLC0415
+
+    install_dir = Path(install_dir)
+    if not material_present(install_dir):
+        return None
+    try:
+        cert = x509.load_pem_x509_certificate((install_dir / TLS_DIR / CERT_FILE).read_bytes())
+    except (ValueError, OSError) as exc:
+        raise TlsError(f"{install_dir / TLS_DIR / CERT_FILE} cannot be read: {exc}") from exc
+    return summarise(cert, made_here=_issued_by_our_ca(install_dir, cert))
+
+
+def _issued_by_our_ca(install_dir: Path, cert: x509.Certificate) -> bool:
+    from cryptography import x509  # noqa: PLC0415
+
+    ca_path = install_dir / CA_DIR / CA_CERT_FILE
+    if not ca_path.is_file():
+        return False
+    try:
+        ca = x509.load_pem_x509_certificate(ca_path.read_bytes())
+    except (ValueError, OSError):
+        return False
+    return cert.issuer == ca.subject
+
+
+# ── writing ───────────────────────────────────────────────────────
+
+
+def _write(path: Path, data: bytes, *, mode: int) -> None:
+    """Write *data* with *mode* from the start, so a key is never readable by others."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    # O_BINARY: Windows' C runtime would otherwise turn every newline into CRLF.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0)
+    fd = os.open(str(tmp), flags, mode)
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    tmp.chmod(mode)
+    tmp.replace(path)
+
+
+def _install(install_dir: Path, cert_pem: bytes, key_pem: bytes, chain_pem: bytes | None) -> None:
+    tls = Path(install_dir) / TLS_DIR
+    # The key last: nginx switches on the pair, so it must never find a key
+    # next to the previous certificate.
+    _write(tls / CERT_FILE, cert_pem, mode=0o644)
+    if chain_pem:
+        _write(tls / CHAIN_FILE, chain_pem, mode=0o644)
+    else:
+        (tls / CHAIN_FILE).unlink(missing_ok=True)
+    _write(tls / KEY_FILE, key_pem, mode=0o600)
+
+
+def remove(install_dir: Path) -> bool:
+    """Take the material away, so nginx goes back to plain HTTP; ``True`` if there was any.
+
+    The authority stays: switched on again, a new certificate is trusted
+    wherever the old one was.
+    """
+    tls = Path(install_dir) / TLS_DIR
+    had = material_present(install_dir)
+    for name in (KEY_FILE, CERT_FILE, CHAIN_FILE):
+        (tls / name).unlink(missing_ok=True)
+    return had
+
+
+# ── made here ─────────────────────────────────────────────────────
+
+
+def _load_or_make_ca(
+    install_dir: Path, now: datetime
+) -> tuple[x509.Certificate, CertificateIssuerPrivateKeyTypes, bool]:
+    """This install's authority, made on first use; ``(cert, key, created)``."""
+    from cryptography import x509  # noqa: PLC0415
+    from cryptography.hazmat.primitives import hashes, serialization  # noqa: PLC0415
+    from cryptography.hazmat.primitives.asymmetric import ec  # noqa: PLC0415
+    from cryptography.x509.oid import NameOID  # noqa: PLC0415
+
+    ca_dir = install_dir / CA_DIR
+    cert_path, key_path = ca_dir / CA_CERT_FILE, ca_dir / CA_KEY_FILE
+    if cert_path.is_file() and key_path.is_file():
+        try:
+            cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+            key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+            if not isinstance(key, ec.EllipticCurvePrivateKey):
+                raise TypeError("not the EC key this CLI makes")
+        except (ValueError, TypeError, OSError) as exc:
+            raise TlsError(
+                f"The certificate authority in {ca_dir} cannot be read ({exc}). Move the directory "
+                "away to make a new one; everything that trusted the old one must then trust the new."
+            ) from exc
+        # Reused while it outlives the certificate it is about to sign.
+        if cert.not_valid_after_utc > now + timedelta(days=LEAF_DAYS + 1):
+            return cert, key, False
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Fadenstack"),
+        x509.NameAttribute(NameOID.COMMON_NAME, f"Fadenstack CA on {socket.gethostname()}"),
+    ])
+    public = key.public_key()
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(public)
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=CA_DAYS))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True, content_commitment=False, key_encipherment=False,
+                data_encipherment=False, key_agreement=False, key_cert_sign=True, crl_sign=True,
+                encipher_only=False, decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(public), critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    ca_dir.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):  # Windows has no such bits
+        ca_dir.chmod(0o700)
+    _write(
+        key_path,
+        key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        ),
+        mode=0o600,
+    )
+    _write(cert_path, cert.public_bytes(serialization.Encoding.PEM), mode=0o644)
+    return cert, key, True
+
+
+@dataclass
+class Generated:
+    """A certificate made here: what it is, and the authority to trust for it."""
+
+    summary: CertSummary
+    ca_public: Path
+    ca_created: bool
+
+
+def generate(install_dir: Path, extra_names: Iterable[str] = (), *, now: datetime | None = None) -> Generated:
+    """Make a certificate for this machine, signed by the install's authority, and install it.
+
+    It names ``localhost``, the machine's host names and every address it
+    has outside Docker's bridges, plus *extra_names* -- a DNS name or an
+    address the console is also reached by.
+    """
+    from cryptography import x509  # noqa: PLC0415
+    from cryptography.hazmat.primitives import hashes, serialization  # noqa: PLC0415
+    from cryptography.hazmat.primitives.asymmetric import ec  # noqa: PLC0415
+    from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID  # noqa: PLC0415
+
+    install_dir = Path(install_dir)
+    now = now or datetime.now(UTC)
+    names = machine_names()
+    for raw in extra_names:
+        extra = raw.strip()
+        if not extra:
+            continue
+        with_port = ":" in extra and not _is_ip(extra)  # IPv6 addresses have colons of their own
+        if extra.startswith(("http://", "https://")) or "/" in extra or " " in extra or with_port:
+            raise TlsError(f"{extra!r} is not a host name or an address (no scheme, port or path).")
+        if extra not in names:
+            names.append(extra)
+
+    ca_cert, ca_key, created = _load_or_make_ca(install_dir, now)
+    key = ec.generate_private_key(ec.SECP256R1())
+    public = key.public_key()
+    loopback = ("localhost", "127.0.0.1", "::1")
+    primary = next((n for n in names if n not in loopback and not _is_ip(n)), "localhost")
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, primary)]))
+        .issuer_name(ca_cert.subject)
+        .public_key(public)
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=LEAF_DAYS))
+        .add_extension(x509.SubjectAlternativeName([_general_name(n) for n in names]), critical=False)
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True, content_commitment=False, key_encipherment=False,
+                data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False,
+                encipher_only=False, decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(public), critical=False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    _install(
+        install_dir,
+        cert.public_bytes(serialization.Encoding.PEM),
+        key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+        ),
+        None,
+    )
+    ca_public = install_dir / TLS_DIR / CA_PUBLIC_FILE
+    _write(ca_public, ca_cert.public_bytes(serialization.Encoding.PEM), mode=0o644)
+    return Generated(summary=summarise(cert, made_here=True), ca_public=ca_public, ca_created=created)
+
+
+# ── brought by the operator ───────────────────────────────────────
+
+
+def _read_pem(path: Path, label: str) -> str:
+    path = Path(path).expanduser()
+    if not path.is_file():
+        raise TlsError(f"{label} {path} does not exist.")
+    raw = path.read_bytes()
+    if len(raw) > _MAX_PEM:
+        raise TlsError(f"{label} {path} is larger than {_MAX_PEM // 1024} KB; that is not a PEM file.")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise TlsError(f"{label} {path} is not PEM text (DER? convert it with openssl first).") from exc
+    if "-----BEGIN " not in text:
+        raise TlsError(f"{label} {path} is not PEM-encoded.")
+    return text
+
+
+def use_own(
+    install_dir: Path,
+    cert_path: Path,
+    key_path: Path,
+    chain_path: Path | None = None,
+    *,
+    now: datetime | None = None,
+) -> CertSummary:
+    """Check the operator's certificate and key, then install them.
+
+    The certificate file may carry its chain after it (a "fullchain" file);
+    a separate *chain_path* is added after that. Problems that make nginx or
+    every client refuse the pair raise :class:`TlsError`; a certificate that
+    does not name the addresses of this machine only warns, since the console
+    may well be reached by a name only DNS knows.
+    """
+    from cryptography import x509  # noqa: PLC0415
+    from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: PLC0415
+
+    now = now or datetime.now(UTC)
+    cert_text = _read_pem(cert_path, "Certificate")
+    key_text = _read_pem(key_path, "Key")
+    blocks = _pem_blocks(cert_text)
+    if not blocks:
+        raise TlsError(f"Certificate {cert_path} holds no CERTIFICATE block.")
+    chain_blocks = blocks[1:]
+    if chain_path is not None:
+        chain_blocks += _pem_blocks(_read_pem(chain_path, "Chain"))
+
+    try:
+        cert = x509.load_pem_x509_certificate(blocks[0].encode())
+    except ValueError as exc:
+        raise TlsError(f"Certificate {cert_path} cannot be read: {exc}") from exc
+    try:
+        key = serialization.load_pem_private_key(key_text.encode(), password=None)
+    except TypeError as exc:
+        raise TlsError(
+            f"Key {key_path} is protected by a passphrase, which nginx cannot ask for. "
+            "Write it out without one, for example: openssl pkey -in <key> -out <key>.plain"
+        ) from exc
+    except ValueError as exc:
+        raise TlsError(f"Key {key_path} cannot be read: {exc}") from exc
+    if not isinstance(key, (rsa.RSAPrivateKey, ec.EllipticCurvePrivateKey)):
+        raise TlsError("Only RSA and EC keys are served; browsers do not accept the others.")
+
+    der = serialization.Encoding.DER
+    spki = serialization.PublicFormat.SubjectPublicKeyInfo
+    if cert.public_key().public_bytes(der, spki) != key.public_key().public_bytes(der, spki):
+        raise TlsError("The key does not belong to the certificate.")
+    if cert.not_valid_before_utc > now:
+        raise TlsError(f"The certificate is not valid before {cert.not_valid_before_utc:%Y-%m-%d %H:%M} UTC.")
+    if cert.not_valid_after_utc < now:
+        raise TlsError(f"The certificate expired on {cert.not_valid_after_utc:%Y-%m-%d}.")
+    for index, block in enumerate(chain_blocks, start=1):
+        try:
+            x509.load_pem_x509_certificate(block.encode())
+        except ValueError as exc:
+            raise TlsError(f"Chain certificate #{index} cannot be read: {exc}") from exc
+
+    summary = summarise(cert)
+    reachable = [n for n in machine_names() if n not in ("localhost", "127.0.0.1", "::1")]
+    if reachable and not any(covers(summary.names, n) for n in reachable):
+        summary.warnings.append(
+            "It names none of this machine's own names or addresses "
+            f"({', '.join(reachable)}); clients must reach the console by a name it lists: "
+            f"{', '.join(summary.names) or 'it lists none'}."
+        )
+    if summary.self_signed:
+        summary.warnings.append("It is self-signed: every browser and client has to be told to trust it.")
+    if (summary.not_after - now).days < EXPIRY_WARNING_DAYS:
+        summary.warnings.append(f"It expires on {summary.not_after:%Y-%m-%d}.")
+
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    _install(
+        Path(install_dir),
+        blocks[0].encode(),
+        key_pem,
+        "".join(chain_blocks).encode() if chain_blocks else None,
+    )
+    return summary

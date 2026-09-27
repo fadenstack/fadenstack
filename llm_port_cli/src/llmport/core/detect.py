@@ -413,6 +413,7 @@ def check_known_ports() -> list[PortCheck]:
 #: cannot be asked (no Docker yet). ``check_install_ports`` reads the real list.
 FALLBACK_INSTALL_PORTS: list[tuple[int, str]] = [
     (80, "nginx: console, API, gateway"),
+    (443, "nginx: the same over HTTPS, once a certificate is installed"),
     (3001, "grafana"),
     (3002, "langfuse-web"),
     (3100, "loki"),

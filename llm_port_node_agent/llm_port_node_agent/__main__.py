@@ -391,6 +391,8 @@ _SETTABLE_KEYS: dict[str, str] = {
     "LOKI_URL": "Loki URL",
     "LOG_LEVEL": "Log level",
     "VERIFY_TLS": "Verify TLS certificates (true/false)",
+    # The server's HTTPS certificate from a private authority (llmport tls generate: tls/ca.crt).
+    "TLS_CA_BUNDLE": "CA certificate file to verify the backend with (PEM)",
     "IMAGE_ALLOWLIST": "Image allowlist (comma-separated prefixes)",
     "LOG_BATCH_SIZE": "Log batch size",
     "LOG_FLUSH_INTERVAL_SEC": "Log flush interval (seconds)",

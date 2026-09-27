@@ -18,7 +18,7 @@ GPUs join afterwards, each through a one-line install from the console.
 - **Ports 80 and 443 free.** The console, the API and the OpenAI-compatible
   gateway are all served on them: plain HTTP on 80, and HTTPS on 443 once
   you [enable it](#enabling-https). To use other ports, see
-  [Changing the port](#changing-the-port).
+  [Changing the ports](#changing-the-ports).
 
 ## Install
 
@@ -33,12 +33,15 @@ llmport deploy
 2. writes the deployment files into `~/llm-port` (or the directory you pass:
    `llmport deploy /opt/llm-port`);
 3. generates `.env` there, with a random password for every service;
-4. pulls the images for the CLI's own version, for example
+4. asks whether to serve HTTPS -- with a certificate it makes for this
+   machine, or with yours -- and checks that its ports are free (see
+   [Enabling HTTPS](#enabling-https) and [Changing the ports](#changing-the-ports));
+5. pulls the images for the CLI's own version, for example
    `ghcr.io/llm-port/backend:0.3.0`;
-5. starts everything and creates the first admin. It asks for the admin's
+6. starts everything and creates the first admin. It asks for the admin's
    email and a password (leave the password blank to have one generated),
    then shows both;
-6. pulls the **runtime images**: the containers the machines run models in,
+7. pulls the **runtime images**: the containers the machines run models in,
    `ghcr.io/llm-port/ray-runtime-x86_64` and `ray-runtime-gb10` (NVIDIA DGX
    Spark). Machines download theirs from this server, not from the internet,
    so the server keeps one per kind of machine -- about 10 GB each. Only
@@ -126,52 +129,93 @@ after the backup keep running on the machines, and the new server can take
 them over without restarting any model. See
 [Taking over clusters your machines still run](taking-over-clusters.md).
 
-## Changing the port
+## Changing the ports
 
-Set `LLM_PORT_HTTP_PORT` (and `LLM_PORT_HTTPS_PORT`, default 443) in
-`~/llm-port/.env` and apply it:
+The console, the API and the gateway (`/v1`) are served on port 80, and on
+443 once HTTPS is on. Both are published even while HTTPS is off, so both
+must be free. `llmport deploy` asks for another port when one is taken, or
+takes them up front:
 
 ```bash
-llmport up
+llmport deploy --http-port 8080 --https-port 8443
 ```
+
+On an install that is running:
+
+```bash
+llmport ports                          # show them
+llmport ports --http 8080 --https 8443 # change them; the proxy moves at once
+```
+
+They are `LLM_PORT_HTTP_PORT` and `LLM_PORT_HTTPS_PORT` in `~/llm-port/.env`.
 
 ## Enabling HTTPS
 
-The console, the API and the gateway are served over HTTPS as soon as a
-certificate is in place; plain HTTP then only redirects to it.
+The console, the API and the gateway are served over HTTPS as soon as the
+install holds a certificate; plain HTTP then only redirects to it (and
+answers the proxy's own health check).
 
-Put the certificate and its key in `~/llm-port/tls/`:
-
-```
-~/llm-port/tls/edge.crt        the server certificate (PEM)
-~/llm-port/tls/edge.key        its private key (PEM)
-~/llm-port/tls/edge-chain.pem  the issuer's intermediates, if any (optional)
-```
-
-and restart the proxy:
+`llmport deploy` asks whether to serve HTTPS, or takes it up front:
 
 ```bash
-llmport up nginx
+llmport deploy --tls generate                 # a certificate made here
+llmport deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
 ```
+
+On an install that is running:
+
+```bash
+llmport tls status                            # on or off, and the certificate
+llmport tls generate [--name console.example.org]
+llmport tls use fullchain.pem key.pem [--chain intermediates.pem]
+llmport tls off                               # back to plain HTTP
+```
+
+Each restarts the proxy (the only container it touches) and waits until the
+console answers.
+
+**A certificate made here** (`generate`) names `localhost`, the server's
+host names and every address it has, plus any `--name` you add. It is signed
+by a certificate authority the CLI makes for this install on first use:
+`~/llm-port/tls/ca.crt` is what everyone trusts, and its key stays in
+`~/llm-port/tls-ca/`, which no container sees. Import `ca.crt` into the
+browsers the console is used from (or accept their warning), and hand it to
+API clients (`curl --cacert ca.crt`, `SSL_CERT_FILE=ca.crt`). A new
+certificate later -- another address, a renewal -- is signed by the same
+authority, so nothing has to be trusted again; `llmport tls off` keeps it too.
+
+**Your own certificate** (`use`) is checked before it is installed: the key
+must belong to it (and have no passphrase), and it must be valid today. The
+certificate file may carry its intermediates after it. A certificate that
+names none of the server's own names or addresses is installed with a
+warning, since the console may be reached by a name only DNS knows.
 
 An administrator in root mode can do the same through the console's API:
 `POST /api/admin/tls/upload` with the files, then `POST /api/admin/tls/activate`,
-which writes them there and restarts the proxy itself.
+which writes them to `~/llm-port/tls/` and restarts the proxy itself
+(`DELETE /api/admin/tls` goes back). Whichever wrote last is what is served.
 
 `LLM_PORT_HSTS_MAX_AGE` in `~/llm-port/.env` (seconds, default 0) turns on
 HTTP Strict Transport Security once you are sure HTTPS stays; 0 tells
-browsers to forget it again.
+browsers to forget it again. The redirect from plain HTTP is temporary
+(307), so browsers do not remember it after HTTPS is switched off.
 
-To go back to plain HTTP, remove the files (or `DELETE /api/admin/tls`) and
-restart the proxy the same way.
+**Machines you add** reach the console at the address you used. With a
+certificate their operating system does not trust (one made here, or from a
+private authority) each agent needs the authority as well. Machines added
+before the switch still hold the plain-HTTP address, which now only
+redirects, so they stay offline until they are pointed at HTTPS. On each
+machine, copy `ca.crt` over and run:
 
-**Machines you add** reach the console at the address you used, so with a
-certificate their operating system does not trust (self-signed, or a private
-CA) each agent needs the CA as well: set `LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE`
-to a file holding it in the agent's environment. Machines added before the
-switch still hold the plain-HTTP address; point them at the HTTPS one
-(`llmport-agent config --set BACKEND_URL=https://<host>`, plus the CA bundle)
-and restart the agent.
+```bash
+llmport-agent configure --set BACKEND_URL=https://<server> \
+                        --set TLS_CA_BUNDLE=/path/to/ca.crt
+systemctl --user restart llmport-agent   # or: sudo systemctl restart llmport-agent
+```
+
+Agents before 0.1.14 do not accept `TLS_CA_BUNDLE` there; add
+`LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE=/path/to/ca.crt` to the agent's
+environment file (`llmport-agent show` prints where it is) instead.
 
 ## Installing from source
 

@@ -90,6 +90,8 @@ def register_core_commands(group: click.Group | None = None) -> None:
     from llmport.commands.admin import admin_group
     from llmport.commands.observe import observe_group
     from llmport.commands.runtime_images import runtime_images_cmd
+    from llmport.commands.tls import tls_group
+    from llmport.commands.ports import ports_cmd
 
     target.add_command(version_cmd, "version")
     target.add_command(doctor_cmd, "doctor")
@@ -109,6 +111,8 @@ def register_core_commands(group: click.Group | None = None) -> None:
     target.add_command(admin_group, "admin")
     target.add_command(observe_group, "observe")
     target.add_command(runtime_images_cmd, "runtime-images")
+    target.add_command(tls_group, "tls")
+    target.add_command(ports_cmd, "ports")
 
 
 register_core_commands()

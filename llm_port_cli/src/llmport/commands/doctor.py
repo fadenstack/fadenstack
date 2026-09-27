@@ -118,7 +118,7 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
         if conflicts:
             console.print(
                 "[dim]  A port held by something else stops `llmport deploy`: free it, or change\n"
-                "  the port in .env (LLM_PORT_HTTP_PORT, PROM_PORT, ...).[/dim]"
+                "  the port (llmport ports --http/--https; PROM_PORT, ... in .env).[/dim]"
             )
 
     # ── Verdict ───────────────────────────────────────────────────
