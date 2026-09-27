@@ -66,5 +66,8 @@
     "no_entities": "未配置实体。",
     "add_entity": "添加实体",
     "refresh": "刷新"
-  }
+  },
+  "thinking": "思考中…",
+  "thought_for": "思考了 {{seconds}} 秒",
+  "thought": "思考过程"
 }

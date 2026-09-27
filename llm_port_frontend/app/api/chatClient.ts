@@ -209,6 +209,12 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
           if (choice?.delta?.content) {
             delta.content = choice.delta.content;
           }
+          // The gateway sends it as reasoning_content; a vLLM streamed
+          // straight through may call it reasoning.
+          const thinking = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+          if (typeof thinking === "string" && thinking) {
+            delta.reasoning = thinking;
+          }
           if (choice?.finish_reason) {
             delta.finish_reason = choice.finish_reason;
           }
@@ -228,6 +234,7 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 
           if (
             delta.content ||
+            delta.reasoning ||
             delta.finish_reason ||
             delta.usage ||
             delta.trace_id
@@ -305,6 +312,12 @@ export function resumeStream(sessionId: string): StreamHandle {
           if (choice?.delta?.content) {
             delta.content = choice.delta.content;
           }
+          // The gateway sends it as reasoning_content; a vLLM streamed
+          // straight through may call it reasoning.
+          const thinking = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+          if (typeof thinking === "string" && thinking) {
+            delta.reasoning = thinking;
+          }
           if (choice?.finish_reason) {
             delta.finish_reason = choice.finish_reason;
           }
@@ -324,6 +337,7 @@ export function resumeStream(sessionId: string): StreamHandle {
 
           if (
             delta.content ||
+            delta.reasoning ||
             delta.finish_reason ||
             delta.usage ||
             delta.trace_id

@@ -19,6 +19,7 @@ import rehypeHighlight from "rehype-highlight";
 import { useTranslation } from "react-i18next";
 
 import type { TokenUsage } from "~/api/chatTypes";
+import ThinkingBlock from "./ThinkingBlock";
 import TokenUsageBadge from "./TokenUsageBadge";
 
 interface Props {
@@ -33,6 +34,9 @@ interface Props {
   traceId?: string | null;
   canDebug?: boolean;
   onDebugClick?: (traceId: string) => void;
+  /** What a reasoning model thought before this reply, folded above it. */
+  reasoning?: string | null;
+  reasoningMs?: number | null;
 }
 
 export default function MessageBubble({
@@ -46,6 +50,8 @@ export default function MessageBubble({
   traceId,
   canDebug = false,
   onDebugClick,
+  reasoning = null,
+  reasoningMs = null,
 }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -157,6 +163,7 @@ export default function MessageBubble({
             wordBreak: "break-word",
           }}
         >
+          {reasoning && !isUser && <ThinkingBlock text={reasoning} ms={reasoningMs} />}
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}

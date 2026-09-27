@@ -86,6 +86,10 @@ def redact_tokens(payload: dict[str, Any], mapping: dict[str, str] | None) -> di
     return out
 
 
+#: The streamed text that may carry tokens: the answer, and a reasoning model's thinking.
+_FIELDS = ("content", "reasoning_content")
+
+
 class _Held:
     """The text of one choice that may still turn out to be part of a token."""
 
@@ -127,7 +131,7 @@ async def restore_sse(stream: AsyncIterator[bytes], mapping: dict[str, str] | No
             yield chunk
         return
 
-    held: dict[int, _Held] = {}
+    held: dict[tuple[int, str], _Held] = {}
     last: dict[str, Any] = {}
     buffer = b""
     async for chunk in stream:
@@ -144,7 +148,7 @@ async def restore_sse(stream: AsyncIterator[bytes], mapping: dict[str, str] | No
 
 
 def _restore_event(
-    event: bytes, held: dict[int, _Held], mapping: dict[str, str], last: dict[str, Any],
+    event: bytes, held: dict[tuple[int, str], _Held], mapping: dict[str, str], last: dict[str, Any],
 ) -> list[bytes]:
     text = event.decode("utf-8", errors="replace").strip()
     if not text.startswith("data:"):
@@ -165,22 +169,25 @@ def _restore_event(
             continue
         index = choice.get("index", 0)
         delta = choice.get("delta")
-        state = held.setdefault(index, _Held(mapping))
-        if isinstance(delta, dict) and isinstance(delta.get("content"), str):
-            delta["content"] = state.feed(delta["content"])
-        if choice.get("finish_reason") is not None and state.pending:
-            if not isinstance(delta, dict):
-                delta = choice["delta"] = {}
-            delta["content"] = (delta.get("content") or "") + state.flush()
+        # The answer and the model's thinking each: a reasoning model thinks
+        # about "[PERSON_1]" as much as it answers about them.
+        for field in _FIELDS:
+            state = held.setdefault((index, field), _Held(mapping))
+            if isinstance(delta, dict) and isinstance(delta.get(field), str):
+                delta[field] = state.feed(delta[field])
+            if choice.get("finish_reason") is not None and state.pending:
+                if not isinstance(delta, dict):
+                    delta = choice["delta"] = {}
+                delta[field] = (delta.get(field) or "") + state.flush()
     return [f"data: {json.dumps(body)}\n\n".encode()]
 
 
-def _flush(held: dict[int, _Held], last: dict[str, Any]) -> list[bytes]:
-    """An event carrying whatever is still held, for each choice."""
+def _flush(held: dict[tuple[int, str], _Held], last: dict[str, Any]) -> list[bytes]:
+    """An event carrying whatever is still held, for each choice and field."""
     out = []
-    for index, state in held.items():
+    for (index, field), state in held.items():
         if state.pending:
-            choice = {"index": index, "delta": {"content": state.flush()}, "finish_reason": None}
+            choice = {"index": index, "delta": {field: state.flush()}, "finish_reason": None}
             body = {**last, "choices": [choice]}
             out.append(f"data: {json.dumps(body)}\n\n".encode())
     return out

@@ -118,6 +118,12 @@ export interface Provider {
   litellm_model: string | null;
   extra_params: Record<string, unknown> | null;
   /**
+   * Whether the gateway offers the model its tools (the time, the tool
+   * search, MCP): false when switched off; null when its kind decides -- a
+   * remote API is offered them.
+   */
+  calls_tools?: boolean | null;
+  /**
    * What owns this provider, when something does. `"inference_deployment"`
    * means a deployment created it and will remove it with itself — it cannot
    * be edited or deleted from the providers screen, because the next
@@ -278,6 +284,8 @@ export interface UpdateProviderPayload {
   litellm_provider?: string | null;
   litellm_model?: string | null;
   extra_params?: Record<string, unknown> | null;
+  /** false: no gateway tools for this model; null: as its kind decides. */
+  calls_tools?: boolean | null;
 }
 
 export interface DownloadModelPayload {

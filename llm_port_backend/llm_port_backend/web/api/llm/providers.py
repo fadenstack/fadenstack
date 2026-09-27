@@ -164,6 +164,12 @@ def _extract_remote_model(capabilities: dict | None) -> str | None:
     return None
 
 
+def calls_tools(capabilities: dict | None) -> bool | None:
+    """Whether the provider's model is offered the gateway's tools; None: as its kind says."""
+    value = capabilities.get("tools") if isinstance(capabilities, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 def _provider_to_dto(
     provider: LLMProvider,
     owners: "dict[str, ManagedByDTO] | None" = None,
@@ -171,7 +177,8 @@ def _provider_to_dto(
     """Serialize a provider including derived remote_model metadata."""
     dto = ProviderDTO.model_validate(provider)
     update: dict[str, Any] = {
-        "remote_model": _extract_remote_model(provider.capabilities)
+        "remote_model": _extract_remote_model(provider.capabilities),
+        "calls_tools": calls_tools(provider.capabilities),
     }
     if provider.source_kind and owners:
         owner = owners.get(str(provider.source_id))
@@ -714,6 +721,20 @@ async def update_provider(
     ):
         litellm_model_update = new_remote_model
 
+    # Whether the gateway offers it its tools. A model or router that takes
+    # none -- OpenRouter's free router only picks among tool models when a
+    # request carries tools -- is switched off here; null goes back to the
+    # route's kind deciding.
+    if "calls_tools" in body.model_fields_set:
+        if next_capabilities is None:
+            base = existing.capabilities if isinstance(existing.capabilities, dict) else {}
+            next_capabilities = dict(base)
+        if body.calls_tools is None:
+            next_capabilities.pop("tools", None)
+        else:
+            next_capabilities["tools"] = body.calls_tools
+        capabilities_changed = True
+
     # Normalised as on create, so the gateway does not ask for /v1/v1/...
     endpoint_url = _normalize_base_url(body.endpoint_url) if body.endpoint_url else body.endpoint_url
     provider = await provider_dao.update(
@@ -750,7 +771,9 @@ async def update_provider(
     # edit left the gateway sending prompts to the old address.
     # A renamed model reaches them the same way: published under its new name
     # (which drops the old one) and asked for by it upstream.
-    routing_fields = {"endpoint_url", "api_key", "litellm_provider", "litellm_model", "extra_params"}
+    routing_fields = {
+        "endpoint_url", "api_key", "litellm_provider", "litellm_model", "extra_params", "calls_tools",
+    }
     routing_changed = bool(routing_fields & body.model_fields_set) or renamed
     if existing.target == ProviderTarget.REMOTE_ENDPOINT and routing_changed:
         await llm_service.sync_remote_routes(runtime_dao, provider)

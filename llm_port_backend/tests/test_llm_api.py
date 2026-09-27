@@ -696,3 +696,28 @@ async def test_regular_user_denied_cancel_job(
     resp = await client.post(f"/api/llm/jobs/{job.id}/cancel")
     assert resp.status_code == status.HTTP_403_FORBIDDEN
     assert resp.json()["detail"] == "Permission denied: llm.jobs:cancel"
+
+
+async def test_a_remote_model_can_be_left_without_the_gateways_tools(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    """OpenRouter's free router picks only among tool models when a request carries tools (2026-09-27)."""
+    published: list[dict] = []
+
+    async def publish(**kwargs):
+        published.append(kwargs)
+
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", publish)
+    provider, _runtime = await _litellm_remote(dbsession, litellm_model="openrouter/free", remote_model="openrouter/free")
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"calls_tools": False})
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["calls_tools"] is False
+    assert resp.json()["remote_model"] == "openrouter/free", "the rest of its capabilities kept"
+    assert [p["tools"] for p in published] == [False], "its route says so, and the gateway offers none"
+
+    # Back to the default: the route no longer says anything.
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"calls_tools": None})
+    assert resp.json()["calls_tools"] is None
+    assert published[-1]["tools"] is None

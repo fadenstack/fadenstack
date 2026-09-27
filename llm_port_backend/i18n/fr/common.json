@@ -1102,7 +1102,9 @@
     "price_help": "Ce que coûte un million de tokens en entrée et en sortie de {{model}} chez {{provider}}. Les requêtes passant par la passerelle sont calculées avec ce prix en moins d'une minute.",
     "price_borrowed": "Calculé actuellement avec une entrée enregistrée sous « {{provider}} ». L'enregistrement en crée une pour ce fournisseur.",
     "price_remove": "Supprimer le prix",
-    "endpoint_url_filled": "L'adresse de {{provider}}, remplie pour vous. Ne la modifiez que pour un proxy."
+    "endpoint_url_filled": "L'adresse de {{provider}}, remplie pour vous. Ne la modifiez que pour un proxy.",
+    "calls_tools": "Proposer les outils de la passerelle",
+    "calls_tools_help": "L'heure, la recherche d'outils et les outils MCP du chat. Désactivez-le pour un modèle ou un routeur qui n'appelle pas d'outils : le routeur gratuit d'OpenRouter choisit alors parmi tous les modèles gratuits, et chaque requête est plus courte d'environ 440 tokens."
   },
   "llm_models": {
     "title": "Modèles LLM",

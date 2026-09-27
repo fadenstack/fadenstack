@@ -1107,7 +1107,9 @@
     "price_help": "Lo que cuesta un millón de tokens de entrada y de salida de {{model}} en {{provider}}. Las solicitudes a través del gateway se calculan con él en menos de un minuto.",
     "price_borrowed": "Ahora se calcula con una entrada registrada bajo «{{provider}}». Al guardar se crea una para este proveedor.",
     "price_remove": "Quitar precio",
-    "endpoint_url_filled": "La dirección de {{provider}}, ya rellenada. Cámbiela solo para un proxy."
+    "endpoint_url_filled": "La dirección de {{provider}}, ya rellenada. Cámbiela solo para un proxy.",
+    "calls_tools": "Ofrecer las herramientas del gateway",
+    "calls_tools_help": "La hora, la búsqueda de herramientas y las herramientas MCP del chat. Desactívelo para un modelo o router que no llame herramientas: el router gratuito de OpenRouter elige entonces entre todos los modelos gratuitos, y cada solicitud es unos 440 tokens más corta."
   },
   "llm_models": {
     "title": "LLM Models",

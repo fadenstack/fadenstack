@@ -21,7 +21,7 @@ from llm_port_api.services.gateway.usage_group import UsageGroupResolver
 from llm_port_api.services.gateway.auth import AuthContext
 from llm_port_api.services.gateway import attachment_search, knowledge, skill_files, system_tools
 from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter
+from llm_port_api.services.gateway.llm_adapter import LLMAdapter, reasoning_of
 from llm_port_api.services.gateway.observability import (
     GatewayObservability,
 )
@@ -2145,6 +2145,17 @@ class GatewayService:
                             calls.add(delta["tool_calls"])
                         if choice.get("finish_reason"):
                             ended["finish"] = choice["finish_reason"]
+                        # The model's thinking reaches the client as it comes, as on
+                        # a stream without tools: a reasoning model answered after
+                        # 1-14 s of nothing in the chat (OpenRouter, 2026-09-27).
+                        # It is not part of the turn sent back with the tools' answers.
+                        thinking = reasoning_of(delta)
+                        if thinking:
+                            yield sse({**own, "choices": [{
+                                "index": choice.get("index", 0),
+                                "delta": {"reasoning_content": thinking},
+                                "finish_reason": None,
+                            }]})
                         if delta.get("content"):
                             said.append(delta["content"])
                             yield sse({**own, "choices": [{

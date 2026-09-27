@@ -57,6 +57,8 @@ export interface UseChatStreamOptions {
 export interface UseChatStreamReturn {
   messages: ChatMessage[];
   streamingContent: string;
+  /** What a reasoning model has thought so far in the reply that streams. */
+  streamingReasoning: string;
   streamingUsage: TokenUsage | null;
   isStreaming: boolean;
   isLoading: boolean;
@@ -85,6 +87,8 @@ export function useChatStream({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const streamThrottle = useStreamThrottle(setStreamingContent);
+  const [streamingReasoning, setStreamingReasoning] = useState("");
+  const reasoningThrottle = useStreamThrottle(setStreamingReasoning);
   const [streamingUsage, setStreamingUsage] = useState<TokenUsage | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -122,16 +126,23 @@ export function useChatStream({
           setIsStreaming(true);
           streamThrottle.reset();
           setStreamingContent("");
+          reasoningThrottle.reset();
+          setStreamingReasoning("");
           setStreamingUsage(null);
 
           const { reader, abort } = resumeStream(sid);
           abortRef.current = abort;
 
           let accumulated = "";
+          let thought = "";
           let finalUsage: TokenUsage | null = null;
           let traceId: string | null = null;
 
           for await (const delta of reader) {
+            if (delta.reasoning) {
+              thought += delta.reasoning;
+              reasoningThrottle.push(thought);
+            }
             if (delta.content) {
               accumulated += delta.content;
               streamThrottle.push(accumulated);
@@ -159,6 +170,7 @@ export function useChatStream({
               token_estimate: finalUsage?.completion_tokens ?? null,
               trace_id: traceId,
               usage: finalUsage,
+              reasoning: thought || null,
               created_at: new Date().toISOString(),
             };
             setMessages((prev) => [...prev, assistantMsg]);
@@ -166,6 +178,8 @@ export function useChatStream({
 
           streamThrottle.flush();
           setStreamingContent("");
+          reasoningThrottle.reset();
+          setStreamingReasoning("");
           setStreamingUsage(null);
           setIsStreaming(false);
           abortRef.current = null;
@@ -251,6 +265,8 @@ export function useChatStream({
         setIsStreaming(true);
         streamThrottle.reset();
         setStreamingContent("");
+        reasoningThrottle.reset();
+        setStreamingReasoning("");
         setStreamingUsage(null);
 
         const streamStartedAt = performance.now();
@@ -274,11 +290,22 @@ export function useChatStream({
         abortRef.current = abort;
 
         let accumulated = "";
+        let thought = "";
+        let thoughtFrom: number | null = null;
+        let thoughtMs: number | null = null;
         let finalUsage: TokenUsage | null = null;
         let traceId: string | null = null;
 
         for await (const delta of reader) {
+          if (delta.reasoning) {
+            thoughtFrom ??= performance.now();
+            thought += delta.reasoning;
+            reasoningThrottle.push(thought);
+          }
           if (delta.content) {
+            if (thoughtFrom !== null && thoughtMs === null) {
+              thoughtMs = Math.round(performance.now() - thoughtFrom);
+            }
             accumulated += delta.content;
             streamThrottle.push(accumulated);
           }
@@ -314,6 +341,8 @@ export function useChatStream({
           token_estimate: finalUsage?.completion_tokens ?? null,
           trace_id: traceId,
           usage: finalUsage,
+          reasoning: thought || null,
+          reasoning_ms: thoughtMs,
           created_at: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);
@@ -321,6 +350,8 @@ export function useChatStream({
         setLastResponseMs(elapsedMs);
         streamThrottle.flush();
         setStreamingContent("");
+        reasoningThrottle.reset();
+        setStreamingReasoning("");
         setStreamingUsage(null);
         setIsStreaming(false);
         abortRef.current = null;
@@ -371,6 +402,7 @@ export function useChatStream({
   return {
     messages,
     streamingContent,
+    streamingReasoning,
     streamingUsage,
     isStreaming,
     isLoading,

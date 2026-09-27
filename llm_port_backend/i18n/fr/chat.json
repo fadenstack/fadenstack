@@ -66,5 +66,8 @@
     "no_entities": "Aucune entité configurée.",
     "add_entity": "Ajouter une entité",
     "refresh": "Actualiser"
-  }
+  },
+  "thinking": "Réflexion…",
+  "thought_for": "A réfléchi {{seconds}} s",
+  "thought": "Réflexion"
 }

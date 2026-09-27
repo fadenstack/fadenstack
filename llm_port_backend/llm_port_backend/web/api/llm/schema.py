@@ -88,6 +88,9 @@ class ProviderUpdateRequest(BaseModel):
     litellm_provider: str | None = Field(None, max_length=64)
     litellm_model: str | None = Field(None, max_length=256)
     extra_params: dict | None = None
+    #: Whether the model is offered the gateway's tools (the time, the tool
+    #: search, MCP). null: as the route's kind says -- a remote API is.
+    calls_tools: bool | None = None
 
 
 class ManagedByDTO(BaseModel):
@@ -149,6 +152,8 @@ class ProviderDTO(BaseModel):
     litellm_provider: str | None = None
     litellm_model: str | None = None
     extra_params: dict | None = None
+    #: Offered the gateway's tools: true, false, or null (as its kind says).
+    calls_tools: bool | None = None
     #: What owns this provider, when something does. ``inference_deployment``
     #: means a deployment created it and will remove it; the screen shows it
     #: differently and refuses edits, because they would not survive the next

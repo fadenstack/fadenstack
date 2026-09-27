@@ -58,6 +58,12 @@ def _has_weights(snapshot: Path) -> bool:
     return any(p.name.endswith(_WEIGHT_SUFFIXES) for p in snapshot.rglob("*"))
 
 
+def _calls_tools(provider: LLMProvider) -> bool | None:
+    """What the provider says about offering its model the gateway's tools (None: nothing)."""
+    value = provider.capabilities.get("tools") if isinstance(provider.capabilities, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 def _remote_base_url(provider: LLMProvider) -> str:
     """Where a remote provider's runtimes send prompts."""
     if provider.endpoint_url:
@@ -763,6 +769,7 @@ class LLMService:
             litellm_provider=provider.litellm_provider,
             litellm_model=provider.litellm_model,
             extra_params=provider.extra_params,
+            tools=_calls_tools(provider),
         )
 
     async def sync_remote_routes(self, runtime_dao: RuntimeDAO, provider: LLMProvider) -> int:

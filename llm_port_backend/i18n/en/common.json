@@ -1102,7 +1102,9 @@
     "price_help": "What a million input and output tokens of {{model}} cost at {{provider}}. Requests through the gateway are priced with it within a minute.",
     "price_borrowed": "Priced now by an entry filed under “{{provider}}”. Saving files one under this provider.",
     "price_remove": "Remove price",
-    "endpoint_url_filled": "{{provider}}'s address, filled in for you. Change it only for a proxy."
+    "endpoint_url_filled": "{{provider}}'s address, filled in for you. Change it only for a proxy.",
+    "calls_tools": "Offer the gateway's tools",
+    "calls_tools_help": "The time, the tool search and the chat's MCP tools. Switch it off for a model or router that does not call tools: OpenRouter's free router then chooses among all free models, and each request is about 440 tokens shorter."
   },
   "llm_models": {
     "title": "LLM Models",

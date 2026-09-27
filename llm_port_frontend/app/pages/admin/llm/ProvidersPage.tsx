@@ -31,9 +31,11 @@ import { ModelPriceDialog, type ModelPriceTarget } from "./ModelPriceDialog";
 
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
@@ -118,6 +120,7 @@ export default function ProvidersPage() {
   const [editEndpointUrl, setEditEndpointUrl] = useState("");
   const [editApiKey, setEditApiKey] = useState("");
   const [editRemoteModel, setEditRemoteModel] = useState("");
+  const [editCallsTools, setEditCallsTools] = useState(true);
 
   // ── Derived data ─────────────────────────────────────────────────
   const runtimeByProvider = useMemo(() => {
@@ -183,6 +186,10 @@ export default function ProvidersPage() {
           payload.endpoint_url = editEndpointUrl.trim();
         if (editApiKey.trim()) payload.api_key = editApiKey.trim();
         payload.remote_model = editRemoteModel.trim() || null;
+        // Off is said; on goes back to the default, which offers them to a remote API.
+        if (editCallsTools !== (editTarget.calls_tools !== false)) {
+          payload.calls_tools = editCallsTools ? null : false;
+        }
       }
       await providers.update(editTarget.id, payload);
       setEditTarget(null);
@@ -476,6 +483,7 @@ export default function ProvidersPage() {
                   );
                   setEditApiKey("");
                   setEditRemoteModel(r.provider.remote_model ?? "");
+                  setEditCallsTools(r.provider.calls_tools !== false);
                 }}
               >
                 <EditIcon fontSize="small" />
@@ -622,6 +630,18 @@ export default function ProvidersPage() {
               onChange={(e) => setEditRemoteModel(e.target.value)}
               fullWidth
             />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editCallsTools}
+                  onChange={(e) => setEditCallsTools(e.target.checked)}
+                />
+              }
+              label={t("llm_providers.calls_tools")}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: "0 !important" }}>
+              {t("llm_providers.calls_tools_help")}
+            </Typography>
           </Stack>
         )}
       </FormDialog>

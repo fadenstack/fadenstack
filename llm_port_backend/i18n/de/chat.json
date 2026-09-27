@@ -66,5 +66,8 @@
     "no_entities": "Keine Entitäten konfiguriert.",
     "add_entity": "Entität hinzufügen",
     "refresh": "Aktualisieren"
-  }
+  },
+  "thinking": "Denkt nach…",
+  "thought_for": "{{seconds}} s nachgedacht",
+  "thought": "Gedanken"
 }

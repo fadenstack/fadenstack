@@ -66,5 +66,8 @@
     "no_entities": "No entities configured.",
     "add_entity": "Add entity",
     "refresh": "Refresh"
-  }
+  },
+  "thinking": "Thinking…",
+  "thought_for": "Thought for {{seconds}} s",
+  "thought": "Thought"
 }

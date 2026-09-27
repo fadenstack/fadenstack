@@ -47,6 +47,10 @@ export interface ChatMessage {
   created_at: string;
   /** What a reply's request used, as logged by the gateway (null if unknown). */
   usage?: TokenUsage | null;
+  /** What a reasoning model thought first (this page only; not saved). */
+  reasoning?: string | null;
+  /** How long it thought, in ms. */
+  reasoning_ms?: number | null;
 }
 
 export interface ChatAttachment {
@@ -105,6 +109,8 @@ export interface TokenUsage {
 /** A single SSE delta parsed from a streaming response. */
 export interface StreamDelta {
   content?: string;
+  /** A reasoning model's thinking, before (or between) the answer's text. */
+  reasoning?: string;
   finish_reason?: string | null;
   usage?: TokenUsage;
   trace_id?: string;

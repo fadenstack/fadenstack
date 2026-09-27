@@ -121,6 +121,37 @@ def _sse(data: dict[str, Any]) -> bytes:
     return f"data: {json.dumps(data)}\n\n".encode()
 
 
+#: What a streamed delta carries: the OpenAI format's keys, and a reasoning model's thinking.
+_DELTA_KEYS = frozenset({"role", "content", "tool_calls", "function_call", "refusal"})
+
+
+def reasoning_of(delta: dict[str, Any]) -> str | None:
+    """A delta's reasoning text, under either name providers give it."""
+    text = delta.get("reasoning_content") or delta.get("reasoning")
+    return text if isinstance(text, str) and text else None
+
+
+def openai_chunk(data: dict[str, Any]) -> dict[str, Any]:
+    """A LiteLLM stream chunk as the OpenAI format has it, with the model's thinking kept.
+
+    LiteLLM puts its own fields in every delta -- ``audio``, ``function_call``,
+    ``provider_specific_fields``, mostly null -- and a reasoning model's thinking
+    twice: ``reasoning`` (OpenRouter's name) and ``reasoning_content`` (LiteLLM's
+    and DeepSeek's). The client gets it once, as ``reasoning_content``, which is
+    what vLLM, DeepSeek and the chat clients that show thinking read.
+    """
+    for choice in data.get("choices") or []:
+        delta = choice.get("delta") if isinstance(choice, dict) else None
+        if not isinstance(delta, dict):
+            continue
+        reasoning = reasoning_of(delta)
+        clean = {k: v for k, v in delta.items() if k in _DELTA_KEYS and v is not None}
+        if reasoning:
+            clean["reasoning_content"] = reasoning
+        choice["delta"] = clean
+    return data
+
+
 def _is_done(event: str) -> bool:
     return event.replace(" ", "") == "data:[DONE]"
 
@@ -621,7 +652,7 @@ class LLMAdapter:
 
         try:
             async for chunk in response:  # type: ignore[union-attr]
-                data = chunk.model_dump()  # type: ignore[union-attr]
+                data = openai_chunk(chunk.model_dump())  # type: ignore[union-attr]
                 yield f"data: {json.dumps(data)}\n\n".encode()
             yield b"data: [DONE]\n\n"
         except Exception as exc:

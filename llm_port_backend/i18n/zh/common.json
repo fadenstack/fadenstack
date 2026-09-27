@@ -1107,7 +1107,9 @@
     "price_help": "{{model}} 在 {{provider}} 每百万输入和输出 token 的费用。经网关的请求会在一分钟内按此计价。",
     "price_borrowed": "当前按登记在 “{{provider}}” 下的条目计价。保存后将为此提供商单独登记一条。",
     "price_remove": "移除价格",
-    "endpoint_url_filled": "已为您填入 {{provider}} 的地址。仅在使用代理时修改。"
+    "endpoint_url_filled": "已为您填入 {{provider}} 的地址。仅在使用代理时修改。",
+    "calls_tools": "向模型提供网关的工具",
+    "calls_tools_help": "时间、工具搜索以及聊天的 MCP 工具。对于不调用工具的模型或路由请关闭：OpenRouter 的免费路由随后会在所有免费模型中选择，且每个请求约少 440 个 token。"
   },
   "llm_models": {
     "title": "LLM 模型",

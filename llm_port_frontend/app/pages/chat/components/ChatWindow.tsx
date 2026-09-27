@@ -19,6 +19,7 @@ import type { InitialMessageState } from "./ChatWelcome";
 import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
 import MessageBubble from "./MessageBubble";
+import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
@@ -72,6 +73,7 @@ export default function ChatWindow({
   const {
     messages,
     streamingContent,
+    streamingReasoning,
     streamingUsage,
     isStreaming,
     isLoading,
@@ -125,7 +127,7 @@ export default function ChatWindow({
   // Auto-scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, streamingReasoning]);
 
   const handleSend = (text: string, files: File[]) => {
     send(text, selectedModel, files, skills.selected);
@@ -192,6 +194,8 @@ export default function ChatWindow({
               traceId={msg.trace_id}
               canDebug={canDebug}
               onDebugClick={setDebugTraceId}
+              reasoning={msg.role === "assistant" ? msg.reasoning : null}
+              reasoningMs={msg.role === "assistant" ? msg.reasoning_ms : null}
             />
           ))}
 
@@ -203,6 +207,7 @@ export default function ChatWindow({
               modelAlias={selectedModel || null}
               usage={streamingUsage}
               streaming
+              reasoning={streamingReasoning || null}
             />
           )}
 
@@ -297,9 +302,15 @@ export default function ChatWindow({
                       ? theme.palette.background.paper
                       : theme.palette.grey[100],
                   border: `1px solid ${theme.palette.divider}`,
+                  // Room for the thinking to show, as wide as a reply may be.
+                  ...(streamingReasoning && { maxWidth: { xs: "100%", sm: "75%" }, minWidth: 220 }),
                 }}
               >
-                <CircularProgress size={16} />
+                {streamingReasoning ? (
+                  <ThinkingBlock text={streamingReasoning} live />
+                ) : (
+                  <CircularProgress size={16} />
+                )}
               </Box>
             </Box>
           )}
