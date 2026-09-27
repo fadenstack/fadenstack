@@ -6,6 +6,29 @@ Ubuntu VM to the `ray` branch, then that VM to release 0.3.0 while it ran a
 model on two DGX Spark machines -- and every problem those upgrades hit is in
 [If the upgrade stops](#if-the-upgrade-stops).
 
+## From LLM.Port 0.3 to Fadenstack 0.4
+
+Release 0.4.0 renamed everything an installation carries (compose project,
+volumes, containers, databases, `LLM_PORT_*` variables, the `llmport` CLI and
+the `llmport-agent`). `faden upgrade` does not do that move: the migration
+tool does, once, and keeps every row, file and setting:
+[llm-port/migrate-to-fadenstack](https://github.com/llm-port/migrate-to-fadenstack).
+
+```bash
+# 1. every machine: stop the old agent
+python3 migrate_to_fadenstack.py machine
+# 2. the server (a checkout install: fetch the new code first, pass --git-ref)
+python3 migrate_to_fadenstack.py server
+# 3. every machine again: installs faden-agent from the migrated server
+python3 migrate_to_fadenstack.py machine
+```
+
+Tried on the release VM and its two DGX Spark machines (28 September 2026):
+the server's rows were all kept, and the Ray cluster -- with TLS between the
+machines -- formed again by itself once the agents were back, its model
+serving again after its usual reload. Every later upgrade is `faden upgrade`
+as below.
+
 ## What `faden upgrade` does
 
 It upgrades the installation the CLI is configured for
