@@ -8,6 +8,8 @@ show what each step printed. The commands are the operator's own; nothing was
 edited on the machines by hand except where this page says so.
 
 For the everyday how-to, see [Installing: Enabling HTTPS](installing.md#enabling-https).
+For a map of every connection in an install, and which of them should move to
+TLS next, see [Connections and TLS](connections-and-tls.md).
 
 - [At a glance](#at-a-glance)
 - [What is protected, and what is not](#what-is-protected-and-what-is-not)
