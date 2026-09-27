@@ -364,6 +364,18 @@ class ModelTls:
 
     # ── the proxy ───────────────────────────────────────────────────
 
+    def port_problem(self, public_port: int) -> str | None:
+        """Why the proxy could not serve *public_port*, asked before anything is started for it."""
+        if self.routes().get(public_port) is None and not self.port_free(public_port):
+            # nginx would fail to bind it -- and on a reload, say nothing --
+            # while the model was published https:// on a port some other
+            # program answers (found on the DGX pair: an MCP server on 8100).
+            return (
+                f"Port {public_port} is already in use on this machine by another program; "
+                "publish this model on another port."
+            )
+        return None
+
     async def ensure_route(self, public_port: int, internal_port: int) -> dict[str, Any]:
         """Put the proxy in front of ``127.0.0.1:internal_port`` on ``public_port``."""
         if not self.has_certificate() and self.refresher is not None:
@@ -376,14 +388,9 @@ class ModelTls:
         async with self._lock:
             routes = self.routes()
             new = routes.get(public_port) is None
-            if new and not self.port_free(public_port):
-                # nginx would fail to bind it -- and on a reload, say nothing --
-                # while the model was published https:// on a port some other
-                # program answers (found on the DGX pair: an MCP server on 8100).
-                raise ModelTlsError(
-                    f"Port {public_port} is already in use on this machine by another program; "
-                    "publish this model on another port."
-                )
+            problem = self.port_problem(public_port) if new else None
+            if problem:
+                raise ModelTlsError(problem)
             if routes.get(public_port) != internal_port:
                 routes[public_port] = internal_port
                 self._save_routes(routes)

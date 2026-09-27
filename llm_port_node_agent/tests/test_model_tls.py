@@ -297,9 +297,17 @@ async def test_a_port_another_program_holds_is_refused_and_not_kept(tmp_path: Pa
     async with _http(_Backend(["10.250.10.49"])) as http:
         await tls.refresh(http, "cred")
     tls.port_free = lambda port: port != 8100
+    # Asked before a model is started for it, too.
+    assert "8100 is already in use" in (tls.port_problem(8100) or "")
+    assert tls.port_problem(8110) is None
     with pytest.raises(ModelTlsError, match="8100 is already in use"):
         await tls.ensure_route(8100, 28100)
     assert tls.routes() == {} and not [c for c in runtime.calls if c[0] == "run"]
+    # A port the proxy already serves is its own, not another program's.
+    tls.port_free = lambda port: True
+    await tls.ensure_route(8110, 28110)
+    tls.port_free = lambda port: False
+    assert tls.port_problem(8110) is None
 
 
 @pytest.mark.asyncio

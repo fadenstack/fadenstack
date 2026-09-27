@@ -167,6 +167,10 @@ class RuntimeManager:
             internal_port = str(int(tls_request["internal_port"]))
             host_port = str(int(tls_request.get("public_port") or host_port))
             port_spec = f"127.0.0.1:{internal_port}:{container_port}"
+            # Refused before the container starts, not after it has taken its GPU memory.
+            problem = self._model_tls.port_problem(int(host_port))
+            if problem:
+                raise RuntimeManagerError(problem)
 
         # Build default command for known provider types when none provided
         entrypoint_override: str | None = None
@@ -299,7 +303,15 @@ class RuntimeManager:
         probe = endpoint
         if internal_port is not None:
             await _progress("model_tls", f"Serving port {host_port} over TLS in front of the container")
-            await self._model_tls.ensure_route(int(host_port), int(internal_port))
+            try:
+                await self._model_tls.ensure_route(int(host_port), int(internal_port))
+            except Exception:
+                # Not served, so not left running: it holds its GPU memory for nothing.
+                try:
+                    await self._runtime.remove(container_name, force=True)
+                except Exception:  # noqa: BLE001 - the route's error is the one to report
+                    log.exception("Could not remove %s after its TLS route failed", container_name)
+                raise
             endpoint = f"https://{self._advertise_host}:{host_port}"
             probe = f"http://127.0.0.1:{internal_port}"
 

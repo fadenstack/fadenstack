@@ -417,10 +417,17 @@ async def test_image_transfer_skipped_when_present(
 class _Proxy:
     """The model-TLS proxy, as far as the runtime manager uses it."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, busy: set[int] | None = None, fail: bool = False) -> None:
         self.routes: dict[int, int] = {}
+        self.busy = busy or set()
+        self.fail = fail
+
+    def port_problem(self, public: int) -> str | None:
+        return f"Port {public} is already in use" if public in self.busy and public not in self.routes else None
 
     async def ensure_route(self, public: int, internal: int) -> dict[str, Any]:
+        if self.fail:
+            raise RuntimeError("nginx did not start")
         self.routes[public] = internal
         return {"protected": True, "public_port": public, "internal_port": internal}
 
@@ -480,3 +487,36 @@ async def test_without_the_proxy_a_request_for_it_fails_loudly(tmp_path: Path, f
             "runtime_id": "r2", "provider_type": "vllm", "image": "vllm/vllm-openai:latest",
             "generic_config": {"model": "m"}, "model_tls": {"public_port": 8000, "internal_port": 28000},
         })
+
+
+def _protected_vllm(runtime_id: str) -> dict[str, Any]:
+    return {
+        "runtime_id": runtime_id, "provider_type": "vllm", "image": "vllm/vllm-openai:latest",
+        "provider_config": {"container_port": "8000", "host_port": "8100"},
+        "generic_config": {"model": "Qwen/Qwen2.5-0.5B-Instruct"},
+        "model_tls": {"public_port": 8100, "internal_port": 28100},
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_busy_port_is_refused_before_the_model_starts(tmp_path: Path, fake_runtime: FakeRuntime) -> None:
+    """Found on the DGX pair: an MCP server held 8100; the vLLM had already taken its GPU memory."""
+    manager = RuntimeManager(
+        runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
+        advertise_host="10.250.10.49", model_tls=_Proxy(busy={8100}),
+    )
+    with pytest.raises(RuntimeManagerError, match="8100 is already in use"):
+        await manager.deploy_workload(_protected_vllm("r3"))
+    assert [c for c in fake_runtime.calls if c[0] == "run"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_model_the_proxy_cannot_serve_is_not_left_running(tmp_path: Path, fake_runtime: FakeRuntime) -> None:
+    manager = RuntimeManager(
+        runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
+        advertise_host="10.250.10.49", model_tls=_Proxy(fail=True),
+    )
+    with pytest.raises(RuntimeError, match="nginx"):
+        await manager.deploy_workload(_protected_vllm("r4"))
+    kinds = [c[0] for c in fake_runtime.calls]
+    assert "run" in kinds and kinds[-1] == "remove"
