@@ -472,14 +472,14 @@ def dev_init(
     force_env: bool,
     install_prereqs: bool,
 ) -> None:
-    """Bootstrap a full fadenstack development workspace.
+    """Bootstrap a full Fadenstack development workspace.
 
     Clones all repositories, installs dependencies, starts shared
     infrastructure, runs migrations, and generates a VS Code workspace.
 
     \b
     Steps:
-      1. Clone all fadenstack repositories
+      1. Clone all Fadenstack repositories
       2. Generate .env with dev credentials
       3. Start shared infrastructure (Postgres, Redis, RabbitMQ, …)
       4. Ensure databases exist

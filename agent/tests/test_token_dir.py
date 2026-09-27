@@ -1,6 +1,6 @@
 """Where a user-service agent keeps its Ray cluster token.
 
-The fallback was a fixed /tmp/fadenstack/ray shared by every user, and it was
+The fallback was a fixed /tmp/faden/ray shared by every user, and it was
 judged usable because mkdir(exist_ok=True) did not raise. On a DGX node that
 directory already existed, root-owned, left by Docker; a user-service agent
 chose it, and starting the Ray head failed on "Permission denied".
@@ -55,4 +55,4 @@ def test_never_falls_back_to_a_directory_shared_between_users(
     chosen = manager._writable_token_dir(unwritable)
 
     assert chosen == tmp_path / "home" / ".local" / "share" / "faden-agent" / "ray"
-    assert "/tmp/fadenstack/ray" not in str(chosen).replace("\\\\", "/")
+    assert "/tmp/faden/ray" not in str(chosen).replace("\\\\", "/")

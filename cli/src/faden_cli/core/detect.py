@@ -391,7 +391,7 @@ def detect_disk(path: str = "/") -> DiskInfo:
     )
 
 
-# ── Port map (all ports used by fadenstack) ─────────────────────────
+# ── Port map (all ports used by Fadenstack) ─────────────────────────
 
 from faden_cli.core.registry import KNOWN_PORTS
 
@@ -405,7 +405,7 @@ def check_port(port: int, label: str = "") -> PortCheck:
 
 
 def check_known_ports() -> list[PortCheck]:
-    """Check all known fadenstack ports."""
+    """Check all known Fadenstack ports."""
     return [check_port(port, label) for port, label in KNOWN_PORTS]
 
 

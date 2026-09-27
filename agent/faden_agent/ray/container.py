@@ -220,7 +220,7 @@ class RayContainerRuntime:
         self,
         *,
         runtime: ContainerRuntime | None = None,
-        token_path: str = "/var/run/fadenstack/ray/cluster.token",
+        token_path: str = "/var/run/faden/ray/cluster.token",
         handler_hint: str = "docker",
     ) -> None:
         self._runtime = runtime

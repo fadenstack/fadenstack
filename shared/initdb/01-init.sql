@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE DATABASE langfuse;
 -- DB for your RAG service
 CREATE DATABASE rag;
--- DB for fadenstack backend (used by local uv-run dev server)
+-- DB for Fadenstack backend (used by local uv-run dev server)
 CREATE DATABASE faden_backend;
 -- DB for llm gateway metadata/audit
 CREATE DATABASE faden_gateway;

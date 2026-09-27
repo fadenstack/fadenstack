@@ -122,7 +122,7 @@ def save_credentials_file(creds: dict, directory: Path) -> Path | None:
     """Write credentials to a restricted file (chmod 600). Returns the path."""
     creds_path = directory / ".bootstrap-credentials"
     content_lines = [
-        f"# fadenstack bootstrap credentials — generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"# Fadenstack bootstrap credentials — generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"ADMIN_EMAIL={creds['email']}",
         f"ADMIN_PASSWORD={creds['password']}",
     ]

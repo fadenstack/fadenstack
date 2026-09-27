@@ -30,5 +30,5 @@ def version_cmd(*, short: bool) -> None:
         ("Compose", docker.compose_version or "[red]not found[/red]"),
     ]
 
-    kv_table("fadenstack CLI", rows)
+    kv_table("Fadenstack CLI", rows)
     console.print()

@@ -1,4 +1,4 @@
-"""faden — CLI installer and management tool for fadenstack.
+"""faden — CLI installer and management tool for Fadenstack.
 
 Layered command structure built on Click framework.
 Install, configure, and manage the full platform.

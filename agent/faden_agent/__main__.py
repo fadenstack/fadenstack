@@ -261,7 +261,7 @@ if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
 
 
 def _banner() -> None:
-    print(f"\n{_BOLD}faden-agent{_RESET} — fadenstack node agent\n")
+    print(f"\n{_BOLD}faden-agent{_RESET} — Fadenstack node agent\n")
 
 
 def _section(title: str) -> None:
@@ -1787,7 +1787,7 @@ def main() -> None:
         pass
     parser = argparse.ArgumentParser(
         prog="faden-agent",
-        description="fadenstack node agent — host-side execution bridge.",
+        description="Fadenstack node agent — host-side execution bridge.",
     )
     sub = parser.add_subparsers(dest="command")
     p_configure = sub.add_parser("configure", help="Interactive configuration wizard (or --set KEY=VALUE)")

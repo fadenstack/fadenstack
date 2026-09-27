@@ -38,19 +38,19 @@ class _Material:
 
 
 def _existing(runtime: _FakeRuntime, spec: RuntimeBundleSpec, *, tls: bool) -> None:
-    env = ["RAY_AUTH_TOKEN_PATH=/var/run/fadenstack/ray/cluster.token"]
+    env = ["RAY_AUTH_TOKEN_PATH=/var/run/faden/ray/cluster.token"]
     if tls:
         env += [f"{k}={v}" for k, v in ray_tls.container_env().items()]
     runtime.containers[spec.name] = {
         "Image": spec.digest,
         "State": {"Running": True},
         "Config": {"Env": env},
-        "Mounts": [{"Destination": "/models"}, {"Destination": "/var/run/fadenstack/ray"}],
+        "Mounts": [{"Destination": "/models"}, {"Destination": "/var/run/faden/ray"}],
     }
 
 
 def _container(runtime: _FakeRuntime) -> RayContainerRuntime:
-    return RayContainerRuntime(runtime=runtime, token_path="/var/run/fadenstack/ray/cluster.token")
+    return RayContainerRuntime(runtime=runtime, token_path="/var/run/faden/ray/cluster.token")
 
 
 # ── the container ────────────────────────────────────────────────────────

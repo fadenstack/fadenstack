@@ -1,4 +1,4 @@
-# Reusable workflow: build and push a single fadenstack Docker image.
+# Reusable workflow: build and push a single Fadenstack Docker image.
 # Called by per-service workflows or the orchestrator workflow.
 #
 # Inputs:

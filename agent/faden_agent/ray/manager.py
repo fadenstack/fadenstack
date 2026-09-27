@@ -63,7 +63,7 @@ _DEFAULT_VERSION = "2.58.0"
 def _writable_token_dir(preferred: Path) -> Path:
     """The first directory this agent can actually write its cluster token in.
 
-    The fallback used to be a fixed ``/tmp/fadenstack/ray``, shared by every
+    The fallback used to be a fixed ``/tmp/faden/ray``, shared by every
     user on the machine, and "usable" meant ``mkdir(exist_ok=True)`` did not
     raise -- which it does not for a directory that already exists, whoever
     owns it. On a DGX node that directory had been created by Docker, as
@@ -99,7 +99,7 @@ class RayManager:
         state_store: StateStore,
         events: EventBuffer,
         ray_base_path: str = "/opt/faden/ray",
-        token_dir: Path | str = "/var/run/fadenstack/ray",
+        token_dir: Path | str = "/var/run/faden/ray",
         backend_url: str = "http://127.0.0.1:8000",
         token_ttl_sec: int = 300,
         http: httpx.AsyncClient | None = None,

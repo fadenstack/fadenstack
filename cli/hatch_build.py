@@ -5,7 +5,7 @@ Grafana, ClickHouse, Loki, RabbitMQ, initdb). Those live in
 ``../shared``; a user who installed only the CLI has no checkout, and
 ``faden deploy`` used to stop at "Cannot find shared".
 
-The wheel carries them at ``faden/bundle/shared``. An sdist carries them at
+The wheel carries them at ``faden_cli/bundle/shared``. An sdist carries them at
 ``src/faden_cli/bundle/shared``, so a wheel built from the sdist -- where
 ``../shared`` does not exist -- picks them up as package files.
 """
@@ -80,6 +80,6 @@ class CustomBuildHook(BuildHookInterface):
         if not shared.is_dir():
             # Building from an sdist: the files are already in the package.
             return
-        prefix = "src/faden_cli/bundle/shared" if self.target_name == "sdist" else "faden/bundle/shared"
+        prefix = "src/faden_cli/bundle/shared" if self.target_name == "sdist" else "faden_cli/bundle/shared"
         for path, rel in bundle_files(shared):
             build_data["force_include"][str(path)] = f"{prefix}/{rel}"

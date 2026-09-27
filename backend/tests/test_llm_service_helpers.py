@@ -47,8 +47,8 @@ def test_node_container_name_keeps_kebab() -> None:
 
 def test_node_container_name_truncates_to_48() -> None:
     name = LLMService._node_container_name("a" * 200)
-    # "faden-" (9) + 48-char slug
-    assert len(name) == 9 + 48
+    # "faden-" (6) + 48-char slug
+    assert len(name) == 6 + 48
     assert name.startswith("faden-" + "a" * 48)
 
 

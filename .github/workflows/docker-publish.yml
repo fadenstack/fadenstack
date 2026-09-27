@@ -1,4 +1,4 @@
-# Build and push all fadenstack core Docker images to GHCR.
+# Build and push all Fadenstack core Docker images to GHCR.
 #
 # Trigger options:
 #   - Push to master (builds changed services only)

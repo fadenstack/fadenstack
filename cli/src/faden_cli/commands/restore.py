@@ -48,7 +48,7 @@ def restore_cmd(
     verify_only: bool,
     yes: bool,
 ) -> None:
-    """Restore fadenstack from a backup directory.
+    """Restore Fadenstack from a backup directory.
 
     BACKUP_DIR is the path to a timestamped backup folder containing
     a manifest.json file created by ``faden backup``.

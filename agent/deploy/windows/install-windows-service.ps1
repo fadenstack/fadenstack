@@ -1,5 +1,5 @@
 # install-windows-service.ps1
-# Registers the fadenstack node agent as a Windows service using NSSM.
+# Registers the Fadenstack node agent as a Windows service using NSSM.
 # Requires: NSSM (https://nssm.cc) on PATH and Administrator privileges.
 # Usage: .\install-windows-service.ps1 [-PythonExe <path>] [-EnvFile <path>]
 

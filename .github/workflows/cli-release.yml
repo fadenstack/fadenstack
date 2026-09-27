@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           python -m zipfile -l dist/*.whl > contents.txt
           for f in docker-compose.yaml nginx/nginx.conf initdb/01-init.sql prometheus/prometheus.yml; do
-            grep -q "faden/bundle/shared/$f" contents.txt || { echo "::error::wheel lacks $f"; exit 1; }
+            grep -q "faden_cli/bundle/shared/$f" contents.txt || { echo "::error::wheel lacks $f"; exit 1; }
           done
           if grep -qE "bundle/shared/(\.env|\.bootstrap-credentials|backups/)" contents.txt; then
             echo "::error::wheel carries install state"; exit 1
@@ -198,7 +198,7 @@ jobs:
           ENTRY=$(python -c "import faden_cli.cli, sys; print(faden_cli.cli.__file__)")
           # --collect-data: the deployment files are package data.
           pyinstaller --onefile --clean --name "${{ matrix.name }}" \
-            --collect-submodules faden --collect-data faden "$ENTRY"
+            --collect-submodules faden_cli --collect-data faden_cli "$ENTRY"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2

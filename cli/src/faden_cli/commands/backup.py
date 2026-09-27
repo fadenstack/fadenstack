@@ -61,7 +61,7 @@ def backup_cmd(
     db_only: bool,
     yes: bool,
 ) -> None:
-    """Create a backup of fadenstack databases, config, and optionally volumes."""
+    """Create a backup of Fadenstack databases, config, and optionally volumes."""
     if click_ctx.invoked_subcommand is not None:
         return
     console.print("\n[bold magenta]fadenstack — Backup[/bold magenta]\n")

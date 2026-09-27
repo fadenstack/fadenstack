@@ -280,7 +280,7 @@ class Settings(BaseSettings):
 
     # RAG Lite module settings (embedded pgvector-based RAG)
     rag_lite_enabled: bool = False
-    rag_lite_file_store_root: str = "/data/fadenstack/rag-lite"
+    rag_lite_file_store_root: str = "/data/faden/rag-lite"
     rag_lite_embedding_provider_id: str = ""
     rag_lite_embedding_model: str = ""
     rag_lite_embedding_dim: int = 768

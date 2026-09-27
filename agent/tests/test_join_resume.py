@@ -59,7 +59,7 @@ def config(tmp_path: Path) -> SimpleNamespace:
         backend_url="http://10.250.10.220:8100",
         container_runtime=None,
         model_store_root="/srv/faden/models",
-        ray_session_dir="/var/lib/fadenstack/ray",
+        ray_session_dir="/var/lib/faden/ray",
         agent_id="workstation-wsl",
         advertise_host="10.250.10.220",
     )

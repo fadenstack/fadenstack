@@ -38,7 +38,7 @@ def _answers(monkeypatch: pytest.MonkeyPatch, answer: Any) -> list[list[str]]:
 
 
 def test_a_container_made_outside_this_project_is_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = {"name": "shared", "services": {
+    config = {"name": "fadenstack", "services": {
         "prometheus": {"container_name": "faden-prometheus"},
         "postgres": {"container_name": "faden-postgres"},
         "backend": {},

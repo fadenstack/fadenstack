@@ -1,6 +1,6 @@
 # Fadenstack Frontend
 
-This is the React-based admin console for fadenstack, providing a unified UI to manage containers and LLM infrastructure, configure system settings and initialization workflows, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
+This is the React-based admin console for Fadenstack, providing a unified UI to manage containers and LLM infrastructure, configure system settings and initialization workflows, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
 
 ## Getting Started
 

@@ -170,7 +170,7 @@ class AgentConfig:
             log_batch_size=int(os.getenv("FADEN_NODE_AGENT_LOG_BATCH_SIZE", "100")),
             log_flush_interval_sec=int(os.getenv("FADEN_NODE_AGENT_LOG_FLUSH_INTERVAL_SEC", "5")),
             ray_session_dir=os.getenv(
-                "FADEN_NODE_AGENT_RAY_SESSION_DIR", "/var/lib/fadenstack/ray"
+                "FADEN_NODE_AGENT_RAY_SESSION_DIR", "/var/lib/faden/ray"
             ),
             container_runtime=os.getenv("FADEN_NODE_AGENT_CONTAINER_RUNTIME", "auto").strip().lower() or "auto",
             image_download_dir=os.getenv("FADEN_NODE_AGENT_IMAGE_DOWNLOAD_DIR", ""),

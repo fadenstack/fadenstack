@@ -1,5 +1,5 @@
 #!/bin/sh
-# fadenstack -- choose the nginx server config at container start.
+# Fadenstack -- choose the nginx server config at container start.
 #
 # HTTPS when the edge material is in place (edge.crt and edge.key under
 # /etc/faden/tls, the install's ./tls directory), plain HTTP otherwise.
@@ -30,8 +30,8 @@ if [ -s "$TLS/edge.crt" ] && [ -s "$TLS/edge.key" ]; then
     sed -e "s|__HTTPS_PORT_SUFFIX__|$suffix|g" \
         -e "s|__HSTS_MAX_AGE__|${FADEN_HSTS_MAX_AGE:-0}|g" \
         "$SRC/nginx-tls.conf" > "$OUT"
-    echo "fadenstack nginx: HTTPS on, edge material found in $TLS"
+    echo "Fadenstack nginx: HTTPS on, edge material found in $TLS"
 else
     cp "$SRC/nginx.conf" "$OUT"
-    echo "fadenstack nginx: plain HTTP, no edge material in $TLS"
+    echo "Fadenstack nginx: plain HTTP, no edge material in $TLS"
 fi

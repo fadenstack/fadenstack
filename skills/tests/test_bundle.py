@@ -30,7 +30,7 @@ def test_a_spec_skill_reads_as_written() -> None:
         "metadata": {"author": "example-org"},
     }
     # The spec's allowed-tools is another agent's permission list; read as
-    # fadenstack's it would strip every MCP tool from the chat.
+    # Fadenstack's it would strip every MCP tool from the chat.
     assert parsed.manifest == {}
 
 

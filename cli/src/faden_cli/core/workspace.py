@@ -1,6 +1,6 @@
 """Shared workspace helpers for ``faden dev`` commands.
 
-``dev init`` clones the fadenstack repos as a *monorepo* at
+``dev init`` clones the Fadenstack repos as a *monorepo* at
 ``<workspace>/fadenstack/<local_name>``.  Consumers (``dev up``,
 ``dev status``, …) must resolve service paths the same way, which is
 why the helpers live here instead of being duplicated per command.
@@ -13,7 +13,7 @@ from pathlib import Path
 
 CORE_DIRNAME = "fadenstack"
 
-# Well-known fadenstack dev processes and the log files they write to in
+# Well-known Fadenstack dev processes and the log files they write to in
 # headless (no terminal-emulator) mode.
 LOG_LABELS = {
     "backend": "faden-backend.log",
@@ -41,11 +41,11 @@ def find_service_dir(workspace: Path, name: str) -> Path:
 #: enough to tell a real checkout from a directory that merely has a similar
 #: name: the first is the service ``dev up`` launches, the second holds the
 #: compose file and the ``.env`` everything else is derived from.
-WORKSPACE_MARKERS = ("faden_backend", "shared")
+WORKSPACE_MARKERS = ("backend", "shared")
 
 
 def is_workspace(path: Path) -> bool:
-    """True when *path* already holds an fadenstack checkout."""
+    """True when *path* already holds a Fadenstack checkout."""
     return all(find_service_dir(path, name).is_dir() for name in WORKSPACE_MARKERS)
 
 

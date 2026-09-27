@@ -1,4 +1,4 @@
-# fadenstack
+# Fadenstack
 
 [![PyPI version](https://img.shields.io/pypi/v/fadenstack)](https://pypi.org/project/fadenstack/)
 [![Python 3.12+](https://img.shields.io/pypi/pyversions/fadenstack)](https://pypi.org/project/fadenstack/)

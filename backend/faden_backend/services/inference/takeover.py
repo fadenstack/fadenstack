@@ -1,6 +1,6 @@
 """Taking over Ray clusters a server's machines still run, after the server lost them.
 
-When an Fadenstack server is rebuilt without its database -- or with an old
+When a Fadenstack server is rebuilt without its database -- or with an old
 backup -- its machines go on running the clusters and models the old server
 started. Recreating them restarts every model, and while the old serving apps
 run they hold their GPUs, so a recreated deployment often cannot even fit.

@@ -158,4 +158,4 @@ def test_deploy_pins_a_release_install_to_the_cli_version(tmp_path: Path) -> Non
 
 def test_the_compose_project_is_named_so_volumes_do_not_follow_the_directory() -> None:
     text = (SHARED / "docker-compose.yaml").read_text(encoding="utf-8")
-    assert "\nname: shared\n" in text, "an install unpacked into ~/fadenstack keeps the checkout's volumes"
+    assert "\nname: fadenstack\n" in text, "an install unpacked into ~/fadenstack keeps the checkout's volumes"

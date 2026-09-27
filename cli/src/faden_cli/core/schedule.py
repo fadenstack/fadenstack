@@ -66,7 +66,7 @@ def _cli() -> list[str]:
     found = shutil.which("faden")
     if found:
         return [str(Path(found).resolve())]
-    return [sys.executable, "-m", "faden"]
+    return [sys.executable, "-m", "faden_cli"]
 
 
 def _config() -> Path | None:

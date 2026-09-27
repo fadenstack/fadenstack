@@ -9,7 +9,7 @@ just brings the checkouts up to date.
 Repositories discovered in the workspace (same convention as
 ``dev status``):
 
-* every fadenstack service in the monorepo layout
+* every Fadenstack service in the monorepo layout
   ``<workspace>/fadenstack/<name>``, or
 * flat ``<workspace>/<name>`` checkouts, when that layout is in use;
 * the workspace root itself, if it is a git checkout (running the CLI

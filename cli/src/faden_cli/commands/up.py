@@ -1,4 +1,4 @@
-"""``faden up`` — start fadenstack services."""
+"""``faden up`` — start Fadenstack services."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def up_cmd(
     gen_env: bool,
     services: tuple[str, ...],
 ) -> None:
-    """Start fadenstack infrastructure and services.
+    """Start Fadenstack infrastructure and services.
 
     Optionally pass SERVICE names to start only specific containers.
     """
@@ -47,7 +47,7 @@ def up_cmd(
 
     ctx = build_context_from_config(cfg)
 
-    console.print("[bold cyan]Starting fadenstack services…[/bold cyan]")
+    console.print("[bold cyan]Starting Fadenstack services…[/bold cyan]")
 
     returncode = compose_up(
         ctx,

@@ -1,6 +1,6 @@
 # Taking over clusters your machines still run
 
-If an Fadenstack server is rebuilt without its database, or restored from a
+If a Fadenstack server is rebuilt without its database, or restored from a
 backup older than its clusters, its machines keep running the clusters and
 models it started. The new server does not know about them. Recreating them
 restarts every model. While the old apps run they also keep their GPUs, so the

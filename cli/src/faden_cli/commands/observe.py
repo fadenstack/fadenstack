@@ -74,7 +74,7 @@ def force_calculate_cmd(*, yes: bool) -> None:
 
     with ApiClient(cfg) as client:
         if not client.healthy():
-            error("Backend is not reachable. Is fadenstack running?")
+            error("Backend is not reachable. Is Fadenstack running?")
             sys.exit(1)
 
         info("Recalculating costs — this may take a moment…")

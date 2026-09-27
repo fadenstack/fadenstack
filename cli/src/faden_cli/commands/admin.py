@@ -26,7 +26,7 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-.]+$")
 
 @click.group("admin")
 def admin_group() -> None:
-    """Administrative commands for a running fadenstack deployment."""
+    """Administrative commands for a running Fadenstack deployment."""
 
 
 @admin_group.command("reset-password")

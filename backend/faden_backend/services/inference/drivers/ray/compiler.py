@@ -1,4 +1,4 @@
-"""Deterministic compiler from an Fadenstack deployment spec to a Ray config.
+"""Deterministic compiler from a Fadenstack deployment spec to a Ray config.
 
 Phase 3 turns an :class:`~faden_backend.services.inference.schemas.InferenceDeploymentSpecV1Alpha1`
 plus the resolved :class:`~faden_backend.db.models.llm.LLMModel` record into the

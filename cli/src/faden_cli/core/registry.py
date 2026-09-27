@@ -1,4 +1,4 @@
-"""Central registry — single source of truth for fadenstack metadata.
+"""Central registry — single source of truth for Fadenstack metadata.
 
 Every component (repos, ports, modules, services, databases, dev env vars)
 is defined exactly **once** here.  Consumer modules import from this file
@@ -26,10 +26,10 @@ DEFAULT_REGISTRY = "ghcr.io/fadenstack"
 
 @dataclass(frozen=True)
 class RepoInfo:
-    """Metadata for a single fadenstack repository."""
+    """Metadata for a single Fadenstack repository."""
 
     github_name: str  # e.g. "faden-backend"
-    local_dir: str  # e.g. "faden_backend"
+    local_dir: str  # e.g. "backend"
     description: str = ""
 
 
@@ -304,7 +304,7 @@ INFRA_HOST_KEYS: tuple[str, ...] = (
 #: host process on port 8001 (bound to all interfaces, mirroring the
 #: backend) and points at the shared 127.0.0.1-published infra (postgres
 #: / redis / rabbit). Chat-file uploads go to a host-local directory
-#: instead of the containerized ``/data/fadenstack`` volume.
+#: instead of the containerized ``/data/faden`` volume.
 GATEWAY_DEV_ENV: dict[str, str] = {
     "FADEN_GATEWAY_HOST": "0.0.0.0",
     "FADEN_GATEWAY_PORT": "8001",
@@ -370,7 +370,7 @@ DEV_MODULE_ENDPOINTS: dict[str, str] = {
 
 
 def repo_clone_url(repo: str, *, method: str = "https", token: str = "") -> str:
-    """Return the git clone URL for a repo in the fadenstack org.
+    """Return the git clone URL for a repo in the Fadenstack org.
 
     When *token* is provided and *method* is ``"https"``, the token is
     embedded in the URL so that ``git clone`` can access private repos.

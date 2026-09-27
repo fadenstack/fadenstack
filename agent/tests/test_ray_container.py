@@ -134,7 +134,7 @@ class _FakeRuntime:
 async def test_start_head_runs_inside_the_pinned_container() -> None:
     """The whole bootstrap happens via exec into the image - no host Ray."""
     runtime = _FakeRuntime()
-    container = RayContainerRuntime(runtime=runtime, token_path="/var/run/fadenstack/ray/cluster.token")
+    container = RayContainerRuntime(runtime=runtime, token_path="/var/run/faden/ray/cluster.token")
     spec = RuntimeBundleSpec.from_payload(_payload())
 
     await container.ensure_image(spec)
@@ -177,7 +177,7 @@ async def test_semantic_requirements_become_handler_flags() -> None:
     assert run["gpus"] == "all"
     assert "/srv/faden/models:/models:ro" in run["volumes"]
     # The cluster token file is mounted read-only so the container can attach.
-    assert any(v.startswith("/var/run/fadenstack/ray:") for v in run["volumes"])
+    assert any(v.startswith("/var/run/faden/ray:") for v in run["volumes"])
     assert run["env"]["RAY_AUTH_TOKEN_PATH"].endswith("cluster.token")
 
 

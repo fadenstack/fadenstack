@@ -1,6 +1,6 @@
 # faden_skills — Skills Registry
 
-Skills Registry microservice for **fadenstack**. Stores skills — reusable
+Skills Registry microservice for **Fadenstack**. Stores skills — reusable
 instruction packs in the [Agent Skills](https://agentskills.io/specification)
 format — with owners, sharing and immutable versions, and resolves which ones
 a chat request gets.

@@ -6,15 +6,15 @@ https://agentskills.io/specification -- ``SKILL.md`` is YAML frontmatter
 ``references/``, ``assets/`` and ``scripts/``. Claude Code, Codex and Open
 WebUI read the same folders.
 
-What fadenstack adds -- the title, tags, priority, when the skill comes into a
+What Fadenstack adds -- the title, tags, priority, when the skill comes into a
 chat, the tool lists, knowledge sources and triggers -- lives in
 ``faden.yaml`` beside ``SKILL.md`` rather than in its frontmatter, so a
 skill exported from here is a plain Agent Skill anywhere else, and one
 written elsewhere imports as is. In particular the spec's ``allowed-tools``
-(``Bash(git:*) Read``) is kept but not applied: read as fadenstack's
+(``Bash(git:*) Read``) is kept but not applied: read as Fadenstack's
 ``allowed_tools`` it would strip every MCP tool from a chat.
 
-Older fadenstack documents put those fields in the frontmatter itself; they are
+Older Fadenstack documents put those fields in the frontmatter itself; they are
 still read, and moved where they belong.
 """
 
@@ -56,7 +56,7 @@ MANIFEST_KEYS = (
 #: new skill on import; afterwards they are edited on the skill itself.
 CATALOG_KEYS = ("title", "tags", "priority", "activation")
 
-#: Keys older fadenstack documents put in the frontmatter that only this
+#: Keys older Fadenstack documents put in the frontmatter that only this
 #: service ever used; dropped on import, never exported.
 _LEGACY_ONLY_KEYS = ("scope", "status", "enabled", "visibility")
 
@@ -176,7 +176,7 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 
 
 def from_markdown(text: str, *, default_name: str | None = None) -> SkillBundle:
-    """A bundle from one ``SKILL.md`` (or an older fadenstack skill document)."""
+    """A bundle from one ``SKILL.md`` (or an older Fadenstack skill document)."""
     fm, body = split_frontmatter(text)
     fm = dict(fm)
     extension = {
@@ -221,7 +221,7 @@ def _name_and_title(
 ) -> tuple[str, str | None]:
     """The skill name, and a title when the document's name was one.
 
-    Older fadenstack documents used ``name`` for the display title ("Financial
+    Older Fadenstack documents used ``name`` for the display title ("Financial
     Analysis"); a name that is not a valid skill name is read as that.
     """
     candidate = _text(raw_name).strip()

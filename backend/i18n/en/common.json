@@ -2498,7 +2498,7 @@
     },
     "found": {
       "title": "Running on your machines, not managed here",
-      "intro": "An Fadenstack server started these clusters and no longer knows them: it was rebuilt, or restored from an older backup. Take one over to manage it here again; its models keep serving throughout.",
+      "intro": "A Fadenstack server started these clusters and no longer knows them: it was rebuilt, or restored from an older backup. Take one over to manage it here again; its models keep serving throughout.",
       "looking": "Looking…",
       "look_again": "Look again",
       "retry": "Retry",

@@ -47,7 +47,7 @@ def bundled_files() -> Traversable | None:
     A CLI run from a source checkout (``pip install -e``) has none: the
     checkout's ``shared`` is used instead.
     """
-    root = resources.files("faden") / "bundle" / "shared"
+    root = resources.files("faden_cli") / "bundle" / "shared"
     return root if root.is_dir() and (root / "docker-compose.yaml").is_file() else None
 
 

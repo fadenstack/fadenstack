@@ -105,7 +105,7 @@ def test_a_generated_env_leaves_the_sizing_to_tune() -> None:
 
 
 def test_deploy_upgrade_and_up_call_the_tune_step() -> None:
-    src = Path(__file__).parents[1] / "src" / "faden"
+    src = Path(__file__).parents[1] / "src" / "faden_cli"
     for command in ("deploy", "upgrade", "up"):
         source = (src / "commands" / f"{command}.py").read_text(encoding="utf-8")
         assert "tune_env(env_path)" in source, command

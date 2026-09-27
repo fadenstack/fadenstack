@@ -1036,6 +1036,56 @@ wheels = [
 ]
 
 [[package]]
+name = "faden-agent"
+version = "0.2.0"
+source = { editable = "." }
+dependencies = [
+    { name = "cryptography" },
+    { name = "httpx" },
+    { name = "psutil" },
+    { name = "pydantic" },
+    { name = "websockets" },
+]
+
+[package.optional-dependencies]
+build = [
+    { name = "pyinstaller" },
+]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+hf = [
+    { name = "huggingface-hub" },
+]
+llm = [
+    { name = "jinja2" },
+    { name = "ray", extra = ["llm", "serve"] },
+]
+ray-host = [
+    { name = "jinja2" },
+    { name = "ray", extra = ["serve"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
+    { name = "httpx", specifier = ">=0.27,<1.0" },
+    { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.27,<2" },
+    { name = "jinja2", marker = "extra == 'llm'", specifier = ">=3.1,<4" },
+    { name = "jinja2", marker = "extra == 'ray-host'", specifier = ">=3.1,<4" },
+    { name = "psutil", specifier = ">=5.9,<8.0" },
+    { name = "pydantic", specifier = ">=2.0,<3.0" },
+    { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0,<7.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "ray", extras = ["serve"], marker = "extra == 'ray-host'", specifier = "==2.58.0" },
+    { name = "ray", extras = ["serve", "llm"], marker = "extra == 'llm'", specifier = "==2.58.0" },
+    { name = "websockets", specifier = ">=12,<16" },
+]
+provides-extras = ["ray-host", "llm", "hf", "build", "dev"]
+
+[[package]]
 name = "fastapi"
 version = "0.136.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2041,56 +2091,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/64/d74336f22242ef94356a456057d4ff1be7c1bc9c7dbc867171c6982a5512/llguidance-1.7.6-cp39-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:ceec951d29a74309984e3be0fe7f5f56c1362434cd937abd517b259a60908b1e", size = 3074809, upload-time = "2026-06-03T20:13:15.498Z" },
     { url = "https://files.pythonhosted.org/packages/49/37/99d700f0e2c83acf25a8d8946b2bee9f5eac47bc530bfbd53ba3126c667f/llguidance-1.7.6-cp39-abi3-win_amd64.whl", hash = "sha256:ace7e81cd31950a87186356ab24bd7f75fbc10a05ca9d9f7f8748f931963f763", size = 2879207, upload-time = "2026-06-03T20:13:23.341Z" },
 ]
-
-[[package]]
-name = "llmport-agent"
-version = "0.1.18"
-source = { editable = "." }
-dependencies = [
-    { name = "cryptography" },
-    { name = "httpx" },
-    { name = "psutil" },
-    { name = "pydantic" },
-    { name = "websockets" },
-]
-
-[package.optional-dependencies]
-build = [
-    { name = "pyinstaller" },
-]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-hf = [
-    { name = "huggingface-hub" },
-]
-llm = [
-    { name = "jinja2" },
-    { name = "ray", extra = ["llm", "serve"] },
-]
-ray-host = [
-    { name = "jinja2" },
-    { name = "ray", extra = ["serve"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=42" },
-    { name = "httpx", specifier = ">=0.27,<1.0" },
-    { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.27,<2" },
-    { name = "jinja2", marker = "extra == 'llm'", specifier = ">=3.1,<4" },
-    { name = "jinja2", marker = "extra == 'ray-host'", specifier = ">=3.1,<4" },
-    { name = "psutil", specifier = ">=5.9,<8.0" },
-    { name = "pydantic", specifier = ">=2.0,<3.0" },
-    { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0,<7.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
-    { name = "ray", extras = ["serve"], marker = "extra == 'ray-host'", specifier = "==2.58.0" },
-    { name = "ray", extras = ["serve", "llm"], marker = "extra == 'llm'", specifier = "==2.58.0" },
-    { name = "websockets", specifier = ">=12,<16" },
-]
-provides-extras = ["ray-host", "llm", "hf", "build", "dev"]
 
 [[package]]
 name = "llvmlite"

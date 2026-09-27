@@ -1,6 +1,6 @@
 # faden_mcp
 
-MCP Tool Registry — governed MCP broker for fadenstack.
+MCP Tool Registry — governed MCP broker for Fadenstack.
 
 Registers MCP-compliant servers (stdio + SSE), discovers tools automatically,
 converts them to OpenAI-compatible tool definitions, and routes all tool

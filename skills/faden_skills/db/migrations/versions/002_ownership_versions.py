@@ -6,7 +6,7 @@
   and triggers move into each version, so a rollback rolls them back.
   A slug is unique per owner instead of per tenant.
 - ``skill_versions``: ``description``, ``frontmatter`` (SKILL.md's other
-  fields), ``manifest`` (fadenstack's), ``files`` and ``content_sha256``;
+  fields), ``manifest`` (Fadenstack's), ``files`` and ``content_sha256``;
   ``frontmatter_yaml`` is taken apart into them.
 - ``skill_grants``: sharing with users and groups.
 - ``skill_usage_daily``: how often each version reached a chat.
@@ -45,7 +45,7 @@ _MANIFEST_KEYS = (
     "knowledge_sources",
     "trigger_rules",
 )
-#: Frontmatter keys only the old fadenstack documents had.
+#: Frontmatter keys only the old Fadenstack documents had.
 _FADEN_KEYS = {
     "name",
     "description",

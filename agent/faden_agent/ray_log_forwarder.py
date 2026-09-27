@@ -41,7 +41,7 @@ log = logging.getLogger(__name__)
 
 #: Where Ray keeps a session's Serve logs, inside the runtime container and --
 #: once the bundle's mount is in place -- on the host.
-DEFAULT_SESSION_DIR = "/var/lib/fadenstack/ray"
+DEFAULT_SESSION_DIR = "/var/lib/faden/ray"
 
 #: ``replica_<app>_<deployment>_<replica id>.log``.
 #:

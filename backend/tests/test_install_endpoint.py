@@ -387,7 +387,7 @@ class TestBinaryResolution:
         found = install_api._source_checkout_binary_dir()
         assert found is not None, "running from a checkout, so this must resolve"
         assert found.name == "dist"
-        assert found.parent.name == "faden_agent"
+        assert found.parent.name == "agent"
         assert (found.parent / "build-binary.sh").is_file()
 
 

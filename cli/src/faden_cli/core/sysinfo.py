@@ -2,7 +2,7 @@
 
 Uses ``psutil`` to detect host hardware (CPU cores, RAM) and derives
 optimal worker counts, DB pool sizes, and message-queue pool sizes
-for all fadenstack services.
+for all Fadenstack services.
 
 The control plane is sized to use only a fraction of the host
 (``DEFAULT_RESOURCE_PCT``, default 25 %) so that the majority of
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import psutil
 
 # ── Resource budget ───────────────────────────────────────────────
-# Percentage of total host resources reserved for the fadenstack
+# Percentage of total host resources reserved for the Fadenstack
 # control plane.  The remainder is left for inference / ML workloads.
 DEFAULT_RESOURCE_PCT: float = 0.25
 

@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     session_max_output_tokens: int | None = 4096
 
     # Chat file attachments
-    chat_file_store_root: str = "/data/fadenstack/chat-files"
+    chat_file_store_root: str = "/data/faden/chat-files"
     chat_upload_max_file_mb: int = 10
     chat_upload_allowed_extensions: str = (
         ".pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.html,.json,"

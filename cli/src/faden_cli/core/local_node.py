@@ -17,7 +17,7 @@ from faden_cli.core.console import error, info, success, warning
 from faden_cli.core.registry import CORE_REPO, core_repo_clone_url, repo_clone_url
 
 _NODE_AGENT_REPO = "faden-node-agent"
-_NODE_AGENT_DIR = "faden_agent"
+_NODE_AGENT_DIR = "agent"
 
 
 def create_enrollment_token(

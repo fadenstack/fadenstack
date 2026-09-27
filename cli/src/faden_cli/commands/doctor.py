@@ -1,7 +1,7 @@
 """``faden doctor`` — diagnose the host environment.
 
 Runs comprehensive checks on the system and reports whether all
-prerequisites are satisfied for running fadenstack.
+prerequisites are satisfied for running Fadenstack.
 """
 
 from __future__ import annotations

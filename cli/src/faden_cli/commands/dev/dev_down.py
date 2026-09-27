@@ -135,7 +135,7 @@ def _generated_env_files(workspace: Path) -> list[Path]:
     if compose_file:
         env_files.append(compose_file.parent / ".env")
 
-    for name in ("faden_backend", "faden_gateway"):
+    for name in ("backend", "gateway"):
         base = workspace / CORE_DIRNAME
         for candidate in (base / name / ".env", workspace / name / ".env"):
             if candidate not in env_files:

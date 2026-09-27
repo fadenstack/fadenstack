@@ -1,4 +1,4 @@
-"""HTTP client for the fadenstack backend REST API.
+"""HTTP client for the Fadenstack backend REST API.
 
 Used by commands that need to interact with a running backend instance
 (``provider``, ``user``, ``model``, ``config``, etc.).  The client

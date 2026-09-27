@@ -259,7 +259,7 @@ export const artifactsPartial: ArtifactReadiness = {
   pending_node_ids: [],
   failed_node_ids: [WORKER_NODE_ID],
   blockers: ["gpu-01: snapshot incomplete, retrying in 300s"],
-  root_paths: { [HEAD_NODE_ID]: "/var/lib/fadenstack/models/qwen" },
+  root_paths: { [HEAD_NODE_ID]: "/var/lib/faden/models/qwen" },
   all_ready: false,
 };
 
@@ -272,8 +272,8 @@ export const artifactsReady: ArtifactReadiness = {
   failed_node_ids: [],
   blockers: [],
   root_paths: {
-    [HEAD_NODE_ID]: "/var/lib/fadenstack/models/qwen",
-    [WORKER_NODE_ID]: "/var/lib/fadenstack/models/qwen",
+    [HEAD_NODE_ID]: "/var/lib/faden/models/qwen",
+    [WORKER_NODE_ID]: "/var/lib/faden/models/qwen",
   },
   all_ready: true,
 };

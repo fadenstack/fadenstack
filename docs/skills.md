@@ -131,7 +131,7 @@ which Claude Code, Codex and Open WebUI read too. A skill is a folder:
 incident-review/
 ├── SKILL.md        name, description (+ license, compatibility, metadata)
 │                   and the instructions
-├── faden.yaml    fadenstack's settings: title, tags, activation,
+├── faden.yaml    Fadenstack's settings: title, tags, activation,
 │                   trigger_rules, allowed/preferred/forbidden tools,
 │                   knowledge_sources
 ├── references/     further documents
@@ -140,12 +140,12 @@ incident-review/
 ```
 
 **Export** gives the zipped folder, or the `SKILL.md` alone. **Import** takes
-either; a skill from anywhere else imports as it is, and an older fadenstack
+either; a skill from anywhere else imports as it is, and an older Fadenstack
 `.md` (with its settings in the frontmatter) is read too.
 
 - `SKILL.md`'s own `allowed-tools` (for example `Bash(git:*) Read`) is kept
-  for export but not applied: fadenstack's tool lists are in `faden.yaml`.
-- Nothing in fadenstack runs a skill's scripts. They are kept so the skill can
+  for export but not applied: Fadenstack's tool lists are in `faden.yaml`.
+- Nothing in Fadenstack runs a skill's scripts. They are kept so the skill can
   be exported to agents that do, and the editor marks them.
 - The chat gets the `SKILL.md` instructions, and the skill's other files
   when it needs them. A model that calls tools sees the files listed with the

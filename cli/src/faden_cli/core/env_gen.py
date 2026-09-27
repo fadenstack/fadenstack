@@ -328,7 +328,7 @@ def write_env_file(
         "core": "Core Infrastructure",
         "langfuse": "Langfuse",
         "clickhouse": "ClickHouse",
-        "faden": "fadenstack Services",
+        "faden": "Fadenstack Services",
     }
 
     for group_key in ["core", "langfuse", "clickhouse", "faden"]:

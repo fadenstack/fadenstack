@@ -2,7 +2,7 @@ apiVersion: 1
 providers:
   - name: fadenstack Provisioned
     orgId: 1
-    folder: fadenstack
+    folder: Fadenstack
     type: file
     disableDeletion: false
     editable: true

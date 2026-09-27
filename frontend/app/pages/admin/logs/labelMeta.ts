@@ -65,7 +65,7 @@ export function valueTitle(key: string, value: string, names: NameLookups, t: TF
       const name = names.deployments.get(value);
       if (name) return name;
       if (value.startsWith("faden-") && names.deployments.size > 0) {
-        return t("logs.deleted_deployment", { id: value.slice(8, 16), defaultValue: value });
+        return t("logs.deleted_deployment", { id: value.slice(6, 14), defaultValue: value });
       }
       return value;
     }

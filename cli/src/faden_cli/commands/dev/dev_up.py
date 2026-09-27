@@ -486,7 +486,7 @@ def _ensure_module_envs(
     shared_path = _shared_env_path(workspace)
     shared = _read_env_values(shared_path) if shared_path else {}
     header = "faden dev up: modules"
-    if api_dir.exists() and _apply_env(api_dir / ".env", caller_env("API", shared=shared, running=running), header=header):
+    if api_dir.exists() and _apply_env(api_dir / ".env", caller_env("GATEWAY", shared=shared, running=running), header=header):
         info("Gateway .env: module switches updated.")
     if backend_dir.exists() and _apply_env(
         backend_dir / ".env", caller_env("BACKEND", shared=shared, running=running), header=header,

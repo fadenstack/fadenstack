@@ -475,7 +475,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         label="File Store Root Path",
         description="Local filesystem path for storing uploaded RAG Lite documents.",
         is_secret=False,
-        default="/data/fadenstack/rag-lite",
+        default="/data/faden/rag-lite",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),

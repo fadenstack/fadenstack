@@ -22,7 +22,7 @@ def logs_cmd(
     timestamps: bool,
     services: tuple[str, ...],
 ) -> None:
-    """View logs from fadenstack services.
+    """View logs from Fadenstack services.
 
     Pass one or more SERVICE names to filter, or omit to see all.
     """

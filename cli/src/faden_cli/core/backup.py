@@ -1,4 +1,4 @@
-"""Backup and restore helpers for fadenstack databases and volumes.
+"""Backup and restore helpers for Fadenstack databases and volumes.
 
 Shared by ``faden backup``, ``faden restore``, and
 ``faden upgrade``.  All database operations run via

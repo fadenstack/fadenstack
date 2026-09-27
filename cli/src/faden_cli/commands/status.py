@@ -33,7 +33,7 @@ def _state_style(state: str) -> str:
 @click.command("status")
 @click.option("--json", "as_json", is_flag=True, help="Output raw JSON from docker compose.")
 def status_cmd(*, as_json: bool) -> None:
-    """Show the status of fadenstack services."""
+    """Show the status of Fadenstack services."""
     cfg = load_config()
     ctx = build_context_from_config(cfg)
 
@@ -50,7 +50,7 @@ def status_cmd(*, as_json: bool) -> None:
         return
 
     table = Table(
-        title="fadenstack Services",
+        title="Fadenstack Services",
         show_header=True,
         header_style="bold cyan",
     )

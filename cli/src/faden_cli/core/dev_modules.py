@@ -126,7 +126,7 @@ def caller_env(
     shared: dict[str, str],
     running: list[ModuleInfo],
 ) -> dict[str, str]:
-    """What the gateway (``API``) or backend (``BACKEND``) needs to reach them.
+    """What the gateway (``GATEWAY``) or backend (``BACKEND``) needs to reach them.
 
     Every module dev mode knows about gets its switch: on with its URL (and
     token) when it runs, off when it does not. Left on while nothing listens,

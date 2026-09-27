@@ -444,7 +444,7 @@ async def test_only_a_stray_model_of_fadenstacks_can_be_taken(
     head, _worker = pair
     env = await _managed_pair(dbsession, head, monkeypatch)
     _answering(monkeypatch, _Machine(_both()))
-    with pytest.raises(takeover.TakeoverError, match=r"runs no model of LLM\.Port's called someone-elses-app"):
+    with pytest.raises(takeover.TakeoverError, match=r"runs no model of Fadenstack's called someone-elses-app"):
         await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=["someone-elses-app"])
     with pytest.raises(takeover.TakeoverError, match="already has its deployment"):
         await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[APP])

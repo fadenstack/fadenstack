@@ -70,7 +70,7 @@ def test_one_token_on_both_sides_and_the_shared_env_wins() -> None:
     skills = MODULES["skills"]
     shared = {**SHARED, "FADEN_SKILLS_SERVICE_TOKEN": "from-shared"}
     receiver = module_env(skills, shared=shared, running=[skills])["FADEN_SKILLS_SERVICE_TOKEN"]
-    gateway = caller_env("API", shared=shared, running=[skills])["FADEN_GATEWAY_SKILLS_SERVICE_TOKEN"]
+    gateway = caller_env("GATEWAY", shared=shared, running=[skills])["FADEN_GATEWAY_SKILLS_SERVICE_TOKEN"]
     backend = caller_env("BACKEND", shared=shared, running=[skills])["FADEN_BACKEND_SKILLS_SERVICE_TOKEN"]
     assert receiver == gateway == backend == "from-shared"
 
@@ -80,7 +80,7 @@ def test_one_token_on_both_sides_and_the_shared_env_wins() -> None:
 
 def test_the_gateway_and_backend_reach_a_running_module_on_the_host() -> None:
     pii = MODULES["pii"]
-    gateway = caller_env("API", shared=SHARED, running=[pii])
+    gateway = caller_env("GATEWAY", shared=SHARED, running=[pii])
     backend = caller_env("BACKEND", shared=SHARED, running=[pii])
     assert gateway["FADEN_GATEWAY_PII_ENABLED"] == "true"
     assert gateway["FADEN_GATEWAY_PII_SERVICE_URL"] == "http://127.0.0.1:8003"
@@ -89,7 +89,7 @@ def test_the_gateway_and_backend_reach_a_running_module_on_the_host() -> None:
 
 def test_a_module_that_does_not_run_is_switched_off() -> None:
     """Left on, the gateway sends every request to a port nothing listens on."""
-    gateway = caller_env("API", shared=SHARED, running=[])
+    gateway = caller_env("GATEWAY", shared=SHARED, running=[])
     assert gateway["FADEN_GATEWAY_PII_ENABLED"] == "false"
     assert gateway["FADEN_GATEWAY_MCP_ENABLED"] == "false"
     assert gateway["FADEN_GATEWAY_SKILLS_ENABLED"] == "false"

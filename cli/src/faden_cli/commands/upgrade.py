@@ -1,4 +1,4 @@
-"""``faden upgrade`` — upgrade the running fadenstack installation.
+"""``faden upgrade`` — upgrade the running Fadenstack installation.
 
 Performs a safe in-place upgrade:
   1. Pre-flight checks (Docker, disk)
@@ -81,7 +81,7 @@ def upgrade_cmd(
     dry_run: bool,
     yes: bool,
 ) -> None:
-    """Upgrade the running fadenstack installation in place.
+    """Upgrade the running Fadenstack installation in place.
 
     Creates a backup, refreshes configuration (preserving secrets),
     rebuilds container images, and performs a rolling restart with

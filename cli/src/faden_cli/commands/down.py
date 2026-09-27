@@ -1,4 +1,4 @@
-"""``faden down`` — stop fadenstack services."""
+"""``faden down`` — stop Fadenstack services."""
 
 from __future__ import annotations
 
@@ -39,14 +39,14 @@ def _remove_project_images() -> int:
 @click.option("--remove-orphans/--no-remove-orphans", default=True, help="Remove containers for services not defined in the compose file.")
 @click.option("--all", "nuke", is_flag=True, help="Remove everything: containers, networks, volumes, and built images (keeps third-party images).")
 def down_cmd(*, volumes: bool, remove_orphans: bool, nuke: bool) -> None:
-    """Stop and remove fadenstack containers and networks."""
+    """Stop and remove Fadenstack containers and networks."""
     cfg = load_config()
     ctx = build_context_from_config(cfg)
 
     if nuke:
         volumes = True
 
-    console.print("[bold cyan]Stopping fadenstack services…[/bold cyan]")
+    console.print("[bold cyan]Stopping Fadenstack services…[/bold cyan]")
 
     with console.status("[bold cyan]docker compose down[/bold cyan]"):
         returncode = compose_down(

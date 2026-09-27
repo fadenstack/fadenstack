@@ -337,13 +337,13 @@ def test_a_generic_bundle_takes_its_mounts_from_the_node() -> None:
         "box",
         machine="x86_64",
         gpu_vendor="nvidia",
-        paths={"model_store": "/home/op/.cache/huggingface", "ray_session": "/var/lib/fadenstack/ray"},
+        paths={"model_store": "/home/op/.cache/huggingface", "ray_session": "/var/lib/faden/ray"},
     )
     spec = registry.container_launch_spec(bundle, name="faden-ray-runtime", node=node)
     by_target = {m["container_path"]: m for m in spec["mounts"]}
     assert by_target["/models"]["host_path"] == "/home/op/.cache/huggingface"
     assert by_target["/models"]["mode"] == "ro"
-    assert by_target["/tmp/ray"]["host_path"] == "/var/lib/fadenstack/ray"
+    assert by_target["/tmp/ray"]["host_path"] == "/var/lib/faden/ray"
     assert by_target["/tmp/ray"]["mode"] == "rw"
 
 
@@ -361,7 +361,7 @@ def test_a_bundle_that_declares_a_mount_keeps_it() -> None:
     )
     by_target = {m["container_path"]: m["host_path"] for m in spec["mounts"]}
     assert by_target["/models"] == "/srv/faden/models"
-    assert by_target["/tmp/ray"] == "/var/lib/fadenstack/ray"
+    assert by_target["/tmp/ray"] == "/var/lib/faden/ray"
 
 
 def test_a_node_with_no_reported_paths_gets_no_invented_ones() -> None:

@@ -1,6 +1,6 @@
 # faden_agent
 
-`faden_agent` is the host-side execution bridge for fadenstack node clusters.
+`faden_agent` is the host-side execution bridge for Fadenstack node clusters.
 
 It does not perform cluster scheduling. The backend remains authoritative for:
 

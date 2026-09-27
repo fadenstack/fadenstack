@@ -311,7 +311,7 @@ def deploy_cmd(
     local_node_enrollment_token: str,
     local_node_sudo: bool,
 ) -> None:
-    """Deploy fadenstack to a local production environment.
+    """Deploy Fadenstack to a local production environment.
 
     Performs a complete deployment: pre-flight checks, environment
     generation, image builds, database migrations, and service startup.

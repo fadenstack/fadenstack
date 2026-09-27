@@ -27,7 +27,7 @@ def _write_env(cfg: FadenConfig, *, enable: list[str], disable: list[str]) -> No
 
 @click.group("module")
 def module_group() -> None:
-    """Manage optional fadenstack modules (pii, mcp, skills)."""
+    """Manage optional Fadenstack modules (pii, mcp, skills)."""
 
 
 @module_group.command("list")
@@ -37,7 +37,7 @@ def module_list() -> None:
     active_profiles = set(cfg.profiles or [])
 
     table = Table(
-        title="fadenstack Modules",
+        title="Fadenstack Modules",
         show_header=True,
         header_style="bold cyan",
     )

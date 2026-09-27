@@ -3,7 +3,7 @@
  * and the chat's "create skill" dialog.
  *
  * Two kinds of fields: the skill's content (description, instructions, and
- * fadenstack's tool lists and triggers) is saved as a new version; its catalog
+ * Fadenstack's tool lists and triggers) is saved as a new version; its catalog
  * fields (title, tags, activation, priority) are changed on the skill itself.
  */
 import { useState } from "react";

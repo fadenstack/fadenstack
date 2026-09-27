@@ -15,7 +15,7 @@ def test_module_execution() -> None:
     env["PYTHONPATH"] = f"{src_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
 
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "faden", "--version"],
+        [sys.executable, "-m", "faden_cli", "--version"],
         capture_output=True,
         text=True,
         env=env,

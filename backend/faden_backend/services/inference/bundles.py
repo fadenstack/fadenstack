@@ -455,7 +455,7 @@ CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
         # Read-write because Ray owns the directory and writes to it; a
         # read-only mount would stop the cluster starting at all.
         ContainerMount(
-            host_path="/var/lib/fadenstack/ray",
+            host_path="/var/lib/faden/ray",
             container_path="/tmp/ray",
             mode="rw",
         ),

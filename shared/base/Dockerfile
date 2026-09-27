@@ -1,7 +1,7 @@
-# ── fadenstack platform base image ──────────────────────────────────
+# ── Fadenstack platform base image ──────────────────────────────────
 #
 # Pre-installs Python, uv, gcc, and the ~27 common packages shared
-# across all fadenstack microservices.
+# across all Fadenstack microservices.
 #
 # Service Dockerfiles extend this with:
 #   ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
