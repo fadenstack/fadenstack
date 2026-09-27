@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from test_tls import NAMES, _issue
 
 from llmport.commands import tls as tls_cmd
 from llmport.core import schedule, tls
 from llmport.core.env_gen import write_env_file
 from llmport.core.settings import LlmportConfig
-from test_tls import NAMES, _issue
 
 pytestmark = pytest.mark.usefixtures("fixed_machine")
 

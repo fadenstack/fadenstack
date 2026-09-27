@@ -83,6 +83,7 @@ def test_backup_without_a_subcommand_still_backs_up(tmp_path: Path, monkeypatch:
         databases = ["llm_port_backend"]
         env_snapshot = None
         volumes: list[str] = []  # noqa: RUF012
+        tls_material: list[str] = []  # noqa: RUF012
         manifest_path = None
 
     monkeypatch.setattr(backup_module, "build_context_from_config", lambda cfg: None)

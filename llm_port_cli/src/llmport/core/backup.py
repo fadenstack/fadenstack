@@ -53,6 +53,7 @@ class BackupResult:
     databases: dict[str, str] = field(default_factory=dict)  # db → dump file
     env_snapshot: str = ""
     volumes: list[str] = field(default_factory=list)
+    tls_material: list[str] = field(default_factory=list)
     manifest_path: Path | None = None
     ok: bool = True
     errors: list[str] = field(default_factory=list)
@@ -65,6 +66,7 @@ class RestoreResult:
     databases_restored: list[str] = field(default_factory=list)
     env_restored: bool = False
     volumes_restored: list[str] = field(default_factory=list)
+    tls_restored: list[str] = field(default_factory=list)
     ok: bool = True
     errors: list[str] = field(default_factory=list)
 
@@ -347,6 +349,60 @@ def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
 # ── Manifest ──────────────────────────────────────────────────────
 
 
+# ── Certificate material ──────────────────────────────────────────
+
+#: What HTTPS and the machines' trust rest on, relative to the install:
+#: the certificate served and its key, and the install's own authority with
+#: its key. Without the authority, a server rebuilt from a backup makes a new
+#: one, and every machine that followed it to HTTPS refuses to connect.
+TLS_MATERIAL = (
+    "tls/edge.crt",
+    "tls/edge.key",
+    "tls/edge-chain.pem",
+    "tls/ca.crt",
+    "tls-ca/ca.crt",
+    "tls-ca/ca.key",
+    "tls-ca/ca-previous.crt",
+    "tls-ca/roots.pem",
+    "tls-ca/source.json",
+)
+_TLS_BACKUP_DIR = "tls-material"
+
+
+def snapshot_tls(install_dir: Path, backup_dir: Path) -> list[str]:
+    """Copy the certificate material into the backup; the files copied, relative to the install."""
+    copied: list[str] = []
+    for rel in TLS_MATERIAL:
+        src = install_dir / rel
+        if not src.is_file():
+            continue
+        dest = backup_dir / _TLS_BACKUP_DIR / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        copied.append(rel)
+    return copied
+
+
+def restore_tls(backup_dir: Path, install_dir: Path, files: list[str]) -> list[str]:
+    """Put the certificate material back, keys readable by their owner only."""
+    restored: list[str] = []
+    for rel in files:
+        if rel not in TLS_MATERIAL:
+            continue  # only the files this CLI backs up, never a path out of the install
+        src = backup_dir / _TLS_BACKUP_DIR / rel
+        if not src.is_file():
+            continue
+        dest = install_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        if rel.endswith((".key", "source.json")):
+            dest.chmod(0o600)
+        restored.append(rel)
+    if any(rel.startswith("tls-ca/") for rel in restored):
+        (install_dir / "tls-ca").chmod(0o700)
+    return restored
+
+
 def write_manifest(
     backup_dir: Path,
     *,
@@ -354,6 +410,7 @@ def write_manifest(
     env_snapshot: str,
     volumes: list[str],
     migration_heads: dict[str, str],
+    tls_material: list[str] | None = None,
 ) -> Path:
     """Write ``manifest.json`` with file checksums and metadata."""
     db_entries: dict[str, dict] = {}
@@ -372,6 +429,9 @@ def write_manifest(
         "databases": db_entries,
         "env_snapshot": env_snapshot,
         "volumes": volumes,
+        "tls_material": {
+            rel: _sha256(backup_dir / _TLS_BACKUP_DIR / rel) for rel in (tls_material or [])
+        },
     }
 
     manifest_path = backup_dir / "manifest.json"
@@ -408,6 +468,12 @@ def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
         actual = _sha256(dump_path)
         if actual != expected:
             errors.append(f"Checksum mismatch for {dump_file}: expected {expected[:12]}… got {actual[:12]}…")
+    for rel, expected in (manifest.get("tls_material") or {}).items():
+        path = backup_dir / _TLS_BACKUP_DIR / rel
+        if not path.is_file():
+            errors.append(f"Missing certificate file: {rel}")
+        elif _sha256(path) != expected:
+            errors.append(f"Checksum mismatch for {rel}")
     return errors
 
 
@@ -480,6 +546,13 @@ def create_backup(
         console.print("\n[bold cyan]Snapshotting .env…[/bold cyan]")
         result.env_snapshot = snapshot_env(Path(str(ctx.env_file)), backup_dir)
 
+    # 3b. The certificate material: HTTPS and the machines' trust rest on it
+    if not db_only and ctx.project_dir:
+        result.tls_material = snapshot_tls(Path(str(ctx.project_dir)), backup_dir)
+        if result.tls_material:
+            count = len(result.tls_material)
+            console.print(f"\n[bold cyan]Certificate material:[/bold cyan] {count} file(s)")
+
     # 4. Snapshot volumes
     if include_volumes and not db_only:
         console.print("\n[bold cyan]Snapshotting Docker volumes…[/bold cyan]")
@@ -497,6 +570,7 @@ def create_backup(
         env_snapshot=result.env_snapshot,
         volumes=result.volumes,
         migration_heads=heads,
+        tls_material=result.tls_material,
     )
 
     # 7. Rotate
@@ -554,5 +628,12 @@ def restore_backup(
     if not db_only and manifest.get("volumes"):
         console.print("\n[bold cyan]Restoring Docker volumes…[/bold cyan]")
         result.volumes_restored = restore_volumes(backup_dir, manifest)
+
+    # 5. The certificate material, so the machines still trust this server
+    if not db_only and manifest.get("tls_material") and ctx.project_dir:
+        console.print("\n[bold cyan]Restoring the certificate material…[/bold cyan]")
+        result.tls_restored = restore_tls(
+            backup_dir, Path(str(ctx.project_dir)), list(manifest["tls_material"])
+        )
 
     return result

@@ -100,6 +100,11 @@ def backup_cmd(
         console.print(f"  .env snapshot: {result.env_snapshot}")
     if result.volumes:
         console.print(f"  Volumes: {', '.join(result.volumes)}")
+    if result.tls_material:
+        console.print(
+            f"  Certificate material: {len(result.tls_material)} file(s), private keys among them;"
+            " keep the backup as private as .env"
+        )
     if result.manifest_path:
         console.print(f"  Manifest: {result.manifest_path.name}")
 

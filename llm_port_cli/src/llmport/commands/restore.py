@@ -130,3 +130,5 @@ def restore_cmd(
         console.print("  .env: restored")
     if result.volumes_restored:
         console.print(f"  Volumes: {', '.join(result.volumes_restored)}")
+    if result.tls_restored:
+        console.print(f"  Certificate material: {len(result.tls_restored)} file(s); the machines still trust it")
