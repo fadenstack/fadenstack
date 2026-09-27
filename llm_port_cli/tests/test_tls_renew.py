@@ -194,3 +194,35 @@ def test_renew_says_what_it_did_and_fails_when_it_cannot_help(
     status = " ".join(runner.invoke(tls_cmd.tls_group, ["status"]).output.split())
     assert "taken again from" in status
     assert "days left" in status
+
+
+def test_a_new_certificate_while_https_stays_on_reloads_instead_of_restarting(
+    install: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A restart cut the machines' streams; they noticed a minute later, when their keepalive gave up."""
+    from llmport.core import bootstrap, compose
+
+    ran: list[list[str]] = []
+    restarts: list[object] = []
+
+    class _Done:
+        def __init__(self, code: int) -> None:
+            self.returncode, self.stdout, self.stderr = code, "", "nginx: [emerg] test"
+
+    monkeypatch.setattr(tls_cmd, "_proxy_running", lambda: True)
+    monkeypatch.setattr(tls_cmd.shutil, "which", lambda _name: "/usr/bin/docker")
+    monkeypatch.setattr(compose, "build_context_from_config", lambda _cfg: object())
+    monkeypatch.setattr(compose, "restart", lambda _ctx, **_k: restarts.append(_k) or 0)
+    monkeypatch.setattr(bootstrap, "wait_for_backend", lambda *_a, **_k: True)
+    monkeypatch.setattr(tls_cmd, "load_config", lambda: LlmportConfig(install_dir=str(install)))
+
+    monkeypatch.setattr(tls_cmd.subprocess, "run", lambda cmd, **_k: ran.append(cmd) or _Done(0))
+    assert tls_cmd.apply_to_proxy(install, reload=True)
+    assert ran == [["/usr/bin/docker", "exec", "llm-port-nginx", "sh", "-c", tls_cmd.RELOAD_COMMAND]]
+    assert restarts == []
+
+    # A reload nginx refuses falls back to the restart; switching modes always restarts.
+    monkeypatch.setattr(tls_cmd.subprocess, "run", lambda cmd, **_k: _Done(1))
+    assert tls_cmd.apply_to_proxy(install, reload=True)
+    assert tls_cmd.apply_to_proxy(install)
+    assert len(restarts) == 2

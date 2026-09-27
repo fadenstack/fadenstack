@@ -2,7 +2,8 @@
 
 nginx picks HTTPS or plain HTTP when it starts, from what ``<install>/tls``
 holds (llm_port_shared/nginx/select-config.sh), so every change here ends with
-a restart of the proxy -- the only container it touches.
+a restart of the proxy -- the only container it touches -- or, when HTTPS stays
+on and only the certificate is new, a reload that keeps open connections.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ PROXY_SERVICE = "nginx"
 #: A connected agent asks for the authority every minute (agent's TRUST_REFRESH_SEC).
 MACHINE_TRUST_WAIT_SEC = 70
 PROXY_CONTAINER = "llm-port-nginx"
+RELOAD_COMMAND = "sh /etc/nginx/llmport/select-config.sh && nginx -s reload"
 
 
 def _install_dir() -> Path:
@@ -50,11 +52,34 @@ def _proxy_running() -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
-def apply_to_proxy(install_dir: Path, *, recreate: bool = False) -> bool:
+def _reload_proxy() -> bool:
+    """Swap the certificate without dropping a connection: select-config.sh, then ``nginx -s reload``."""
+    docker = shutil.which("docker")
+    if not docker:
+        return False
+    result = subprocess.run(  # noqa: S603
+        [docker, "exec", PROXY_CONTAINER, "sh", "-c", RELOAD_COMMAND],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        why = (result.stderr or result.stdout).strip()[:200]
+        warning(f"The proxy could not reload ({why}); restarting it.")
+    return result.returncode == 0
+
+
+def apply_to_proxy(install_dir: Path, *, recreate: bool = False, reload: bool = False) -> bool:
     """Have nginx pick up the install's material and ports; ``True`` once the console answers.
 
     A restart re-runs select-config.sh; new ports need the container made
     again (*recreate*), which ``docker compose up`` does when they changed.
+    With HTTPS staying on and only the certificate new (*reload*: a renewal,
+    a replacement), nginx reloads instead: new connections get the new
+    certificate and the open ones -- the machines' streams -- stay up. A
+    restart cut them, and the machines noticed only when their keepalive
+    timed out, a minute later. Switching between HTTP and HTTPS restarts, so
+    every open plain-HTTP connection meets the redirect at once.
     """
     from llmport.core.bootstrap import wait_for_backend  # noqa: PLC0415
     from llmport.core.compose import build_context_from_config, restart, up  # noqa: PLC0415
@@ -65,6 +90,8 @@ def apply_to_proxy(install_dir: Path, *, recreate: bool = False) -> bool:
     ctx = build_context_from_config(load_config())
     if recreate:
         rc = up(ctx, services=[PROXY_SERVICE], detach=True, wait=True, timeout=120)
+    elif reload and _reload_proxy():
+        rc = 0
     else:
         rc = restart(ctx, services=[PROXY_SERVICE])
     if rc != 0:
@@ -445,6 +472,7 @@ def status_cmd() -> None:
 def generate_cmd(*, names: tuple[str, ...], no_restart: bool, no_wait: bool) -> None:
     """Make a certificate for this machine, signed by the install's own authority."""
     install_dir = _install_dir()
+    was_on = tls.material_present(install_dir)
     try:
         made = tls.generate(install_dir, names)
     except tls.TlsError as exc:
@@ -455,7 +483,7 @@ def generate_cmd(*, names: tuple[str, ...], no_restart: bool, no_wait: bool) -> 
     # Deploy and upgrade make the authority ahead of time; an install that has
     # not been through either since gets it only now.
     _wait_for_machines(made.trust_changed, no_restart=no_restart, no_wait=no_wait)
-    if not no_restart and not apply_to_proxy(install_dir):
+    if not no_restart and not apply_to_proxy(install_dir, reload=was_on):
         sys.exit(1)
     schedule_renewal(install_dir)
     refresh_edge_info(install_dir)
@@ -492,6 +520,7 @@ def use_cmd(
     tooling) is served without anyone running this again.
     """
     install_dir = _install_dir()
+    was_on = tls.material_present(install_dir)
     try:
         summary = tls.use_own(install_dir, cert, key, chain, ca_path=ca)
     except tls.TlsError as exc:
@@ -500,7 +529,7 @@ def use_cmd(
     success("Certificate checked and installed.")
     print_summary(summary)
     _wait_for_machines(summary.trust_changed, no_restart=no_restart, no_wait=no_wait)
-    if not no_restart and not apply_to_proxy(install_dir):
+    if not no_restart and not apply_to_proxy(install_dir, reload=was_on):
         sys.exit(1)
     schedule_renewal(install_dir)
     refresh_edge_info(install_dir)
@@ -509,7 +538,7 @@ def use_cmd(
 
 @tls_group.command("renew")
 @click.option(
-    "--days", type=click.IntRange(1, 365), default=tls.RENEW_BEFORE_DAYS, show_default=True,
+    "--days", type=click.IntRange(1, tls.CA_DAYS), default=tls.RENEW_BEFORE_DAYS, show_default=True,
     help="Issue a certificate made here again once it has fewer days left than this.",
 )
 @click.option("--force", is_flag=True, help="Issue it again, or take the operator's files again, now.")
@@ -539,7 +568,7 @@ def renew_cmd(*, days: int, force: bool, no_wait: bool) -> None:
         if result.summary is not None:
             print_summary(result.summary)
         _wait_for_machines(result.trust_changed or rotated, no_restart=False, no_wait=no_wait)
-        if not apply_to_proxy(install_dir):
+        if not apply_to_proxy(install_dir, reload=True):
             sys.exit(1)
         refresh_edge_info(install_dir)
         return
