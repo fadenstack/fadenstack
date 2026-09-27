@@ -931,9 +931,10 @@ def _emit(text: str) -> None:
 def cmd_license() -> None:
     """Print the licence and attribution notice this build carries.
 
-    The agent is Apache-2.0 and ships a NOTICE, and section 4(d) requires
-    that notice to accompany the distribution. The binary bundles both
-    files; this is how somebody holding only the binary reads them.
+    The agent is AGPL-3.0-only and ships a NOTICE with the licence's
+    section 7 permission; both have to reach whoever receives it. The
+    binary bundles both files; this is how somebody holding only the
+    binary reads them.
     """
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
     shown = False
@@ -952,8 +953,8 @@ def cmd_license() -> None:
     # Never imply a licence whose text we cannot actually produce.
     _emit(f"faden-agent {_AGENT_VERSION}")
     _emit("Copyright 2026 Emagin8 UG (haftungsbeschraenkt) and contributors.")
-    _emit("Licensed under the Apache License, Version 2.0.")
-    _emit("http://www.apache.org/licenses/LICENSE-2.0")
+    _emit("Licensed under the GNU Affero General Public License, version 3 only.")
+    _emit("https://www.gnu.org/licenses/agpl-3.0.html")
     _emit("")
     _emit("(The full text was not bundled with this build.)")
 

@@ -30,14 +30,14 @@ _PROJECT = tomllib.loads((HERE / "pyproject.toml").read_text(encoding="utf-8"))[
 VERSION = _PROJECT["version"]
 DESCRIPTION = _PROJECT["description"]
 COMPANY = _PROJECT["authors"][0]["name"]
-COPYRIGHT = f"Copyright 2026 {COMPANY} and contributors. Apache License 2.0."
+COPYRIGHT = f"Copyright 2026 {COMPANY} and contributors. GNU AGPL v3.0 only."
 
 # The licence travels with the binary.
 #
-# The agent is Apache-2.0 and ships a NOTICE, and section 4(d) requires that
-# notice to accompany every distribution of a derivative work. This binary is
-# distributed to every node the product manages, and carried neither file --
-# so what we handed out was not a compliant distribution. `--license` prints
+# The agent is AGPL-3.0-only and ships a NOTICE (with the section 7
+# permission); both have to accompany every copy conveyed. This binary is
+# distributed to every node the product manages, and once carried neither
+# file -- so what we handed out was not a compliant distribution. `--license` prints
 # them back out, because a file nobody can read is a poor kind of notice.
 _LICENCE_FILES = [
     (str(HERE / name), ".")
