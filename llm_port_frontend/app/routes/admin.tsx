@@ -554,6 +554,13 @@ function AdminLayoutInner() {
             p: { xs: 2, sm: 3 },
             // Room under the last row for the floating menu button.
             pb: { xs: "calc(96px + env(safe-area-inset-bottom, 0px))", sm: 3 },
+            // On a phone the whole page scrolls, under the button. A page that fills
+            // the height and scrolls inside itself (settings, audit, roles, ...) ended
+            // above that room instead, cut off, with the button in an empty band.
+            // A page that needs its height (a graph canvas) says so.
+            [theme.breakpoints.down("sm")]: {
+              "& > :not([data-keeps-height])": { height: "auto" },
+            },
           }}
         >
           <Outlet

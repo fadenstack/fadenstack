@@ -464,6 +464,8 @@ export default function GraphPage() {
 
   return (
     <Box
+      // The graph canvas needs a height: kept on a phone too (see the admin layout).
+      data-keeps-height
       sx={{
         display: "grid",
         gridTemplateColumns: "1fr 380px",
