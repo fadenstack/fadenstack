@@ -77,9 +77,11 @@ const GRAFANA_OVERVIEW_PATH = "/grafana/d/llm-port-overview/llm-port-overview";
 
 /**
  * Grafana "llm_port overview" dashboard URL.
- * In dev the service is served under the `/grafana` sub-path on its
- * exposed port (default 3001) with anonymous Viewer access, so the
- * URL embeds directly without authentication.
+ * Grafana serves under the `/grafana` sub-path with anonymous Viewer access,
+ * so the URL embeds directly without authentication. A full install reaches
+ * it same-origin through nginx, over whatever scheme the console uses: its own
+ * port (3001) speaks plain HTTP only, so from a console on HTTPS the frame was
+ * refused. The dev stack has no nginx, and there the exposed port is the way in.
  */
 export function grafanaOverviewUrl(theme: "light" | "dark"): string {
   const override = (import.meta.env.VITE_GRAFANA_DASHBOARD_URL as string | undefined)?.trim();
@@ -90,7 +92,11 @@ export function grafanaOverviewUrl(theme: "light" | "dark"): string {
   }
   const host = (import.meta.env.VITE_GRAFANA_HOST as string | undefined) ?? undefined;
   const port = portFromEnv("VITE_GRAFANA_PORT", 3001);
-  const url = new URL(buildUrl(host, port, GRAFANA_OVERVIEW_PATH));
+  const sameOrigin =
+    !import.meta.env.DEV && !host && !import.meta.env.VITE_GRAFANA_PORT && typeof window !== "undefined";
+  const url = new URL(
+    sameOrigin ? `${window.location.origin}${GRAFANA_OVERVIEW_PATH}` : buildUrl(host, port, GRAFANA_OVERVIEW_PATH),
+  );
   url.searchParams.set("orgId", "1");
   url.searchParams.set("from", "now-6h");
   url.searchParams.set("to", "now");

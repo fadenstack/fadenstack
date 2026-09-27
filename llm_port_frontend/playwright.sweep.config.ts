@@ -15,6 +15,10 @@ import { defineConfig, devices } from "@playwright/test";
  * untranslated keys, error screens -- are written to
  * test-results/sweep/report.jsonl, and a screenshot of each page to
  * test-results/sweep/pages/.
+ *
+ * Against an install on HTTPS with a certificate made there (llmport tls
+ * generate), set E2E_IGNORE_HTTPS_ERRORS=1 unless this machine trusts the
+ * install's tls/ca.crt: the pages are still served and checked over HTTPS.
  */
 export const SWEEP_STATE = "e2e/.auth/sweep.json";
 
@@ -33,6 +37,7 @@ export default defineConfig({
     video: "off",
     colorScheme: "dark",
     locale: "en-US",
+    ignoreHTTPSErrors: process.env.E2E_IGNORE_HTTPS_ERRORS === "1",
   },
   projects: [
     { name: "setup", testMatch: /sweep\.setup\.ts/ },
