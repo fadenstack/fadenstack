@@ -158,11 +158,14 @@ answers the proxy's own health check).
 What is protected and what is not, how the machines come to trust the server,
 where the keys are and a hardening checklist: [HTTPS and trust](https-and-trust.md).
 
-`llmport deploy` asks whether to serve HTTPS, or takes it up front:
+`llmport deploy` serves HTTPS by default, with a certificate made here. It
+asks when it runs interactively (`generate` is the default answer), and takes
+the choice up front:
 
 ```bash
-llmport deploy --tls generate                 # a certificate made here
+llmport deploy --tls generate                 # a certificate made here (the default)
 llmport deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
+llmport deploy --tls off                      # plain HTTP; remembered, so a later deploy -y keeps it
 ```
 
 On an install that is running:
