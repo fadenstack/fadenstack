@@ -138,6 +138,8 @@ class RayManager:
         os.environ.setdefault("RAY_AUTH_TOKEN_PATH", str(self._token_file))
         self._core = RayCoreClient(token_path=self._token_file)
         self._serve = RayServeManager(core=self._core)
+        #: The machine's model-TLS proxy (``model_tls.ModelTls``), set by the service.
+        self.model_tls: Any = None
         self._metrics = RayMetricsDiscovery(core=self._core)
         self._state_diag = RayStateDiagnostics(core=self._core)
         self._backend_url = backend_url.rstrip("/")
@@ -681,11 +683,13 @@ class RayManager:
         spec = RunServeAppPayload.model_validate(payload)
         if await self._use_container(payload):
             bundle = self._bundle_spec(payload)
-            return await self._container.run_serve_app(
+            http_options = dict(spec.http_options or {})
+            tls = await self._model_tls_for_serve(bundle.name, spec.model_tls, http_options)
+            result = await self._container.run_serve_app(
                 bundle.name,
                 spec.app_name,
                 spec.llm_serving_args,
-                http_options=spec.http_options,
+                http_options=http_options,
                 # One prefix per application, matching the host path.  The
                 # container path defaulted to "/", so the address the backend
                 # published (which assumes "/<app>") 404'd, and a second
@@ -693,6 +697,9 @@ class RayManager:
                 # first over the root prefix.
                 route_prefix=f"/{spec.app_name}",
             )
+            if tls is not None:
+                result = {**result, **tls}
+            return result
 
         # build_openai_app + serve.run are driver-side Python API calls that
         # do GCS round-trips; run off the event loop.
@@ -703,6 +710,76 @@ class RayManager:
             proxy_location=spec.proxy_location,
             http_options=spec.http_options,
         )
+
+    async def _serve_http(self, container: str) -> dict[str, Any]:
+        """What Serve's proxy binds on this cluster: ``{"running": bool, "host", "port"}``."""
+        from llm_port_node_agent.ray import serve_http  # noqa: PLC0415
+
+        code, out, err = await self._container.run_python(serve_http.READ_SCRIPT, container, timeout_sec=90)
+        doc = serve_http.parse(out)
+        if doc is None or not doc.get("attached") or doc.get("error"):
+            detail = (doc or {}).get("error") or (err or out or "").strip()[-400:]
+            raise ContainerRuntimeError(f"could not read Serve's HTTP options (exit {code}): {detail}")
+        return doc
+
+    async def _model_tls_for_serve(
+        self, container: str, request: dict[str, Any] | None, http_options: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Put the model-TLS proxy in front of Serve, when the backend asked and Serve allows.
+
+        Serve binds once. Not running: it will start on the loopback address
+        the backend asked for, behind the proxy. Already on that address: the
+        proxy is (re)confirmed. Already listening on the network (a cluster
+        from before model TLS): it keeps doing so -- the application is
+        deployed on it as before and the result says so, for the backend to
+        publish ``http://`` and offer the move (``shutdown_serve``).
+        """
+        if not request:
+            return None
+        public = int(request["public_port"])
+        internal = int(request["internal_port"])
+        if self.model_tls is None:
+            raise ContainerRuntimeError("this agent has no model-TLS proxy configured")
+        current = await self._serve_http(container)
+        host = str(current.get("host") or "")
+        from llm_port_node_agent.ray.serve_http import LOOPBACK  # noqa: PLC0415
+
+        if current.get("running") and not (host in LOOPBACK and int(current.get("port") or 0) == internal):
+            # Keep what runs; say where, so the backend publishes the truth.
+            http_options["host"] = host
+            http_options["port"] = int(current.get("port") or public)
+            return {
+                "model_tls": {"protected": False, "reason": "serve_running", "public_port": public},
+                "serve_http": {"host": host, "port": int(current.get("port") or 0)},
+            }
+        route = await self.model_tls.ensure_route(public, internal)
+        return {"model_tls": route, "serve_http": {"host": "127.0.0.1", "port": internal}}
+
+    async def shutdown_serve(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Stop Serve on this cluster: every application and the proxy.
+
+        For moving a cluster behind the model-TLS proxy: the backend applies
+        its applications again afterwards, and the first starts Serve anew
+        with the loopback options. Requires the runtime container.
+        """
+        from llm_port_node_agent.ray import serve_http  # noqa: PLC0415
+
+        bundle = self._bundle_spec(payload)
+        name = bundle.name if bundle is not None else None
+        facts = await (self._container.facts(name) if name else self._container.facts())
+        if facts is None or not facts.get("running"):
+            raise ContainerRuntimeError("shutdown_serve needs the runtime container, and it is not running here")
+        name = name or str(facts.get("name") or "") or None
+        if name:
+            code, out, err = await self._container.run_python(serve_http.SHUTDOWN_SCRIPT, name, timeout_sec=180)
+        else:
+            code, out, err = await self._container.run_python(serve_http.SHUTDOWN_SCRIPT, timeout_sec=180)
+        doc = serve_http.parse(out) or {}
+        if not doc.get("shut_down"):
+            detail = doc.get("error") or (err or out or "").strip()[-400:]
+            raise ContainerRuntimeError(f"serve.shutdown failed (exit {code}): {detail}")
+        self._events.add(event_type="ray.serve_shut_down", payload={"container": name})
+        return {"shut_down": True}
 
     async def delete_serve_app(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Delete a named Serve application (Phase 3)."""

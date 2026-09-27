@@ -166,6 +166,14 @@ class Settings(BaseSettings):
     # activated or removed so the switch needs no operator step.
     tls_edge_proxy_container: str = "llm-port-nginx"
 
+    # ── Model traffic TLS (gateway <-> machines) ─────────────────────
+    # The machine CA (services/machine_tls) issues each machine a
+    # certificate for its model-TLS proxy and the gateway a client one;
+    # models deployed on machines whose agent can run the proxy are
+    # published as https:// and reached with mutual TLS. Off: models
+    # are published as before, plain HTTP on the machines' network.
+    machine_tls_enabled: bool = True
+
     # LLM Server settings
     # Defaults to the standard HuggingFace cache in the user's home so
     # unprivileged host-process deployments (e.g. ``llmport dev up``) can

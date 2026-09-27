@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llmport-agent"
-version = "0.1.15"
+version = "0.1.16"
 description = "Node execution agent for llm-port cluster-managed runtimes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,9 @@ dependencies = [
   # __main__ pulls in on every invocation -- so a clean install without it
   # cannot even print --help, let alone run.  Undeclared until 0.1.9.
   "pydantic>=2.0,<3.0",
+  # The machine's model-TLS proxy: its key and certificate request are made
+  # here, and the certificates it is handed are read (model_tls.py).
+  "cryptography>=42",
 ]
 
 [project.scripts]

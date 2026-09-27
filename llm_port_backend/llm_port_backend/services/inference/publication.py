@@ -139,6 +139,9 @@ class InferencePublicationCoordinator:
                 health_status=health_status,
                 is_routable=is_routable,
                 tools=deployment_calls_tools(deployment.spec_json),
+                # Behind the machine's model-TLS proxy: reached with the
+                # gateway's machine certificate (services/machine_tls).
+                machine_tls=bool((primary_endpoint.published_json or {}).get("machine_tls")),
             )
         elif primary_endpoint.status in (EndpointStatus.FAILED, EndpointStatus.RETIRED) or ready_replicas == 0:
             # Endpoint is unhealthy or has 0 ready replicas

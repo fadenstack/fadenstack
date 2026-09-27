@@ -582,6 +582,18 @@
       "tls_certificate_expired": {
         "title": "HTTPS-Zertifikat ist am {{until}} abgelaufen",
         "detail": "Browser und Maschinen lehnen die Konsole ab. Erneuern: llmport tls renew oder llmport tls use CERT KEY."
+      },
+      "model_traffic_unencrypted": {
+        "title": "Modellverkehr zu {{cluster}} ist nicht verschlüsselt",
+        "detail": "Das Gateway erreicht die Modelle über unverschlüsseltes HTTP. Auf der Cluster-Seite hinter TLS verlegen; die Modelle laden neu."
+      },
+      "machine_certificate_expiring": {
+        "title": "Modell-TLS-Zertifikat von {{machine}} läuft in {{days}} Tagen ab",
+        "detail": "Am {{until}}. Es erneuert sich zehn Tage vorher selbst: Ist der Agent der Maschine verbunden und aktuell?"
+      },
+      "gateway_machine_certificate_expiring": {
+        "title": "Das Maschinenzertifikat des Gateways läuft in {{days}} Tagen ab",
+        "detail": "Am {{until}}. Das Backend erneuert es stündlich; sein Log nennt den Grund (Machine CA)."
       }
     },
     "integrations": {
@@ -2552,6 +2564,18 @@
       "col_running": "Laufende Kopien",
       "col_alias": "Name am Gateway",
       "take_over": "Übernehmen"
+    },
+    "model_tls": {
+      "title": "Modellverkehr",
+      "encrypted": "Verschlüsselt",
+      "plain": "{{count}} unverschlüsselt",
+      "encrypted_detail": "Das Gateway erreicht die Modelle dieses Clusters über gegenseitiges TLS: Der Proxy der Head-Maschine akzeptiert nur das Zertifikat des Gateways.",
+      "plain_detail": "Das Gateway erreicht einige Modelle dieses Clusters über unverschlüsseltes HTTP: Serve wurde vor Modell-TLS gestartet und lauscht im Netzwerk, bis es neu startet.",
+      "move": "Modellverkehr verschlüsseln",
+      "move_warning": "Serve startet auf diesem Cluster neu: Die Modelle stoppen, laden hinter TLS neu und antworten wieder, sobald sie geladen sind – bei großen Modellen Minuten.",
+      "move_confirm": "Neu starten und verschlüsseln",
+      "moved": "Serve gestoppt; {{count}} Modell(e) laden hinter TLS neu.",
+      "update_agent": "Der Agent auf der Head-Maschine kann den Modell-TLS-Proxy noch nicht ausführen. Aktualisieren Sie ihn, indem Sie die Installationszeile auf dieser Maschine erneut ausführen."
     }
   },
   "inference": {

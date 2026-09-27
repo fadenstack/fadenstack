@@ -343,6 +343,9 @@ class LLMRuntime(Base):
     )
     desired_state: Mapped[str] = mapped_column(String(64), nullable=False, default="running")
     placement_explain_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #: Reached through its machine's model-TLS proxy, with the gateway's
+    #: machine certificate (services/machine_tls): what the agent reported.
+    machine_tls: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     last_command_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("infra_node_command.id", ondelete="SET NULL"),

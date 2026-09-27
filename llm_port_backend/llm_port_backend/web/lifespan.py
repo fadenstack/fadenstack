@@ -719,6 +719,39 @@ def _start_inference_reconciler(app: FastAPI) -> None:
     app.state.inference_reconciler = task
 
 
+async def _machine_tls_loop(app: FastAPI) -> None:
+    """Keep the machine CA and the gateway's client certificate current.
+
+    At startup, then hourly. ``store.maintain`` takes a transaction-scoped
+    advisory lock, so every uvicorn worker may run this and only one acts at
+    a time; it is idempotent.
+    """
+    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+
+    interval_sec = 3600
+    while True:
+        try:
+            if broker.is_worker_process:
+                return
+            if settings.machine_tls_enabled:
+                async with app.state.db_session_factory() as session:
+                    done = await store.maintain(session, settings.settings_master_key)
+                    await session.commit()
+                for note in done.notes:
+                    log.info("Machine CA: %s", note)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Machine CA maintenance failed.")
+        await asyncio.sleep(interval_sec)
+
+
+def _start_machine_tls(app: FastAPI) -> None:
+    if broker.is_worker_process:
+        return
+    app.state.machine_tls = asyncio.create_task(_machine_tls_loop(app), name="machine_tls")
+
+
 async def _stop_notification_runtime(app: FastAPI) -> None:
     """Stop notification background workers and close shared HTTP client."""
     monitor: GatewayAlertMonitor | None = getattr(app.state, "gateway_alert_monitor", None)
@@ -944,6 +977,9 @@ async def lifespan_setup(
     # ── Start inference reconciler background task ────────────
     _start_inference_reconciler(app)
 
+    # ── Machine CA: model traffic TLS (background) ────────────
+    _start_machine_tls(app)
+
     # ── Export catalogued runtime images for nodes (background) ──
     _start_runtime_image_exports(app)
 
@@ -1019,6 +1055,14 @@ async def lifespan_setup(
         reconciler_task.cancel()
         try:
             await reconciler_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    machine_tls_task = getattr(app.state, "machine_tls", None)
+    if machine_tls_task is not None:
+        machine_tls_task.cancel()
+        try:
+            await machine_tls_task
         except (asyncio.CancelledError, Exception):
             pass
 

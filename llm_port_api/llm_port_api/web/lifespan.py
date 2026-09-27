@@ -330,9 +330,16 @@ async def lifespan_setup(
                 log.debug("Price cache refresh failed", exc_info=True)
 
     pricing_task = asyncio.create_task(_pricing_refresh_loop())
+    # The machines' mutual TLS: the gateway's certificate and the machine CAs,
+    # read from the backend every minute (services/gateway/upstream_tls.py).
+    from llm_port_api.services.gateway import upstream_tls  # noqa: PLC0415
+
+    await upstream_tls.machine_identity.refresh()
+    machine_tls_task = asyncio.create_task(upstream_tls.refresh_loop(), name="machine_tls")
 
     yield
     pricing_task.cancel()
+    machine_tls_task.cancel()
     if not broker.is_worker_process:
         await broker.shutdown()
     if getattr(app.state, "usage_group_resolver", None) is not None:

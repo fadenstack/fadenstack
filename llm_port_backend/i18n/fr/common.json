@@ -582,6 +582,18 @@
       "tls_certificate_expired": {
         "title": "Le certificat HTTPS a expiré le {{until}}",
         "detail": "Les navigateurs et les machines refusent la console. Renouvelez-le : llmport tls renew ou llmport tls use CERT KEY."
+      },
+      "model_traffic_unencrypted": {
+        "title": "Le trafic des modèles vers {{cluster}} n'est pas chiffré",
+        "detail": "La passerelle atteint ses modèles en HTTP non chiffré. Placez-les derrière TLS sur la page du cluster ; ils se rechargent."
+      },
+      "machine_certificate_expiring": {
+        "title": "Le certificat TLS des modèles de {{machine}} expire dans {{days}} jours",
+        "detail": "Le {{until}}. Il se renouvelle seul dix jours avant : l'agent de la machine est-il connecté et à jour ?"
+      },
+      "gateway_machine_certificate_expiring": {
+        "title": "Le certificat machine de la passerelle expire dans {{days}} jours",
+        "detail": "Le {{until}}. Le backend le renouvelle chaque heure ; son journal dit pourquoi il ne l'a pas fait (Machine CA)."
       }
     },
     "integrations": {
@@ -2552,6 +2564,18 @@
       "col_running": "Copies en cours",
       "col_alias": "Nom sur la passerelle",
       "take_over": "Reprendre"
+    },
+    "model_tls": {
+      "title": "Trafic des modèles",
+      "encrypted": "Chiffré",
+      "plain": "{{count}} non chiffré(s)",
+      "encrypted_detail": "La passerelle atteint les modèles de ce cluster en TLS mutuel : le proxy de la machine principale n'accepte que le certificat de la passerelle.",
+      "plain_detail": "La passerelle atteint certains modèles de ce cluster en HTTP non chiffré : Serve a démarré avant le TLS des modèles et reste à l'écoute sur le réseau jusqu'à son redémarrage.",
+      "move": "Chiffrer le trafic des modèles",
+      "move_warning": "Serve redémarre sur ce cluster : ses modèles s'arrêtent, se rechargent derrière TLS et répondent de nouveau une fois chargés — quelques minutes pour un grand modèle.",
+      "move_confirm": "Redémarrer et chiffrer",
+      "moved": "Serve arrêté ; {{count}} modèle(s) se rechargent derrière TLS.",
+      "update_agent": "L'agent de la machine principale ne peut pas encore exécuter le proxy TLS des modèles. Mettez-le à jour en relançant la ligne d'installation sur cette machine."
     }
   },
   "inference": {

@@ -66,7 +66,36 @@ def run_step(cfg: LlmportConfig, *, value: str | None = None) -> bool:
 
     for outcome in report.outcomes:
         _say(outcome)
-    return report.ok
+    return _model_tls_images(chosen) and report.ok
+
+
+def _model_tls_images(chosen: set[str]) -> bool:
+    """The machines' model-TLS proxy (nginx), per architecture: small, and needed by air-gapped machines."""
+    info("Model-TLS proxy image for the machines (nginx):")
+    try:
+        outcomes = rt.fetch_model_tls(chosen)
+    except RuntimeError as exc:
+        warning(f"Could not fetch the model-TLS proxy image: {exc}")
+        return False
+    ok = True
+    for tag, arch, outcome in outcomes:
+        what = f"{tag} ({arch})"
+        if outcome == "present":
+            success(f"{what}: already on this server.")
+        elif outcome == "pulled":
+            success(f"{what}: pulled.")
+        elif outcome == "skipped":
+            console.print(f"  [dim]{what}: skipped, not chosen (--runtime-images).[/dim]")
+        else:
+            ok = False
+            reason = "docker pull failed"
+            if outcome == "mismatch":
+                reason = "the registry's image is not the pinned build"
+            warning(
+                f"{what}: {reason}. Machines with internet access pull it themselves;"
+                f" retry with {_HOW_TO_RETRY}."
+            )
+    return ok
 
 
 def _say(outcome: rt.Outcome) -> None:

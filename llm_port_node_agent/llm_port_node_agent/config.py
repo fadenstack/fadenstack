@@ -110,6 +110,12 @@ class AgentConfig:
     #: them; ``true``: always; ``false``: never (a backend rolled back to one
     #: that does not sign).
     require_signed_commands: str = "auto"
+    #: The machine's model-TLS proxy: key, certificate, trust and nginx's
+    #: configuration (model_tls.py). Empty means ``model-tls`` beside the state.
+    model_tls_dir: str = ""
+    #: The same directory as the container runtime's host sees it, when the
+    #: agent itself runs in a container (Docker-out-of-Docker). Empty: the same.
+    model_tls_host_dir: str = ""
 
     @classmethod
     def from_env(cls) -> AgentConfig:
@@ -171,6 +177,8 @@ class AgentConfig:
             require_signed_commands=(
                 os.getenv("LLM_PORT_NODE_AGENT_REQUIRE_SIGNED_COMMANDS", "auto").strip().lower() or "auto"
             ),
+            model_tls_dir=os.getenv("LLM_PORT_NODE_AGENT_MODEL_TLS_DIR", "").strip(),
+            model_tls_host_dir=os.getenv("LLM_PORT_NODE_AGENT_MODEL_TLS_HOST_DIR", "").strip(),
         )
         if not instance.verify_tls:
             log.warning("TLS verification is disabled — connections are vulnerable to MITM.")

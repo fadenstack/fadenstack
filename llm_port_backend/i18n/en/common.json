@@ -582,6 +582,18 @@
       "tls_certificate_expired": {
         "title": "HTTPS certificate ran out on {{until}}",
         "detail": "Browsers and machines refuse the console. Renew it: llmport tls renew, or llmport tls use CERT KEY."
+      },
+      "model_traffic_unencrypted": {
+        "title": "Model traffic to {{cluster}} is not encrypted",
+        "detail": "The gateway reaches its models over plain HTTP. Move them behind TLS on the cluster's page; they load again."
+      },
+      "machine_certificate_expiring": {
+        "title": "Model TLS certificate of {{machine}} runs out in {{days}} days",
+        "detail": "On {{until}}. It renews by itself ten days before: is the machine's agent connected and up to date?"
+      },
+      "gateway_machine_certificate_expiring": {
+        "title": "The gateway's machine certificate runs out in {{days}} days",
+        "detail": "On {{until}}. The backend renews it every hour; its log says why it did not (Machine CA)."
       }
     },
     "integrations": {
@@ -2550,6 +2562,18 @@
       "col_running": "Copies running",
       "col_alias": "Name at the gateway",
       "take_over": "Take over"
+    },
+    "model_tls": {
+      "title": "Model traffic",
+      "encrypted": "Encrypted",
+      "plain": "{{count}} not encrypted",
+      "encrypted_detail": "The gateway reaches this cluster's models over mutual TLS: the head machine's proxy accepts the gateway's certificate and nothing else.",
+      "plain_detail": "The gateway reaches some of this cluster's models over plain HTTP: Serve was started before model TLS and keeps listening on the network until it starts again.",
+      "move": "Encrypt model traffic",
+      "move_warning": "Serve restarts on this cluster: its models stop, load again behind TLS and answer again when loaded — minutes for a large model.",
+      "move_confirm": "Restart and encrypt",
+      "moved": "Serve stopped; {{count}} model(s) are loading again behind TLS.",
+      "update_agent": "The agent on the head machine cannot run the model-TLS proxy yet. Update it by re-running the install line on that machine."
     }
   },
   "inference": {

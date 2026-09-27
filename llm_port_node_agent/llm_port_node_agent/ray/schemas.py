@@ -144,6 +144,11 @@ class RunServeAppPayload(BaseModel):
     # cluster (``serve.start``); ignored by Ray once Serve is running.
     proxy_location: str | None = None
     http_options: dict[str, Any] | None = None
+    #: ``{"public_port": .., "internal_port": ..}``: Serve binds the loopback
+    #: address at ``internal_port`` (``http_options``) and the machine's
+    #: model-TLS proxy serves ``public_port`` in front of it (model_tls.py).
+    #: Sent only to agents that report the ``model_tls`` capability.
+    model_tls: dict[str, Any] | None = None
 
 
 class DeleteServeAppPayload(BaseModel):

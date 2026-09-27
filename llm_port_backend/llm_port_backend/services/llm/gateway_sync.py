@@ -126,8 +126,13 @@ class GatewaySyncService:
         source_id: uuid.UUID | None = None,
         task: str | None = None,
         tools: bool | None = None,
+        machine_tls: bool = False,
     ) -> None:
         """Create or update gateway routing records for a runtime.
+
+        *machine_tls*: the address is a machine's model-TLS proxy, which the
+        gateway reaches with its machine certificate (``ssl_verify_mode``
+        ``machine``). Any other TLS setting on the instance is left alone.
 
         *task* -- ``chat``, ``embeddings``, ``scoring`` -- is what the model is
         for; the gateway lists it with the model and refuses requests of the
@@ -174,14 +179,19 @@ class GatewaySyncService:
                             (id, type, base_url, enabled, weight, max_concurrency,
                              health_status, api_key_encrypted, litellm_provider,
                              litellm_model, extra_params, node_id, node_metadata,
-                             capacity_hints, source_kind, source_id, created_at, updated_at)
+                             capacity_hints, source_kind, source_id, ssl_verify_mode,
+                             created_at, updated_at)
                         VALUES
                             (:id, :type, :base_url, TRUE, :weight, :max_concurrency,
                              :health, :api_key, :litellm_provider,
                              :litellm_model, :extra_params, :node_id, :node_metadata,
-                             :capacity_hints, :source_kind, :source_id, NOW(), NOW())
+                             :capacity_hints, :source_kind, :source_id,
+                             CASE WHEN :machine_tls THEN 'machine' ELSE NULL END, NOW(), NOW())
                         ON CONFLICT (id) DO UPDATE
                             SET base_url        = EXCLUDED.base_url,
+                                ssl_verify_mode = CASE WHEN :machine_tls THEN 'machine'
+                                    WHEN llm_provider_instance.ssl_verify_mode = 'machine' THEN NULL
+                                    ELSE llm_provider_instance.ssl_verify_mode END,
                                 type            = EXCLUDED.type,
                                 enabled         = TRUE,
                                 weight          = EXCLUDED.weight,
@@ -214,6 +224,7 @@ class GatewaySyncService:
                         "capacity_hints": json.dumps(capacity_hints) if capacity_hints else None,
                         "source_kind": source_kind or ("remote_provider" if is_remote else "runtime"),
                         "source_id": source_id or runtime_id,
+                        "machine_tls": machine_tls,
                     },
                 )
 
@@ -383,6 +394,7 @@ class GatewaySyncService:
         capacity_hints: dict[str, Any] | None = None,
         task: str | None = "chat",
         tools: bool | None = None,
+        machine_tls: bool = False,
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
 
@@ -420,14 +432,19 @@ class GatewaySyncService:
                             (id, type, base_url, enabled, weight, max_concurrency,
                              health_status, api_key_encrypted, litellm_provider,
                              litellm_model, extra_params, node_id, node_metadata,
-                             capacity_hints, source_kind, source_id, created_at, updated_at)
+                             capacity_hints, source_kind, source_id, ssl_verify_mode,
+                             created_at, updated_at)
                         VALUES
                             (:id, :type, :base_url, :enabled, :weight, :max_concurrency,
                              :health, :api_key, NULL,
                              :litellm_model, :extra_params, NULL, :node_metadata,
-                             :capacity_hints, 'inference_deployment', :dep_id, NOW(), NOW())
+                             :capacity_hints, 'inference_deployment', :dep_id,
+                             CASE WHEN :machine_tls THEN 'machine' ELSE NULL END, NOW(), NOW())
                         ON CONFLICT (id) DO UPDATE
                             SET base_url        = EXCLUDED.base_url,
+                                ssl_verify_mode = CASE WHEN :machine_tls THEN 'machine'
+                                    WHEN llm_provider_instance.ssl_verify_mode = 'machine' THEN NULL
+                                    ELSE llm_provider_instance.ssl_verify_mode END,
                                 type            = EXCLUDED.type,
                                 enabled         = EXCLUDED.enabled,
                                 weight          = EXCLUDED.weight,
@@ -458,6 +475,7 @@ class GatewaySyncService:
                             {k: v for k, v in (("task", task), ("tools", tools)) if v is not None},
                         ) if (task or tools is not None) else None,
                         "dep_id": deployment_id,
+                        "machine_tls": machine_tls,
                     },
                 )
 

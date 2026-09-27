@@ -98,6 +98,42 @@ class LLMService:
         slug = "".join(ch for ch in slug if ch.isalnum() or ch == "-").strip("-")
         return f"llm-port-{slug[:48]}" if slug else "llm-port-runtime"
 
+    @staticmethod
+    async def _machine_tls_health(session: Any, endpoint_url: str) -> Any:
+        """``/health`` of a model behind a machine's model-TLS proxy, presenting the gateway's certificate."""
+        import httpx  # noqa: PLC0415
+
+        from llm_port_backend.services.llm.base import HealthStatus  # noqa: PLC0415
+        from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+
+        try:
+            ctx = await store.client_context(session, settings.settings_master_key)
+        except Exception as exc:  # noqa: BLE001 - reported as the probe's result
+            return HealthStatus(healthy=False, detail=f"machine TLS identity unavailable: {exc}")
+        if ctx is None:
+            return HealthStatus(healthy=False, detail="machine TLS identity not made yet")
+        try:
+            async with httpx.AsyncClient(verify=ctx, timeout=5.0) as client:
+                resp = await client.get(f"{endpoint_url.rstrip('/')}/health")
+            if resp.status_code == 200:
+                return HealthStatus(healthy=True)
+            return HealthStatus(healthy=False, detail=f"HTTP {resp.status_code}")
+        except Exception as exc:  # noqa: BLE001
+            return HealthStatus(healthy=False, detail=str(exc))
+
+    @staticmethod
+    def _model_tls_request(node: Any, provider_config: dict[str, Any] | None) -> dict[str, int] | None:
+        """Behind the machine's model-TLS proxy, when its agent can run one: which ports."""
+        from llm_port_backend.services import machine_tls  # noqa: PLC0415
+
+        if node is None or not settings.machine_tls_enabled:
+            return None
+        if not machine_tls.supported(getattr(node, "capabilities_json", None)):
+            return None
+        config = provider_config or {}
+        public = int(config.get("host_port") or config.get("container_port") or 8000)
+        return {"public_port": public, "internal_port": machine_tls.internal_port(public)}
+
     async def _build_node_deploy_payload(
         self,
         runtime: LLMRuntime,
@@ -121,7 +157,10 @@ class LLMService:
             ipc_mode = "host"
         model_source = prov_config.get("model_source") or "sync_from_server"
         image_source = prov_config.get("image_source") or "pull_from_registry"
+        node = await session.get(InfraNode, runtime.assigned_node_id) if runtime.assigned_node_id else None
+        tls = self._model_tls_request(node, prov_config)
         return {
+            **({"model_tls": tls} if tls else {}),
             "runtime_id": str(runtime.id),
             "runtime_name": runtime.name,
             "container_name": self._node_container_name(runtime.name),
@@ -520,10 +559,12 @@ class LLMService:
             if not ipc_mode and gpu_request and provider.type.value in ("vllm", "tgi"):
                 ipc_mode = "host"
 
+            tls_request = self._model_tls_request(selected_node, provider_config)
             command = await node_service.issue_command(
                 node_id=selected_node.id,
                 command_type=NodeCommandType.DEPLOY_WORKLOAD.value,
                 payload={
+                    **({"model_tls": tls_request} if tls_request else {}),
                     "runtime_id": str(runtime.id),
                     "runtime_name": runtime.name,
                     "container_name": self._node_container_name(runtime.name),
@@ -1195,7 +1236,11 @@ class LLMService:
         runtime = await self.reconcile_runtime_status(runtime_dao, runtime)
 
         adapter = get_adapter(provider.type)
-        health = await adapter.get_health(runtime)
+        if getattr(runtime, "machine_tls", False) and runtime.endpoint_url:
+            # Behind its machine's model-TLS proxy, which wants the gateway's certificate.
+            health = await self._machine_tls_health(runtime_dao.session, runtime.endpoint_url)
+        else:
+            health = await adapter.get_health(runtime)
 
         # Promote STARTING → RUNNING when the health probe passes
         if health.healthy and runtime.status == RuntimeStatus.STARTING:

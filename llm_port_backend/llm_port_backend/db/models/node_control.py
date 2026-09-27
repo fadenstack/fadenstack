@@ -75,6 +75,10 @@ class NodeCommandType(enum.StrEnum):
     # --- Ray Serve application lifecycle (Phase 3) ---
     RUN_SERVE_APP = "run_serve_app"
     DELETE_SERVE_APP = "delete_serve_app"
+    #: Stop Serve on a cluster, applications and proxy alike, so the next
+    #: application starts it with other HTTP options (moving it behind the
+    #: machine's model-TLS proxy).
+    SHUTDOWN_SERVE = "shutdown_serve"
 
     # --- Fabric planning / active validation (Phase 4A) ---
     VALIDATE_FABRIC_LISTEN = "validate_fabric_listen"

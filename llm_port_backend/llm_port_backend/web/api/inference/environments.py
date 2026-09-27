@@ -444,3 +444,36 @@ async def take_over_stray_models(
     except takeover.TakeoverError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+
+@router.get("/{environment_id}/model-tls")
+async def model_tls_status(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Which of this cluster's models the gateway reaches over mutual TLS, and which not yet."""
+    from llm_port_backend.services.inference import model_tls  # noqa: PLC0415
+
+    try:
+        return await model_tls.environment_status(session, environment_id)
+    except model_tls.ModelTlsMoveError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/model-tls/move")
+async def move_behind_model_tls(
+    environment_id: uuid.UUID,
+    request: Request,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Restart Serve on the cluster so its models are served behind the head's model-TLS proxy.
+
+    The models stop and load again -- minutes for a large one.
+    """
+    from llm_port_backend.services.inference import model_tls  # noqa: PLC0415
+
+    try:
+        return await model_tls.move(session, _command_gateway(request), environment_id)
+    except model_tls.ModelTlsMoveError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

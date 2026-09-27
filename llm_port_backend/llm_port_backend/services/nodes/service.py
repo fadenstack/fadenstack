@@ -1548,6 +1548,9 @@ class NodeControlService:
             }:
                 runtime.status = RuntimeStatus.RUNNING
                 result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+                if "model_tls" in result:
+                    # What the agent did: behind its model-TLS proxy, or not.
+                    runtime.machine_tls = bool(result.get("model_tls"))
                 endpoint_url = result.get("endpoint_url")
                 if isinstance(endpoint_url, str) and endpoint_url.strip():
                     endpoint_url = await self._rewrite_endpoint_host(endpoint_url.strip(), node_id=command.node_id)
@@ -1792,6 +1795,7 @@ class NodeControlService:
             },
             task=runtime_kind(runtime),
             tools=runtime_calls_tools(runtime),
+            machine_tls=bool(getattr(runtime, "machine_tls", False)),
         )
 
     _STALE_THRESHOLD = timedelta(minutes=2)

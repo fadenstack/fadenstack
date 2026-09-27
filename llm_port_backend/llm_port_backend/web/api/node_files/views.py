@@ -163,6 +163,86 @@ async def node_server_trust(_node: InfraNode = Depends(_authenticate_node)) -> d
     }
 
 
+@router.get("/machine-tls", name="node_machine_tls")
+async def node_machine_tls(
+    request: Request,
+    node: InfraNode = Depends(_authenticate_node),
+) -> dict[str, Any]:
+    """What this machine's model-TLS proxy needs to know, asked every minute.
+
+    ``trust_pem`` is every machine CA to trust (the gateway's certificate
+    comes from one of them); ``issuer_key_id`` says which one signs now and
+    ``names`` what a certificate for this machine names -- when either differs
+    from the certificate the machine holds, it asks for a new one.
+    """
+    from llm_port_backend.services.machine_tls import authority, store  # noqa: PLC0415
+
+    if not settings.machine_tls_enabled:
+        return {"enabled": False}
+    async with request.app.state.db_session_factory() as session:
+        issuer = await store.issuer_key_id(session)
+        if issuer is None:
+            await store.maintain(session, settings.settings_master_key)
+            await session.commit()
+            issuer = await store.issuer_key_id(session)
+        trust = await store.trust_bundle(session)
+    return {
+        "enabled": True,
+        "trust_pem": trust,
+        "trust_sha256": authority.bundle_sha256(trust),
+        "issuer_key_id": issuer,
+        "names": store.machine_names(node.host),
+        "client_name": authority.GATEWAY_CLIENT,
+        "renew_before_sec": int(authority.RENEW_BEFORE.total_seconds()),
+    }
+
+
+@router.post("/machine-tls/certificate", name="node_machine_tls_certificate")
+async def node_machine_tls_certificate(
+    request: Request,
+    node: InfraNode = Depends(_authenticate_node),
+) -> dict[str, Any]:
+    """Sign this machine's certificate request for its model-TLS proxy.
+
+    The key never leaves the machine: the request carries only the public
+    half. The certificate names what the backend records for the machine,
+    whatever the request names.
+    """
+    from llm_port_backend.services.machine_tls import authority, store  # noqa: PLC0415
+
+    if not settings.machine_tls_enabled:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Model traffic TLS is switched off.")
+    try:
+        body = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Expected a JSON body.") from exc
+    csr_pem = body.get("csr_pem") if isinstance(body, dict) else None
+    if not isinstance(csr_pem, str) or len(csr_pem) > 16 * 1024:
+        raise HTTPException(status_code=400, detail="csr_pem is required.")
+    async with request.app.state.db_session_factory() as session:
+        try:
+            issued = await store.issue_for_node(
+                session, settings.settings_master_key, node_id=node.id, host=node.host, csr_pem=csr_pem,
+            )
+        except store.TooSoonError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="A certificate was issued to this machine less than a minute ago.",
+            ) from exc
+        except authority.AuthorityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await session.commit()
+    log.info("Model-TLS certificate issued to machine %s for %s", node.id, ", ".join(issued.names))
+    return {
+        "certificate_pem": issued.cert_pem,
+        "trust_pem": issued.trust_pem,
+        "trust_sha256": authority.bundle_sha256(issued.trust_pem),
+        "not_after": issued.not_after.isoformat(),
+        "names": issued.names,
+        "issuer_key_id": issued.issuer_key_id,
+    }
+
+
 @router.get(
     "/models/{model_id}/manifest",
     name="node_model_manifest",

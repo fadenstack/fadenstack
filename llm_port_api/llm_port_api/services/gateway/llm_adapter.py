@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import ssl
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import aclosing
@@ -21,6 +22,7 @@ import litellm
 
 from llm_port_api.db.crypto import decrypt_value
 from llm_port_api.db.models.gateway import ProviderType
+from llm_port_api.services.gateway import upstream_tls
 from llm_port_api.services.gateway.ssl_helpers import build_ssl_kwargs
 from llm_port_api.settings import settings
 
@@ -252,6 +254,112 @@ def _upstream_kwargs(
     return kwargs
 
 
+#: Provider types LiteLLM reaches through the OpenAI SDK ("openai/..."): a
+#: TLS setting of their own goes in as a ready-made ``AsyncOpenAI``.
+_OPENAI_SDK_TYPES = frozenset({
+    ProviderType.VLLM,
+    ProviderType.LLAMACPP,
+    ProviderType.TGI,
+    ProviderType.REMOTE_OPENAI,
+    ProviderType.REMOTE_CUSTOM,
+})
+_OPENAI_DEFAULT_BASE = "https://api.openai.com/v1"
+_WARNED_NO_CLIENT_CERT: set[str] = set()
+
+
+class _TlsRefusedError(Exception):
+    """A model this gateway cannot reach securely yet; the message says why."""
+
+
+def _provider_tls(
+    *,
+    instance_id: uuid.UUID | None,
+    ssl_verify_mode: str | None,
+    ssl_ca_bundle_pem: str | None,
+    ssl_client_cert_pem: str | None,
+    ssl_client_key_pem: str | None,
+) -> upstream_tls.UpstreamTls | None:
+    if instance_id is None:
+        return None
+    try:
+        return upstream_tls.for_provider(
+            ssl_verify_mode=ssl_verify_mode,
+            ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+            ssl_client_cert_pem=ssl_client_cert_pem,
+            ssl_client_key_pem=ssl_client_key_pem,
+        )
+    except upstream_tls.MachineTlsUnavailableError as exc:
+        raise _TlsRefusedError(str(exc)) from exc
+
+
+def _native_kwargs(
+    tls: upstream_tls.UpstreamTls | None,
+    *,
+    provider_type: ProviderType,
+    instance_id: uuid.UUID | None,
+    ssl_verify_mode: str | None,
+    ssl_ca_bundle_pem: str | None,
+    ssl_client_cert_pem: str | None,
+    ssl_client_key_pem: str | None,
+) -> dict[str, Any]:
+    """The per-call kwargs for a provider LiteLLM speaks natively, which honour a CA only."""
+    if tls is None or provider_type in _OPENAI_SDK_TYPES or instance_id is None:
+        return {}
+    return build_ssl_kwargs(
+        instance_id=instance_id,
+        ssl_verify_mode=ssl_verify_mode,
+        ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+        ssl_client_cert_pem=ssl_client_cert_pem,
+        ssl_client_key_pem=ssl_client_key_pem,
+    )
+
+
+def _apply_tls(
+    kwargs: dict[str, Any],
+    tls: upstream_tls.UpstreamTls | None,
+    *,
+    provider_type: ProviderType,
+    instance_id: uuid.UUID | None,
+    native: dict[str, Any],
+) -> None:
+    """Give LiteLLM a client that carries *tls*, where it takes one.
+
+    The OpenAI-compatible types get an ``AsyncOpenAI`` over a client made with
+    the setting's own SSL context -- the only way the CA and the client
+    certificate reach the connection (LiteLLM builds that path's client from
+    its globals). The providers LiteLLM speaks natively keep the per-call
+    ``ssl_verify`` they honour; a client certificate cannot be presented to
+    them, and that is said once.
+    """
+    if tls is None:
+        return
+    if provider_type in _OPENAI_SDK_TYPES:
+        kwargs["client"] = upstream_tls.clients.openai(
+            tls, base_url=str(kwargs.get("api_base") or _OPENAI_DEFAULT_BASE), api_key=kwargs.get("api_key"),
+        )
+        return
+    kwargs.update(native)
+    if tls.cert_pem and str(provider_type) not in _WARNED_NO_CLIENT_CERT:
+        _WARNED_NO_CLIENT_CERT.add(str(provider_type))
+        logger.warning(
+            "Provider %s (%s) has a client certificate, which LiteLLM cannot present for this "
+            "provider type; its CA setting is applied, the certificate is not.",
+            instance_id, provider_type,
+        )
+
+
+def _refusal(stream: bool, message: str) -> Any:
+    payload = _error_payload("server_error", message)
+    if not stream:
+        return CompletionResult(status_code=503, payload=payload)
+
+    async def _events() -> AsyncIterator[bytes]:
+        yield _sse(payload)
+        yield _DONE
+
+    return _events()
+
+
 class LLMAdapter:
     """Provider-agnostic adapter backed by LiteLLM.
 
@@ -305,7 +413,7 @@ class LLMAdapter:
                 base_url=base_url,
                 api_key=api_key,
                 provider_type=provider_type,
-            )
+            ),
         )
 
         # Pass through supported OpenAI params
@@ -325,19 +433,26 @@ class LLMAdapter:
             litellm_only = dict(extra_params)
             kwargs.update(extra_params)
 
-        # Apply per-provider TLS overrides (CA bundle / mTLS).  When the
-        # provider has nothing configured this is a no-op and LiteLLM
-        # inherits the global default set in lifespan.
-        tls: dict[str, Any] = {}
-        if instance_id is not None:
-            tls = build_ssl_kwargs(
+        # A TLS setting of the provider's own -- a CA, a client certificate,
+        # or the machines' mutual TLS -- goes in as a client made with it
+        # (see _apply_tls). Nothing of its own: LiteLLM's global default.
+        try:
+            tls = _provider_tls(
                 instance_id=instance_id,
                 ssl_verify_mode=ssl_verify_mode,
                 ssl_ca_bundle_pem=ssl_ca_bundle_pem,
                 ssl_client_cert_pem=ssl_client_cert_pem,
                 ssl_client_key_pem=ssl_client_key_pem,
             )
-            kwargs.update(tls)
+        except _TlsRefusedError as exc:
+            return _refusal(stream, str(exc))  # type: ignore[no-any-return]
+        native = _native_kwargs(
+            tls, provider_type=provider_type, instance_id=instance_id,
+            ssl_verify_mode=ssl_verify_mode,
+            ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+            ssl_client_cert_pem=ssl_client_cert_pem,
+            ssl_client_key_pem=ssl_client_key_pem,
+        )
 
         if str(kwargs["model"]) in _SYSTEM_FIRST:
             kwargs["messages"] = _system_first(kwargs["messages"]) or kwargs["messages"]
@@ -346,8 +461,12 @@ class LLMAdapter:
             # Request token usage in the final streaming chunk (OpenAI-compatible).
             kwargs["stream_options"] = {"include_usage": True}
             if self._goes_direct(provider_type, kwargs, tls=tls, litellm_only=litellm_only):
-                return self._stream_direct(kwargs, extra_headers)
+                http = upstream_tls.clients.http(tls) if tls is not None else self._http
+                return self._stream_direct(kwargs, extra_headers, http=http)
+            _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
             return self._stream_completion(**kwargs)
+
+        _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
 
         result = await self._non_stream_completion(**kwargs)
         moved = _late_system_refused(result.status_code, json.dumps(result.payload), kwargs["messages"])
@@ -361,27 +480,31 @@ class LLMAdapter:
         provider_type: ProviderType,
         kwargs: dict[str, Any],
         *,
-        tls: dict[str, Any],
+        tls: upstream_tls.UpstreamTls | None,
         litellm_only: dict[str, Any],
     ) -> bool:
         """Whether a streamed chat can skip LiteLLM: vLLM, as a plain OpenAI server.
 
-        Everything LiteLLM would do differently keeps LiteLLM: per-provider
-        TLS and the default outbound CA bundle are LiteLLM settings, and extra
-        params beyond headers are LiteLLM call arguments. Remote OpenAI APIs
-        stay too: LiteLLM rewrites some of their parameters per model.
+        Everything LiteLLM would do differently keeps LiteLLM: the default
+        outbound CA bundle is a LiteLLM setting, and extra params beyond
+        headers are LiteLLM call arguments. Remote OpenAI APIs stay too:
+        LiteLLM rewrites some of their parameters per model. A TLS setting of
+        the model's own -- the machines' mutual TLS above all -- does not: the
+        stream goes over a client made with it.
         """
         if self._http is None or not settings.vllm_direct_stream:
             return False
-        if provider_type != ProviderType.VLLM or tls or litellm_only:
+        if provider_type != ProviderType.VLLM or litellm_only:
             return False
         base = str(kwargs.get("api_base") or "")
         if not base:
             return False
+        if tls is not None:
+            return True
         return not (base.startswith("https://") and settings.tls_outbound_default_ca_bundle)
 
     async def _stream_direct(
-        self, kwargs: dict[str, Any], extra_headers: dict[str, Any],
+        self, kwargs: dict[str, Any], extra_headers: dict[str, Any], *, http: httpx.AsyncClient | None = None,
     ) -> AsyncIterator[bytes]:
         """Stream a chat from vLLM as the engine sends it, event by event.
 
@@ -395,7 +518,8 @@ class LLMAdapter:
         every step after this one -- PII restore, usage, the saved reply --
         reads whole events.
         """
-        assert self._http is not None  # noqa: S101 - _goes_direct checked it
+        client = http or self._http
+        assert client is not None  # noqa: S101 - _goes_direct checked it
         url = f"{str(kwargs['api_base']).rstrip('/')}/chat/completions"
         body = {key: value for key, value in kwargs.items() if key in _DIRECT_BODY_KEYS}
         body["model"] = str(kwargs["model"]).removeprefix("openai/")
@@ -405,7 +529,7 @@ class LLMAdapter:
         retried = False
         try:
             while True:
-                request = self._http.stream("POST", url, json=body, headers=headers, timeout=timeout)
+                request = client.stream("POST", url, json=body, headers=headers, timeout=timeout)
                 async with request as response:
                     if response.status_code >= 400:
                         detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
@@ -431,7 +555,9 @@ class LLMAdapter:
                                 closed = True
                                 break
                 break
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, ssl.SSLError) as exc:
+            # A TLS alert after the handshake -- a proxy refusing this client's
+            # certificate, under TLS 1.3 -- arrives on the first read, unmapped.
             logger.exception("Direct vLLM stream failed")
             yield _sse(_error_payload("server_error", str(exc) or type(exc).__name__))
             yield _DONE
@@ -536,21 +662,29 @@ class LLMAdapter:
                 base_url=base_url,
                 api_key=api_key,
                 provider_type=provider_type,
-            )
+            ),
         )
         if extra_params:
             kwargs.update(extra_params)
 
-        if instance_id is not None:
-            kwargs.update(
-                build_ssl_kwargs(
-                    instance_id=instance_id,
-                    ssl_verify_mode=ssl_verify_mode,
-                    ssl_ca_bundle_pem=ssl_ca_bundle_pem,
-                    ssl_client_cert_pem=ssl_client_cert_pem,
-                    ssl_client_key_pem=ssl_client_key_pem,
-                ),
+        try:
+            tls = _provider_tls(
+                instance_id=instance_id,
+                ssl_verify_mode=ssl_verify_mode,
+                ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+                ssl_client_cert_pem=ssl_client_cert_pem,
+                ssl_client_key_pem=ssl_client_key_pem,
             )
+        except _TlsRefusedError as exc:
+            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        native = _native_kwargs(
+            tls, provider_type=provider_type, instance_id=instance_id,
+            ssl_verify_mode=ssl_verify_mode,
+            ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+            ssl_client_cert_pem=ssl_client_cert_pem,
+            ssl_client_key_pem=ssl_client_key_pem,
+        )
+        _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
 
         # The same mapping as a completion's: an embeddings request to a model
         # that cannot embed is the caller's mistake (400), not a gateway fault
@@ -626,20 +760,24 @@ class LLMAdapter:
                 base_url=base_url,
                 api_key=_resolve_api_key(api_key_encrypted),
                 provider_type=provider_type,
-            )
+            ),
         )
         if extra_params:
             kwargs.update(extra_params)
-        if instance_id is not None:
-            kwargs.update(
-                build_ssl_kwargs(
-                    instance_id=instance_id,
-                    ssl_verify_mode=ssl_verify_mode,
-                    ssl_ca_bundle_pem=ssl_ca_bundle_pem,
-                    ssl_client_cert_pem=ssl_client_cert_pem,
-                    ssl_client_key_pem=ssl_client_key_pem,
-                ),
+        try:
+            tls = _provider_tls(
+                instance_id=instance_id,
+                ssl_verify_mode=ssl_verify_mode,
+                ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+                ssl_client_cert_pem=ssl_client_cert_pem,
+                ssl_client_key_pem=ssl_client_key_pem,
             )
+        except _TlsRefusedError as exc:
+            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        if tls is not None:
+            # Rerank goes through LiteLLM's own HTTP handler for every
+            # provider, and that takes a ready-made one.
+            kwargs["client"] = upstream_tls.clients.handler(tls)
         try:
             response = await litellm.arerank(**kwargs)
             return CompletionResult(status_code=200, payload=response.model_dump())  # type: ignore[union-attr]

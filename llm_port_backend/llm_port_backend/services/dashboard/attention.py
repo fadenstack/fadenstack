@@ -430,6 +430,67 @@ async def edge_certificate(facts: Facts) -> list[Item]:
     return []
 
 
+#: Model-TLS certificates renew ten days before their end; this close means renewal is failing.
+MACHINE_CERT_WARNING_DAYS = 5
+MACHINE_CERT_CRITICAL_DAYS = 2
+
+
+async def model_traffic(facts: Facts) -> list[Item]:
+    """Models reached over plain HTTP where TLS is possible, and model-TLS certificates not renewing."""
+
+    async def query(session: Any) -> list[Item]:
+        from llm_port_backend.db.models.inference import InferenceEndpoint  # noqa: PLC0415
+        from llm_port_backend.db.models.machine_tls import MachineCertificate, MachineTlsClient  # noqa: PLC0415
+        from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+
+        items: list[Item] = []
+        if not settings.machine_tls_enabled:
+            return items
+        pending = (
+            await session.execute(
+                select(InferenceEnvironment.id, InferenceEnvironment.name, InferenceEndpoint.published_json)
+                .join(InferenceDeployment, InferenceDeployment.environment_id == InferenceEnvironment.id)
+                .join(InferenceEndpoint, InferenceEndpoint.deployment_id == InferenceDeployment.id)
+                .where(InferenceDeployment.desired_state == DeploymentDesiredState.ACTIVE.value)
+            )
+        ).all()
+        seen: set[Any] = set()
+        for env_id, env_name, published in pending:
+            if env_id in seen or not (published or {}).get("model_tls_pending"):
+                continue
+            seen.add(env_id)
+            items.append(Item(
+                f"model_traffic_unencrypted:{env_id}", "model_traffic_unencrypted", "warning", "models",
+                {"cluster": env_name}, None, f"/admin/clusters/{env_id}",
+            ))
+        rows = (
+            await session.execute(
+                select(MachineCertificate, InfraNode.host).join(InfraNode, InfraNode.id == MachineCertificate.node_id)
+            )
+        ).all()
+        for cert, host in rows:
+            days = (cert.not_after - facts.now).total_seconds() / 86400
+            if days < MACHINE_CERT_WARNING_DAYS:
+                items.append(Item(
+                    f"machine_certificate_expiring:{cert.node_id}", "machine_certificate_expiring",
+                    "critical" if days < MACHINE_CERT_CRITICAL_DAYS else "warning", "infrastructure",
+                    {"machine": host, "days": max(int(days), 0), "until": cert.not_after.date().isoformat()},
+                    None, "/admin/nodes",
+                ))
+        gateway = await session.get(MachineTlsClient, "fadenstack-gateway")
+        if gateway is not None:
+            days = (gateway.not_after - facts.now).total_seconds() / 86400
+            if days < MACHINE_CERT_WARNING_DAYS:
+                items.append(Item(
+                    "gateway_machine_certificate_expiring", "gateway_machine_certificate_expiring",
+                    "critical" if days < MACHINE_CERT_CRITICAL_DAYS else "warning", "platform",
+                    {"days": max(int(days), 0), "until": gateway.not_after.date().isoformat()},
+                ))
+        return items
+
+    return await facts.on_backend(query)
+
+
 RULES: list[Rule] = [
     machines,
     join_requests,
@@ -442,6 +503,7 @@ RULES: list[Rule] = [
     rag_jobs,
     mcp_servers,
     edge_certificate,
+    model_traffic,
 ]
 
 

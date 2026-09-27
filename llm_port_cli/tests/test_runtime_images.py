@@ -204,3 +204,46 @@ def test_none_fetches_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(rt, "fetch", no_docker)
     assert cmd.run_step(LlmportConfig(runtime_images="none")) is True
+
+
+# ── the machines' model-TLS proxy ──────────────────────────────────────────
+
+
+class TaggingDocker(FakeDocker):
+    """FakeDocker that also tags: the tag points at what the reference holds."""
+
+    def __call__(self, argv: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
+        if argv[1] == "tag":
+            self.calls.append(argv)
+            self.store[argv[3]] = self.store[argv[2]]
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return super().__call__(argv, **kw)
+
+
+def test_the_model_tls_proxy_is_held_per_architecture_by_its_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    layers = {arch: [f"sha256:{arch}-layer"] for arch in rt.MODEL_TLS_NGINX}
+    monkeypatch.setattr(
+        rt, "MODEL_TLS_NGINX",
+        {arch: (ref, rt.rootfs_digest(layers[arch])) for arch, (ref, _pin) in rt.MODEL_TLS_NGINX.items()},
+    )
+    registry = {ref: layers[arch] for arch, (ref, _pin) in rt.MODEL_TLS_NGINX.items()}
+    fake = _use(monkeypatch, TaggingDocker(registry=registry))
+    monkeypatch.setattr(rt.shutil, "which", lambda name: "docker")
+
+    out = rt.fetch_model_tls({"x86_64", "aarch64"})
+    assert sorted(o for _t, _a, o in out) == ["pulled", "pulled"]
+    arm_ref = rt.MODEL_TLS_NGINX["aarch64"][0]
+    assert ["docker", "pull", "--platform", "linux/arm64", arm_ref] in fake.pulls()
+    assert ["docker", "tag", arm_ref, "llmport/model-tls-nginx:1.31.6-alpine-aarch64"] in fake.calls
+
+    fake.calls.clear()
+    assert [o for _t, _a, o in rt.fetch_model_tls({"x86_64", "aarch64"})] == ["present", "present"]
+    assert fake.pulls() == []
+
+
+def test_a_model_tls_image_that_is_not_the_pinned_build_is_not_tagged(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = {ref: ["sha256:someone-elses"] for ref, _pin in rt.MODEL_TLS_NGINX.values()}
+    fake = _use(monkeypatch, TaggingDocker(registry=registry))
+    monkeypatch.setattr(rt.shutil, "which", lambda name: "docker")
+    assert [o for _t, _a, o in rt.fetch_model_tls({"x86_64"})] == ["mismatch", "skipped"]
+    assert not [c for c in fake.calls if c[1] == "tag"]

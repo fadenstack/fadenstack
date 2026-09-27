@@ -582,6 +582,18 @@
       "tls_certificate_expired": {
         "title": "HTTPS 证书已于 {{until}} 过期",
         "detail": "浏览器和机器会拒绝访问控制台。请续期：llmport tls renew 或 llmport tls use CERT KEY。"
+      },
+      "model_traffic_unencrypted": {
+        "title": "到 {{cluster}} 的模型流量未加密",
+        "detail": "网关通过未加密的 HTTP 访问其模型。请在集群页面将其移至 TLS 之后；模型将重新加载。"
+      },
+      "machine_certificate_expiring": {
+        "title": "{{machine}} 的模型 TLS 证书将在 {{days}} 天后到期",
+        "detail": "到期日 {{until}}。它会在到期前十天自动续期：该机器的代理是否已连接且为最新版本？"
+      },
+      "gateway_machine_certificate_expiring": {
+        "title": "网关的机器证书将在 {{days}} 天后到期",
+        "detail": "到期日 {{until}}。后端每小时续期一次；其日志说明未续期的原因（Machine CA）。"
       }
     },
     "integrations": {
@@ -2552,6 +2564,18 @@
       "col_running": "运行中的副本",
       "col_alias": "网关名称",
       "take_over": "接管"
+    },
+    "model_tls": {
+      "title": "模型流量",
+      "encrypted": "已加密",
+      "plain": "{{count}} 个未加密",
+      "encrypted_detail": "网关通过双向 TLS 访问此集群的模型：头节点机器的代理只接受网关的证书。",
+      "plain_detail": "网关通过未加密的 HTTP 访问此集群的部分模型：Serve 在模型 TLS 之前启动，并在重新启动前一直在网络上监听。",
+      "move": "加密模型流量",
+      "move_warning": "此集群上的 Serve 将重启：其模型会停止，在 TLS 之后重新加载，加载完成后再次响应——大型模型需要数分钟。",
+      "move_confirm": "重启并加密",
+      "moved": "Serve 已停止；{{count}} 个模型正在 TLS 之后重新加载。",
+      "update_agent": "头节点机器上的代理尚不能运行模型 TLS 代理。请在该机器上重新运行安装命令以更新它。"
     }
   },
   "inference": {

@@ -185,12 +185,11 @@ def _litellm_answers(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         (lambda: {"provider_type": ProviderType.OLLAMA}, "not vLLM"),
         (lambda: {"provider_type": ProviderType.REMOTE_OPENAI}, "LiteLLM rewrites parameters per model"),
         (lambda: {"extra_params": {"api_version": "2024-01"}}, "an argument meant for LiteLLM"),
-        (
-            lambda: {"instance_id": __import__("uuid").uuid4(), "ssl_verify_mode": "verify"},
-            "per-provider TLS is a LiteLLM setting",
-        ),
+        # A TLS setting of the model's own no longer keeps LiteLLM: the stream
+        # goes direct over a client made with it (tests/test_upstream_tls.py,
+        # against a real server that wants the certificate).
     ],
-    ids=["ollama", "remote-openai", "litellm-params", "provider-tls"],
+    ids=["ollama", "remote-openai", "litellm-params"],
 )
 async def test_what_needs_litellm_keeps_it(
     change: Callable[[], dict[str, Any]], why: str, monkeypatch: pytest.MonkeyPatch,

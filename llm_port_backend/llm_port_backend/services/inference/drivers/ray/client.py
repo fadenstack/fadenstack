@@ -378,6 +378,24 @@ class RayClusterClient:
             wait_budget_sec=budget_sec,
         )
 
+    async def shutdown_serve(
+        self, *, node_id: str | uuid.UUID, budget_sec: float | None = 200,
+    ) -> dict[str, Any] | None:
+        """Stop Serve on the cluster *node_id* heads (SHUTDOWN_SERVE): applications and proxy.
+
+        So that the next application starts Serve with other HTTP options --
+        moving a cluster behind its head's model-TLS proxy. ``None`` when the
+        machine did not answer in time.
+        """
+        return await self._dispatch_and_poll(
+            node_id=node_id,
+            command_type=NodeCommandType.SHUTDOWN_SERVE.value,
+            payload={},
+            idem_prefix=f"inference-model-tls:shutdown:{uuid.uuid4()}",
+            timeout_sec=240,
+            wait_budget_sec=budget_sec,
+        )
+
     async def probe_serve(
         self,
         *,

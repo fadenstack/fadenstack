@@ -24,6 +24,7 @@ from llm_port_node_agent.loki_client import LokiClient
 from llm_port_node_agent.ray_log_forwarder import RayServeLogForwarder
 from llm_port_node_agent.image_loader import load_image_from_backend
 from llm_port_node_agent.model_puller import pull_model
+from llm_port_node_agent.model_tls import ModelTls
 from llm_port_node_agent.policy_guard import PolicyGuard
 from llm_port_node_agent.preflight import build_static_capabilities
 from llm_port_node_agent.runtimes import detect_runtime
@@ -55,6 +56,7 @@ class NodeAgentService:
         # Held so the forwarders are never garbage-collected mid-run.
         self._log_tasks: list[asyncio.Task[None]] = []
         self._ray_manager: Any = None  # typed import is local (optional dep)
+        self._model_tls: ModelTls | None = None
 
     async def run_forever(self) -> None:
         """Run agent forever with reconnect and re-enrollment handling."""
@@ -72,6 +74,9 @@ class NodeAgentService:
                 "ray_session": self._config.ray_session_dir,
             },
         )
+        # This agent can put the model-TLS proxy in front of what it serves
+        # (model_tls.py); the backend sends loopback binds only to agents that say so.
+        static_capabilities["model_tls"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -115,6 +120,34 @@ class NodeAgentService:
                 emit_progress=emit_progress,
             )
 
+        async def _load_tls_image(*, image: str, expect_rootfs: str | None = None, **_: Any) -> None:
+            credential = self._state_store.state.credential
+            if not credential:
+                raise RuntimeError("No credential available for image transfer.")
+            await load_image_from_backend(
+                client=self._client.http, credential=credential, image=image,
+                runtime=runtime, expect_rootfs=expect_rootfs,
+            )
+
+        tls_dir = (
+            Path(self._config.model_tls_dir)
+            if self._config.model_tls_dir
+            else Path(self._config.state_path).parent / "model-tls"
+        )
+        self._model_tls = ModelTls(
+            runtime=runtime,
+            directory=tls_dir,
+            host_directory=self._config.model_tls_host_dir or None,
+            image_loader=_load_tls_image,
+        )
+
+        async def _refresh_now() -> None:
+            credential = self._state_store.state.credential
+            if credential:
+                await self._refresh_model_tls(credential)
+
+        self._model_tls.refresher = _refresh_now
+
         from llm_port_node_agent.ray.manager import RayManager
 
         # Reuse the agent's configured backend HTTP client (TLS + base URL)
@@ -130,6 +163,7 @@ class NodeAgentService:
             ),
         )
         self._ray_manager = ray_manager
+        ray_manager.model_tls = self._model_tls
 
         runtime_manager = RuntimeManager(
             runtime=runtime,
@@ -140,6 +174,7 @@ class NodeAgentService:
             model_store_root=self._config.model_store_root,
             model_puller=_pull_model,
             image_loader=_load_image,
+            model_tls=self._model_tls,
         )
         stream = StreamClient(
             config=self._config,
@@ -245,6 +280,17 @@ class NodeAgentService:
             await self._trust.refresh(self._client.http, credential)
         except Exception:  # noqa: BLE001 - an old backend, or a blip: the next round asks again
             log.debug("Could not ask the backend which authority to trust.", exc_info=True)
+        await self._refresh_model_tls(credential)
+
+    async def _refresh_model_tls(self, credential: str) -> None:
+        """Keep the model-TLS certificate current, and the proxy with it."""
+        if self._model_tls is None:
+            return
+        try:
+            await self._model_tls.refresh(self._client.http, credential)
+        except Exception as exc:  # noqa: BLE001 - the next round asks again
+            self._model_tls.last_error = str(exc)[-500:]
+            log.warning("Model TLS refresh failed: %s", exc)
 
     async def _trust_loop(self) -> None:
         while True:

@@ -76,6 +76,7 @@ class RuntimeManager:
         model_store_root: str = "/srv/llm-port/models",
         model_puller: Callable[..., Any] | None = None,
         image_loader: Callable[..., Any] | None = None,
+        model_tls: Any = None,
     ) -> None:
         self._runtime = runtime
         self._state = state_store
@@ -85,6 +86,8 @@ class RuntimeManager:
         self._model_store_root = model_store_root
         self._model_puller = model_puller
         self._image_loader = image_loader
+        #: The machine's model-TLS proxy (``model_tls.ModelTls``).
+        self._model_tls = model_tls
 
     async def deploy_workload(
         self, payload: dict[str, Any], *, emit_progress: ProgressEmitter | None = None,
@@ -140,6 +143,16 @@ class RuntimeManager:
         # host_port:container_port binding keeps it stable.
         host_port = str(payload.get("host_port") or provider_config.get("host_port") or container_port).strip()
         port_spec = f"{host_port}:{container_port}"
+        # Behind the machine's model-TLS proxy: the container is published on
+        # the loopback address only, and the proxy serves host_port with TLS.
+        tls_request = payload.get("model_tls") if isinstance(payload.get("model_tls"), dict) else None
+        internal_port: str | None = None
+        if tls_request:
+            if self._model_tls is None:
+                raise RuntimeManagerError("This agent has no model-TLS proxy configured.")
+            internal_port = str(int(tls_request["internal_port"]))
+            host_port = str(int(tls_request.get("public_port") or host_port))
+            port_spec = f"127.0.0.1:{internal_port}:{container_port}"
 
         # Build default command for known provider types when none provided
         entrypoint_override: str | None = None
@@ -269,6 +282,12 @@ class RuntimeManager:
         await _progress("resolve_endpoint", "Resolving container endpoint")
         # Use the pinned host_port directly — no need to query Docker
         endpoint = f"{self._advertise_scheme}://{self._advertise_host}:{host_port}"
+        probe = endpoint
+        if internal_port is not None:
+            await _progress("model_tls", f"Serving port {host_port} over TLS in front of the container")
+            await self._model_tls.ensure_route(int(host_port), int(internal_port))
+            endpoint = f"https://{self._advertise_host}:{host_port}"
+            probe = f"http://127.0.0.1:{internal_port}"
 
         self._state.set_workload(
             runtime_id,
@@ -281,12 +300,13 @@ class RuntimeManager:
                 "container_port": container_port,
                 "host_port": host_port,
                 "endpoint_url": endpoint,
+                "model_tls_internal_port": internal_port,
             },
         )
 
         # ── Wait for the service inside the container to be ready ─
         await self._wait_for_ready(
-            endpoint,
+            probe,
             provider_type=provider_type,
             container_name=container_name,
             progress=_progress,
@@ -303,6 +323,7 @@ class RuntimeManager:
             "container_name": container_name,
             "container_id": container_id,
             "endpoint_url": endpoint,
+            "model_tls": internal_port is not None,
         }
 
     async def sync_model(
@@ -401,7 +422,7 @@ class RuntimeManager:
             log.info("Container not found for %s — falling back to deploy", runtime_id)
             return await self.deploy_workload(payload, emit_progress=emit_progress)
         await self._runtime.start(container_name)
-        endpoint = await self._resolve_endpoint(container_name)
+        endpoint = await self._workload_endpoint(runtime_id, container_name)
         self._events.add(
             event_type="workload.started",
             payload={"runtime_id": runtime_id, "container_name": container_name},
@@ -437,7 +458,7 @@ class RuntimeManager:
             log.info("Container not found for %s — falling back to deploy", runtime_id)
             return await self.deploy_workload(payload, emit_progress=emit_progress)
         await self._runtime.restart(container_name)
-        endpoint = await self._resolve_endpoint(container_name)
+        endpoint = await self._workload_endpoint(runtime_id, container_name)
         self._events.add(
             event_type="workload.restarted",
             payload={"runtime_id": runtime_id, "container_name": container_name},
@@ -451,6 +472,9 @@ class RuntimeManager:
         container_name = self._lookup_container(runtime_id, payload, allow_missing=True)
         if container_name:
             await self._runtime.remove(container_name)
+        row = self._state.workload(runtime_id) or {}
+        if row.get("model_tls_internal_port") and self._model_tls is not None:
+            await self._model_tls.remove_route(int(row.get("host_port") or 0))
         self._state.drop_workload(runtime_id)
         self._events.add(
             event_type="workload.removed",
@@ -595,6 +619,13 @@ class RuntimeManager:
         if len(log_lines) > _LOGS_TAIL_MAX_LINES:
             log_lines = log_lines[-_LOGS_TAIL_MAX_LINES:]
         return "\n".join(log_lines)
+
+    async def _workload_endpoint(self, runtime_id: str, container_name: str) -> str | None:
+        """Where a started workload is reached: its proxy's https address when it has one."""
+        row = self._state.workload(runtime_id) or {}
+        if row.get("model_tls_internal_port") and row.get("host_port"):
+            return f"https://{self._advertise_host}:{row['host_port']}"
+        return await self._resolve_endpoint(container_name)
 
     async def _resolve_endpoint(self, container_name: str, *, container_port: str = "8000") -> str | None:
         host_port = await self._runtime.port(container_name, container_port)

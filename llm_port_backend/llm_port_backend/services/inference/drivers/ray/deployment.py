@@ -89,6 +89,8 @@ from llm_port_backend.services.inference.drivers.ray.compiler import (
     compile_deployment,
 )
 from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
+from llm_port_backend.services import machine_tls
+from llm_port_backend.settings import settings
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from llm_port_backend.services.nodes.service import NodeControlService
@@ -168,6 +170,12 @@ def _no_serve_instance(detail: str | None) -> bool:
     application, as opposed to a probe that could not see.
     """
     return "no serve instance" in (detail or "").lower()
+
+
+def _reported_run(deployment: Any) -> dict[str, Any]:
+    observed = getattr(deployment, "observed_status_json", None) or {}
+    run = (observed.get("observation") or {}).get("run") or {}
+    return run if isinstance(run, dict) else {}
 
 
 def _reported_route_prefix(deployment: Any) -> str | None:
@@ -410,6 +418,9 @@ class _DeploymentFacts:
     #: The composed mount table -- the bundle's, plus the head node's own
     #: paths.  What the container will actually be started with.
     runtime_mounts: list[Any] = field(default_factory=list)
+    #: Serve goes behind the head's model-TLS proxy: the machine CA is on and
+    #: the head's agent can run the proxy (``services/machine_tls``).
+    model_tls: bool = False
 
 
 @dataclass
@@ -1112,6 +1123,15 @@ class RayDeploymentManager:
         head_row, facts.runtime_bundle = await node_and_bundle_for(
             session, head, driver="ray"
         )
+        # Behind the model-TLS proxy only where the head's agent can run it and
+        # Serve runs in the runtime container (where the agent can see what it
+        # binds); an operator pinning serve_http_host keeps the old way.
+        facts.model_tls = (
+            settings.machine_tls_enabled
+            and machine_tls.supported(getattr(head_row, "capabilities_json", None))
+            and facts.runtime_bundle is not None
+            and not self._environment_config(facts).serve_http_host
+        )
         if facts.runtime_bundle is not None:
             # The mount table as the agent will see it: the bundle's own
             # mounts plus the head's paths.  ``_resolve`` keeps it because the
@@ -1376,6 +1396,18 @@ class RayDeploymentManager:
                 "to start on any node without that address.",
                 cfg.serve_http_host,
             )
+        if getattr(facts, "model_tls", False):
+            # Serve on the loopback address; the head's model-TLS proxy serves
+            # the published port in front of it. Applies when Serve starts --
+            # a Serve already listening on the network is reported by the
+            # agent and published as it is (see _publish_endpoint).
+            public = int(cfg.serve_http_port)
+            internal = machine_tls.internal_port(public)
+            return {
+                "proxy_location": location,
+                "http_options": {"host": "127.0.0.1", "port": internal},
+                "model_tls": {"public_port": public, "internal_port": internal},
+            }
         return {
             "proxy_location": location,
             "http_options": {"host": host, "port": int(cfg.serve_http_port)},
@@ -1400,16 +1432,29 @@ class RayDeploymentManager:
         # The OpenAI ingress on the head's Serve proxy is the single published
         # upstream; the app is mounted at route prefix ``/<app_name>`` (the
         # agent sets it), so the base URL is <proxy>/<app_name><path>.
-        http = self._serve_options(facts)["http_options"]
-        host = http["host"]
-        if host in _WILDCARD_BINDS:  # wildcard bind: publish the head's address
-            host = facts.head_host or (facts.environment.address if facts.environment else None) or "head"
+        cfg = self._environment_config(facts)
+        head = facts.head_host or (facts.environment.address if facts.environment else None) or "head"
         # Take the prefix the agent reported rather than assuming it.  This
         # published "/<app>" while the container path was mounting at "/",
         # so the address in the UI returned 404 for a model that was serving
         # perfectly well one path up.
         prefix = _reported_route_prefix(deployment) or f"/{app_name}"
-        address = f"http://{host}:{http['port']}{prefix}"
+        # What the agent says it did wins over what was asked: Serve binds
+        # once, so a cluster whose Serve predates model TLS keeps listening on
+        # the network until it is moved (shutdown_serve), and that is where
+        # its models are reached meanwhile.
+        run = _reported_run(deployment)
+        tls = run.get("model_tls") if isinstance(run.get("model_tls"), dict) else {}
+        served = run.get("serve_http") if isinstance(run.get("serve_http"), dict) else {}
+        machine = bool(tls.get("protected"))
+        if machine:
+            address = f"https://{head}:{int(tls.get('public_port') or cfg.serve_http_port)}{prefix}"
+        else:
+            host = cfg.serve_http_host or head
+            port = int(served.get("port") or cfg.serve_http_port)
+            if str(served.get("host") or "") in ("127.0.0.1", "::1", "localhost"):
+                port = int(cfg.serve_http_port)  # never publish a loopback-only port
+            address = f"http://{host}:{port}{prefix}"
 
         existing = await endpoint_dao.list_for_deployment(deployment.id)
         target = next(
@@ -1422,6 +1467,11 @@ class RayDeploymentManager:
             "ready_replicas": ready_replicas,
             "path": path,
             "base_url": f"{address}{path}",
+            # Reached with the gateway's machine certificate (gateway_sync).
+            "machine_tls": machine,
+            # Serve predates model TLS on this cluster: moving it is one
+            # administrator action (``move_behind_model_tls``).
+            "model_tls_pending": bool(getattr(facts, "model_tls", False) and not machine),
         }
         if target is None:
             await endpoint_dao.create(

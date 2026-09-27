@@ -582,6 +582,18 @@
       "tls_certificate_expired": {
         "title": "El certificado HTTPS caducó el {{until}}",
         "detail": "Los navegadores y las máquinas rechazan la consola. Renuévelo: llmport tls renew o llmport tls use CERT KEY."
+      },
+      "model_traffic_unencrypted": {
+        "title": "El tráfico de modelos hacia {{cluster}} no está cifrado",
+        "detail": "El gateway llega a sus modelos por HTTP sin cifrar. Muévalos detrás de TLS en la página del clúster; se vuelven a cargar."
+      },
+      "machine_certificate_expiring": {
+        "title": "El certificado TLS de modelos de {{machine}} caduca en {{days}} días",
+        "detail": "El {{until}}. Se renueva solo diez días antes: ¿está el agente de la máquina conectado y actualizado?"
+      },
+      "gateway_machine_certificate_expiring": {
+        "title": "El certificado de máquina del gateway caduca en {{days}} días",
+        "detail": "El {{until}}. El backend lo renueva cada hora; su registro dice por qué no lo hizo (Machine CA)."
       }
     },
     "integrations": {
@@ -2552,6 +2564,18 @@
       "col_running": "Copias en ejecución",
       "col_alias": "Nombre en el gateway",
       "take_over": "Tomar el control"
+    },
+    "model_tls": {
+      "title": "Tráfico de modelos",
+      "encrypted": "Cifrado",
+      "plain": "{{count}} sin cifrar",
+      "encrypted_detail": "El gateway llega a los modelos de este clúster mediante TLS mutuo: el proxy de la máquina principal solo acepta el certificado del gateway.",
+      "plain_detail": "El gateway llega a algunos modelos de este clúster por HTTP sin cifrar: Serve se inició antes de TLS de modelos y sigue escuchando en la red hasta que se reinicie.",
+      "move": "Cifrar el tráfico de modelos",
+      "move_warning": "Serve se reinicia en este clúster: sus modelos se detienen, se vuelven a cargar detrás de TLS y responden de nuevo al terminar; minutos para un modelo grande.",
+      "move_confirm": "Reiniciar y cifrar",
+      "moved": "Serve detenido; {{count}} modelo(s) se vuelven a cargar detrás de TLS.",
+      "update_agent": "El agente de la máquina principal aún no puede ejecutar el proxy TLS de modelos. Actualícelo volviendo a ejecutar la línea de instalación en esa máquina."
     }
   },
   "inference": {

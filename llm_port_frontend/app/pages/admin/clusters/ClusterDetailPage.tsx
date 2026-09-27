@@ -31,6 +31,7 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { HostModelDialog } from "~/components/hosting/HostModelDialog";
 import { useAsyncData } from "~/lib/useAsyncData";
 import StrayModelsCard from "./StrayModelsCard";
+import ModelTrafficCard from "./ModelTrafficCard";
 
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -610,6 +611,9 @@ export default function ClusterDetailPage() {
           </AsyncSection>
         </CardContent>
       </Card>
+
+      {/* --- how the gateway reaches its models ----------------------------- */}
+      <ModelTrafficCard environmentId={id!} onMoved={() => void deployments.refresh()} />
 
       {/* --- models it runs that no deployment here owns ------------------- */}
       {/* Both: taking over can add the model to the catalogue, and without

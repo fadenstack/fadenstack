@@ -250,3 +250,60 @@ def fetch(image: str, *, architectures: set[str]) -> Report:
             continue
         report.outcomes.append(Outcome(runtime, "pulled"))
     return report
+
+
+# ── the machines' model-TLS proxy ──────────────────────────────────────────
+
+#: nginx in front of the models on every machine (the node agent's
+#: ``model_tls.py`` pins the same build): one single-platform manifest per
+#: architecture, and the content identity the agent checks (sha256 over the
+#: ordered layer diff IDs). An air-gapped machine takes it from this server.
+MODEL_TLS_NGINX = {
+    "x86_64": (
+        "nginx@sha256:0530961ff0592b58c10f767535cc0abdfccf9e389ff7cc90f87320c1bc7e8506",
+        "sha256:268c8b4b4baa285e4082ade32c9f2f69a013617ea0b7d0ff25f711bdb10750e7",
+    ),
+    "aarch64": (
+        "nginx@sha256:84dd96a0337ae0f15be81afa8c6bd99d06a514a2ab71a1503aba91ce4392ecc2",
+        "sha256:2f89fd28b672e74bd0d11deb485485881ca606ccc04a6a14b05cca1272f0459a",
+    ),
+}
+MODEL_TLS_TAG = "llmport/model-tls-nginx:1.31.6-alpine-{arch}"
+
+
+def rootfs_digest(layers: tuple[str, ...] | list[str]) -> str:
+    """What the agent and the backend compare: sha256 over the layer IDs, one per line."""
+    import hashlib  # noqa: PLC0415
+
+    return "sha256:" + hashlib.sha256(chr(10).join(layers).encode()).hexdigest()
+
+
+def fetch_model_tls(architectures: set[str]) -> list[tuple[str, str, str]]:
+    """Hold the model-TLS proxy image for each chosen architecture: ``(tag, arch, outcome)``.
+
+    Pulled by its single-platform manifest (so either Docker image store keeps
+    exactly that platform under the tag) and checked against the pin before
+    it is tagged where the agents ask for it.
+    """
+    out: list[tuple[str, str, str]] = []
+    for arch, (ref, pin) in MODEL_TLS_NGINX.items():
+        tag = MODEL_TLS_TAG.format(arch=arch)
+        if arch not in architectures:
+            out.append((tag, arch, "skipped"))
+            continue
+        have = local_layers(tag)
+        if have and rootfs_digest(have) == pin:
+            out.append((tag, arch, "present"))
+            continue
+        if _run([_docker(), "pull", "--platform", _PLATFORMS[arch], ref]).returncode != 0:
+            out.append((tag, arch, "failed"))
+            continue
+        pulled = local_layers(ref)
+        if not pulled or rootfs_digest(pulled) != pin:
+            out.append((tag, arch, "mismatch"))
+            continue
+        if _run([_docker(), "tag", ref, tag], capture_output=True).returncode != 0:
+            out.append((tag, arch, "failed"))
+            continue
+        out.append((tag, arch, "pulled"))
+    return out

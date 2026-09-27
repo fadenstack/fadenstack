@@ -450,3 +450,52 @@ async def tls_delete(
         audit_dao,
         metadata_json=None,
     )
+
+
+# ── the machine CA (model traffic TLS) ──────────────────────────────────────
+
+
+@router.get("/machine-ca")
+async def machine_ca_status(
+    _user: Annotated[User, Depends(require_superuser)],
+    dao: SystemSettingsDAO = Depends(),
+) -> dict:
+    """The machine CA: its generations, the gateway's certificate, each machine's.
+
+    Behind the TLS between the gateway and the models on the machines
+    (services/machine_tls); it looks after itself, this only shows it.
+    """
+    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+
+    return {"enabled": settings.machine_tls_enabled, **(await store.status(dao.session))}
+
+
+@router.post("/machine-ca/rotate")
+async def machine_ca_rotate(
+    user: Annotated[User, Depends(require_superuser)],
+    _root: Annotated[bool, Depends(get_root_mode_active)],
+    audit_dao: AuditDAO = Depends(),
+    dao: SystemSettingsDAO = Depends(),
+) -> dict:
+    """Replace the machine CA at once and distrust every earlier one: for a suspected leak.
+
+    The gateway picks the new certificate up within a minute and every machine
+    asks for a new one within a minute; model calls fail in between.
+    """
+    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+
+    if not settings.machine_tls_enabled:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Model traffic TLS is switched off.")
+    issuer = await store.rotate(dao.session, settings.settings_master_key)
+    await dao.session.commit()
+    await audit_action(
+        "tls.machine_ca.rotate",
+        "tls",
+        "machine-ca",
+        AuditResult.ALLOW,
+        user.id,
+        "high",
+        audit_dao,
+        metadata_json=json.dumps({"fingerprint_sha256": issuer.fingerprint_sha256}),
+    )
+    return {"rotated": True, "fingerprint_sha256": issuer.fingerprint_sha256}

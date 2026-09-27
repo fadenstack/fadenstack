@@ -588,6 +588,16 @@ export interface TakeOverResult {
 }
 
 /** Models a managed cluster runs that no deployment here owns, read from Ray. */
+/** Which of a cluster's models the gateway reaches over mutual TLS (the head's model-TLS proxy). */
+export interface ModelTlsStatus {
+  enabled: boolean;
+  head_supported: boolean;
+  head_agent_version: string | null;
+  protected: { deployment_id: string; base_url: string }[];
+  plain: { deployment_id: string; base_url: string }[];
+  can_move: boolean;
+}
+
 export interface StrayModels {
   models: FoundClusterApp[];
   /** Why the cluster could not be asked, when it could not. */
@@ -878,6 +888,13 @@ export const inferenceApi = {
   /** Asks the cluster's head what it serves; takes seconds. */
   strayModels(environmentId: string) {
     return request<StrayModels>(`/environments/${enc(environmentId)}/stray-models`);
+  },
+  modelTls(environmentId: string) {
+    return request<ModelTlsStatus>(`/environments/${enc(environmentId)}/model-tls`);
+  },
+  /** Restarts Serve on the cluster: its models stop and load again behind TLS. */
+  moveBehindModelTls(environmentId: string) {
+    return request<{ moved: number }>(`/environments/${enc(environmentId)}/model-tls/move`, { method: "POST" });
   },
   takeOverStrayModels(environmentId: string, appNames: string[], aliases: Record<string, string>) {
     return request<StrayTakeOverResult>(`/environments/${enc(environmentId)}/stray-models/take-over`, {
