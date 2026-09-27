@@ -625,6 +625,47 @@ async def test_environment_loop_runs_all_steps(probe_env, dbsession: AsyncSessio
     assert env.observed_status_json["cluster"]["num_nodes"] == 2
 
 
+async def test_ray_tls_is_said_to_every_member_at_every_step(probe_env, dbsession: AsyncSession) -> None:
+    _cp, env, nodes = probe_env
+    for node in nodes:
+        node.capabilities_json = {**node.capabilities_json, "ray_tls": 1}
+    env.config_json = {**(env.config_json or {}), "ray_tls": True}
+    await dbsession.flush()
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
+
+    wanted = {"environment_id": str(env.id)}
+    for step in (NodeCommandType.ENSURE_RAY_RUNTIME, NodeCommandType.START_RAY_HEAD, NodeCommandType.JOIN_RAY_CLUSTER):
+        issued = fake.by_type(step.value)
+        assert issued and all(c["payload"]["ray_tls"] == wanted for c in issued), step
+    assert env.status is EnvironmentStatus.READY
+
+
+async def test_ray_tls_off_is_said_too(probe_env, dbsession: AsyncSession) -> None:
+    """An agent recreates a container started with TLS when the cluster no longer wants it."""
+    _cp, env, _nodes = probe_env
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
+    for step in (NodeCommandType.ENSURE_RAY_RUNTIME, NodeCommandType.START_RAY_HEAD, NodeCommandType.JOIN_RAY_CLUSTER):
+        assert all(c["payload"]["ray_tls"] is False for c in fake.by_type(step.value)), step
+
+
+async def test_ray_tls_refused_before_anything_starts_when_an_agent_is_too_old(
+    probe_env, dbsession: AsyncSession,
+) -> None:
+    _cp, env, nodes = probe_env
+    nodes[0].capabilities_json = {**nodes[0].capabilities_json, "ray_tls": 1}
+    env.config_json = {**(env.config_json or {}), "ray_tls": True}
+    await dbsession.flush()
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
+
+    assert fake.issued == []
+    assert env.status is EnvironmentStatus.FAILED
+    reason = env.observed_status_json["observation"]["reason"]
+    assert "Ray TLS" in reason and nodes[1].host in reason and nodes[0].host not in reason
+
+
 async def test_a_new_cluster_waits_for_its_network_before_starting(probe_env, dbsession: AsyncSession) -> None:
     """Found in an end-to-end run: the console creates the cluster, then asks which network to use.
 

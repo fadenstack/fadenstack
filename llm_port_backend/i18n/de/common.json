@@ -2576,6 +2576,19 @@
       "move_confirm": "Neu starten und verschlüsseln",
       "moved": "Serve gestoppt; {{count}} Modell(e) laden hinter TLS neu.",
       "update_agent": "Der Agent auf der Head-Maschine kann den Modell-TLS-Proxy noch nicht ausführen. Aktualisieren Sie ihn, indem Sie die Installationszeile auf dieser Maschine erneut ausführen."
+    },
+    "ray_tls": {
+      "title": "Verkehr zwischen den Maschinen",
+      "encrypted": "Verschlüsselt",
+      "plain": "Unverschlüsselt",
+      "applying": "Startet neu",
+      "encrypted_detail": "Rays Verkehr zwischen den Maschinen dieses Clusters (Objektübertragungen, der Kontrollspeicher, die Knotenverwalter) läuft über gegenseitiges TLS mit der eigenen Zertifizierungsstelle des Clusters.",
+      "plain_detail": "Rays Verkehr zwischen den Maschinen dieses Clusters (Objektübertragungen, der Kontrollspeicher, die Knotenverwalter) geht unverschlüsselt über das Netz. Nur das Cluster-Token schützt ihn.",
+      "switch_on": "Verschlüsseln",
+      "switch_off": "Ausschalten",
+      "restart_warning": "Der Cluster startet auf jeder Maschine neu: Seine Modelle halten an, laden neu und antworten wieder, sobald sie geladen sind — Minuten bei einem großen Modell.",
+      "restart_confirm": "Cluster neu starten",
+      "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.17 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
     }
   },
   "inference": {

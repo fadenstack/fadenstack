@@ -2576,6 +2576,19 @@
       "move_confirm": "Redémarrer et chiffrer",
       "moved": "Serve arrêté ; {{count}} modèle(s) se rechargent derrière TLS.",
       "update_agent": "L'agent de la machine principale ne peut pas encore exécuter le proxy TLS des modèles. Mettez-le à jour en relançant la ligne d'installation sur cette machine."
+    },
+    "ray_tls": {
+      "title": "Trafic entre les machines",
+      "encrypted": "Chiffré",
+      "plain": "Non chiffré",
+      "applying": "Redémarrage",
+      "encrypted_detail": "Le trafic de Ray entre les machines de ce cluster (transferts d'objets, magasin de contrôle, gestionnaires de nœuds) passe par TLS mutuel avec l'autorité de certification propre au cluster.",
+      "plain_detail": "Le trafic de Ray entre les machines de ce cluster (transferts d'objets, magasin de contrôle, gestionnaires de nœuds) traverse le réseau en clair. Seul le jeton du cluster le protège.",
+      "switch_on": "Chiffrer",
+      "switch_off": "Désactiver",
+      "restart_warning": "Le cluster redémarre sur chaque machine : ses modèles s'arrêtent, se rechargent et répondent de nouveau une fois chargés — quelques minutes pour un grand modèle.",
+      "restart_confirm": "Redémarrer le cluster",
+      "update_agents": "Le chiffrement entre les machines exige l'agent 0.1.17 ou plus récent sur chaque machine. Mettez à jour {{hosts}} en relançant la ligne d'installation sur place."
     }
   },
   "inference": {

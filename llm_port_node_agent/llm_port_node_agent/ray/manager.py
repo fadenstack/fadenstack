@@ -140,6 +140,8 @@ class RayManager:
         self._serve = RayServeManager(core=self._core)
         #: The machine's model-TLS proxy (``model_tls.ModelTls``), set by the service.
         self.model_tls: Any = None
+        #: Issues this machine's Ray TLS certificates (``ray.ray_tls.RayTls``), set by the service.
+        self.ray_tls: Any = None
         self._metrics = RayMetricsDiscovery(core=self._core)
         self._state_diag = RayStateDiagnostics(core=self._core)
         self._backend_url = backend_url.rstrip("/")
@@ -308,8 +310,19 @@ class RayManager:
             spec, loader=loader, emit_progress=emit_progress,
         )
         if payload.get("ensure_container"):
-            result.update(await self._container.ensure_container(spec))
+            result.update(await self._container.ensure_container(spec, ray_tls=self._ray_tls_for(payload)))
         return result
+
+    def _ray_tls_for(self, payload: dict[str, Any]) -> Any:
+        """``None`` (not said), ``False`` (off) or the material to run Ray with mutual TLS."""
+        if "ray_tls" not in payload:
+            return None
+        wanted = payload.get("ray_tls")
+        if not wanted:
+            return False
+        if self.ray_tls is None:
+            raise ContainerRuntimeError("this agent cannot run Ray with TLS")
+        return self.ray_tls.material(str(wanted["environment_id"]))
 
     def _image_loader(self, emit_progress: Any = None) -> Any:
         """Loader that fetches the pinned image from the backend (air-gap path).
@@ -439,7 +452,7 @@ class RayManager:
         )
         try:
             image = await self._container.ensure_image(bundle, loader=self._image_loader())
-            await self._container.ensure_container(bundle)
+            await self._container.ensure_container(bundle, ray_tls=self._ray_tls_for(payload))
             version = await self._container.installed_version(bundle)
         except (ContainerRuntimeError, ValueError) as exc:
             return {
@@ -483,7 +496,7 @@ class RayManager:
         bundle = self._bundle_spec(payload)
         if bundle is not None:
             await self._container.ensure_image(bundle, loader=self._image_loader())
-            await self._container.ensure_container(bundle)
+            await self._container.ensure_container(bundle, ray_tls=self._ray_tls_for(payload))
             try:
                 result = await self._container.start_head(
                     bundle,
@@ -545,7 +558,7 @@ class RayManager:
         bundle = self._bundle_spec(payload)
         if bundle is not None:
             await self._container.ensure_image(bundle, loader=self._image_loader())
-            await self._container.ensure_container(bundle)
+            await self._container.ensure_container(bundle, ray_tls=self._ray_tls_for(payload))
             try:
                 await self._container.join_cluster(
                     bundle,

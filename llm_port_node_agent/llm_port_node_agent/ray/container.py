@@ -424,16 +424,27 @@ class RayContainerRuntime:
         spec: RuntimeBundleSpec,
         *,
         env: dict[str, str] | None = None,
+        ray_tls: Any = None,
     ) -> dict[str, Any]:
         """Ensure the runtime container exists and is running.
 
         Idempotent: an existing container of the same name running the pinned
         image is reused; one running a *different* image is replaced, because
         the pinned digest is the contract.
+
+        *ray_tls*: ``None`` -- not said, leave the container as it is; ``False``
+        -- Ray without TLS; a :class:`~llm_port_node_agent.ray.ray_tls.RayTlsMaterial`
+        -- Ray with mutual TLS, its certificate made just before the container
+        is (re)created. Switching either way recreates the container.
         """
+        from llm_port_node_agent.ray import ray_tls as ray_tls_mod  # noqa: PLC0415
+
         handler = self._handler(spec)
         merged_env = dict(spec.env)
         merged_env.update(env or {})
+        tls_on = ray_tls is not None and ray_tls is not False
+        if tls_on:
+            merged_env.update(ray_tls_mod.container_env())
         # The agent hands the cluster token in by path; the file is bind-mounted
         # so the container reads the same 0600 file the host wrote.
         merged_env.setdefault("RAY_AUTH_MODE", "token")
@@ -451,7 +462,7 @@ class RayContainerRuntime:
             local_id = await self._local_image_id(spec)
             if local_id:
                 expected_ids.add(local_id)
-            drift = self._launch_drift(info, spec, merged_env)
+            drift = self._launch_drift(info, spec, merged_env, ray_tls=None if ray_tls is None else tls_on)
             if running_image and running_image not in expected_ids:
                 log.warning(
                     "Container %s runs image %s, expected %s — recreating",
@@ -476,6 +487,10 @@ class RayContainerRuntime:
         volumes = [m.to_flag() for m in spec.mounts]
         token_dir = self._token_path.rsplit("/", 1)[0]
         volumes.append(f"{token_dir}:{token_dir}:ro")
+        if tls_on:
+            # Made now, for this container: Ray reads them only when it starts.
+            await ray_tls.prepare()
+            volumes.append(f"{ray_tls.host_dir}:{ray_tls_mod.MOUNT}:ro")
 
         container_id = await handler.run(
             image=spec.image,
@@ -502,6 +517,8 @@ class RayContainerRuntime:
         info: dict[str, Any] | None,
         spec: RuntimeBundleSpec,
         env: dict[str, str],
+        *,
+        ray_tls: bool | None = None,
     ) -> str | None:
         """Describe how a running container differs from the spec, if it does.
 
@@ -536,6 +553,8 @@ class RayContainerRuntime:
         wanted_token = env.get("RAY_AUTH_TOKEN_PATH")
         if wanted_token and actual_env.get("RAY_AUTH_TOKEN_PATH") != wanted_token:
             return "RAY_AUTH_TOKEN_PATH changed"
+        if ray_tls is not None and (actual_env.get("RAY_USE_TLS") == "1") != ray_tls:
+            return "Ray TLS switched " + ("on" if ray_tls else "off")
         return None
 
     async def _local_image_id(self, spec: RuntimeBundleSpec) -> str | None:

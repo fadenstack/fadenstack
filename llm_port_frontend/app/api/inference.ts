@@ -598,6 +598,17 @@ export interface ModelTlsStatus {
   can_move: boolean;
 }
 
+/** Ray's own traffic between the cluster's machines: mutual TLS on or off. */
+export interface RayTlsStatus {
+  on: boolean;
+  /** The last pass ran with the switch as it is: the containers match it. */
+  applied: boolean;
+  machines: number;
+  /** Machines whose agent cannot run Ray with TLS yet. */
+  old_agents: string[];
+  can_switch_on: boolean;
+}
+
 export interface StrayModels {
   models: FoundClusterApp[];
   /** Why the cluster could not be asked, when it could not. */
@@ -895,6 +906,16 @@ export const inferenceApi = {
   /** Restarts Serve on the cluster: its models stop and load again behind TLS. */
   moveBehindModelTls(environmentId: string) {
     return request<{ moved: number }>(`/environments/${enc(environmentId)}/model-tls/move`, { method: "POST" });
+  },
+  rayTls(environmentId: string) {
+    return request<RayTlsStatus>(`/environments/${enc(environmentId)}/ray-tls`);
+  },
+  /** Restarts the cluster: every machine's Ray starts again with TLS, or without. */
+  switchRayTls(environmentId: string, on: boolean) {
+    return request<RayTlsStatus>(`/environments/${enc(environmentId)}/ray-tls`, {
+      method: "POST",
+      body: JSON.stringify({ on }),
+    });
   },
   takeOverStrayModels(environmentId: string, appNames: string[], aliases: Record<string, string>) {
     return request<StrayTakeOverResult>(`/environments/${enc(environmentId)}/stray-models/take-over`, {

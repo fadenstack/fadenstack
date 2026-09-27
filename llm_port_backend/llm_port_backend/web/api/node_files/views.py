@@ -318,6 +318,75 @@ async def node_machine_tls_certificate(
     }
 
 
+@router.post("/ray-tls/certificate", name="node_ray_tls_certificate")
+async def node_ray_tls_certificate(
+    request: Request,
+    node: InfraNode = Depends(_authenticate_node),
+) -> dict[str, Any]:
+    """Sign this machine's certificate for its Ray cluster's mutual TLS (``RAY_USE_TLS``).
+
+    Only for a member of a cluster that has Ray TLS switched on. The names
+    are the backend's: the fabric address the cluster runs on, the machine's
+    own, loopback -- whatever the request names.
+    """
+    from llm_port_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode  # noqa: PLC0415
+    from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig  # noqa: PLC0415
+    from llm_port_backend.services.machine_tls import authority, ray_ca  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    try:
+        body = await request.json()
+        environment_id = uuid.UUID(str(body.get("environment_id")))
+        csr_pem = str(body["csr_pem"])
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=400, detail="environment_id and csr_pem are required.") from exc
+    if len(csr_pem) > 16 * 1024:
+        raise HTTPException(status_code=400, detail="csr_pem is too large.")
+    async with request.app.state.db_session_factory() as session:
+        environment = await session.get(InferenceEnvironment, environment_id)
+        member = (await session.execute(
+            select(InferenceEnvironmentNode).where(
+                InferenceEnvironmentNode.environment_id == environment_id,
+                InferenceEnvironmentNode.node_id == node.id,
+            )
+        )).scalars().first()
+        if environment is None or member is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of that cluster.")
+        config = RayEnvironmentConfig.model_validate(environment.config_json or {})
+        if not config.ray_tls:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ray TLS is off for that cluster.")
+        binding = (((environment.observed_status_json or {}).get("resolved_fabric") or {})
+                   .get("node_bindings") or {}).get(str(node.id)) or {}
+        names = [
+            str(binding.get("ip") or ""),
+            *store_names(node),
+            str((node.capabilities_json or {}).get("hostname") or ""),
+            "127.0.0.1",
+            "localhost",
+        ]
+        try:
+            issued = await ray_ca.issue(
+                session, settings.settings_master_key,
+                environment_id=environment_id, csr_pem=csr_pem, names=names,
+            )
+        except authority.AuthorityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await session.commit()
+    log.info("Ray TLS certificate issued to machine %s for %s", node.id, ", ".join(issued.names))
+    return {
+        "certificate_pem": issued.cert_pem,
+        "ca_pem": issued.ca_pem,
+        "not_after": issued.not_after.isoformat(),
+        "names": issued.names,
+    }
+
+
+def store_names(node: InfraNode) -> list[str]:
+    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+
+    return store.machine_names(node.host)
+
+
 @router.get(
     "/models/{model_id}/manifest",
     name="node_model_manifest",

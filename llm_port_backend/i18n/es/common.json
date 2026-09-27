@@ -2576,6 +2576,19 @@
       "move_confirm": "Reiniciar y cifrar",
       "moved": "Serve detenido; {{count}} modelo(s) se vuelven a cargar detrás de TLS.",
       "update_agent": "El agente de la máquina principal aún no puede ejecutar el proxy TLS de modelos. Actualícelo volviendo a ejecutar la línea de instalación en esa máquina."
+    },
+    "ray_tls": {
+      "title": "Tráfico entre máquinas",
+      "encrypted": "Cifrado",
+      "plain": "Sin cifrar",
+      "applying": "Reiniciando",
+      "encrypted_detail": "El tráfico de Ray entre las máquinas de este clúster (transferencias de objetos, el almacén de control, los gestores de nodo) usa TLS mutuo con la autoridad de certificación propia del clúster.",
+      "plain_detail": "El tráfico de Ray entre las máquinas de este clúster (transferencias de objetos, el almacén de control, los gestores de nodo) cruza la red sin cifrar. Solo lo protege el token del clúster.",
+      "switch_on": "Cifrar",
+      "switch_off": "Desactivar",
+      "restart_warning": "El clúster se reinicia en todas las máquinas: sus modelos se detienen, vuelven a cargarse y responden de nuevo al terminar — minutos para un modelo grande.",
+      "restart_confirm": "Reiniciar el clúster",
+      "update_agents": "El cifrado entre máquinas necesita el agente 0.1.17 o posterior en cada máquina. Actualice {{hosts}} ejecutando de nuevo allí la línea de instalación."
     }
   },
   "inference": {

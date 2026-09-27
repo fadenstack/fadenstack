@@ -28,6 +28,10 @@ class RayEnvironmentConfig(BaseModel):
     serve_proxy_location: str = "HeadOnly"
     serve_http_host: str | None = None
     serve_http_port: int = 8000
+    #: Ray's own mutual TLS between the cluster's machines (``RAY_USE_TLS``),
+    #: with the cluster's CA (services/machine_tls/ray_ca.py). Switching it
+    #: restarts the cluster: Ray reads its certificates only when it starts.
+    ray_tls: bool = False
 
 
 class RayProbeResult(BaseModel):

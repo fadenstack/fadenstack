@@ -477,3 +477,38 @@ async def move_behind_model_tls(
         return await model_tls.move(session, _command_gateway(request), environment_id)
     except model_tls.ModelTlsMoveError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+class RayTlsSwitch(BaseModel):
+    on: bool
+
+
+@router.get("/{environment_id}/ray-tls")
+async def ray_tls_status(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Whether Ray's traffic between this cluster's machines is encrypted (mutual TLS)."""
+    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+
+    try:
+        return await ray_tls.environment_status(session, environment_id)
+    except ray_tls.RayTlsError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/ray-tls")
+async def switch_ray_tls(
+    environment_id: uuid.UUID,
+    body: RayTlsSwitch,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Switch Ray's mutual TLS between the machines on or off. The cluster restarts."""
+    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+
+    try:
+        return await ray_tls.switch(session, environment_id, on=body.on)
+    except ray_tls.RayTlsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

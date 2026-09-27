@@ -818,8 +818,15 @@ class RayEnvironmentManager:
         def key(step: str, node_id: Any) -> str:
             return f"inference-env:{environment.id}:{gen}:{step}:{node_id}"
 
+        ray_tls = (
+            self._ray_tls_payload(environment)
+            if RayEnvironmentConfig.model_validate(environment.config_json or {}).ray_tls
+            else False
+        )
+
         def body(node, **extra: Any) -> dict[str, Any]:
-            return {"runtime_bundle": payloads[node.node_id], "ensure_container": True, **extra}
+            # The container this makes is the one Ray runs in: with TLS or not, as the cluster says.
+            return {"runtime_bundle": payloads[node.node_id], "ensure_container": True, "ray_tls": ray_tls, **extra}
 
         # 1. Who already has it.
         probes = []
@@ -1288,6 +1295,10 @@ class RayEnvironmentManager:
             for node in nodes
         }
 
+        # Ray TLS needs it on every member: refuse before any container is touched.
+        if config.ray_tls:
+            await self._require_ray_tls(session, nodes)
+
         # 2a. The exact OCI digest must be present on every member node
         # before anything tries to run out of it.  The agent verifies the
         # pinned identity locally and, when absent, side-loads it from the
@@ -1302,6 +1313,8 @@ class RayEnvironmentManager:
                 "version": config.ray_version,
                 "runtime_bundle": payloads[node.node_id],
             }
+            # Said either way: an agent recreates its container to match.
+            payload["ray_tls"] = self._ray_tls_payload(environment) if config.ray_tls else False
             cmd = await self._issue(
                 gateway,
                 node_id=node.node_id,
@@ -1426,6 +1439,24 @@ class RayEnvironmentManager:
             )
 
     @staticmethod
+    def _ray_tls_payload(environment) -> dict[str, Any]:
+        """What a member needs to run Ray with mutual TLS: which cluster to ask a certificate for."""
+        return {"environment_id": str(environment.id)}
+
+    async def _require_ray_tls(self, session, nodes) -> None:
+        """Every member's agent must run Ray with TLS, or none can: refuse before starting anything."""
+        old = []
+        for member in nodes:
+            row = await session.get(InfraNode, member.node_id)
+            if row is None or not (row.capabilities_json or {}).get("ray_tls"):
+                old.append(getattr(row, "host", None) or str(member.node_id))
+        if old:
+            raise _LifecycleFailed(
+                "Ray TLS needs agent 0.1.17 or later on every machine of the cluster; update "
+                + ", ".join(sorted(old)) + " (re-run the install line), or switch Ray TLS off."
+            )
+
+    @staticmethod
     def _get_resolved_fabric(environment) -> dict[str, Any] | None:
         """The fabric apply-plan resolved, from the observation that owns it.
 
@@ -1461,6 +1492,7 @@ class RayEnvironmentManager:
             "dashboard_host": config.dashboard_host,
             "node_ip_address": head_host,
         }
+        payload["ray_tls"] = self._ray_tls_payload(environment) if config.ray_tls else False
         env_vars = dict(config.node_env_vars or {})
         if head_binding:
             if head_binding.get("interface"):
@@ -1525,6 +1557,8 @@ class RayEnvironmentManager:
                 "version": config.ray_version,
                 "node_ip_address": host,
             }
+            # Said either way: an agent recreates its container to match.
+            payload["ray_tls"] = self._ray_tls_payload(environment) if config.ray_tls else False
             env_vars = dict(config.node_env_vars or {})
             if worker_binding:
                 if worker_binding.get("interface"):

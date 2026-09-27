@@ -2576,6 +2576,19 @@
       "move_confirm": "重启并加密",
       "moved": "Serve 已停止；{{count}} 个模型正在 TLS 之后重新加载。",
       "update_agent": "头节点机器上的代理尚不能运行模型 TLS 代理。请在该机器上重新运行安装命令以更新它。"
+    },
+    "ray_tls": {
+      "title": "机器之间的流量",
+      "encrypted": "已加密",
+      "plain": "未加密",
+      "applying": "正在重启",
+      "encrypted_detail": "此集群各机器之间的 Ray 流量（对象传输、控制存储、节点管理器）通过双向 TLS 传输，使用集群自己的证书颁发机构。",
+      "plain_detail": "此集群各机器之间的 Ray 流量（对象传输、控制存储、节点管理器）以明文穿过网络，仅由集群令牌保护。",
+      "switch_on": "加密",
+      "switch_off": "关闭",
+      "restart_warning": "集群将在每台机器上重启：其模型会停止、重新加载，加载完成后再次响应——大型模型需要几分钟。",
+      "restart_confirm": "重启集群",
+      "update_agents": "机器之间的加密需要每台机器上的代理为 0.1.17 或更高版本。请在 {{hosts}} 上重新运行安装命令以更新。"
     }
   },
   "inference": {

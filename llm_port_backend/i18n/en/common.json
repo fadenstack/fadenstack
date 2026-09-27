@@ -2574,6 +2574,19 @@
       "move_confirm": "Restart and encrypt",
       "moved": "Serve stopped; {{count}} model(s) are loading again behind TLS.",
       "update_agent": "The agent on the head machine cannot run the model-TLS proxy yet. Update it by re-running the install line on that machine."
+    },
+    "ray_tls": {
+      "title": "Traffic between machines",
+      "encrypted": "Encrypted",
+      "plain": "Not encrypted",
+      "applying": "Restarting",
+      "encrypted_detail": "Ray's traffic between this cluster's machines (object transfers, the control store, the node managers) runs over mutual TLS with the cluster's own certificate authority.",
+      "plain_detail": "Ray's traffic between this cluster's machines (object transfers, the control store, the node managers) crosses the network unencrypted. Only the cluster token guards it.",
+      "switch_on": "Encrypt",
+      "switch_off": "Switch off",
+      "restart_warning": "The cluster restarts on every machine: its models stop, load again and answer again when loaded — minutes for a large model.",
+      "restart_confirm": "Restart the cluster",
+      "update_agents": "Encryption between the machines needs agent 0.1.17 or later on every machine. Update {{hosts}} by re-running the install line there."
     }
   },
   "inference": {

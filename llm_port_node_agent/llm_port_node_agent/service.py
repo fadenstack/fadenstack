@@ -77,6 +77,8 @@ class NodeAgentService:
         # This agent can put the model-TLS proxy in front of what it serves
         # (model_tls.py); the backend sends loopback binds only to agents that say so.
         static_capabilities["model_tls"] = 1
+        # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
+        static_capabilities["ray_tls"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -164,6 +166,13 @@ class NodeAgentService:
         )
         self._ray_manager = ray_manager
         ray_manager.model_tls = self._model_tls
+        from llm_port_node_agent.ray.ray_tls import RayTls  # noqa: PLC0415
+
+        ray_manager.ray_tls = RayTls(
+            base_dir=Path(self._config.state_path).parent / "ray-tls",
+            http=self._client.http,
+            credential=lambda: self._state_store.state.credential,
+        )
 
         runtime_manager = RuntimeManager(
             runtime=runtime,

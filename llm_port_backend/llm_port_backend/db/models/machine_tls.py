@@ -82,3 +82,26 @@ class MachineCertificate(Base):
     issued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
+
+
+class RayClusterCA(Base):
+    """A Ray cluster's own authority, for Ray's mutual TLS between its machines (``RAY_USE_TLS``).
+
+    One per cluster, separate from the machine CA: Ray loads its certificates
+    when a process starts and never again, so a machine CA rotation must not
+    reach a running cluster. Its node certificates live as long as the
+    cluster's containers; a new container gets a new one.
+    """
+
+    __tablename__ = "ray_cluster_ca"
+
+    environment_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("inference_environments.id", ondelete="CASCADE"), primary_key=True,
+    )
+    cert_pem: Mapped[str] = mapped_column(Text, nullable=False)
+    key_sealed: Mapped[str] = mapped_column(Text, nullable=False)
+    not_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
