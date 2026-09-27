@@ -155,6 +155,9 @@ The console, the API and the gateway are served over HTTPS as soon as the
 install holds a certificate; plain HTTP then only redirects to it (and
 answers the proxy's own health check).
 
+What is protected and what is not, how the machines come to trust the server,
+where the keys are and a hardening checklist: [HTTPS and trust](https-and-trust.md).
+
 `llmport deploy` asks whether to serve HTTPS, or takes it up front:
 
 ```bash
@@ -167,12 +170,13 @@ On an install that is running:
 ```bash
 llmport tls status                            # on or off, and the certificate
 llmport tls generate [--name console.example.org]
-llmport tls use fullchain.pem key.pem [--chain intermediates.pem]
+llmport tls use fullchain.pem key.pem [--chain intermediates.pem] [--ca root.pem]
 llmport tls off                               # back to plain HTTP
 ```
 
-Each restarts the proxy (the only container it touches) and waits until the
-console answers.
+Switching between HTTP and HTTPS restarts the proxy (the only container it
+touches); a new certificate while HTTPS stays on reloads it instead, so open
+connections stay up. Either way the CLI waits until the console answers.
 
 **A certificate made here** (`generate`) names `localhost`, the server's
 host names and every address it has, plus any `--name` you add. It is signed
