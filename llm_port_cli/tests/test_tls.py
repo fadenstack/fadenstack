@@ -420,3 +420,43 @@ def test_generate_waits_for_the_machines_only_when_the_authority_is_new(
     result = runner.invoke(tls_cmd.tls_group, ["off"])
     assert result.exit_code == 0, result.output
     assert "never falls back" in " ".join(result.output.split())
+
+
+# ── the machine CA (model traffic TLS) ─────────────────────────────────────
+
+
+def test_machine_ca_status_and_replace_run_in_the_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+    import subprocess
+
+    from click.testing import CliRunner
+
+    from llmport.commands import tls as tls_cmd
+
+    calls: list[list[str]] = []
+    doc = {
+        "enabled": True,
+        "authorities": [{"fingerprint_sha256": "ab" * 32, "not_after": "2031-09-26T14:38:41+00:00",
+                         "issuing": True, "issuing_from": "2026-09-27T14:38:41+00:00", "reason": "replaced"}],
+        "gateway": {"not_after": "2026-10-27T15:02:08+00:00", "current": True},
+        "machines": {"n": {"not_after": "2026-10-27T15:02:45+00:00", "names": ["10.250.10.71"],
+                           "issued_at": "2026-09-27T15:02:45+00:00", "current": False}},
+    }
+
+    def run(argv: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
+        calls.append(argv)
+        assert "store.rotate" in str(kw["input"]), "the script is fed on stdin"
+        return subprocess.CompletedProcess(argv, 0, "noise\n" + json.dumps(doc) + "\n", "")
+
+    monkeypatch.setattr(tls_cmd.shutil, "which", lambda name: "docker")
+    monkeypatch.setattr(tls_cmd.subprocess, "run", run)
+    out = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca"])
+    assert out.exit_code == 0, out.output
+    assert calls[-1][:5] == ["docker", "exec", "-i", "llm-port-backend", "python"] and calls[-1][-1] == "status"
+    assert "10.250.10.71" in out.output and "renews within a minute" in out.output
+
+    refused = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca", "--replace"], input="n\n")
+    assert refused.exit_code != 0 and calls[-1][-1] == "status", "nothing replaced without a yes"
+    done = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca", "--replace", "--yes"])
+    assert done.exit_code == 0 and calls[-1][-1] == "replace"
+    assert "replaced" in done.output

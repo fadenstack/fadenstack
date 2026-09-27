@@ -409,3 +409,74 @@ async def test_image_transfer_skipped_when_present(
     })
     assert result["runtime_id"] == "rt-img-skip"
     fake_runtime.images.assert_awaited()
+
+
+# ── behind the machine's model-TLS proxy ─────────────────────────────────
+
+
+class _Proxy:
+    """The model-TLS proxy, as far as the runtime manager uses it."""
+
+    def __init__(self) -> None:
+        self.routes: dict[int, int] = {}
+
+    async def ensure_route(self, public: int, internal: int) -> dict[str, Any]:
+        self.routes[public] = internal
+        return {"protected": True, "public_port": public, "internal_port": internal}
+
+    async def remove_route(self, public: int) -> None:
+        self.routes.pop(public, None)
+
+
+@pytest.mark.asyncio
+async def test_a_protected_vllm_listens_on_loopback_behind_the_proxy(
+    tmp_path: Path, fake_runtime: FakeRuntime, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from llm_port_node_agent import runtime_manager as rm
+
+    probed: list[str] = []
+
+    class _OK:
+        status_code = 200
+
+    async def _get(self: Any, url: str, **_: Any) -> _OK:
+        probed.append(url)
+        return _OK()
+
+    monkeypatch.setattr(rm.httpx.AsyncClient, "get", _get)
+    proxy = _Proxy()
+    manager = RuntimeManager(
+        runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
+        advertise_host="10.250.10.49", advertise_scheme="http", model_tls=proxy,
+    )
+    result = await manager.deploy_workload({
+        "runtime_id": "r1", "provider_type": "vllm", "image": "vllm/vllm-openai:latest",
+        "provider_config": {"container_port": "8000", "host_port": "8100"},
+        "generic_config": {"model": "Qwen/Qwen2.5-0.5B-Instruct"},
+        "model_tls": {"public_port": 8100, "internal_port": 28100},
+    })
+    assert fake_runtime.run_kwargs()["ports"] == ["127.0.0.1:28100:8000"], "never on the network itself"
+    assert proxy.routes == {8100: 28100}
+    assert result["endpoint_url"] == "https://10.250.10.49:8100" and result["model_tls"] is True
+    assert probed[0] == "http://127.0.0.1:28100/health", "readiness is checked on loopback, past the proxy"
+
+    # Started again later: still reached through the proxy.
+    monkeypatch.setattr(FakeRuntime, "exists", lambda self, name: asyncio.sleep(0, result=True))
+    again = await manager.start_workload({"runtime_id": "r1"})
+    assert again["endpoint_url"] == "https://10.250.10.49:8100"
+
+    await manager.remove_workload({"runtime_id": "r1"})
+    assert proxy.routes == {}
+
+
+@pytest.mark.asyncio
+async def test_without_the_proxy_a_request_for_it_fails_loudly(tmp_path: Path, fake_runtime: FakeRuntime) -> None:
+    manager = RuntimeManager(
+        runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
+        advertise_host="10.250.10.49",
+    )
+    with pytest.raises(RuntimeManagerError, match="model-TLS"):
+        await manager.deploy_workload({
+            "runtime_id": "r2", "provider_type": "vllm", "image": "vllm/vllm-openai:latest",
+            "generic_config": {"model": "m"}, "model_tls": {"public_port": 8000, "internal_port": 28000},
+        })

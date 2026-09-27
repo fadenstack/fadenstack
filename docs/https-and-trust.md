@@ -17,6 +17,7 @@ TLS next, see [Connections and TLS](connections-and-tls.md).
 - [Switching HTTPS on](#switching-https-on)
 - [The machines follow by themselves](#the-machines-follow-by-themselves)
 - [Commands are signed](#commands-are-signed)
+- [Model traffic: the gateway and the machines](#model-traffic-the-gateway-and-the-machines)
 - [Adding a machine while HTTPS is on](#adding-a-machine-while-https-is-on)
 - [Your own certificate, and a company CA](#your-own-certificate-and-a-company-ca)
 - [Renewal, rotation and warnings](#renewal-rotation-and-warnings)
@@ -35,6 +36,7 @@ TLS next, see [Connections and TLS](connections-and-tls.md).
 | **Certificates** | Made on the server by its own certificate authority (`llmport tls generate`), or yours -- from a public issuer or a company CA (`llmport tls use`). |
 | **Machines** | Agents 0.1.14 and later learn the server's authority while connected and move to HTTPS by themselves when it is switched on. They never move back by themselves. |
 | **Commands** | Every command the server sends a machine is signed (HMAC-SHA256, keyed by the machine's credential); agents 0.1.15 and later refuse one without a valid signature. |
+| **Model traffic** | The gateway reaches the models on the machines over mutual TLS: each machine runs nginx in front of its models, which accepts only the gateway's certificate. Agents 0.1.16 and later; its own certificate authority, kept by the backend, renewed and rotated automatically. On whether HTTPS is on or not. |
 | **New machines** | The install line pins the server's authority by its SHA-256 fingerprint; a mismatch stops it before anything is downloaded or run. |
 | **Renewal** | Daily and automatic. Certificates made on the server are issued again 30 days before they run out; yours are taken again from the files your tooling renews. Renewing does not interrupt the machines. |
 | **Warnings** | `llmport tls status`, `llmport doctor`, and the console's dashboard before a certificate runs out. |
@@ -59,8 +61,9 @@ With HTTPS on:
 | Agents downloading models and runtime images from the server | Yes | Same connection and verification as the stream. |
 | Grafana through the console (`/grafana/`) | Yes | The dashboard's embedded panel goes through nginx. |
 | Grafana's own port `3001`, Langfuse `3002` | Not on the network | Plain HTTP, published on `127.0.0.1` only by default; the console reaches Grafana at `/grafana/`. `GRAFANA_BIND` / `LANGFUSE_BIND` publish them. |
-| The gateway to the models on the machines (Ray Serve, vLLM) | **No** | Plain HTTP on the machines' network. |
-| Ray between machines (cluster, object transfer) | **No** | On the machines' network, as Ray does it. |
+| The gateway to the models on the machines (Ray Serve, and vLLM that LLM.Port starts) | Yes, mutual TLS | Agents 0.1.16 and later; a cluster from before is moved with one button (see [Model traffic](#model-traffic-the-gateway-and-the-machines)). Independent of HTTPS on the front door. |
+| The gateway to a vLLM LLM.Port found running and did not start | **No** | Routed as it is, plain HTTP. |
+| Ray between machines (cluster, object transfer) | **Not encrypted** | Authenticated with the cluster's token (Ray token authentication); keep it on the machines' own network. |
 | Agents pushing logs to Loki (`3100`) | **No** | Plain HTTP, when Loki is published beyond the server. |
 | Between the containers on the server | **No** | Docker's internal network. |
 
@@ -193,6 +196,86 @@ Both machines on the test run: after updating to 0.1.15, each logged "The
 backend signs its commands; unsigned ones are refused from now on", and
 commands sent to them afterwards ran and succeeded.
 
+## Model traffic: the gateway and the machines
+
+Every prompt and every answer crosses the network between the gateway and the
+machines that run the models. That link has its own TLS, separate from the
+front door and on whether HTTPS is switched on or not:
+
+- **Each machine runs nginx in front of its models** (`nginx:1.31.6-alpine`,
+  pinned by content per architecture, the same product as the server's front
+  door), in its own container `llm-port-model-tls`, with host networking. It
+  listens on the port the model is published on; the model itself -- Ray
+  Serve's proxy, or a vLLM container LLM.Port starts -- listens on the loopback
+  address only, at that port plus 20000 (8010 -> 28010).
+- **The proxy demands a client certificate** (`ssl_verify_client on`) from the
+  machine CA and lets only the gateway's name through (`CN=fadenstack-gateway`);
+  anything else is refused or answered 403. TLS 1.2 and 1.3 only.
+- **A certificate authority of its own, kept by the backend.** Unlike the
+  install's authority, the machine CA is trusted by nobody but the gateway and
+  the machines' proxies -- no browser, not the agents' trust in the server --
+  so the backend may hold its key (sealed in its database with the settings
+  master key): whoever controls the backend already sees every prompt and
+  commands every machine.
+- **Roles are kept apart.** A machine's certificate may only act as a server,
+  and names exactly the address the backend records for it, whatever the
+  machine asks for; the gateway's may only act as a client. So a stolen
+  machine key can impersonate that one machine, and opens no other machine's
+  models.
+- **Keys stay where they are used.** A machine makes its key and sends the
+  backend a request carrying only the public half, over its authenticated
+  connection. The gateway reads its certificate from the backend's database
+  every minute, the way it reads its JWT secret.
+
+All of it maintains itself:
+
+| When | What happens |
+|---|---|
+| The backend first starts after the upgrade | It makes the machine CA (5 years) and the gateway's certificate (30 days). |
+| A machine's agent connects, and every minute | It asks whether it needs a new certificate: none held, ten days before the end, another CA signing, another address. If so it gets one and reloads nginx -- no connection is dropped. |
+| Hourly, in the backend | The gateway's certificate is renewed ten days before its end. A year before the CA ends the next one is made, trusted everywhere two days before it signs anything; the old one is retired once all it signed has expired. |
+| A database restored without its `.env` | The CA's key cannot be opened with the new master key: a new CA is made, and the machines fetch new certificates within a minute. |
+| Suspected leak | `llmport tls machine-ca --replace` (or `POST /api/admin/tls/machine-ca/rotate` as a superuser): a new CA at once, every other one distrusted at once. `llmport tls machine-ca` alone shows the CAs, the gateway's certificate and each machine's. |
+
+A cluster started before its head machine's agent was 0.1.16 keeps its Ray
+Serve listening on the network: Serve binds once, when it starts. The server
+publishes such a model at `http://` as before and says so -- the cluster page
+shows **Model traffic: not encrypted** and the dashboard lists it. **Encrypt
+model traffic** on the cluster page stops Serve on the cluster and applies its
+models again behind the proxy; they are down while they load.
+
+![The cluster page after the move](images/https/18-model-traffic-encrypted.png)
+
+The proxy's image reaches an air-gapped machine the way the runtime image does:
+`llmport runtime-images` (also run by `deploy` and `upgrade`) holds a copy per
+architecture on the server (`llmport/model-tls-nginx:1.31.6-alpine-<arch>`), the
+agent fetches it from there and checks it against the pin, and only falls back to
+the registry, by digest.
+
+**Measured on the DGX pair** (27 September 2026, agents 0.1.16, the `dgx-pair`
+cluster serving `qwen-chat` on two machines):
+
+- After the upgrade, each machine had its certificate within a minute of its
+  agent starting: key mode 600, `TLS Web Server Authentication` only, its
+  address as the one name.
+- **Encrypt model traffic**: Serve stopped in 8 s; the head fetched the proxy
+  image from the server (26 MB), started it on port 8000, and qwen-chat was
+  published `https://10.250.10.71:8000/...` 70 s later. The worker's Serve now
+  listens on `127.0.0.1:28000` only -- no longer reachable from the network.
+- Chat through the gateway: 1.85 s, as over plain HTTP before; streaming too.
+- From the server, against the head's model port: plain HTTP, TLS without a
+  client certificate, and the gateway's name from a foreign CA -- all refused
+  (400); the gateway's certificate -- 200. TLS 1.3.
+- Restarting the head's agent left the proxy running; chat worked throughout.
+- **Replacing the machine CA**: chat failed from 8 s to 42 s after the request, then
+  recovered with nothing done by hand; both machines logged "another CA signs
+  now", fetched new certificates and reloaded nginx.
+
+The same configuration, run with the real nginx image against certificates the
+machine CA made (12 checks: a renewal served after a reload, both CAs accepted
+during a rotation's overlap, another machine's certificate refused as a client),
+is in the model-TLS test kit.
+
 ## Adding a machine while HTTPS is on
 
 A machine being added does not trust the server's authority yet. The console's
@@ -324,9 +407,17 @@ Point each back and restart it:
   for agents that announce they check. On plain HTTP, anyone who can intercept
   an older agent's stream can send it commands, containers included; update
   every agent (re-run the install line).
-- **Traffic to and between the machines' models is plain HTTP**: the gateway to
-  Ray Serve and vLLM, Ray's own traffic, and log pushes to Loki. Keep the
-  machines on a network only they and the server share.
+- **Some traffic around the machines is still plain**: Ray's own traffic between
+  the machines (authenticated with the cluster's token, not encrypted), log
+  pushes to Loki, Prometheus' scrapes, and the gateway's calls to a vLLM
+  LLM.Port found running rather than started. Keep the machines on a network
+  only they and the server share. See [Connections and TLS](connections-and-tls.md).
+- **A remote provider pointed at a machine's model address stops working**
+  once that model moves behind the proxy: the proxy refuses plain HTTP, and a
+  remote provider has no machine certificate. Route the model LLM.Port serves
+  instead (its deployment's name), and delete the remote provider.
+- **Model traffic TLS on standalone vLLM was checked by tests, not yet on the
+  DGX pair**, which had no memory left beside qwen-chat.
 - **Grafana has anonymous read access.** Anyone who reaches it -- through the
   console's `/grafana/`, or its own port if you publish it -- sees every
   dashboard.
@@ -364,11 +455,14 @@ Point each back and restart it:
    `/grafana/`; reach Langfuse through an SSH tunnel
    (`ssh -L 3002:localhost:3002 <server>`).
 5. Keep the machines, and the network between them and the server, private:
-   model traffic is plain HTTP.
-6. Update every machine's agent to 0.1.15 or later (re-run the install line):
-   0.1.14 follows the server to HTTPS, 0.1.15 refuses unsigned commands.
-7. Keep the nightly backup, and keep backups private: they hold the keys.
-8. Watch the dashboard's attention list and `systemctl --user --failed` for the
+   Ray's traffic between them is authenticated, not encrypted.
+6. Update every machine's agent to 0.1.16 or later (re-run the install line):
+   0.1.14 follows the server to HTTPS, 0.1.15 refuses unsigned commands,
+   0.1.16 runs the model-TLS proxy.
+7. On each cluster page, **Encrypt model traffic** where it says the traffic is
+   not encrypted (the dashboard lists them).
+8. Keep the nightly backup, and keep backups private: they hold the keys.
+9. Watch the dashboard's attention list and `systemctl --user --failed` for the
    renewal.
 
 ## Verify it yourself

@@ -418,6 +418,7 @@ def tls_group() -> None:
     llmport tls use CERT KEY            your own certificate (--chain, --ca for a private issuer)
     llmport tls renew                   renew what is due (runs every morning by itself)
     llmport tls off                     back to plain HTTP
+    llmport tls machine-ca              the machine CA behind model traffic TLS (--replace)
     """
 
 
@@ -605,3 +606,104 @@ def off_cmd(*, no_restart: bool) -> None:
             "LLM_PORT_HSTS_MAX_AGE is set: browsers that saw it keep insisting on HTTPS until it runs out."
         )
     print_addresses(install_dir)
+
+
+#: Run in the backend container: the machine CA lives in its database, sealed with its master key.
+_MACHINE_CA_SCRIPT = """
+import asyncio, json, sys
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from llm_port_backend.settings import settings
+from llm_port_backend.services.machine_tls import store
+
+async def main(replace):
+    engine = create_async_engine(str(settings.db_url))
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            if replace:
+                await store.rotate(session, settings.settings_master_key)
+                await session.commit()
+            print(json.dumps({"enabled": settings.machine_tls_enabled, **(await store.status(session))}))
+    finally:
+        await engine.dispose()
+
+asyncio.run(main(sys.argv[1] == "replace"))
+"""
+
+
+def _machine_ca(replace: bool) -> dict:
+    import json  # noqa: PLC0415
+
+    docker = shutil.which("docker")
+    if not docker:
+        error("docker not found on PATH")
+        sys.exit(1)
+    proc = subprocess.run(  # noqa: S603
+        [docker, "exec", "-i", "llm-port-backend", "python", "-", "replace" if replace else "status"],
+        input=_MACHINE_CA_SCRIPT, capture_output=True, text=True, check=False,
+    )
+    line = next((ln for ln in reversed(proc.stdout.strip().splitlines()) if ln.startswith("{")), "")
+    if proc.returncode != 0 or not line:
+        error("Could not read the machine CA from the backend -- is llm-port-backend running?")
+        detail = (proc.stderr or proc.stdout).strip().splitlines()
+        if detail:
+            error(f"  {detail[-1]}")
+        sys.exit(1)
+    return json.loads(line)
+
+
+@tls_group.command("machine-ca")
+@click.option(
+    "--replace", is_flag=True, default=False,
+    help="Make a new machine CA now and distrust every earlier one (a suspected leak).",
+)
+@click.option("--yes", "-y", is_flag=True, default=False, help="Do not ask before --replace.")
+def machine_ca_cmd(*, replace: bool, yes: bool) -> None:
+    """The machine CA: the TLS between the gateway and the models on the machines.
+
+    It looks after itself -- renewals, the yearly rotation, the gateway's
+    certificate -- in the backend. This shows it; --replace is for a suspected
+    leak: the gateway and every machine move to a new CA within a minute, and
+    model calls fail until they have.
+    """
+    if replace and not yes:
+        click.confirm(
+            "Replace the machine CA now? Model calls fail for about a minute while the gateway"
+            " and the machines take new certificates.",
+            abort=True,
+        )
+    doc = _machine_ca(replace)
+    if not doc.get("enabled"):
+        console.print(
+            "Model traffic TLS is [bold]switched off[/bold] (LLM_PORT_BACKEND_MACHINE_TLS_ENABLED=false).",
+        )
+        return
+    if replace:
+        success("Machine CA replaced; the gateway and the machines move to it within a minute.")
+    now = datetime.now(UTC)
+    for ca in doc.get("authorities") or []:
+        until = datetime.fromisoformat(ca["not_after"])
+        role = "signs now" if ca.get("issuing") else f"signs from {ca['issuing_from'][:10]}"
+        console.print(
+            f"  Machine CA  {ca['fingerprint_sha256'][:16]}…  until {until:%Y-%m-%d}"
+            f" ({(until - now).days} days), {role} [dim]({ca.get('reason')})[/dim]"
+        )
+    gateway = doc.get("gateway")
+    if gateway:
+        until = datetime.fromisoformat(gateway["not_after"])
+        state = ""
+        if not gateway.get("current"):
+            state = " [yellow](from an earlier CA; renewed within the hour)[/yellow]"
+        console.print(f"  Gateway     until {until:%Y-%m-%d} ({(until - now).days} days){state}")
+    machines = doc.get("machines") or {}
+    for entry in sorted(machines.values(), key=lambda m: ",".join(m.get("names") or [])):
+        until = datetime.fromisoformat(entry["not_after"])
+        state = ""
+        if not entry.get("current"):
+            state = " [yellow](from an earlier CA; renews within a minute)[/yellow]"
+        console.print(
+            f"  Machine     {', '.join(entry.get('names') or ['?']):<16} until {until:%Y-%m-%d}"
+            f" ({(until - now).days} days){state}"
+        )
+    if not machines:
+        console.print("  [dim]No machine has asked for a certificate yet (agents 0.1.16 and later do).[/dim]")
+
