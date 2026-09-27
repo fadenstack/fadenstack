@@ -14,6 +14,7 @@ For the everyday how-to, see [Installing: Enabling HTTPS](installing.md#enabling
 - [The trust model](#the-trust-model)
 - [Switching HTTPS on](#switching-https-on)
 - [The machines follow by themselves](#the-machines-follow-by-themselves)
+- [Commands are signed](#commands-are-signed)
 - [Adding a machine while HTTPS is on](#adding-a-machine-while-https-is-on)
 - [Your own certificate, and a company CA](#your-own-certificate-and-a-company-ca)
 - [Renewal, rotation and warnings](#renewal-rotation-and-warnings)
@@ -31,16 +32,18 @@ For the everyday how-to, see [Installing: Enabling HTTPS](installing.md#enabling
 | **Protocols** | TLS 1.3 and 1.2 only; TLS 1.1 and older are refused by the server. HTTP/2. |
 | **Certificates** | Made on the server by its own certificate authority (`llmport tls generate`), or yours -- from a public issuer or a company CA (`llmport tls use`). |
 | **Machines** | Agents 0.1.14 and later learn the server's authority while connected and move to HTTPS by themselves when it is switched on. They never move back by themselves. |
+| **Commands** | Every command the server sends a machine is signed (HMAC-SHA256, keyed by the machine's credential); agents 0.1.15 and later refuse one without a valid signature. |
 | **New machines** | The install line pins the server's authority by its SHA-256 fingerprint; a mismatch stops it before anything is downloaded or run. |
 | **Renewal** | Daily and automatic. Certificates made on the server are issued again 30 days before they run out; yours are taken again from the files your tooling renews. Renewing does not interrupt the machines. |
 | **Warnings** | `llmport tls status`, `llmport doctor`, and the console's dashboard before a certificate runs out. |
 | **Keys** | The authority's key never enters a container. Backups carry the certificate material; keys stay readable by their owner only. |
 | **Default** | Plain HTTP until you switch HTTPS on: one command, at deploy (`llmport deploy --tls generate`) or later (`llmport tls generate`). |
 
-**Switch HTTPS on.** Without it, the traffic between the server and its
-machines is plain HTTP, and the commands the server sends to the machines are
-not signed: anyone who can intercept that traffic can send a machine commands.
-See [Known limitations](#known-limitations).
+**Switch HTTPS on.** Without it, everything between the browsers, the API
+clients, the machines and the server -- sign-ins, API keys, prompts, the
+machines' credentials -- crosses the network in the clear. The signatures on
+commands keep anyone from sending a machine one of their own, but they hide
+nothing.
 
 ## What is protected, and what is not
 
@@ -53,16 +56,21 @@ With HTTPS on:
 | Agents to the server: control stream (WebSocket), enrollment, credential rotation | Yes | Verified against the server's authority or the public roots; never falls back to plain HTTP. |
 | Agents downloading models and runtime images from the server | Yes | Same connection and verification as the stream. |
 | Grafana through the console (`/grafana/`) | Yes | The dashboard's embedded panel goes through nginx. |
-| Grafana's own port `3001`, Langfuse `3002` | **No** | Published on every interface over plain HTTP by default. See the [checklist](#hardening-checklist). |
+| Grafana's own port `3001`, Langfuse `3002` | Not on the network | Plain HTTP, published on `127.0.0.1` only by default; the console reaches Grafana at `/grafana/`. `GRAFANA_BIND` / `LANGFUSE_BIND` publish them. |
 | The gateway to the models on the machines (Ray Serve, vLLM) | **No** | Plain HTTP on the machines' network. |
 | Ray between machines (cluster, object transfer) | **No** | On the machines' network, as Ray does it. |
 | Agents pushing logs to Loki (`3100`) | **No** | Plain HTTP, when Loki is published beyond the server. |
 | Between the containers on the server | **No** | Docker's internal network. |
 
-By default everything on the server except nginx (80/443), Grafana and
-Langfuse is published on `127.0.0.1` only: Postgres, Redis, RabbitMQ,
-ClickHouse, MinIO, Prometheus, Loki, the gateway's own port. `PROM_BIND` and
-`LOKI_BIND` in `.env` can open the last two; they are plain HTTP.
+By default everything on the server except nginx (80/443) is published on
+`127.0.0.1` only: Grafana, Langfuse, Postgres, Redis, RabbitMQ, ClickHouse,
+MinIO, Prometheus, Loki, the gateway's own port. `PROM_BIND` and
+`LOKI_BIND`, `GRAFANA_BIND` and `LANGFUSE_BIND` in `.env` can publish those;
+they are plain HTTP.
+
+nginx sets `X-Forwarded-For` and `X-Forwarded-Proto` itself, from the
+connection it sees, whatever the client sent: the addresses in the audit log,
+the rate limits and a machine's recorded address are the real ones.
 
 ## The trust model
 
@@ -158,6 +166,30 @@ The rules an agent follows:
 
 Agents before 0.1.14 do not follow; update them (re-running the install line
 updates an agent) or point them at HTTPS by hand.
+
+## Commands are signed
+
+Every command the server sends a machine -- start a container, join a Ray
+cluster, download a model -- carries an HMAC-SHA256 signature over the whole
+command, its issue time included. The key is derived from the credential the
+machine's agent connected with, on both sides; the server stores only a hash
+of that credential and derives the key from the one on the connection, so a
+copy of its database signs nothing.
+
+- The agent announces it checks when it connects; the server then signs every
+  command on that connection and says so.
+- From then on the agent refuses a command without a valid signature
+  (`signature_missing`, `signature_invalid`), on every later connection too:
+  stripping the signatures off stops working.
+- A command older than five minutes is refused as well, unless the server
+  re-sends one still running; the agent never runs the same command twice.
+- `LLM_PORT_NODE_AGENT_REQUIRE_SIGNED_COMMANDS=true` requires signatures from
+  the first connection; `false` switches the check off, for a server rolled
+  back to one that does not sign.
+
+Both machines on the test run: after updating to 0.1.15, each logged "The
+backend signs its commands; unsigned ones are refused from now on", and
+commands sent to them afterwards ran and succeeded.
 
 ## Adding a machine while HTTPS is on
 
@@ -285,18 +317,17 @@ Point each back and restart it:
 
 ## Known limitations
 
-- **Commands to the machines are not signed.** The agent verifies a signature
-  when a command carries one, but the server sends none. With HTTPS on, the
-  stream runs inside a verified TLS connection and cannot be tampered with; on
-  plain HTTP, anyone who can intercept it can send a machine commands --
-  including starting containers. Switch HTTPS on before adding machines on a
-  network you do not fully control.
+- **Agents before 0.1.15 get unsigned commands.** They changed their signing
+  key mid-connection on every credential rotation, so the server signs only
+  for agents that announce they check. On plain HTTP, anyone who can intercept
+  an older agent's stream can send it commands, containers included; update
+  every agent (re-run the install line).
 - **Traffic to and between the machines' models is plain HTTP**: the gateway to
   Ray Serve and vLLM, Ray's own traffic, and log pushes to Loki. Keep the
   machines on a network only they and the server share.
-- **Grafana (`3001`) and Langfuse (`3002`) are published on every interface
-  over plain HTTP** by default, Grafana with anonymous read access. The console
-  reaches Grafana through nginx; restrict both (see the checklist).
+- **Grafana has anonymous read access.** Anyone who reaches it -- through the
+  console's `/grafana/`, or its own port if you publish it -- sees every
+  dashboard.
 - **Trust on first use.** A machine enrolled over plain HTTP learns the
   server's authority over plain HTTP. After HTTPS is on, the pinned install
   line closes this for new machines.
@@ -305,14 +336,16 @@ Point each back and restart it:
 - **No revocation.** The install CA publishes no CRL or OCSP. To withdraw it,
   move `tls-ca/` away and generate again: machines then have to be pointed at
   the server again, like after `tls off`.
-- **The backend and gateway trust `X-Forwarded-Proto` from any address**
-  (`FORWARDED_ALLOW_IPS=*`). Their ports are not published beyond the server,
-  so only containers on its Docker network could set it.
+- **The backend and gateway trust forwarded headers from any address**
+  (`FORWARDED_ALLOW_IPS=*`). nginx replaces whatever a client sends, and their
+  own ports are not published beyond the server, so only a container on its
+  Docker network could set them.
 - **HSTS is off** (`max-age=0`) until you choose, so HTTPS can be switched off
   again without locking browsers out.
 - **No built-in ACME.** Use certbot or acme.sh and hand the files to
   `llmport tls use`; the daily run picks up every renewal.
-- **Agents before 0.1.14** neither learn the authority nor follow.
+- **Agents before 0.1.14** neither learn the authority nor follow; before
+  0.1.15 they do not check signatures.
 
 ## Hardening checklist
 
@@ -324,12 +357,14 @@ Point each back and restart it:
 3. Once HTTPS stays, set HSTS in `~/llm-port/.env` --
    `LLM_PORT_HSTS_MAX_AGE=31536000` -- and apply it with `llmport up nginx`
    (a restart alone keeps the old setting).
-4. Keep Grafana and Langfuse off the network: `GRAFANA_BIND=127.0.0.1` and
-   `LANGFUSE_BIND=127.0.0.1` in `.env`, then `llmport up`. Grafana stays
-   reachable in the console at `/grafana/`; Langfuse through an SSH tunnel.
+4. Leave Grafana and Langfuse on the server (the default): don't set
+   `GRAFANA_BIND` or `LANGFUSE_BIND` to `0.0.0.0`. Grafana is in the console at
+   `/grafana/`; reach Langfuse through an SSH tunnel
+   (`ssh -L 3002:localhost:3002 <server>`).
 5. Keep the machines, and the network between them and the server, private:
    model traffic is plain HTTP.
-6. Update every machine's agent to 0.1.14 or later (re-run the install line).
+6. Update every machine's agent to 0.1.15 or later (re-run the install line):
+   0.1.14 follows the server to HTTPS, 0.1.15 refuses unsigned commands.
 7. Keep the nightly backup, and keep backups private: they hold the keys.
 8. Watch the dashboard's attention list and `systemctl --user --failed` for the
    renewal.

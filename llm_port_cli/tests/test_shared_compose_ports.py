@@ -48,3 +48,20 @@ def test_prometheus_is_not_on_minios_port() -> None:
     spec = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
     ports = [_host_port(e) for e in spec["services"]["prometheus"]["ports"]]
     assert ("127.0.0.1", "9099") in ports
+
+
+def test_only_the_front_door_is_on_the_network_by_default() -> None:
+    """Grafana (anonymous dashboards) and Langfuse (a sign-in form) are plain HTTP.
+
+    Published on every interface they bypassed HTTPS, and Grafana showed every
+    dashboard to anyone on the network; the console reaches Grafana through
+    nginx at /grafana/. Only nginx's HTTP and HTTPS ports are public by default.
+    """
+    spec = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    public = sorted(
+        (name, port)
+        for name, service in (spec.get("services") or {}).items()
+        for port in (_host_port(e) for e in service.get("ports") or [])
+        if port and port[0] not in ("127.0.0.1", "::1")
+    )
+    assert public == [("nginx", ("0.0.0.0", "443")), ("nginx", ("0.0.0.0", "80"))]

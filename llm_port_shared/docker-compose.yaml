@@ -211,10 +211,12 @@ services:
     container_name: llm-port-web
     restart: unless-stopped
     ports:
-      # LLM observability UI (traces / evals / datasets) — exposed by
-      # default for remote dev access; it has its own login auth. Set
-      # LANGFUSE_BIND=127.0.0.1 to keep it local-only.
-      - "${LANGFUSE_BIND:-0.0.0.0}:3002:3000"
+      # LLM observability UI (traces / evals / datasets), plain HTTP: on this
+      # machine only by default, so a password typed into it never crosses the
+      # network in the clear (reach it through an SSH tunnel). Its sign-in
+      # also expects http://localhost (LANGFUSE_NEXTAUTH_URL).
+      # LANGFUSE_BIND=0.0.0.0 publishes it on the network.
+      - "${LANGFUSE_BIND:-127.0.0.1}:3002:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -851,10 +853,12 @@ services:
     container_name: llm-port-grafana
     restart: unless-stopped
     ports:
-      # Dashboards — exposed by default so the dev box's logs dashboards
-      # are reachable from the LAN. Runs in anonymous read-only Viewer mode
-      # (login form disabled). Set GRAFANA_BIND=127.0.0.1 to keep it local.
-      - "${GRAFANA_BIND:-0.0.0.0}:3001:3000"
+      # Dashboards, anonymous read-only (login form disabled), plain HTTP. The
+      # console reaches them through nginx at /grafana/ -- over HTTPS when that
+      # is on -- so the port itself stays on this machine by default; published
+      # on the network it bypassed HTTPS and showed every dashboard to anyone.
+      # GRAFANA_BIND=0.0.0.0 publishes it.
+      - "${GRAFANA_BIND:-127.0.0.1}:3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin} # CHANGEME
