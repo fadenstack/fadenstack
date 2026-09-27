@@ -14,7 +14,6 @@ dependencies = [
   "fastapi >=0.122.0,<1",
   "uvicorn[standard] >=0.38.0,<1",
   "fastapi-users >=15.0.1,<16",
-  "httpx-oauth >=0.16.1,<1",
   "fastapi-users-db-sqlalchemy >=7.0.0,<8",
   "pydantic >=2.12.5,<3",
   "pydantic-settings >=2.14.2,<3",  # >=2.14.2: clears GHSA-4xgf-cpjx-pc3j

@@ -1073,18 +1073,6 @@ wheels = [
 ]
 
 [[package]]
-name = "httpx-oauth"
-version = "0.16.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/07/db4ad128da3926be22eec586aa87dafd8840c9eb03fe88505fbed016b5c6/httpx_oauth-0.16.1.tar.gz", hash = "sha256:7402f061f860abc092ea4f5c90acfc576a40bbb79633c1d2920f1ca282c296ee", size = 44148, upload-time = "2024-12-20T07:23:02.589Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/4b/2b81e876abf77b4af3372aff731f4f6722840ebc7dcfd85778eaba271733/httpx_oauth-0.16.1-py3-none-any.whl", hash = "sha256:2fcad82f80f28d0473a0fc4b4eda223dc952050af7e3a8c8781342d850f09fb5", size = 38056, upload-time = "2024-12-20T07:23:00.394Z" },
-]
-
-[[package]]
 name = "huggingface-hub"
 version = "0.36.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1229,7 +1217,6 @@ dependencies = [
     { name = "fastapi-users-db-sqlalchemy" },
     { name = "hf-xet" },
     { name = "httpx" },
-    { name = "httpx-oauth" },
     { name = "huggingface-hub" },
     { name = "idna" },
     { name = "loguru" },
@@ -1300,7 +1287,6 @@ requires-dist = [
     { name = "fastapi-users-db-sqlalchemy", specifier = ">=7.0.0,<8" },
     { name = "hf-xet", specifier = ">=1.1.0,<2" },
     { name = "httpx", specifier = ">=0.28.1,<1" },
-    { name = "httpx-oauth", specifier = ">=0.16.1,<1" },
     { name = "huggingface-hub", specifier = ">=0.27.0,<1" },
     { name = "idna", specifier = ">=3.15" },
     { name = "loguru", specifier = ">=0.7.3,<1" },
