@@ -78,7 +78,9 @@ class NodeAgentService:
         # (model_tls.py); the backend sends loopback binds only to agents that say so.
         static_capabilities["model_tls"] = 1
         # ... and run Ray with mutual TLS between the cluster's machines (ray/ray_tls.py).
-        static_capabilities["ray_tls"] = 1
+        # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
+        # (1 was a lab build that did not).
+        static_capabilities["ray_tls"] = 2
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")

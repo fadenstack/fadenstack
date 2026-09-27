@@ -452,7 +452,7 @@ class RayManager:
         )
         try:
             image = await self._container.ensure_image(bundle, loader=self._image_loader())
-            await self._container.ensure_container(bundle, ray_tls=self._ray_tls_for(payload))
+            ensured = await self._container.ensure_container(bundle, ray_tls=self._ray_tls_for(payload))
             version = await self._container.installed_version(bundle)
         except (ContainerRuntimeError, ValueError) as exc:
             return {
@@ -476,6 +476,7 @@ class RayManager:
             # The certified image ships the full Serve-LLM stack; that is the
             # bundle's contract, not something to re-derive from host metadata.
             "serve_llm_available": True,
+            **({"ray_tls": ensured["ray_tls"]} if "ray_tls" in (ensured or {}) else {}),
         }
 
     async def start_head(self, payload: dict[str, Any], emit_progress: Any) -> dict[str, Any]:

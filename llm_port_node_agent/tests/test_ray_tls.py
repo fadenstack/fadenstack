@@ -64,7 +64,7 @@ async def test_a_new_container_runs_ray_with_tls_and_its_certificate_made_for_it
 
     result = await _container(runtime).ensure_container(spec, ray_tls=material)
 
-    assert result["created"] is True
+    assert result["created"] is True and result["ray_tls"] is True
     assert material.prepared == 1
     run = runtime.runs[-1]
     assert run["env"]["RAY_USE_TLS"] == "1"
@@ -83,7 +83,7 @@ async def test_a_running_tls_container_is_kept_and_its_certificate_not_remade() 
 
     result = await _container(runtime).ensure_container(spec, ray_tls=material)
 
-    assert result["created"] is False
+    assert result["created"] is False and result["ray_tls"] is True
     assert material.prepared == 0
     assert runtime.runs == []
 
@@ -110,7 +110,7 @@ async def test_switching_tls_off_recreates_the_container_without_it() -> None:
 
     result = await _container(runtime).ensure_container(spec, ray_tls=False)
 
-    assert result["created"] is True
+    assert result["created"] is True and result["ray_tls"] is False
     run = runtime.runs[-1]
     assert "RAY_USE_TLS" not in run["env"]
     assert not any(v.endswith(":/etc/llmport-ray-tls:ro") for v in run["volumes"])
@@ -127,6 +127,7 @@ async def test_a_command_that_does_not_say_leaves_the_container_as_it_is() -> No
         result = await _container(runtime).ensure_container(spec)
 
         assert result["created"] is False, tls
+        assert "ray_tls" not in result, "nothing said, nothing claimed"
         assert runtime.runs == []
 
 

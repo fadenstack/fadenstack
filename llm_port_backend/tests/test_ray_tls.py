@@ -118,7 +118,7 @@ async def test_one_ca_per_cluster_kept_sealed(dbsession: AsyncSession) -> None:
     assert row is not None
     assert "PRIVATE KEY" not in row.key_sealed
     # Another cluster's CA does not vouch for this one's machines.
-    with pytest.raises(Exception):  # noqa: B017, PT011
+    with pytest.raises(Exception):  # noqa: B017
         _load(first.cert_pem).verify_directly_issued_by(_load(elsewhere.ca_pem))
 
 
@@ -207,34 +207,51 @@ async def test_only_members_of_a_cluster_with_ray_tls_on(
 
 @pytest.mark.anyio
 async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+    from llm_port_backend.services.inference import ray_tls
 
     env, node = await _cluster(dbsession, ray_tls=False)
-    node.capabilities_json = {**node.capabilities_json, "ray_tls": 1}
+    node.capabilities_json = {**node.capabilities_json, "ray_tls": 2}
     env.observed_generation = env.generation
     await dbsession.flush()
     before = env.generation
 
     state = await ray_tls.switch(dbsession, env.id, on=True)
     assert state["on"] is True and state["applied"] is False
+    assert state["running"] == {"10.250.10.49": None}, "nothing reported yet"
+    env.observed_status_json = {**(env.observed_status_json or {}), "ray_tls": {str(node.id): True}}
+    await dbsession.flush()
+    assert (await ray_tls.environment_status(dbsession, env.id))["applied"] is True
     assert env.config_json["ray_tls"] is True and env.generation == before + 1
     # Said again: nothing to restart.
     await ray_tls.switch(dbsession, env.id, on=True)
     assert env.generation == before + 1
 
-    await ray_tls.switch(dbsession, env.id, on=False)
+    state = await ray_tls.switch(dbsession, env.id, on=False)
     assert env.config_json["ray_tls"] is False and env.generation == before + 2
+    assert state["applied"] is False, "a machine still runs it"
+
+
+@pytest.mark.anyio
+async def test_a_lab_build_that_does_not_report_cannot_switch_it_on(dbsession: AsyncSession) -> None:
+    from llm_port_backend.services.inference import ray_tls
+
+    env, node = await _cluster(dbsession, ray_tls=False)
+    node.capabilities_json = {**node.capabilities_json, "ray_tls": 1}
+    await dbsession.flush()
+    assert (await ray_tls.environment_status(dbsession, env.id))["can_switch_on"] is False
+    with pytest.raises(ray_tls.RayTlsError, match=r"0\.1\.18"):
+        await ray_tls.switch(dbsession, env.id, on=True)
 
 
 @pytest.mark.anyio
 async def test_not_on_while_an_agent_cannot(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+    from llm_port_backend.services.inference import ray_tls
 
     env, _node = await _cluster(dbsession, ray_tls=False)
     before = env.generation
     state = await ray_tls.environment_status(dbsession, env.id)
     assert state["old_agents"] == ["10.250.10.49"] and state["can_switch_on"] is False
-    with pytest.raises(ray_tls.RayTlsError, match="10.250.10.49"):
+    with pytest.raises(ray_tls.RayTlsError, match=r"10\.250\.10\.49"):
         await ray_tls.switch(dbsession, env.id, on=True)
     assert env.generation == before
     # Off is always possible.

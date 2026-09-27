@@ -445,6 +445,8 @@ class RayContainerRuntime:
         tls_on = ray_tls is not None and ray_tls is not False
         if tls_on:
             merged_env.update(ray_tls_mod.container_env())
+        # What the container runs, once it matches: the backend shows it.
+        said = {} if ray_tls is None else {"ray_tls": tls_on}
         # The agent hands the cluster token in by path; the file is bind-mounted
         # so the container reads the same 0600 file the host wrote.
         merged_env.setdefault("RAY_AUTH_MODE", "token")
@@ -477,10 +479,10 @@ class RayContainerRuntime:
                 log.warning("Container %s no longer matches its spec (%s) — recreating", spec.name, drift)
                 await handler.remove(spec.name, force=True)
             elif state.get("Running"):
-                return {"container": spec.name, "created": False, "running": True}
+                return {"container": spec.name, "created": False, "running": True, **said}
             else:
                 await handler.start(spec.name)
-                return {"container": spec.name, "created": False, "running": True}
+                return {"container": spec.name, "created": False, "running": True, **said}
 
         preflight = await self.preflight(spec)
 
@@ -510,6 +512,7 @@ class RayContainerRuntime:
             "created": True,
             "running": True,
             "preflight": preflight,
+            **said,
         }
 
     def _launch_drift(

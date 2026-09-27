@@ -480,6 +480,8 @@ async def move_behind_model_tls(
 
 
 class RayTlsSwitch(BaseModel):
+    """Request body for switching Ray TLS: on or off."""
+
     on: bool
 
 

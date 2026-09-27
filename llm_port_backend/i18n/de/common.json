@@ -2588,7 +2588,7 @@
       "switch_off": "Ausschalten",
       "restart_warning": "Der Cluster startet auf jeder Maschine neu: Seine Modelle halten an, laden neu und antworten wieder, sobald sie geladen sind — Minuten bei einem großen Modell.",
       "restart_confirm": "Cluster neu starten",
-      "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.17 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
+      "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.18 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
     }
   },
   "inference": {

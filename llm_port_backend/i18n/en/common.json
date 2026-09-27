@@ -2586,7 +2586,7 @@
       "switch_off": "Switch off",
       "restart_warning": "The cluster restarts on every machine: its models stop, load again and answer again when loaded — minutes for a large model.",
       "restart_confirm": "Restart the cluster",
-      "update_agents": "Encryption between the machines needs agent 0.1.17 or later on every machine. Update {{hosts}} by re-running the install line there."
+      "update_agents": "Encryption between the machines needs agent 0.1.18 or later on every machine. Update {{hosts}} by re-running the install line there."
     }
   },
   "inference": {

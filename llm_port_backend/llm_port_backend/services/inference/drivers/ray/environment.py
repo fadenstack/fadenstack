@@ -67,6 +67,7 @@ from llm_port_backend.services.inference.drivers.ray.status import (
     build_environment_conditions,
     map_cluster_to_environment_status,
 )
+from llm_port_backend.services.inference.ray_tls import supported as ray_tls_supported
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -826,7 +827,9 @@ class RayEnvironmentManager:
 
         def body(node, **extra: Any) -> dict[str, Any]:
             # The container this makes is the one Ray runs in: with TLS or not, as the cluster says.
-            return {"runtime_bundle": payloads[node.node_id], "ensure_container": True, "ray_tls": ray_tls, **extra}
+            return {
+                "runtime_bundle": payloads[node.node_id], "ensure_container": True, "ray_tls": ray_tls, **extra,
+            }
 
         # 1. Who already has it.
         probes = []
@@ -1323,6 +1326,7 @@ class RayEnvironmentManager:
                 key=f"inference-env:{environment.id}:{environment.generation}:ensure-runtime:{node.node_id}",
             )
             issued.append((node, cmd))
+        reported: dict[str, bool] = {}
         for node, cmd in issued:
             result = await self._await_result(
                 gateway, cmd, what=f"ensure_ray_runtime on node {node.node_id}"
@@ -1333,6 +1337,11 @@ class RayEnvironmentManager:
                     f"runtime container on node {node.node_id}: "
                     f"{result.get('error') or 'not found'}"
                 )
+            if "ray_tls" in result:  # whether its container runs Ray with TLS
+                reported[str(node.node_id)] = bool(result["ray_tls"])
+        observed = dict(environment.observed_status_json or {})
+        observed["ray_tls"] = reported
+        environment.observed_status_json = observed
 
     @staticmethod
     async def _bundle_of(session, node_id) -> "tuple[Any, Any]":
@@ -1448,11 +1457,11 @@ class RayEnvironmentManager:
         old = []
         for member in nodes:
             row = await session.get(InfraNode, member.node_id)
-            if row is None or not (row.capabilities_json or {}).get("ray_tls"):
+            if row is None or not ray_tls_supported(row.capabilities_json):
                 old.append(getattr(row, "host", None) or str(member.node_id))
         if old:
             raise _LifecycleFailed(
-                "Ray TLS needs agent 0.1.17 or later on every machine of the cluster; update "
+                "Ray TLS needs agent 0.1.18 or later on every machine of the cluster; update "
                 + ", ".join(sorted(old)) + " (re-run the install line), or switch Ray TLS off."
             )
 

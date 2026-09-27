@@ -19,6 +19,7 @@ reach a running cluster. Its key is sealed with the settings master key.
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import uuid
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ from llm_port_backend.db.models.machine_tls import RayClusterCA
 from llm_port_backend.services.machine_tls import authority as auth
 
 KEY_PURPOSE = "ray-cluster-ca-key"
+_CURVES = ("secp256r1", "secp384r1")
 CA_DAYS = 10 * 365
 #: Longer than any cluster runs without its containers being made again.
 LEAF_DAYS = 2 * 365
@@ -42,6 +44,8 @@ LEAF_DAYS = 2 * 365
 
 @dataclass(frozen=True)
 class RayCertificate:
+    """A node's signed Ray certificate, the cluster CA's, and the names it carries."""
+
     cert_pem: str
     ca_pem: str
     not_after: datetime
@@ -87,10 +91,10 @@ async def _ensure_ca(
         .sign(key, hashes.SHA256())
     )
     pem = cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
-    sealed = auth.seal(
-        key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()),
-        master_key, KEY_PURPOSE,
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption(),
     )
+    sealed = auth.seal(key_pem, master_key, KEY_PURPOSE)
     if row is None:
         session.add(RayClusterCA(
             environment_id=environment_id, cert_pem=pem, key_sealed=sealed,
@@ -105,10 +109,8 @@ async def _ensure_ca(
 def _san(names: list[str]) -> x509.SubjectAlternativeName:
     entries: list[x509.GeneralName] = []
     for name in names:
-        try:
+        with contextlib.suppress(ValueError):
             entries.append(x509.IPAddress(ipaddress.ip_address(name)))
-        except ValueError:
-            pass
         entries.append(x509.DNSName(name))
     return x509.SubjectAlternativeName(entries)
 
@@ -131,7 +133,7 @@ async def issue(
     if not csr.is_signature_valid:
         raise auth.AuthorityError("The request is not signed by the key it carries.")
     public = csr.public_key()
-    if not isinstance(public, ec.EllipticCurvePublicKey) or public.curve.name not in ("secp256r1", "secp384r1"):
+    if not isinstance(public, ec.EllipticCurvePublicKey) or public.curve.name not in _CURVES:
         raise auth.AuthorityError("Ray certificates take an EC P-256 or P-384 key.")
     clean = list(dict.fromkeys(n.strip() for n in names if n and n.strip()))
     if not clean:
@@ -157,11 +159,14 @@ async def issue(
             critical=True,
         )
         .add_extension(
-            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False,
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH]),
+            critical=False,
         )
         .add_extension(_san(clean), critical=False)
         .add_extension(x509.SubjectKeyIdentifier.from_public_key(public), critical=False)
-        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False,
+        )
         .sign(ca_key, hashes.SHA256())
     )
     return RayCertificate(

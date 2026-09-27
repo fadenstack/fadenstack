@@ -327,12 +327,16 @@ async def node_ray_tls_certificate(
 
     Only for a member of a cluster that has Ray TLS switched on. The names
     are the backend's: the fabric address the cluster runs on, the machine's
-    own, loopback -- whatever the request names.
+    own, loopback -- not whatever the request names.
     """
-    from llm_port_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+        InferenceEnvironment,
+        InferenceEnvironmentNode,
+    )
     from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig  # noqa: PLC0415
     from llm_port_backend.services.machine_tls import authority, ray_ca  # noqa: PLC0415
-    from sqlalchemy import select  # noqa: PLC0415
 
     try:
         body = await request.json()
@@ -354,7 +358,9 @@ async def node_ray_tls_certificate(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of that cluster.")
         config = RayEnvironmentConfig.model_validate(environment.config_json or {})
         if not config.ray_tls:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ray TLS is off for that cluster.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Ray TLS is off for that cluster.",
+            )
         binding = (((environment.observed_status_json or {}).get("resolved_fabric") or {})
                    .get("node_bindings") or {}).get(str(node.id)) or {}
         names = [
@@ -382,6 +388,7 @@ async def node_ray_tls_certificate(
 
 
 def store_names(node: InfraNode) -> list[str]:
+    """The names the machine's own certificate carries: the address the backend reaches it by."""
     from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
 
     return store.machine_names(node.host)

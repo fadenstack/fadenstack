@@ -601,8 +601,10 @@ export interface ModelTlsStatus {
 /** Ray's own traffic between the cluster's machines: mutual TLS on or off. */
 export interface RayTlsStatus {
   on: boolean;
-  /** The last pass ran with the switch as it is: the containers match it. */
+  /** Every machine's agent says its container runs Ray as the switch says. */
   applied: boolean;
+  /** Per machine: what its agent last said (null: not yet). */
+  running: Record<string, boolean | null>;
   machines: number;
   /** Machines whose agent cannot run Ray with TLS yet. */
   old_agents: string[];

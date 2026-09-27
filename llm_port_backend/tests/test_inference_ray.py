@@ -628,10 +628,13 @@ async def test_environment_loop_runs_all_steps(probe_env, dbsession: AsyncSessio
 async def test_ray_tls_is_said_to_every_member_at_every_step(probe_env, dbsession: AsyncSession) -> None:
     _cp, env, nodes = probe_env
     for node in nodes:
-        node.capabilities_json = {**node.capabilities_json, "ray_tls": 1}
+        node.capabilities_json = {**node.capabilities_json, "ray_tls": 2}
     env.config_json = {**(env.config_json or {}), "ray_tls": True}
     await dbsession.flush()
-    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={NodeCommandType.ENSURE_RAY_RUNTIME.value: {"installed": True, "version": "2.58.0", "ray_tls": True}},
+    )
     await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
 
     wanted = {"environment_id": str(env.id)}
@@ -639,6 +642,12 @@ async def test_ray_tls_is_said_to_every_member_at_every_step(probe_env, dbsessio
         issued = fake.by_type(step.value)
         assert issued and all(c["payload"]["ray_tls"] == wanted for c in issued), step
     assert env.status is EnvironmentStatus.READY
+    # What each machine said its container runs is kept, and is what the console shows.
+    assert env.observed_status_json["ray_tls"] == {str(n.id): True for n in nodes}
+    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+
+    state = await ray_tls.environment_status(dbsession, env.id)
+    assert state["applied"] is True and set(state["running"].values()) == {True}
 
 
 async def test_ray_tls_off_is_said_too(probe_env, dbsession: AsyncSession) -> None:
@@ -654,7 +663,7 @@ async def test_ray_tls_refused_before_anything_starts_when_an_agent_is_too_old(
     probe_env, dbsession: AsyncSession,
 ) -> None:
     _cp, env, nodes = probe_env
-    nodes[0].capabilities_json = {**nodes[0].capabilities_json, "ray_tls": 1}
+    nodes[0].capabilities_json = {**nodes[0].capabilities_json, "ray_tls": 2}
     env.config_json = {**(env.config_json or {}), "ray_tls": True}
     await dbsession.flush()
     fake = _FakeNodeControl(result_json=_healthy_probe_result())
