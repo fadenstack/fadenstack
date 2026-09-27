@@ -24,8 +24,22 @@ services:
     restart: unless-stopped
     ports:
       - "${LLM_PORT_HTTP_PORT:-80}:80"
+      # Served once ./tls holds a certificate and key (nginx/select-config.sh);
+      # until then nothing listens here.
+      - "${LLM_PORT_HTTPS_PORT:-443}:443"
+    environment:
+      LLM_PORT_HTTPS_PORT: ${LLM_PORT_HTTPS_PORT:-443}
+      # Strict-Transport-Security max-age sent over HTTPS; 0 tells browsers
+      # to forget it, so HTTPS can be switched off again.
+      LLM_PORT_HSTS_MAX_AGE: ${LLM_PORT_HSTS_MAX_AGE:-0}
+    # select-config.sh installs the plain-HTTP or the HTTPS server config,
+    # then nginx runs as usual (the image's own entrypoint still runs first).
+    command: ["/bin/sh", "-c", "sh /etc/nginx/llmport/select-config.sh && exec nginx -g 'daemon off;'"]
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx:/etc/nginx/llmport:ro
+      # The edge certificate and key: written by the backend's TLS admin API
+      # (/api/admin/tls), or copied in by the operator. See tls/README.md.
+      - ./tls:/etc/llmport/tls:ro
     depends_on:
       llm-port-backend:
         condition: service_healthy
@@ -334,6 +348,11 @@ services:
     environment:
       LLM_PORT_API_HOST: 0.0.0.0
       LLM_PORT_API_PORT: 8000
+      # Behind nginx, which sets X-Forwarded-Proto/For; uvicorn honours them
+      # only from these addresses (its default is 127.0.0.1, which nginx is
+      # not here). Every peer is on the compose network; the host port above
+      # is loopback-only.
+      FORWARDED_ALLOW_IPS: "*"
       LLM_PORT_API_RELOAD: "false"
       LLM_PORT_API_ENVIRONMENT: ${LLM_PORT_API_ENVIRONMENT:-production}
       # JWT secret is read from backend DB at startup (llm_port_api.jwt_secret system setting).
@@ -426,6 +445,12 @@ services:
     environment:
       LLM_PORT_BACKEND_HOST: 0.0.0.0
       LLM_PORT_BACKEND_PORT: 8000
+      # Behind nginx, which sets X-Forwarded-Proto/For; uvicorn honours them
+      # only from these addresses (its default is 127.0.0.1, which nginx is
+      # not here). Only the compose network reaches the backend, so any peer
+      # is ours. Without this the backend believes every request is plain
+      # HTTP: it would refuse a TLS upload and never mark a cookie Secure.
+      FORWARDED_ALLOW_IPS: "*"
       LLM_PORT_BACKEND_RELOAD: "false"
       LLM_PORT_BACKEND_ENVIRONMENT: ${LLM_PORT_BACKEND_ENVIRONMENT:-production}
       LLM_PORT_BACKEND_DB_HOST: postgres
@@ -491,6 +516,9 @@ services:
       # Without a copy here a machine can only fetch the published release,
       # which an air-gapped site cannot reach and a new agent may not be yet.
       - ./agent-binaries:/srv/llm-port/agent-binaries:ro
+      # The edge certificate and key the TLS admin API writes; nginx mounts
+      # the same directory read-only and serves HTTPS from it.
+      - ./tls:/etc/llmport/tls:rw
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:

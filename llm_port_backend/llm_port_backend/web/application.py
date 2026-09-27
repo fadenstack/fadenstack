@@ -14,6 +14,7 @@ from llm_port_backend.log import configure_logging
 from llm_port_backend.settings import settings
 from llm_port_backend.web.api.router import api_router
 from llm_port_backend.web.lifespan import lifespan_setup
+from llm_port_backend.web.middleware import SecureCookiesMiddleware
 
 APP_ROOT = Path(__file__).parent.parent
 
@@ -59,6 +60,8 @@ def get_app() -> FastAPI:
         openapi_url="/api/openapi.json",
         default_response_class=UJSONResponse,
     )
+    # The session cookie is Secure whenever the page was served over HTTPS.
+    app.add_middleware(SecureCookiesMiddleware)
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated
     # endpoints with enterprise implementations.

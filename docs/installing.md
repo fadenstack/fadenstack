@@ -15,8 +15,10 @@ GPUs join afterwards, each through a one-line install from the console.
 - **Docker Engine 24 or later with Compose v2**, and your user in the
   `docker` group.
 - **Python 3.12 or later**, with `pipx` or `uv` to install the CLI.
-- **Port 80 free.** The console, the API and the OpenAI-compatible gateway
-  are all served on it. To use another port, see [Changing the port](#changing-the-port).
+- **Ports 80 and 443 free.** The console, the API and the OpenAI-compatible
+  gateway are all served on them: plain HTTP on 80, and HTTPS on 443 once
+  you [enable it](#enabling-https). To use other ports, see
+  [Changing the port](#changing-the-port).
 
 ## Install
 
@@ -126,11 +128,50 @@ them over without restarting any model. See
 
 ## Changing the port
 
-Set `LLM_PORT_HTTP_PORT` in `~/llm-port/.env` and apply it:
+Set `LLM_PORT_HTTP_PORT` (and `LLM_PORT_HTTPS_PORT`, default 443) in
+`~/llm-port/.env` and apply it:
 
 ```bash
 llmport up
 ```
+
+## Enabling HTTPS
+
+The console, the API and the gateway are served over HTTPS as soon as a
+certificate is in place; plain HTTP then only redirects to it.
+
+Put the certificate and its key in `~/llm-port/tls/`:
+
+```
+~/llm-port/tls/edge.crt        the server certificate (PEM)
+~/llm-port/tls/edge.key        its private key (PEM)
+~/llm-port/tls/edge-chain.pem  the issuer's intermediates, if any (optional)
+```
+
+and restart the proxy:
+
+```bash
+llmport up nginx
+```
+
+An administrator in root mode can do the same through the console's API:
+`POST /api/admin/tls/upload` with the files, then `POST /api/admin/tls/activate`,
+which writes them there and restarts the proxy itself.
+
+`LLM_PORT_HSTS_MAX_AGE` in `~/llm-port/.env` (seconds, default 0) turns on
+HTTP Strict Transport Security once you are sure HTTPS stays; 0 tells
+browsers to forget it again.
+
+To go back to plain HTTP, remove the files (or `DELETE /api/admin/tls`) and
+restart the proxy the same way.
+
+**Machines you add** reach the console at the address you used, so with a
+certificate their operating system does not trust (self-signed, or a private
+CA) each agent needs the CA as well: set `LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE`
+to a file holding it in the agent's environment. Machines added before the
+switch still hold the plain-HTTP address; point them at the HTTPS one
+(`llmport-agent config --set BACKEND_URL=https://<host>`, plus the CA bundle)
+and restart the agent.
 
 ## Installing from source
 
