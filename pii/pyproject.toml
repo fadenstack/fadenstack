@@ -3,6 +3,8 @@ name = "faden_pii"
 version = "0.4.0"
 description = ""
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<4"
 authors = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },

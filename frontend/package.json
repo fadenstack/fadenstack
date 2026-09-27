@@ -1,6 +1,7 @@
 {
   "name": "faden-frontend",
   "private": true,
+  "license": "AGPL-3.0-only",
   "author": "Sachith Liyanagama <liyanagama@outlook.de>",
   "type": "module",
   "scripts": {

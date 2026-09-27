@@ -10,6 +10,8 @@ maintainers = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },
 ]
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = [
   "fastapi >=0.122.0,<1",
   "uvicorn[standard] >=0.38.0,<1",

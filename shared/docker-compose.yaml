@@ -120,7 +120,7 @@ services:
       start_period: 2s
 
   redis:
-    image: redis:7
+    image: redis:7.2
     container_name: faden-redis
     restart: unless-stopped
     command: >

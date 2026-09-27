@@ -1,8 +1,10 @@
 [project]
 name = "faden_skills"
 version = "0.4.0"
-description = "Centralized Skills Registry — reasoning playbooks for fadenstack"
+description = "Centralized Skills Registry — reasoning playbooks for Fadenstack"
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<4"
 authors = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },

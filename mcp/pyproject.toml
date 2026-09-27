@@ -1,8 +1,10 @@
 [project]
 name = "faden_mcp"
 version = "0.4.0"
-description = "MCP Tool Registry — governed MCP broker for fadenstack"
+description = "MCP Tool Registry — governed MCP broker for Fadenstack"
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<4"
 authors = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },
