@@ -1,14 +1,19 @@
 /**
  * Pricing tab — CRUD editor for price_catalog entries.
+ *
+ * Prices are shown and typed in USD per million tokens, as providers publish
+ * them; the catalogue keeps them per 1K (PriceField converts).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { observability, type PricingEntry } from "~/api/observability";
 import {
-  observability,
-  type PricingEntry,
-  type PricingCreate,
-} from "~/api/observability";
+  PriceField,
+  formatPerMillion,
+  perMillion,
+  perThousand,
+} from "~/components/PriceField";
 
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -144,10 +149,10 @@ export default function PricingTab() {
                 <TableCell>{t("observability.col_provider")}</TableCell>
                 <TableCell>{t("observability.col_model")}</TableCell>
                 <TableCell align="right">
-                  {t("observability.col_input_price")}
+                  {t("observability.col_input_price_1m")}
                 </TableCell>
                 <TableCell align="right">
-                  {t("observability.col_output_price")}
+                  {t("observability.col_output_price_1m")}
                 </TableCell>
                 <TableCell>{t("observability.col_currency")}</TableCell>
                 <TableCell>{t("observability.col_source")}</TableCell>
@@ -163,10 +168,10 @@ export default function PricingTab() {
                   <TableCell>{e.provider}</TableCell>
                   <TableCell>{e.model}</TableCell>
                   <TableCell align="right">
-                    {Number(e.input_price_per_1k).toFixed(6)}
+                    {formatPerMillion(e.input_price_per_1k)}
                   </TableCell>
                   <TableCell align="right">
-                    {Number(e.output_price_per_1k).toFixed(6)}
+                    {formatPerMillion(e.output_price_per_1k)}
                   </TableCell>
                   <TableCell>{e.currency}</TableCell>
                   <TableCell>
@@ -231,10 +236,10 @@ export default function PricingTab() {
                 <TableRow>
                   <TableCell>{t("common.status")}</TableCell>
                   <TableCell align="right">
-                    {t("observability.col_input_price")}
+                    {t("observability.col_input_price_1m")}
                   </TableCell>
                   <TableCell align="right">
-                    {t("observability.col_output_price")}
+                    {t("observability.col_output_price_1m")}
                   </TableCell>
                   <TableCell>{t("observability.col_effective")}</TableCell>
                   <TableCell>{t("observability.col_source")}</TableCell>
@@ -254,10 +259,10 @@ export default function PricingTab() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      {Number(h.input_price_per_1k).toFixed(6)}
+                      {formatPerMillion(h.input_price_per_1k)}
                     </TableCell>
                     <TableCell align="right">
-                      {Number(h.output_price_per_1k).toFixed(6)}
+                      {formatPerMillion(h.output_price_per_1k)}
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {fmtDate(h.effective_from)}
@@ -303,21 +308,38 @@ function CreateDialog({
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState<PricingCreate>({
-    provider: "",
-    model: "",
-    input_price_per_1k: 0,
-    output_price_per_1k: 0,
-    currency: "USD",
-  });
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [inputPrice, setInputPrice] = useState<number | null>(null);
+  const [outputPrice, setOutputPrice] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A fresh form each time it opens.
+  useEffect(() => {
+    if (!open) return;
+    setProvider("");
+    setModel("");
+    setInputPrice(null);
+    setOutputPrice(null);
+    setNotes("");
+    setError(null);
+  }, [open]);
+
   const handleSave = async () => {
+    if (inputPrice === null || outputPrice === null) return;
     setSaving(true);
     setError(null);
     try {
-      await observability.createPricing(form);
+      await observability.createPricing({
+        provider,
+        model,
+        input_price_per_1k: perThousand(inputPrice),
+        output_price_per_1k: perThousand(outputPrice),
+        currency: "USD",
+        notes: notes || undefined,
+      });
       onCreated();
       onClose();
     } catch (err: unknown) {
@@ -340,47 +362,40 @@ function CreateDialog({
         )}
         <Stack spacing={2} sx={{ mt: 1 }}>
           <NameAutocomplete
-            value={form.provider}
-            onChange={(v) => setForm({ ...form, provider: v })}
+            value={provider}
+            onChange={setProvider}
             label={t("observability.col_provider")}
             placeholder={t("observability.provider_names_placeholder")}
             fetcher={observability.providerNames}
           />
           <NameAutocomplete
-            value={form.model}
-            onChange={(v) => setForm({ ...form, model: v })}
+            value={model}
+            onChange={setModel}
             label={t("observability.col_model")}
             placeholder={t("observability.model_names_placeholder")}
             fetcher={observability.modelNames}
           />
-          <TextField
-            label={t("observability.input_price_per_1k")}
-            type="number"
-            value={form.input_price_per_1k}
-            onChange={(e) =>
-              setForm({ ...form, input_price_per_1k: Number(e.target.value) })
-            }
+          <PriceField
+            label={t("observability.input_price_per_1m")}
+            value={inputPrice}
+            onChange={setInputPrice}
             size="small"
             fullWidth
-            inputProps={{ step: 0.000001, min: 0 }}
+            required
           />
-          <TextField
-            label={t("observability.output_price_per_1k")}
-            type="number"
-            value={form.output_price_per_1k}
-            onChange={(e) =>
-              setForm({ ...form, output_price_per_1k: Number(e.target.value) })
-            }
+          <PriceField
+            label={t("observability.output_price_per_1m")}
+            value={outputPrice}
+            onChange={setOutputPrice}
             size="small"
             fullWidth
-            inputProps={{ step: 0.000001, min: 0 }}
+            required
+            helperText={t("observability.price_per_1m_help")}
           />
           <TextField
             label={t("observability.notes")}
-            value={form.notes ?? ""}
-            onChange={(e) =>
-              setForm({ ...form, notes: e.target.value || undefined })
-            }
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
             size="small"
             fullWidth
             multiline
@@ -393,7 +408,9 @@ function CreateDialog({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving || !form.provider || !form.model}
+          disabled={
+            saving || !provider || !model || inputPrice === null || outputPrice === null
+          }
         >
           {saving ? t("observability.saving") : t("common.create")}
         </Button>
@@ -414,23 +431,24 @@ function EditDialog({
   onUpdated: () => void;
 }) {
   const { t } = useTranslation();
-  const [inputPrice, setInputPrice] = useState(
-    Number(entry.input_price_per_1k),
+  const [inputPrice, setInputPrice] = useState<number | null>(
+    perMillion(entry.input_price_per_1k),
   );
-  const [outputPrice, setOutputPrice] = useState(
-    Number(entry.output_price_per_1k),
+  const [outputPrice, setOutputPrice] = useState<number | null>(
+    perMillion(entry.output_price_per_1k),
   );
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    if (inputPrice === null || outputPrice === null) return;
     setSaving(true);
     setError(null);
     try {
       await observability.updatePricing(entry.id, {
-        input_price_per_1k: inputPrice,
-        output_price_per_1k: outputPrice,
+        input_price_per_1k: perThousand(inputPrice),
+        output_price_per_1k: perThousand(outputPrice),
         notes: notes || undefined,
       });
       onUpdated();
@@ -459,23 +477,22 @@ function EditDialog({
           </Alert>
         )}
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            label={t("observability.input_price_per_1k")}
-            type="number"
+          <PriceField
+            label={t("observability.input_price_per_1m")}
             value={inputPrice}
-            onChange={(e) => setInputPrice(Number(e.target.value))}
+            onChange={setInputPrice}
             size="small"
             fullWidth
-            inputProps={{ step: 0.000001, min: 0 }}
+            required
           />
-          <TextField
-            label={t("observability.output_price_per_1k")}
-            type="number"
+          <PriceField
+            label={t("observability.output_price_per_1m")}
             value={outputPrice}
-            onChange={(e) => setOutputPrice(Number(e.target.value))}
+            onChange={setOutputPrice}
             size="small"
             fullWidth
-            inputProps={{ step: 0.000001, min: 0 }}
+            required
+            helperText={t("observability.price_per_1m_help")}
           />
           <TextField
             label={t("observability.notes")}
@@ -490,7 +507,11 @@ function EditDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="contained" onClick={handleSave} disabled={saving}>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={saving || inputPrice === null || outputPrice === null}
+        >
           {saving ? t("observability.saving") : t("common.save")}
         </Button>
       </DialogActions>

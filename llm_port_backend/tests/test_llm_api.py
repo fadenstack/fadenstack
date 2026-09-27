@@ -357,6 +357,88 @@ async def test_patch_provider_no_cascade_when_model_custom_named(
     assert fresh_runtime.name == "gpt-4o-mini"
 
 
+async def _litellm_remote(dbsession: AsyncSession, *, litellm_model: str, remote_model: str | None):
+    provider = await _seed_provider(
+        dbsession,
+        name="OpenRouter",
+        type_=ProviderType.CLOUD,
+        target=ProviderTarget.REMOTE_ENDPOINT,
+        litellm_provider="openrouter",
+        litellm_model=litellm_model,
+        capabilities={"remote": True, **({"remote_model": remote_model} if remote_model else {})},
+    )
+    name = remote_model or litellm_model
+    model = await _seed_model(
+        dbsession, display_name=name, source=ModelSource.REMOTE,
+        tags=["remote", "auto-provisioned"], status=ModelStatus.AVAILABLE,
+    )
+    runtime = await _seed_runtime(dbsession, name=name, provider_id=provider.id, model_id=model.id)
+    return provider, runtime
+
+
+async def test_renaming_a_litellm_model_asks_for_the_new_one_upstream(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    """Found on the release VM: the alias became "deepseek/..." while OpenRouter was still asked for nemotron."""
+    published: list[dict] = []
+
+    async def publish(**kwargs):
+        published.append(kwargs)
+
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", publish)
+    provider, runtime = await _litellm_remote(
+        dbsession, litellm_model="nvidia/nemotron-3-super-120b-a12b", remote_model="nvidia/nemotron-3-super-120b-a12b",
+    )
+
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+    resp = await client.patch(
+        f"/api/llm/providers/{provider.id}", json={"remote_model": "deepseek/deepseek-v4.1-flash"},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    fresh = (await dbsession.execute(select(LLMProvider).where(LLMProvider.id == provider.id))).scalar_one()
+    assert fresh.litellm_model == "deepseek/deepseek-v4.1-flash"
+    assert runtime.name == "deepseek/deepseek-v4.1-flash"
+    # Published again under the new name, which drops the old one (gateway_sync).
+    assert [(p["alias"], p["litellm_model"]) for p in published] == [
+        ("deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash"),
+    ]
+
+
+async def test_a_provider_named_after_its_litellm_model_is_renamed_too(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    """Made without a remote model: the runtime and alias carry the LiteLLM model's name."""
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", _noop_publish)
+    provider, runtime = await _litellm_remote(dbsession, litellm_model="openai/gpt-4.1-mini", remote_model=None)
+
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"remote_model": "openai/gpt-4.1"})
+    assert resp.status_code == status.HTTP_200_OK
+    fresh = (await dbsession.execute(select(LLMProvider).where(LLMProvider.id == provider.id))).scalar_one()
+    assert fresh.litellm_model == "openai/gpt-4.1"
+    assert runtime.name == "openai/gpt-4.1"
+
+
+async def test_a_litellm_model_set_apart_from_the_name_is_kept(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", _noop_publish)
+    provider, runtime = await _litellm_remote(
+        dbsession, litellm_model="anthropic/claude-sonnet-4", remote_model="sonnet",
+    )
+
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"remote_model": "sonnet-4"})
+    assert resp.status_code == status.HTTP_200_OK
+    fresh = (await dbsession.execute(select(LLMProvider).where(LLMProvider.id == provider.id))).scalar_one()
+    assert fresh.litellm_model == "anthropic/claude-sonnet-4"
+    assert runtime.name == "sonnet-4"
+
+
+async def _noop_publish(**_kwargs) -> None:
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------

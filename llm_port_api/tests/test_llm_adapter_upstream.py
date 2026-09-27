@@ -119,3 +119,21 @@ def test_no_placeholder_key_for_cloud_default_base() -> None:
         base_url=None, api_key=None, provider_type=ProviderType.REMOTE_OPENAI
     )
     assert kwargs == {}
+
+
+@pytest.mark.parametrize(
+    ("provider_type", "saved", "api_base"),
+    [
+        (ProviderType.REMOTE_GROQ, "https://api.groq.com/openai", "https://api.groq.com/openai/v1"),
+        (ProviderType.REMOTE_MISTRAL, "https://api.mistral.ai", "https://api.mistral.ai/v1"),
+        (ProviderType.REMOTE_OPENAI, "https://openrouter.ai/api", "https://openrouter.ai/api/v1"),
+        # DeepSeek serves /chat/completions at its root: nothing added.
+        (ProviderType.REMOTE_DEEPSEEK, "https://api.deepseek.com", "https://api.deepseek.com"),
+    ],
+)
+def test_the_addresses_the_console_fills_in_reach_the_api(
+    provider_type: ProviderType, saved: str, api_base: str,
+) -> None:
+    """The backend strips a trailing /v1 on save; the gateway puts it back where the API lives under it."""
+    kwargs = _upstream_kwargs(base_url=saved, api_key="k", provider_type=provider_type)
+    assert kwargs["api_base"] == api_base

@@ -64,6 +64,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import NetworkCheckIcon from "@mui/icons-material/NetworkCheck";
 
 import { EngineSettingsEditor } from "~/components/engine/EngineSettingsEditor";
+import { PriceField, perThousand } from "~/components/PriceField";
 import { parseExtraFlags, toContainerFields, type EngineConfig } from "~/lib/engine";
 import {
   ContainerResourcesPanel,
@@ -76,22 +77,39 @@ const PROVIDER_TARGETS: ProviderTarget[] = ["local_docker", "remote_endpoint"];
 const CUSTOM_IMAGE_VALUE = "__custom__";
 const AUTO_IMAGE_VALUE = "__auto__";
 
-/** Known LiteLLM provider prefixes shown in the remote-endpoint dropdown. */
-const LITELLM_PROVIDERS: { value: string; label: string; labelKey?: string }[] = [
-  { value: "openai", label: "OpenAI" },
+/** "Other (OpenAI-compatible)": LiteLLM's openai provider at an address of the user's. */
+const OPENAI_COMPATIBLE = "openai_compatible";
+
+/**
+ * Known LiteLLM provider prefixes shown in the remote-endpoint dropdown.
+ *
+ * *address*: the provider's OpenAI-compatible API, filled in when it is
+ * picked (the gateway puts back the /v1 the backend strips on save). The
+ * others -- Anthropic, Gemini, Bedrock, Azure, ... -- LiteLLM reaches at their
+ * own addresses: the field stays empty, and filling it in would change how it
+ * calls them. Azure and Bedrock have no one address anyway.
+ */
+const LITELLM_PROVIDERS: { value: string; label: string; labelKey?: string; address?: string }[] = [
+  { value: "openai", label: "OpenAI", address: "https://api.openai.com/v1" },
   { value: "anthropic", label: "Anthropic" },
   { value: "gemini", label: "Google Gemini" },
   { value: "vertex_ai", label: "Google Vertex AI" },
   { value: "bedrock", label: "AWS Bedrock" },
   { value: "azure", label: "Azure OpenAI" },
   { value: "azure_ai", label: "Azure AI" },
-  { value: "mistral", label: "Mistral" },
-  { value: "groq", label: "Groq" },
-  { value: "deepseek", label: "DeepSeek" },
+  { value: "mistral", label: "Mistral", address: "https://api.mistral.ai/v1" },
+  { value: "groq", label: "Groq", address: "https://api.groq.com/openai/v1" },
+  { value: "deepseek", label: "DeepSeek", address: "https://api.deepseek.com" },
   { value: "cohere", label: "Cohere" },
-  { value: "openrouter", label: "OpenRouter" },
-  { value: "openai", label: "Other (OpenAI-compatible)", labelKey: "llm_providers.other_openai" },
+  { value: "openrouter", label: "OpenRouter", address: "https://openrouter.ai/api/v1" },
+  // Its own value: sharing "openai" with OpenAI, picking it showed "OpenAI".
+  { value: OPENAI_COMPATIBLE, label: "Other (OpenAI-compatible)", labelKey: "llm_providers.other_openai" },
 ];
+
+/** What the backend and LiteLLM call the picked provider. */
+function litellmName(choice: string): string {
+  return choice === OPENAI_COMPATIBLE ? "openai" : choice;
+}
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return "0 B";
@@ -157,9 +175,13 @@ export function ProviderWizardDialog({
   const [testMessage, setTestMessage] = useState("");
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
-  // Pricing step (remote only)
-  const [pricingInputPrice, setPricingInputPrice] = useState(0);
-  const [pricingOutputPrice, setPricingOutputPrice] = useState(0);
+  // The address filled in for the picked provider, so picking another replaces
+  // it -- but never an address the user typed.
+  const [filledAddress, setFilledAddress] = useState("");
+
+  // Pricing step (remote only), USD per 1M tokens; null = not set
+  const [pricingInputPrice, setPricingInputPrice] = useState<number | null>(null);
+  const [pricingOutputPrice, setPricingOutputPrice] = useState<number | null>(null);
 
   // Node deployment target (local Docker providers)
   const [nodeList, setNodeList] = useState<ManagedNode[]>([]);
@@ -225,11 +247,12 @@ export function ProviderWizardDialog({
       setApiKey("");
       setRemoteModel("");
       setLitellmProvider("");
+      setFilledAddress("");
       setTestStatus("idle");
       setTestMessage("");
       setDiscoveredModels([]);
-      setPricingInputPrice(0);
-      setPricingOutputPrice(0);
+      setPricingInputPrice(null);
+      setPricingOutputPrice(null);
       setSelectedNodeId("");
       setModelSource("sync_from_server");
       setHfRepoId("");
@@ -455,7 +478,7 @@ export function ProviderWizardDialog({
       const result = await providers.testEndpoint({
         ...(endpointUrl && { endpoint_url: endpointUrl }),
         ...(apiKey && { api_key: apiKey }),
-        ...(litellmProvider && { litellm_provider: litellmProvider }),
+        ...(litellmProvider && { litellm_provider: litellmName(litellmProvider) }),
         ...(remoteModel.trim() && { litellm_model: remoteModel.trim() }),
       });
       if (result.compatible) {
@@ -566,24 +589,27 @@ export function ProviderWizardDialog({
         ...(target === "remote_endpoint" &&
           remoteModel.trim() && { remote_model: remoteModel.trim() }),
         ...(target === "remote_endpoint" &&
-          litellmProvider && { litellm_provider: litellmProvider }),
+          litellmProvider && { litellm_provider: litellmName(litellmProvider) }),
         ...(target === "remote_endpoint" &&
           remoteModel.trim() && { litellm_model: remoteModel.trim() }),
       };
       const newProv = await providers.create(provPayload);
       newProvId = newProv.id;
 
-      // If user set pricing during wizard, create price catalog entry
+      // If user set pricing during wizard, create price catalog entry --
+      // filed under the names the gateway prices by: the LiteLLM provider (or
+      // the provider's name) and the model's alias, which is the remote model.
       if (
         target === "remote_endpoint" &&
-        (pricingInputPrice > 0 || pricingOutputPrice > 0)
+        remoteModel.trim() &&
+        (pricingInputPrice !== null || pricingOutputPrice !== null)
       ) {
         try {
           await observability.createPricing({
-            provider: litellmProvider || name,
+            provider: litellmProvider ? litellmName(litellmProvider) : name,
             model: remoteModel.trim(),
-            input_price_per_1k: pricingInputPrice,
-            output_price_per_1k: pricingOutputPrice,
+            input_price_per_1k: perThousand(pricingInputPrice ?? 0),
+            output_price_per_1k: perThousand(pricingOutputPrice ?? 0),
             currency: "USD",
           });
         } catch {
@@ -908,12 +934,21 @@ export function ProviderWizardDialog({
                     value={litellmProvider}
                     label={t("llm_providers.litellm_provider", "Provider")}
                     onChange={(e) => {
-                      setLitellmProvider(e.target.value);
+                      const choice = e.target.value;
+                      setLitellmProvider(choice);
                       setDiscoveredModels([]);
+                      // Its address, unless the user typed one of their own.
+                      if (!endpointUrl.trim() || endpointUrl === filledAddress) {
+                        const address =
+                          LITELLM_PROVIDERS.find((p) => p.value === choice)?.address ?? "";
+                        setEndpointUrl(address);
+                        setFilledAddress(address);
+                        setTestStatus("idle");
+                      }
                     }}
                   >
                     {LITELLM_PROVIDERS.map((p) => (
-                      <MenuItem key={`${p.value}-${p.label}`} value={p.value}>
+                      <MenuItem key={p.value} value={p.value}>
                         {p.labelKey ? t(p.labelKey) : p.label}
                       </MenuItem>
                     ))}
@@ -931,12 +966,17 @@ export function ProviderWizardDialog({
                   }}
                   fullWidth
                   helperText={
-                    litellmProvider
-                      ? t(
-                          "llm_providers.endpoint_url_help_optional",
-                          "Optional — leave empty for hosted providers like Gemini, Anthropic, etc.",
-                        )
-                      : t("llm_providers.endpoint_url_help")
+                    endpointUrl && endpointUrl === filledAddress
+                      ? t("llm_providers.endpoint_url_filled", {
+                          provider:
+                            LITELLM_PROVIDERS.find((p) => p.value === litellmProvider)?.label ?? "",
+                        })
+                      : litellmProvider && litellmProvider !== OPENAI_COMPATIBLE
+                        ? t(
+                            "llm_providers.endpoint_url_help_optional",
+                            "Optional — leave empty for hosted providers like Gemini, Anthropic, etc.",
+                          )
+                        : t("llm_providers.endpoint_url_help")
                   }
                 />
                 <TextField
@@ -1023,23 +1063,20 @@ export function ProviderWizardDialog({
             <Typography variant="body2" color="text.secondary">
               {t("observability.wizard_pricing_description")}
             </Typography>
-            <TextField
-              label={t("observability.wizard_pricing_input")}
-              type="number"
+            <PriceField
+              label={t("observability.input_price_per_1m")}
               value={pricingInputPrice}
-              onChange={(e) => setPricingInputPrice(Number(e.target.value))}
+              onChange={setPricingInputPrice}
               size="small"
               fullWidth
-              inputProps={{ step: 0.000001, min: 0 }}
             />
-            <TextField
-              label={t("observability.wizard_pricing_output")}
-              type="number"
+            <PriceField
+              label={t("observability.output_price_per_1m")}
               value={pricingOutputPrice}
-              onChange={(e) => setPricingOutputPrice(Number(e.target.value))}
+              onChange={setPricingOutputPrice}
               size="small"
               fullWidth
-              inputProps={{ step: 0.000001, min: 0 }}
+              helperText={t("observability.price_per_1m_help")}
             />
             <Typography variant="caption" color="text.secondary">
               {t("observability.wizard_pricing_skip_hint")}
@@ -1392,7 +1429,13 @@ export function ProviderWizardDialog({
         ) : (
           <Button
             variant="contained"
-            disabled={!name}
+            disabled={
+              !name ||
+              // An OpenAI-compatible server of the user's has no address to fall back on.
+              (target === "remote_endpoint" &&
+                litellmProvider === OPENAI_COMPATIBLE &&
+                !endpointUrl.trim())
+            }
             onClick={() => setStep((s) => s + 1)}
           >
             {t("common.next")}

@@ -17,6 +17,8 @@ class FakeAsyncSession:
         self.executed: list[tuple[str, dict]] = []
         self.committed = False
         self._select_responses = list(select_responses or [])
+        #: Aliases the "one name per runtime" cleanup reports it removed the runtime from.
+        self.removed_aliases: list[str] = []
 
     async def execute(self, stmt: Any, params: dict | None = None):
         sql_text = str(stmt.text if hasattr(stmt, "text") else stmt)
@@ -32,6 +34,8 @@ class FakeAsyncSession:
             mock_result.fetchall.return_value = [(i,) for i in ids]
         elif "SELECT count(*)" in sql_text:
             mock_result.scalar.return_value = 0
+        elif "RETURNING model_alias" in sql_text:
+            mock_result.fetchall.return_value = [(a,) for a in self.removed_aliases]
         return mock_result
 
     async def commit(self) -> None:
@@ -187,3 +191,52 @@ async def test_publish_runtime_backward_compatible():
     assert params["source_id"] == runtime_id
     assert params["id"] == runtime_id
     assert params["base_url"] == "http://10.0.0.5:8000"
+
+
+@pytest.mark.anyio
+async def test_publish_runtime_drops_the_names_it_no_longer_has():
+    """Found on the release VM: a renamed remote model stayed routed under its old name as well."""
+    fake_session = FakeAsyncSession()
+    service = GatewaySyncService(MagicMock(return_value=fake_session))
+    runtime_id = uuid.uuid4()
+
+    await service.publish_runtime(
+        runtime_id=runtime_id,
+        alias="deepseek/deepseek-v4.1-flash",
+        base_url="https://openrouter.ai/api/v1",
+        backend_provider_type="cloud",
+        is_remote=True,
+        litellm_provider="openrouter",
+        litellm_model="deepseek/deepseek-v4.1-flash",
+    )
+
+    statements = [c for c in fake_session.executed]
+    cleanup = next(
+        (i, c) for i, c in enumerate(statements)
+        if "DELETE FROM llm_pool_membership" in c[0] and "model_alias <> :alias" in c[0]
+    )
+    index, (_sql, params) = cleanup
+    assert params == {"alias": "deepseek/deepseek-v4.1-flash", "instance_id": runtime_id}
+    # After the membership under the new name is in place, before the commit.
+    membership = next(i for i, c in enumerate(statements) if "INSERT INTO llm_pool_membership" in c[0])
+    assert membership < index
+    assert fake_session.committed
+
+
+@pytest.mark.anyio
+async def test_a_name_nothing_serves_any_more_is_switched_off():
+    fake_session = FakeAsyncSession()
+    fake_session.removed_aliases = ["nvidia/nemotron-3-super-120b-a12b"]
+    service = GatewaySyncService(MagicMock(return_value=fake_session))
+
+    await service.publish_runtime(
+        runtime_id=uuid.uuid4(),
+        alias="deepseek/deepseek-v4.1-flash",
+        base_url="https://openrouter.ai/api/v1",
+        backend_provider_type="cloud",
+        is_remote=True,
+    )
+
+    disabled = [c for c in fake_session.executed if "UPDATE llm_model_alias SET enabled = FALSE" in c[0]]
+    assert [c[1] for c in disabled] == [{"alias": "nvidia/nemotron-3-super-120b-a12b"}]
+    assert "NOT EXISTS" in disabled[0][0], "only when no other runtime serves it"

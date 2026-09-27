@@ -240,6 +240,32 @@ class GatewaySyncService:
                     {"alias": alias, "instance_id": runtime_id},
                 )
 
+                # 3a ── one name per runtime ─────────────────────────────────
+                # A runtime answers to its name only. Renaming a remote model
+                # left it routed under the old name as well: on the release VM
+                # "nvidia/nemotron-3-super-120b-a12b" and "deepseek/deepseek-v4.1-flash"
+                # both reached the same OpenRouter instance. A name nothing
+                # serves any more is switched off.
+                removed = await session.execute(
+                    text("""
+                        DELETE FROM llm_pool_membership
+                        WHERE provider_instance_id = :instance_id AND model_alias <> :alias
+                        RETURNING model_alias
+                    """),
+                    {"alias": alias, "instance_id": runtime_id},
+                )
+                for (old_alias,) in removed.fetchall():
+                    await session.execute(
+                        text("""
+                            UPDATE llm_model_alias SET enabled = FALSE, updated_at = NOW()
+                            WHERE alias = :alias AND NOT EXISTS (
+                                SELECT 1 FROM llm_pool_membership
+                                WHERE model_alias = :alias AND enabled = TRUE
+                            )
+                        """),
+                        {"alias": old_alias},
+                    )
+
                 await session.commit()
                 log.info(
                     "Gateway sync: published runtime %s as alias '%s' -> %s [%s]",

@@ -1038,7 +1038,7 @@
     "wizard_step_pricing": "Pricing (Optional)",
     "wizard_pricing_heading": "Set Model Pricing",
     "wizard_pricing_description": "Optionally set input/output token pricing for cost tracking. You can skip this and configure pricing later.",
-    "wizard_pricing_skip_hint": "Leave prices at 0 to skip.",
+    "wizard_pricing_skip_hint": "Leave both empty to skip.",
     "wizard_pricing_input": "Input Price per 1K tokens",
     "wizard_pricing_output": "Output Price per 1K tokens",
     "model_names_placeholder": "Type to search registered models...",
@@ -1051,7 +1051,12 @@
     "tokens_split": "{{prompt}} prompt · {{completion}} completion",
     "latency_total": "Total latency",
     "latency_ttft": "Time to first token",
-    "top_user_value": "{{requests}} req · {{cost}}"
+    "top_user_value": "{{requests}} req · {{cost}}",
+    "input_price_per_1m": "Input price (USD per 1M tokens)",
+    "output_price_per_1m": "Output price (USD per 1M tokens)",
+    "price_per_1m_help": "Per million tokens, as providers list them (OpenRouter, OpenAI, …).",
+    "col_input_price_1m": "Input $/1M",
+    "col_output_price_1m": "Output $/1M"
   },
   "llm_providers": {
     "title": "LLM Providers",
@@ -1089,7 +1094,15 @@
     "model_source_sync_desc": "Copy the model from this server's cache (for machines without internet).",
     "select_or_type_model": "Select or type a model…",
     "test_to_discover": "Test the connection to list its models",
-    "other_openai": "Other (OpenAI-compatible)"
+    "other_openai": "Other (OpenAI-compatible)",
+    "col_price": "Price $/1M (in / out)",
+    "price_set": "Set price",
+    "price_edit": "Change the price",
+    "price_title": "Price of {{model}}",
+    "price_help": "What a million input and output tokens of {{model}} cost at {{provider}}. Requests through the gateway are priced with it within a minute.",
+    "price_borrowed": "Priced now by an entry filed under “{{provider}}”. Saving files one under this provider.",
+    "price_remove": "Remove price",
+    "endpoint_url_filled": "{{provider}}'s address, filled in for you. Change it only for a proxy."
   },
   "llm_models": {
     "title": "LLM Models",

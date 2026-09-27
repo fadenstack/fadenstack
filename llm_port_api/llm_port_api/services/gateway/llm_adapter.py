@@ -239,10 +239,15 @@ def _upstream_kwargs(
         # serve the Chat Completions / Embeddings API under a /v1 prefix;
         # restore the segment the backend normaliser stripped on save.
         # (Full rationale: see the docstring above.)
+        # Groq and Mistral are OpenAI-compatible under /v1 as well
+        # (api.groq.com/openai/v1, api.mistral.ai/v1): their address, as the
+        # console fills it in, lost the segment on save like any other.
         v1_prefixed = (
             ProviderType.VLLM,
             ProviderType.TGI,
             ProviderType.REMOTE_OPENAI,
+            ProviderType.REMOTE_GROQ,
+            ProviderType.REMOTE_MISTRAL,
         )
         if provider_type in v1_prefixed and not effective_base.endswith("/v1"):
             effective_base += "/v1"

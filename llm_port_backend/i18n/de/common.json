@@ -1043,7 +1043,7 @@
     "wizard_step_pricing": "Preise (Optional)",
     "wizard_pricing_heading": "Modellpreise festlegen",
     "wizard_pricing_description": "Optional koennen Sie Eingabe-/Ausgabe-Token-Preise fuer die Kostenverfolgung festlegen. Sie koennen dies ueberspringen und die Preise spaeter konfigurieren.",
-    "wizard_pricing_skip_hint": "Preise auf 0 lassen, um zu ueberspringen.",
+    "wizard_pricing_skip_hint": "Beide Felder leer lassen, um den Schritt zu überspringen.",
     "wizard_pricing_input": "Eingabepreis pro 1K Tokens",
     "wizard_pricing_output": "Ausgabepreis pro 1K Tokens",
     "model_names_placeholder": "Tippen, um registrierte Modelle zu suchen...",
@@ -1056,7 +1056,12 @@
     "tokens_split": "{{prompt}} Prompt · {{completion}} Antwort",
     "latency_total": "Gesamtlatenz",
     "latency_ttft": "Zeit bis zum ersten Token",
-    "top_user_value": "{{requests}} Anfr. · {{cost}}"
+    "top_user_value": "{{requests}} Anfr. · {{cost}}",
+    "input_price_per_1m": "Eingabepreis (USD pro 1 Mio. Tokens)",
+    "output_price_per_1m": "Ausgabepreis (USD pro 1 Mio. Tokens)",
+    "price_per_1m_help": "Pro Million Tokens, wie Anbieter sie angeben (OpenRouter, OpenAI, …).",
+    "col_input_price_1m": "Eingabe $/1 Mio.",
+    "col_output_price_1m": "Ausgabe $/1 Mio."
   },
   "llm_providers": {
     "title": "LLM-Provider",
@@ -1094,7 +1099,15 @@
     "model_source_sync_desc": "Das Modell aus dem Cache dieses Servers kopieren (für Maschinen ohne Internet).",
     "select_or_type_model": "Modell wählen oder eingeben…",
     "test_to_discover": "Verbindung testen, um die Modelle aufzulisten",
-    "other_openai": "Andere (OpenAI-kompatibel)"
+    "other_openai": "Andere (OpenAI-kompatibel)",
+    "col_price": "Preis $/1 Mio. (ein / aus)",
+    "price_set": "Preis festlegen",
+    "price_edit": "Preis ändern",
+    "price_title": "Preis von {{model}}",
+    "price_help": "Was eine Million Eingabe- und Ausgabe-Tokens von {{model}} bei {{provider}} kosten. Anfragen über das Gateway werden innerhalb einer Minute damit berechnet.",
+    "price_borrowed": "Derzeit berechnet mit einem Eintrag unter „{{provider}}“. Beim Speichern wird einer für diesen Anbieter angelegt.",
+    "price_remove": "Preis entfernen",
+    "endpoint_url_filled": "Die Adresse von {{provider}}, für Sie eingetragen. Nur für einen Proxy ändern."
   },
   "llm_models": {
     "title": "LLM-Modelle",

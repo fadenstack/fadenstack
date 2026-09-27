@@ -675,13 +675,17 @@ async def update_provider(
     # Track the old remote_model so we can cascade the rename.
     old_remote_model: str | None = None
     new_remote_model: str | None = None
+    # Read before the update: the row is the same object the DAO changes.
+    old_litellm_model = (existing.litellm_model or "").strip() or None
 
     if "remote_model" in body.model_fields_set:
         if next_capabilities is None:
             base = existing.capabilities if isinstance(existing.capabilities, dict) else {}
             next_capabilities = dict(base)
         old_caps = existing.capabilities if isinstance(existing.capabilities, dict) else {}
-        old_remote_model = (old_caps.get("remote_model") or "").strip() or None
+        # The name the model went by: its remote model, or -- made without
+        # one -- the LiteLLM model the runtime and alias were named after.
+        old_remote_model = (old_caps.get("remote_model") or "").strip() or old_litellm_model
         remote_model = body.remote_model.strip() if isinstance(body.remote_model, str) else None
         if remote_model:
             next_capabilities["remote_model"] = remote_model
@@ -689,6 +693,26 @@ async def update_provider(
         else:
             next_capabilities.pop("remote_model", None)
         capabilities_changed = True
+
+    # A new remote model is the model asked for upstream too, when the LiteLLM
+    # model only followed the old one. Renaming used to change the name clients
+    # call and nothing else: on the release VM "deepseek/deepseek-v4.1-flash"
+    # was answered by nvidia/nemotron-3-super-120b-a12b, the model before.
+    litellm_model_update: object = (
+        body.litellm_model if "litellm_model" in body.model_fields_set else ...
+    )
+    renamed = bool(
+        new_remote_model
+        and new_remote_model != old_remote_model
+        and existing.target == ProviderTarget.REMOTE_ENDPOINT
+    )
+    if (
+        renamed
+        and litellm_model_update is ...
+        and existing.litellm_provider
+        and old_litellm_model in (None, old_remote_model)
+    ):
+        litellm_model_update = new_remote_model
 
     # Normalised as on create, so the gateway does not ask for /v1/v1/...
     endpoint_url = _normalize_base_url(body.endpoint_url) if body.endpoint_url else body.endpoint_url
@@ -699,19 +723,14 @@ async def update_provider(
         endpoint_url=endpoint_url if endpoint_url is not None else ...,
         api_key_encrypted=body.api_key if body.api_key is not None else ...,
         litellm_provider=body.litellm_provider if "litellm_provider" in body.model_fields_set else ...,
-        litellm_model=body.litellm_model if "litellm_model" in body.model_fields_set else ...,
+        litellm_model=litellm_model_update,
         extra_params=body.extra_params if "extra_params" in body.model_fields_set else ...,
     )
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
     # ── Cascade remote_model rename to auto-provisioned model + runtime ──
-    if (
-        new_remote_model
-        and old_remote_model
-        and new_remote_model != old_remote_model
-        and existing.target == ProviderTarget.REMOTE_ENDPOINT
-    ):
+    if renamed and old_remote_model:
         rts = await runtime_dao.list_by_provider(provider_id)
         for rt in rts:
             model = await model_dao.get(rt.model_id)
@@ -729,8 +748,11 @@ async def update_provider(
     # Where prompts go and how they get there reach the routes too: they were
     # copied into each runtime and its gateway route when it was made, and an
     # edit left the gateway sending prompts to the old address.
+    # A renamed model reaches them the same way: published under its new name
+    # (which drops the old one) and asked for by it upstream.
     routing_fields = {"endpoint_url", "api_key", "litellm_provider", "litellm_model", "extra_params"}
-    if existing.target == ProviderTarget.REMOTE_ENDPOINT and routing_fields & body.model_fields_set:
+    routing_changed = bool(routing_fields & body.model_fields_set) or renamed
+    if existing.target == ProviderTarget.REMOTE_ENDPOINT and routing_changed:
         await llm_service.sync_remote_routes(runtime_dao, provider)
 
     await audit_action(

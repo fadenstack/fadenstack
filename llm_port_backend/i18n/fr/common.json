@@ -1038,7 +1038,7 @@
     "wizard_step_pricing": "Tarification (Optionnel)",
     "wizard_pricing_heading": "Définir les prix du modèle",
     "wizard_pricing_description": "Définissez optionnellement les prix des tokens d'entrée/sortie pour le suivi des coûts. Vous pouvez ignorer ceci et configurer les prix plus tard.",
-    "wizard_pricing_skip_hint": "Laissez les prix à 0 pour ignorer.",
+    "wizard_pricing_skip_hint": "Laissez les deux vides pour passer cette étape.",
     "wizard_pricing_input": "Prix d'entrée par 1K tokens",
     "wizard_pricing_output": "Prix de sortie par 1K tokens",
     "model_names_placeholder": "Tapez pour rechercher les modèles enregistrés...",
@@ -1051,7 +1051,12 @@
     "tokens_split": "{{prompt}} prompt · {{completion}} réponse",
     "latency_total": "Latence totale",
     "latency_ttft": "Délai avant le premier jeton",
-    "top_user_value": "{{requests}} req. · {{cost}}"
+    "top_user_value": "{{requests}} req. · {{cost}}",
+    "input_price_per_1m": "Prix en entrée (USD pour 1 M de tokens)",
+    "output_price_per_1m": "Prix en sortie (USD pour 1 M de tokens)",
+    "price_per_1m_help": "Par million de tokens, comme les fournisseurs les affichent (OpenRouter, OpenAI, …).",
+    "col_input_price_1m": "Entrée $/1 M",
+    "col_output_price_1m": "Sortie $/1 M"
   },
   "llm_providers": {
     "title": "Fournisseurs LLM",
@@ -1089,7 +1094,15 @@
     "model_source_sync_desc": "Copier le modèle depuis le cache de ce serveur (pour les machines sans Internet).",
     "select_or_type_model": "Choisissez ou saisissez un modèle…",
     "test_to_discover": "Testez la connexion pour lister ses modèles",
-    "other_openai": "Autre (compatible OpenAI)"
+    "other_openai": "Autre (compatible OpenAI)",
+    "col_price": "Prix $/1 M (entrée / sortie)",
+    "price_set": "Définir le prix",
+    "price_edit": "Modifier le prix",
+    "price_title": "Prix de {{model}}",
+    "price_help": "Ce que coûte un million de tokens en entrée et en sortie de {{model}} chez {{provider}}. Les requêtes passant par la passerelle sont calculées avec ce prix en moins d'une minute.",
+    "price_borrowed": "Calculé actuellement avec une entrée enregistrée sous « {{provider}} ». L'enregistrement en crée une pour ce fournisseur.",
+    "price_remove": "Supprimer le prix",
+    "endpoint_url_filled": "L'adresse de {{provider}}, remplie pour vous. Ne la modifiez que pour un proxy."
   },
   "llm_models": {
     "title": "Modèles LLM",

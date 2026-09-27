@@ -97,9 +97,22 @@ class PricingService:
     # Resolution & calculation
     # ------------------------------------------------------------------
 
-    def resolve(self, provider: str, model: str) -> PriceCatalogEntry | None:
-        """Look up the active price for a provider/model pair."""
-        return self._cache.get((provider.lower(), model.lower()))
+    def resolve(self, provider: str | None, model: str) -> PriceCatalogEntry | None:
+        """Look up the active price for a provider/model pair.
+
+        A route with no LiteLLM provider -- a model on our own machines, an
+        OpenAI-compatible endpoint -- has no provider to look up, and a price
+        set for it in the console is keyed on the provider's name. Then, or
+        when nothing is priced under the provider, the model's own price is
+        used if exactly one provider has one.
+        """
+        if provider:
+            entry = self._cache.get((provider.lower(), model.lower()))
+            if entry is not None:
+                return entry
+        wanted = model.lower()
+        matches = [entry for (_provider, name), entry in self._cache.items() if name == wanted]
+        return matches[0] if len(matches) == 1 else None
 
     def compute_cost(
         self,
@@ -116,7 +129,7 @@ class PricingService:
         counts are entirely missing, ``partial`` when only some token
         counts are present, and ``complete`` when all inputs are known.
         """
-        if not provider_name or not model_alias:
+        if not model_alias:
             return CostEstimate(
                 estimated_input_cost=None,
                 estimated_output_cost=None,

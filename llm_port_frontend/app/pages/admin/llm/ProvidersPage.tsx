@@ -5,7 +5,7 @@
  * - Local Docker providers own exactly one runtime → start/stop/restart inline.
  * - Remote Endpoint providers have an external URL and no container to manage.
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, type MouseEvent } from "react";
 import { Link as RouterLink, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -23,7 +23,11 @@ import { EngineChip, RuntimeStatusChip } from "~/components/Chips";
 import MonitoringCardRow from "~/pages/admin/llm/MonitoringCardRow";
 import { FormDialog } from "~/components/FormDialog";
 import { ProviderWizardDialog } from "~/components/ProviderWizardDialog";
+import { formatPerMillion } from "~/components/PriceField";
+import { observability, type PricingEntry } from "~/api/observability";
+import { findPrice, priceModelKey, priceProviderKey } from "~/lib/modelPrice";
 import { useAsyncData } from "~/lib/useAsyncData";
+import { ModelPriceDialog, type ModelPriceTarget } from "./ModelPriceDialog";
 
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -81,6 +85,14 @@ export default function ProvidersPage() {
   const modelsState = useAsyncData(() => modelApi.list(), [], {
     initialValue: [] as Model[],
   });
+  // The catalogue's prices, for the price column; empty for a user who may
+  // not read them (the column then offers to set one, and saving says why not).
+  const pricesState = useAsyncData(
+    () => observability.listPricing().catch(() => [] as PricingEntry[]),
+    [],
+    { initialValue: [] as PricingEntry[] },
+  );
+  const [priceTarget, setPriceTarget] = useState<ModelPriceTarget | null>(null);
   const runtimesList = runtimesState.data;
   const modelsList = modelsState.data;
   // True while a column's source is still on its way, so the cell can say
@@ -271,6 +283,37 @@ export default function ProvidersPage() {
             {t("llm_providers.no_runtime")}
           </Typography>
         ),
+    },
+    {
+      key: "price",
+      label: t("llm_providers.col_price"),
+      render: (r) => {
+        const model = priceModelKey(r.provider, r.runtime);
+        if (!model) return null;
+        const provider = priceProviderKey(r.provider);
+        const current = findPrice(pricesState.data, provider, model);
+        const open = (e: MouseEvent) => {
+          e.stopPropagation();
+          setPriceTarget({ provider, model, providerLabel: r.provider.name, current });
+        };
+        return current ? (
+          <Tooltip title={t("llm_providers.price_edit")}>
+            <Link
+              component="button"
+              type="button"
+              underline="hover"
+              onClick={open}
+              sx={{ fontSize: "0.8rem", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+            >
+              ${formatPerMillion(current.input_price_per_1k)} / ${formatPerMillion(current.output_price_per_1k)}
+            </Link>
+          </Tooltip>
+        ) : (
+          <Button size="small" onClick={open} sx={{ whiteSpace: "nowrap" }}>
+            {t("llm_providers.price_set")}
+          </Button>
+        );
+      },
     },
     {
       key: "status",
@@ -516,6 +559,12 @@ export default function ProvidersPage() {
         models={modelsList}
         onClose={() => setShowWizard(false)}
         onCreated={load}
+      />
+
+      <ModelPriceDialog
+        target={priceTarget}
+        onClose={() => setPriceTarget(null)}
+        onSaved={() => void pricesState.refresh()}
       />
 
       {/* ── Edit dialog ─────────────────────────────────────────── */}

@@ -135,7 +135,30 @@ class TestComputeCost:
         assert est.estimated_total_cost is None
         assert est.price_catalog_id is None
 
-    def test_no_provider(self, pricing_service: PricingService) -> None:
+    def test_no_provider_uses_the_models_one_price(self, pricing_service: PricingService) -> None:
+        """A route without a LiteLLM provider (our own machines, an OpenAI-compatible endpoint)."""
+        est = pricing_service.compute_cost(
+            provider_name=None,
+            model_alias="gpt-4.1",
+            prompt_tokens=1000,
+            completion_tokens=500,
+        )
+        assert est.status == "complete"
+        assert est.estimated_total_cost == Decimal("0.002") + Decimal("0.004")
+
+    def test_nothing_under_the_provider_uses_the_models_one_price(self, pricing_service: PricingService) -> None:
+        est = pricing_service.compute_cost(
+            provider_name="openrouter",
+            model_alias="gemini-2.5-pro",
+            prompt_tokens=1000,
+            completion_tokens=0,
+        )
+        assert est.status == "complete"
+
+    def test_a_model_priced_by_two_providers_needs_the_provider(self, pricing_service: PricingService) -> None:
+        entry = _make_entry("azure", "gpt-4.1", "0.001", "0.004")
+        pricing_service._cache[("azure", "gpt-4.1")] = entry
+        assert pricing_service.resolve("azure", "gpt-4.1") is entry
         est = pricing_service.compute_cost(
             provider_name=None,
             model_alias="gpt-4.1",

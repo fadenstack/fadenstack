@@ -1043,7 +1043,7 @@
     "wizard_step_pricing": "Precios (Opcional)",
     "wizard_pricing_heading": "Establecer precios del modelo",
     "wizard_pricing_description": "Opcionalmente establezca precios de tokens de entrada/salida para el seguimiento de costos. Puede omitir esto y configurar los precios más tarde.",
-    "wizard_pricing_skip_hint": "Deje los precios en 0 para omitir.",
+    "wizard_pricing_skip_hint": "Deje ambos vacíos para omitir este paso.",
     "wizard_pricing_input": "Precio de entrada por 1K tokens",
     "wizard_pricing_output": "Precio de salida por 1K tokens",
     "model_names_placeholder": "Escriba para buscar modelos registrados...",
@@ -1056,7 +1056,12 @@
     "tokens_split": "{{prompt}} prompt · {{completion}} respuesta",
     "latency_total": "Latencia total",
     "latency_ttft": "Tiempo hasta el primer token",
-    "top_user_value": "{{requests}} sol. · {{cost}}"
+    "top_user_value": "{{requests}} sol. · {{cost}}",
+    "input_price_per_1m": "Precio de entrada (USD por 1 M de tokens)",
+    "output_price_per_1m": "Precio de salida (USD por 1 M de tokens)",
+    "price_per_1m_help": "Por millón de tokens, como los publican los proveedores (OpenRouter, OpenAI, …).",
+    "col_input_price_1m": "Entrada $/1 M",
+    "col_output_price_1m": "Salida $/1 M"
   },
   "llm_providers": {
     "title": "LLM Providers",
@@ -1094,7 +1099,15 @@
     "model_source_sync_desc": "Copiar el modelo desde la caché de este servidor (para máquinas sin internet).",
     "select_or_type_model": "Seleccione o escriba un modelo…",
     "test_to_discover": "Pruebe la conexión para listar sus modelos",
-    "other_openai": "Otro (compatible con OpenAI)"
+    "other_openai": "Otro (compatible con OpenAI)",
+    "col_price": "Precio $/1 M (entrada / salida)",
+    "price_set": "Fijar precio",
+    "price_edit": "Cambiar el precio",
+    "price_title": "Precio de {{model}}",
+    "price_help": "Lo que cuesta un millón de tokens de entrada y de salida de {{model}} en {{provider}}. Las solicitudes a través del gateway se calculan con él en menos de un minuto.",
+    "price_borrowed": "Ahora se calcula con una entrada registrada bajo «{{provider}}». Al guardar se crea una para este proveedor.",
+    "price_remove": "Quitar precio",
+    "endpoint_url_filled": "La dirección de {{provider}}, ya rellenada. Cámbiela solo para un proxy."
   },
   "llm_models": {
     "title": "LLM Models",

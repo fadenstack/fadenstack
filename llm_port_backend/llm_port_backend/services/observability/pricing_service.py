@@ -55,6 +55,15 @@ class PricingCRUDService:
     ) -> dict:
         new_id = uuid.uuid4()
         now = datetime.now(timezone.utc)
+        # A model has one active price (a unique index says so): a new one
+        # replaces it, kept in the history, instead of failing on the index.
+        await self._session.execute(
+            text("""
+                UPDATE price_catalog SET active = FALSE, updated_at = :now
+                WHERE provider = :provider AND model = :model AND active = TRUE
+            """),
+            {"provider": provider.strip().lower(), "model": model.strip().lower(), "now": now},
+        )
         q = text("""
             INSERT INTO price_catalog
                 (id, provider, model, input_price_per_1k, output_price_per_1k,
