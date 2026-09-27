@@ -353,3 +353,10 @@ def test_the_commands_work_on_the_configured_install(install: Path, monkeypatch:
     assert result.exit_code == 0, result.output
     assert not tls.material_present(install)
     assert "http://10.250.10.61" in result.output
+
+
+def test_other_machines_are_shown_an_address_they_can_resolve() -> None:
+    assert tls_cmd.reachable_example(["https://llm-port", "https://10.250.10.61"]) == "https://10.250.10.61"
+    assert tls_cmd.reachable_example(["https://box", "https://box.lan:8443"]) == "https://box.lan:8443"
+    assert tls_cmd.reachable_example(["https://box"]) == "https://box"
+    assert tls_cmd.reachable_example([]) == "https://<this server>"

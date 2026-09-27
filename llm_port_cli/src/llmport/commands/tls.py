@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import click
 
@@ -91,10 +92,21 @@ def print_summary(summary: tls.CertSummary) -> None:
         warning(note)
 
 
+def reachable_example(urls: list[str]) -> str:
+    """The address to show other machines: an IP or a dotted name before a bare host name.
+
+    A bare name ("llm-port") resolves on the server itself, rarely anywhere else.
+    """
+    for url in urls:
+        host = urlsplit(url).hostname or ""
+        if tls._is_ip(host) or "." in host:  # noqa: SLF001
+            return url
+    return urls[0] if urls else "https://<this server>"
+
+
 def print_trust_hints(install_dir: Path, ca_public: Path) -> None:
     """How browsers, API clients and machines come to trust a certificate made here."""
-    urls = addresses(install_dir)
-    example = urls[0] if urls else "https://<this server>"
+    example = reachable_example(addresses(install_dir))
     console.print(
         "\n  [bold]Trust this install's certificate authority once[/bold],"
         " wherever the console is used from:\n"
