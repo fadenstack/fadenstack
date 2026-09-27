@@ -9,8 +9,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { Watch } from "./watch";
 
-// The current page's fill (palette.accent.navActiveBg = primary.dark) in dark mode.
-const NAV_FILL = { nord: "rgb(14, 124, 134)", aurora: "rgb(63, 29, 203)" } as const;
+// The current page's fill (palette.accent.navActiveBg) in dark mode.
+const NAV_FILL = { frost: "rgb(76, 106, 146)", graphite: "rgb(55, 65, 81)", aurora: "rgb(63, 29, 203)" } as const;
+const NAMES = { frost: "Frost", graphite: "Graphite", aurora: "Aurora" } as const;
 const THREAD_ON_DARK = "#FF4D6D";
 
 function watch(page: Page, baseURL: string | undefined) {
@@ -48,11 +49,11 @@ test.describe("the brand and the accent", () => {
     await page.goto("/admin/settings?tab=appearance");
     await page.evaluate(() => localStorage.setItem("llm-port-theme-mode", "dark"));
     await page.reload();
-    const before = (await page.evaluate(() => localStorage.getItem("llm-port-accent"))) ?? "nord";
+    const before = (await page.evaluate(() => localStorage.getItem("llm-port-accent"))) ?? "frost";
 
     try {
-      for (const accent of ["aurora", "nord"] as const) {
-        const name = accent === "nord" ? "Nord" : "Aurora";
+      for (const accent of ["aurora", "graphite", "frost"] as const) {
+        const name = NAMES[accent];
         await page.getByRole("radio", { name }).check();
         await expect.poll(() => navFill(page)).toBe(NAV_FILL[accent]);
         expect(await threadStroke(page)).toBe(THREAD_ON_DARK);

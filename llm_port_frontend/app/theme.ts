@@ -3,37 +3,48 @@ import type { PaletteMode } from "@mui/material";
 import { grey } from "@mui/material/colors";
 
 /**
- * The console's theme: a mode (dark / light) and an accent (Nord / Aurora),
- * from the Fadenstack tokens (brand/tokens/fadenstack-tokens.json).
+ * The console's theme: a mode (dark / light) and an accent (Frost, Graphite
+ * or Aurora).
+ *
+ * Aurora is the Fadenstack tokens' violet (brand/tokens/fadenstack-tokens.json).
+ * Frost and Graphite replaced the tokens' Nord cyan on 2026-09-27, by the
+ * owner's choice: the cyan was the loudest colour on the page (8.1:1 on the
+ * dark card, against 3.5 for the healthy green and 4.2 for the error red)
+ * and sat next to green, so it drew the eye from the statuses. Frost is a
+ * muted steel blue (Nord's frost #81A1C1, about half the cyan's saturation);
+ * Graphite has no hue at all, so colour means status only. A stored "nord"
+ * is no longer an accent and falls back to the default, Frost.
  *
  * The accent gives `primary`, `secondary`, the residency colours and the
  * navigation highlight. It never changes the mark (plates and thread are
  * `palette.brand`), the status colours (`error`, `warning`, `success`,
  * `dashboard.health`) or the backgrounds.
  *
- * Contrast, WCAG 2.x, checked 2026-09-27 for both accents in both modes
- * (paper: #111827 dark, #FFFFFF light):
+ * Contrast, WCAG 2.x, checked 2026-09-27 (paper: #111827 dark, #FFFFFF light).
+ * "Text on hover" is the button's text on `primary.dark`, which MUI fills a
+ * contained button with on hover.
  *
- *                  main/paper  text on main  nav text  secondary  accent text  residency (machines/private/external/unknown)
- *   Nord dark        8.14        7.72          4.95      6.52       10.44        8.14 / 10.44 / 6.52 / 3.67
- *   Nord light       4.95        4.95          6.75      4.81        6.75        9.65 /  4.95 / 4.81 / 4.83
- *   Aurora dark      3.69        4.81          9.34      7.44        6.14        3.69 /  6.14 / 7.44 / 3.67
- *   Aurora light     4.81        4.81          9.34      4.16        9.34        9.34 /  4.81 / 4.16 / 4.83
+ *                  main/   text on  text on  nav    secondary  accent  residency
+ *                  paper   main     hover    text              text    (machines/private/external/unknown)
+ *   Frost dark     6.59    7.15     5.71     5.55   6.26        9.48    6.59 / 10.35 / 6.26 / 3.67
+ *   Frost light    5.55    5.55     7.71     7.71   5.43        7.71    7.71 /  3.07 / 5.43 / 4.83
+ *   Graphite dark 14.33   14.33    12.04    10.31   6.99       14.33   14.33 /  6.99 / 6.59 / 3.67
+ *   Graphite light14.68   14.68    17.74    14.68   4.83       14.68   14.68 /  7.56 / 5.55 / 4.83
+ *   Aurora dark    3.69    4.81     9.34     9.34   7.44        6.14    3.69 /  6.14 / 7.44 / 3.67
+ *   Aurora light   4.81    4.81     9.34     9.34   4.16        9.34    9.34 /  4.81 / 4.16 / 4.83
  *
  * Every colour a chart, a bar or an outline draws on paper is at least 3:1,
- * and every text on an accent fill at least 4.5:1. The token ramp is used as
- * given on dark; on light a colour under 3:1 on white moves one step darker
- * on its own ramp (Nord's cyan #22C1D3 is 2.2:1 on white, so light Nord is
- * #0E7C86 with white text). The darker teals #0B6570 and #084C55 are the
- * Nord ramp of the docs site. The load scale is the exception by design --
- * a lightly used GPU is meant to look faint -- and is always shown with its
- * numbers. `warning.main` on white is 2.4:1, so the light mode's
- * `dashboard.health.degraded` takes a darker amber (4.24:1).
+ * and every text on an accent fill -- hovered or not, and the current page --
+ * at least 4.5:1 (theme.test.ts holds this). On light, a colour under 3:1 on
+ * white moves one step darker on its own ramp. The load scale is the
+ * exception by design -- a lightly used GPU is meant to look faint -- and is
+ * always shown with its numbers. `warning.main` on white is 2.4:1, so the
+ * light mode's `dashboard.health.degraded` takes a darker amber (4.24:1).
  */
-export type Accent = "nord" | "aurora";
+export type Accent = "frost" | "graphite" | "aurora";
 
-export const ACCENT_KEYS: readonly Accent[] = ["nord", "aurora"];
-export const DEFAULT_ACCENT: Accent = "nord";
+export const ACCENT_KEYS: readonly Accent[] = ["frost", "graphite", "aurora"];
+export const DEFAULT_ACCENT: Accent = "frost";
 
 interface Ramp {
   main: string;
@@ -43,33 +54,58 @@ interface Ramp {
 
 export interface AccentDefinition {
   label: string;
-  /** The accent's own colour, for its swatch in Settings. */
-  swatch: string;
   primary: Record<PaletteMode, Ramp & { contrastText: string }>;
   secondary: Record<PaletteMode, Ramp>;
   residency: Record<PaletteMode, DashboardPalette["residency"]>;
+  /** The current page in a navigation list: its fill and text. */
+  nav: Record<PaletteMode, { bg: string; text: string }>;
+  /** The accent as text or an icon on paper. */
+  text: Record<PaletteMode, string>;
 }
 
 export const ACCENTS: Record<Accent, AccentDefinition> = {
-  nord: {
-    label: "Nord",
-    swatch: "#22C1D3",
+  frost: {
+    label: "Frost",
     primary: {
-      dark: { main: "#22C1D3", light: "#7DD3E8", dark: "#0E7C86", contrastText: "#06202A" },
-      light: { main: "#0E7C86", light: "#22C1D3", dark: "#0B6570", contrastText: "#FFFFFF" },
+      dark: { main: "#81A1C1", light: "#A9C0D8", dark: "#6F8FB0", contrastText: "#0A0E1A" },
+      light: { main: "#4C6A92", light: "#81A1C1", dark: "#3B5478", contrastText: "#FFFFFF" },
     },
     secondary: {
-      dark: { main: "#A78BFA", light: "#C4B5FD", dark: "#7C4DFF" },
-      light: { main: "#7C4DFF", light: "#A78BFA", dark: "#3F1DCB" },
+      dark: { main: "#B48EAD", light: "#CDB3C8", dark: "#8A5A83" },
+      light: { main: "#8A5A83", light: "#B48EAD", dark: "#6E4467" },
     },
     residency: {
-      dark: { machines: "#22C1D3", private: "#7DD3E8", external: "#A78BFA", unknown: "#6B7280" },
-      light: { machines: "#084C55", private: "#0E7C86", external: "#7C4DFF", unknown: "#6B7280" },
+      dark: { machines: "#81A1C1", private: "#B4C8DE", external: "#B48EAD", unknown: "#6B7280" },
+      light: { machines: "#3B5478", private: "#7C95B8", external: "#8A5A83", unknown: "#6B7280" },
     },
+    nav: {
+      dark: { bg: "#4C6A92", text: "#FFFFFF" },
+      light: { bg: "#3B5478", text: "#FFFFFF" },
+    },
+    text: { dark: "#A9C0D8", light: "#3B5478" },
+  },
+  graphite: {
+    label: "Graphite",
+    primary: {
+      dark: { main: "#E5E7EB", light: "#F3F4F6", dark: "#D1D5DB", contrastText: "#111827" },
+      light: { main: "#1F2937", light: "#4B5563", dark: "#111827", contrastText: "#FFFFFF" },
+    },
+    secondary: {
+      dark: { main: "#9CA3AF", light: "#D1D5DB", dark: "#6B7280" },
+      light: { main: "#6B7280", light: "#9CA3AF", dark: "#4B5563" },
+    },
+    residency: {
+      dark: { machines: "#E5E7EB", private: "#9CA3AF", external: "#81A1C1", unknown: "#6B7280" },
+      light: { machines: "#1F2937", private: "#4B5563", external: "#4C6A92", unknown: "#6B7280" },
+    },
+    nav: {
+      dark: { bg: "#374151", text: "#FFFFFF" },
+      light: { bg: "#1F2937", text: "#FFFFFF" },
+    },
+    text: { dark: "#E5E7EB", light: "#1F2937" },
   },
   aurora: {
     label: "Aurora",
-    swatch: "#7C4DFF",
     primary: {
       dark: { main: "#7C4DFF", light: "#B47CFF", dark: "#3F1DCB", contrastText: "#FFFFFF" },
       light: { main: "#7C4DFF", light: "#B47CFF", dark: "#3F1DCB", contrastText: "#FFFFFF" },
@@ -82,11 +118,16 @@ export const ACCENTS: Record<Accent, AccentDefinition> = {
       dark: { machines: "#7C4DFF", private: "#B47CFF", external: "#00B8D4", unknown: "#6B7280" },
       light: { machines: "#3F1DCB", private: "#7C4DFF", external: "#0088A3", unknown: "#6B7280" },
     },
+    nav: {
+      dark: { bg: "#3F1DCB", text: "#FFFFFF" },
+      light: { bg: "#3F1DCB", text: "#FFFFFF" },
+    },
+    text: { dark: "#B47CFF", light: "#3F1DCB" },
   },
 };
 
 export function isAccent(value: unknown): value is Accent {
-  return value === "nord" || value === "aurora";
+  return typeof value === "string" && (ACCENT_KEYS as readonly string[]).includes(value);
 }
 
 /** The mark's colours per mode (brand tokens). Never follows the accent. */
@@ -278,9 +319,9 @@ export function getAppTheme(mode: PaletteMode, accent: Accent = DEFAULT_ACCENT) 
 
   const brand = brandPalette(mode);
   const accentPalette: AccentPalette = {
-    text: dark ? palette.primary.light : palette.primary.dark,
-    navActiveBg: palette.primary.dark,
-    navActiveText: "#FFFFFF",
+    text: tokens.text[mode],
+    navActiveBg: tokens.nav[mode].bg,
+    navActiveText: tokens.nav[mode].text,
     hover: alpha(palette.primary.main, 0.12),
     tint: alpha(palette.primary.main, 0.06),
   };

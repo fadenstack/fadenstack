@@ -12,7 +12,7 @@ import { ThemeModeContext } from "~/theme-mode";
 /** The app's provider in small: the choices re-theme what is rendered inside. */
 function Themed({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<PaletteMode>("dark");
-  const [accent, setAccent] = useState<Accent>("nord");
+  const [accent, setAccent] = useState<Accent>("frost");
   const value = useMemo(
     () => ({ mode, setMode, toggleMode: () => setMode((m) => (m === "dark" ? "light" : "dark")), accent, setAccent }),
     [mode, accent],
@@ -25,12 +25,14 @@ function Themed({ children }: { children: React.ReactNode }) {
 }
 
 describe("the appearance settings", () => {
-  it("offer Nord (chosen) and Aurora as radios with their names", () => {
+  it("offer Frost (chosen), Graphite and Aurora as radios with their names", () => {
     render(<AppearanceSettings />, { wrapper: Themed });
     const accent = screen.getByRole("radiogroup", { name: "Accent" });
     expect(accent).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Nord" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Frost" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Graphite" })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "Aurora" })).not.toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Nord" })).toBeNull();
   });
 
   it("switch the accent and the mode at once", () => {
@@ -68,7 +70,8 @@ describe("the mark", () => {
       unmount();
       return colours;
     };
-    expect(strokes("nord")).toEqual(["#F3F4F6", "#FF4D6D", "#F3F4F6"]);
-    expect(strokes("aurora")).toEqual(strokes("nord"));
+    expect(strokes("frost")).toEqual(["#F3F4F6", "#FF4D6D", "#F3F4F6"]);
+    expect(strokes("graphite")).toEqual(strokes("frost"));
+    expect(strokes("aurora")).toEqual(strokes("frost"));
   });
 });

@@ -1,5 +1,5 @@
 /**
- * The viewer's accent (Nord / Aurora) and mode (dark / light), with a live
+ * The viewer's accent (Frost / Graphite / Aurora) and mode (dark / light), with a live
  * preview: a choice re-themes the page at once. Both are kept in this
  * browser, as the language is (theme-mode.tsx).
  *
