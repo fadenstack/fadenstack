@@ -136,3 +136,34 @@ def test_requests_are_not_logged_line_by_line() -> None:
     agent_main._configure_logging("INFO")
     assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
     assert not logging.getLogger("httpcore").isEnabledFor(logging.INFO)
+
+
+# ── pushing through the backend (agent 0.1.17) ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_pushes_through_the_backend_carry_the_credential_and_follow_its_address() -> None:
+    import httpx
+
+    from llm_port_node_agent.log_collector import LogEntry
+    from llm_port_node_agent.loki_client import LokiClient
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(204)
+
+    backend = httpx.AsyncClient(base_url="https://10.250.10.61", transport=httpx.MockTransport(handler))
+    creds = ["cred-1"]
+    loki = LokiClient(loki_url="/api/node-files/logs", labels={"job": "node-agent", "host": "10.250.10.49"},
+                      http=backend, credential=lambda: creds[0])
+    loki.add(LogEntry(timestamp_ns=1, line="hello", level="info"))
+    assert await loki.flush()
+    creds[0] = "cred-2"  # rotated: the next push carries the new one
+    assert await loki.push_streams(labels={"container": "c"}, entries=[(2, "x")])
+    await loki.close()  # the backend's client is not the Loki client's to close
+    assert not backend.is_closed
+    assert [str(r.url) for r in seen] == ["https://10.250.10.61/api/node-files/logs/loki/api/v1/push"] * 2
+    assert [r.headers["authorization"] for r in seen] == ["Bearer cred-1", "Bearer cred-2"]
+    await backend.aclose()

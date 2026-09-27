@@ -89,6 +89,20 @@ class RuntimeManager:
         #: The machine's model-TLS proxy (``model_tls.ModelTls``).
         self._model_tls = model_tls
 
+    async def model_tls_route(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Put the model-TLS proxy in front of a port on this machine, or take it away.
+
+        For a vLLM found running here: it keeps its own port, and the gateway
+        reaches it through the proxy on ``public_port`` instead.
+        """
+        if self._model_tls is None:
+            raise RuntimeManagerError("This agent has no model-TLS proxy configured.")
+        public = int(payload["public_port"])
+        if str(payload.get("action") or "ensure") == "remove":
+            await self._model_tls.remove_route(public)
+            return {"removed": True, "public_port": public}
+        return await self._model_tls.ensure_route(public, int(payload["internal_port"]))
+
     async def deploy_workload(
         self, payload: dict[str, Any], *, emit_progress: ProgressEmitter | None = None,
     ) -> dict[str, Any]:

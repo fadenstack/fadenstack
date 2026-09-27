@@ -231,6 +231,8 @@ class CommandDispatcher:
             if not self._ray:
                 raise RuntimeManagerError("Ray manager not available")
             return await self._ray.delete_serve_app(payload)
+        if command_type == NodeCommandType.MODEL_TLS_ROUTE.value:
+            return await self._runtime.model_tls_route(payload)
         if command_type == NodeCommandType.SHUTDOWN_SERVE.value:
             if not self._ray:
                 raise RuntimeManagerError("Ray manager not available")

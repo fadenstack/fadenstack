@@ -73,3 +73,57 @@ async def test_the_endpoint_needs_a_node_credential(client: AsyncClient) -> None
     # authentication fails closed with 503 before it reads the credential.)
     assert response.status_code in (401, 403, 503)
     assert "loki_url" not in response.text
+
+
+# ── through the backend (agents 0.1.17 and later) ──────────────────────────
+
+
+@pytest.mark.anyio()
+async def test_an_agent_that_asks_is_sent_to_the_backend_itself(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pushed straight to Loki, logs were plain HTTP to a Loki with no authentication -- and failed
+    wherever Loki was published on the server's loopback only (the release VM: every 5 s)."""
+    monkeypatch.setattr(settings, "loki_base_url", "http://llm-port-loki:3100")
+    monkeypatch.setattr(settings, "agent_loki_url", "")
+    fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(id="n1")
+    try:
+        asked = await client.get("/api/node-files/log-sink", params={"via": "backend"})
+        older = await client.get("/api/node-files/log-sink", headers={"host": "10.250.10.61"})
+    finally:
+        fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
+    assert asked.json() == {"loki_url": "/api/node-files/logs", "via": "backend"}
+    assert older.json() == {"loki_url": "http://10.250.10.61:3100"}, "an older agent is answered as before"
+
+
+@pytest.mark.anyio()
+async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    forwarded: list[httpx.Request] = []
+
+    def loki(request: httpx.Request) -> httpx.Response:
+        forwarded.append(request)
+        return httpx.Response(204)
+
+    monkeypatch.setattr(settings, "loki_base_url", "http://llm-port-loki:3100")
+    monkeypatch.setattr(views, "_loki_http", httpx.AsyncClient(transport=httpx.MockTransport(loki)))
+    fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(
+        id="n1", host="10.250.10.49", agent_id="gpu-02",
+    )
+    push = {"streams": [{"stream": {"job": "node-agent", "host": "10.250.10.71"}, "values": [["1", "hello"]]}]}
+    try:
+        response = await client.post("/api/node-files/logs/loki/api/v1/push", json=push)
+        bad = await client.post("/api/node-files/logs/loki/api/v1/push", json={"lines": ["x"]})
+    finally:
+        fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
+        monkeypatch.setattr(views, "_loki_http", None)
+    assert response.status_code == 204
+    assert str(forwarded[0].url) == "http://llm-port-loki:3100/loki/api/v1/push"
+    import json
+
+    sent = json.loads(forwarded[0].content)
+    assert sent["streams"][0]["stream"] == {"job": "node-agent", "host": "10.250.10.49"}, "no machine speaks for another"
+    assert bad.status_code == 400 and len(forwarded) == 1

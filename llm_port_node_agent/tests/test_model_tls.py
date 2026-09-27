@@ -126,6 +126,11 @@ class _Runtime:
         self.calls.append(("exec", tuple(command)))
         return 0, "", ""
 
+    async def logs(self, name: str, **_: Any) -> tuple[int, str]:
+        return 0, self.log_text
+
+    log_text = ""
+
 
 @pytest.fixture
 def pinned(monkeypatch: pytest.MonkeyPatch) -> list[str]:
@@ -135,7 +140,11 @@ def pinned(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 def _tls(tmp_path: Path, runtime: _Runtime, **kw: Any) -> ModelTls:
-    return ModelTls(runtime=runtime, directory=tmp_path / "model-tls", now=lambda: NOW, **kw)
+    tls = ModelTls(runtime=runtime, directory=tmp_path / "model-tls", now=lambda: NOW, **kw)
+    tls.port_free = lambda _port: True
+    tls.listening = lambda _port: True
+    tls.settle_sec = 0.5
+    return tls
 
 
 def _http(backend: _Backend) -> httpx.AsyncClient:
@@ -278,3 +287,44 @@ async def test_the_image_comes_from_the_server_then_the_registry(tmp_path: Path,
     runtime3 = _Runtime(images={model_tls.server_image_tag(): ["sha256:other"]})
     with pytest.raises(ModelTlsError, match="not available"):
         await _tls(tmp_path / "c", runtime3)._ensure_image()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_a_port_another_program_holds_is_refused_and_not_kept(tmp_path: Path, pinned: list[str]) -> None:
+    """Found on the DGX pair: an MCP server held 8100, nginx could not bind, the model was published there."""
+    runtime = _Runtime(images={model_tls.server_image_tag(): pinned})
+    tls = _tls(tmp_path, runtime)
+    async with _http(_Backend(["10.250.10.49"])) as http:
+        await tls.refresh(http, "cred")
+    tls.port_free = lambda port: port != 8100
+    with pytest.raises(ModelTlsError, match="8100 is already in use"):
+        await tls.ensure_route(8100, 28100)
+    assert tls.routes() == {} and not [c for c in runtime.calls if c[0] == "run"]
+
+
+@pytest.mark.asyncio
+async def test_a_port_nginx_does_not_answer_on_is_rolled_back(tmp_path: Path, pinned: list[str]) -> None:
+    runtime = _Runtime(images={model_tls.server_image_tag(): pinned})
+    runtime.log_text = "2026/09/27 [emerg] 1#1: bind() to 0.0.0.0:8120 failed (98: Address in use)\n"
+    tls = _tls(tmp_path, runtime)
+    async with _http(_Backend(["10.250.10.49"])) as http:
+        await tls.refresh(http, "cred")
+    await tls.ensure_route(8010, 28010)
+    tls.listening = lambda port: port != 8120  # the new one never answers
+    with pytest.raises(ModelTlsError, match="does not serve port 8120.*bind"):
+        await tls.ensure_route(8120, 28120)
+    assert tls.routes() == {8010: 28010}, "the route that works stays; the one that does not goes"
+    assert "listen 8120" not in (tmp_path / "model-tls" / model_tls.CONF_FILE).read_text()
+
+
+def test_port_free_sees_a_listener() -> None:
+    import socket
+
+    with socket.socket() as held:
+        held.bind(("0.0.0.0", 0))  # noqa: S104
+        held.listen()
+        port = held.getsockname()[1]
+        assert not model_tls.port_free(port)
+        assert model_tls.listening(port)
+    assert model_tls.port_free(port)
+

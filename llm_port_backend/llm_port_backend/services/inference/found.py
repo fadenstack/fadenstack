@@ -178,6 +178,41 @@ async def found(session: AsyncSession, *, check: bool = True) -> list[dict[str, 
 # ---------------------------------------------------------------------------
 
 
+def proxy_port(container_port: int) -> int:
+    """The port a machine's model-TLS proxy serves a found container on: its own port plus 20000."""
+    from llm_port_backend.services import machine_tls  # noqa: PLC0415
+
+    return machine_tls.internal_port(container_port)
+
+
+async def _behind_the_proxy(
+    commands: Any, node: InfraNode, container: dict[str, Any],
+) -> tuple[str, dict[str, Any]] | None:
+    """Have the machine's proxy serve the container: ``(https base URL, route)``, or ``None``.
+
+    The container keeps listening on its own port -- it is not LLM.Port's to
+    change -- but the gateway's traffic to it goes over mutual TLS.
+    """
+    from llm_port_backend.services import machine_tls  # noqa: PLC0415
+    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+    from llm_port_backend.settings import settings  # noqa: PLC0415
+
+    if commands is None or not settings.machine_tls_enabled or not machine_tls.supported(node.capabilities_json):
+        return None
+    host, port = _host(node), container.get("host_port")
+    if not host or not port:
+        return None
+    try:
+        public = proxy_port(int(port))
+    except ValueError:
+        return None
+    result = await RayClusterClient(commands).model_tls_route(node_id=node.id, public_port=public, internal_port=int(port))
+    if not result or not result.get("protected"):
+        return None
+    netloc = f"[{host}]" if ":" in host else host
+    return f"https://{netloc}:{public}/v1", {"public_port": public, "internal_port": int(port)}
+
+
 async def route(
     session: AsyncSession,
     gateway_sync: Any,
@@ -186,8 +221,15 @@ async def route(
     container_name: str,
     alias: str,
     user_id: uuid.UUID | None = None,
+    commands: Any = None,
 ) -> InferenceAdoption:
-    """Route a found container at the gateway under *alias*, touching nothing else."""
+    """Route a found container at the gateway under *alias*, touching nothing else.
+
+    With *commands* (the channel to the machines) and a machine whose agent
+    runs the model-TLS proxy, the gateway reaches it through the proxy, over
+    mutual TLS; when the proxy cannot take it, it is routed as it is and the
+    reason kept on the adoption.
+    """
     if gateway_sync is None or not getattr(gateway_sync, "enabled", False):
         raise FoundError("There is no gateway to route it through.")
     alias = (alias or "").strip()
@@ -217,6 +259,13 @@ async def route(
     if any(m.get("member_enabled") for m in await gateway_sync.members(alias)):
         raise FoundError(f"The name {alias} already routes to something else. Pick another.")
 
+    detail: dict[str, Any] = {"container": container, "container_state": "running"}
+    protected = await _behind_the_proxy(commands, node, container)
+    if protected is not None:
+        url, detail["model_tls"] = protected
+    elif commands is not None:
+        detail["model_tls_error"] = "The machine's model-TLS proxy did not take it; routed as it is, over plain HTTP."
+        log.warning("Found container %s on %s: routed over plain HTTP (no model-TLS proxy)", container_name, node.agent_id)
     adoption = InferenceAdoption(
         node_id=node_id,
         container_name=container_name,
@@ -227,7 +276,7 @@ async def route(
         state=AdoptionState.ROUTED.value,
         created_by=user_id,
         routed_at=datetime.now(tz=UTC),
-        detail_json={"container": container, "container_state": "running"},
+        detail_json=detail,
     )
     session.add(adoption)
     await session.flush()
@@ -271,17 +320,29 @@ async def route(
         # declared chat on LLM.Port's guess.
         task=container.get("task"),
         tools=argv_calls_tools(container.get("args")),
+        machine_tls=protected is not None,
     )
     log.info("Routing %s on %s as %s -> %s", container_name, node.agent_id, alias, url)
     return adoption
 
 
-async def release(session: AsyncSession, gateway_sync: Any, adoption: InferenceAdoption) -> InferenceAdoption:
-    """Stop routing a found container. The container is not touched."""
+async def release(
+    session: AsyncSession, gateway_sync: Any, adoption: InferenceAdoption, *, commands: Any = None,
+) -> InferenceAdoption:
+    """Stop routing a found container. The container is not touched; its proxy route goes."""
     if adoption.state != AdoptionState.ROUTED.value:
         raise FoundError("It is not being routed as it is.")
     if gateway_sync is not None and getattr(gateway_sync, "enabled", False):
         await gateway_sync.unpublish_runtime(runtime_id=adoption.id, alias=adoption.alias)
+    route_info = (adoption.detail_json or {}).get("model_tls")
+    if commands is not None and route_info and adoption.node_id is not None:
+        from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+
+        done = await RayClusterClient(commands).model_tls_route(
+            node_id=adoption.node_id, public_port=int(route_info["public_port"]), remove=True,
+        )
+        if not done:
+            log.warning("The model-TLS proxy route for %s was not removed", adoption.container_name)
     if adoption.provider_id is not None:
         provider = await session.get(LLMProvider, adoption.provider_id)
         if provider is not None:
@@ -335,6 +396,8 @@ def describe(adoption: InferenceAdoption) -> dict[str, Any]:
     """An adoption as the page shows it."""
     detail = adoption.detail_json or {}
     return {
+        "machine_tls": bool(detail.get("model_tls")),
+        "model_tls_error": detail.get("model_tls_error"),
         "id": str(adoption.id),
         "node_id": str(adoption.node_id) if adoption.node_id else None,
         "container": adoption.container_name,

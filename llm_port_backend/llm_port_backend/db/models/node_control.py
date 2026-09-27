@@ -79,6 +79,9 @@ class NodeCommandType(enum.StrEnum):
     #: application starts it with other HTTP options (moving it behind the
     #: machine's model-TLS proxy).
     SHUTDOWN_SERVE = "shutdown_serve"
+    #: Put the machine's model-TLS proxy in front of a port (or take it away):
+    #: a vLLM found running on the machine, reached through the proxy.
+    MODEL_TLS_ROUTE = "model_tls_route"
 
     # --- Fabric planning / active validation (Phase 4A) ---
     VALIDATE_FABRIC_LISTEN = "validate_fabric_listen"

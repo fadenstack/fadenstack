@@ -9,6 +9,7 @@ driven by an async loop that calls :meth:`add` for each entry and
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -32,6 +33,11 @@ class LokiClient:
     ca_bundle:
         Optional path to a custom CA bundle. When set and ``verify_tls``
         is True, this bundle is used as the trust store.
+    http, credential:
+        Push through the backend instead (``loki_url`` is then a path on
+        it, as ``/api/node-files/log-sink?via=backend`` answers): over the
+        agent's own client -- its TLS trust, its move to HTTPS -- with the
+        machine credential. The backend forwards to Loki on the server.
     """
 
     PUSH_PATH = "/loki/api/v1/push"
@@ -43,18 +49,33 @@ class LokiClient:
         labels: dict[str, str],
         verify_tls: bool = True,
         ca_bundle: str | None = None,
+        http: httpx.AsyncClient | None = None,
+        credential: Callable[[], str | None] | None = None,
     ) -> None:
         self._url = loki_url.rstrip("/") + self.PUSH_PATH
         self._labels = labels
         self._buffer: list[LogEntry] = []
-        verify: Any = ca_bundle if (verify_tls and ca_bundle) else verify_tls
-        self._http = httpx.AsyncClient(
-            timeout=10,
-            verify=verify,
-        )
+        self._credential = credential
+        self._owns_http = http is None
+        if http is not None:
+            self._http = http
+        else:
+            verify: Any = ca_bundle if (verify_tls and ca_bundle) else verify_tls
+            self._http = httpx.AsyncClient(
+                timeout=10,
+                verify=verify,
+            )
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        token = self._credential() if self._credential is not None else None
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return headers
 
     async def close(self) -> None:
-        await self._http.aclose()
+        if self._owns_http:
+            await self._http.aclose()
 
     def add(self, entry: LogEntry) -> None:
         """Buffer a single log entry for the next flush."""
@@ -102,7 +123,7 @@ class LokiClient:
             resp = await self._http.post(
                 self._url,
                 json=payload,
-                headers={"Content-Type": "application/json"},
+                headers=self._headers(),
             )
             if resp.status_code in {200, 204}:
                 log.debug("Pushed %d log entries to Loki.", len(entries))
@@ -144,7 +165,7 @@ class LokiClient:
             resp = await self._http.post(
                 self._url,
                 json=payload,
-                headers={"Content-Type": "application/json"},
+                headers=self._headers(),
             )
             if resp.status_code in {200, 204}:
                 log.debug(

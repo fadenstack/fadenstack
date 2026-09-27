@@ -206,16 +206,27 @@ def _ask_mode(install_dir: Path, *, yes: bool) -> str | None:
             " (change: llmport tls)."
         )
         return None
+    off_by_choice = tls.chose_off(install_dir)
     if yes:
-        info("HTTPS is off. Switch it on any time: llmport tls generate, or llmport tls use CERT KEY.")
-        return None
+        if off_by_choice:
+            info(
+                "HTTPS is off, as chosen. Switch it on any time: llmport tls generate,"
+                " or llmport tls use CERT KEY.",
+            )
+            return None
+        # HTTPS is the default: without it sign-ins, API keys, prompts and the
+        # machines' credentials cross the network in the clear.
+        info("HTTPS by default: a certificate made here (plain HTTP instead: llmport deploy --tls off).")
+        return "generate"
     console.print(
         "  Serve the console, the API and /v1 over HTTPS?\n"
-        "    [bold]off[/bold]       plain HTTP (switch HTTPS on later with llmport tls)\n"
-        "    [bold]generate[/bold]  a certificate made here for this machine's names and addresses\n"
-        "    [bold]own[/bold]       your own certificate and key (PEM files)"
+        "    [bold]generate[/bold]  a certificate made here for this machine's names and addresses"
+        " (default)\n"
+        "    [bold]own[/bold]       your own certificate and key (PEM files)\n"
+        "    [bold]off[/bold]       plain HTTP (switch HTTPS on later with llmport tls)"
     )
-    return click.prompt("  HTTPS", type=click.Choice(TLS_MODES), default="off")
+    default = "off" if off_by_choice else "generate"
+    return click.prompt("  HTTPS", type=click.Choice(TLS_MODES), default=default)
 
 
 def renewal_scheduled() -> bool:
@@ -396,6 +407,7 @@ def _https_step(
     if mode is None:
         return None
     if mode == "off":
+        tls.remember_off(install_dir)
         if tls.remove(install_dir):
             unschedule_renewal()
             info("HTTPS switched off: the certificate was removed (the install's authority is kept).")
@@ -586,6 +598,7 @@ def renew_cmd(*, days: int, force: bool, no_wait: bool) -> None:
 def off_cmd(*, no_restart: bool) -> None:
     """Go back to plain HTTP. The install's authority is kept for next time."""
     install_dir = _install_dir()
+    tls.remember_off(install_dir)
     if not tls.remove(install_dir):
         info("HTTPS was already off.")
         return

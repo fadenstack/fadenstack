@@ -119,8 +119,11 @@ class BackendClient:
         (404). Raises when the backend cannot be asked right now, so the
         caller retries rather than giving up on logs for good.
         """
+        # via=backend: a backend that can take the pushes itself answers with
+        # a path on it; an older one ignores the parameter.
         res = await self._client.get(
             "/api/node-files/log-sink",
+            params={"via": "backend"},
             headers={"Authorization": f"Bearer {credential}"},
         )
         if res.status_code == 404:

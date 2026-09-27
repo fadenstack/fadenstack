@@ -378,6 +378,31 @@ class RayClusterClient:
             wait_budget_sec=budget_sec,
         )
 
+    async def model_tls_route(
+        self,
+        *,
+        node_id: str | uuid.UUID,
+        public_port: int,
+        internal_port: int | None = None,
+        remove: bool = False,
+        budget_sec: float | None = 120,
+    ) -> dict[str, Any] | None:
+        """Have *node_id*'s model-TLS proxy serve ``public_port`` in front of ``internal_port`` (or stop).
+
+        ``None`` when the machine did not do it in time or could not.
+        """
+        payload: dict[str, Any] = {"action": "remove" if remove else "ensure", "public_port": int(public_port)}
+        if internal_port is not None:
+            payload["internal_port"] = int(internal_port)
+        return await self._dispatch_and_poll(
+            node_id=node_id,
+            command_type=NodeCommandType.MODEL_TLS_ROUTE.value,
+            payload=payload,
+            idem_prefix=f"inference-model-tls:route:{uuid.uuid4()}",
+            timeout_sec=180,
+            wait_budget_sec=budget_sec,
+        )
+
     async def shutdown_serve(
         self, *, node_id: str | uuid.UUID, budget_sec: float | None = 200,
     ) -> dict[str, Any] | None:

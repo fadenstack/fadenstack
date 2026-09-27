@@ -330,8 +330,13 @@ class NodeAgentService:
         # with the address the request came from), so labelling
         # with ``config.host`` -- the local hostname -- produced logs that
         # were shipped, stored, and impossible to find.
+        # A path is the backend's own address for pushes (log-sink?via=backend):
+        # they go over this agent's client, with its credential.
+        via_backend = loki_url.startswith("/")
         loki_client = LokiClient(
             loki_url=loki_url,
+            http=self._client.http if via_backend else None,
+            credential=(lambda: self._state_store.state.credential) if via_backend else None,
             labels={
                 "job": "node-agent",
                 "host": self._config.advertise_host,

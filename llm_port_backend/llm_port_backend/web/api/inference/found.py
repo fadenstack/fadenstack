@@ -35,6 +35,14 @@ def _gateway_sync(request: Request) -> Any:
     return getattr(getattr(request.app.state, "llm_service", None), "gateway_sync", None)
 
 
+def _commands(request: Request) -> Any:
+    """The channel to the machines (for their model-TLS proxy); ``None`` without a database."""
+    from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway  # noqa: PLC0415
+
+    factory = getattr(request.app.state, "db_session_factory", None)
+    return NodeCommandGateway(factory) if factory is not None else None
+
+
 @router.get("")
 async def list_found(
     check: bool = True,
@@ -64,6 +72,7 @@ async def route(
         adoption = await found_vllm.route(
             session, _gateway_sync(request),
             node_id=body.node_id, container_name=body.container, alias=body.alias, user_id=user.id,
+            commands=_commands(request),
         )
     except found_vllm.FoundError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -92,7 +101,7 @@ async def release(
     if adoption is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nothing like that is routed.")
     try:
-        await found_vllm.release(session, _gateway_sync(request), adoption)
+        await found_vllm.release(session, _gateway_sync(request), adoption, commands=_commands(request))
     except found_vllm.FoundError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return found_vllm.describe(adoption)

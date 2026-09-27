@@ -345,3 +345,62 @@ async def test_a_found_container_declares_the_kind_it_was_found_as(dbsession: As
     gateway = _Gateway()
     await found_vllm.route(dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb")
     assert gateway.calls[0][1]["task"] == "embeddings"
+
+
+# ---------------------------------------------------------------------------
+# Behind the machine's model-TLS proxy
+# ---------------------------------------------------------------------------
+
+
+class _Proxy:
+    """RayClusterClient.model_tls_route, as the machine would answer."""
+
+    def __init__(self, answer: dict[str, Any] | None) -> None:
+        self.answer = answer
+        self.calls: list[dict[str, Any]] = []
+
+    async def __call__(self, **kw: Any) -> dict[str, Any] | None:
+        self.calls.append(kw)
+        return self.answer if not kw.get("remove") else {"removed": True}
+
+
+async def test_a_found_container_is_reached_through_the_proxy_where_the_machine_has_one(
+    dbsession: AsyncSession, answers: dict, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
+
+    node = await _machine(dbsession, [_embed()])
+    node.capabilities_json = {"model_tls": 1}
+    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    proxy = _Proxy({"protected": True, "public_port": 27997, "internal_port": 7997})
+    monkeypatch.setattr(RayClusterClient, "model_tls_route", proxy)
+    gateway = _Gateway()
+
+    adoption = await found_vllm.route(
+        dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb", commands=object(),
+    )
+    assert proxy.calls == [{"node_id": node.id, "public_port": 27997, "internal_port": 7997}]
+    published = gateway.calls[0][1]
+    assert published["base_url"] == "https://10.250.10.220:27997/v1" and published["machine_tls"] is True
+    assert found_vllm.describe(adoption)["machine_tls"] is True
+
+    await found_vllm.release(dbsession, gateway, adoption, commands=object())
+    assert proxy.calls[-1] == {"node_id": node.id, "public_port": 27997, "remove": True}
+
+
+async def test_when_the_proxy_cannot_take_it_it_is_routed_as_before_and_says_so(
+    dbsession: AsyncSession, answers: dict, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
+
+    node = await _machine(dbsession, [_embed()])
+    node.capabilities_json = {"model_tls": 1}
+    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    monkeypatch.setattr(RayClusterClient, "model_tls_route", _Proxy(None))
+    gateway = _Gateway()
+    adoption = await found_vllm.route(
+        dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb", commands=object(),
+    )
+    assert gateway.calls[0][1]["base_url"] == "http://10.250.10.220:7997/v1"
+    assert gateway.calls[0][1]["machine_tls"] is False
+    assert "plain HTTP" in found_vllm.describe(adoption)["model_tls_error"]

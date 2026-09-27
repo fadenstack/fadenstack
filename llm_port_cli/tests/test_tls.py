@@ -288,12 +288,18 @@ def _step(install: Path, **kwargs):  # type: ignore[no-untyped-def]
     return tls_cmd.deploy_step(install, install / ".env", **args)
 
 
-def test_deploy_with_yes_keeps_what_the_install_has(install: Path, free_ports: None) -> None:
-    assert _step(install) is None
-    assert not tls.material_present(install)
-    tls.generate(install)
+def test_deploy_with_yes_switches_https_on_by_default_and_keeps_a_choice(install: Path, free_ports: None) -> None:
+    """HTTPS is the default: without it sign-ins, keys, prompts and machine credentials cross in the clear."""
+    assert _step(install) == install / "tls" / "ca.crt"
+    assert tls.material_present(install)
     assert _step(install) is None
     assert tls.material_present(install), "a redeploy must not switch HTTPS off"
+    _step(install, mode="off")
+    assert not tls.material_present(install) and tls.chose_off(install)
+    assert _step(install) is None
+    assert not tls.material_present(install), "plain HTTP chosen on purpose stays"
+    tls.generate(install)
+    assert not tls.chose_off(install), "switching HTTPS on again forgets the choice"
 
 
 def test_deploy_can_generate_bring_or_switch_off(install: Path, tmp_path: Path, free_ports: None) -> None:
@@ -321,7 +327,7 @@ def test_deploy_with_yes_stops_on_a_taken_port(install: Path, monkeypatch: pytes
     )
     with pytest.raises(SystemExit):
         _step(install)
-    assert _step(install, https_port=8443) is None
+    assert _step(install, https_port=8443, mode="off") is None
     assert ports(read_env_file(install / ".env")) == (80, 8443)
 
 
@@ -392,7 +398,7 @@ def test_the_authority_is_made_once_and_its_public_copy_kept(install: Path) -> N
 
 
 def test_deploy_makes_the_authority_even_with_https_off(install: Path, free_ports: None) -> None:
-    assert _step(install) is None
+    assert _step(install, mode="off") is None
     assert (install / "tls" / "ca.crt").is_file()
     assert not tls.material_present(install)
 

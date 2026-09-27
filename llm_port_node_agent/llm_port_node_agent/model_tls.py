@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import platform
+import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -136,6 +137,38 @@ def render_conf(routes: dict[int, int], *, client_name: str, ipv6: bool) -> str:
     )
 
 
+def port_free(port: int) -> bool:
+    """Whether nothing listens on *port* on this machine (any address, IPv4 or IPv6).
+
+    Bound with SO_REUSEADDR, as nginx binds: a port that only has connections
+    in TIME_WAIT counts as free, one something listens on does not.
+    """
+    for family, address in ((socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::")):  # noqa: S104
+        try:
+            probe = socket.socket(family, socket.SOCK_STREAM)
+        except OSError:  # no IPv6 here
+            continue
+        try:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if family == socket.AF_INET6:
+                probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            probe.bind((address, port))
+        except OSError:
+            return False
+        finally:
+            probe.close()
+    return True
+
+
+def listening(port: int) -> bool:
+    """Whether something accepts connections on ``127.0.0.1:port``."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
 def _write(path: Path, data: bytes, *, mode: int) -> None:
     tmp = path.with_name(path.name + ".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), mode)
@@ -206,6 +239,11 @@ class ModelTls:
         #: Asks the backend now (the service's trust refresh); used when a
         #: route is wanted before the minute's round has fetched a certificate.
         self.refresher: Callable[[], Awaitable[Any]] | None = None
+        #: How ports are checked (replaced in tests): free before a route is
+        #: taken, answering once nginx has it.
+        self.port_free: Callable[[int], bool] = port_free
+        self.listening: Callable[[int], bool] = listening
+        self.settle_sec = 8.0
 
     # ── files ───────────────────────────────────────────────────────
 
@@ -337,11 +375,54 @@ class ModelTls:
             )
         async with self._lock:
             routes = self.routes()
+            new = routes.get(public_port) is None
+            if new and not self.port_free(public_port):
+                # nginx would fail to bind it -- and on a reload, say nothing --
+                # while the model was published https:// on a port some other
+                # program answers (found on the DGX pair: an MCP server on 8100).
+                raise ModelTlsError(
+                    f"Port {public_port} is already in use on this machine by another program; "
+                    "publish this model on another port."
+                )
             if routes.get(public_port) != internal_port:
                 routes[public_port] = internal_port
                 self._save_routes(routes)
-            await self._apply()
+            try:
+                await self._apply()
+                await self._confirm([public_port])
+            except ModelTlsError:
+                if new:  # not served: not kept, so nothing is published on it
+                    routes.pop(public_port, None)
+                    self._save_routes(routes)
+                    try:
+                        await self._apply() if routes else await self._drop_container()
+                    except Exception:  # noqa: BLE001 - the original error is the one to report
+                        log.exception("Model TLS: could not undo the route for port %s", public_port)
+                raise
         return {"protected": True, "public_port": public_port, "internal_port": internal_port}
+
+    async def _confirm(self, ports: list[int]) -> None:
+        """nginx answers on every port in *ports*, or the reason it does not."""
+        waited = 0.0
+        missing = list(ports)
+        while missing and waited <= self.settle_sec:
+            missing = [p for p in missing if not await asyncio.to_thread(self.listening, p)]
+            if missing:
+                await asyncio.sleep(0.5)
+                waited += 0.5
+        if not missing:
+            return
+        _code, logs = await self._runtime.logs(CONTAINER, tail="20")
+        reason = next(
+            (line.strip() for line in reversed(logs.splitlines()) if "[emerg]" in line or "bind()" in line),
+            "nginx is not listening",
+        )
+        self.last_error = reason[-300:]
+        raise ModelTlsError(f"The model-TLS proxy does not serve port {', '.join(map(str, missing))}: {reason}")
+
+    async def _drop_container(self) -> None:
+        if await self._runtime.exists(CONTAINER):
+            await self._runtime.remove(CONTAINER)
 
     async def remove_route(self, public_port: int) -> None:
         async with self._lock:
@@ -352,7 +433,7 @@ class ModelTls:
             if routes:
                 await self._apply()
             elif await self._runtime.exists(CONTAINER):
-                await self._runtime.remove(CONTAINER)
+                await self._drop_container()
                 log.info("Model TLS: no model left behind the proxy; removed it")
 
     def _ipv6(self) -> bool:

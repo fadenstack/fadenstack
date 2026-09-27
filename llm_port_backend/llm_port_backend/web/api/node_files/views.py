@@ -129,9 +129,17 @@ def agent_log_sink(loki_base_url: str, agent_loki_url: str, request_host: str | 
     return f"{parts.scheme or 'http'}://{netloc}:{port}"
 
 
+#: Where an agent that asks ``via=backend`` pushes its logs, relative to the
+#: backend address it already uses (so over HTTPS when the front door is).
+LOG_PUSH_BASE = "/api/node-files/logs"
+#: A push larger than this is refused (an agent batches every few seconds).
+_MAX_LOG_PUSH = 8 * 1024 * 1024
+
+
 @router.get("/log-sink", name="node_log_sink")
 async def node_log_sink(
     request: Request,
+    via: str | None = None,
     _node: InfraNode = Depends(_authenticate_node),
 ) -> dict[str, Any]:
     """Where this machine should send its logs.
@@ -139,12 +147,79 @@ async def node_log_sink(
     The one-line install writes no Loki address, and an agent without one
     forwards nothing: machines installed that way disappeared from the logs
     page without a word. The agent asks here instead when it has none.
+
+    An agent that can (``via=backend``, 0.1.17 and later) is sent to the
+    backend itself: its pushes go over its authenticated connection, HTTPS
+    when the front door is, and Loki stays on the server's loopback address.
+    Pushed straight to Loki they were plain HTTP to a Loki without
+    authentication -- and failed wherever Loki was not published at all.
     """
+    if via == "backend" and not settings.agent_loki_url.strip() and settings.loki_base_url.strip():
+        return {"loki_url": LOG_PUSH_BASE, "via": "backend"}
     return {
         "loki_url": agent_log_sink(
             settings.loki_base_url, settings.agent_loki_url, request.url.hostname,
         ),
     }
+
+
+_loki_http: Any = None
+
+
+def _loki_client() -> Any:
+    global _loki_http  # noqa: PLW0603
+    import httpx  # noqa: PLC0415
+
+    if _loki_http is None:
+        from llm_port_backend.services.tls import default_httpx_verify  # noqa: PLC0415
+
+        _loki_http = httpx.AsyncClient(timeout=15, verify=default_httpx_verify())
+    return _loki_http
+
+
+def stamp_streams(payload: Any, host: str) -> dict[str, Any]:
+    """The push as Loki takes it, with every stream's ``host`` set to the machine that sent it.
+
+    ``host`` is what the logs page selects a machine's logs by; taken from
+    the machine's credential, one machine cannot write into another's.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("streams"), list):
+        raise ValueError("expected Loki's JSON push format: {\"streams\": [...]}")
+    streams = []
+    for stream in payload["streams"]:
+        if not isinstance(stream, dict) or not isinstance(stream.get("values"), list):
+            raise ValueError("every stream needs values")
+        labels = stream.get("stream") if isinstance(stream.get("stream"), dict) else {}
+        clean = {str(k)[:64]: str(v)[:256] for k, v in labels.items() if k != "host"}
+        clean["host"] = host
+        streams.append({"stream": clean, "values": stream["values"]})
+    return {"streams": streams}
+
+
+@router.post(LOG_PUSH_BASE.removeprefix("/api/node-files") + "/loki/api/v1/push", name="node_log_push")
+async def node_log_push(
+    request: Request,
+    node: InfraNode = Depends(_authenticate_node),
+) -> Response:
+    """A machine's log push, forwarded to Loki on the server."""
+    import json  # noqa: PLC0415
+
+    body = await request.body()
+    if len(body) > _MAX_LOG_PUSH:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Log push too large.")
+    try:
+        payload = stamp_streams(json.loads(body or b"{}"), str(node.host or node.agent_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    base = settings.loki_base_url.rstrip("/")
+    try:
+        answer = await _loki_client().post(f"{base}/loki/api/v1/push", json=payload)
+    except Exception as exc:  # noqa: BLE001 - the agent retries on its next flush
+        log.warning("Forwarding logs from %s to Loki failed: %s", node.host, exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Loki is not reachable.") from exc
+    if answer.status_code >= 300:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Loki answered {answer.status_code}.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/server-trust", name="node_server_trust")

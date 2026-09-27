@@ -46,6 +46,8 @@ CA_PREVIOUS_FILE = "ca-previous.crt"
 ROOTS_FILE = "roots.pem"
 #: Where the operator's certificate came from, so ``tls renew`` can take the renewed one.
 SOURCE_FILE = "source.json"
+#: The operator chose plain HTTP (``llmport tls off``, ``deploy --tls off``): deploy keeps it.
+OFF_CHOICE_FILE = "https-off"
 #: A certificate made here is re-issued this many days before it runs out.
 RENEW_BEFORE_DAYS = 30
 
@@ -250,8 +252,22 @@ def _write(path: Path, data: bytes, *, mode: int) -> None:
     tmp.replace(path)
 
 
+def chose_off(install_dir: Path) -> bool:
+    """Whether the operator switched HTTPS off on purpose (so ``deploy --yes`` keeps it off)."""
+    return (Path(install_dir) / TLS_DIR / OFF_CHOICE_FILE).is_file()
+
+
+def remember_off(install_dir: Path) -> None:
+    """Record that plain HTTP is the operator's choice, not a default nobody changed."""
+    tls = Path(install_dir) / TLS_DIR
+    tls.mkdir(parents=True, exist_ok=True)
+    note = b"HTTPS was switched off on purpose; llmport deploy keeps it off.\n"
+    _write(tls / OFF_CHOICE_FILE, note, mode=0o644)
+
+
 def _install(install_dir: Path, cert_pem: bytes, key_pem: bytes, chain_pem: bytes | None) -> None:
     tls = Path(install_dir) / TLS_DIR
+    (tls / OFF_CHOICE_FILE).unlink(missing_ok=True)
     # The key last: nginx switches on the pair, so it must never find a key
     # next to the previous certificate.
     _write(tls / CERT_FILE, cert_pem, mode=0o644)

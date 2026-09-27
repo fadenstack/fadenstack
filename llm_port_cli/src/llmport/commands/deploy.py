@@ -212,8 +212,8 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     "tls_mode",
     type=click.Choice(["off", "generate", "own"]),
     default=None,
-    help="HTTPS: off, generate (a certificate made here for this machine), or own (--tls-cert/--tls-key). "
-    "Default: ask; with --yes, keep what the install has.",
+    help="HTTPS: generate (a certificate made here for this machine; the default), own (--tls-cert/--tls-key), "
+    "or off. Default: ask; with --yes, generate unless HTTPS was switched off on purpose.",
 )
 @click.option(
     "--tls-cert", type=click.Path(dir_okay=False, path_type=Path), default=None,
