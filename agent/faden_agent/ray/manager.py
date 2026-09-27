@@ -650,6 +650,17 @@ class RayManager:
             except Exception as e:
                 log.warning("Could not ensure token for get_status: %s", e)
 
+        # A pinned runtime that is not running here is an answer to "is Ray
+        # up?": it is not. Raising instead made the backend's health check
+        # read "no answer" and never re-form the cluster, so a removed
+        # container -- an agent moved to a new name, a `docker rm` -- left the
+        # cluster down until someone restarted it by hand. Still no fallback
+        # to the host SDK: the reply says why, not "dead cluster".
+        bundle = self._bundle_spec(payload)
+        if bundle is not None and not await self._container.is_running(bundle.name):
+            return {"alive": False, "version": None, "num_nodes": 0, "nodes": [],
+                    "runtime_running": False, "runtime_container": bundle.name}
+
         # Containerized runtime: every Ray-aware call goes through the
         # in-container helper, with the same tiers the host path reports.
         if await self._use_container(payload):

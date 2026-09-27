@@ -281,6 +281,25 @@ async def test_a_bundled_command_with_no_container_fails_loudly(tmp_path) -> Non
 
 
 @pytest.mark.anyio()
+async def test_status_with_no_runtime_container_is_an_answer(tmp_path) -> None:
+    """A removed runtime container means no Ray here, and the status says so.
+
+    Raising made the backend's health check read "no answer", which never
+    restarts anything -- so a cluster whose containers were removed stayed
+    down. The reply is a definite "not alive" with the reason, and the host
+    SDK is still not consulted.
+    """
+    runtime = _HelperRuntime({}, running=False)
+    manager = _manager(tmp_path, runtime)
+
+    result = await manager.get_status({"runtime_bundle": _bundle_payload()})
+
+    assert result["alive"] is False
+    assert result["runtime_running"] is False
+    assert runtime.calls == []  # nothing was run in a container that is not there
+
+
+@pytest.mark.anyio()
 async def test_status_tiers_reach_the_container(tmp_path) -> None:
     """include_serve / include_metrics / expected_version must be forwarded."""
     runtime = _HelperRuntime({
