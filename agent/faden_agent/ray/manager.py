@@ -2,22 +2,22 @@
 
 Spec section 2 target layout, implemented:
 
-* :class:`~llm_port_node_agent.ray.runtime.RayRuntime` — bootstrap/process,
+* :class:`~faden_agent.ray.runtime.RayRuntime` — bootstrap/process,
   the ONLY CLI layer (``ray start`` / ``ray stop``).
-* :class:`~llm_port_node_agent.ray.core.RayCoreClient` — live cluster state
+* :class:`~faden_agent.ray.core.RayCoreClient` — live cluster state
   via Ray Core Python APIs (GCS-direct; no Dashboard).
-* :class:`~llm_port_node_agent.ray.serve.RayServeManager` — Serve
+* :class:`~faden_agent.ray.serve.RayServeManager` — Serve
   lifecycle/status via the ``ray.serve`` Python API.
-* :class:`~llm_port_node_agent.ray.metrics.RayMetricsDiscovery` — Tier C
+* :class:`~faden_agent.ray.metrics.RayMetricsDiscovery` — Tier C
   Prometheus scrape targets discovered from ``ray.nodes()``.
-* :class:`~llm_port_node_agent.ray.state.RayStateDiagnostics` — Tier B
+* :class:`~faden_agent.ray.state.RayStateDiagnostics` — Tier B
   optional ``ray.util.state`` (Dashboard-dependent; never gates health).
 
 ``RayManager`` keeps the exact same public surface the dispatcher already
 calls (``ensure_runtime`` / ``start_head`` / ``join_cluster`` /
 ``leave_cluster`` / ``stop_ray`` / ``get_status``), plus ``get_serve_status``.
 ``get_status`` answers ``GET_RAY_STATUS`` with the enriched
-:class:`~llm_port_node_agent.ray.models.RayEnvironmentStatus` (flat fields
+:class:`~faden_agent.ray.models.RayEnvironmentStatus` (flat fields
 preserved for the existing backend parser; tiers additive and non-gating).
 """
 
@@ -30,16 +30,16 @@ from typing import Any
 
 import httpx
 
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.ray import errors
-from llm_port_node_agent.ray.container import (
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.ray import errors
+from faden_agent.ray.container import (
     RayContainerRuntime,
     RuntimeBundleSpec,
 )
-from llm_port_node_agent.ray.core import RayCoreClient
-from llm_port_node_agent.ray.metrics import RayMetricsDiscovery
-from llm_port_node_agent.ray.runtime import RayRuntime
-from llm_port_node_agent.ray.schemas import (
+from faden_agent.ray.core import RayCoreClient
+from faden_agent.ray.metrics import RayMetricsDiscovery
+from faden_agent.ray.runtime import RayRuntime
+from faden_agent.ray.schemas import (
     DeleteServeAppPayload,
     EnsureRayRuntimePayload,
     JoinRayClusterPayload,
@@ -49,10 +49,10 @@ from llm_port_node_agent.ray.schemas import (
     GetRayServeStatusPayload,
     GetRayStatusPayload,
 )
-from llm_port_node_agent.ray.serve import RayServeManager
-from llm_port_node_agent.runtimes import ContainerRuntimeError
-from llm_port_node_agent.ray.state import RayStateDiagnostics
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.ray.serve import RayServeManager
+from faden_agent.runtimes import ContainerRuntimeError
+from faden_agent.ray.state import RayStateDiagnostics
+from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ _DEFAULT_VERSION = "2.58.0"
 def _writable_token_dir(preferred: Path) -> Path:
     """The first directory this agent can actually write its cluster token in.
 
-    The fallback used to be a fixed ``/tmp/llm-port/ray``, shared by every
+    The fallback used to be a fixed ``/tmp/fadenstack/ray``, shared by every
     user on the machine, and "usable" meant ``mkdir(exist_ok=True)`` did not
     raise -- which it does not for a directory that already exists, whoever
     owns it. On a DGX node that directory had been created by Docker, as
@@ -75,10 +75,10 @@ def _writable_token_dir(preferred: Path) -> Path:
     candidates = [preferred]
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
     if runtime_dir:
-        candidates.append(Path(runtime_dir) / "llmport-agent" / "ray")
-    candidates.append(Path.home() / ".local" / "share" / "llmport-agent" / "ray")
+        candidates.append(Path(runtime_dir) / "faden-agent" / "ray")
+    candidates.append(Path.home() / ".local" / "share" / "faden-agent" / "ray")
     uid = os.getuid() if hasattr(os, "getuid") else 0
-    candidates.append(Path(f"/tmp/llm-port-{uid}/ray"))
+    candidates.append(Path(f"/tmp/faden-{uid}/ray"))
 
     for candidate in candidates:
         try:
@@ -98,8 +98,8 @@ class RayManager:
         *,
         state_store: StateStore,
         events: EventBuffer,
-        ray_base_path: str = "/opt/llm-port/ray",
-        token_dir: Path | str = "/var/run/llm-port/ray",
+        ray_base_path: str = "/opt/faden/ray",
+        token_dir: Path | str = "/var/run/fadenstack/ray",
         backend_url: str = "http://127.0.0.1:8000",
         token_ttl_sec: int = 300,
         http: httpx.AsyncClient | None = None,
@@ -113,7 +113,7 @@ class RayManager:
         # with a mock keep working; it is now a :class:`RayRuntime`.
         self._process = RayRuntime(ray_base_path=ray_base_path)
         self._runtime = self._process
-        token_env = os.getenv("LLM_PORT_NODE_AGENT_RAY_TOKEN_DIR")
+        token_env = os.getenv("FADEN_NODE_AGENT_RAY_TOKEN_DIR")
         self._token_dir = Path(token_env) if token_env else _writable_token_dir(Path(token_dir))
         # Claim the directory now, whichever branch chose it.  The runtime
         # container bind-mounts this path, and Docker creates a missing
@@ -334,8 +334,8 @@ class RayManager:
         """
 
         async def _load(spec: RuntimeBundleSpec) -> None:
-            from llm_port_node_agent.image_loader import load_image_from_backend
-            from llm_port_node_agent.runtimes import detect_runtime
+            from faden_agent.image_loader import load_image_from_backend
+            from faden_agent.runtimes import detect_runtime
 
             credential = self._state.state.credential
             if not credential:
@@ -359,15 +359,15 @@ class RayManager:
         """Loader that fetches the pinned image from a cluster peer."""
 
         async def _load(spec: RuntimeBundleSpec) -> None:
-            from llm_port_node_agent.image_seed import fetch_from_peer
-            from llm_port_node_agent.runtimes import detect_runtime
+            from faden_agent.image_seed import fetch_from_peer
+            from faden_agent.runtimes import detect_runtime
 
             await fetch_from_peer(
                 url=str(source["peer_url"]),
                 token=str(source.get("token") or ""),
                 image=spec.image,
                 runtime=detect_runtime(preferred=spec.runtime_handler),
-                download_dir=self._image_dir or Path("/tmp/llmport-agent-images"),
+                download_dir=self._image_dir or Path("/tmp/faden-agent-images"),
                 emit_progress=emit_progress,
             )
 
@@ -382,7 +382,7 @@ class RayManager:
         no loader, so a node that does not hold the right build refuses
         instead of passing a wrong one along.
         """
-        from llm_port_node_agent.image_seed import serve_image
+        from faden_agent.image_seed import serve_image
 
         spec = self._bundle_spec(payload)
         if spec is None:
@@ -395,7 +395,7 @@ class RayManager:
             token=str(payload["token"]),
             expected_peers=int(payload.get("expected_peers") or 1),
             timeout_sec=float(payload.get("timeout_sec") or 3600),
-            work_dir=self._image_dir or Path("/tmp/llmport-agent-images"),
+            work_dir=self._image_dir or Path("/tmp/faden-agent-images"),
             emit_progress=emit_progress,
         )
 
@@ -727,7 +727,7 @@ class RayManager:
 
     async def _serve_http(self, container: str) -> dict[str, Any]:
         """What Serve's proxy binds on this cluster: ``{"running": bool, "host", "port"}``."""
-        from llm_port_node_agent.ray import serve_http  # noqa: PLC0415
+        from faden_agent.ray import serve_http  # noqa: PLC0415
 
         code, out, err = await self._container.run_python(serve_http.READ_SCRIPT, container, timeout_sec=90)
         doc = serve_http.parse(out)
@@ -756,7 +756,7 @@ class RayManager:
             raise ContainerRuntimeError("this agent has no model-TLS proxy configured")
         current = await self._serve_http(container)
         host = str(current.get("host") or "")
-        from llm_port_node_agent.ray.serve_http import LOOPBACK  # noqa: PLC0415
+        from faden_agent.ray.serve_http import LOOPBACK  # noqa: PLC0415
 
         if current.get("running") and not (host in LOOPBACK and int(current.get("port") or 0) == internal):
             # Keep what runs; say where, so the backend publishes the truth.
@@ -776,7 +776,7 @@ class RayManager:
         its applications again afterwards, and the first starts Serve anew
         with the loopback options. Requires the runtime container.
         """
-        from llm_port_node_agent.ray import serve_http  # noqa: PLC0415
+        from faden_agent.ray import serve_http  # noqa: PLC0415
 
         bundle = self._bundle_spec(payload)
         name = bundle.name if bundle is not None else None
@@ -816,7 +816,7 @@ class RayManager:
         cluster keeps and the new server needs to let machines join it; the
         backend encrypts it the moment the result arrives.
         """
-        from llm_port_node_agent.ray import inspect  # noqa: PLC0415
+        from faden_agent.ray import inspect  # noqa: PLC0415
 
         facts = await self._container.facts()
         if facts is None or not facts.get("running"):

@@ -23,7 +23,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.nodes.wakeup import (
+from faden_backend.services.nodes.wakeup import (
     CommandNotifier,
     dsn_for_asyncpg,
 )
@@ -220,10 +220,10 @@ async def test_two_commands_in_one_transaction_wake_once_each(
 @pytest.mark.anyio()
 async def test_issuing_a_command_arms_a_wake_up(dbsession: AsyncSession) -> None:
     """The integration point: the service, not the caller, arms the push."""
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.db.models.node_control import InfraNode
-    from llm_port_backend.services.nodes import NodeControlService
-    from llm_port_backend.services.nodes.wakeup import get_command_notifier
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.models.node_control import InfraNode
+    from faden_backend.services.nodes import NodeControlService
+    from faden_backend.services.nodes.wakeup import get_command_notifier
 
     node = InfraNode(
         agent_id=f"agent-{uuid.uuid4().hex[:8]}",
@@ -261,15 +261,15 @@ def test_the_listener_dials_without_sqlalchemys_driver_marker() -> None:
     """asyncpg does not understand ``postgresql+asyncpg://`` and will not say so
     helpfully; it raises on the scheme."""
     assert (
-        dsn_for_asyncpg("postgresql+asyncpg://u:p@db:5432/llmport")
-        == "postgresql://u:p@db:5432/llmport"
+        dsn_for_asyncpg("postgresql+asyncpg://u:p@db:5432/faden")
+        == "postgresql://u:p@db:5432/faden"
     )
 
 
 def test_a_plain_url_is_left_alone() -> None:
     assert (
-        dsn_for_asyncpg("postgresql://u:p@db:5432/llmport")
-        == "postgresql://u:p@db:5432/llmport"
+        dsn_for_asyncpg("postgresql://u:p@db:5432/faden")
+        == "postgresql://u:p@db:5432/faden"
     )
 
 
@@ -278,7 +278,7 @@ def test_a_plain_url_is_left_alone() -> None:
 
 @pytest.mark.anyio()
 async def test_a_frame_returns_as_a_frame(notifier: CommandNotifier) -> None:
-    from llm_port_backend.web.api.admin.system.views import _await_frame_or_wakeup
+    from faden_backend.web.api.admin.system.views import _await_frame_or_wakeup
 
     async def receive() -> dict[str, str]:
         return {"type": "heartbeat"}
@@ -334,7 +334,7 @@ async def test_the_carried_receive_is_the_same_task(
     notifier: CommandNotifier,
 ) -> None:
     """Passing it back in must resume it, not start a second read."""
-    from llm_port_backend.web.api.admin.system.views import _await_frame_or_wakeup
+    from faden_backend.web.api.admin.system.views import _await_frame_or_wakeup
 
     node_id = uuid.uuid4()
     starts = 0
@@ -363,7 +363,7 @@ async def test_the_carried_receive_is_the_same_task(
 @pytest.mark.anyio()
 async def test_nothing_happening_returns_neither(notifier: CommandNotifier) -> None:
     """How the caller learns to check the idle clock."""
-    from llm_port_backend.web.api.admin.system.views import _await_frame_or_wakeup
+    from faden_backend.web.api.admin.system.views import _await_frame_or_wakeup
 
     async def receive() -> dict[str, str]:
         await asyncio.sleep(5)
@@ -382,7 +382,7 @@ async def test_a_disconnect_reaches_the_caller(notifier: CommandNotifier) -> Non
     """Swallowing it would leave the loop spinning on a dead socket."""
     from starlette.websockets import WebSocketDisconnect
 
-    from llm_port_backend.web.api.admin.system.views import _await_frame_or_wakeup
+    from faden_backend.web.api.admin.system.views import _await_frame_or_wakeup
 
     async def receive() -> dict[str, str]:
         raise WebSocketDisconnect(code=1001)
@@ -394,7 +394,7 @@ async def test_a_disconnect_reaches_the_caller(notifier: CommandNotifier) -> Non
 
 
 async def _call(notifier, node_id, receive, *, timeout, recv_task):
-    from llm_port_backend.web.api.admin.system.views import _await_frame_or_wakeup
+    from faden_backend.web.api.admin.system.views import _await_frame_or_wakeup
 
     return await _await_frame_or_wakeup(
         recv_task, receive, notifier, node_id, timeout=timeout

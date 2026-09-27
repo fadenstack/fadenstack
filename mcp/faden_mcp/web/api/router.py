@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 from fastapi.responses import UJSONResponse
 
-from llm_port_mcp.web.api.admin.views import router as admin_router
-from llm_port_mcp.web.api.internal.views import router as internal_router
+from faden_mcp.web.api.admin.views import router as admin_router
+from faden_mcp.web.api.internal.views import router as internal_router
 
 api_router = APIRouter()
 

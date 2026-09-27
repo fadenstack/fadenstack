@@ -18,9 +18,9 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
-from llm_port_backend.db.base import Base
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.settings import settings
+from faden_backend.db.base import Base
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             return
 
         try:
-            from llm_port_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+            from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
 
             rbac_dao = RbacDAO(session)
             default_role = await rbac_dao.get_role_by_name("default_user")
@@ -91,7 +91,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ) -> None:
         """Enqueue password-reset email delivery via notification outbox."""
         try:
-            from llm_port_backend.services.notifications import NotificationService  # noqa: PLC0415
+            from faden_backend.services.notifications import NotificationService  # noqa: PLC0415
         except Exception:
             log.exception("Failed to import NotificationService in forgot-password hook.")
             return

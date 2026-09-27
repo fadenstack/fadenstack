@@ -14,7 +14,7 @@
 #                     C:\Users\user\.cache\huggingface\hub)
 
 services:
-  llm-port-backend:
+  faden-backend:
     deploy:
       resources:
         reservations:
@@ -23,12 +23,12 @@ services:
               count: all
               capabilities: [gpu]
     environment:
-      LLM_PORT_BACKEND_HOST_HF_CACHE_DIR: /host-hf-cache
+      FADEN_BACKEND_HOST_HF_CACHE_DIR: /host-hf-cache
     volumes:
       - ${HF_CACHE_DIR:-./.empty-hf-cache}:/host-hf-cache:ro
 
-  llm-port-backend-worker:
+  faden-backend-worker:
     environment:
-      LLM_PORT_BACKEND_HOST_HF_CACHE_DIR: /host-hf-cache
+      FADEN_BACKEND_HOST_HF_CACHE_DIR: /host-hf-cache
     volumes:
       - ${HF_CACHE_DIR:-./.empty-hf-cache}:/host-hf-cache:ro

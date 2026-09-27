@@ -13,11 +13,11 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray.container import (
+from faden_agent.ray.container import (
     DEFAULT_CONTAINER_NAME,
     RayContainerRuntime,
 )
-from llm_port_node_agent.runtimes import ContainerRuntimeError
+from faden_agent.runtimes import ContainerRuntimeError
 
 
 class _HelperRuntime:
@@ -224,9 +224,9 @@ async def test_unparseable_helper_output_is_not_mistaken_for_a_live_cluster() ->
 
 
 def _manager(tmp_path, runtime):
-    from llm_port_node_agent.event_buffer import EventBuffer
-    from llm_port_node_agent.ray.manager import RayManager
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.event_buffer import EventBuffer
+    from faden_agent.ray.manager import RayManager
+    from faden_agent.state_store import StateStore
 
     manager = RayManager(
         state_store=StateStore(tmp_path / "state.json"),
@@ -241,7 +241,7 @@ def _manager(tmp_path, runtime):
 def _bundle_payload(name: str = DEFAULT_CONTAINER_NAME) -> dict[str, Any]:
     return {
         "name": name,
-        "image": "llmport/ray-vllm-gb10:ray2.58-nv26.08",
+        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
         "digest": "sha256:" + "7d" * 32,
         "requirements": {},
         "mounts": [],
@@ -315,7 +315,7 @@ def test_session_mismatch_counts_as_already_running() -> None:
     persisted in the GCS KV store.  Treating that as a hard failure turned a
     healthy two-node cluster into ``failed`` on the next reconcile pass.
     """
-    from llm_port_node_agent.ray.container import _means_already_running
+    from faden_agent.ray.container import _means_already_running
 
     detail = (
         "assertionerror: session name session_2026-09-21_06-01-04_502717_4415 "

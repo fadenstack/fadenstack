@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from llm_port_backend.services.gpu.types import GpuVendor
+from faden_backend.services.gpu.types import GpuVendor
 
 logger = logging.getLogger(__name__)
 

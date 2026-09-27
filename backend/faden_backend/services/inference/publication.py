@@ -1,7 +1,7 @@
 """Generic inference publication layer (Phase 5).
 
-Translates normalized :class:`~llm_port_backend.db.models.inference.InferenceDeployment`
-and :class:`~llm_port_backend.db.models.inference.InferenceEndpoint` states into
+Translates normalized :class:`~faden_backend.db.models.inference.InferenceDeployment`
+and :class:`~faden_backend.db.models.inference.InferenceEndpoint` states into
 generic gateway provider availability, completely separated from driver-specific
 runtimes (Ray, Dynamo, vLLM).
 """
@@ -13,16 +13,16 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from llm_port_backend.db.dao.inference_dao import EndpointDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import EndpointDAO
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
     InferenceDeployment,
     InferenceEndpoint,
 )
-from llm_port_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
-from llm_port_backend.services.llm.kinds import deployment_calls_tools
+from faden_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
+from faden_backend.services.llm.kinds import deployment_calls_tools
 
 #: Marks a provider row as owned by a deployment.  The same string the
 #: gateway stamps on ``llm_provider_instance``, so ownership reads the same
@@ -31,7 +31,7 @@ DERIVED_SOURCE_KIND = "inference_deployment"
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-    from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
+    from faden_backend.services.llm.gateway_sync import GatewaySyncService
 
 log = logging.getLogger(__name__)
 

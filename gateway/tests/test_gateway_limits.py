@@ -3,9 +3,9 @@ import uuid
 import pytest
 from redis.asyncio import ConnectionPool
 
-from llm_port_api.services.cache.redis import RedisCache
-from llm_port_api.services.gateway.lease import LeaseManager
-from llm_port_api.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.cache.redis import RedisCache
+from faden_gateway.services.gateway.lease import LeaseManager
+from faden_gateway.services.gateway.ratelimit import RateLimiter
 
 
 @pytest.mark.anyio

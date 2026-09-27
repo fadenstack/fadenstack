@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 #: Ports a new cluster is created with, stored in its config.
 #:
-#: Ray's own defaults collide with LLM.Port on the machine that runs the
+#: Ray's own defaults collide with Fadenstack on the machine that runs the
 #: server: 6379 is Redis (published on the host by the compose file) and 8000
 #: is the backend in a dev install. A machine that is both server and GPU node
 #: -- the first install most people make -- could not start its cluster: Ray's

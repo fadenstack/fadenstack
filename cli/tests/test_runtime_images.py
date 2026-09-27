@@ -16,12 +16,12 @@ from typing import Any
 
 import pytest
 
-from llmport.commands import runtime_images as cmd
-from llmport.core import runtime_images as rt
-from llmport.core.settings import LlmportConfig
+from faden_cli.commands import runtime_images as cmd
+from faden_cli.core import runtime_images as rt
+from faden_cli.core.settings import FadenConfig
 
-GB10 = "ghcr.io/llm-port/ray-runtime-gb10:2.58.0-1"
-X86 = "ghcr.io/llm-port/ray-runtime-x86_64:2.58.0-1"
+GB10 = "ghcr.io/fadenstack/ray-runtime-gb10:2.58.0-1"
+X86 = "ghcr.io/fadenstack/ray-runtime-x86_64:2.58.0-1"
 GB10_LAYERS = ["sha256:" + "1" * 64, "sha256:" + "2" * 64]
 X86_LAYERS = ["sha256:" + "3" * 64]
 
@@ -93,9 +93,9 @@ def test_the_images_come_from_the_backend_image_of_this_release(
     docker: FakeDocker, tmp_path: Path,
 ) -> None:
     env = tmp_path / ".env"
-    env.write_text("VERSION=0.3.0\nREGISTRY=ghcr.io/llm-port\n", encoding="utf-8")
+    env.write_text("VERSION=0.3.0\nREGISTRY=ghcr.io/fadenstack\n", encoding="utf-8")
     image = rt.backend_image(env)
-    assert image == "ghcr.io/llm-port/backend:0.3.0"
+    assert image == "ghcr.io/fadenstack/backend:0.3.0"
 
     pinned = {p.ref: p for p in rt.pinned(image)}
     assert set(pinned) == {GB10, X86}
@@ -105,7 +105,7 @@ def test_the_images_come_from_the_backend_image_of_this_release(
 
 
 def test_an_install_without_a_version_pin_reads_latest(tmp_path: Path) -> None:
-    assert rt.backend_image(tmp_path / ".env") == "ghcr.io/llm-port/backend:latest"
+    assert rt.backend_image(tmp_path / ".env") == "ghcr.io/fadenstack/backend:latest"
 
 
 def test_missing_images_are_pulled_for_their_own_platform(docker: FakeDocker) -> None:
@@ -137,7 +137,7 @@ def test_a_build_on_no_registry_is_not_asked_of_docker_hub(
     monkeypatch: pytest.MonkeyPatch, docker: FakeDocker,
 ) -> None:
     """Before a runtime release is certified the manifest names a local build."""
-    local = {"runtime-manifest.json": {"release_tag": "llmport/ray-vllm-gb10:ray2.58-nv26.08",
+    local = {"runtime-manifest.json": {"release_tag": "faden/ray-vllm-gb10:ray2.58-nv26.08",
                                        "rootfs_layers": GB10_LAYERS, "base_image": {"architecture": "arm64"}}}
     fake = _use(monkeypatch, FakeDocker(manifests=local))
     report = rt.fetch("backend:x", architectures={"aarch64"})
@@ -172,8 +172,8 @@ def test_a_backend_image_without_manifests_says_so(
 @pytest.mark.parametrize(("ref", "registry"), [
     (GB10, True),
     ("localhost:5000/ray-runtime:1", True),
-    ("llmport/ray-vllm-gb10:ray2.58-nv26.08", False),
-    ("llmport-ray-runtime-x86_64:2.58.0", False),
+    ("faden/ray-vllm-gb10:ray2.58-nv26.08", False),
+    ("faden-ray-runtime-x86_64:2.58.0", False),
 ])
 def test_what_counts_as_a_registry(ref: str, registry: bool) -> None:
     assert rt.is_registry_ref(ref) is registry
@@ -191,7 +191,7 @@ def test_the_choice_is_read_and_checked() -> None:
 def test_a_choice_on_the_command_line_is_remembered_for_upgrades(monkeypatch: pytest.MonkeyPatch) -> None:
     saved: list[str] = []
     monkeypatch.setattr(cmd, "save_config", lambda c: saved.append(c.runtime_images))
-    cfg = LlmportConfig()
+    cfg = FadenConfig()
     assert cmd.choose(cfg, "x86_64") == {"x86_64"}
     assert saved == ["x86_64"] and cfg.runtime_images == "x86_64"
     assert cmd.choose(cfg, None) == {"x86_64"}, "the next upgrade uses it"
@@ -203,7 +203,7 @@ def test_none_fetches_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("docker must not run")
 
     monkeypatch.setattr(rt, "fetch", no_docker)
-    assert cmd.run_step(LlmportConfig(runtime_images="none")) is True
+    assert cmd.run_step(FadenConfig(runtime_images="none")) is True
 
 
 # ── the machines' model-TLS proxy ──────────────────────────────────────────
@@ -234,7 +234,7 @@ def test_the_model_tls_proxy_is_held_per_architecture_by_its_pin(monkeypatch: py
     assert sorted(o for _t, _a, o in out) == ["pulled", "pulled"]
     arm_ref = rt.MODEL_TLS_NGINX["aarch64"][0]
     assert ["docker", "pull", "--platform", "linux/arm64", arm_ref] in fake.pulls()
-    assert ["docker", "tag", arm_ref, "llmport/model-tls-nginx:1.31.6-alpine-aarch64"] in fake.calls
+    assert ["docker", "tag", arm_ref, "faden/model-tls-nginx:1.31.6-alpine-aarch64"] in fake.calls
 
     fake.calls.clear()
     assert [o for _t, _a, o in rt.fetch_model_tls({"x86_64", "aarch64"})] == ["present", "present"]

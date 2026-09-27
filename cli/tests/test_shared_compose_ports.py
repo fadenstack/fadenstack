@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-COMPOSE = Path(__file__).parents[2] / "llm_port_shared" / "docker-compose.yaml"
+COMPOSE = Path(__file__).parents[2] / "shared" / "docker-compose.yaml"
 _VARIABLE = re.compile(r"\$\{(\w+)(?::?-([^}]*))?\}")
 
 

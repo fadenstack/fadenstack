@@ -1,7 +1,7 @@
-"""Shared workspace helpers for ``llmport dev`` commands.
+"""Shared workspace helpers for ``faden dev`` commands.
 
-``dev init`` clones the llm-port repos as a *monorepo* at
-``<workspace>/llm-port-core/<local_name>``.  Consumers (``dev up``,
+``dev init`` clones the fadenstack repos as a *monorepo* at
+``<workspace>/fadenstack/<local_name>``.  Consumers (``dev up``,
 ``dev status``, …) must resolve service paths the same way, which is
 why the helpers live here instead of being duplicated per command.
 """
@@ -11,23 +11,23 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-CORE_DIRNAME = "llm-port-core"
+CORE_DIRNAME = "fadenstack"
 
-# Well-known llm-port dev processes and the log files they write to in
+# Well-known fadenstack dev processes and the log files they write to in
 # headless (no terminal-emulator) mode.
 LOG_LABELS = {
-    "backend": "llmport-backend.log",
-    "worker": "llmport-taskiq-worker.log",
-    "frontend": "llmport-frontend.log",
-    "api gateway": "llmport-api-gateway.log",
+    "backend": "faden-backend.log",
+    "worker": "faden-taskiq-worker.log",
+    "frontend": "faden-frontend.log",
+    "gateway": "faden-gateway.log",
 }
 
 
 def find_service_dir(workspace: Path, name: str) -> Path:
     """Return the path to a service directory, checking the monorepo first.
 
-    ``llmport dev init`` clones everything under
-    ``<workspace>/llm-port-core/<name>``.  Legacy/flat layouts that keep
+    ``faden dev init`` clones everything under
+    ``<workspace>/fadenstack/<name>``.  Legacy/flat layouts that keep
     the service directly in ``<workspace>/<name>`` still work.
     """
     monorepo = workspace / CORE_DIRNAME / name
@@ -41,11 +41,11 @@ def find_service_dir(workspace: Path, name: str) -> Path:
 #: enough to tell a real checkout from a directory that merely has a similar
 #: name: the first is the service ``dev up`` launches, the second holds the
 #: compose file and the ``.env`` everything else is derived from.
-WORKSPACE_MARKERS = ("llm_port_backend", "llm_port_shared")
+WORKSPACE_MARKERS = ("faden_backend", "shared")
 
 
 def is_workspace(path: Path) -> bool:
-    """True when *path* already holds an llm.port checkout."""
+    """True when *path* already holds an fadenstack checkout."""
     return all(find_service_dir(path, name).is_dir() for name in WORKSPACE_MARKERS)
 
 
@@ -83,8 +83,8 @@ def resolve_workspace(*, remember: bool = False) -> Path:
     ``remember`` persists a detected workspace to config, so the commands
     that only read it agree with the one that found it.
     """
-    from llmport.core.console import info, warning
-    from llmport.core.settings import load_config
+    from faden_cli.core.console import info, warning
+    from faden_cli.core.settings import load_config
 
     cfg = load_config()
     configured = Path(cfg.dev.workspace_dir) if cfg.dev and cfg.dev.workspace_dir else None
@@ -106,8 +106,8 @@ def resolve_workspace(*, remember: bool = False) -> Path:
 
 def _remember_workspace(workspace: Path) -> None:
     """Persist a detected workspace so the read-only dev commands agree."""
-    from llmport.core.console import warning
-    from llmport.core.settings import DevConfig, load_config, save_config
+    from faden_cli.core.console import warning
+    from faden_cli.core.settings import DevConfig, load_config, save_config
 
     cfg = load_config()
     if cfg.dev and cfg.dev.workspace_dir == str(workspace):
@@ -123,10 +123,10 @@ def _remember_workspace(workspace: Path) -> None:
 def resolve_shared_compose(workspace: Path) -> Path | None:
     """Locate the shared docker-compose file for a dev workspace."""
     for candidate in (
-        workspace / "llm_port_shared" / "docker-compose.yaml",
-        workspace / "llm_port_shared" / "docker-compose.yml",
-        workspace / CORE_DIRNAME / "llm_port_shared" / "docker-compose.yaml",
-        workspace / CORE_DIRNAME / "llm_port_shared" / "docker-compose.yml",
+        workspace / "shared" / "docker-compose.yaml",
+        workspace / "shared" / "docker-compose.yml",
+        workspace / CORE_DIRNAME / "shared" / "docker-compose.yaml",
+        workspace / CORE_DIRNAME / "shared" / "docker-compose.yml",
         workspace / "infra" / "shared" / "docker-compose.yaml",
         workspace / "infra" / "shared" / "docker-compose.yml",
     ):
@@ -138,8 +138,8 @@ def resolve_shared_compose(workspace: Path) -> Path | None:
 def log_filename(label: str) -> str:
     """Log file name for a dev process label (``backend``/``worker``/...).
 
-    Unmapped labels are slugified rather than interpolated raw. "api gateway"
-    fell through this fallback and produced ``llmport-api gateway.log`` -- a
+    Unmapped labels are slugified rather than interpolated raw. A label with a
+    space fell through this fallback and produced ``faden-api gateway.log`` -- a
     space in a path every caller then has to quote, and which nothing in the
     tooling did.
     """
@@ -147,9 +147,9 @@ def log_filename(label: str) -> str:
     if known is not None:
         return known
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", label).strip("-").lower() or "process"
-    return f"llmport-{slug}.log"
+    return f"faden-{slug}.log"
 
 
 def dev_logs_dir() -> Path:
     """Directory holding background (headless) dev process log files."""
-    return Path.home() / ".llmport-dev" / "logs"
+    return Path.home() / ".faden-dev" / "logs"

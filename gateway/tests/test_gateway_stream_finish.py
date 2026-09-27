@@ -26,9 +26,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import LLMGatewayRequestLog, ProviderType
-from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
-from llm_port_api.services.gateway.service import _BACKGROUND, GatewayService, _split_done
+from faden_gateway.db.models.gateway import LLMGatewayRequestLog, ProviderType
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.service import _BACKGROUND, GatewayService, _split_done
 from tests.test_gateway_pipeline_combined import (
     ALIAS,
     _chunk,

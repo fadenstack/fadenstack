@@ -1,7 +1,7 @@
 """Image identity against the real DGX Spark images (Phase 4B, F-05).
 
 ``tests/fixtures/dgx_spark_image_identity.json`` is the verbatim output of
-``docker image inspect llmport/ray-vllm-gb10:ray2.58-nv26.08`` on both nodes
+``docker image inspect faden/ray-vllm-gb10:ray2.58-nv26.08`` on both nodes
 on 2026-09-20.  It records the situation digest pinning exists to catch, and
 the one it must not mistake for it:
 
@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray.container import (
+from faden_agent.ray.container import (
     RayContainerRuntime,
     RuntimeBundleSpec,
     RuntimeDigestMismatch,
@@ -59,7 +59,7 @@ class _RecordedRuntime:
 
 def _spec(**overrides: Any) -> RuntimeBundleSpec:
     payload: dict[str, Any] = {
-        "image": "llmport/ray-vllm-gb10:ray2.58-nv26.08",
+        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
         "digest": BUNDLE_DIGEST,
         "rootfs_digest": BUNDLE_ROOTFS,
         "requirements": {},

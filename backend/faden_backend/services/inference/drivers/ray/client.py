@@ -7,13 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
-from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.inference.drivers.ray.schemas import RayClusterStatus
+from faden_backend.services.nodes.service import NodeControlService
 
 log = logging.getLogger(__name__)
 

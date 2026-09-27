@@ -4,10 +4,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlalchemy.future import Connection
-from llm_port_backend.db.meta import meta
-from llm_port_backend.db.models import load_all_models
-from llm_port_backend.services.tls import build_asyncpg_ssl
-from llm_port_backend.settings import settings
+from faden_backend.db.meta import meta
+from faden_backend.db.models import load_all_models
+from faden_backend.services.tls import build_asyncpg_ssl
+from faden_backend.settings import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

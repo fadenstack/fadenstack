@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from llm_port_node_agent.single_instance import (
+from faden_agent.single_instance import (
     AlreadyRunningError,
     SingleInstanceLock,
 )
@@ -94,7 +94,7 @@ def test_a_killed_holder_releases_the_lock(tmp_path: Path) -> None:
         f"""
         import sys, time
         sys.path.insert(0, {str(Path(__file__).resolve().parents[1])!r})
-        from llm_port_node_agent.single_instance import SingleInstanceLock
+        from faden_agent.single_instance import SingleInstanceLock
         lock = SingleInstanceLock({str(state)!r})
         lock.acquire()
         print("held", flush=True)

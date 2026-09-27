@@ -8,12 +8,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.root_session_dao import RootSessionDAO
-from llm_port_backend.db.models.containers import AuditResult, RootSession
-from llm_port_backend.db.models.users import User
-from llm_port_backend.web.api.admin.dependencies import audit_action, require_superuser
-from llm_port_backend.web.api.admin.root_mode.schema import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.root_session_dao import RootSessionDAO
+from faden_backend.db.models.containers import AuditResult, RootSession
+from faden_backend.db.models.users import User
+from faden_backend.web.api.admin.dependencies import audit_action, require_superuser
+from faden_backend.web.api.admin.root_mode.schema import (
     RootModeStatusDTO,
     RootSessionDTO,
     StartRootModeRequest,

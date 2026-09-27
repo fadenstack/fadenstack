@@ -8,7 +8,7 @@ legacy container only when that container is allowed onto the network, where
 it stays until that container is stopped and started again. Cluster machines
 never receive it: they get models from this server.
 
-``LLM_PORT_BACKEND_HF_TOKEN`` still works as a fallback for installations that
+``FADEN_BACKEND_HF_TOKEN`` still works as a fallback for installations that
 set it before the setting existed; a stored token takes precedence.
 """
 
@@ -27,7 +27,7 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 HF_TOKEN_KEY = "llm_backend.hf_token"
-ENV_VAR = "LLM_PORT_BACKEND_HF_TOKEN"
+ENV_VAR = "FADEN_BACKEND_HF_TOKEN"
 MAX_TOKEN_LENGTH = 512
 _DEV_MASTER_KEY = "dev-settings-master-key-change-me"
 _IDENTITY_TTL = 600.0
@@ -68,15 +68,15 @@ def _fingerprint(token: str) -> str:
 
 
 def _crypto() -> Any:
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     return SettingsCrypto(settings.settings_master_key)
 
 
 def _env_token() -> str | None:
     """The token set in the environment, read fresh so a stored one never shadows it here."""
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     value = os.environ.get(ENV_VAR) or settings.hf_token
     return value.strip() if isinstance(value, str) and value.strip() else None
@@ -92,7 +92,7 @@ def normalize(token: str) -> str:
 
 def storage_is_safe() -> bool:
     """Whether the master key that encrypts the token is this installation's own."""
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     key = settings.settings_master_key or ""
     if settings.environment.lower() in {"dev", "development", "test", "pytest"}:
@@ -102,7 +102,7 @@ def storage_is_safe() -> bool:
 
 async def stored_token(session: Any) -> str | None:
     """The stored token, decrypted, or None."""
-    from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+    from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
 
     secret = await SystemSettingsDAO(session).get_secret(HF_TOKEN_KEY)
     if secret is None or not secret.ciphertext:
@@ -132,7 +132,7 @@ def _hub_client() -> Any:
     import httpx  # noqa: PLC0415
     from huggingface_hub.constants import ENDPOINT  # noqa: PLC0415
 
-    from llm_port_backend.services.tls import default_httpx_verify  # noqa: PLC0415
+    from faden_backend.services.tls import default_httpx_verify  # noqa: PLC0415
 
     return httpx.Client(base_url=ENDPOINT, timeout=_WHOAMI_TIMEOUT, verify=default_httpx_verify())
 
@@ -192,8 +192,8 @@ async def status(session: Any) -> dict[str, Any]:
 
 
 async def _audit(session: Any, action: str, actor_id: uuid.UUID | None, metadata: dict[str, Any]) -> None:
-    from llm_port_backend.db.dao.audit_dao import AuditDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.containers import AuditResult  # noqa: PLC0415
+    from faden_backend.db.dao.audit_dao import AuditDAO  # noqa: PLC0415
+    from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
 
     await AuditDAO(session).log(
         action=action,
@@ -207,7 +207,7 @@ async def _audit(session: Any, action: str, actor_id: uuid.UUID | None, metadata
 
 def _forget_cached_hub_answers() -> None:
     """Gated models look different with another token: ask the Hub again."""
-    from llm_port_backend.services.marketplace.hub import clear_cache  # noqa: PLC0415
+    from faden_backend.services.marketplace.hub import clear_cache  # noqa: PLC0415
 
     clear_cache()
 
@@ -218,13 +218,13 @@ async def store(session: Any, token: str, actor_id: uuid.UUID | None) -> dict[st
     A token Hugging Face rejects is not kept. When Hugging Face cannot be
     reached the token is kept unchecked and the answer says so.
     """
-    from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+    from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
 
     value = normalize(token)
     if not storage_is_safe():
         raise TokenStoreUnsafe(
             "This server still uses the default settings master key, so a stored token would not be "
-            "protected. Set LLM_PORT_BACKEND_SETTINGS_MASTER_KEY to a random value first.",
+            "protected. Set FADEN_BACKEND_SETTINGS_MASTER_KEY to a random value first.",
         )
     identity = await identify(value, fresh=True)
     if identity.check == "invalid":
@@ -247,7 +247,7 @@ async def remove(session: Any, actor_id: uuid.UUID | None) -> dict[str, Any]:
     """Forget the stored token. An environment token, if any, applies again."""
     from sqlalchemy import delete  # noqa: PLC0415
 
-    from llm_port_backend.db.models.system_settings import SystemSettingSecret  # noqa: PLC0415
+    from faden_backend.db.models.system_settings import SystemSettingSecret  # noqa: PLC0415
 
     result = await session.execute(delete(SystemSettingSecret).where(SystemSettingSecret.key == HF_TOKEN_KEY))
     if result.rowcount:

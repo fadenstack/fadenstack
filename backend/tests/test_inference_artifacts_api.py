@@ -11,18 +11,18 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import ControlPlaneDAO, EnvironmentDAO, EnvironmentNodeDAO
-from llm_port_backend.db.dao.llm_dao import ModelDAO
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import ControlPlaneDAO, EnvironmentDAO, EnvironmentNodeDAO
+from faden_backend.db.dao.llm_dao import ModelDAO
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.inference import (
     EnvironmentNodeRole,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.users import User, current_active_user
 
 API = "/api/inference"
 

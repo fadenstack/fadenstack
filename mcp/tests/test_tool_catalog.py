@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest
 
-from llm_port_mcp.services.dao import MCPDao
-from llm_port_mcp.web.api.internal import views
+from faden_mcp.services.dao import MCPDao
+from faden_mcp.web.api.internal import views
 
 ON, OFF = uuid.uuid4(), uuid.uuid4()
 

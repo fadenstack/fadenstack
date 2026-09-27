@@ -20,16 +20,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette import status
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.module_registry import ModuleDef, module_registry
-from llm_port_backend.services.notifications import NotificationService
-from llm_port_backend.services.system_settings import SystemSettingsService
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.system.views import get_system_settings_service
-from llm_port_backend.web.api.admin.dependencies import get_docker
-from llm_port_backend.web.api.rbac import require_permission
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.db.models.users import User
+from faden_backend.services.module_registry import ModuleDef, module_registry
+from faden_backend.services.notifications import NotificationService
+from faden_backend.services.system_settings import SystemSettingsService
+from faden_backend.services.docker.client import DockerService
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.system.views import get_system_settings_service
+from faden_backend.web.api.admin.dependencies import get_docker
+from faden_backend.web.api.rbac import require_permission
+from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ async def _emit_module_lifecycle_alert(
                 fingerprint=f"module_lifecycle_error:{module_name}:{action}",
                 summary=summary,
                 details=details,
-                source="llm_port_backend.admin.services",
+                source="faden_backend.admin.services",
             )
             if queued:
                 await session.commit()

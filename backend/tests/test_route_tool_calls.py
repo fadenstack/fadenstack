@@ -15,8 +15,8 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.inference import found as found_vllm
-from llm_port_backend.services.llm.kinds import (
+from faden_backend.services.inference import found as found_vllm
+from faden_backend.services.llm.kinds import (
     argv_calls_tools,
     calls_tools,
     deployment_calls_tools,

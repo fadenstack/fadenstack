@@ -15,10 +15,10 @@ from typing import Any
 
 import pytest
 
-from llm_port_backend.services.nodes import signing
-from llm_port_backend.web.api.admin.system import views
+from faden_backend.services.nodes import signing
+from faden_backend.web.api.admin.system import views
 
-#: The same vector is checked by the agent's tests (llm_port_node_agent/tests/test_command_signing.py).
+#: The same vector is checked by the agent's tests (agent/tests/test_command_signing.py).
 CREDENTIAL = "0b8f6c1e-7d2a-4c11-9e3f-5a6b7c8d9e0f.s3cr3t-Example_Secret"
 COMMAND = {
     "id": "4f1f2c3d-0000-4000-8000-000000000001",

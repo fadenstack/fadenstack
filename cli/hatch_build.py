@@ -1,13 +1,13 @@
-"""Pack ``llm_port_shared`` into the CLI, so ``pip install llmport-cli`` can deploy.
+"""Pack ``shared`` into the CLI, so ``pip install fadenstack`` can deploy.
 
 A deployment needs the compose file and what it mounts (nginx, Prometheus,
 Grafana, ClickHouse, Loki, RabbitMQ, initdb). Those live in
-``../llm_port_shared``; a user who installed only the CLI has no checkout, and
-``llmport deploy`` used to stop at "Cannot find llm_port_shared".
+``../shared``; a user who installed only the CLI has no checkout, and
+``faden deploy`` used to stop at "Cannot find shared".
 
-The wheel carries them at ``llmport/bundle/shared``. An sdist carries them at
-``src/llmport/bundle/shared``, so a wheel built from the sdist -- where
-``../llm_port_shared`` does not exist -- picks them up as package files.
+The wheel carries them at ``faden/bundle/shared``. An sdist carries them at
+``src/faden_cli/bundle/shared``, so a wheel built from the sdist -- where
+``../shared`` does not exist -- picks them up as package files.
 """
 
 from __future__ import annotations
@@ -76,10 +76,10 @@ class CustomBuildHook(BuildHookInterface):
     """Add the shared deployment files to the wheel or sdist being built."""
 
     def initialize(self, version: str, build_data: dict) -> None:  # noqa: ARG002
-        shared = Path(self.root).parent / "llm_port_shared"
+        shared = Path(self.root).parent / "shared"
         if not shared.is_dir():
             # Building from an sdist: the files are already in the package.
             return
-        prefix = "src/llmport/bundle/shared" if self.target_name == "sdist" else "llmport/bundle/shared"
+        prefix = "src/faden_cli/bundle/shared" if self.target_name == "sdist" else "faden/bundle/shared"
         for path, rel in bundle_files(shared):
             build_data["force_include"][str(path)] = f"{prefix}/{rel}"

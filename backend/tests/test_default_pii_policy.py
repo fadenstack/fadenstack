@@ -1,6 +1,6 @@
 """The PII policy a new install starts with."""
 
-from llm_port_backend.web.lifespan import _CORE_DEFAULT_PII_POLICY
+from faden_backend.web.lifespan import _CORE_DEFAULT_PII_POLICY
 
 
 def test_dates_are_not_redacted_by_default() -> None:

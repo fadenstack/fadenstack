@@ -9,16 +9,16 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from llm_port_pii.log import configure_logging
-from llm_port_pii.settings import settings
-from llm_port_pii.web.api.router import api_router
-from llm_port_pii.web.lifespan import lifespan_setup
+from faden_pii.log import configure_logging
+from faden_pii.settings import settings
+from faden_pii.web.api.router import api_router
+from faden_pii.web.lifespan import lifespan_setup
 
 APP_ROOT = Path(__file__).parent.parent
 
 # ── Optional EE plugin ────────────────────────────────────────────
 try:
-    from llm_port_ee.plugins.pii import pii_plugin  # type: ignore[import-untyped]
+    from faden_ee.plugins.pii import pii_plugin  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover
     pii_plugin = None
 # ──────────────────────────────────────────────────────────────────
@@ -51,8 +51,8 @@ def get_app() -> FastAPI:
             ],
         )
     app = FastAPI(
-        title="llm_port_pii",
-        version=metadata.version("llm_port_pii"),
+        title="faden_pii",
+        version=metadata.version("faden_pii"),
         lifespan=lifespan_setup,
         docs_url=None,
         redoc_url=None,

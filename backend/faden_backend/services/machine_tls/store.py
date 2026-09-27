@@ -30,12 +30,12 @@ from cryptography.fernet import InvalidToken
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.machine_tls import MachineCA, MachineCertificate, MachineTlsClient
-from llm_port_backend.services.machine_tls import authority as auth
+from faden_backend.db.models.machine_tls import MachineCA, MachineCertificate, MachineTlsClient
+from faden_backend.services.machine_tls import authority as auth
 
 log = logging.getLogger(__name__)
 
-_LOCK = "hashtext('llmport.machine_ca')"
+_LOCK = "hashtext('faden.machine_ca')"
 #: A machine asking again this soon for the same certificate is refused.
 REISSUE_PACE = timedelta(seconds=60)
 
@@ -349,7 +349,7 @@ async def client_context(session: AsyncSession, master_key: str, now: datetime |
         return None
     key_pem = auth.unseal(row.key_sealed, master_key, auth.KEY_PURPOSE_CLIENT)
     ctx = ssl.create_default_context(cadata=trust)
-    directory = Path(tempfile.mkdtemp(prefix="llmport-machine-tls-"))
+    directory = Path(tempfile.mkdtemp(prefix="faden-machine-tls-"))
     try:
         cert_path, key_path = directory / "cert.pem", directory / "key.pem"
         cert_path.write_bytes(row.cert_pem.encode("ascii"))

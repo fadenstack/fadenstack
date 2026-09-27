@@ -31,17 +31,17 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.models import NodeCommandType
-from llm_port_node_agent.policy_guard import PolicyGuard
-from llm_port_node_agent.runtime_manager import RuntimeManagerError
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent.ray import errors, models
-from llm_port_node_agent.ray.core import RayCoreClient
-from llm_port_node_agent.ray.manager import RayManager
-from llm_port_node_agent.ray.metrics import RayMetricsDiscovery
-from llm_port_node_agent.ray.models import (
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.models import NodeCommandType
+from faden_agent.policy_guard import PolicyGuard
+from faden_agent.runtime_manager import RuntimeManagerError
+from faden_agent.state_store import StateStore
+from faden_agent.ray import errors, models
+from faden_agent.ray.core import RayCoreClient
+from faden_agent.ray.manager import RayManager
+from faden_agent.ray.metrics import RayMetricsDiscovery
+from faden_agent.ray.models import (
     RayCapabilities,
     RayEnvironmentStatus,
     RayMetricsTargets,
@@ -49,8 +49,8 @@ from llm_port_node_agent.ray.models import (
     RayServeStatusTier,
     RayStateCapability,
 )
-from llm_port_node_agent.ray.serve import RayServeManager
-from llm_port_node_agent.ray.state import RayStateDiagnostics
+from faden_agent.ray.serve import RayServeManager
+from faden_agent.ray.state import RayStateDiagnostics
 
 
 # ---------------------------------------------------------------------------
@@ -697,7 +697,7 @@ def test_dispatcher_serve_status_without_manager_failure(state: StateStore) -> N
 
 
 def test_ray_status_result_projection_from_environment_status() -> None:
-    from llm_port_node_agent.ray.schemas import RayStatusResult
+    from faden_agent.ray.schemas import RayStatusResult
 
     flat = RayStatusResult.from_environment_status(_alive_env())
     assert flat.alive is True
@@ -710,7 +710,7 @@ def test_ray_status_result_projection_from_environment_status() -> None:
 def test_serve_status_result_json_roundtrip() -> None:
     """The GET_RAY_SERVE_STATUS result must be a plain-JSON document (no Ray
     objects leak across the wire)."""
-    from llm_port_node_agent.ray.schemas import RayServeStatusResult
+    from faden_agent.ray.schemas import RayServeStatusResult
 
     res = RayServeStatusResult(
         alive=True,

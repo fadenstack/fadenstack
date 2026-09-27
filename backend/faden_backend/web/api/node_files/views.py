@@ -21,14 +21,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from starlette import status
 
-from llm_port_backend.db.dao.llm_dao import ModelDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services import edge_trust
-from llm_port_backend.services.inference import image_cache
-from llm_port_backend.services.nodes import NodeControlService
-from llm_port_backend.settings import settings
+from faden_backend.db.dao.llm_dao import ModelDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services import edge_trust
+from faden_backend.services.inference import image_cache
+from faden_backend.services.nodes import NodeControlService
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ async def _authenticate_node(request: Request) -> InfraNode:
 # Helpers (delegated to services.llm.artifacts)
 # ------------------------------------------------------------------
 
-from llm_port_backend.services.llm.artifacts import (
+from faden_backend.services.llm.artifacts import (
     build_cache_manifest as _build_cache_manifest,
     model_cache_dir as _model_cache_dir,
     resolve_blob_hash as _resolve_blob_hash,
@@ -103,7 +103,7 @@ def agent_log_sink(loki_base_url: str, agent_loki_url: str, request_host: str | 
     """The Loki address a node agent should push to.
 
     The backend's own address for Loki is usually one only it can use: a
-    loopback address in development, the container name ``llm-port-loki`` in
+    loopback address in development, the container name ``faden-loki`` in
     the deployment. Neither means anything on a machine across the network.
     The machine does know one address that works -- the one it reached this
     backend on -- and in both setups Loki is published on that same host, so
@@ -171,7 +171,7 @@ def _loki_client() -> Any:
     import httpx  # noqa: PLC0415
 
     if _loki_http is None:
-        from llm_port_backend.services.tls import default_httpx_verify  # noqa: PLC0415
+        from faden_backend.services.tls import default_httpx_verify  # noqa: PLC0415
 
         _loki_http = httpx.AsyncClient(timeout=15, verify=default_httpx_verify())
     return _loki_http
@@ -250,7 +250,7 @@ async def node_machine_tls(
     ``names`` what a certificate for this machine names -- when either differs
     from the certificate the machine holds, it asks for a new one.
     """
-    from llm_port_backend.services.machine_tls import authority, store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import authority, store  # noqa: PLC0415
 
     if not settings.machine_tls_enabled:
         return {"enabled": False}
@@ -283,7 +283,7 @@ async def node_machine_tls_certificate(
     half. The certificate names what the backend records for the machine,
     whatever the request names.
     """
-    from llm_port_backend.services.machine_tls import authority, store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import authority, store  # noqa: PLC0415
 
     if not settings.machine_tls_enabled:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Model traffic TLS is switched off.")
@@ -331,12 +331,12 @@ async def node_ray_tls_certificate(
     """
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         InferenceEnvironment,
         InferenceEnvironmentNode,
     )
-    from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig  # noqa: PLC0415
-    from llm_port_backend.services.machine_tls import authority, ray_ca  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig  # noqa: PLC0415
+    from faden_backend.services.machine_tls import authority, ray_ca  # noqa: PLC0415
 
     try:
         body = await request.json()
@@ -389,7 +389,7 @@ async def node_ray_tls_certificate(
 
 def store_names(node: InfraNode) -> list[str]:
     """The names the machine's own certificate carries: the address the backend reaches it by."""
-    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import store  # noqa: PLC0415
 
     return store.machine_names(node.host)
 

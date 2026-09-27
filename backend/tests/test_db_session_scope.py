@@ -15,7 +15,7 @@ import pytest
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.routing import APIRoute
 
-from llm_port_backend.db.dependencies import commit_before_responding, get_db_session
+from faden_backend.db.dependencies import commit_before_responding, get_db_session
 
 
 class _Session:
@@ -87,7 +87,7 @@ async def test_a_failing_commit_fails_the_request() -> None:
 
 
 def test_every_route_of_the_backend_commits_before_responding() -> None:
-    from llm_port_backend.web.application import get_app
+    from faden_backend.web.application import get_app
 
     app = get_app()
     unwrapped = [r.path for r in app.router.routes

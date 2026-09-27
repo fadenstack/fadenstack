@@ -1,6 +1,6 @@
 """A machine hands the runtime image to its cluster peer.
 
-Every member used to pull ~12 GB from the LLM.Port server over its management
+Every member used to pull ~12 GB from the Fadenstack server over its management
 link -- on the DGX pair, both machines sharing 1 Gb/s while a 200 Gb/s fabric
 sat idle between them. These run the real seed server on loopback and fetch
 from it with the real resumable client.
@@ -16,9 +16,9 @@ from typing import Any
 import httpx
 import pytest
 
-from llm_port_node_agent import image_loader, image_seed
+from faden_agent import image_loader, image_seed
 
-IMAGE = "llmport/ray-vllm-gb10:ray2.58-nv26.08"
+IMAGE = "faden/ray-vllm-gb10:ray2.58-nv26.08"
 BLOB = bytes(range(256)) * 8192  # 2 MiB
 
 
@@ -126,7 +126,7 @@ async def test_a_partial_download_resumes_from_the_peer(tmp_path: Path) -> None:
     serving = await _serve(tmp_path, port)
     recv = tmp_path / "recv"
     recv.mkdir(parents=True)
-    (recv / "llmport_ray-vllm-gb10_ray2.58-nv26.08.tar.part").write_bytes(BLOB[:700_000])
+    (recv / "faden_ray-vllm-gb10_ray2.58-nv26.08.tar.part").write_bytes(BLOB[:700_000])
 
     part = await _download(tmp_path, port)
     result = await asyncio.wait_for(serving, timeout=10)

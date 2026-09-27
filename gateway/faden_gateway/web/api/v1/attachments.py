@@ -8,20 +8,20 @@ from fastapi import APIRouter, Depends, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import AttachmentScope
-from llm_port_api.services.gateway.attachment_service import (
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import AttachmentScope
+from faden_gateway.services.gateway.attachment_service import (
     AttachmentError,
     ChatAttachmentService,
 )
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
-from llm_port_api.services.gateway.docling_client import ChatDoclingClient
-from llm_port_api.services.gateway.session_schemas import (
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.docling_client import ChatDoclingClient
+from faden_gateway.services.gateway.session_schemas import (
     AttachmentDTO,
     AttachmentStatsDTO,
     AttachmentUploadResponse,
 )
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 router = APIRouter(prefix="/v1/sessions", tags=["attachments"])
 
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/v1/sessions", tags=["attachments"])
 def _build_service(request: Request, dao: SessionDAO) -> ChatAttachmentService:
     file_store = getattr(request.app.state, "chat_file_store", None)
     if file_store is None:
-        from llm_port_api.services.gateway.errors import GatewayError  # noqa: PLC0415
+        from faden_gateway.services.gateway.errors import GatewayError  # noqa: PLC0415
 
         raise GatewayError(
             status_code=501,

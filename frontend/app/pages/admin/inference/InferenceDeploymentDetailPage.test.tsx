@@ -118,7 +118,7 @@ describe("InferenceDeploymentDetailPage", () => {
 
     // 8. metrics
     expect(screen.getByText("Metrics")).toBeInTheDocument();
-    expect(screen.getByText("llm-port-qwen-serve")).toBeInTheDocument();
+    expect(screen.getByText("faden-qwen-serve")).toBeInTheDocument();
     expect(screen.getByText("RUNNING")).toBeInTheDocument();
     expect(screen.getByText("LLMDeployment:qwen")).toBeInTheDocument();
 
@@ -210,7 +210,7 @@ describe("InferenceDeploymentDetailPage", () => {
     // v1alpha1 is not partially patchable, and `replicas` / `autoscale` are
     // mutually exclusive, so the scale block must be replaced wholesale.
     expect(payload.spec).toMatchObject({
-      api_version: "inference.llmport.ai/v1alpha1",
+      api_version: "inference.fadenstack.com/v1alpha1",
       scale: { replicas: 3 },
     });
   });

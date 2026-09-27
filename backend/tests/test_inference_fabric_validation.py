@@ -14,18 +14,18 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.planner import MultiNodeFabricPlanner
+from faden_backend.services.inference.planner import MultiNodeFabricPlanner
 
 
 class _FakeGateway:
@@ -162,7 +162,7 @@ async def test_apply_refuses_an_environment_the_replan_cannot_bind(
     dbsession: AsyncSession,
 ) -> None:
     """Apply re-derives the plan, so it also re-derives the blockers."""
-    from llm_port_backend.services.inference.service import ConflictError
+    from faden_backend.services.inference.service import ConflictError
 
     env = await _dgx_pair(dbsession)
     planner = MultiNodeFabricPlanner(dbsession)

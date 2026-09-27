@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceEnvironment,
     ModelAvailability,
     ModelAvailabilityStatus,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.artifacts import (
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.artifacts import (
     ArtifactReadiness,
     ModelArtifactCoordinator,
     is_ready_for,
@@ -95,7 +95,7 @@ async def test_coordinator_evaluate_all_ready() -> None:
     )
     coordinator._dao.list_for_nodes = AsyncMock(return_value=[row])
 
-    with patch("llm_port_backend.services.inference.artifacts.model_cache_dir", return_value=None):
+    with patch("faden_backend.services.inference.artifacts.model_cache_dir", return_value=None):
         readiness = await coordinator.evaluate(model=model, environment=env)
 
     assert readiness.all_ready
@@ -129,8 +129,8 @@ async def test_coordinator_evaluate_detects_missing_and_stale() -> None:
     coordinator._dao.mark = AsyncMock()
 
     fake_manifest = {"manifest_sha256": "digest_new", "blobs": [{"hash": "b1"}]}
-    with patch("llm_port_backend.services.inference.artifacts.model_cache_dir", return_value="/tmp/cache"):
-        with patch("llm_port_backend.services.inference.artifacts.build_cache_manifest", return_value=fake_manifest):
+    with patch("faden_backend.services.inference.artifacts.model_cache_dir", return_value="/tmp/cache"):
+        with patch("faden_backend.services.inference.artifacts.build_cache_manifest", return_value=fake_manifest):
             readiness = await coordinator.evaluate(model=model, environment=env)
 
     assert not readiness.all_ready
@@ -173,9 +173,9 @@ async def test_coordinator_ensure_issues_commands() -> None:
 
     fake_payload = {"model_id": str(model.id), "blobs": [{"hash": "b1"}]}
     with (
-        patch("llm_port_backend.services.inference.artifacts.build_model_sync_payload", return_value=fake_payload),
+        patch("faden_backend.services.inference.artifacts.build_model_sync_payload", return_value=fake_payload),
         # No download of it under way on this server (the session is a mock).
-        patch("llm_port_backend.services.inference.server_copy.download_under_way", AsyncMock(return_value=None)),
+        patch("faden_backend.services.inference.server_copy.download_under_way", AsyncMock(return_value=None)),
     ):
         res = await coordinator.ensure(model=model, environment=env, gateway=gateway_mock)
 

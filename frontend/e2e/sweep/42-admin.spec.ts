@@ -24,13 +24,13 @@ test.describe("the console", () => {
     await page.goto("/admin/containers");
     const tiles = page.getByRole("group", { name: /Containers by state/ });
     await expect(tiles).toBeVisible();
-    await expect(page.getByText("llm-port-postgres").first()).toBeVisible();
+    await expect(page.getByText("faden-postgres").first()).toBeVisible();
     await tiles.getByText("Not running").click();
-    await expect(page.getByText("llm-port-postgres")).toHaveCount(0);
+    await expect(page.getByText("faden-postgres")).toHaveCount(0);
     await tiles.getByText("Not running").click();
-    await expect(page.getByText("llm-port-postgres").first()).toBeVisible();
+    await expect(page.getByText("faden-postgres").first()).toBeVisible();
     await tiles.getByText("Running").first().click();
-    await expect(page.getByText("llm-port-postgres").first()).toBeVisible();
+    await expect(page.getByText("faden-postgres").first()).toBeVisible();
     await w.inspect();
     await w.report("admin: container tiles");
     expect(w.failures()).toEqual([]);

@@ -1,8 +1,8 @@
-"""Daily jobs -- the backup, the certificate renewal -- for the user who runs LLM.Port; no root.
+"""Daily jobs -- the backup, the certificate renewal -- for the user who runs Fadenstack; no root.
 
 Two ways, whichever the machine has:
 
-* a **systemd user timer** (``llmport-backup.timer``), preferred: every
+* a **systemd user timer** (``faden-backup.timer``), preferred: every
   systemd distribution has one, and ``Persistent=true`` runs a job missed
   while the server was off. It runs without anyone logged in only with
   *lingering* on, which is switched on for the user (as the node agent's
@@ -24,11 +24,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 #: Marks the crontab line of the backup.
-MARK = "# llmport-backup"
+MARK = "# faden-backup"
 #: The systemd user units of the backup.
-UNIT = "llmport-backup"
-#: The systemd user units (and crontab mark) of the daily ``llmport tls renew``.
-TLS_UNIT = "llmport-tls-renew"
+UNIT = "faden-backup"
+#: The systemd user units (and crontab mark) of the daily ``faden tls renew``.
+TLS_UNIT = "faden-tls-renew"
 
 #: Scheduled jobs run with a bare PATH; docker is usually in one of these.
 _PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -63,14 +63,14 @@ def available() -> bool:
 
 def _cli() -> list[str]:
     """How a scheduled job should run this CLI: by absolute path, not a PATH lookup."""
-    found = shutil.which("llmport")
+    found = shutil.which("faden")
     if found:
         return [str(Path(found).resolve())]
-    return [sys.executable, "-m", "llmport"]
+    return [sys.executable, "-m", "faden"]
 
 
 def _config() -> Path | None:
-    value = os.environ.get("LLMPORT_CONFIG")
+    value = os.environ.get("FADEN_CONFIG")
     return Path(value).expanduser().resolve() if value else None
 
 
@@ -113,7 +113,7 @@ def job_entry(job: Job, config: Path | None) -> str:
     """The crontab line for *job*."""
     env = f"PATH={_PATH}"
     if config is not None:
-        env += f" LLMPORT_CONFIG={shlex.quote(str(config))}"
+        env += f" FADEN_CONFIG={shlex.quote(str(config))}"
     log = shlex.quote(str(job.log))
     return f"{job.minute} {job.hour} * * * {env} {_command(job)} >> {log} 2>&1 {job.mark}"
 
@@ -130,7 +130,7 @@ def job_units(job: Job, config: Path | None) -> dict[str, str]:
     """The service and timer unit files for *job*."""
     env = [f"Environment=PATH={_PATH}"]
     if config is not None:
-        env.append(f'Environment="LLMPORT_CONFIG={config}"')
+        env.append(f'Environment="FADEN_CONFIG={config}"')
     service = "\n".join([
         "[Unit]",
         f"Description={job.description}",
@@ -239,7 +239,7 @@ def remove_job(unit: str) -> bool:
 
 
 def _backup(*, hour: int, minute: int, retain: int, log: Path) -> Job:
-    return Job(UNIT, "LLM.Port nightly backup", ("backup", "-y", "--retain", str(retain)), hour, minute, log)
+    return Job(UNIT, "Fadenstack nightly backup", ("backup", "-y", "--retain", str(retain)), hour, minute, log)
 
 
 def entry(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> str:
@@ -274,5 +274,5 @@ def remove() -> bool:
 
 
 def tls_renewal(log: Path) -> Job:
-    """``llmport tls renew`` every morning; it changes nothing until something is due."""
-    return Job(TLS_UNIT, "LLM.Port certificate renewal", ("tls", "renew"), 4, 40, log)
+    """``faden tls renew`` every morning; it changes nothing until something is due."""
+    return Job(TLS_UNIT, "Fadenstack certificate renewal", ("tls", "renew"), 4, 40, log)

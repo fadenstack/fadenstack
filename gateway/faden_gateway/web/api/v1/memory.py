@@ -8,11 +8,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import MemoryFactScope, MemoryFactStatus
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.session_schemas import (
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import MemoryFactScope, MemoryFactStatus
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.session_schemas import (
     MemoryFactCreateRequest,
     MemoryFactDTO,
     MemoryFactUpdateRequest,

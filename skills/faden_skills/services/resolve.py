@@ -24,7 +24,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from llm_port_skills.db.models.skill import SkillActivation, SkillVisibility
+from faden_skills.db.models.skill import SkillActivation, SkillVisibility
 
 #: ``$code-review`` in a message. Not after a word character or another
 #: ``$`` (``US$5``, ``$$``), and the slug must hold a letter (``$100`` is

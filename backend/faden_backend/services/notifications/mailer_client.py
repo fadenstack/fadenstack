@@ -1,4 +1,4 @@
-"""MailerClient — thin HTTP wrapper around the llm_port_mailer service."""
+"""MailerClient — thin HTTP wrapper around the faden_mailer service."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 

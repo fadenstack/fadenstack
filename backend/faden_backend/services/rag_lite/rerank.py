@@ -19,8 +19,8 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.services.rag_lite.embedding import api_base
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.rag_lite.embedding import api_base
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 
@@ -106,8 +106,8 @@ class RerankClient:
         http_client: httpx.AsyncClient | None = None,
     ) -> RerankClient | None:
         """The reranker RAG Lite is set to use, or ``None`` when none is."""
-        from llm_port_backend.db.dao.llm_dao import ProviderDAO  # noqa: PLC0415
-        from llm_port_backend.settings import settings  # noqa: PLC0415
+        from faden_backend.db.dao.llm_dao import ProviderDAO  # noqa: PLC0415
+        from faden_backend.settings import settings  # noqa: PLC0415
 
         provider_id = (settings.rag_lite_rerank_provider_id or "").strip()
         if not provider_id:

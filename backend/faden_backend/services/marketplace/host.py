@@ -55,7 +55,7 @@ def build_spec(request: HostRequest) -> dict[str, Any]:
         # own default is 0.9 -- would crowd the others it shares the card with.
         engine["gpu_memory_utilization"] = round(gpus, 2)
     spec: dict[str, Any] = {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": engine},
         "scale": {"replicas": max(1, int(request.copies))},
         "resources": {"replica": {"gpus": int(gpus) if gpus >= 1 else round(gpus, 2)}},
@@ -73,8 +73,8 @@ async def host(session: Any, llm_service: Any, request: HostRequest) -> dict[str
 
     *llm_service* starts the download (the application's shared ``LLMService``).
     """
-    from llm_port_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
-    from llm_port_backend.services.inference.service import DeploymentService  # noqa: PLC0415
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
+    from faden_backend.services.inference.service import DeploymentService  # noqa: PLC0415
 
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", request.repo_id or ""):
         raise HostError("Not a Hugging Face repository id.")

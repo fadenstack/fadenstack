@@ -8,7 +8,7 @@ import logging
 
 import psutil
 
-from llm_port_node_agent.gpu import GpuDevice, GpuSnapshot
+from faden_agent.gpu import GpuDevice, GpuSnapshot
 
 log = logging.getLogger(__name__)
 

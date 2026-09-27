@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import inspect
 
-from llm_port_backend.services.inference.drivers.ray import client as ray_client
-from llm_port_backend.services.inference.drivers.ray import driver as ray_driver
+from faden_backend.services.inference.drivers.ray import client as ray_client
+from faden_backend.services.inference.drivers.ray import driver as ray_driver
 
 
 def test_the_interactive_budget_is_short_enough_to_poll_behind() -> None:
@@ -108,7 +108,7 @@ def test_a_probe_that_times_out_is_not_reported_as_zeros() -> None:
     Only the first is a fact. Copying the second into the metrics produced
     "0 of 0 accelerators" looking exactly like a measurement.
     """
-    from llm_port_backend.services.inference.drivers.ray.client import (
+    from faden_backend.services.inference.drivers.ray.client import (
         _parse_cluster_status,
     )
 

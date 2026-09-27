@@ -12,8 +12,8 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import ChatProject, ChatSession
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.db.models.gateway import ChatProject, ChatSession
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 
 pytestmark = pytest.mark.anyio
 

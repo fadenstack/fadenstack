@@ -3,8 +3,8 @@ import type { PaletteMode } from "@mui/material";
 import { ACCENT_KEYS, ACCENTS, DEFAULT_ACCENT, type Accent } from "./theme";
 
 /** Where the browser keeps the viewer's choices (per browser, like the language). */
-export const MODE_STORAGE_KEY = "llm-port-theme-mode";
-export const ACCENT_STORAGE_KEY = "llm-port-accent";
+export const MODE_STORAGE_KEY = "faden-theme-mode";
+export const ACCENT_STORAGE_KEY = "faden-accent";
 
 export interface ThemeModeContextValue {
   mode: PaletteMode;

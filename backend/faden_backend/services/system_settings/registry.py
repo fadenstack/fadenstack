@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from llm_port_backend.db.models.system_settings import SystemApplyScope
+from faden_backend.db.models.system_settings import SystemApplyScope
 
 SettingType = Literal["string", "int", "bool", "secret", "json", "enum"]
 
@@ -51,7 +51,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         category="api_server",
         group="endpoint",
         label="Endpoint URL",
-        description="Swagger/OpenAPI URL for llm_port_api docs.",
+        description="Swagger/OpenAPI URL for faden_gateway docs.",
         is_secret=False,
         default="/gateway-docs/docs",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
@@ -65,25 +65,25 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         label="API Container Name",
         description="Container name used for endpoint lifecycle operations.",
         is_secret=False,
-        default="llm-port-api",
+        default="faden-gateway",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),
     SettingDefinition(
-        key="llm_port_api.jwt_secret",
+        key="faden_gateway.jwt_secret",
         type="secret",
         category="auth",
         group="jwt",
         label="LLM API JWT Secret",
-        description="JWT verification secret for llm_port_api.",
+        description="JWT verification secret for faden_gateway.",
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
         protected=True,
     ),
     SettingDefinition(
-        key="llm_port_backend.users_secret",
+        key="faden_backend.users_secret",
         type="secret",
         category="auth",
         group="jwt",
@@ -92,11 +92,11 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
         protected=True,
     ),
     SettingDefinition(
-        key="llm_port_api.langfuse_enabled",
+        key="faden_gateway.langfuse_enabled",
         type="bool",
         category="observability",
         group="langfuse",
@@ -105,22 +105,22 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=False,
         default=False,
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.langfuse_host",
+        key="faden_gateway.langfuse_host",
         type="string",
         category="observability",
         group="langfuse",
         label="Langfuse Host",
-        description="Langfuse URL reachable by llm_port_api.",
+        description="Langfuse URL reachable by faden_gateway.",
         is_secret=False,
         default="http://langfuse-web:3000",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.langfuse_public_key",
+        key="faden_gateway.langfuse_public_key",
         type="secret",
         category="observability",
         group="langfuse",
@@ -129,10 +129,10 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.langfuse_secret_key",
+        key="faden_gateway.langfuse_secret_key",
         type="secret",
         category="observability",
         group="langfuse",
@@ -141,7 +141,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
         protected=True,
     ),
     SettingDefinition(
@@ -154,7 +154,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.STACK_RECREATE,
-        service_targets=("redis", "langfuse-web", "langfuse-worker", "llm-port-api"),
+        service_targets=("redis", "langfuse-web", "langfuse-worker", "faden-gateway"),
         protected=True,
     ),
     SettingDefinition(
@@ -188,7 +188,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
     # ``services/llm/hf_token.py``, behind ``/api/llm/settings/hf-token``.
     # ── PII module settings ─────────────────────────────────────
     SettingDefinition(
-        key="llm_port_api.pii_enabled",
+        key="faden_gateway.pii_enabled",
         type="bool",
         category="modules",
         group="pii",
@@ -197,22 +197,22 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=False,
         default=False,
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.pii_service_url",
+        key="faden_gateway.pii_service_url",
         type="string",
         category="modules",
         group="pii",
         label="PII Service URL",
-        description="Internal URL of the PII micro-service (e.g. http://llm-port-pii:8000 in Docker, http://127.0.0.1:8003/api in dev).",
+        description="Internal URL of the PII micro-service (e.g. http://faden-pii:8000 in Docker, http://127.0.0.1:8003/api in dev).",
         is_secret=False,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.pii_default_policy",
+        key="faden_gateway.pii_default_policy",
         type="json",
         category="modules",
         group="pii",
@@ -225,11 +225,11 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=False,
         default={},
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     # ── MCP module settings ──────────────────────────────────
     SettingDefinition(
-        key="llm_port_api.mcp_enabled",
+        key="faden_gateway.mcp_enabled",
         type="bool",
         category="modules",
         group="mcp",
@@ -238,26 +238,26 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=False,
         default=False,
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.mcp_service_url",
+        key="faden_gateway.mcp_service_url",
         type="string",
         category="modules",
         group="mcp",
         label="MCP Service URL",
         description=(
             "Internal URL of the MCP micro-service "
-            "(e.g. http://llm-port-mcp:8000 in Docker, "
+            "(e.g. http://faden-mcp:8000 in Docker, "
             "http://127.0.0.1:8007 in dev)."
         ),
         is_secret=False,
-        default="http://llm-port-mcp:8000",
+        default="http://faden-mcp:8000",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.mcp_service_token",
+        key="faden_gateway.mcp_service_token",
         type="secret",
         category="modules",
         group="mcp",
@@ -266,12 +266,12 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
         protected=True,
     ),
     # ── Skills module settings ───────────────────────────────
     SettingDefinition(
-        key="llm_port_api.skills_enabled",
+        key="faden_gateway.skills_enabled",
         type="bool",
         category="modules",
         group="skills",
@@ -280,26 +280,26 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=False,
         default=False,
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.skills_service_url",
+        key="faden_gateway.skills_service_url",
         type="string",
         category="modules",
         group="skills",
         label="Skills Service URL",
         description=(
             "Internal URL of the Skills micro-service "
-            "(e.g. http://llm-port-skills:8000 in Docker, "
+            "(e.g. http://faden-skills:8000 in Docker, "
             "http://127.0.0.1:8008 in dev)."
         ),
         is_secret=False,
-        default="http://llm-port-skills:8000",
+        default="http://faden-skills:8000",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
     ),
     SettingDefinition(
-        key="llm_port_api.skills_service_token",
+        key="faden_gateway.skills_service_token",
         type="secret",
         category="modules",
         group="skills",
@@ -308,7 +308,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         is_secret=True,
         default="",
         apply_scope=SystemApplyScope.SERVICE_RESTART,
-        service_targets=("llm-port-api",),
+        service_targets=("faden-gateway",),
         protected=True,
     ),
     # ── RAG Lite ─────────────────────────────────────────────
@@ -475,7 +475,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         label="File Store Root Path",
         description="Local filesystem path for storing uploaded RAG Lite documents.",
         is_secret=False,
-        default="/data/llm-port/rag-lite",
+        default="/data/fadenstack/rag-lite",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),

@@ -19,15 +19,15 @@ from prometheus_fastapi_instrumentator.instrumentation import (
     PrometheusFastApiInstrumentator,
 )
 
-from llm_port_pii.services.pii.service import PIIService
-from llm_port_pii.settings import settings
+from faden_pii.services.pii.service import PIIService
+from faden_pii.settings import settings
 
 log = logging.getLogger(__name__)
 
 # ── Optional EE plugin ────────────────────────────────────────────
 try:
-    from llm_port_ee import setup_ee, teardown_ee  # type: ignore[import-untyped]
-    from llm_port_ee.plugins.pii import pii_plugin  # type: ignore[import-untyped]
+    from faden_ee import setup_ee, teardown_ee  # type: ignore[import-untyped]
+    from faden_ee.plugins.pii import pii_plugin  # type: ignore[import-untyped]
 
     _EE_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -47,7 +47,7 @@ def setup_opentelemetry(app: FastAPI) -> None:  # pragma: no cover
     tracer_provider = TracerProvider(
         resource=Resource(
             attributes={
-                SERVICE_NAME: "llm_port_pii",
+                SERVICE_NAME: "faden_pii",
                 TELEMETRY_SDK_LANGUAGE: "python",
                 DEPLOYMENT_ENVIRONMENT: settings.environment,
             },

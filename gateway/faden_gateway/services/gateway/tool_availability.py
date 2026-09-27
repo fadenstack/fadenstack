@@ -14,12 +14,12 @@ import logging
 import uuid
 from typing import Any
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.models.gateway import ExecutionMode, ToolRealm
-from llm_port_api.services.gateway.mcp_client import MCPClient
-from llm_port_api.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from llm_port_api.services.gateway.policy_engine import PolicyAction, PolicyEngine
-from llm_port_api.services.gateway.schemas import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.models.gateway import ExecutionMode, ToolRealm
+from faden_gateway.services.gateway.mcp_client import MCPClient
+from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
+from faden_gateway.services.gateway.policy_engine import PolicyAction, PolicyEngine
+from faden_gateway.services.gateway.schemas import (
     ExecutionModeEnum,
     ToolAvailabilityDTO,
     ToolAvailabilityResponse,

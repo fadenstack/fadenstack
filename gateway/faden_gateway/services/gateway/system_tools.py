@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from llm_port_api.services.gateway.attachment_search import words
+from faden_gateway.services.gateway.attachment_search import words
 
 FIND = "get_available_tools"
 TIME = "current_time"

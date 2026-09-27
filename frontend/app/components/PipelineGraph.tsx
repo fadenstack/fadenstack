@@ -1,6 +1,6 @@
 /**
  * PipelineGraph — interactive React Flow visualisation of a single
- * gateway request's journey through the LLM.port pipeline.
+ * gateway request's journey through the Fadenstack pipeline.
  *
  * Node categories (each with a distinct colour scheme):
  *   gateway  → request ingress / egress (purple)

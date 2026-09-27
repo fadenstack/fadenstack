@@ -1,15 +1,15 @@
-# Build and push all llm.port core Docker images to GHCR.
+# Build and push all fadenstack core Docker images to GHCR.
 #
 # Trigger options:
 #   - Push to master (builds changed services only)
 #   - A release tag v<version> (e.g. v0.3.0): every image, tagged 0.3.0, 0.3 and
-#     latest. `llmport deploy` from the CLI of that version pulls exactly
+#     latest. `faden deploy` from the CLI of that version pulls exactly
 #     <version>, so the images must be published before the CLI is.
 #   - Manual dispatch (choose which services to build)
 #
 # Prerequisites:
 #   1. Ensure the repo has packages:write permission (automatic with GITHUB_TOKEN)
-#   2. Images are published to ghcr.io/llm-port/<service>
+#   2. Images are published to ghcr.io/fadenstack/<service>
 
 name: Publish Docker Images
 
@@ -24,7 +24,7 @@ on:
       registry:
         description: "Container registry"
         required: false
-        default: "ghcr.io/llm-port"
+        default: "ghcr.io/fadenstack"
         type: string
       version:
         description: "Image tag (leave empty for auto-tagging)"
@@ -43,14 +43,14 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+  REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
 jobs:
   # ── Determine which services to build ───────────────────────────────
   changes:
     runs-on: ubuntu-latest
     outputs:
-      api: ${{ steps.filter.outputs.api }}
+      gateway: ${{ steps.filter.outputs.gateway }}
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       pii: ${{ steps.filter.outputs.pii }}
@@ -75,12 +75,12 @@ jobs:
         if: steps.manual.outputs.build_all != 'true' && github.event_name == 'push'
         with:
           filters: |
-            api:      ['llm_port_api/**']
-            backend:  ['llm_port_backend/**', 'llm_port_runtime_image/runtime-manifest*.json']
-            frontend: ['llm_port_frontend/**']
-            pii:      ['llm_port_pii/**']
-            mcp:      ['llm_port_mcp/**']
-            skills:   ['llm_port_skills/**']
+            gateway:      ['gateway/**']
+            backend:  ['backend/**', 'runtime-image/runtime-manifest*.json']
+            frontend: ['frontend/**']
+            pii:      ['pii/**']
+            mcp:      ['mcp/**']
+            skills:   ['skills/**']
 
   # ── Build base image first ────────────────────────────────────────
   base:
@@ -88,23 +88,23 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: base
-      context: llm_port_shared/base
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      context: shared/base
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   # ── Build each service ──────────────────────────────────────────────
-  api:
+  gateway:
     needs: [changes, base]
     if: >-
-      needs.changes.outputs.api == 'true' ||
+      needs.changes.outputs.gateway == 'true' ||
       startsWith(github.ref, 'refs/tags/core-v') ||
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'api'))
+      (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'gateway'))
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
-      service: api
-      context: llm_port_api
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      service: gateway
+      context: gateway
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   backend:
     needs: [changes, base]
@@ -117,10 +117,10 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: backend
-      context: llm_port_backend
+      context: backend
       # The runtime manifests the Dockerfile copies in.
-      build-contexts: runtime_manifests=llm_port_runtime_image
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      build-contexts: runtime_manifests=runtime-image
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   frontend:
     needs: changes
@@ -133,8 +133,8 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: frontend
-      context: llm_port_frontend
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      context: frontend
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   pii:
     needs: [changes, base]
@@ -147,8 +147,8 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: pii
-      context: llm_port_pii
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      context: pii
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   mcp:
     needs: [changes, base]
@@ -161,8 +161,8 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: mcp
-      context: llm_port_mcp
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      context: mcp
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   skills:
     needs: [changes, base]
@@ -175,5 +175,5 @@ jobs:
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: skills
-      context: llm_port_skills
-      registry: ${{ github.event.inputs.registry || 'ghcr.io/llm-port' }}
+      context: skills
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}

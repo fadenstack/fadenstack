@@ -1,10 +1,10 @@
-"""Inject one failure into a live cluster and time how LLM.Port comes back.
+"""Inject one failure into a live cluster and time how Fadenstack comes back.
 
     python faults.py <scenario> [--deployment qwen-chat] [--timeout 900]
 
 Scenarios (see ``SCENARIOS``) break one thing on the head or a worker over
 SSH (key only), or restart a local dev process by touching its source. Every
-five seconds the run records what LLM.Port says -- cluster status, the
+five seconds the run records what Fadenstack says -- cluster status, the
 deployment's phase and copies -- and whether a real chat through the gateway
 answers, and prints each change as it happens. It stops once everything is
 healthy again (or after ``--timeout``) and writes a JSON report beside itself.
@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CORE = HERE.parents[2]
-RUNTIME = "llm-port-ray-runtime"
+RUNTIME = "faden-ray-runtime"
 
 
 @dataclass
@@ -36,7 +36,7 @@ class Scenario:
     where: str  # "head", "worker", "local" (touch a dev source file) or "manual"
     command: str
     expect: str
-    #: Whether LLM.Port is expected to notice anything at all.
+    #: Whether Fadenstack is expected to notice anything at all.
     breaks: bool = True
 
 
@@ -64,13 +64,13 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     "agent-restart": Scenario(
         "worker",
-        "systemctl --user restart llmport-agent",
+        "systemctl --user restart faden-agent",
         "Nothing restarts: the agent reconnects to a healthy cluster.",
         breaks=False,
     ),
     "backend-restart": Scenario(
         "local",
-        "llm_port_backend/llm_port_backend/web/lifespan.py",
+        "backend/faden_backend/web/lifespan.py",
         "Nothing restarts and nothing is re-applied; clusters are looked at on startup.",
         breaks=False,
     ),

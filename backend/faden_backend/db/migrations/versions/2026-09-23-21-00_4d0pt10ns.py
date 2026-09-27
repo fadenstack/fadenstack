@@ -1,4 +1,4 @@
-"""vLLM containers LLM.Port found on a machine and took over.
+"""vLLM containers Fadenstack found on a machine and took over.
 
 One table, ``inference_adoptions``: which machine and container, the name
 clients call it by, what it serves, the provider row routing it, and -- when

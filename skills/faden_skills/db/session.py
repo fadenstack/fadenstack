@@ -1,11 +1,11 @@
-"""Database engine and session factory for llm_port_skills."""
+"""Database engine and session factory for faden_skills."""
 
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from llm_port_skills.settings import settings
+from faden_skills.settings import settings
 
 engine = create_async_engine(
     str(settings.db_url),

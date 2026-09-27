@@ -8,8 +8,8 @@ from fastapi import Depends
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dependencies import get_db_session
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dependencies import get_db_session
+from faden_gateway.db.models.gateway import (
     ChatAttachment,
     ChatMessage,
     ChatProject,

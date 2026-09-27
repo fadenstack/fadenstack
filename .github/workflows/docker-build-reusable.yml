@@ -1,10 +1,10 @@
-# Reusable workflow: build and push a single llm.port Docker image.
+# Reusable workflow: build and push a single fadenstack Docker image.
 # Called by per-service workflows or the orchestrator workflow.
 #
 # Inputs:
 #   service   — image name (api, backend, frontend, pii, mcp, skills)
-#   context   — relative path to the build context (e.g. llm_port_backend)
-#   registry  — GHCR registry path (default: ghcr.io/llm-port)
+#   context   — relative path to the build context (e.g. faden_backend)
+#   registry  — GHCR registry path (default: ghcr.io/fadenstack)
 #   platforms — comma-separated platforms (default: linux/amd64)
 #   build-contexts — named build contexts, name=path per line (optional)
 
@@ -22,7 +22,7 @@ on:
       registry:
         required: false
         type: string
-        default: ghcr.io/llm-port
+        default: ghcr.io/fadenstack
       platforms:
         required: false
         type: string

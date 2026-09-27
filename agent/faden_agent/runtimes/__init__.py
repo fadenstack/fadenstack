@@ -147,8 +147,8 @@ def detect_runtime(*, preferred: str | None = None) -> ContainerRuntime:
         If set, try this runtime first (``"docker"`` or ``"podman"``).
         Falls back to auto-detection if the preferred CLI is absent.
     """
-    from llm_port_node_agent.runtimes.docker import DockerRuntime  # noqa: E402 — late import avoids cycles
-    from llm_port_node_agent.runtimes.podman import PodmanRuntime  # noqa: E402
+    from faden_agent.runtimes.docker import DockerRuntime  # noqa: E402 — late import avoids cycles
+    from faden_agent.runtimes.podman import PodmanRuntime  # noqa: E402
 
     candidates: list[tuple[str, type[ContainerRuntime]]] = [
         ("docker", DockerRuntime),

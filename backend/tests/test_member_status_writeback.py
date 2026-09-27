@@ -26,13 +26,13 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.reconciliation import _sync_member_status
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.reconciliation import _sync_member_status
 
 
 class _Ctx:
@@ -378,8 +378,8 @@ async def test_the_fleet_list_carries_each_machines_utilization(
     node's allocation arc from exactly that field, so the arc never drew -- it
     looked like a rendering bug and was a missing join.
     """
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.services.nodes import NodeControlService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.services.nodes import NodeControlService
 
     node = await _node(dbsession, "10.250.10.49")
     dao = NodeControlDAO(dbsession)
@@ -410,8 +410,8 @@ async def test_a_machine_that_has_never_reported_says_so(
     dbsession: AsyncSession,
 ) -> None:
     """Null, not an invented zero -- a node with no snapshot has no arc."""
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.services.nodes import NodeControlService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.services.nodes import NodeControlService
 
     node = await _node(dbsession, "10.250.10.71")
     service = NodeControlService(
@@ -439,9 +439,9 @@ async def test_the_newest_snapshot_wins(dbsession: AsyncSession) -> None:
     """
     from datetime import timedelta
 
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.db.models.node_control import InfraNodeInventorySnapshot
-    from llm_port_backend.services.nodes import NodeControlService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.models.node_control import InfraNodeInventorySnapshot
+    from faden_backend.services.nodes import NodeControlService
 
     node = await _node(dbsession, "10.250.10.49")
     base = datetime.now(timezone.utc)
@@ -475,8 +475,8 @@ async def test_each_machine_gets_its_own_snapshot(dbsession: AsyncSession) -> No
     ``DISTINCT ON`` is easy to write so that a single busy machine's snapshot
     is handed to every node in the fleet.
     """
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.services.nodes import NodeControlService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.services.nodes import NodeControlService
 
     head = await _node(dbsession, "10.250.10.49")
     worker = await _node(dbsession, "10.250.10.71")

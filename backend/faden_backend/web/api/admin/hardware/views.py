@@ -2,7 +2,7 @@
 
 ``GET /admin/hardware`` — returns GPU inventory, live metrics,
 the recommended vLLM image tag, and a list of available image presets
-(built-in + admin-defined from ``LLM_PORT_BACKEND_VLLM_IMAGE_PRESETS``).
+(built-in + admin-defined from ``FADEN_BACKEND_VLLM_IMAGE_PRESETS``).
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.gpu.detector import detect_gpus, redetect_gpus
-from llm_port_backend.services.gpu.metrics import collect_gpu_metrics
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import require_superuser
-from llm_port_backend.web.api.admin.hardware.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.gpu.detector import detect_gpus, redetect_gpus
+from faden_backend.services.gpu.metrics import collect_gpu_metrics
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.hardware.schema import (
     GpuDeviceDTO,
     GpuInventoryDTO,
     GpuMetricsDTO,

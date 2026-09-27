@@ -9,11 +9,11 @@ from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-from llm_port_api.log import configure_logging
-from llm_port_api.services.gateway.errors import GatewayError, error_response
-from llm_port_api.settings import settings
-from llm_port_api.web.api.router import api_router, public_router
-from llm_port_api.web.lifespan import lifespan_setup
+from faden_gateway.log import configure_logging
+from faden_gateway.services.gateway.errors import GatewayError, error_response
+from faden_gateway.settings import settings
+from faden_gateway.web.api.router import api_router, public_router
+from faden_gateway.web.lifespan import lifespan_setup
 
 APP_ROOT = Path(__file__).parent.parent
 
@@ -44,8 +44,8 @@ def get_app() -> FastAPI:
             ],
         )
     app = FastAPI(
-        title="llm_port_api",
-        version=metadata.version("llm_port_api"),
+        title="faden_gateway",
+        version=metadata.version("faden_gateway"),
         lifespan=lifespan_setup,
         docs_url=None,
         redoc_url=None,

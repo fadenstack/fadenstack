@@ -2,16 +2,16 @@
 .empty-hf-cache/
 .bootstrap-credentials
 rabbitmq/definitions.json
-# Backups made by llmport backup / upgrade: database dumps and .env copies.
+# Backups made by faden backup / upgrade: database dumps and .env copies.
 backups/
 # The edge certificate and key nginx serves HTTPS with (docs/installing.md,
 # "Enabling HTTPS"); only tls/README.md is tracked.
 tls/*.crt
 tls/*.key
 tls/*.pem
-# The certificate authority llmport tls generate makes; its key never leaves this machine.
+# The certificate authority faden tls generate makes; its key never leaves this machine.
 tls-ca/
-# The CLI's note of this host's addresses and ports for the backend (llmport tls, ports).
+# The CLI's note of this host's addresses and ports for the backend (faden tls, ports).
 tls/edge.json
-# Output of the daily jobs (llmport tls renew).
+# Output of the daily jobs (faden tls renew).
 logs/

@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_node_agent.runtimes import ContainerRuntime, ContainerRuntimeError
+from faden_agent.runtimes import ContainerRuntime, ContainerRuntimeError
 
 log = logging.getLogger(__name__)
 

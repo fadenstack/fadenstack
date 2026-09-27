@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_port_api.services.gateway.pii_policy import (
+from faden_gateway.services.gateway.pii_policy import (
     VALID_ENTITIES,
     PIIEgressPolicy,
     PIIPolicy,
@@ -381,7 +381,7 @@ class TestResolvePiiPolicyWithOverride:
         return row
 
     def test_no_override_returns_floor(self) -> None:
-        from llm_port_api.services.gateway.service import _resolve_pii_policy
+        from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy({
             "egress": {"enabled_for_cloud": True, "fail_action": "allow"},
@@ -392,7 +392,7 @@ class TestResolvePiiPolicyWithOverride:
         assert result.egress.fail_action == "allow"
 
     def test_override_clamps_fail_action(self) -> None:
-        from llm_port_api.services.gateway.service import _resolve_pii_policy
+        from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy({
             "egress": {"enabled_for_cloud": True, "fail_action": "allow"},
@@ -404,7 +404,7 @@ class TestResolvePiiPolicyWithOverride:
         assert result.egress.fail_action == "block"
 
     def test_override_cannot_weaken_fail_action(self) -> None:
-        from llm_port_api.services.gateway.service import _resolve_pii_policy
+        from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy({
             "egress": {"enabled_for_cloud": True, "fail_action": "block"},
@@ -417,7 +417,7 @@ class TestResolvePiiPolicyWithOverride:
         assert result.egress.fail_action == "block"
 
     def test_override_raises_threshold(self) -> None:
-        from llm_port_api.services.gateway.service import _resolve_pii_policy
+        from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy({
             "egress": {"enabled_for_cloud": True, "fail_action": "allow"},
@@ -429,7 +429,7 @@ class TestResolvePiiPolicyWithOverride:
         assert result.presidio.threshold == 0.9
 
     def test_no_pii_config_returns_none(self) -> None:
-        from llm_port_api.services.gateway.service import _resolve_pii_policy
+        from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy(pii_config=None)
         override = self._make_mock_override(egress_fail_action="block")

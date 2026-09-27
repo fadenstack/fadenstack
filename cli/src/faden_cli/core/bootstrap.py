@@ -1,6 +1,6 @@
 """First-admin bootstrap — calls ``POST /api/bootstrap``.
 
-Used by ``llmport deploy`` and ``llmport dev init`` to create the
+Used by ``faden deploy`` and ``faden dev init`` to create the
 initial admin user after services are up.  The raw credentials are
 displayed once and optionally saved to a local file.
 """
@@ -14,8 +14,8 @@ from pathlib import Path
 
 import httpx
 
-from llmport.core.console import console, error, success, warning
-from llmport.core.edge import verify_for
+from faden_cli.core.console import console, error, success, warning
+from faden_cli.core.edge import verify_for
 
 
 def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
@@ -122,7 +122,7 @@ def save_credentials_file(creds: dict, directory: Path) -> Path | None:
     """Write credentials to a restricted file (chmod 600). Returns the path."""
     creds_path = directory / ".bootstrap-credentials"
     content_lines = [
-        f"# llm.port bootstrap credentials — generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"# fadenstack bootstrap credentials — generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"ADMIN_EMAIL={creds['email']}",
         f"ADMIN_PASSWORD={creds['password']}",
     ]

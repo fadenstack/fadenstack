@@ -1,6 +1,6 @@
 """Throwaway local check: in-place vs atomic JSON writers in monitoring.py.
 
-Run: uv run python scripts/check_writers.py   (from llm_port_backend/)
+Run: uv run python scripts/check_writers.py   (from backend/)
 """
 
 import json
@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from llm_port_backend.services.llm.monitoring import (  # noqa: E402
+from faden_backend.services.llm.monitoring import (  # noqa: E402
     _atomic_write_json,
     _atomic_write_json_inplace,
 )

@@ -15,12 +15,12 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import ChatAttachment, ExtractionStatus, ProviderType
-from llm_port_api.services.gateway import skill_files
-from llm_port_api.services.gateway.service import _file_types
-from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
-from llm_port_api.services.registry import service_registry
-from llm_port_api.settings import settings
+from faden_gateway.db.models.gateway import ChatAttachment, ExtractionStatus, ProviderType
+from faden_gateway.services.gateway import skill_files
+from faden_gateway.services.gateway.service import _file_types
+from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
+from faden_gateway.services.registry import service_registry
+from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import CAN_CALL_TOOLS, _call, _Model, _say, _streamed, _tool_names
 from tests.test_gateway_pipeline_combined import ALIAS, _Observability, _seed, _session, _token
 

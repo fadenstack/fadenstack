@@ -16,14 +16,14 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommandEvent,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.services.nodes.service import NodeControlService
 
 
 def _service(session: AsyncSession) -> NodeControlService:

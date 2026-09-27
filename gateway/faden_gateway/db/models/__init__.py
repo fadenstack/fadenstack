@@ -1,6 +1,6 @@
 """Database model package for gateway service."""
 
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.models.gateway import (
     LLMGatewayRequestLog,
     LLMModelAlias,
     LLMPoolMembership,

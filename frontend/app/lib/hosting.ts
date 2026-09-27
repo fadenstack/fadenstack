@@ -42,7 +42,7 @@ export function buildSpec({ copies, gpusPerCopy, chatName = "", engineConfig = {
   }
   const tp = sharing ? 1 : Math.max(1, Math.round(gpusPerCopy));
   return {
-    api_version: "inference.llmport.ai/v1alpha1",
+    api_version: "inference.fadenstack.com/v1alpha1",
     engine: { name: "vllm", config: engine },
     scale: { replicas: Math.max(1, Math.round(copies)) },
     resources: { replica: { gpus: sharing ? Math.round(gpusPerCopy * 100) / 100 : tp } },

@@ -1,10 +1,10 @@
-"""``llmport restore`` — restore from a backup directory.
+"""``faden restore`` — restore from a backup directory.
 
 Examples:
-    llmport restore backups/20250115T120000Z
-    llmport restore backups/20250115T120000Z --verify-only
-    llmport restore backups/20250115T120000Z --db-only
-    llmport restore backups/20250115T120000Z --skip-env
+    faden restore backups/20250115T120000Z
+    faden restore backups/20250115T120000Z --verify-only
+    faden restore backups/20250115T120000Z --db-only
+    faden restore backups/20250115T120000Z --skip-env
 """
 
 from __future__ import annotations
@@ -14,19 +14,19 @@ from pathlib import Path
 
 import click
 
-from llmport.core.backup import (
+from faden_cli.core.backup import (
     read_manifest,
     restore_backup,
     verify_backup,
 )
-from llmport.core.compose import (
+from faden_cli.core.compose import (
     build_context_from_config,
     down as compose_down,
     up as compose_up,
 )
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.settings import load_config
-from llmport.commands.deploy import _sync_postgres_password
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.settings import load_config
+from faden_cli.commands.deploy import _sync_postgres_password
 
 
 @click.command("restore")
@@ -48,12 +48,12 @@ def restore_cmd(
     verify_only: bool,
     yes: bool,
 ) -> None:
-    """Restore llm.port from a backup directory.
+    """Restore fadenstack from a backup directory.
 
     BACKUP_DIR is the path to a timestamped backup folder containing
-    a manifest.json file created by ``llmport backup``.
+    a manifest.json file created by ``faden backup``.
     """
-    console.print("\n[bold magenta]llm.port — Restore[/bold magenta]\n")
+    console.print("\n[bold magenta]fadenstack — Restore[/bold magenta]\n")
 
     backup_path = Path(backup_dir).resolve()
     manifest = read_manifest(backup_path)
@@ -63,7 +63,7 @@ def restore_cmd(
 
     # ── Show backup info ──────────────────────────────────────
     console.print(f"  Backup date:    {manifest.get('created_at', 'unknown')}")
-    console.print(f"  llmport version: {manifest.get('llmport_version', 'unknown')}")
+    console.print(f"  faden version: {manifest.get('faden_version', 'unknown')}")
     db_names = list(manifest.get("databases", {}).keys())
     console.print(f"  Databases:      {', '.join(db_names)}")
     if manifest.get("env_snapshot"):

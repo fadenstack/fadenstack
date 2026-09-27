@@ -1,4 +1,4 @@
-"""``llmport dev up`` — start the development servers.
+"""``faden dev up`` — start the development servers.
 
 Mirrors the logic of ``start-dev.ps1`` / ``start-dev.sh``:
   1. Start shared infrastructure (if not already running)
@@ -23,10 +23,10 @@ from pathlib import Path
 import click
 import psutil
 
-from llmport.core.console import console, success, warning, error, info
-from llmport.core.registry import DEV_ENDPOINTS, DEV_MODULE_ENDPOINTS, ModuleInfo
-from llmport.core.settings import load_config
-from llmport.core.workspace import (
+from faden_cli.core.console import console, success, warning, error, info
+from faden_cli.core.registry import DEV_ENDPOINTS, DEV_MODULE_ENDPOINTS, ModuleInfo
+from faden_cli.core.settings import load_config
+from faden_cli.core.workspace import (
     find_service_dir,
     resolve_shared_compose,
     resolve_workspace,
@@ -54,8 +54,8 @@ def _ensure_databases(backend_dir: Path) -> None:
     checkout that was never initialised, and equally after
     ``dev down --volumes`` wipes them.  Both are recoverable, so recover.
     """
-    from llmport.commands.dev.dev_init import _ensure_backend_role, _ensure_database
-    from llmport.core.registry import DATABASES
+    from faden_cli.commands.dev.dev_init import _ensure_backend_role, _ensure_database
+    from faden_cli.core.registry import DATABASES
 
     created = [name for name in DATABASES if _ensure_database(name, quiet=True)]
     if created:
@@ -69,7 +69,7 @@ def _ensure_databases(backend_dir: Path) -> None:
 #: Named rather than numbered so a second ``dev up`` reuses the same window
 #: instead of opening another, and so the tabs never land in a window the
 #: operator is working in.
-_WT_WINDOW_NAME = "llmport-dev"
+_WT_WINDOW_NAME = "faden-dev"
 
 
 def _launch_terminal(title: str, working_dir: Path, command: str, headless: bool) -> bool:
@@ -168,7 +168,7 @@ def _can_open_terminal(system: str) -> bool:
 
 def _launch_background(working_dir: Path, command: str, label: str | None = None) -> bool:
     """Start a dev process detached (headless) and log its output."""
-    from llmport.core.workspace import dev_logs_dir, log_filename
+    from faden_cli.core.workspace import dev_logs_dir, log_filename
 
     log_dir = dev_logs_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -241,7 +241,7 @@ def _which(name: str) -> str | None:
 
 
 def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
-    """Create or repair ``llm_port_backend/.env``.
+    """Create or repair ``backend/.env``.
 
     Creates it with the dev defaults if missing. If it exists, the file
     is self-healed in place (all other lines preserved):
@@ -256,8 +256,8 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
     env_path = backend_dir / ".env"
     if not backend_dir.exists():
         return
-    from llmport.core.env_gen import write_env_file
-    from llmport.core.registry import backend_dev_env_for
+    from faden_cli.core.env_gen import write_env_file
+    from faden_cli.core.registry import backend_dev_env_for
 
     shared_env_path = _shared_env_path(workspace)
     if not shared_env_path:
@@ -275,7 +275,7 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
     rewrite = {
         k: v
         for k, v in desired.items()
-        if k in ("LLM_PORT_BACKEND_HOST", "LLM_PORT_BACKEND_RABBIT_USER", "LLM_PORT_BACKEND_RABBIT_PASS")
+        if k in ("FADEN_BACKEND_HOST", "FADEN_BACKEND_RABBIT_USER", "FADEN_BACKEND_RABBIT_PASS")
     }
     # Keys added in newer CLI versions: appended if the file predates them.
     append = {
@@ -283,9 +283,9 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
         for k, v in desired.items()
         if k
         in (
-            "LLM_PORT_BACKEND_COOKIE_SECURE",
-            "LLM_PORT_BACKEND_GATEWAY_URL",
-            "LLM_PORT_BACKEND_ENVIRONMENT",
+            "FADEN_BACKEND_COOKIE_SECURE",
+            "FADEN_BACKEND_GATEWAY_URL",
+            "FADEN_BACKEND_ENVIRONMENT",
         )
     }
 
@@ -317,7 +317,7 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
     if missing:
         if fixed and fixed[-1].strip():
             fixed.append("")
-        fixed.append("# ── llmport dev up: dev defaults ──")
+        fixed.append("# ── faden dev up: dev defaults ──")
         known = {**rewrite, **append}
         fixed.extend(f"{k}={known[k]}" for k in missing)
     env_path.write_text("\n".join(fixed) + "\n", encoding="utf-8")
@@ -331,7 +331,7 @@ def _loopback_fixes(current: dict[str, str]) -> dict[str, str]:
     every new connection on Windows (see ``INFRA_LOOPBACK``). Only that exact
     value is rewritten: a host someone pointed elsewhere is theirs.
     """
-    from llmport.core.registry import INFRA_HOST_KEYS, INFRA_LOOPBACK
+    from faden_cli.core.registry import INFRA_HOST_KEYS, INFRA_LOOPBACK
 
     return {
         k: INFRA_LOOPBACK
@@ -343,8 +343,8 @@ def _loopback_fixes(current: dict[str, str]) -> dict[str, str]:
 def _shared_env_path(workspace: Path) -> Path | None:
     """Locate the shared (infra) ``.env`` for the dev workspace."""
     for candidate in (
-        workspace / "llm_port_shared" / ".env",
-        workspace / "llm-port-core" / "llm_port_shared" / ".env",
+        workspace / "shared" / ".env",
+        workspace / "fadenstack" / "shared" / ".env",
     ):
         if candidate.exists():
             return candidate
@@ -368,8 +368,8 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     Returns the shared env path (existing or newly written), or ``None``
     if the shared compose directory cannot be found.
     """
-    from llmport.core.env_gen import dev_env_vars, write_env_file
-    from llmport.core.workspace import resolve_shared_compose
+    from faden_cli.core.env_gen import dev_env_vars, write_env_file
+    from faden_cli.core.workspace import resolve_shared_compose
 
     compose_file = resolve_shared_compose(workspace)
     if not compose_file:
@@ -382,7 +382,7 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     info(f"Shared .env not found — generating fresh dev credentials at {env_path}")
     write_env_file(env_path, dev_env_vars())
     try:
-        from llmport.commands.dev.dev_init import _resync_rmq_credentials
+        from faden_cli.commands.dev.dev_init import _resync_rmq_credentials
 
         _resync_rmq_credentials(shared_dir, skip_infra=False)
     except Exception as exc:  # noqa: BLE001 — resync is best-effort
@@ -391,7 +391,7 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
 
 
 def _ensure_gateway_env(api_dir: Path, workspace: Path) -> None:
-    """Create ``llm_port_api/.env`` for the host-running gateway.
+    """Create ``gateway/.env`` for the host-running gateway.
 
     The gateway is the OpenAI-compatible ``/v1`` edge; in dev it runs as a
     host process (port 8001) and must point at the shared 127.0.0.1
@@ -401,8 +401,8 @@ def _ensure_gateway_env(api_dir: Path, workspace: Path) -> None:
     """
     if not api_dir.exists():
         return
-    from llmport.core.env_gen import write_env_file
-    from llmport.core.registry import gateway_dev_env_for
+    from faden_cli.core.env_gen import write_env_file
+    from faden_cli.core.registry import gateway_dev_env_for
 
     shared_env_path = _shared_env_path(workspace)
     if not shared_env_path:
@@ -435,7 +435,7 @@ def _ensure_gateway_env(api_dir: Path, workspace: Path) -> None:
     if not missing:
         return
     with env_path.open("a", encoding="utf-8") as fh:
-        fh.write("# ── llmport dev up: gateway dev defaults ──\n")
+        fh.write("# ── faden dev up: gateway dev defaults ──\n")
         for k, v in missing.items():
             fh.write(f"{k}={v}\n")
     info("Gateway .env completed with missing dev defaults.")
@@ -480,12 +480,12 @@ def _ensure_module_envs(
     a module that is not started this time is switched off, not left pointing
     at a port nothing listens on.
     """
-    from llmport.core.dev_modules import caller_env, module_env
-    from llmport.core.registry import _read_env_values
+    from faden_cli.core.dev_modules import caller_env, module_env
+    from faden_cli.core.registry import _read_env_values
 
     shared_path = _shared_env_path(workspace)
     shared = _read_env_values(shared_path) if shared_path else {}
-    header = "llmport dev up: modules"
+    header = "faden dev up: modules"
     if api_dir.exists() and _apply_env(api_dir / ".env", caller_env("API", shared=shared, running=running), header=header):
         info("Gateway .env: module switches updated.")
     if backend_dir.exists() and _apply_env(
@@ -531,7 +531,7 @@ def _install_module_deps(module_dir: Path, module: ModuleInfo) -> None:
 def _own_environment() -> dict[str, str]:
     """This environment, less the virtualenv ``dev up`` itself runs in.
 
-    Run as ``uv run llmport``, the CLI's own ``.venv`` is ``VIRTUAL_ENV``.
+    Run as ``uv run faden``, the CLI's own ``.venv`` is ``VIRTUAL_ENV``.
     ``uv sync`` and ``uv run`` ignore it inside a project, but ``uv pip``
     honours it before the project's ``.venv``: PII's spaCy model was
     installed into the CLI, and PII could not load it.
@@ -573,7 +573,7 @@ def _own_process_chain() -> set[int]:
     """This process and every ancestor of it.
 
     The reclaim matches on the workspace path, and so does the command line of
-    whatever launched us -- ``uv run -m llmport`` from a shell inside the
+    whatever launched us -- ``uv run -m faden_cli`` from a shell inside the
     workspace. Without this the reclaim killed its own parent.
     """
     chain: set[int] = set()
@@ -650,7 +650,7 @@ def _stop_workspace_services(workspace: Path) -> list[int]:
     # Spare this command and everything that launched it.
     #
     # Sparing only our own pid was not enough: ``dev up`` runs as
-    # ``uv run -m llmport``, so ``uv.exe`` is our parent and its command line
+    # ``uv run -m faden_cli``, so ``uv.exe`` is our parent and its command line
     # names the workspace just as a service's does. Killing it took the whole
     # terminal down, mid-reclaim, leaving nothing started and no explanation.
     own = _own_process_chain()
@@ -688,13 +688,13 @@ def _stop_workspace_services_posix(workspace: Path) -> list[int]:
 #: How ``dev up`` invokes each service. Matched literally, so an ad-hoc shell
 #: that merely mentions a module name is not mistaken for a running service.
 _SERVICE_INVOCATIONS = (
-    "uv run -m llm_port_backend",
-    "uv run -m llm_port_api",
+    "uv run -m faden_backend",
+    "uv run -m faden_gateway",
     "uv run taskiq worker",
     "npm run dev",
-    "uv run -m llm_port_pii",
-    "uv run -m llm_port_mcp",
-    "uv run -m llm_port_skills",
+    "uv run -m faden_pii",
+    "uv run -m faden_mcp",
+    "uv run -m faden_skills",
 )
 
 
@@ -712,7 +712,7 @@ def _stop_service_hosts(workspace: Path) -> list[int]:
 
     ``_stop_workspace_services`` matches the workspace path in a command
     line. The service processes satisfy that; the shells hosting them do
-    not. A tab runs ``pwsh -NoExit -Command uv run -m llm_port_backend``,
+    not. A tab runs ``pwsh -NoExit -Command uv run -m faden_backend``,
     which names the module and no path at all, so the leaf process was
     killed and its host survived.
 
@@ -971,13 +971,13 @@ def _stop_old_workers() -> None:
     help=(
         "Optional modules to run beside the backend, comma-separated "
         "(pii, mcp, skills), or 'none'. Default: the ones switched on with "
-        "`llmport module enable`."
+        "`faden module enable`."
     ),
 )
 @click.option(
     "--local-node",
     is_flag=True,
-    help="Provision llm_port_node_agent locally or over SSH before launching dev services.",
+    help="Provision faden_agent locally or over SSH before launching dev services.",
 )
 @click.option(
     "--local-node-host",
@@ -992,7 +992,7 @@ def _stop_old_workers() -> None:
 @click.option(
     "--local-node-branch",
     default="",
-    help="Git branch for llm-port-node-agent (default: config dev.branch).",
+    help="Git branch for faden-node-agent (default: config dev.branch).",
 )
 @click.option(
     "--local-node-backend-url",
@@ -1043,24 +1043,24 @@ def dev_up(
 
     \b
     Services started:
-      • Backend   → uv run -m llm_port_backend  (http://localhost:8000)
-      • Gateway   → uv run -m llm_port_api      (http://localhost:8001, /v1 edge)
+      • Backend   → uv run -m faden_backend  (http://localhost:8000)
+      • Gateway   → uv run -m faden_gateway      (http://localhost:8001, /v1 edge)
       • Worker    → uv run taskiq worker …       (task processing)
       • Frontend  → npm run dev                  (http://localhost:5173)
 
-    With --modules (or modules switched on with `llmport module enable`):
-      • PII       → uv run -m llm_port_pii       (http://127.0.0.1:8003)
-      • MCP       → uv run -m llm_port_mcp       (http://127.0.0.1:8007)
-      • Skills    → uv run -m llm_port_skills    (http://127.0.0.1:8008)
+    With --modules (or modules switched on with `faden module enable`):
+      • PII       → uv run -m faden_pii       (http://127.0.0.1:8003)
+      • MCP       → uv run -m faden_mcp       (http://127.0.0.1:8007)
+      • Skills    → uv run -m faden_skills    (http://127.0.0.1:8008)
     """
-    from llmport.core.dev_modules import UnknownModuleError, select_modules
+    from faden_cli.core.dev_modules import UnknownModuleError, select_modules
 
     cfg = load_config()
     workspace = _find_workspace()
-    # Monorepo-aware: init clones services into <workspace>/llm-port-core/…
-    backend_dir = find_service_dir(workspace, "llm_port_backend")
-    frontend_dir = find_service_dir(workspace, "llm_port_frontend")
-    api_dir = find_service_dir(workspace, "llm_port_api")
+    # Monorepo-aware: init clones services into <workspace>/fadenstack/…
+    backend_dir = find_service_dir(workspace, "backend")
+    frontend_dir = find_service_dir(workspace, "frontend")
+    api_dir = find_service_dir(workspace, "gateway")
 
     try:
         running_modules = [] if frontend_only else select_modules(modules, cfg.profiles)
@@ -1071,7 +1071,7 @@ def dev_up(
         m for m in running_modules if _module_present(workspace, m)
     ]
 
-    console.print("[bold magenta]llm.port Dev Environment[/bold magenta]\n")
+    console.print("[bold magenta]fadenstack Dev Environment[/bold magenta]\n")
 
     # ── Self-heal the shared (infra) .env ─────────────────────────
     # `dev down` is a full reset and deletes the generated env files.
@@ -1089,9 +1089,9 @@ def dev_up(
 
     # ── Shared infra ──────────────────────────────────────────────
     if not skip_infra and not frontend_only:
-        from llmport.commands.dev.dev_init import _wait_for_postgres
-        from llmport.core.compose import ComposeContext, up as compose_up
-        from llmport.core.registry import INFRA_SERVICES
+        from faden_cli.commands.dev.dev_init import _wait_for_postgres
+        from faden_cli.core.compose import ComposeContext, up as compose_up
+        from faden_cli.core.registry import INFRA_SERVICES
 
         console.print("[cyan]Checking shared infrastructure…[/cyan]")
         compose_file = resolve_shared_compose(workspace)
@@ -1116,20 +1116,20 @@ def dev_up(
     # ── Dependencies ──────────────────────────────────────────────
     if not skip_deps:
         if not frontend_only and backend_dir.exists():
-            from llmport.commands.dev.dev_init import _install_backend_deps
+            from faden_cli.commands.dev.dev_init import _install_backend_deps
             _install_backend_deps(backend_dir)
         if not backend_only and frontend_dir.exists():
-            from llmport.commands.dev.dev_init import _install_frontend_deps
+            from faden_cli.commands.dev.dev_init import _install_frontend_deps
             _install_frontend_deps(frontend_dir)
         if not frontend_only and api_dir.exists():
-            from llmport.commands.dev.dev_init import _install_backend_deps
+            from faden_cli.commands.dev.dev_init import _install_backend_deps
             _install_backend_deps(api_dir)
         for module in running_modules:
             _install_module_deps(find_service_dir(workspace, module.dev_dir), module)
 
     # ── Migrations ────────────────────────────────────────────────
     if not skip_migrations and not frontend_only and backend_dir.exists():
-        from llmport.commands.dev.dev_init import _run_migrations
+        from faden_cli.commands.dev.dev_init import _run_migrations
         _run_migrations(backend_dir)
     if not skip_migrations:
         for module in running_modules:
@@ -1168,7 +1168,7 @@ def dev_up(
             error(f"Backend directory not found: {backend_dir}")
         else:
             console.print("\n[cyan]Launching backend…[/cyan]")
-            if _launch_terminal("Backend", backend_dir, "uv run -m llm_port_backend", headless=headless):
+            if _launch_terminal("Backend", backend_dir, "uv run -m faden_backend", headless=headless):
                 success("Backend server → http://localhost:8000")
                 started.append("Backend")
             else:
@@ -1179,7 +1179,7 @@ def dev_up(
             console.print("[cyan]Launching taskiq worker…[/cyan]")
             if _launch_terminal(
                 "Worker", backend_dir,
-                "uv run taskiq worker llm_port_backend.tkq:broker llm_port_backend.services.llm.tasks llm_port_backend.services.rag_lite.tasks",
+                "uv run taskiq worker faden_backend.tkq:broker faden_backend.services.llm.tasks faden_backend.services.rag_lite.tasks",
                 headless=headless,
             ):
                 success("Taskiq worker started.")
@@ -1192,7 +1192,7 @@ def dev_up(
                 warning(f"API gateway directory not found: {api_dir} — skipping.")
             else:
                 console.print("[cyan]Launching API gateway…[/cyan]")
-                if _launch_terminal("API Gateway", api_dir, "uv run -m llm_port_api", headless=headless):
+                if _launch_terminal("Gateway", api_dir, "uv run -m faden_gateway", headless=headless):
                     success("API gateway → http://localhost:8001")
                     started.append("API gateway")
                 else:
@@ -1212,7 +1212,7 @@ def dev_up(
 
     # ── Optional local-node provisioning (after backend is up) ───
     if local_node:
-        from llmport.core.local_node import (  # noqa: PLC0415
+        from faden_cli.core.local_node import (  # noqa: PLC0415
             create_enrollment_token,
             provision_local_node_agent,
         )
@@ -1223,7 +1223,7 @@ def dev_up(
         # then bootstrap (idempotent — skips if already done) to
         # obtain an API token and create an enrollment token.
         if not enrollment_token.strip():
-            from llmport.core.bootstrap import (  # noqa: PLC0415
+            from faden_cli.core.bootstrap import (  # noqa: PLC0415
                 bootstrap_interactive,
                 wait_for_backend,
             )
@@ -1231,9 +1231,9 @@ def dev_up(
             dev_backend_url = local_node_backend_url.strip() or "http://localhost:8000"
             console.print("  [dim]Waiting for backend to become healthy…[/dim]")
             if wait_for_backend(dev_backend_url, timeout=60):
-                shared_dir = workspace / "llm_port_shared"
+                shared_dir = workspace / "shared"
                 if not shared_dir.is_dir():
-                    shared_dir = workspace / "llm-port-core" / "llm_port_shared"
+                    shared_dir = workspace / "fadenstack" / "shared"
                 creds = bootstrap_interactive(
                     dev_backend_url,
                     shared_dir,
@@ -1286,12 +1286,12 @@ def dev_up(
     # ── Summary ───────────────────────────────────────────────────
     if started:
         console.print("\n[bold green]Dev environment started![/bold green]")
-        from llmport.core.workspace import dev_logs_dir
+        from faden_cli.core.workspace import dev_logs_dir
 
         if headless or platform.system() == "Linux":
             log_dir = dev_logs_dir()
             console.print(f"[dim]Background logs: {log_dir}/ (pids in log filenames)\n[/dim]")
-            console.print("[dim]Stop services: llmport dev down  (--keep-infra to keep containers; --volumes to also wipe dev data)[/dim]")
+            console.print("[dim]Stop services: faden dev down  (--keep-infra to keep containers; --volumes to also wipe dev data)[/dim]")
         else:
             console.print("[dim]Each service runs in its own terminal window.[/dim]")
             console.print("[dim]Close windows or Ctrl+C to stop.[/dim]")

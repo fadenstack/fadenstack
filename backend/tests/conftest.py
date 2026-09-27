@@ -16,12 +16,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.utils import create_database, drop_database
-from llm_port_backend.services.rabbit.dependencies import get_rmq_channel_pool
-from llm_port_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
-from llm_port_backend.settings import settings
-from llm_port_backend.web.application import get_app
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.utils import create_database, drop_database
+from faden_backend.services.rabbit.dependencies import get_rmq_channel_pool
+from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
+from faden_backend.settings import settings
+from faden_backend.web.application import get_app
 
 
 @pytest.fixture(scope="session")
@@ -41,8 +41,8 @@ async def _engine(anyio_backend: Any) -> AsyncGenerator[AsyncEngine]:
 
     :yield: new engine.
     """
-    from llm_port_backend.db.meta import meta
-    from llm_port_backend.db.models import load_all_models
+    from faden_backend.db.meta import meta
+    from faden_backend.db.models import load_all_models
 
     load_all_models()
 

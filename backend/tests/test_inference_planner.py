@@ -8,13 +8,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.planner import (
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.planner import (
     FabricCandidate,
     InferenceEnvironmentPlan,
     MultiNodeFabricPlanner,
@@ -23,7 +23,7 @@ from llm_port_backend.services.inference.planner import (
     compute_fabric_fingerprint,
     score_fabric_candidate,
 )
-from llm_port_backend.services.inference.service import ConflictError
+from faden_backend.services.inference.service import ConflictError
 
 
 def test_fingerprint_deterministic() -> None:

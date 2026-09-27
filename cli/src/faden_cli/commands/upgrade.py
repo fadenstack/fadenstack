@@ -1,20 +1,20 @@
-"""``llmport upgrade`` — upgrade the running llm.port installation.
+"""``faden upgrade`` — upgrade the running fadenstack installation.
 
 Performs a safe in-place upgrade:
   1. Pre-flight checks (Docker, disk)
   2. Auto-backup (unless --no-backup)
   3. Refresh the deployment files and .env (existing values kept)
-  4. Pull this release's images (an install made by ``llmport deploy``
+  4. Pull this release's images (an install made by ``faden deploy``
      from the published images), or rebuild them (a source checkout)
   5. Rolling restart: infra → migrators → app → modules
   6. Health gate: poll backend /api/health
   7. Print summary
 
 Examples:
-    llmport upgrade                  # standard upgrade
-    llmport upgrade --no-backup      # skip pre-upgrade backup
-    llmport upgrade --no-build       # skip image rebuild
-    llmport upgrade --dry-run        # show what would happen
+    faden upgrade                  # standard upgrade
+    faden upgrade --no-backup      # skip pre-upgrade backup
+    faden upgrade --no-build       # skip image rebuild
+    faden upgrade --dry-run        # show what would happen
 """
 
 from __future__ import annotations
@@ -24,10 +24,10 @@ from pathlib import Path
 
 import click
 
-from llmport import __version__
-from llmport.core.backup import create_backup
-from llmport.core.bundle import installed_release, unpack
-from llmport.core.compose import (
+from faden_cli import __version__
+from faden_cli.core.backup import create_backup
+from faden_cli.core.bundle import installed_release, unpack
+from faden_cli.core.compose import (
     ComposeContext,
     build as compose_build,
     build_base_image,
@@ -35,10 +35,10 @@ from llmport.core.compose import (
     pull_base_images,
     up as compose_up,
 )
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.detect import detect_docker
-from llmport.core.env_gen import default_env_vars, read_env_file, write_env_file
-from llmport.core.settings import load_config, save_config
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.detect import detect_docker
+from faden_cli.core.env_gen import default_env_vars, read_env_file, write_env_file
+from faden_cli.core.settings import load_config, save_config
 
 
 @click.command("upgrade")
@@ -81,21 +81,21 @@ def upgrade_cmd(
     dry_run: bool,
     yes: bool,
 ) -> None:
-    """Upgrade the running llm.port installation in place.
+    """Upgrade the running fadenstack installation in place.
 
     Creates a backup, refreshes configuration (preserving secrets),
     rebuilds container images, and performs a rolling restart with
     a health gate. Then fetches the runtime images this release pins, which
     machines download from this server.
     """
-    console.print("\n[bold magenta]llm.port — Upgrade[/bold magenta]\n")
+    console.print("\n[bold magenta]fadenstack — Upgrade[/bold magenta]\n")
 
     cfg = load_config()
 
     if not cfg.install_dir:
         error(
             "No install directory configured.\n"
-            "  Run 'llmport deploy' first, or set install_dir in llmport.yaml."
+            "  Run 'faden deploy' first, or set install_dir in faden.yaml."
         )
         sys.exit(1)
 
@@ -114,13 +114,13 @@ def upgrade_cmd(
         error(
             f"This CLI ({__version__}) is older than the install ({release}).\n"
             "  Its database has already been migrated past this release; going back is a restore:\n"
-            "    llmport restore <install_dir>/backups/<time>\n"
-            "  To upgrade, install the newer CLI first: pip install -U llmport-cli"
+            "    faden restore <install_dir>/backups/<time>\n"
+            "  To upgrade, install the newer CLI first: pip install -U fadenstack"
         )
         sys.exit(1)
 
     # Build compose file list (include GPU overlay if present)
-    from llmport.core.compose import has_nvidia_gpu  # noqa: PLC0415
+    from faden_cli.core.compose import has_nvidia_gpu  # noqa: PLC0415
 
     compose_files: list[Path] = [compose_file]
     gpu_overlay = shared_dir / "docker-compose.gpu.yaml"
@@ -176,7 +176,7 @@ def upgrade_cmd(
 
     # Before the backup and the builds, not after: compose cannot replace a
     # container it did not create, and the restart would stop on it.
-    from llmport.core.compose import foreign_containers  # noqa: PLC0415
+    from faden_cli.core.compose import foreign_containers  # noqa: PLC0415
 
     foreign = foreign_containers(ctx)
     if foreign:
@@ -229,28 +229,28 @@ def upgrade_cmd(
         env_vars.update(read_env_file(env_path))
         write_env_file(env_path, env_vars)
         if release is not None:
-            from llmport.commands.deploy import pin_release  # noqa: PLC0415
+            from faden_cli.commands.deploy import pin_release  # noqa: PLC0415
 
             pin_release(env_path)
         success(".env refreshed (existing settings kept).")
-        # Sized again, as deploy does: what ``llmport tune`` last chose.
-        from llmport.core.tune import tune_env  # noqa: PLC0415
+        # Sized again, as deploy does: what ``faden tune`` last chose.
+        from faden_cli.core.tune import tune_env  # noqa: PLC0415
 
         tune_env(env_path)
         # RabbitMQ makes its users from definitions.json on every start; the
         # services log in with the passwords in .env. Written only by deploy,
         # the file kept an older install's passwords, and after an upgrade
         # the gateway and backend were refused ("invalid credentials").
-        from llmport.commands.deploy import _regenerate_rmq_definitions  # noqa: PLC0415
+        from faden_cli.commands.deploy import _regenerate_rmq_definitions  # noqa: PLC0415
 
         _regenerate_rmq_definitions(shared_dir, read_env_file(env_path), cfg.profiles)
         success("RabbitMQ users written from .env.")
     else:
         warning("No .env file found — skipping env refresh.")
 
-    # The authority machines keep for when HTTPS is switched on (llmport tls):
+    # The authority machines keep for when HTTPS is switched on (faden tls):
     # made while they can still fetch it over plain HTTP.
-    from llmport.core import tls as edge_tls  # noqa: PLC0415
+    from faden_cli.core import tls as edge_tls  # noqa: PLC0415
 
     try:
         ca_public, ca_created = edge_tls.ensure_ca(shared_dir)
@@ -259,7 +259,7 @@ def upgrade_cmd(
     else:
         if ca_created:
             success(f"Certificate authority for the machines made: {ca_public}")
-    from llmport.commands.tls import refresh_edge_info  # noqa: PLC0415
+    from faden_cli.commands.tls import refresh_edge_info  # noqa: PLC0415
 
     refresh_edge_info(shared_dir)
 
@@ -267,7 +267,7 @@ def upgrade_cmd(
     if release is not None:
         step += 1
         console.print(f"\n[bold cyan]Step {step}: Pulling release {__version__}…[/bold cyan]")
-        from llmport.core.compose import pull as compose_pull  # noqa: PLC0415
+        from faden_cli.core.compose import pull as compose_pull  # noqa: PLC0415
 
         rc = compose_pull(ctx)
         if rc != 0:
@@ -301,7 +301,7 @@ def upgrade_cmd(
     console.print(f"\n[bold cyan]Step {step}: Rolling restart…[/bold cyan]")
 
     # Sync postgres password before restarting (same as deploy)
-    from llmport.commands.deploy import _sync_postgres_password  # noqa: PLC0415
+    from faden_cli.commands.deploy import _sync_postgres_password  # noqa: PLC0415
 
     _sync_postgres_password(ctx, env_path)
 
@@ -314,7 +314,7 @@ def upgrade_cmd(
 
     # ClickHouse's diagnostic logs are off from this release; what they hold
     # stays until dropped (41 GB of trace_log filled one install's disk).
-    from llmport.core.clickhouse import drop_stale_logs  # noqa: PLC0415
+    from faden_cli.core.clickhouse import drop_stale_logs  # noqa: PLC0415
 
     try:
         dropped = drop_stale_logs(ctx)
@@ -328,8 +328,8 @@ def upgrade_cmd(
     step += 1
     console.print(f"\n[bold cyan]Step {step}: Health check…[/bold cyan]")
 
-    from llmport.core.bootstrap import wait_for_backend  # noqa: PLC0415
-    from llmport.core.edge import console_url  # noqa: PLC0415
+    from faden_cli.core.bootstrap import wait_for_backend  # noqa: PLC0415
+    from faden_cli.core.edge import console_url  # noqa: PLC0415
 
     backend_url = console_url(shared_dir, read_env_file(env_path) if env_path.exists() else {})
 
@@ -339,7 +339,7 @@ def upgrade_cmd(
     else:
         warning(
             "Backend did not become healthy within 120 s.\n"
-            "  Check logs: llmport logs backend"
+            "  Check logs: faden logs backend"
         )
 
     # ── 7. Runtime images ─────────────────────────────────────
@@ -348,7 +348,7 @@ def upgrade_cmd(
     # matters once a machine starts a cluster.
     step += 1
     console.print(f"\n[bold cyan]Step {step}: Runtime images for machines…[/bold cyan]")
-    from llmport.commands.runtime_images import run_step  # noqa: PLC0415
+    from faden_cli.commands.runtime_images import run_step  # noqa: PLC0415
 
     run_step(cfg, value=runtime_images)
 

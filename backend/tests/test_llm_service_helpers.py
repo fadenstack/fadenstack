@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import uuid
 
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.web.api.node_files import views as node_files_views
+from faden_backend.services.llm.service import LLMService
+from faden_backend.web.api.node_files import views as node_files_views
 
 MODEL_ID = uuid.UUID("11111111-2222-3333-4444-555555555555")
 HF_REPO = "org/mistral-7b-q4"
@@ -34,27 +34,27 @@ def _model(hf_repo_id: str | None = HF_REPO, **overrides: object) -> object:
 
 def test_node_container_name_slugifies() -> None:
     # separators (space) become '-', punctuation is dropped, lower-cased
-    assert LLMService._node_container_name("My Model!") == "llm-port-my-model"
+    assert LLMService._node_container_name("My Model!") == "faden-my-model"
 
 
 def test_node_container_name_strips_underscores_and_slashes() -> None:
-    assert LLMService._node_container_name("my_model/runtime") == "llm-port-my-model-runtime"
+    assert LLMService._node_container_name("my_model/runtime") == "faden-my-model-runtime"
 
 
 def test_node_container_name_keeps_kebab() -> None:
-    assert LLMService._node_container_name("llama-70b-v2") == "llm-port-llama-70b-v2"
+    assert LLMService._node_container_name("llama-70b-v2") == "faden-llama-70b-v2"
 
 
 def test_node_container_name_truncates_to_48() -> None:
     name = LLMService._node_container_name("a" * 200)
-    # "llm-port-" (9) + 48-char slug
+    # "faden-" (9) + 48-char slug
     assert len(name) == 9 + 48
-    assert name.startswith("llm-port-" + "a" * 48)
+    assert name.startswith("faden-" + "a" * 48)
 
 
 def test_node_container_name_empty_falls_back_to_runtime() -> None:
-    assert LLMService._node_container_name("") == "llm-port-runtime"
-    assert LLMService._node_container_name("!!##") == "llm-port-runtime"
+    assert LLMService._node_container_name("") == "faden-runtime"
+    assert LLMService._node_container_name("!!##") == "faden-runtime"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

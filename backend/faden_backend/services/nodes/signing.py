@@ -2,7 +2,7 @@
 
 The key is HMAC-SHA256(credential, "command-signing") -- the credential the
 agent opened the stream with, exactly as the agent derives it
-(``llm_port_node_agent.command_verifier``). Nothing is stored: the credential
+(``faden_agent.command_verifier``). Nothing is stored: the credential
 is on the connection for as long as it lasts, and the backend itself keeps
 only a hash of it.
 

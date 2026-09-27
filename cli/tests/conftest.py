@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from llmport.commands.dev import dev_up
+from faden_cli.commands.dev import dev_up
 
 
 @pytest.fixture(autouse=True)

@@ -15,8 +15,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.web.api.admin.chat import views as chat_admin
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.web.api.admin.chat import views as chat_admin
 
 pytestmark = pytest.mark.anyio()
 

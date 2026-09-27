@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 
 import httpx
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class CompletionClient:
         crypto: Any | None = None,
     ) -> CompletionClient:
         """Find a chat-capable provider with a running runtime."""
-        from llm_port_backend.db.dao.llm_dao import (  # noqa: PLC0415
+        from faden_backend.db.dao.llm_dao import (  # noqa: PLC0415
             ModelDAO,
             ProviderDAO,
             RuntimeDAO,

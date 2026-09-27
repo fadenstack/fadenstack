@@ -8,17 +8,17 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.web.api.admin.dependencies import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.users import User
+from faden_backend.services.docker.client import DockerService
+from faden_backend.web.api.admin.dependencies import (
     audit_action,
     get_docker,
     require_superuser,
 )
-from llm_port_backend.web.api.rbac import require_permission
-from llm_port_backend.web.api.admin.networks.schema import (
+from faden_backend.web.api.rbac import require_permission
+from faden_backend.web.api.admin.networks.schema import (
     CreateNetworkRequest,
     NetworkContainerDTO,
     NetworkDetailDTO,

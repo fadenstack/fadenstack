@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from llm_port_api.services.gateway.mcp_client import MCPClient
+from faden_gateway.services.gateway.mcp_client import MCPClient
 
 SERVICE_TOKEN = "service-token"
 

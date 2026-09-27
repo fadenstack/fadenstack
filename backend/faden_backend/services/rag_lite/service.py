@@ -12,22 +12,22 @@ import time
 import uuid
 from typing import Any
 
-from llm_port_backend.db.dao.rag_lite_dao import (
+from faden_backend.db.dao.rag_lite_dao import (
     RagLiteChunkDAO,
     RagLiteCollectionDAO,
     RagLiteDocumentDAO,
     RagLiteIngestJobDAO,
 )
-from llm_port_backend.db.models.rag_lite import (
+from faden_backend.db.models.rag_lite import (
     MAX_EMBEDDING_DIM,
     RagLiteDocumentStatus,
     RagLiteEventType,
     RagLiteJobStatus,
 )
-from llm_port_backend.services.rag_lite.rerank import RerankClient, fuse
-from llm_port_backend.services.rag_lite.chunker import ChunkerConfig, chunk_text
-from llm_port_backend.services.rag_lite.embedding import EmbeddingClient
-from llm_port_backend.services.rag_lite.file_store import FileStore
+from faden_backend.services.rag_lite.rerank import RerankClient, fuse
+from faden_backend.services.rag_lite.chunker import ChunkerConfig, chunk_text
+from faden_backend.services.rag_lite.embedding import EmbeddingClient
+from faden_backend.services.rag_lite.file_store import FileStore
 
 log = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class RagLiteService:
 
             # 2. Extract text
             if processor is None:
-                from llm_port_backend.services.docling.processor import (  # noqa: PLC0415
+                from faden_backend.services.docling.processor import (  # noqa: PLC0415
                     DocumentProcessor,
                 )
 
@@ -168,7 +168,7 @@ class RagLiteService:
             # 3. Chunk
             # The sizes as set now (the worker reads the settings per job),
             # not as they were when this process started.
-            from llm_port_backend.settings import settings  # noqa: PLC0415
+            from faden_backend.settings import settings  # noqa: PLC0415
 
             chunker_config = ChunkerConfig(
                 max_tokens=settings.rag_lite_chunk_max_tokens,

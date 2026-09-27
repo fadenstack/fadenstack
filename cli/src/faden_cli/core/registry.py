@@ -1,4 +1,4 @@
-"""Central registry — single source of truth for llm.port metadata.
+"""Central registry — single source of truth for fadenstack metadata.
 
 Every component (repos, ports, modules, services, databases, dev env vars)
 is defined exactly **once** here.  Consumer modules import from this file
@@ -13,12 +13,12 @@ from pathlib import Path
 
 # ── GitHub organisation ───────────────────────────────────────────
 
-GITHUB_ORG = "llm-port"
-CORE_REPO = "llm-port-core"
+GITHUB_ORG = "fadenstack"
+CORE_REPO = "fadenstack"
 
 # ── Container registry ───────────────────────────────────────────
 
-DEFAULT_REGISTRY = "ghcr.io/llm-port"
+DEFAULT_REGISTRY = "ghcr.io/fadenstack"
 
 
 # ── Repository definitions ───────────────────────────────────────
@@ -26,23 +26,23 @@ DEFAULT_REGISTRY = "ghcr.io/llm-port"
 
 @dataclass(frozen=True)
 class RepoInfo:
-    """Metadata for a single llm.port repository."""
+    """Metadata for a single fadenstack repository."""
 
-    github_name: str  # e.g. "llm-port-backend"
-    local_dir: str  # e.g. "llm_port_backend"
+    github_name: str  # e.g. "faden-backend"
+    local_dir: str  # e.g. "faden_backend"
     description: str = ""
 
 
 REPOS: list[RepoInfo] = [
     # ── Core platform ─────────────────────────────────────────
-    RepoInfo("llm-port-backend", "llm_port_backend", "Backend API server"),
-    RepoInfo("llm-port-frontend", "llm_port_frontend", "React frontend"),
-    RepoInfo("llm-port-api", "llm_port_api", "LLM Gateway API"),
-    RepoInfo("llm-port-pii", "llm_port_pii", "PII redaction service"),
-    RepoInfo("llm-port-mcp", "llm_port_mcp", "MCP Tool Registry"),
-    RepoInfo("llm-port-skills", "llm_port_skills", "Skills Registry"),
-    RepoInfo("llm-port-shared", "llm_port_shared", "Shared infra (compose)"),
-    RepoInfo("llm-port-cli", "llm_port_cli", "CLI"),
+    RepoInfo("faden-backend", "backend", "Backend API server"),
+    RepoInfo("faden-frontend", "frontend", "React frontend"),
+    RepoInfo("faden-gateway", "gateway", "LLM Gateway API"),
+    RepoInfo("faden-pii", "pii", "PII redaction service"),
+    RepoInfo("faden-mcp", "mcp", "MCP Tool Registry"),
+    RepoInfo("faden-skills", "skills", "Skills Registry"),
+    RepoInfo("faden-shared", "shared", "Shared infra (compose)"),
+    RepoInfo("faden-cli", "cli", "CLI"),
 ]
 
 REPO_DIR_MAP: dict[str, str] = {r.github_name: r.local_dir for r in REPOS}
@@ -66,7 +66,7 @@ class ModuleInfo:
     port: int = 0
     service_url: str = ""
     env_vars: tuple[tuple[str, str], ...] = ()
-    # ── How ``llmport dev up`` runs it: on the host, like the backend ──
+    # ── How ``faden dev up`` runs it: on the host, like the backend ──
     #: The service directory it runs from; empty for a module dev mode
     #: does not run.
     dev_dir: str = ""
@@ -75,7 +75,7 @@ class ModuleInfo:
     #: The Redis database number it uses, when it uses Redis.
     redis_base: int | None = None
     #: The token the gateway and backend present to it, in dev. The shared
-    #: ``.env`` overrides it (``LLM_PORT_<NAME>_SERVICE_TOKEN``).
+    #: ``.env`` overrides it (``FADEN_<NAME>_SERVICE_TOKEN``).
     dev_service_token: str = ""
     #: What the backend's URL for it adds to the service root.
     backend_url_suffix: str = ""
@@ -96,17 +96,17 @@ MODULES: dict[str, ModuleInfo] = {
         name="pii",
         profile="pii",
         description="PII detection and redaction (Presidio + spaCy)",
-        container="llm-port-pii",
+        container="faden-pii",
         port=8003,
-        service_url="http://llm-port-pii:8000",
+        service_url="http://faden-pii:8000",
         env_vars=(
-            ("LLM_PORT_API_PII_ENABLED", "true"),
-            ("LLM_PORT_API_PII_SERVICE_URL", "http://llm-port-pii:8000"),
+            ("FADEN_GATEWAY_PII_ENABLED", "true"),
+            ("FADEN_GATEWAY_PII_SERVICE_URL", "http://faden-pii:8000"),
             # The compose file defaults it to false, which the console's
             # module switch then cannot see past.
-            ("LLM_PORT_BACKEND_PII_ENABLED", "true"),
+            ("FADEN_BACKEND_PII_ENABLED", "true"),
         ),
-        dev_dir="llm_port_pii",
+        dev_dir="pii",
         backend_url_suffix="/api",
         # The spaCy model Presidio loads. Not a PyPI package, so the lock
         # file cannot carry it; the image installs the same wheel.
@@ -120,31 +120,31 @@ MODULES: dict[str, ModuleInfo] = {
         name="mcp",
         profile="mcp",
         description="MCP Tool Registry (governed MCP server broker)",
-        container="llm-port-mcp",
+        container="faden-mcp",
         port=8007,
-        service_url="http://llm-port-mcp:8000",
+        service_url="http://faden-mcp:8000",
         env_vars=(
-            ("LLM_PORT_API_MCP_ENABLED", "true"),
-            ("LLM_PORT_API_MCP_SERVICE_URL", "http://llm-port-mcp:8000"),
-            ("LLM_PORT_BACKEND_MCP_ENABLED", "true"),
-            ("LLM_PORT_BACKEND_MCP_SERVICE_URL", "http://llm-port-mcp:8000"),
+            ("FADEN_GATEWAY_MCP_ENABLED", "true"),
+            ("FADEN_GATEWAY_MCP_SERVICE_URL", "http://faden-mcp:8000"),
+            ("FADEN_BACKEND_MCP_ENABLED", "true"),
+            ("FADEN_BACKEND_MCP_SERVICE_URL", "http://faden-mcp:8000"),
         ),
-        dev_dir="llm_port_mcp",
-        database="llm_mcp",
+        dev_dir="mcp",
+        database="faden_mcp",
         redis_base=3,
         dev_service_token="dev-mcp-service-token",
         # Fixed, like every other dev secret: it encrypts the MCP servers'
-        # credentials in llm_mcp, which outlive a regenerated .env.
+        # credentials in faden_mcp, which outlive a regenerated .env.
         dev_settings=(("ENCRYPTION_KEY", "dev-mcp-encryption-key-change-me-32b"),),
         dev_links=(("PII_SERVICE_URL", "pii"),),
         # Its own key in an install: the compose file falls back to the dev
         # key above, the same for every install that has none.
         secret_groups=(
-            ("LLM_PORT_MCP_ENCRYPTION_KEY",),
+            ("FADEN_MCP_ENCRYPTION_KEY",),
             (
-                "LLM_PORT_API_MCP_SERVICE_TOKEN",
-                "LLM_PORT_BACKEND_MCP_SERVICE_TOKEN",
-                "LLM_PORT_MCP_SERVICE_TOKEN",
+                "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
+                "FADEN_BACKEND_MCP_SERVICE_TOKEN",
+                "FADEN_MCP_SERVICE_TOKEN",
             ),
         ),
     ),
@@ -152,24 +152,24 @@ MODULES: dict[str, ModuleInfo] = {
         name="skills",
         profile="skills",
         description="Skills Registry (centralized LLM instruction sets)",
-        container="llm-port-skills",
+        container="faden-skills",
         port=8008,
-        service_url="http://llm-port-skills:8000",
+        service_url="http://faden-skills:8000",
         env_vars=(
-            ("LLM_PORT_API_SKILLS_ENABLED", "true"),
-            ("LLM_PORT_API_SKILLS_SERVICE_URL", "http://llm-port-skills:8000"),
-            ("LLM_PORT_BACKEND_SKILLS_ENABLED", "true"),
-            ("LLM_PORT_BACKEND_SKILLS_SERVICE_URL", "http://llm-port-skills:8000"),
+            ("FADEN_GATEWAY_SKILLS_ENABLED", "true"),
+            ("FADEN_GATEWAY_SKILLS_SERVICE_URL", "http://faden-skills:8000"),
+            ("FADEN_BACKEND_SKILLS_ENABLED", "true"),
+            ("FADEN_BACKEND_SKILLS_SERVICE_URL", "http://faden-skills:8000"),
         ),
-        dev_dir="llm_port_skills",
-        database="llm_skills",
+        dev_dir="skills",
+        database="faden_skills",
         redis_base=4,
         dev_service_token="dev-skills-service-token",
         secret_groups=(
             (
-                "LLM_PORT_API_SKILLS_SERVICE_TOKEN",
-                "LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN",
-                "LLM_PORT_SKILLS_SERVICE_TOKEN",
+                "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
+                "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
+                "FADEN_SKILLS_SERVICE_TOKEN",
             ),
         ),
     ),
@@ -199,7 +199,7 @@ KNOWN_PORTS: list[tuple[int, str]] = [
     # Application services
     (8000, "Backend"),
     (5173, "Frontend (dev)"),
-    (8001, "API Gateway"),
+    (8001, "Gateway"),
     (8003, "PII Service"),
     (8007, "MCP Tool Registry"),
     (8008, "Skills Registry"),
@@ -214,15 +214,15 @@ KNOWN_PORTS: list[tuple[int, str]] = [
 # ── Database registry ────────────────────────────────────────────
 
 DATABASES: list[str] = [
-    "llm_port_backend",
-    "llm_api",
+    "faden_backend",
+    "faden_gateway",
     "pii",
-    "llm_mcp",
-    "llm_skills",
+    "faden_mcp",
+    "faden_skills",
     "langfuse",
 ]
 
-POSTGRES_CONTAINER = "llm-port-postgres"
+POSTGRES_CONTAINER = "faden-postgres"
 
 # Services that use pre-built public images and should be started in dev mode.
 # Application services (backend, frontend, api) are run natively on the host.
@@ -233,7 +233,7 @@ INFRA_SERVICES: list[str] = [
     "clickhouse",
     "langfuse-worker",
     "langfuse-web",
-    "llm-port-rmq",
+    "faden-rmq",
     "loki",
     "grafana",
     "alloy",
@@ -245,41 +245,41 @@ INFRA_SERVICES: list[str] = [
 BACKEND_DEV_ENV: dict[str, str] = {
     # Bind the dev backend to all interfaces so it is reachable from
     # other machines on the LAN (remote dev server, node agents,
-    # external API clients). Override with LLM_PORT_BACKEND_HOST=
+    # external API clients). Override with FADEN_BACKEND_HOST=
     # 127.0.0.1 in the local .env to keep it local-only.
-    "LLM_PORT_BACKEND_HOST": "0.0.0.0",
-    "LLM_PORT_BACKEND_PORT": "8000",
+    "FADEN_BACKEND_HOST": "0.0.0.0",
+    "FADEN_BACKEND_PORT": "8000",
     # Session cookies must not carry the Secure flag in dev: browsers
     # drop Secure cookies over plain HTTP, which would silently break
     # login on a remote LAN access (HTTP, no TLS). Prod keeps the
     # default (True) behind TLS/nginx.
-    "LLM_PORT_BACKEND_COOKIE_SECURE": "false",
-    "LLM_PORT_BACKEND_ENVIRONMENT": "dev",
+    "FADEN_BACKEND_COOKIE_SECURE": "false",
+    "FADEN_BACKEND_ENVIRONMENT": "dev",
     # The dev API gateway runs on the host's port 8001.
-    "LLM_PORT_BACKEND_GATEWAY_URL": "http://127.0.0.1:8001",
-    "LLM_PORT_BACKEND_RELOAD": "true",
+    "FADEN_BACKEND_GATEWAY_URL": "http://127.0.0.1:8001",
+    "FADEN_BACKEND_RELOAD": "true",
     # 127.0.0.1, never "localhost": see INFRA_LOOPBACK.
-    "LLM_PORT_BACKEND_DB_HOST": "127.0.0.1",
-    "LLM_PORT_BACKEND_DB_PORT": "5432",
-    "LLM_PORT_BACKEND_DB_USER": "llm_port_backend",
-    "LLM_PORT_BACKEND_DB_PASS": "llm_port_backend",
-    "LLM_PORT_BACKEND_DB_BASE": "llm_port_backend",
-    "LLM_PORT_BACKEND_RABBIT_HOST": "127.0.0.1",
-    "LLM_PORT_BACKEND_RABBIT_PORT": "5672",
+    "FADEN_BACKEND_DB_HOST": "127.0.0.1",
+    "FADEN_BACKEND_DB_PORT": "5432",
+    "FADEN_BACKEND_DB_USER": "faden_backend",
+    "FADEN_BACKEND_DB_PASS": "faden_backend",
+    "FADEN_BACKEND_DB_BASE": "faden_backend",
+    "FADEN_BACKEND_RABBIT_HOST": "127.0.0.1",
+    "FADEN_BACKEND_RABBIT_PORT": "5672",
     # Matches the per-service AMQP user created in
-    # llm_port_shared/rabbitmq/definitions.json by `llmport dev init`
+    # shared/rabbitmq/definitions.json by `faden dev init`
     # (see backend_dev_env_for for the password).
-    "LLM_PORT_BACKEND_RABBIT_USER": "llmport-backend",
-    "LLM_PORT_BACKEND_RABBIT_PASS": "devpassword",
-    "LLM_PORT_BACKEND_RABBIT_VHOST": "/",
-    "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
+    "FADEN_BACKEND_RABBIT_USER": "faden-backend",
+    "FADEN_BACKEND_RABBIT_PASS": "devpassword",
+    "FADEN_BACKEND_RABBIT_VHOST": "/",
+    "FADEN_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
 }
 
 
 #: The address the host-run dev services reach the shared infra on.
 #:
 #: Postgres, Redis and RabbitMQ are published on 127.0.0.1 only
-#: (``llm_port_shared/docker-compose.yaml``). "localhost" resolves to ::1
+#: (``shared/docker-compose.yaml``). "localhost" resolves to ::1
 #: first on Windows, where nothing listens -- and with WSL mirrored
 #: networking the SYN to ::1 is not refused but dropped, so every new
 #: connection waited out Windows' 21 s connect retry before falling back to
@@ -290,33 +290,33 @@ INFRA_LOOPBACK = "127.0.0.1"
 
 #: The keys that carry that address, in the backend and gateway env files.
 INFRA_HOST_KEYS: tuple[str, ...] = (
-    "LLM_PORT_BACKEND_DB_HOST",
-    "LLM_PORT_BACKEND_RABBIT_HOST",
-    "LLM_PORT_API_DB_HOST",
-    "LLM_PORT_API_REDIS_HOST",
-    "LLM_PORT_API_RABBIT_HOST",
+    "FADEN_BACKEND_DB_HOST",
+    "FADEN_BACKEND_RABBIT_HOST",
+    "FADEN_GATEWAY_DB_HOST",
+    "FADEN_GATEWAY_REDIS_HOST",
+    "FADEN_GATEWAY_RABBIT_HOST",
 )
 
 
-#: Default env for the API gateway dev process (``llmport dev up``).
+#: Default env for the API gateway dev process (``faden dev up``).
 #:
 #: The gateway is the OpenAI-compatible ``/v1`` edge. In dev it runs as a
 #: host process on port 8001 (bound to all interfaces, mirroring the
 #: backend) and points at the shared 127.0.0.1-published infra (postgres
 #: / redis / rabbit). Chat-file uploads go to a host-local directory
-#: instead of the containerized ``/data/llm-port`` volume.
+#: instead of the containerized ``/data/fadenstack`` volume.
 GATEWAY_DEV_ENV: dict[str, str] = {
-    "LLM_PORT_API_HOST": "0.0.0.0",
-    "LLM_PORT_API_PORT": "8001",
+    "FADEN_GATEWAY_HOST": "0.0.0.0",
+    "FADEN_GATEWAY_PORT": "8001",
     # 127.0.0.1, never "localhost": see INFRA_LOOPBACK.
-    "LLM_PORT_API_DB_HOST": "127.0.0.1",
-    "LLM_PORT_API_DB_PORT": "5432",
-    "LLM_PORT_API_REDIS_HOST": "127.0.0.1",
-    "LLM_PORT_API_REDIS_PORT": "6379",
-    "LLM_PORT_API_RABBIT_HOST": "127.0.0.1",
-    "LLM_PORT_API_RABBIT_PORT": "5672",
-    "LLM_PORT_API_RAG_LITE_BACKEND_URL": "http://127.0.0.1:8000",
-    "LLM_PORT_API_CHAT_FILE_STORE_ROOT": "~/.llmport-dev/chat-files",
+    "FADEN_GATEWAY_DB_HOST": "127.0.0.1",
+    "FADEN_GATEWAY_DB_PORT": "5432",
+    "FADEN_GATEWAY_REDIS_HOST": "127.0.0.1",
+    "FADEN_GATEWAY_REDIS_PORT": "6379",
+    "FADEN_GATEWAY_RABBIT_HOST": "127.0.0.1",
+    "FADEN_GATEWAY_RABBIT_PORT": "5672",
+    "FADEN_GATEWAY_RAG_LITE_BACKEND_URL": "http://127.0.0.1:8000",
+    "FADEN_GATEWAY_CHAT_FILE_STORE_ROOT": "~/.faden-dev/chat-files",
 }
 
 # ── Dev process patterns (for status checks) ─────────────────────
@@ -324,7 +324,7 @@ GATEWAY_DEV_ENV: dict[str, str] = {
 
 @dataclass(frozen=True)
 class DevProcess:
-    """A dev-mode process pattern for ``llmport dev status``."""
+    """A dev-mode process pattern for ``faden dev status``."""
 
     name: str
     pattern: str
@@ -332,18 +332,18 @@ class DevProcess:
 
 
 DEV_PROCESSES: list[DevProcess] = [
-    DevProcess("Backend", "llm_port_backend", "http://localhost:8000"),
+    DevProcess("Backend", "faden_backend", "http://localhost:8000"),
     DevProcess("Worker", "taskiq worker", "—"),
     DevProcess("Frontend", "npm run dev", "http://localhost:5173"),
-    DevProcess("API gateway", "llm_port_api", "http://localhost:8001"),
-    # Optional modules (``llmport dev up --modules``).
-    DevProcess("PII", "llm_port_pii", "http://127.0.0.1:8003"),
-    DevProcess("MCP", "llm_port_mcp", "http://127.0.0.1:8007"),
-    DevProcess("Skills", "llm_port_skills", "http://127.0.0.1:8008"),
+    DevProcess("API gateway", "faden_gateway", "http://localhost:8001"),
+    # Optional modules (``faden dev up --modules``).
+    DevProcess("PII", "faden_pii", "http://127.0.0.1:8003"),
+    DevProcess("MCP", "faden_mcp", "http://127.0.0.1:8007"),
+    DevProcess("Skills", "faden_skills", "http://127.0.0.1:8008"),
 ]
 
 
-# ── Dev endpoint summary (for ``llmport dev up``) ────────────────
+# ── Dev endpoint summary (for ``faden dev up``) ────────────────
 
 DEV_ENDPOINTS: list[tuple[str, str]] = [
     ("Backend", "http://localhost:8000"),
@@ -370,7 +370,7 @@ DEV_MODULE_ENDPOINTS: dict[str, str] = {
 
 
 def repo_clone_url(repo: str, *, method: str = "https", token: str = "") -> str:
-    """Return the git clone URL for a repo in the llm-port org.
+    """Return the git clone URL for a repo in the fadenstack org.
 
     When *token* is provided and *method* is ``"https"``, the token is
     embedded in the URL so that ``git clone`` can access private repos.
@@ -403,7 +403,7 @@ def module_env_vars(profile: str) -> dict[str, str]:
     return dict(mod.env_vars)
 
 
-# ── Extension API (used by llmport-ee to layer on EE data) ────────
+# ── Extension API (used by faden-ee to layer on EE data) ────────
 
 
 def _rebuild_derived() -> None:
@@ -491,9 +491,9 @@ def backend_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     """Build the backend dev ``.env`` with correct RabbitMQ credentials.
 
     The broker users are loaded from
-    ``llm_port_shared/rabbitmq/definitions.json``, which dev init regenerates
+    ``shared/rabbitmq/definitions.json``, which dev init regenerates
     from the shared ``.env`` passwords. The backend must therefore log in as
-    ``llmport-backend`` with ``RABBITMQ_BACKEND_PASS`` — ``BACKEND_DEV_ENV``'s
+    ``faden-backend`` with ``RABBITMQ_BACKEND_PASS`` — ``BACKEND_DEV_ENV``'s
     historical ``guest/guest`` default does not exist once definitions are
     loaded (RabbitMQ reports ``ACCESS_REFUSED``).
     """
@@ -501,14 +501,14 @@ def backend_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     shared = _read_env_values(shared_env_path)
     backend_pass = shared.get("RABBITMQ_BACKEND_PASS")
     if backend_pass:
-        env["LLM_PORT_BACKEND_RABBIT_USER"] = "llmport-backend"
-        env["LLM_PORT_BACKEND_RABBIT_PASS"] = backend_pass
+        env["FADEN_BACKEND_RABBIT_USER"] = "faden-backend"
+        env["FADEN_BACKEND_RABBIT_PASS"] = backend_pass
         return env
     # Shared env predates per-service users — the only account guaranteed to
     # exist on the broker is the one the shared env configures for it.
     if shared.get("RABBITMQ_ADMIN_USER") and shared.get("RABBITMQ_ADMIN_PASS"):
-        env["LLM_PORT_BACKEND_RABBIT_USER"] = shared["RABBITMQ_ADMIN_USER"]
-        env["LLM_PORT_BACKEND_RABBIT_PASS"] = shared["RABBITMQ_ADMIN_PASS"]
+        env["FADEN_BACKEND_RABBIT_USER"] = shared["RABBITMQ_ADMIN_USER"]
+        env["FADEN_BACKEND_RABBIT_PASS"] = shared["RABBITMQ_ADMIN_PASS"]
     return env
 
 
@@ -517,8 +517,8 @@ def gateway_dev_env_for(shared_env_path: Path) -> dict[str, str]:
 
     Mirrors :func:`backend_dev_env_for`: DB credentials come from
     ``POSTGRES_USER`` / ``POSTGRES_PASSWORD`` in
-    ``llm_port_shared/.env``, the RabbitMQ broker login from
-    ``RABBITMQ_API_PASS`` as user ``llmport-api`` (the per-service user
+    ``shared/.env``, the RabbitMQ broker login from
+    ``RABBITMQ_API_PASS`` as user ``faden-gateway`` (the per-service user
     that ``definitions.json`` creates; ``RABBITMQ_API_USER`` overrides
     the name, and the admin pair is used only for pre-per-service-user
     envs that have no ``RABBITMQ_API_PASS``), and the Redis password
@@ -532,22 +532,22 @@ def gateway_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     if not shared:
         return env
     if shared.get("POSTGRES_USER"):
-        env["LLM_PORT_API_DB_USER"] = shared["POSTGRES_USER"]
+        env["FADEN_GATEWAY_DB_USER"] = shared["POSTGRES_USER"]
     if shared.get("POSTGRES_PASSWORD"):
-        env["LLM_PORT_API_DB_PASS"] = shared["POSTGRES_PASSWORD"]
+        env["FADEN_GATEWAY_DB_PASS"] = shared["POSTGRES_PASSWORD"]
     api_pass = shared.get("RABBITMQ_API_PASS")
     if api_pass:
         # Env generation never writes RABBITMQ_API_USER — the per-service
         # user name is fixed by the definitions.json generator, so key off
         # the password and default the name (as backend_dev_env_for does).
-        env["LLM_PORT_API_RABBIT_USER"] = shared.get("RABBITMQ_API_USER", "llmport-api")
-        env["LLM_PORT_API_RABBIT_PASS"] = api_pass
+        env["FADEN_GATEWAY_RABBIT_USER"] = shared.get("RABBITMQ_API_USER", "faden-gateway")
+        env["FADEN_GATEWAY_RABBIT_PASS"] = api_pass
     elif shared.get("RABBITMQ_ADMIN_USER") and shared.get("RABBITMQ_ADMIN_PASS"):
-        env["LLM_PORT_API_RABBIT_USER"] = shared["RABBITMQ_ADMIN_USER"]
-        env["LLM_PORT_API_RABBIT_PASS"] = shared["RABBITMQ_ADMIN_PASS"]
+        env["FADEN_GATEWAY_RABBIT_USER"] = shared["RABBITMQ_ADMIN_USER"]
+        env["FADEN_GATEWAY_RABBIT_PASS"] = shared["RABBITMQ_ADMIN_PASS"]
     redis_pass = shared.get("REDIS_AUTH") or shared.get("REDIS_PASSWORD")
     if redis_pass:
-        env["LLM_PORT_API_REDIS_PASS"] = redis_pass
+        env["FADEN_GATEWAY_REDIS_PASS"] = redis_pass
     return env
 
 
@@ -555,7 +555,7 @@ def extend_backend_dev_env(extra: dict[str, str]) -> None:
     """Merge extra env vars into ``BACKEND_DEV_ENV`` (idempotent).
 
     Existing keys are **not** overwritten.  This allows the EE CLI
-    overlay to inject ``LLM_PORT_EE_*`` variables that will be written
+    overlay to inject ``FADEN_EE_*`` variables that will be written
     to the backend ``.env`` file by ``dev init`` and ``dev up``.
     """
     for key, value in extra.items():

@@ -27,8 +27,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from llm_port_backend.services.inference.bundles import compute_rootfs_digest
-from llm_port_backend.settings import TEMP_DIR, settings
+from faden_backend.services.inference.bundles import compute_rootfs_digest
+from faden_backend.settings import TEMP_DIR, settings
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class ImageMismatch(Exception):
 def cache_dir() -> Path:
     """Where exported images live."""
     configured = getattr(settings, "image_cache_dir", "") or ""
-    return Path(configured) if configured else TEMP_DIR / "llmport-image-cache"
+    return Path(configured) if configured else TEMP_DIR / "faden-image-cache"
 
 
 def _key(image_id: str) -> str:
@@ -94,7 +94,7 @@ def verify_expected(
         f"This server holds a different build of the runtime image "
         f"(id {local_id or 'unknown'}) than the node was asked to run "
         f"(id {expect_id or 'unset'}). Rebuild the image, or import the pinned "
-        f"build, on the LLM.Port server -- retrying will not change this."
+        f"build, on the Fadenstack server -- retrying will not change this."
     )
 
 

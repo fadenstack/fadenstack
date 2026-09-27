@@ -1,6 +1,6 @@
-"""TLS helpers for llm_port_api."""
+"""TLS helpers for faden_gateway."""
 
-from llm_port_api.services.tls.connection_ssl import (
+from faden_gateway.services.tls.connection_ssl import (
     SSLMode,
     build_asyncpg_ssl,
     build_httpx_verify,

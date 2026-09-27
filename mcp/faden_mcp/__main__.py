@@ -4,7 +4,7 @@ from pathlib import Path
 
 import uvicorn
 
-from llm_port_mcp.settings import settings
+from faden_mcp.settings import settings
 
 
 def set_multiproc_dir() -> None:
@@ -27,7 +27,7 @@ def main() -> None:
     """Entrypoint of the application."""
     set_multiproc_dir()
     uvicorn.run(
-        "llm_port_mcp.web.application:get_app",
+        "faden_mcp.web.application:get_app",
         workers=settings.workers_count,
         host=settings.host,
         port=settings.port,

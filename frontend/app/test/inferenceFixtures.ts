@@ -210,7 +210,7 @@ export const deployment: InferenceDeployment = {
   name: "qwen-serve",
   description: null,
   spec: {
-    api_version: "inference.llmport.ai/v1alpha1",
+    api_version: "inference.fadenstack.com/v1alpha1",
     engine: { name: "vllm", config: {} },
     scale: { replicas: 2 },
   },
@@ -259,7 +259,7 @@ export const artifactsPartial: ArtifactReadiness = {
   pending_node_ids: [],
   failed_node_ids: [WORKER_NODE_ID],
   blockers: ["gpu-01: snapshot incomplete, retrying in 300s"],
-  root_paths: { [HEAD_NODE_ID]: "/var/lib/llm-port/models/qwen" },
+  root_paths: { [HEAD_NODE_ID]: "/var/lib/fadenstack/models/qwen" },
   all_ready: false,
 };
 
@@ -272,8 +272,8 @@ export const artifactsReady: ArtifactReadiness = {
   failed_node_ids: [],
   blockers: [],
   root_paths: {
-    [HEAD_NODE_ID]: "/var/lib/llm-port/models/qwen",
-    [WORKER_NODE_ID]: "/var/lib/llm-port/models/qwen",
+    [HEAD_NODE_ID]: "/var/lib/fadenstack/models/qwen",
+    [WORKER_NODE_ID]: "/var/lib/fadenstack/models/qwen",
   },
   all_ready: true,
 };
@@ -300,7 +300,7 @@ export const deploymentMetricsPartial: DeploymentMetrics = {
     last_request_at: "2026-09-22T05:50:22Z",
   },
   deployment_id: DEPLOYMENT_ID,
-  app_name: "llm-port-qwen-serve",
+  app_name: "faden-qwen-serve",
   app_status: "RUNNING",
   replicas_ready: 1,
   replicas_total: 2,

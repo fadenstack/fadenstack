@@ -8,18 +8,18 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.container_registry_dao import ContainerRegistryDAO
-from llm_port_backend.db.dao.root_session_dao import RootSessionDAO
-from llm_port_backend.db.models.containers import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
+from faden_backend.db.dao.root_session_dao import RootSessionDAO
+from faden_backend.db.models.containers import (
     AuditResult,
     ContainerClass,
     ContainerPolicy,
     ContainerRegistry,
 )
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.policy.enforcement import PolicyEnforcer
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.policy.enforcement import PolicyEnforcer
 
 
 def get_docker(request: Request) -> DockerService:

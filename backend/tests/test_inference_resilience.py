@@ -16,14 +16,14 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import DeploymentDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import DeploymentDAO
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceDeployment,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import NodeCommandType
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import NodeCommandType
 from tests.test_inference_ray import (  # noqa: F401 - fixtures are used by name
     _deployment_spec,
     _FakeNodeControl,
@@ -93,7 +93,7 @@ class _Scripted(_FakeNodeControl):
 @pytest.fixture()
 def quick(monkeypatch: pytest.MonkeyPatch) -> None:
     """No waiting between looks: the order of events is what is under test."""
-    from llm_port_backend.services.inference.drivers.ray import environment
+    from faden_backend.services.inference.drivers.ray import environment
 
     monkeypatch.setattr(environment, "_CONFIRM_AFTER_SEC", 0)
     monkeypatch.setattr(environment, "_RECOVERY_BACKOFF_SEC", 0)
@@ -138,7 +138,7 @@ async def test_the_start_sequence_marks_the_cluster_as_up(
     probe_env, dbsession: AsyncSession, quick: None,
 ) -> None:
     """Once started, later passes are health checks rather than another start."""
-    from llm_port_backend.services.inference.service import _queue_for_reconcile
+    from faden_backend.services.inference.service import _queue_for_reconcile
 
     _cp, env, _nodes = probe_env
     fake = _Scripted({STATUS: [_probe(HEAD_IP, WORKER_IP)]})
@@ -246,7 +246,7 @@ async def test_a_lost_worker_is_rejoined_and_the_head_left_alone(
 async def test_recovery_gives_up_after_three_attempts_and_says_what_it_tried(
     probe_env, dbsession: AsyncSession, quick: None,
 ) -> None:
-    from llm_port_backend.services.inference.service import EnvironmentService
+    from faden_backend.services.inference.service import EnvironmentService
 
     _cp, env, nodes = probe_env
     _up(env)
@@ -281,8 +281,8 @@ async def test_recovery_gives_up_after_three_attempts_and_says_what_it_tried(
 async def test_a_cluster_given_up_on_is_still_looked_at_now_and_then(
     probe_env, dbsession: AsyncSession, quick: None, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A partition that heals, a machine repaired: nobody tells LLM.Port."""
-    from llm_port_backend.services.inference.drivers.ray import environment
+    """A partition that heals, a machine repaired: nobody tells Fadenstack."""
+    from faden_backend.services.inference.drivers.ray import environment
 
     _cp, env, _nodes = probe_env
     _up(env)
@@ -349,7 +349,7 @@ async def test_one_machine_dropping_on_its_own_is_not_hidden_for_two_minutes(
     import time
     from datetime import UTC, datetime, timedelta
 
-    from llm_port_backend.services.inference.drivers.ray import environment
+    from faden_backend.services.inference.drivers.ray import environment
 
     _cp, env, nodes = probe_env
     _up(env)
@@ -445,7 +445,7 @@ async def test_a_surviving_copy_keeps_serving_while_a_worker_is_rejoined(
         message="gpu-02 has dropped out of the cluster. Rejoining (attempt 1 of 3).",
         cluster=_probe(HEAD_IP),
     )
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     fake = _Scripted({SERVE: [_serve_status(app)]})
 
     await _deploy(dbsession, dep, fake)
@@ -482,7 +482,7 @@ async def test_a_model_is_reapplied_when_the_cluster_has_a_new_head(
 ) -> None:
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     env = await _cluster(
         dbsession, dep, status=EnvironmentStatus.READY.value, message=None,
         cluster=_probe(HEAD_IP, head_id="head-A"),
@@ -501,7 +501,7 @@ async def test_a_model_is_reapplied_when_the_cluster_has_a_new_head(
     async def progress(session: Any) -> None:
         said.append((dep.phase, dep.phase_message, dep.ready_replicas))
 
-    from llm_port_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
+    from faden_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
 
     monkeypatch.setattr(RayDeploymentManager, "_commit_progress", staticmethod(progress))
     again = _Scripted({RUN: [_run_serve_result(app)], SERVE: [_serve_status(app)]})
@@ -521,7 +521,7 @@ async def test_the_head_is_recorded_for_a_model_applied_before_it_was_kept(
 ) -> None:
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     await _cluster(
         dbsession, dep, status=EnvironmentStatus.READY.value, message=None,
         cluster=_probe(HEAD_IP, head_id="head-A"),
@@ -548,11 +548,11 @@ async def test_a_look_at_a_serving_model_never_recompiles_it(
     local copy, its hash changed, and the serving model was re-applied --
     both copies restarted.
     """
-    from llm_port_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
+    from faden_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
 
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     await _deploy(dbsession, dep, _Scripted({RUN: [_run_serve_result(app)], SERVE: [_serve_status(app)]}))
     assert dep.observed_status_json["applied_generation"] == dep.generation
 
@@ -572,7 +572,7 @@ async def test_nothing_is_applied_while_a_machine_is_reconnecting(
 ) -> None:
     """The root of the restarts: an offline member reads as not having the
     model, and the config compiled to the remote source."""
-    from llm_port_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
+    from faden_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
 
     _fast_readiness(monkeypatch)
     dep, node = deployment_env
@@ -596,7 +596,7 @@ async def test_a_look_nobody_answered_leaves_a_serving_model_as_it_was(
 ) -> None:
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     await _deploy(dbsession, dep, _Scripted({RUN: [_run_serve_result(app)], SERVE: [_serve_status(app)]}))
 
     fake = _Scripted({SERVE: [None]})
@@ -614,7 +614,7 @@ async def test_a_cluster_with_no_serve_at_all_gets_the_model_applied(
     """What a freshly started head answers: absent, not unobserved."""
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     await _deploy(dbsession, dep, _Scripted({RUN: [_run_serve_result(app)], SERVE: [_serve_status(app)]}))
     assert dep.phase == "running"
 
@@ -655,8 +655,8 @@ async def _deployment_on(dbsession: AsyncSession, env: InferenceEnvironment, **f
 async def test_a_cluster_going_down_or_coming_back_queues_its_models(
     probe_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.services.inference import reconciliation
-    from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+    from faden_backend.services.inference import reconciliation
+    from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
 
     _cp, env, _nodes = probe_env
     env.status = EnvironmentStatus.READY.value
@@ -681,7 +681,7 @@ async def test_a_cluster_going_down_or_coming_back_queues_its_models(
 
 
 async def test_health_checks_queue_what_is_up_and_nothing_else(dbsession: AsyncSession) -> None:
-    from llm_port_backend.web.lifespan import _queue_health_checks
+    from faden_backend.web.lifespan import _queue_health_checks
 
     ready = await _seed_environment(dbsession, generation=2, observed_generation=2)
     failed = await _seed_environment(
@@ -704,7 +704,7 @@ async def test_health_checks_queue_what_is_up_and_nothing_else(dbsession: AsyncS
 
 
 def test_health_checks_come_round_at_their_interval(monkeypatch: pytest.MonkeyPatch) -> None:
-    from llm_port_backend.web import lifespan
+    from faden_backend.web import lifespan
 
     now = [1000.0]
     monkeypatch.setattr(lifespan.time, "monotonic", lambda: now[0])
@@ -723,7 +723,7 @@ def test_health_checks_come_round_at_their_interval(monkeypatch: pytest.MonkeyPa
 
 
 def test_the_reason_serve_is_missing_survives_parsing() -> None:
-    from llm_port_backend.services.inference.drivers.ray.client import _parse_serve_status
+    from faden_backend.services.inference.drivers.ray.client import _parse_serve_status
 
     helper_shape = {"available": False, "applications": {}, "error": "There is no Serve instance running."}
     assert _parse_serve_status(helper_shape).detail == "There is no Serve instance running."

@@ -14,20 +14,20 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
-from llm_port_backend.services.inference.planner import MultiNodeFabricPlanner
+from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+from faden_backend.services.inference.planner import MultiNodeFabricPlanner
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
 

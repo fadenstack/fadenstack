@@ -23,8 +23,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from llm_port_node_agent.ray import models
-from llm_port_node_agent.ray.core import RayCoreClient
+from faden_agent.ray import models
+from faden_agent.ray.core import RayCoreClient
 
 log = logging.getLogger(__name__)
 

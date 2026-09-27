@@ -37,7 +37,7 @@ from urllib.parse import urlsplit
 
 log = logging.getLogger(__name__)
 
-#: On a machine LLM.Port runs or manages.
+#: On a machine Fadenstack runs or manages.
 MACHINES = "machines"
 #: Self-hosted on the organisation's own network.
 PRIVATE = "private"

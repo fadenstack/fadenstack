@@ -15,9 +15,9 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.node_files import views
-from llm_port_backend.web.api.node_files.views import agent_log_sink
+from faden_backend.settings import settings
+from faden_backend.web.api.node_files import views
+from faden_backend.web.api.node_files.views import agent_log_sink
 
 
 @pytest.mark.parametrize(
@@ -27,7 +27,7 @@ from llm_port_backend.web.api.node_files.views import agent_log_sink
         ("http://127.0.0.1:3100", "10.250.10.220", "http://10.250.10.220:3100"),
         ("http://localhost:3100", "10.250.10.220", "http://10.250.10.220:3100"),
         # The deployment: a compose service name only the backend can resolve.
-        ("http://llm-port-loki:3100", "llmport.example.com", "http://llmport.example.com:3100"),
+        ("http://faden-loki:3100", "faden.example.com", "http://faden.example.com:3100"),
         # A Loki the machines can already reach is passed on as it is.
         ("https://loki.corp.example:3100/", "10.0.0.5", "https://loki.corp.example:3100"),
         ("http://10.0.0.9:3100", "10.0.0.5", "http://10.0.0.9:3100"),
@@ -84,7 +84,7 @@ async def test_an_agent_that_asks_is_sent_to_the_backend_itself(
 ) -> None:
     """Pushed straight to Loki, logs were plain HTTP to a Loki with no authentication -- and failed
     wherever Loki was published on the server's loopback only (the release VM: every 5 s)."""
-    monkeypatch.setattr(settings, "loki_base_url", "http://llm-port-loki:3100")
+    monkeypatch.setattr(settings, "loki_base_url", "http://faden-loki:3100")
     monkeypatch.setattr(settings, "agent_loki_url", "")
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(id="n1")
     try:
@@ -108,7 +108,7 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
         forwarded.append(request)
         return httpx.Response(204)
 
-    monkeypatch.setattr(settings, "loki_base_url", "http://llm-port-loki:3100")
+    monkeypatch.setattr(settings, "loki_base_url", "http://faden-loki:3100")
     monkeypatch.setattr(views, "_loki_http", httpx.AsyncClient(transport=httpx.MockTransport(loki)))
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(
         id="n1", host="10.250.10.49", agent_id="gpu-02",
@@ -121,7 +121,7 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
         fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
         monkeypatch.setattr(views, "_loki_http", None)
     assert response.status_code == 204
-    assert str(forwarded[0].url) == "http://llm-port-loki:3100/loki/api/v1/push"
+    assert str(forwarded[0].url) == "http://faden-loki:3100/loki/api/v1/push"
     import json
 
     sent = json.loads(forwarded[0].content)

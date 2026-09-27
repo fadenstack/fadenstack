@@ -32,7 +32,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 

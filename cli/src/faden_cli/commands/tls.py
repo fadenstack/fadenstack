@@ -1,7 +1,7 @@
-"""``llmport tls`` — serve the console, the API and /v1 over HTTPS, or stop.
+"""``faden tls`` — serve the console, the API and /v1 over HTTPS, or stop.
 
 nginx picks HTTPS or plain HTTP when it starts, from what ``<install>/tls``
-holds (llm_port_shared/nginx/select-config.sh), so every change here ends with
+holds (shared/nginx/select-config.sh), so every change here ends with
 a restart of the proxy -- the only container it touches -- or, when HTTPS stays
 on and only the certificate is new, a reload that keeps open connections.
 """
@@ -18,23 +18,23 @@ from urllib.parse import urlsplit
 
 import click
 
-from llmport.core import tls
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.edge import console_url, url_for
-from llmport.core.env_gen import read_env_file
-from llmport.core.settings import load_config
+from faden_cli.core import tls
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.edge import console_url, url_for
+from faden_cli.core.env_gen import read_env_file
+from faden_cli.core.settings import load_config
 
 PROXY_SERVICE = "nginx"
 #: A connected agent asks for the authority every minute (agent's TRUST_REFRESH_SEC).
 MACHINE_TRUST_WAIT_SEC = 70
-PROXY_CONTAINER = "llm-port-nginx"
-RELOAD_COMMAND = "sh /etc/nginx/llmport/select-config.sh && nginx -s reload"
+PROXY_CONTAINER = "faden-nginx"
+RELOAD_COMMAND = "sh /etc/nginx/faden/select-config.sh && nginx -s reload"
 
 
 def _install_dir() -> Path:
     cfg = load_config()
     if not cfg.install_dir:
-        error("No install found. Run llmport deploy first.")
+        error("No install found. Run faden deploy first.")
         sys.exit(1)
     return Path(cfg.install_dir)
 
@@ -81,8 +81,8 @@ def apply_to_proxy(install_dir: Path, *, recreate: bool = False, reload: bool = 
     timed out, a minute later. Switching between HTTP and HTTPS restarts, so
     every open plain-HTTP connection meets the redirect at once.
     """
-    from llmport.core.bootstrap import wait_for_backend  # noqa: PLC0415
-    from llmport.core.compose import build_context_from_config, restart, up  # noqa: PLC0415
+    from faden_cli.core.bootstrap import wait_for_backend  # noqa: PLC0415
+    from faden_cli.core.compose import build_context_from_config, restart, up  # noqa: PLC0415
 
     if not _proxy_running():
         info("The proxy is not running; it serves this the next time the install starts.")
@@ -95,13 +95,13 @@ def apply_to_proxy(install_dir: Path, *, recreate: bool = False, reload: bool = 
     else:
         rc = restart(ctx, services=[PROXY_SERVICE])
     if rc != 0:
-        error(f"Restarting the proxy failed (exit code {rc}); see: llmport logs {PROXY_SERVICE}")
+        error(f"Restarting the proxy failed (exit code {rc}); see: faden logs {PROXY_SERVICE}")
         return False
     url = console_url(install_dir, read_env_file(install_dir / ".env"))
     if wait_for_backend(url, timeout=90):
         success(f"The console answers at {url}")
         return True
-    error(f"The console does not answer at {url}; see: llmport logs {PROXY_SERVICE}")
+    error(f"The console does not answer at {url}; see: faden logs {PROXY_SERVICE}")
     return False
 
 
@@ -126,7 +126,7 @@ def print_summary(summary: tls.CertSummary) -> None:
 def reachable_example(urls: list[str]) -> str:
     """The address to show other machines: an IP or a dotted name before a bare host name.
 
-    A bare name ("llm-port") resolves on the server itself, rarely anywhere else.
+    A bare name ("fadenstack") resolves on the server itself, rarely anywhere else.
     """
     for url in urls:
         host = urlsplit(url).hostname or ""
@@ -146,7 +146,7 @@ def print_trust_hints(install_dir: Path, ca_public: Path) -> None:
         f"  API clients: curl --cacert ca.crt {example}/v1/models  ·  Python: SSL_CERT_FILE=ca.crt\n"
         "  Machines with agent 0.1.14 or later learnt it from this server and follow it to HTTPS\n"
         "  by themselves. Older agents stay on plain HTTP, which now only redirects: point each at\n"
-        f"  {example} and give it the file (llmport-agent configure --set BACKEND_URL=...\n"
+        f"  {example} and give it the file (faden-agent configure --set BACKEND_URL=...\n"
         '  --set TLS_CA_BUNDLE=...; docs/installing.md, "Enabling HTTPS").[/dim]'
     )
 
@@ -163,7 +163,7 @@ TLS_MODES = ("off", "generate", "own")
 
 def _free_port(label: str, port: int, *, yes: bool, current: tuple[int, int], other: int) -> int:
     """*port*, or another one the operator picks when something else holds it."""
-    from llmport.commands.ports import port_conflicts  # noqa: PLC0415
+    from faden_cli.commands.ports import port_conflicts  # noqa: PLC0415
 
     while True:
         pair = (port, other) if label == "HTTP" else (other, port)
@@ -178,8 +178,8 @@ def _free_port(label: str, port: int, *, yes: bool, current: tuple[int, int], ot
 
 
 def _ports_step(env_path: Path, *, yes: bool, http_port: int | None, https_port: int | None) -> None:
-    from llmport.commands.ports import set_ports  # noqa: PLC0415
-    from llmport.core.edge import check_ports, ports  # noqa: PLC0415
+    from faden_cli.commands.ports import set_ports  # noqa: PLC0415
+    from faden_cli.core.edge import check_ports, ports  # noqa: PLC0415
 
     current = ports(read_env_file(env_path))
     http = http_port if http_port is not None else current[0]
@@ -193,7 +193,7 @@ def _ports_step(env_path: Path, *, yes: bool, http_port: int | None, https_port:
     set_ports(env_path, http=http, https=https)
     console.print(
         f"  HTTP on port {http}, HTTPS on port {https} "
-        "[dim](change: --http-port/--https-port, or later llmport ports)[/dim]"
+        "[dim](change: --http-port/--https-port, or later faden ports)[/dim]"
     )
 
 
@@ -203,35 +203,35 @@ def _ask_mode(install_dir: Path, *, yes: bool) -> str | None:
     if present is not None:
         info(
             f"HTTPS is on, with {present.subject} until {present.not_after:%Y-%m-%d}"
-            " (change: llmport tls)."
+            " (change: faden tls)."
         )
         return None
     off_by_choice = tls.chose_off(install_dir)
     if yes:
         if off_by_choice:
             info(
-                "HTTPS is off, as chosen. Switch it on any time: llmport tls generate,"
-                " or llmport tls use CERT KEY.",
+                "HTTPS is off, as chosen. Switch it on any time: faden tls generate,"
+                " or faden tls use CERT KEY.",
             )
             return None
         # HTTPS is the default: without it sign-ins, API keys, prompts and the
         # machines' credentials cross the network in the clear.
-        info("HTTPS by default: a certificate made here (plain HTTP instead: llmport deploy --tls off).")
+        info("HTTPS by default: a certificate made here (plain HTTP instead: faden deploy --tls off).")
         return "generate"
     console.print(
         "  Serve the console, the API and /v1 over HTTPS?\n"
         "    [bold]generate[/bold]  a certificate made here for this machine's names and addresses"
         " (default)\n"
         "    [bold]own[/bold]       your own certificate and key (PEM files)\n"
-        "    [bold]off[/bold]       plain HTTP (switch HTTPS on later with llmport tls)"
+        "    [bold]off[/bold]       plain HTTP (switch HTTPS on later with faden tls)"
     )
     default = "off" if off_by_choice else "generate"
     return click.prompt("  HTTPS", type=click.Choice(TLS_MODES), default=default)
 
 
 def renewal_scheduled() -> bool:
-    """Whether ``llmport tls renew`` runs by itself every day."""
-    from llmport.core import schedule  # noqa: PLC0415
+    """Whether ``faden tls renew`` runs by itself every day."""
+    from faden_cli.core import schedule  # noqa: PLC0415
 
     try:
         return schedule.available() and schedule.job_current(schedule.TLS_UNIT) is not None
@@ -240,30 +240,30 @@ def renewal_scheduled() -> bool:
 
 
 def schedule_renewal(install_dir: Path) -> None:
-    """Have ``llmport tls renew`` run every morning, once HTTPS is on; say how."""
-    from llmport.core import schedule  # noqa: PLC0415
+    """Have ``faden tls renew`` run every morning, once HTTPS is on; say how."""
+    from faden_cli.core import schedule  # noqa: PLC0415
 
     if renewal_scheduled():
         return
     if not schedule.available():
         warning(
             "No systemd user manager or cron here to renew the certificate by itself: "
-            "run llmport tls renew now and then (it only acts when something is due)."
+            "run faden tls renew now and then (it only acts when something is due)."
         )
         return
     try:
         how, notes = schedule.install_job(schedule.tls_renewal(install_dir / "logs" / "tls-renew.log"))
     except (RuntimeError, OSError) as exc:
-        warning(f"Could not schedule the renewal: {exc}. Run llmport tls renew now and then.")
+        warning(f"Could not schedule the renewal: {exc}. Run faden tls renew now and then.")
         return
-    success(f"Kept current by itself: llmport tls renew runs every morning ({how}).")
+    success(f"Kept current by itself: faden tls renew runs every morning ({how}).")
     for note in notes:
         warning(note)
 
 
 def unschedule_renewal() -> None:
     """Stop the daily renewal: with HTTPS off there is nothing to renew."""
-    from llmport.core import schedule  # noqa: PLC0415
+    from faden_cli.core import schedule  # noqa: PLC0415
 
     if schedule.available():
         schedule.remove_job(schedule.TLS_UNIT)
@@ -271,7 +271,7 @@ def unschedule_renewal() -> None:
 
 def refresh_edge_info(install_dir: Path) -> None:
     """Tell the backend this host's addresses and ports (``tls/edge.json``); best effort."""
-    from llmport.core.edge import ports  # noqa: PLC0415
+    from faden_cli.core.edge import ports  # noqa: PLC0415
 
     http_port, https_port = ports(read_env_file(install_dir / ".env"))
     try:
@@ -366,7 +366,7 @@ def deploy_step(
     names: tuple[str, ...],
     ca: Path | None = None,
 ) -> Path | None:
-    """``llmport deploy``'s ports-and-HTTPS step, before anything starts.
+    """``faden deploy``'s ports-and-HTTPS step, before anything starts.
 
     Returns the authority to trust when a certificate was made here. With
     ``--yes`` and no ``--tls``, what the install has stays as it is.
@@ -425,24 +425,24 @@ def tls_group() -> None:
     """HTTPS for the console, the API and the gateway (/v1).
 
     \b
-    llmport tls status                  what is served, until when, and how it is renewed
-    llmport tls generate                a certificate made here for this machine
-    llmport tls use CERT KEY            your own certificate (--chain, --ca for a private issuer)
-    llmport tls renew                   renew what is due (runs every morning by itself)
-    llmport tls off                     back to plain HTTP
-    llmport tls machine-ca              the machine CA behind model traffic TLS (--replace)
+    faden tls status                  what is served, until when, and how it is renewed
+    faden tls generate                a certificate made here for this machine
+    faden tls use CERT KEY            your own certificate (--chain, --ca for a private issuer)
+    faden tls renew                   renew what is due (runs every morning by itself)
+    faden tls off                     back to plain HTTP
+    faden tls machine-ca              the machine CA behind model traffic TLS (--replace)
     """
 
 
 def _renewal_line(install_dir: Path, summary: tls.CertSummary) -> str:
     left = (summary.not_after - datetime.now(UTC)).days
-    auto = "every morning by llmport tls renew" if renewal_scheduled() else "when you run llmport tls renew"
+    auto = "every morning by faden tls renew" if renewal_scheduled() else "when you run faden tls renew"
     if summary.made_here:
         return f"issued again {tls.RENEW_BEFORE_DAYS} days before it runs out, {auto} ({left} days left)"
     origin = tls.source(install_dir)
     if origin is not None:
         return f"taken again from {origin['cert']} when it changes there, {auto} ({left} days left)"
-    return f"by hand: llmport tls use CERT KEY with the renewed files ({left} days left)"
+    return f"by hand: faden tls use CERT KEY with the renewed files ({left} days left)"
 
 
 @tls_group.command("status")
@@ -456,7 +456,7 @@ def status_cmd() -> None:
         sys.exit(1)
     if summary is None:
         console.print("HTTPS is [bold]off[/bold]: the console is served over plain HTTP.")
-        console.print("[dim]  Switch it on: llmport tls generate, or llmport tls use CERT KEY[/dim]")
+        console.print("[dim]  Switch it on: faden tls generate, or faden tls use CERT KEY[/dim]")
     else:
         console.print("HTTPS is [bold green]on[/bold green]; plain HTTP redirects to it.")
         print_summary(summary)
@@ -465,7 +465,7 @@ def status_cmd() -> None:
         if ca_public.is_file():
             console.print(f"  Machines trust: {ca_public}")
         if (summary.not_after - datetime.now(UTC)).days < tls.EXPIRY_WARNING_DAYS:
-            warning(f"The certificate runs out on {summary.not_after:%Y-%m-%d}: llmport tls renew")
+            warning(f"The certificate runs out on {summary.not_after:%Y-%m-%d}: faden tls renew")
     print_addresses(install_dir)
 
 
@@ -528,7 +528,7 @@ def use_cmd(
 ) -> None:
     """Serve your own certificate: CERT and KEY are PEM files (CERT may be a full chain).
 
-    The files are read again from the same place by llmport tls renew when they
+    The files are read again from the same place by faden tls renew when they
     change there, so a certificate renewed in place (certbot, acme.sh, your own
     tooling) is served without anyone running this again.
     """
@@ -610,13 +610,13 @@ def off_cmd(*, no_restart: bool) -> None:
     urls = addresses(install_dir)
     warning(
         "Machines that followed this server to HTTPS stay there: an agent never falls back to plain HTTP "
-        "by itself. Point each back with: llmport-agent configure --set BACKEND_URL="
+        "by itself. Point each back with: faden-agent configure --set BACKEND_URL="
         f"{reachable_example(urls) if urls else 'http://<this server>'}, then restart it."
     )
     env = read_env_file(install_dir / ".env")
-    if (env.get("LLM_PORT_HSTS_MAX_AGE") or "0").strip() not in ("", "0"):
+    if (env.get("FADEN_HSTS_MAX_AGE") or "0").strip() not in ("", "0"):
         warning(
-            "LLM_PORT_HSTS_MAX_AGE is set: browsers that saw it keep insisting on HTTPS until it runs out."
+            "FADEN_HSTS_MAX_AGE is set: browsers that saw it keep insisting on HTTPS until it runs out."
         )
     print_addresses(install_dir)
 
@@ -625,8 +625,8 @@ def off_cmd(*, no_restart: bool) -> None:
 _MACHINE_CA_SCRIPT = """
 import asyncio, json, sys
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from llm_port_backend.settings import settings
-from llm_port_backend.services.machine_tls import store
+from faden_backend.settings import settings
+from faden_backend.services.machine_tls import store
 
 async def main(replace):
     engine = create_async_engine(str(settings.db_url))
@@ -651,12 +651,12 @@ def _machine_ca(replace: bool) -> dict:
         error("docker not found on PATH")
         sys.exit(1)
     proc = subprocess.run(  # noqa: S603
-        [docker, "exec", "-i", "llm-port-backend", "python", "-", "replace" if replace else "status"],
+        [docker, "exec", "-i", "faden-backend", "python", "-", "replace" if replace else "status"],
         input=_MACHINE_CA_SCRIPT, capture_output=True, text=True, check=False,
     )
     line = next((ln for ln in reversed(proc.stdout.strip().splitlines()) if ln.startswith("{")), "")
     if proc.returncode != 0 or not line:
-        error("Could not read the machine CA from the backend -- is llm-port-backend running?")
+        error("Could not read the machine CA from the backend -- is faden-backend running?")
         detail = (proc.stderr or proc.stdout).strip().splitlines()
         if detail:
             error(f"  {detail[-1]}")
@@ -687,7 +687,7 @@ def machine_ca_cmd(*, replace: bool, yes: bool) -> None:
     doc = _machine_ca(replace)
     if not doc.get("enabled"):
         console.print(
-            "Model traffic TLS is [bold]switched off[/bold] (LLM_PORT_BACKEND_MACHINE_TLS_ENABLED=false).",
+            "Model traffic TLS is [bold]switched off[/bold] (FADEN_BACKEND_MACHINE_TLS_ENABLED=false).",
         )
         return
     if replace:

@@ -1,8 +1,8 @@
-"""llmport — CLI installer and management tool for llm.port.
+"""faden — CLI installer and management tool for fadenstack.
 
 Layered command structure built on Click framework.
 Install, configure, and manage the full platform.
-YAML-driven configuration persisted in llmport.yaml.
+YAML-driven configuration persisted in faden.yaml.
 Async HTTP calls to backend REST API via httpx.
 Native Docker Compose integration for orchestration.
 Automatic system detection for OS, GPU, and Docker.
@@ -13,4 +13,4 @@ Module activation via Docker Compose profiles.
 All secrets generated securely during init phase.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

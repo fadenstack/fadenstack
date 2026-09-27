@@ -12,11 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.llm import hf_token
-from llm_port_backend.web.api.llm.schema import HFTokenSetRequest, HFTokenStatusDTO
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
+from faden_backend.services.llm import hf_token
+from faden_backend.web.api.llm.schema import HFTokenSetRequest, HFTokenStatusDTO
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 

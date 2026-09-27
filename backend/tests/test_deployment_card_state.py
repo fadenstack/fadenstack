@@ -24,17 +24,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentPhase,
     InferenceControlPlane,
     InferenceDeployment,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
-from llm_port_backend.services.inference.observability import MetricsPartial
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.drivers.ray.driver import RayDriver
+from faden_backend.services.inference.observability import MetricsPartial
 
 pytestmark = pytest.mark.anyio()
 
@@ -100,7 +100,7 @@ async def _deployment(dbsession, *, phase: str, reconciled: bool = True):
         observed_status_json={
             "observation": {
                 "reconciled": reconciled,
-                "app": "llmport-app",
+                "app": "faden-app",
                 "ready_replicas": 2,
             }
         },
@@ -196,7 +196,7 @@ def test_a_stopped_deployment_reports_no_copies() -> None:
     (ready / wanted) 1 / 1" for a cluster with no Serve application on it,
     which is the one screen an operator checks to confirm a stop worked.
     """
-    from llm_port_backend.services.inference.drivers.ray.deployment import (
+    from faden_backend.services.inference.drivers.ray.deployment import (
         RayDeploymentManager,
     )
 

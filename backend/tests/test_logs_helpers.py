@@ -14,8 +14,8 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import HTTPException
 
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.logs import views as logs_views
+from faden_backend.settings import settings
+from faden_backend.web.api.logs import views as logs_views
 
 ONE_SEC_NS = 1_000_000_000
 

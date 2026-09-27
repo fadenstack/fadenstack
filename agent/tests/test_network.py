@@ -11,7 +11,7 @@ import socket
 
 import pytest
 
-from llm_port_node_agent.network import (
+from faden_agent.network import (
     NetworkInterfaceInfo,
     _detect_rdma_device_for_net_if,
     _parse_proc_net_route,
@@ -349,7 +349,7 @@ def _free_port() -> int:
 async def test_ephemeral_probe_handshake_success() -> None:
     """Test ephemeral active probe listener and connect handshake."""
     import asyncio
-    from llm_port_node_agent.network import run_ephemeral_connect, run_ephemeral_listener
+    from faden_agent.network import run_ephemeral_connect, run_ephemeral_listener
 
     # Pick a dynamic high port
     port = _free_port()
@@ -377,7 +377,7 @@ async def test_ephemeral_probe_handshake_success() -> None:
 async def test_ephemeral_probe_token_mismatch() -> None:
     """Test that mismatched probe token is rejected."""
     import asyncio
-    from llm_port_node_agent.network import run_ephemeral_connect, run_ephemeral_listener
+    from faden_agent.network import run_ephemeral_connect, run_ephemeral_listener
 
     port = _free_port()
     listener_task = asyncio.create_task(
@@ -407,8 +407,8 @@ async def test_validate_fabric_commands_complete_the_challenge() -> None:
     """
     import asyncio
 
-    from llm_port_node_agent.dispatcher import CommandDispatcher
-    from llm_port_node_agent.models import NodeCommandType
+    from faden_agent.dispatcher import CommandDispatcher
+    from faden_agent.models import NodeCommandType
 
     dispatcher = CommandDispatcher.__new__(CommandDispatcher)
     port = _free_port()
@@ -449,7 +449,7 @@ async def test_validate_fabric_commands_complete_the_challenge() -> None:
 @pytest.mark.asyncio
 async def test_validate_fabric_connect_reports_an_unreachable_peer() -> None:
     """A failed challenge is a structured result, not an exception."""
-    from llm_port_node_agent.network import handle_validate_fabric_connect
+    from faden_agent.network import handle_validate_fabric_connect
 
     result = await handle_validate_fabric_connect(
         {"target_ip": "127.0.0.1", "target_port": 45461, "timeout_sec": 0.5}
@@ -461,7 +461,7 @@ async def test_validate_fabric_connect_reports_an_unreachable_peer() -> None:
 @pytest.mark.asyncio
 async def test_validate_fabric_listen_rejects_a_bad_payload() -> None:
     """A malformed probe request fails cleanly instead of binding something odd."""
-    from llm_port_node_agent.network import handle_validate_fabric_listen
+    from faden_agent.network import handle_validate_fabric_listen
 
     assert (await handle_validate_fabric_listen({"port": 45470}))["listening"] is False
     bad_port = await handle_validate_fabric_listen({"ip": "127.0.0.1", "port": 0})
@@ -477,7 +477,7 @@ async def test_listener_serves_one_probe_per_peer() -> None:
     """
     import asyncio
 
-    from llm_port_node_agent.network import run_ephemeral_connect, run_ephemeral_listener
+    from faden_agent.network import run_ephemeral_connect, run_ephemeral_listener
 
     port = _free_port()
     token = "multi-peer-token"
@@ -508,7 +508,7 @@ async def test_prober_waits_out_a_listener_that_starts_late() -> None:
     """
     import asyncio
 
-    from llm_port_node_agent.network import (
+    from faden_agent.network import (
         handle_validate_fabric_connect,
         run_ephemeral_listener,
     )
@@ -544,7 +544,7 @@ async def test_prober_does_not_retry_a_definitive_rejection() -> None:
     """A rejected token is an answer, not a race; it must not burn the window."""
     import asyncio
 
-    from llm_port_node_agent.network import (
+    from faden_agent.network import (
         handle_validate_fabric_connect,
         run_ephemeral_listener,
     )

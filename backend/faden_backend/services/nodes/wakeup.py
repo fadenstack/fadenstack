@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 
 #: Postgres channel names are identifiers, so this must stay lowercase and
 #: unquoted-safe.
-CHANNEL = "llmport_node_commands"
+CHANNEL = "faden_node_commands"
 
 #: How long a failed listener waits before dialling again.  Long enough not to
 #: hammer a database that is down, short enough that a restart heals quickly.

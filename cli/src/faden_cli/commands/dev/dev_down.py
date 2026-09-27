@@ -1,6 +1,6 @@
-"""``llmport dev down`` — stop the development environment (full reset).
+"""``faden dev down`` — stop the development environment (full reset).
 
-Counterpart of ``llmport dev up``:
+Counterpart of ``faden dev up``:
 
   1. Stops the dev host processes (backend, taskiq worker, API gateway,
      frontend) launched by ``dev up`` — on Windows/macOS/Linux.
@@ -8,15 +8,15 @@ Counterpart of ``llmport dev up``:
      infrastructure compose file — removes the containers AND every named
      data volume (postgres, redis, minio, clickhouse, langfuse, …).
   3. Deletes the generated secret/env files
-     (``llm_port_shared/.env``, ``llm_port_backend/.env``,
-     ``llm_port_api/.env``) so the next ``dev up`` starts from a clean
+     (``shared/.env``, ``backend/.env``,
+     ``gateway/.env``) so the next ``dev up`` starts from a clean
      slate with freshly generated credentials.
 
 The full reset avoids the failure modes that occur when stale volumes or
 env files from an older commit outlive a code update (alembic revision
 not found, RMQ credential drift, …).
 
-``llmport dev up`` regenerates any deleted env file (fresh dev
+``faden dev up`` regenerates any deleted env file (fresh dev
 credentials + RMQ definitions) before infra starts, so the workspace is
 always restorable with a plain ``dev up``.
 
@@ -34,9 +34,9 @@ from pathlib import Path
 
 import click
 
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.settings import load_config
-from llmport.core.workspace import CORE_DIRNAME, dev_logs_dir, resolve_shared_compose
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.settings import load_config
+from faden_cli.core.workspace import CORE_DIRNAME, dev_logs_dir, resolve_shared_compose
 
 from .dev_group import dev_group
 
@@ -44,30 +44,30 @@ from .dev_group import dev_group
 # patterns matched a live process. Patterns are EREs over the full command
 # line, tuned to the real `ps` output of a live dev stack:
 #
-#   Backend        uv run -m llm_port_backend   → python3 -m llm_port_backend
-#   TaskIQ worker  uv run taskiq worker llm_port_backend.tkq:broker … (+ forkserver)
-#   API gateway    uv run -m llm_port_api       → python3 -m llm_port_api
+#   Backend        uv run -m faden_backend   → python3 -m faden_backend
+#   TaskIQ worker  uv run taskiq worker faden_backend.tkq:broker … (+ forkserver)
+#   API gateway    uv run -m faden_gateway       → python3 -m faden_gateway
 #   Frontend       npm run dev                  → node …/react-router dev
 #
-# The Backend pattern is ``m llm_port_backend`` (the ``-m`` module form),
-# NOT bare ``llm_port_backend``: the worker's cmdline also contains
-# ``llm_port_backend`` (so a bare match would kill the worker too), and
-# ``postgres: … llm_port_backend …`` backend sessions carry the db name in
+# The Backend pattern is ``m faden_backend`` (the ``-m`` module form),
+# NOT bare ``faden_backend``: the worker's cmdline also contains
+# ``faden_backend`` (so a bare match would kill the worker too), and
+# ``postgres: … faden_backend …`` backend sessions carry the db name in
 # their rewritten cmdline — both would be matched by a bare pattern. The
 # ``m …`` form (leading dash dropped so pkill doesn't parse it as its own
-# flag) hits only the real ``-m llm_port_backend`` server.
+# flag) hits only the real ``-m faden_backend`` server.
 _DEV_PROCESS_PATTERNS: list[tuple[str, list[str]]] = [
     # ``taskiq worker`` hits the uv launcher + taskiq main; the broker URI
     # additionally hits the forkserver workers whose argv no longer carries
     # the word "taskiq".
-    ("TaskIQ worker", ["taskiq worker", "llm_port_backend.tkq:broker"]),
-    ("API gateway", ["m llm_port_api"]),
-    ("Backend", ["m llm_port_backend"]),
+    ("TaskIQ worker", ["taskiq worker", "faden_backend.tkq:broker"]),
+    ("API gateway", ["m faden_gateway"]),
+    ("Backend", ["m faden_backend"]),
     ("Frontend", ["npm run dev", "react-router dev"]),
     # Optional modules started by ``dev up --modules``.
-    ("PII", ["m llm_port_pii"]),
-    ("MCP", ["m llm_port_mcp"]),
-    ("Skills", ["m llm_port_skills"]),
+    ("PII", ["m faden_pii"]),
+    ("MCP", ["m faden_mcp"]),
+    ("Skills", ["m faden_skills"]),
 ]
 
 
@@ -117,7 +117,7 @@ def _stop_dev_processes() -> int:
 
 def _find_workspace() -> Path:
     """Resolve the dev workspace (shared with dev up / dev status)."""
-    from llmport.core.workspace import resolve_workspace
+    from faden_cli.core.workspace import resolve_workspace
 
     return resolve_workspace()
 
@@ -135,7 +135,7 @@ def _generated_env_files(workspace: Path) -> list[Path]:
     if compose_file:
         env_files.append(compose_file.parent / ".env")
 
-    for name in ("llm_port_backend", "llm_port_api"):
+    for name in ("faden_backend", "faden_gateway"):
         base = workspace / CORE_DIRNAME
         for candidate in (base / name / ".env", workspace / name / ".env"):
             if candidate not in env_files:
@@ -157,15 +157,15 @@ def dev_down(*, keep_infra: bool, yes: bool) -> None:
     Kills the host processes, then removes the infra containers, the named
     data volumes (postgres, redis, minio, clickhouse, langfuse, …) and the
     generated .env secret files. Everything is regenerated on the next
-    ``llmport dev up``.
+    ``faden dev up``.
 
     \b
     Examples:
-        llmport dev down          # full reset (prompts for confirmation)
-        llmport dev down -y       # full reset, no prompt (scripts)
-        llmport dev down --keep-infra  # stop only the host processes
+        faden dev down          # full reset (prompts for confirmation)
+        faden dev down -y       # full reset, no prompt (scripts)
+        faden dev down --keep-infra  # stop only the host processes
     """
-    console.print("\n[bold magenta]llm.port — Dev Environment Teardown[/bold magenta]\n")
+    console.print("\n[bold magenta]fadenstack — Dev Environment Teardown[/bold magenta]\n")
 
     # ── 1. Stop host processes ───────────────────────────────────
     console.print("[cyan]Stopping dev processes…[/cyan]")
@@ -179,7 +179,7 @@ def dev_down(*, keep_infra: bool, yes: bool) -> None:
     if keep_infra:
         console.print(
             f"\n[dim]Shared infra, volumes and .env files left running. Logs kept: {dev_logs_dir()}\n"
-            "[dim]Restart with: llmport dev up --skip-deps[/dim]\n"
+            "[dim]Restart with: faden dev up --skip-deps[/dim]\n"
         )
         return
 
@@ -202,7 +202,7 @@ def dev_down(*, keep_infra: bool, yes: bool) -> None:
     if not compose_file:
         warning(f"Shared compose file not found in {workspace}. Infra may have been started manually.")
     else:
-        from llmport.core.compose import ComposeContext, down as compose_down
+        from faden_cli.core.compose import ComposeContext, down as compose_down
 
         env_file = compose_file.parent / ".env"
         ctx = ComposeContext(
@@ -233,5 +233,5 @@ def dev_down(*, keep_infra: bool, yes: bool) -> None:
 
     console.print(
         f"\n[dim]Dev state fully reset. Logs kept: {dev_logs_dir()}\n"
-        f"[dim]Start fresh with: llmport dev up[/dim]\n"
+        f"[dim]Start fresh with: faden dev up[/dim]\n"
     )

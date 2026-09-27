@@ -9,18 +9,18 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from llm_port_backend.db.dependencies import commit_before_responding
-from llm_port_backend.log import configure_logging
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.router import api_router
-from llm_port_backend.web.lifespan import lifespan_setup
-from llm_port_backend.web.middleware import SecureCookiesMiddleware
+from faden_backend.db.dependencies import commit_before_responding
+from faden_backend.log import configure_logging
+from faden_backend.settings import settings
+from faden_backend.web.api.router import api_router
+from faden_backend.web.lifespan import lifespan_setup
+from faden_backend.web.middleware import SecureCookiesMiddleware
 
 APP_ROOT = Path(__file__).parent.parent
 
 # ── Optional EE plugin ────────────────────────────────────────────
 try:
-    from llm_port_ee.plugins.backend import backend_plugin  # type: ignore[import-untyped]
+    from faden_ee.plugins.backend import backend_plugin  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover
     backend_plugin = None
 # ──────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ def get_app() -> FastAPI:
             ],
         )
     app = FastAPI(
-        title="llm-port-backend",
+        title="faden-backend",
         lifespan=lifespan_setup,
         docs_url=None,
         redoc_url=None,

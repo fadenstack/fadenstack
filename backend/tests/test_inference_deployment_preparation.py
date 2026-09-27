@@ -9,8 +9,8 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EnvironmentStatus,
@@ -21,15 +21,15 @@ from llm_port_backend.db.models.inference import (
     ModelAvailability,
     ModelAvailabilityStatus,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
-from llm_port_backend.services.inference.drivers.ray.client import RayCommandError
+from faden_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
+from faden_backend.services.inference.drivers.ray.client import RayCommandError
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
 
@@ -77,7 +77,7 @@ class _FakeNodeControlService:
 
 def _spec() -> dict[str, Any]:
     return {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": {}},
         "scale": {"replicas": 1},
         "resources": {"replica": {"gpus": 1.0}},
@@ -191,7 +191,7 @@ async def test_deployment_phase_progression_pending_preparing_applying_running(
         model_id=model.id,
         node_id=node.id,
         status=ModelAvailabilityStatus.READY,
-        root_path="/srv/llm-port/models/models--org--test-model/snapshots/commit123",
+        root_path="/srv/faden/models/models--org--test-model/snapshots/commit123",
         revision="commit123",
         manifest_sha256="sha256:abc",
         size_bytes=1000,
@@ -204,11 +204,11 @@ async def test_deployment_phase_progression_pending_preparing_applying_running(
 
     monkeypatch.setattr(manager, "_probe_serve", _mock_probe_empty)
     monkeypatch.setattr(
-        "llm_port_backend.services.inference.drivers.ray.deployment._READINESS_PASS_BUDGET_SEC",
+        "faden_backend.services.inference.drivers.ray.deployment._READINESS_PASS_BUDGET_SEC",
         0.05,
     )
     monkeypatch.setattr(
-        "llm_port_backend.services.inference.drivers.ray.deployment._READINESS_POLL_SEC",
+        "faden_backend.services.inference.drivers.ray.deployment._READINESS_POLL_SEC",
         0.01,
     )
 
@@ -225,20 +225,20 @@ async def test_deployment_phase_progression_pending_preparing_applying_running(
     run_serve_cmds = [c for c in fake_control.issued if c["command_type"] == NodeCommandType.RUN_SERVE_APP.value]
     assert len(run_serve_cmds) == 2
     llm_args = run_serve_cmds[-1]["payload"]["llm_serving_args"]
-    # Host /srv/llm-port/models maps to container /models
+    # Host /srv/faden/models maps to container /models
     assert (
         llm_args["llm_configs"][0]["model_loading_config"]["model_source"]
         == "/models/models--org--test-model/snapshots/commit123"
     )
 
     # Pass 3: Serve status probe returns RUNNING with ready replica -> transitions to RUNNING
-    app_name = f"llmport-{dep.id}"
+    app_name = f"faden-{dep.id}"
 
     class _MockServeResponse:
         alive = True
 
     async def _mock_probe_running(*args: Any, **kwargs: Any) -> Any:
-        from llm_port_backend.services.inference.drivers.ray.client import _parse_serve_status
+        from faden_backend.services.inference.drivers.ray.client import _parse_serve_status
         data = _make_serve_status(app_name, status="RUNNING", ready=1)
         return _parse_serve_status(data)
 
@@ -354,7 +354,7 @@ async def test_a_copy_that_failed_a_while_ago_is_tried_again(
     """
     from datetime import UTC, datetime, timedelta
 
-    from llm_port_backend.services.inference import artifacts as artifacts_mod
+    from faden_backend.services.inference import artifacts as artifacts_mod
 
     monkeypatch.setattr(artifacts_mod, "build_model_sync_payload",
                         lambda model, source: {"model_id": str(model.id), "files": [{"path": "config.json"}]})
@@ -417,8 +417,8 @@ async def test_a_copy_that_just_failed_fails_the_deployment_for_now_and_is_revis
     again. For a copy that can simply be retried that meant waiting for
     someone to press "check now"; it stays in the queue instead.
     """
-    from llm_port_backend.db.dao.inference_dao import DeploymentDAO
-    from llm_port_backend.services.inference import artifacts as artifacts_mod
+    from faden_backend.db.dao.inference_dao import DeploymentDAO
+    from faden_backend.services.inference import artifacts as artifacts_mod
 
     monkeypatch.setattr(artifacts_mod, "build_model_sync_payload",
                         lambda model, source: {"model_id": str(model.id), "files": [{"path": "config.json"}]})
@@ -475,7 +475,7 @@ async def test_a_model_the_server_is_downloading_is_waited_for(
     is air-gapped and the model was still on its way to the server. It waits
     for the download instead, says so, and hands nothing to Ray.
     """
-    from llm_port_backend.db.models.llm import DownloadJob, DownloadJobStatus
+    from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus
 
     cp = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:8]}", driver="ray")
     dbsession.add(cp)
@@ -519,7 +519,7 @@ async def test_a_model_the_server_is_downloading_is_waited_for(
     await RayDeploymentManager().reconcile_deployment(dbsession, dep, node_control=fake_control)
 
     assert dep.phase == DeploymentPhase.PREPARING.value
-    assert "Downloading Qwen/Qwen3-0.6B to the LLM.Port server (40%)" in (dep.phase_message or "")
+    assert "Downloading Qwen/Qwen3-0.6B to the Fadenstack server (40%)" in (dep.phase_message or "")
     assert (dep.observed_status_json or {})["observation"]["reason"] == "model_downloading_to_server"
     assert not any(
         c["command_type"] == NodeCommandType.RUN_SERVE_APP.value for c in fake_control.issued
@@ -538,8 +538,8 @@ async def test_a_model_the_server_lacks_is_fetched_here(
     appropriate cached snapshot folder": the runtime is air-gapped, and the
     machines cannot fetch a model themselves.
     """
-    from llm_port_backend.db.models.llm import DownloadJob
-    from llm_port_backend.services.llm import tasks as llm_tasks
+    from faden_backend.db.models.llm import DownloadJob
+    from faden_backend.services.llm import tasks as llm_tasks
 
     cp = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:8]}", driver="ray")
     dbsession.add(cp)
@@ -581,7 +581,7 @@ async def test_a_model_the_server_lacks_is_fetched_here(
 
     assert [s["hf_repo_id"] for s in started] == [model.hf_repo_id], "the server downloads it"
     assert dep.phase == DeploymentPhase.PREPARING.value, dep.phase_message
-    assert f"Downloading {model.hf_repo_id} to the LLM.Port server" in (dep.phase_message or "")
+    assert f"Downloading {model.hf_repo_id} to the Fadenstack server" in (dep.phase_message or "")
     assert (await dbsession.get(DownloadJob, uuid.UUID(started[0]["job_id"]))) is not None
     assert not any(c["command_type"] == NodeCommandType.RUN_SERVE_APP.value for c in fake_control.issued), (
         "nothing is handed to Ray until the model can be copied to the machines")
@@ -697,7 +697,7 @@ async def test_deployment_offline_only_blocks_on_unmapped_mount(
     dbsession.add(model)
     await dbsession.flush()
 
-    # Seed availability with path not under /srv/llm-port/models
+    # Seed availability with path not under /srv/faden/models
     dao = ModelAvailabilityDAO(dbsession)
     await dao.mark(
         model_id=model.id,

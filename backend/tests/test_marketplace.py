@@ -17,9 +17,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.marketplace import facts, fit, hub, recipes, settings
-from llm_port_backend.services.marketplace.hardware import gpus_from_utilization
-from llm_port_backend.services.marketplace.host import HostError, HostRequest, build_spec
+from faden_backend.services.marketplace import facts, fit, hub, recipes, settings
+from faden_backend.services.marketplace.hardware import gpus_from_utilization
+from faden_backend.services.marketplace.host import HostError, HostRequest, build_spec
 
 GB10_MIB = 124_610
 GIB = 1024**3
@@ -206,7 +206,7 @@ def _request(**over: Any) -> HostRequest:
 
 @pytest.mark.parametrize("gpus, extra", [(1, {}), (2, {"topology": {"tensor_parallel_size": 2}}), (0.3, {})])
 def test_host_specs_compile_for_ray(gpus: float, extra: dict[str, Any]) -> None:
-    from llm_port_backend.services.inference.drivers.ray.compiler import compile_deployment
+    from faden_backend.services.inference.drivers.ray.compiler import compile_deployment
 
     spec = build_spec(_request(gpus_per_copy=gpus, engine_config={"gpu_memory_utilization": 0.5,
                                                                    "tensor_parallel_size": 8}))
@@ -240,7 +240,7 @@ def test_a_shared_card_stays_capped_after_the_spec_is_edited(edited: dict[str, A
     from the deployment page or the API that clears or raises the share is
     capped all the same, so the copy cannot crowd the others on its card.
     """
-    from llm_port_backend.services.inference.drivers.ray.compiler import compile_deployment
+    from faden_backend.services.inference.drivers.ray.compiler import compile_deployment
 
     spec = build_spec(_request(gpus_per_copy=0.25, engine_config={}))
     spec["engine"]["config"] = dict(edited)
@@ -301,7 +301,7 @@ def fake_hub(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 def authed(fastapi_app: FastAPI) -> FastAPI:
     from unittest.mock import MagicMock
 
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
@@ -310,11 +310,11 @@ def authed(fastapi_app: FastAPI) -> FastAPI:
 
 
 async def _dgx_cluster(dbsession: AsyncSession) -> str:
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.db.models.inference import (
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.models.inference import (
         InferenceControlPlane, InferenceEnvironment, InferenceEnvironmentNode,
     )
-    from llm_port_backend.db.models.node_control import InfraNode
+    from faden_backend.db.models.node_control import InfraNode
 
     plane = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:6]}", driver="ray", status="pending", config_json={})
     dbsession.add(plane)
@@ -365,8 +365,8 @@ async def test_a_catalogue_entry_is_not_a_copy_on_this_server(
     The wizard read the entry as "this server already keeps this model", and
     the deployment failed on the machines for want of the files.
     """
-    from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-    from llm_port_backend.settings import settings as app_settings
+    from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+    from faden_backend.settings import settings as app_settings
 
     monkeypatch.setattr(app_settings, "model_store_root", str(tmp_path))
     dbsession.add(LLMModel(display_name="Qwen3-8B", source=ModelSource.HUGGINGFACE,
@@ -404,16 +404,16 @@ async def test_offline_is_an_answer_not_an_error(authed: FastAPI, client: AsyncC
 async def test_hosting_keeps_the_model_and_creates_the_deployment(
     authed: FastAPI, client: AsyncClient, dbsession: AsyncSession, fake_hub: dict[str, Any],
 ) -> None:
-    from llm_port_backend.db.models.inference import InferenceDeployment
-    from llm_port_backend.db.models.llm import LLMModel
-    from llm_port_backend.web.api.llm.dependencies import get_llm_service
+    from faden_backend.db.models.inference import InferenceDeployment
+    from faden_backend.db.models.llm import LLMModel
+    from faden_backend.web.api.llm.dependencies import get_llm_service
 
     env_id = await _dgx_cluster(dbsession)
     started: list[str] = []
 
     class _Llm:
         async def start_download(self, model_dao: Any, job_dao: Any, *, hf_repo_id: str, **kw: Any) -> Any:
-            from llm_port_backend.db.models.llm import ModelSource, ModelStatus
+            from faden_backend.db.models.llm import ModelSource, ModelStatus
 
             started.append(hf_repo_id)
             model = await model_dao.create(display_name=kw.get("display_name") or hf_repo_id,

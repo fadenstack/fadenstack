@@ -1,4 +1,4 @@
-# llm_port_api
+# faden_gateway
 
 OpenAI-compatible LLM gateway service.
 
@@ -13,68 +13,68 @@ Internal template/debug endpoints remain under `/api/*`.
 ## Quick Start
 ```bash
 poetry install
-poetry run python -m llm_port_api
+poetry run python -m faden_gateway
 ```
 
 Swagger UI:
 - `/api/docs`
 
 ## Docker Compose (Shared Stack)
-From `llm_port_shared/`:
+From `shared/`:
 ```bash
 # Normal containerized run
-docker compose up -d llm-port-api
+docker compose up -d faden-gateway
 
 # Dev mode with bind mount + reload (no image rebuild per code change)
-docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d llm-port-api
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d faden-gateway
 ```
 
 ## Environment Variables
 Core variables:
-- `LLM_PORT_API_HOST`
-- `LLM_PORT_API_PORT`
-- `LLM_PORT_API_RELOAD`
-- `LLM_PORT_API_ENVIRONMENT`
+- `FADEN_GATEWAY_HOST`
+- `FADEN_GATEWAY_PORT`
+- `FADEN_GATEWAY_RELOAD`
+- `FADEN_GATEWAY_ENVIRONMENT`
 
 Database:
-- `LLM_PORT_API_DB_HOST`
-- `LLM_PORT_API_DB_PORT`
-- `LLM_PORT_API_DB_USER`
-- `LLM_PORT_API_DB_PASS`
-- `LLM_PORT_API_DB_BASE` (default `llm_api`)
-- `LLM_PORT_API_DB_ECHO`
+- `FADEN_GATEWAY_DB_HOST`
+- `FADEN_GATEWAY_DB_PORT`
+- `FADEN_GATEWAY_DB_USER`
+- `FADEN_GATEWAY_DB_PASS`
+- `FADEN_GATEWAY_DB_BASE` (default `faden_gateway`)
+- `FADEN_GATEWAY_DB_ECHO`
 
 JWT:
-- `LLM_PORT_API_JWT_SECRET`
-- `LLM_PORT_API_JWT_ALGORITHM` (default `HS256`)
+- `FADEN_GATEWAY_JWT_SECRET`
+- `FADEN_GATEWAY_JWT_ALGORITHM` (default `HS256`)
 
 Gateway behavior:
-- `LLM_PORT_API_HTTP_TIMEOUT_SEC`
-- `LLM_PORT_API_LEASE_TTL_SEC`
-- `LLM_PORT_API_RETRY_PRE_FIRST_TOKEN`
-- `LLM_PORT_API_REQUEST_MAX_BODY_BYTES`
-- `LLM_PORT_API_STREAM_IDLE_TIMEOUT_SEC`
+- `FADEN_GATEWAY_HTTP_TIMEOUT_SEC`
+- `FADEN_GATEWAY_LEASE_TTL_SEC`
+- `FADEN_GATEWAY_RETRY_PRE_FIRST_TOKEN`
+- `FADEN_GATEWAY_REQUEST_MAX_BODY_BYTES`
+- `FADEN_GATEWAY_STREAM_IDLE_TIMEOUT_SEC`
 
 Langfuse:
-- `LLM_PORT_API_LANGFUSE_ENABLED`
-- `LLM_PORT_API_LANGFUSE_HOST`
-- `LLM_PORT_API_LANGFUSE_PUBLIC_KEY`
-- `LLM_PORT_API_LANGFUSE_SECRET_KEY`
-- `LLM_PORT_API_LANGFUSE_TRACING_ENABLED`
-- `LLM_PORT_API_LANGFUSE_RELEASE`
-- `LLM_PORT_API_LANGFUSE_DEBUG`
+- `FADEN_GATEWAY_LANGFUSE_ENABLED`
+- `FADEN_GATEWAY_LANGFUSE_HOST`
+- `FADEN_GATEWAY_LANGFUSE_PUBLIC_KEY`
+- `FADEN_GATEWAY_LANGFUSE_SECRET_KEY`
+- `FADEN_GATEWAY_LANGFUSE_TRACING_ENABLED`
+- `FADEN_GATEWAY_LANGFUSE_RELEASE`
+- `FADEN_GATEWAY_LANGFUSE_DEBUG`
 
 Redis/Rabbit:
-- `LLM_PORT_API_REDIS_HOST`
-- `LLM_PORT_API_REDIS_PORT`
-- `LLM_PORT_API_REDIS_USER`
-- `LLM_PORT_API_REDIS_PASS`
-- `LLM_PORT_API_REDIS_BASE`
-- `LLM_PORT_API_RABBIT_HOST`
-- `LLM_PORT_API_RABBIT_PORT`
-- `LLM_PORT_API_RABBIT_USER`
-- `LLM_PORT_API_RABBIT_PASS`
-- `LLM_PORT_API_RABBIT_VHOST`
+- `FADEN_GATEWAY_REDIS_HOST`
+- `FADEN_GATEWAY_REDIS_PORT`
+- `FADEN_GATEWAY_REDIS_USER`
+- `FADEN_GATEWAY_REDIS_PASS`
+- `FADEN_GATEWAY_REDIS_BASE`
+- `FADEN_GATEWAY_RABBIT_HOST`
+- `FADEN_GATEWAY_RABBIT_PORT`
+- `FADEN_GATEWAY_RABBIT_USER`
+- `FADEN_GATEWAY_RABBIT_PASS`
+- `FADEN_GATEWAY_RABBIT_VHOST`
 
 ## Migrations
 ```bash
@@ -115,7 +115,7 @@ curl http://localhost:8000/v1/embeddings \
 ## Quality Gates
 ```bash
 poetry run ruff check .
-poetry run mypy llm_port_api
+poetry run mypy faden_gateway
 poetry run pytest -vv
 ```
 

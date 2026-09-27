@@ -9,11 +9,11 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from starlette import status
 
-from llm_port_backend.settings import Settings, settings
+from faden_backend.settings import Settings, settings
 
 
 def test_environment_defaults_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("LLM_PORT_BACKEND_ENVIRONMENT", raising=False)
+    monkeypatch.delenv("FADEN_BACKEND_ENVIRONMENT", raising=False)
     assert Settings(_env_file=None).environment == "production"
 
 

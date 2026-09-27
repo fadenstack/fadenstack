@@ -8,8 +8,8 @@ from typing import Any
 
 import psutil
 
-from llm_port_node_agent.gpu import GpuCollector, GpuSnapshot, NullCollector
-from llm_port_node_agent.network import collect_network_interfaces, summarize_network_inventory
+from faden_agent.gpu import GpuCollector, GpuSnapshot, NullCollector
+from faden_agent.network import collect_network_interfaces, summarize_network_inventory
 
 # Module-level default used when no collector is injected.
 _default_collector: GpuCollector = NullCollector()

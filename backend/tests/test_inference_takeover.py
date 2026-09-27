@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentPhase,
     EnvironmentStatus,
     InferenceControlPlane,
@@ -22,13 +22,13 @@ from llm_port_backend.db.models.inference import (
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeCommandType
-from llm_port_backend.services.inference import takeover
-from llm_port_backend.services.inference.drivers.ray.compiler import compile_deployment
-from llm_port_backend.services.inference.drivers.ray.secrets import retrieve_cluster_token, seal_token
+from faden_backend.db.models.node_control import InfraNode, NodeCommandType
+from faden_backend.services.inference import takeover
+from faden_backend.services.inference.drivers.ray.compiler import compile_deployment
+from faden_backend.services.inference.drivers.ray.secrets import retrieve_cluster_token, seal_token
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
-APP = "llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"
+APP = "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"
 SOURCE = "/root/.cache/huggingface/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775"
 #: qwen-chat's LLMConfig, as the agent read it from the DGX pair's cluster.
 RUNNING = {
@@ -65,7 +65,7 @@ def _doc(*, apps: list[dict[str, Any]] | None = None, extra_nodes: list[dict[str
     """The cluster as DESCRIBE_RAY_CLUSTER answers (the DGX pair's)."""
     return {
         "attached": True, "ray_version": "2.58.0", "gcs_address": "10.100.0.2:6379", "errors": [],
-        "container": {"running": True, "image": "llmport/ray-vllm-gb10:ray2.58-nv26.08"},
+        "container": {"running": True, "image": "faden/ray-vllm-gb10:ray2.58-nv26.08"},
         "nodes": [
             {"node_id": "ray-head", "ip": "10.100.0.2", "hostname": "gpu-01", "alive": True, "is_head": True, "gpus": 1.0},
             {"node_id": "ray-worker", "ip": "10.100.0.1", "hostname": "gpu-02", "alive": True, "is_head": False, "gpus": 1.0},
@@ -136,7 +136,7 @@ def test_the_dgx_config_rebuilds_into_the_spec_it_came_from() -> None:
     assert compiled["deployment_config"] == RUNNING["deployment_config"]
 
 
-_BASE = {"api_version": "inference.llmport.ai/v1alpha1", "engine": {"name": "vllm", "config": {}},
+_BASE = {"api_version": "inference.fadenstack.com/v1alpha1", "engine": {"name": "vllm", "config": {}},
          "artifacts": {"source": "local_path", "root_path": "/models/org/m"}, "service": {"path": "/v1"}}
 
 
@@ -154,15 +154,15 @@ _BASE = {"api_version": "inference.llmport.ai/v1alpha1", "engine": {"name": "vll
     {"scale": {"autoscale": {"min_replicas": 1, "max_replicas": 2}}, "resources": {"replica": {"gpus": 1}},
      "extensions": {"ray": {"target_ongoing_requests": 8}}},
 ], ids=["tools", "tp2", "autoscale", "half-gpu", "cpu", "tp2-2-nodes", "tp2-pp2", "autoscale-target"])
-def test_what_llm_port_deploys_compiles_back_to_itself(spec: dict[str, Any]) -> None:
-    """The inverse holds for what LLM.Port itself emits: compile, rebuild, compile again."""
+def test_what_faden_deploys_compiles_back_to_itself(spec: dict[str, Any]) -> None:
+    """The inverse holds for what Fadenstack itself emits: compile, rebuild, compile again."""
     first = compile_deployment(spec_data={**_BASE, **spec}, model_display_name="m", model_source="huggingface")
     rebuilt, _notes = takeover.spec_from_llm_config(first["llm_configs"][0])
     again = compile_deployment(spec_data=rebuilt, model_display_name="m", model_source="huggingface")
     assert again == first
 
 
-def test_an_app_llm_port_did_not_deploy_is_not_taken() -> None:
+def test_an_app_faden_did_not_deploy_is_not_taken() -> None:
     assert takeover.recover_deployment({"name": "someone-elses-app", "llm_configs": [RUNNING]}) is None
     assert takeover.recover_deployment({"name": APP, "llm_configs": []}) is None
 
@@ -199,7 +199,7 @@ async def test_what_stops_a_takeover_is_said(dbsession: AsyncSession, pair: tupl
 async def test_found_clusters_are_listed_once_and_silent_machines_apart(
     dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
 
     head, worker = pair
     silent = InfraNode(agent_id="old-agent", host="10.250.10.50", status="healthy")
@@ -294,10 +294,10 @@ async def test_after_the_takeover_the_reconciler_restarts_nothing(
     """The point of it all: the next pass observes, and neither re-applies the app nor copies the model."""
     from tests.test_inference_deployment_preparation import _FakeNodeControlService, _make_serve_status
 
-    from llm_port_backend.db.dao.inference_dao import EndpointDAO
-    from llm_port_backend.db.models.inference import EndpointStatus
-    from llm_port_backend.services.inference.drivers.ray.client import _parse_serve_status
-    from llm_port_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
+    from faden_backend.db.dao.inference_dao import EndpointDAO
+    from faden_backend.db.models.inference import EndpointStatus
+    from faden_backend.services.inference.drivers.ray.client import _parse_serve_status
+    from faden_backend.services.inference.drivers.ray.deployment import RayDeploymentManager
 
     head, _worker = pair
     _answering(monkeypatch, _Machine(_doc()))
@@ -324,9 +324,9 @@ async def test_after_the_takeover_the_reconciler_restarts_nothing(
 
 @pytest.mark.anyio
 async def test_the_token_is_sealed_before_the_command_result_is_stored(dbsession: AsyncSession) -> None:
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.services.inference.drivers.ray.secrets import unseal_token
-    from llm_port_backend.services.nodes.service import NodeControlService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.services.inference.drivers.ray.secrets import unseal_token
+    from faden_backend.services.nodes.service import NodeControlService
 
     node = InfraNode(agent_id=f"a-{uuid.uuid4().hex[:6]}", host="10.0.0.1", status="healthy")
     dbsession.add(node)
@@ -360,7 +360,7 @@ async def test_the_token_is_sealed_before_the_command_result_is_stored(dbsession
 
 # ── Models a managed cluster runs that no deployment here owns ──────────
 
-STRAY = "llmport-a34b195a-d92a-4bc8-9d74-6b7aa7919b4a"
+STRAY = "faden-a34b195a-d92a-4bc8-9d74-6b7aa7919b4a"
 STRAY_SOURCE = "/root/.cache/huggingface/models--Qwen--Qwen3-0.6B/snapshots/c1899de289a04d12100db370d81485cdf75e47ca"
 
 
@@ -414,14 +414,14 @@ async def test_a_stray_model_is_taken_over_into_its_cluster_as_it_runs(
         dbsession, None, environment_id=env.id, app_names=[STRAY], aliases={STRAY: "qwen3-0.6b"},
     )
 
-    dep = await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("llmport-")))
+    dep = await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("faden-")))
     assert dep is not None and dep.environment_id == env.id, "into the cluster it runs on, under its own id"
     assert dep.phase == DeploymentPhase.RUNNING.value and dep.generation == dep.observed_generation
     assert dep.observed_status_json["applied_head"] == "ray-head", "recorded as applied: nothing restarts"
     assert dep.spec_json["service"]["alias"] == "qwen3-0.6b"
     assert STRAY in machine.asked[-1]["verify"] and machine.asked[-1]["hand_over_token"] is False, (
         "checked against what runs; the cluster's token is already here")
-    assert result["deployments"][0]["deployment_id"] == STRAY.removeprefix("llmport-")
+    assert result["deployments"][0]["deployment_id"] == STRAY.removeprefix("faden-")
     assert (await takeover.stray_models(dbsession, None, env.id))["models"] == [], "and it is no longer a stray"
 
 
@@ -434,11 +434,11 @@ async def test_a_stray_model_that_would_restart_is_not_taken(
     _answering(monkeypatch, _Machine(_both(), equal=False))
     with pytest.raises(takeover.TakeoverError, match=r"would restart Qwen3-0\.6B"):
         await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[STRAY])
-    assert await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("llmport-"))) is None
+    assert await dbsession.get(InferenceDeployment, uuid.UUID(STRAY.removeprefix("faden-"))) is None
 
 
 @pytest.mark.anyio
-async def test_only_a_stray_model_of_llm_ports_can_be_taken(
+async def test_only_a_stray_model_of_fadenstacks_can_be_taken(
     dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     head, _worker = pair

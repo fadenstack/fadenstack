@@ -1,4 +1,4 @@
-"""``llmport version`` — print version and runtime information."""
+"""``faden version`` — print version and runtime information."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import sys
 
 import click
 
-from llmport import __version__
-from llmport.core.console import console, kv_table
-from llmport.core.detect import detect_docker
+from faden_cli import __version__
+from faden_cli.core.console import console, kv_table
+from faden_cli.core.detect import detect_docker
 
 
 @click.command("version")
@@ -23,12 +23,12 @@ def version_cmd(*, short: bool) -> None:
     docker = detect_docker()
 
     rows: list[tuple[str, str]] = [
-        ("llmport CLI", __version__),
+        ("faden CLI", __version__),
         ("Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"),
         ("Platform", platform.platform()),
         ("Docker", docker.version or "[red]not found[/red]"),
         ("Compose", docker.compose_version or "[red]not found[/red]"),
     ]
 
-    kv_table("llm.port CLI", rows)
+    kv_table("fadenstack CLI", rows)
     console.print()

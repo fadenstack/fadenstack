@@ -1,4 +1,4 @@
-"""llm_port_backend package.
+"""faden_backend package.
 
 Layered architecture with service and repository pattern.
 Internal REST API exposed via FastAPI routers.

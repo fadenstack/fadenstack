@@ -1,10 +1,10 @@
-"""``llmport deploy`` — full production deployment in one command.
+"""``faden deploy`` — full production deployment in one command.
 
 Runs the complete production flow:
   1. Pre-flight checks (Docker, Compose, disk, RAM)
   2. Locate or set up the install directory
   3. Generate ``.env`` with random secrets, and size the services for
-     this host (what ``llmport tune`` does)
+     this host (what ``faden tune`` does)
   4. Enable requested modules (compose profiles)
      and choose the ports and whether to serve HTTPS
   5. Pull pre-built container images from the registry
@@ -19,9 +19,9 @@ from pathlib import Path
 
 import click
 
-from llmport import __version__
-from llmport.core.bundle import DEFAULT_INSTALL_DIR, bundled_files, installed_release, unpack
-from llmport.core.compose import (
+from faden_cli import __version__
+from faden_cli.core.bundle import DEFAULT_INSTALL_DIR, bundled_files, installed_release, unpack
+from faden_cli.core.compose import (
     ComposeContext,
     build as compose_build,
     build_base_image,
@@ -29,13 +29,13 @@ from llmport.core.compose import (
     pull_base_images,
     up as compose_up,
 )
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.detect import detect_docker
-from llmport.core.env_gen import default_env_vars, read_env_file, write_env_file
-from llmport.core.registry import MODULES_COMPAT as KNOWN_MODULES
-from llmport.core.rmq import write_definitions as write_rmq_definitions
-from llmport.core.settings import LlmportConfig, load_config, save_config
-from llmport.core.tune import tune_env
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.detect import detect_docker
+from faden_cli.core.env_gen import default_env_vars, read_env_file, write_env_file
+from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
+from faden_cli.core.rmq import write_definitions as write_rmq_definitions
+from faden_cli.core.settings import FadenConfig, load_config, save_config
+from faden_cli.core.tune import tune_env
 
 
 def _regenerate_rmq_definitions(
@@ -83,7 +83,7 @@ def _sync_postgres_password(ctx: ComposeContext, env_path: Path) -> None:
     import shutil
     import subprocess
 
-    from llmport.core.env_gen import read_env_file
+    from faden_cli.core.env_gen import read_env_file
 
     docker = shutil.which("docker")
     if not docker:
@@ -106,7 +106,7 @@ def _sync_postgres_password(ctx: ComposeContext, env_path: Path) -> None:
     safe_pass = pg_pass.replace("'", "''")
     alter_sql = f"ALTER USER {pg_user} PASSWORD '{safe_pass}';\n"
     result = subprocess.run(  # noqa: S603
-        [docker, "exec", "-i", "llm-port-postgres", "psql", "-U", pg_user],
+        [docker, "exec", "-i", "faden-postgres", "psql", "-U", pg_user],
         input=alter_sql,
         capture_output=True,
         text=True,
@@ -130,17 +130,17 @@ def _resolve_compose_file(install_dir: Path) -> Path | None:
 
 
 def _find_shared_dir(workspace: Path) -> Path | None:
-    """Locate the llm_port_shared directory relative to workspace.
+    """Locate the shared directory relative to workspace.
 
     Searches in order:
-      1. workspace/llm_port_shared        (monorepo layout)
-      2. workspace/llm-port-core/llm_port_shared  (monorepo cloned)
-      3. workspace/../llm_port_shared      (legacy polyrepo sibling)
+      1. workspace/shared        (monorepo layout)
+      2. workspace/fadenstack/shared  (monorepo cloned)
+      3. workspace/../shared      (legacy polyrepo sibling)
     """
     for candidate in (
-        workspace / "llm_port_shared",
-        workspace / "llm-port-core" / "llm_port_shared",
-        workspace.parent / "llm_port_shared",
+        workspace / "shared",
+        workspace / "fadenstack" / "shared",
+        workspace.parent / "shared",
     ):
         if candidate.is_dir():
             return candidate
@@ -153,8 +153,8 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
 
     import httpx  # noqa: PLC0415
 
-    from llmport.core.console import error, success  # noqa: PLC0415
-    from llmport.core.edge import verify_for  # noqa: PLC0415
+    from faden_cli.core.console import error, success  # noqa: PLC0415
+    from faden_cli.core.edge import verify_for  # noqa: PLC0415
 
     password = click.prompt(f"  Password for {email}", hide_input=True, show_default=False)
     try:
@@ -245,7 +245,7 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
 @click.option(
     "--local-node",
     is_flag=True,
-    help="Provision llm_port_node_agent locally or over SSH during deployment.",
+    help="Provision faden_agent locally or over SSH during deployment.",
 )
 @click.option(
     "--local-node-host",
@@ -260,7 +260,7 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
 @click.option(
     "--local-node-branch",
     default="",
-    help="Git branch for llm-port-node-agent (default: config dev.branch).",
+    help="Git branch for faden-node-agent (default: config dev.branch).",
 )
 @click.option(
     "--local-node-backend-url",
@@ -311,7 +311,7 @@ def deploy_cmd(
     local_node_enrollment_token: str,
     local_node_sudo: bool,
 ) -> None:
-    """Deploy llm.port to a local production environment.
+    """Deploy fadenstack to a local production environment.
 
     Performs a complete deployment: pre-flight checks, environment
     generation, image builds, database migrations, and service startup.
@@ -321,26 +321,26 @@ def deploy_cmd(
 
     \b
     Examples:
-        llmport deploy                         # deploy the published images (into ~/llm-port)
-        llmport deploy /opt/llm-port           # deploy to specific directory
-        llmport deploy --build                 # from a source checkout: build the images
-        llmport deploy --force-env             # regenerate secrets
-        llmport deploy --tls generate          # HTTPS with a certificate made here
-        llmport deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
-        llmport deploy --http-port 8080 --https-port 8443
+        faden deploy                         # deploy the published images (into ~/fadenstack)
+        faden deploy /opt/faden           # deploy to specific directory
+        faden deploy --build                 # from a source checkout: build the images
+        faden deploy --force-env             # regenerate secrets
+        faden deploy --tls generate          # HTTPS with a certificate made here
+        faden deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
+        faden deploy --http-port 8080 --https-port 8443
     """
-    console.print("\n[bold magenta]llm.port — Production Deployment[/bold magenta]\n")
+    console.print("\n[bold magenta]fadenstack — Production Deployment[/bold magenta]\n")
 
     # ── 0. Resolve install directory ──────────────────────────────
     #
     # Priority order:
-    #   1. Explicit CLI argument  (llmport deploy /path)
-    #   2. Current working directory — if it contains llm_port_shared
+    #   1. Explicit CLI argument  (faden deploy /path)
+    #   2. Current working directory — if it contains shared
     #   3. Saved config install_dir  (from a previous dev init / deploy)
-    #   4. ~/llm-port, unpacked from the files this CLI carries
+    #   4. ~/fadenstack, unpacked from the files this CLI carries
     #   5. CWD as final fallback
     #
-    # This ensures that running ``llmport deploy`` from a development
+    # This ensures that running ``faden deploy`` from a development
     # workspace always builds from the local source, even when the
     # config still points at a different (possibly stale) clone.
     cfg = load_config()
@@ -371,9 +371,9 @@ def deploy_cmd(
             success(f"Deployment files for release {__version__} written to {workspace}")
         else:
             error(
-                f"Cannot find llm_port_shared in {workspace}.\n"
+                f"Cannot find shared in {workspace}.\n"
                 "  Run from the workspace root, or pass the install directory as an argument.\n"
-                "  If you haven't cloned the repos yet, run: llmport dev init <dir>"
+                "  If you haven't cloned the repos yet, run: faden dev init <dir>"
             )
             sys.exit(1)
 
@@ -383,13 +383,13 @@ def deploy_cmd(
         if release != __version__:
             error(
                 f"{shared_dir} runs release {release}; this CLI is {__version__}.\n"
-                "  To move it to this release, run: llmport upgrade"
+                "  To move it to this release, run: faden upgrade"
             )
             sys.exit(1)
         if build or no_cache:
             error(
                 "--build needs a source checkout; this install runs the published images.\n"
-                "  Deploy without --build, or deploy from a checkout of llm-port-core."
+                "  Deploy without --build, or deploy from a checkout of fadenstack."
             )
             sys.exit(1)
         unpack(shared_dir)  # puts back anything deleted since
@@ -498,14 +498,14 @@ def deploy_cmd(
     # ── 3a. Size the services for this host ───────────────────────
     # On every deploy, not only with a new .env: an install deployed before
     # a fix to the sizing gets it too. Profile and CPU share are what
-    # ``llmport tune`` last chose.
+    # ``faden tune`` last chose.
     console.print("\n[bold cyan]Step 3a: Sizing the services for this host…[/bold cyan]")
     tune_env(env_path)
 
     # ── 3b. Migrate old single-credential RabbitMQ env vars ───────
     existing = read_env_file(env_path)
     if "RABBITMQ_BACKEND_PASS" not in existing:
-        from llmport.core.env_gen import _random_password  # noqa: PLC0415
+        from faden_cli.core.env_gen import _random_password  # noqa: PLC0415
 
         info("Migrating RabbitMQ credentials to per-service format…")
         existing["RABBITMQ_ADMIN_USER"] = existing.pop("RABBITMQ_USER", "admin")
@@ -524,7 +524,7 @@ def deploy_cmd(
     # ── 3d. Ports and HTTPS ───────────────────────────────────────
     # Before anything starts: nginx picks plain HTTP or HTTPS when it starts.
     console.print("\n[bold cyan]Step 3d: Ports and HTTPS…[/bold cyan]")
-    from llmport.commands.tls import deploy_step as edge_step  # noqa: PLC0415
+    from faden_cli.commands.tls import deploy_step as edge_step  # noqa: PLC0415
 
     ca_to_trust = edge_step(
         shared_dir,
@@ -547,7 +547,7 @@ def deploy_cmd(
     save_config(cfg)
 
     # ── 5. Build images ───────────────────────────────────────────
-    from llmport.core.compose import has_nvidia_gpu  # noqa: PLC0415
+    from faden_cli.core.compose import has_nvidia_gpu  # noqa: PLC0415
 
     use_gpu = has_nvidia_gpu() if gpu is None else gpu
     compose_files = [compose_file]
@@ -592,7 +592,7 @@ def deploy_cmd(
             success("All images built successfully.")
     else:
         console.print("\n[bold cyan]Step 4: Pulling pre-built images…[/bold cyan]")
-        from llmport.core.compose import pull as compose_pull  # noqa: PLC0415
+        from faden_cli.core.compose import pull as compose_pull  # noqa: PLC0415
 
         rc = compose_pull(ctx)
         if rc != 0:
@@ -616,7 +616,7 @@ def deploy_cmd(
     # condition where workers start before Docker's embedded DNS has
     # registered the RMQ container, causing permanent AMQP connection
     # failures.
-    infra_services = ["redis", "llm-port-rmq", "minio"]
+    infra_services = ["redis", "faden-rmq", "minio"]
     info("Starting infrastructure services (Redis, RabbitMQ, MinIO)…")
     rc = compose_up(ctx, services=infra_services, detach=True, wait=True, timeout=60)
     if rc != 0:
@@ -633,8 +633,8 @@ def deploy_cmd(
     # ── 6. Initial admin setup ────────────────────────────────────
     console.print("\n[bold cyan]Step 6: Initial admin setup…[/bold cyan]")
 
-    from llmport.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
-    from llmport.core.edge import console_url  # noqa: PLC0415
+    from faden_cli.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
+    from faden_cli.core.edge import console_url  # noqa: PLC0415
 
     # HTTPS as soon as the install holds a certificate: plain HTTP only redirects then.
     backend_url = console_url(shared_dir, read_env_file(env_path) if env_path.exists() else {})
@@ -651,7 +651,7 @@ def deploy_cmd(
             save_config(cfg)
 
             # ── Sync credentials to Grafana, Langfuse & RabbitMQ ──
-            from llmport.core.compose import up as compose_up_svc  # noqa: PLC0415
+            from faden_cli.core.compose import up as compose_up_svc  # noqa: PLC0415
 
             env_vars = read_env_file(env_path)
             env_vars["GRAFANA_ADMIN_USER"] = creds["email"]
@@ -664,10 +664,10 @@ def deploy_cmd(
             env_vars["LANGFUSE_INIT_USER_EMAIL"] = creds["email"]
             env_vars["LANGFUSE_INIT_USER_PASSWORD"] = creds["password"]
             env_vars["LANGFUSE_INIT_USER_NAME"] = "Admin"
-            env_vars["LANGFUSE_INIT_PROJECT_NAME"] = "llm-port"
+            env_vars["LANGFUSE_INIT_PROJECT_NAME"] = "fadenstack"
             if creds.get("api_token"):
                 env_vars["LANGFUSE_INIT_PROJECT_SECRET_KEY"] = creds["api_token"][:40]
-                env_vars["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"] = "pk-lf-llmport"
+                env_vars["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"] = "pk-lf-faden"
 
             write_env_file(env_path, env_vars)
             info("Synced admin credentials to Grafana, Langfuse & RabbitMQ.")
@@ -680,7 +680,7 @@ def deploy_cmd(
             # includes the admin password.  Service workers are NOT
             # recreated because their per-service passwords have not
             # changed.
-            recreate_services = ["grafana", "langfuse-web", "llm-port-rmq"]
+            recreate_services = ["grafana", "langfuse-web", "faden-rmq"]
             compose_up_svc(
                 ctx,
                 services=recreate_services,
@@ -692,20 +692,20 @@ def deploy_cmd(
             success("Grafana, Langfuse & RabbitMQ recreated with shared credentials.")
     else:
         warning("Backend did not become healthy in time — skipping admin setup.")
-        console.print("  [dim]Run 'llmport deploy' again or create an admin via the UI.[/dim]")
+        console.print("  [dim]Run 'faden deploy' again or create an admin via the UI.[/dim]")
 
     # ── 7. Runtime images ─────────────────────────────────────────
     # Machines download the container they run models in from this server,
     # so it has to be here before the first machine starts a cluster.
     console.print("\n[bold cyan]Step 7: Runtime images for machines…[/bold cyan]")
-    from llmport.commands.runtime_images import run_step  # noqa: PLC0415
+    from faden_cli.commands.runtime_images import run_step  # noqa: PLC0415
 
     run_step(cfg, value=runtime_images)
 
     # ── 8. Optional local-node provisioning ───────────────────────
     if local_node:
         console.print("\n[bold cyan]Step 8: Local node-agent provisioning…[/bold cyan]")
-        from llmport.core.local_node import (  # noqa: PLC0415
+        from faden_cli.core.local_node import (  # noqa: PLC0415
             create_enrollment_token,
             provision_local_node_agent,
         )
@@ -754,7 +754,7 @@ def deploy_cmd(
             sys.exit(1)
 
     # ── 7b. Nightly backups ───────────────────────────────────────
-    from llmport.core import schedule  # noqa: PLC0415
+    from faden_cli.core import schedule  # noqa: PLC0415
 
     if schedule.available() and schedule.current() is None:
         console.print()
@@ -767,7 +767,7 @@ def deploy_cmd(
                 warning(f"Could not schedule nightly backups: {exc}")
             else:
                 success(
-                    f"Nightly backups into {backups} ({how}; change: llmport backup schedule --at HH:MM,"
+                    f"Nightly backups into {backups} ({how}; change: faden backup schedule --at HH:MM,"
                     " stop: --off)."
                 )
                 for note in notes:
@@ -797,7 +797,7 @@ def deploy_cmd(
 
     console.print(table)
 
-    from llmport.commands.tls import print_addresses, print_trust_hints  # noqa: PLC0415
+    from faden_cli.commands.tls import print_addresses, print_trust_hints  # noqa: PLC0415
 
     print_addresses(shared_dir)
     if ca_to_trust is not None:
@@ -805,11 +805,11 @@ def deploy_cmd(
 
     console.print(
         "\n[dim]Useful commands:\n"
-        "  llmport status        — container status\n"
-        "  llmport logs -f       — follow logs\n"
-        "  llmport module list   — show enabled modules\n"
-        "  llmport down          — stop all services\n"
-        "  llmport tls status    — HTTPS and its certificate\n"
-        "  llmport ports         — the HTTP and HTTPS ports\n"
-        "  llmport deploy --help — deployment options[/dim]"
+        "  faden status        — container status\n"
+        "  faden logs -f       — follow logs\n"
+        "  faden module list   — show enabled modules\n"
+        "  faden down          — stop all services\n"
+        "  faden tls status    — HTTPS and its certificate\n"
+        "  faden ports         — the HTTP and HTTPS ports\n"
+        "  faden deploy --help — deployment options[/dim]"
     )

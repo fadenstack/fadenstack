@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from llm_port_backend.services.docker.client import DockerService, resolve_binds
+from faden_backend.services.docker.client import DockerService, resolve_binds
 
 logger = logging.getLogger(__name__)
 

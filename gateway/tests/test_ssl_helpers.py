@@ -1,4 +1,4 @@
-"""Unit tests for ``llm_port_api.services.gateway.ssl_helpers``.
+"""Unit tests for ``faden_gateway.services.gateway.ssl_helpers``.
 
 These tests don't touch litellm — they verify the kwargs we'd pass to it.
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from llm_port_api.services.gateway import ssl_helpers as mod
+from faden_gateway.services.gateway import ssl_helpers as mod
 
 
 @pytest.fixture(autouse=True)

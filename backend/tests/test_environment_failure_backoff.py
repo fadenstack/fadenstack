@@ -19,13 +19,13 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import EnvironmentStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.inference import EnvironmentStatus
+from faden_backend.db.models.node_control import (
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
 from tests.test_inference_env_observation import _bound_environment, _FakeNodeControl
 
 MISMATCH = (
@@ -172,7 +172,7 @@ async def test_success_clears_the_memory_of_failure(dbsession: AsyncSession) -> 
 @pytest.mark.anyio()
 async def test_try_again_overrides_the_backoff(dbsession: AsyncSession) -> None:
     """The person pressing it has usually just fixed what it was waiting on."""
-    from llm_port_backend.services.inference.service import EnvironmentService
+    from faden_backend.services.inference.service import EnvironmentService
 
     env = await _bound_environment(dbsession)
     await RayEnvironmentManager().reconcile_environment(dbsession, env, node_control=_ImageRefused())
@@ -187,9 +187,9 @@ async def test_try_again_overrides_the_backoff(dbsession: AsyncSession) -> None:
 @pytest.mark.anyio()
 async def test_progress_from_a_member_reaches_the_cluster(dbsession: AsyncSession) -> None:
     """The page said "Preparing 1 machine" for the whole transfer."""
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.db.models.node_control import InfraNode
-    from llm_port_backend.services.inference.service import EnvironmentService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.models.node_control import InfraNode
+    from faden_backend.services.inference.service import EnvironmentService
 
     env = await _bound_environment(dbsession)
     node = InfraNode(agent_id=f"n-{uuid.uuid4().hex[:6]}", host="10.0.0.9", status="healthy",
@@ -211,7 +211,7 @@ async def test_progress_from_a_member_reaches_the_cluster(dbsession: AsyncSessio
     await dao.append_command_event(
         command_id=command.id,
         phase="progress",
-        message="Receiving llmport/ray-vllm-gb10: 4.0 GiB of 12.0 GiB (33%)",
+        message="Receiving faden/ray-vllm-gb10: 4.0 GiB of 12.0 GiB (33%)",
         payload_json={"progress_pct": 33},
     )
     await dbsession.flush()
@@ -225,7 +225,7 @@ async def test_progress_from_a_member_reaches_the_cluster(dbsession: AsyncSessio
 
 @pytest.mark.anyio()
 async def test_no_progress_once_nothing_is_in_flight(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference.service import EnvironmentService
+    from faden_backend.services.inference.service import EnvironmentService
 
     env = await _bound_environment(dbsession)
 
@@ -235,9 +235,9 @@ async def test_no_progress_once_nothing_is_in_flight(dbsession: AsyncSession) ->
 @pytest.mark.anyio()
 async def test_each_machine_keeps_its_own_progress(dbsession: AsyncSession) -> None:
     """Two machines receive the image at once; one line would flick between them."""
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-    from llm_port_backend.db.models.node_control import InfraNode
-    from llm_port_backend.services.inference.service import EnvironmentService
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.db.models.node_control import InfraNode
+    from faden_backend.services.inference.service import EnvironmentService
 
     env = await _bound_environment(dbsession)
     dao = NodeControlDAO(dbsession)

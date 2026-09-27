@@ -6,9 +6,9 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { afterEach, vi } from "vitest";
 
-import chat from "../../../llm_port_backend/i18n/en/chat.json";
-import common from "../../../llm_port_backend/i18n/en/common.json";
-import tour from "../../../llm_port_backend/i18n/en/tour.json";
+import chat from "../../../backend/i18n/en/chat.json";
+import common from "../../../backend/i18n/en/common.json";
+import tour from "../../../backend/i18n/en/tour.json";
 
 // The English strings the app ships, so a page renders what an English
 // reader sees -- and a key missing from them renders as the key, which the

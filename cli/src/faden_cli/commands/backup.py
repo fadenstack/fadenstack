@@ -1,13 +1,13 @@
-"""``llmport backup`` — create a backup of all databases and config.
+"""``faden backup`` — create a backup of all databases and config.
 
 Examples:
-    llmport backup                          # backup to ./backups
-    llmport backup --output-dir /mnt/bak    # custom output directory
-    llmport backup --include-volumes        # also snapshot Docker volumes
-    llmport backup --db-only                # databases only, skip .env
-    llmport backup --retain 3               # keep only 3 most recent
-    llmport backup schedule                 # every night at 03:00, keep 7
-    llmport backup schedule --off           # stop the nightly backup
+    faden backup                          # backup to ./backups
+    faden backup --output-dir /mnt/bak    # custom output directory
+    faden backup --include-volumes        # also snapshot Docker volumes
+    faden backup --db-only                # databases only, skip .env
+    faden backup --retain 3               # keep only 3 most recent
+    faden backup schedule                 # every night at 03:00, keep 7
+    faden backup schedule --off           # stop the nightly backup
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ from pathlib import Path
 
 import click
 
-from llmport.core.backup import create_backup
-from llmport.core.compose import build_context_from_config
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.settings import load_config
+from faden_cli.core.backup import create_backup
+from faden_cli.core.compose import build_context_from_config
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.settings import load_config
 
 
 @click.group("backup", invoke_without_command=True)
@@ -61,10 +61,10 @@ def backup_cmd(
     db_only: bool,
     yes: bool,
 ) -> None:
-    """Create a backup of llm.port databases, config, and optionally volumes."""
+    """Create a backup of fadenstack databases, config, and optionally volumes."""
     if click_ctx.invoked_subcommand is not None:
         return
-    console.print("\n[bold magenta]llm.port — Backup[/bold magenta]\n")
+    console.print("\n[bold magenta]fadenstack — Backup[/bold magenta]\n")
 
     cfg = load_config()
     ctx = build_context_from_config(cfg)
@@ -118,12 +118,12 @@ def schedule_cmd(*, at: str, retain: int, off: bool) -> None:
 
     The backups land in <install_dir>/backups/, on the same disk as the
     data: copy them elsewhere too (or pass --output-dir to a mounted disk
-    with `llmport backup` from your own scheduler).
+    with `faden backup` from your own scheduler).
     """
-    from llmport.core import schedule  # noqa: PLC0415
+    from faden_cli.core import schedule  # noqa: PLC0415
 
     if not schedule.available():
-        error("No systemd user manager or cron here: schedule `llmport backup -y` with your own scheduler.")
+        error("No systemd user manager or cron here: schedule `faden backup -y` with your own scheduler.")
         sys.exit(1)
     if off:
         if schedule.remove():
@@ -143,7 +143,7 @@ def schedule_cmd(*, at: str, retain: int, off: bool) -> None:
         sys.exit(2)
     cfg = load_config()
     if not cfg.install_dir:
-        error("No install to back up: run `llmport deploy` first.")
+        error("No install to back up: run `faden deploy` first.")
         sys.exit(1)
     backups = cfg.install_path / "backups"
     backups.mkdir(parents=True, exist_ok=True)

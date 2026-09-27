@@ -15,9 +15,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from llm_port_backend.services.llm import service as llm_service_mod
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.services.marketplace import hub
+from faden_backend.services.llm import service as llm_service_mod
+from faden_backend.services.llm.service import LLMService
+from faden_backend.services.marketplace import hub
 
 
 def _cached_repo(cache: Path, repo_id: str, files: dict[str, bytes]) -> None:

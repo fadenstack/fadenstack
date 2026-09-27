@@ -6,14 +6,14 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
     InferenceDeployment,
     InferenceEndpoint,
 )
-from llm_port_backend.services.inference.publication import InferencePublicationCoordinator
+from faden_backend.services.inference.publication import InferencePublicationCoordinator
 
 
 @pytest.fixture
@@ -50,12 +50,12 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/llmport-dep1",
+        address="http://10.250.10.49:8000/faden-dep1",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
         published_json={
             "model": "meta-llama/Meta-Llama-3-8B-Instruct",
-            "base_url": "http://10.250.10.49:8000/llmport-dep1/v1",
+            "base_url": "http://10.250.10.49:8000/faden-dep1/v1",
         },
     )
 
@@ -67,7 +67,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
     mock_gateway_sync.publish_inference_endpoint.assert_awaited_once_with(
         deployment_id=dep_id,
         endpoint_id=endpoint.id,
-        base_url="http://10.250.10.49:8000/llmport-dep1/v1",
+        base_url="http://10.250.10.49:8000/faden-dep1/v1",
         alias="llama3",
         served_model_name="meta-llama/Meta-Llama-3-8B-Instruct",
         backend_provider_type="vllm",
@@ -95,7 +95,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/llmport-dep2",
+        address="http://10.250.10.49:8000/faden-dep2",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
         published_json={"model": "Qwen/Qwen2.5-Coder-1.5B-Instruct"},
@@ -110,7 +110,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
     mock_gateway_sync.publish_inference_endpoint.assert_awaited_once_with(
         deployment_id=dep_id,
         endpoint_id=endpoint.id,
-        base_url="http://10.250.10.49:8000/llmport-dep2/v1",
+        base_url="http://10.250.10.49:8000/faden-dep2/v1",
         alias=None,
         served_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
         backend_provider_type="vllm",

@@ -1,7 +1,7 @@
 [project]
-name = "llm_port_skills"
-version = "0.3.0"
-description = "Centralized Skills Registry — reasoning playbooks for llm.port"
+name = "faden_skills"
+version = "0.4.0"
+description = "Centralized Skills Registry — reasoning playbooks for fadenstack"
 readme = "README.md"
 requires-python = ">=3.11,<4"
 authors = [
@@ -65,7 +65,7 @@ build-backend = "hatchling.build"
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-src_paths = ["llm_port_skills",]
+src_paths = ["faden_skills",]
 
 [tool.mypy]
 strict = true
@@ -89,11 +89,11 @@ filterwarnings = [
     "ignore:.*unclosed.*:ResourceWarning",
 ]
 env = [
-    "LLM_PORT_SKILLS_ENVIRONMENT=pytest",
-    "LLM_PORT_SKILLS_DB_BASE=llm_skills_test",
-    "LLM_PORT_SKILLS_SERVICE_TOKEN=test-service-token",
-    "LLM_PORT_SKILLS_JWT_SECRET=",
-    "LLM_PORT_SKILLS_SENTRY_DSN=",
+    "FADEN_SKILLS_ENVIRONMENT=pytest",
+    "FADEN_SKILLS_DB_BASE=llm_skills_test",
+    "FADEN_SKILLS_SERVICE_TOKEN=test-service-token",
+    "FADEN_SKILLS_JWT_SECRET=",
+    "FADEN_SKILLS_SENTRY_DSN=",
 ]
 
 [tool.ruff]

@@ -19,23 +19,23 @@ from types import SimpleNamespace
 
 import pytest
 
-from llm_port_backend.db.models.llm import ArtifactFormat, ProviderType
-from llm_port_backend.services.gpu.detector import detect_gpus
-from llm_port_backend.services.gpu.types import (
+from faden_backend.db.models.llm import ArtifactFormat, ProviderType
+from faden_backend.services.gpu.detector import detect_gpus
+from faden_backend.services.gpu.types import (
     GpuComputeApi,
     GpuDevice,
     GpuInventory,
     GpuVendor,
 )
-from llm_port_backend.services.llm.adapters import vllm as vllm_adapter_module
-from llm_port_backend.services.llm.adapters.cloud import CloudAdapter
-from llm_port_backend.services.llm.adapters.llamacpp import LlamaCppAdapter
-from llm_port_backend.services.llm.adapters.ollama import OllamaAdapter
-from llm_port_backend.services.llm.adapters.tgi import TGIAdapter
-from llm_port_backend.services.llm.adapters.vllm import VLLMAdapter
-from llm_port_backend.services.llm import registry
-from llm_port_backend.services.llm.base import CompatResult
-from llm_port_backend.settings import settings
+from faden_backend.services.llm.adapters import vllm as vllm_adapter_module
+from faden_backend.services.llm.adapters.cloud import CloudAdapter
+from faden_backend.services.llm.adapters.llamacpp import LlamaCppAdapter
+from faden_backend.services.llm.adapters.ollama import OllamaAdapter
+from faden_backend.services.llm.adapters.tgi import TGIAdapter
+from faden_backend.services.llm.adapters.vllm import VLLMAdapter
+from faden_backend.services.llm import registry
+from faden_backend.services.llm.base import CompatResult
+from faden_backend.settings import settings
 
 # ──────────────────────────────────────────────────────────────────────────────
 # fixtures — plain objects exposing only the attributes the adapter reads

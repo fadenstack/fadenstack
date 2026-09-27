@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from llm_port_backend.db.models.system_settings import SystemApplyScope
-from llm_port_backend.services.system_settings import registry as reg
-from llm_port_backend.services.system_settings.registry import (
+from faden_backend.db.models.system_settings import SystemApplyScope
+from faden_backend.services.system_settings import registry as reg
+from faden_backend.services.system_settings.registry import (
     SETTINGS_REGISTRY,
     SettingDefinition,
     extend_registry,
@@ -43,8 +43,8 @@ def test_known_keys_present_in_registry() -> None:
     keys = set(registry_by_key())
     for key in (
         "api.server.endpoint_url",
-        "llm_port_api.jwt_secret",
-        "llm_port_api.pii_enabled",
+        "faden_gateway.jwt_secret",
+        "faden_gateway.pii_enabled",
         "shared.redis.password",
         "rag_lite.enabled",
         "rag_lite.chunk_max_tokens",
@@ -54,7 +54,7 @@ def test_known_keys_present_in_registry() -> None:
 
 def test_registry_by_key_maps_key_to_definition() -> None:
     by_key = registry_by_key()
-    pii = by_key["llm_port_api.pii_enabled"]
+    pii = by_key["faden_gateway.pii_enabled"]
     assert pii.type == "bool"
     assert pii.default is False
 

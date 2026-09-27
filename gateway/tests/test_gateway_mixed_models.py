@@ -1,7 +1,7 @@
 """Several kinds of model behind one gateway.
 
 Found running a chat model on a Ray cluster beside an embedding model in a
-vLLM container LLM.Port found (2026-09-23):
+vLLM container Fadenstack found (2026-09-23):
 
 * embeddings went through the chat path (``test_gateway_api``);
 * an embeddings request to the chat model was a 502 rather than a 400;
@@ -22,12 +22,12 @@ import litellm
 import pytest
 from redis.asyncio import ConnectionPool
 
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.cache.redis import RedisCache
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.lease import LeaseManager
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter
-from llm_port_api.services.gateway.routing import RouterService
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.cache.redis import RedisCache
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.lease import LeaseManager
+from faden_gateway.services.gateway.llm_adapter import LLMAdapter
+from faden_gateway.services.gateway.routing import RouterService
 
 
 @pytest.mark.anyio
@@ -48,13 +48,13 @@ async def test_a_request_that_outlives_its_lease_does_not_keep_its_slot(fake_red
 
 
 def _candidate(max_concurrency: int = 1) -> Any:
-    from llm_port_api.db.dao.gateway_dao import RoutedInstance
+    from faden_gateway.db.dao.gateway_dao import RoutedInstance
 
     return RoutedInstance(
         alias="qwen2.5-0.5b-instruct",
         instance_id=uuid.uuid4(),
         provider_type=ProviderType.VLLM,
-        base_url="http://10.250.10.71:8000/llmport-x",
+        base_url="http://10.250.10.71:8000/faden-x",
         weight=1.0,
         max_concurrency=max_concurrency,
         source_kind="inference_deployment",
@@ -112,8 +112,8 @@ async def test_embeddings_asked_of_a_chat_model_are_the_callers_mistake(monkeypa
 
 @pytest.mark.anyio
 async def test_the_model_list_says_what_each_model_is_for(db_session: Any) -> None:
-    from llm_port_api.db.dao.gateway_dao import GatewayDAO
-    from llm_port_api.db.models.gateway import LLMModelAlias, LLMPoolMembership, LLMProviderInstance
+    from faden_gateway.db.dao.gateway_dao import GatewayDAO
+    from faden_gateway.db.models.gateway import LLMModelAlias, LLMPoolMembership, LLMProviderInstance
 
     async def route(alias: str, task: str | None) -> None:
         instance = LLMProviderInstance(
@@ -140,7 +140,7 @@ def _routed(task: str | None) -> Any:
 
 
 def test_a_request_of_the_wrong_kind_is_refused_before_it_goes_anywhere() -> None:
-    from llm_port_api.services.gateway.service import _check_kind
+    from faden_gateway.services.gateway.service import _check_kind
 
     with pytest.raises(GatewayError) as chat_to_embed:
         _check_kind("/v1/chat/completions", "qwen3-embedding-0.6b", [_routed("embeddings")])
@@ -157,7 +157,7 @@ def test_a_request_of_the_wrong_kind_is_refused_before_it_goes_anywhere() -> Non
 
 def test_a_route_that_does_not_say_is_not_refused() -> None:
     """A remote API's kind cannot be known; the upstream decides."""
-    from llm_port_api.services.gateway.service import _check_kind
+    from faden_gateway.services.gateway.service import _check_kind
 
     _check_kind("/v1/chat/completions", "remote-120b", [_routed(None)])
     _check_kind("/v1/embeddings", "remote-120b", [_routed(None)])

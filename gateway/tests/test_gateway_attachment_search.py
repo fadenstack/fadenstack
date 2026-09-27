@@ -15,9 +15,9 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import AttachmentScope, ChatAttachment, ExtractionStatus, ProviderType
-from llm_port_api.services.gateway.attachment_search import AttachmentSearch, SearchableFile, passages, words
-from llm_port_api.settings import settings
+from faden_gateway.db.models.gateway import AttachmentScope, ChatAttachment, ExtractionStatus, ProviderType
+from faden_gateway.services.gateway.attachment_search import AttachmentSearch, SearchableFile, passages, words
+from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import CAN_CALL_TOOLS, _ask, _call, _Model, _say, _tool_names
 from tests.test_gateway_pipeline_combined import _Observability, _seed, _session
 

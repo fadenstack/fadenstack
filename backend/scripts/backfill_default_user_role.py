@@ -11,10 +11,10 @@ import asyncio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.rbac import UserRole
-from llm_port_backend.db.models.users import User
-from llm_port_backend.settings import settings
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.rbac import UserRole
+from faden_backend.db.models.users import User
+from faden_backend.settings import settings
 
 
 async def main() -> None:

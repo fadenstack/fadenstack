@@ -18,15 +18,15 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     InferenceDeployment,
     InferenceEndpoint,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services import machine_tls
-from llm_port_backend.settings import settings
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services import machine_tls
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -68,8 +68,8 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
 
 async def move(session: AsyncSession, gateway: Any, environment_id: Any) -> dict[str, Any]:
     """Shut Serve down on the head and have every deployment applied again, behind the proxy."""
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
-    from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
 
     if not settings.machine_tls_enabled:
         raise ModelTlsMoveError("Model traffic TLS is switched off on this server.")

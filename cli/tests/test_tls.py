@@ -16,12 +16,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from llmport.commands import ports as ports_cmd_mod
-from llmport.commands import tls as tls_cmd
-from llmport.core import tls
-from llmport.core.edge import check_ports, console_url, ports, url_for, verify_for
-from llmport.core.env_gen import read_env_file, write_env_file
-from llmport.core.settings import LlmportConfig
+from faden_cli.commands import ports as ports_cmd_mod
+from faden_cli.commands import tls as tls_cmd
+from faden_cli.core import tls
+from faden_cli.core.edge import check_ports, console_url, ports, url_for, verify_for
+from faden_cli.core.env_gen import read_env_file, write_env_file
+from faden_cli.core.settings import FadenConfig
 
 NAMES = ["localhost", "127.0.0.1", "::1", "box", "10.250.10.61"]
 
@@ -30,7 +30,7 @@ NAMES = ["localhost", "127.0.0.1", "::1", "box", "10.250.10.61"]
 def fixed_machine(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tls, "machine_names", lambda: list(NAMES))
     # Never a real timer or crontab from a test run.
-    from llmport.core import schedule
+    from faden_cli.core import schedule
 
     monkeypatch.setattr(schedule, "available", lambda: False)
 
@@ -235,7 +235,7 @@ def test_wildcards_cover_one_label() -> None:
 
 
 def test_urls_follow_the_ports_and_the_scheme(install: Path) -> None:
-    env = {"LLM_PORT_HTTP_PORT": "8080", "LLM_PORT_HTTPS_PORT": "8443"}
+    env = {"FADEN_HTTP_PORT": "8080", "FADEN_HTTPS_PORT": "8443"}
     assert url_for("box", https=False, env=env) == "http://box:8080"
     assert url_for("box", https=True, env=env) == "https://box:8443"
     assert url_for("box", https=True, env={}) == "https://box"
@@ -266,7 +266,7 @@ def test_ports_are_written_to_the_env_file(install: Path) -> None:
     assert ports_cmd_mod.set_ports(env_path, http=None, https=None) is None
     assert ports_cmd_mod.set_ports(env_path, http=8080, https=None) == (8080, 443)
     env = read_env_file(env_path)
-    assert (env["LLM_PORT_HTTP_PORT"], env["LLM_PORT_HTTPS_PORT"], env["VERSION"]) == ("8080", "443", "0.3.0")
+    assert (env["FADEN_HTTP_PORT"], env["FADEN_HTTPS_PORT"], env["VERSION"]) == ("8080", "443", "0.3.0")
     with pytest.raises(click.UsageError):
         ports_cmd_mod.set_ports(env_path, http=443, https=443)
 
@@ -346,7 +346,7 @@ def test_deploy_asks_for_another_port_when_one_is_taken(install: Path, monkeypat
 
 
 def test_the_commands_work_on_the_configured_install(install: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = LlmportConfig(install_dir=str(install))
+    cfg = FadenConfig(install_dir=str(install))
     monkeypatch.setattr(tls_cmd, "load_config", lambda: cfg)
     monkeypatch.setattr(ports_cmd_mod, "load_config", lambda: cfg)
     monkeypatch.setattr(ports_cmd_mod, "port_conflicts", lambda *_a, **_k: [])
@@ -372,7 +372,7 @@ def test_the_commands_work_on_the_configured_install(install: Path, monkeypatch:
 
 
 def test_other_machines_are_shown_an_address_they_can_resolve() -> None:
-    assert tls_cmd.reachable_example(["https://llm-port", "https://10.250.10.61"]) == "https://10.250.10.61"
+    assert tls_cmd.reachable_example(["https://fadenstack", "https://10.250.10.61"]) == "https://10.250.10.61"
     assert tls_cmd.reachable_example(["https://box", "https://box.lan:8443"]) == "https://box.lan:8443"
     assert tls_cmd.reachable_example(["https://box"]) == "https://box"
     assert tls_cmd.reachable_example([]) == "https://<this server>"
@@ -406,7 +406,7 @@ def test_deploy_makes_the_authority_even_with_https_off(install: Path, free_port
 def test_generate_waits_for_the_machines_only_when_the_authority_is_new(
     install: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    cfg = LlmportConfig(install_dir=str(install))
+    cfg = FadenConfig(install_dir=str(install))
     monkeypatch.setattr(tls_cmd, "load_config", lambda: cfg)
     monkeypatch.setattr(tls_cmd, "apply_to_proxy", lambda *_a, **_k: True)
     slept: list[float] = []
@@ -437,7 +437,7 @@ def test_machine_ca_status_and_replace_run_in_the_backend(monkeypatch: pytest.Mo
 
     from click.testing import CliRunner
 
-    from llmport.commands import tls as tls_cmd
+    from faden_cli.commands import tls as tls_cmd
 
     calls: list[list[str]] = []
     doc = {
@@ -458,7 +458,7 @@ def test_machine_ca_status_and_replace_run_in_the_backend(monkeypatch: pytest.Mo
     monkeypatch.setattr(tls_cmd.subprocess, "run", run)
     out = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca"])
     assert out.exit_code == 0, out.output
-    assert calls[-1][:5] == ["docker", "exec", "-i", "llm-port-backend", "python"] and calls[-1][-1] == "status"
+    assert calls[-1][:5] == ["docker", "exec", "-i", "faden-backend", "python"] and calls[-1][-1] == "status"
     assert "10.250.10.71" in out.output and "renews within a minute" in out.output
 
     refused = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca", "--replace"], input="n\n")

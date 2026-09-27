@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
-from llm_port_skills.db.models.skill import (
+from faden_skills.db.models.skill import (
     GrantAccess,
     PrincipalType,
     SkillActivation,
@@ -32,8 +32,8 @@ from llm_port_skills.db.models.skill import (
     SkillVersionModel,
     SkillVisibility,
 )
-from llm_port_skills.services import bundle as fmt
-from llm_port_skills.services.access import (
+from faden_skills.services import bundle as fmt
+from faden_skills.services.access import (
     CAP_CREATE,
     CAP_PUBLISH,
     CAP_SHARE,
@@ -44,14 +44,14 @@ from llm_port_skills.services.access import (
     shared_with_clause,
     visible_clause,
 )
-from llm_port_skills.services.errors import (
+from faden_skills.services.errors import (
     ConflictError,
     ForbiddenError,
     LimitError,
     NotFoundError,
 )
-from llm_port_skills.services.resolve import Candidate, Match, RequestContext, choose
-from llm_port_skills.settings import settings
+from faden_skills.services.resolve import Candidate, Match, RequestContext, choose
+from faden_skills.settings import settings
 
 MAX_GRANTS_PER_SKILL = 200
 

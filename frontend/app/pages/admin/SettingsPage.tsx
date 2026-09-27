@@ -77,11 +77,11 @@ function toTitleCase(value: string): string {
 }
 
 function isPiiSettingKey(key: string): boolean {
-  return key.startsWith("llm_port_api.pii_");
+  return key.startsWith("faden_gateway.pii_");
 }
 
 function isMailerSettingKey(key: string): boolean {
-  return key.startsWith("llm_port_mailer.");
+  return key.startsWith("faden_mailer.");
 }
 
 export default function SettingsPage() {

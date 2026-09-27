@@ -17,7 +17,7 @@ const HEAD = "11111111-1111-1111-1111-111111111111";
 const CLUSTER: FoundCluster = {
   address: "10.100.0.2:6379",
   runtime_version: "2.58.0",
-  image: "llmport/ray-vllm-gb10:ray2.58-nv26.08",
+  image: "faden/ray-vllm-gb10:ray2.58-nv26.08",
   head: {
     ip: "10.100.0.2", hostname: "gpu-01", role: "head", gpus: 1,
     runtime_node_id: "ray-head", node_id: HEAD, name: "gpu-01",
@@ -29,7 +29,7 @@ const CLUSTER: FoundCluster = {
       runtime_node_id: "ray-worker", node_id: "22222222-2222-2222-2222-222222222222", name: "gpu-02" },
   ],
   apps: [{
-    app_name: "llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
+    app_name: "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
     deployment_id: "e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
     model_id: "Qwen2.5-0.5B-Instruct",
     model_source: "/root/.cache/huggingface/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae5576",

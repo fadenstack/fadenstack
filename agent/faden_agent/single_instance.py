@@ -59,7 +59,7 @@ class SingleInstanceLock:
         except OSError as exc:
             handle.close()
             raise AlreadyRunningError(
-                f"another llmport-agent already holds {self._path}. "
+                f"another faden-agent already holds {self._path}. "
                 "Two agents on one node both enrol as the same machine, and "
                 "commands dispatched to the other one never complete. "
                 "Stop the running agent first."

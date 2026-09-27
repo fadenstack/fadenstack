@@ -16,7 +16,7 @@ import { defineConfig, devices } from "@playwright/test";
  * test-results/sweep/report.jsonl, and a screenshot of each page to
  * test-results/sweep/pages/.
  *
- * Against an install on HTTPS with a certificate made there (llmport tls
+ * Against an install on HTTPS with a certificate made there (faden tls
  * generate), set E2E_IGNORE_HTTPS_ERRORS=1 unless this machine trusts the
  * install's tls/ca.crt: the pages are still served and checked over HTTPS.
  */

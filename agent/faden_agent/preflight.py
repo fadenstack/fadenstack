@@ -6,8 +6,8 @@ import platform
 import socket
 from typing import Any
 
-from llm_port_node_agent.gpu import GpuCollector, NullCollector
-from llm_port_node_agent.runtimes import ContainerRuntime
+from faden_agent.gpu import GpuCollector, NullCollector
+from faden_agent.runtimes import ContainerRuntime
 
 
 async def docker_available(runtime: ContainerRuntime | None = None) -> bool:

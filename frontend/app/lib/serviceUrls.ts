@@ -11,7 +11,7 @@
  *
  * Host/port can be overridden for non-standard setups via env
  * (e.g. frontend running on a different machine than the services):
- *   VITE_LLM_PORT_API_HOST / VITE_LLM_PORT_API_PORT
+ *   VITE_FADEN_GATEWAY_HOST / VITE_FADEN_GATEWAY_PORT
  *   VITE_GRAFANA_HOST      / VITE_GRAFANA_PORT
  *   VITE_GRAFANA_DASHBOARD_URL (absolute URL, highest precedence)
  */
@@ -35,12 +35,12 @@ function buildUrl(host: string | undefined, port: number, path: string): string 
 }
 
 /**
- * Swagger UI for the llm_port_api gateway (`/api/docs`).
+ * Swagger UI for the gateway (`/api/docs`).
  * The gateway container exposes its port (default 8001) for dev.
  */
 export function apiDocsUrl(): string {
-  const host = (import.meta.env.VITE_LLM_PORT_API_HOST as string | undefined) ?? undefined;
-  const port = portFromEnv("VITE_LLM_PORT_API_PORT", 8001);
+  const host = (import.meta.env.VITE_FADEN_GATEWAY_HOST as string | undefined) ?? undefined;
+  const port = portFromEnv("VITE_FADEN_GATEWAY_PORT", 8001);
   return buildUrl(host, port, "/api/docs");
 }
 
@@ -55,11 +55,11 @@ export const GATEWAY_DOCS_PATH = "/gateway-docs/docs";
  * `/gateway-docs/docs` answers instead. The dev stack is the other way round:
  * no nginx, so that path answers with the app itself (or 404) and the exposed
  * port is the way in. Ask the same origin first; an explicit
- * VITE_LLM_PORT_API_HOST / _PORT always wins.
+ * VITE_FADEN_GATEWAY_HOST / _PORT always wins.
  */
 export async function resolveApiDocsUrl(fetcher: typeof fetch = fetch): Promise<string> {
   const env = import.meta.env;
-  if (env.VITE_LLM_PORT_API_HOST || env.VITE_LLM_PORT_API_PORT || typeof window === "undefined") {
+  if (env.VITE_FADEN_GATEWAY_HOST || env.VITE_FADEN_GATEWAY_PORT || typeof window === "undefined") {
     return apiDocsUrl();
   }
   try {
@@ -73,10 +73,10 @@ export async function resolveApiDocsUrl(fetcher: typeof fetch = fetch): Promise<
   return apiDocsUrl();
 }
 
-const GRAFANA_OVERVIEW_PATH = "/grafana/d/llm-port-overview/llm-port-overview";
+const GRAFANA_OVERVIEW_PATH = "/grafana/d/faden-overview/faden-overview";
 
 /**
- * Grafana "llm_port overview" dashboard URL.
+ * Grafana "faden overview" dashboard URL.
  * Grafana serves under the `/grafana` sub-path with anonymous Viewer access,
  * so the URL embeds directly without authentication. A full install reaches
  * it same-origin through nginx, over whatever scheme the console uses: its own

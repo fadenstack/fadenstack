@@ -26,8 +26,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 

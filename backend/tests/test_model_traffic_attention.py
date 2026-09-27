@@ -9,16 +9,16 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceDeployment,
     InferenceEndpoint,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.dashboard import attention
-from llm_port_backend.services.machine_tls import store
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.dashboard import attention
+from faden_backend.services.machine_tls import store
 
 pytestmark = pytest.mark.anyio
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)

@@ -9,13 +9,13 @@ encrypted secrets from ``system_setting_secret``.
 
 Keys loaded
 -----------
-- ``llm_port_api.pii_enabled`` → ``settings.pii_enabled``
-- ``llm_port_api.pii_service_url`` → ``settings.pii_service_url``
-- ``llm_port_api.pii_default_policy`` → ``settings.pii_default_policy``
-- ``llm_port_api.mcp_enabled`` → ``settings.mcp_enabled``
-- ``llm_port_api.mcp_service_url`` → ``settings.mcp_service_url``
-- ``llm_port_api.skills_enabled`` → ``settings.skills_enabled``
-- ``llm_port_api.skills_service_url`` → ``settings.skills_service_url``
+- ``faden_gateway.pii_enabled`` → ``settings.pii_enabled``
+- ``faden_gateway.pii_service_url`` → ``settings.pii_service_url``
+- ``faden_gateway.pii_default_policy`` → ``settings.pii_default_policy``
+- ``faden_gateway.mcp_enabled`` → ``settings.mcp_enabled``
+- ``faden_gateway.mcp_service_url`` → ``settings.mcp_service_url``
+- ``faden_gateway.skills_enabled`` → ``settings.skills_enabled``
+- ``faden_gateway.skills_service_url`` → ``settings.skills_service_url``
 - ``rag_lite.enabled`` → ``settings.rag_lite_enabled``
 """
 
@@ -26,17 +26,17 @@ from typing import Any
 import asyncpg
 from loguru import logger
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 # Keys to load and their mapping to settings attributes.
 _VALUE_KEYS: dict[str, str] = {
-    "llm_port_api.pii_enabled": "pii_enabled",
-    "llm_port_api.pii_service_url": "pii_service_url",
-    "llm_port_api.pii_default_policy": "pii_default_policy",
-    "llm_port_api.mcp_enabled": "mcp_enabled",
-    "llm_port_api.mcp_service_url": "mcp_service_url",
-    "llm_port_api.skills_enabled": "skills_enabled",
-    "llm_port_api.skills_service_url": "skills_service_url",
+    "faden_gateway.pii_enabled": "pii_enabled",
+    "faden_gateway.pii_service_url": "pii_service_url",
+    "faden_gateway.pii_default_policy": "pii_default_policy",
+    "faden_gateway.mcp_enabled": "mcp_enabled",
+    "faden_gateway.mcp_service_url": "mcp_service_url",
+    "faden_gateway.skills_enabled": "skills_enabled",
+    "faden_gateway.skills_service_url": "skills_service_url",
     # The Modules page switches RAG Lite on for the backend only; without
     # this the gateway never added retrieved context to a chat that asked
     # for it -- it went to the model without it, and nothing said so.

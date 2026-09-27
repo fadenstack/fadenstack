@@ -22,10 +22,10 @@ from cryptography.x509.oid import NameOID
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.services import edge_trust
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api import install as install_api
-from llm_port_backend.web.api.node_files import views as node_files
+from faden_backend.services import edge_trust
+from faden_backend.settings import settings
+from faden_backend.web.api import install as install_api
+from faden_backend.web.api.node_files import views as node_files
 
 
 def _cert(subject: str, key: ec.EllipticCurvePrivateKey, issuer: str, signer: ec.EllipticCurvePrivateKey) -> bytes:

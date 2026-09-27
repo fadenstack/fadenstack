@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import pytest
 
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway.llm_adapter import _upstream_kwargs
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway.llm_adapter import _upstream_kwargs
 
 
 @pytest.mark.parametrize(

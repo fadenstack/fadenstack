@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_api.services.gateway.pii_restore import redact_tokens, restore_payload, restore_sse
+from faden_gateway.services.gateway.pii_restore import redact_tokens, restore_payload, restore_sse
 
 MAPPING = {"[PERSON_1]": "Alice Meyer", "[EMAIL_ADDRESS_1]": "alice@example.com"}
 

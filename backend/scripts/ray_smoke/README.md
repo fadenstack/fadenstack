@@ -20,8 +20,8 @@ wiring). Run this before calling a Ray change done.
   pinned torch 2.11/cu130 wheels ship sm_75+). Verified on a TITAN RTX under
   Docker Desktop/WSL2.
 - The shared stack's Postgres container running (default name
-  `llm-port-postgres`, reachable on `127.0.0.1:5432`), and the backend venv
-  (`llm_port_backend/.venv`).
+  `faden-postgres`, reachable on `127.0.0.1:5432`), and the backend venv
+  (`backend/.venv`).
 - About 15 GB for the agent image, and internet access for the model download.
 - Free host ports: 8000 (backend), 5673 (broker), 18000 (Serve, head → host).
 
@@ -30,11 +30,11 @@ Everything runs from Git Bash on Windows or any bash on Linux.
 ## Runbook
 
 ```bash
-cd llm_port_backend/scripts/ray_smoke
+cd backend/scripts/ray_smoke
 
 ./smoke.sh build-image        # once: python:3.12 + ray[serve,llm]==2.58.0 (vLLM 0.26.0)
 ./smoke.sh broker             # throwaway RabbitMQ on 127.0.0.1:5673
-./smoke.sh reset-db           # fresh llm_port_smoke DB at the migration head
+./smoke.sh reset-db           # fresh faden_smoke DB at the migration head
 ./smoke.sh backend            # separate terminal; leave running
 
 ./smoke.sh enroll             # agent enrolls via /nodes/enroll and heartbeats
@@ -69,7 +69,7 @@ endpoint at any point.
 |---|---|
 | Environment via loop | `ready` in one pass after the agent came up; token-auth attach OK |
 | Deploy | 1 × `run_serve_app` (25 s, non-blocking), `running` after the model loaded, `ready_replicas: 1` |
-| Endpoint | `http://<head-ip>:8000/llmport-<id>/v1` answered from a separate container |
+| Endpoint | `http://<head-ip>:8000/faden-<id>/v1` answered from a separate container |
 | Reconcile a healthy deployment | 0 new `run_serve_app`, 0 replica restarts |
 | Teardown | app deleted (route 404), endpoint `retired`, `stopped` after `stop_ray` succeeded |
 
@@ -105,9 +105,9 @@ When the product path fails, these isolate the layer:
 | Variable | Default |
 |---|---|
 | `RAY_SMOKE_WORKDIR` | `./.work` (state, token, JWT secret, backend log; git-ignored) |
-| `RAY_SMOKE_IMAGE` | `llmport-agent-ray-smoke:2.58.0` |
-| `RAY_SMOKE_PG_CONTAINER` | `llm-port-postgres` |
-| `RAY_SMOKE_DB` / `RAY_SMOKE_DB_OWNER` | `llm_port_smoke` / `llm_port_backend` |
+| `RAY_SMOKE_IMAGE` | `faden-agent-ray-smoke:2.58.0` |
+| `RAY_SMOKE_PG_CONTAINER` | `faden-postgres` |
+| `RAY_SMOKE_DB` / `RAY_SMOKE_DB_OWNER` | `faden_smoke` / `faden_backend` |
 | `RAY_SMOKE_BROKER_PORT` / `RAY_SMOKE_BACKEND_PORT` / `RAY_SMOKE_SERVE_HOST_PORT` | `5673` / `8000` / `18000` |
 | `RAY_SMOKE_MODEL_REPO` | `Qwen/Qwen2.5-0.5B-Instruct` |
 

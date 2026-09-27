@@ -16,9 +16,9 @@ import pytest
 from mcp.shared.exceptions import McpError
 from mcp.types import ErrorData
 
-from llm_port_mcp.services import connection_manager
-from llm_port_mcp.services.connection_manager import MCPConnectionManager, session_gone
-from llm_port_mcp.services.transport.base import MCPServerConfig
+from faden_mcp.services import connection_manager
+from faden_mcp.services.connection_manager import MCPConnectionManager, session_gone
+from faden_mcp.services.transport.base import MCPServerConfig
 
 TERMINATED = McpError(ErrorData(code=32600, message="Session terminated"))
 

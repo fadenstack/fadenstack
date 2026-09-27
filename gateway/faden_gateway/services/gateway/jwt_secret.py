@@ -7,19 +7,19 @@ import asyncpg
 from cryptography.fernet import Fernet
 from loguru import logger
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 _JWT_SECRET_KEYS: tuple[str, ...] = (
-    "llm_port_api.jwt_secret",
-    "llm_port_backend.users_secret",
+    "faden_gateway.jwt_secret",
+    "faden_backend.users_secret",
 )
 
 
 async def load_jwt_secret_from_backend_db() -> bool:
     """Load JWT secret from backend system settings DB.
 
-    Preferred key is ``llm_port_api.jwt_secret``; if absent/empty, fallback to
-    ``llm_port_backend.users_secret`` to keep signing and verification aligned.
+    Preferred key is ``faden_gateway.jwt_secret``; if absent/empty, fallback to
+    ``faden_backend.users_secret`` to keep signing and verification aligned.
     """
     if not settings.backend_db_base or not settings.settings_master_key:
         return False
@@ -67,12 +67,12 @@ async def load_jwt_secret_from_backend_db() -> bool:
             continue
 
         settings.jwt_secret = secret
-        if db_key == "llm_port_api.jwt_secret":
-            logger.info("JWT secret loaded from backend DB (llm_port_api.jwt_secret).")
+        if db_key == "faden_gateway.jwt_secret":
+            logger.info("JWT secret loaded from backend DB (faden_gateway.jwt_secret).")
         else:
             logger.warning(
                 "JWT secret loaded from backend fallback key '{}'. "
-                "Set llm_port_api.jwt_secret explicitly to avoid drift.",
+                "Set faden_gateway.jwt_secret explicitly to avoid drift.",
                 db_key,
             )
         return True

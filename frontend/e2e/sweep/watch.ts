@@ -21,7 +21,7 @@ const KNOWN_KEYS = (() => {
   };
   for (const ns of ["common", "chat", "tour"]) {
     try {
-      walk(JSON.parse(readFileSync(`../llm_port_backend/i18n/en/${ns}.json`, "utf-8")), "");
+      walk(JSON.parse(readFileSync(`../backend/i18n/en/${ns}.json`, "utf-8")), "");
     } catch {
       /* a namespace that is not there */
     }

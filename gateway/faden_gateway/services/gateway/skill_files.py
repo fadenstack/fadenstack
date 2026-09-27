@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillsClient
+from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillsClient
 
 NAME = "read_skill_file"
 

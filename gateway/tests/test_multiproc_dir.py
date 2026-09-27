@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from llm_port_api.__main__ import _reset_multiproc_dir
+from faden_gateway.__main__ import _reset_multiproc_dir
 
 
 def test_a_fresh_directory_is_created(tmp_path: Path) -> None:

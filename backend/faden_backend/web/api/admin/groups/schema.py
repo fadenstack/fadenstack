@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from llm_port_backend.web.api.admin.users.schema import RoleDTO
+from faden_backend.web.api.admin.users.schema import RoleDTO
 
 
 class GroupDTO(BaseModel):

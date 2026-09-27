@@ -1,23 +1,23 @@
-# llmport-cli
+# fadenstack
 
-[![PyPI version](https://img.shields.io/pypi/v/llmport-cli)](https://pypi.org/project/llmport-cli/)
-[![Python 3.12+](https://img.shields.io/pypi/pyversions/llmport-cli)](https://pypi.org/project/llmport-cli/)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/llm-port/llm-port-cli/blob/main/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/fadenstack)](https://pypi.org/project/fadenstack/)
+[![Python 3.12+](https://img.shields.io/pypi/pyversions/fadenstack)](https://pypi.org/project/fadenstack/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/fadenstack/fadenstack/blob/main/cli/LICENSE)
 
 The single entry point to **deploy, configure, and manage** the
-[llm.port](https://llm-port.github.io) platform — an open-source LLM gateway
+[fadenstack](https://fadenstack.github.io) platform — an open-source LLM gateway
 that routes, secures, and observes traffic across local runtimes and remote
 providers.
 
 ```
-pipx install llmport-cli       # or: uv tool install llmport-cli
-llmport deploy                 # installs LLM.Port into ~/llm-port and starts it
+pipx install fadenstack       # or: uv tool install fadenstack
+faden deploy                 # installs Fadenstack into ~/fadenstack and starts it
 ```
 
 The CLI carries the deployment files of its release and runs that release's
-published images: `llmport-cli 0.3.0` deploys LLM.Port 0.3.0. To upgrade,
-upgrade the CLI and run `llmport upgrade`. See
-[Installing LLM.Port](https://github.com/llm-port/llm-port-core/blob/master/docs/installing.md).
+published images: `fadenstack 0.3.0` deploys Fadenstack 0.3.0. To upgrade,
+upgrade the CLI and run `faden upgrade`. See
+[Installing Fadenstack](https://github.com/fadenstack/fadenstack/blob/master/docs/installing.md).
 
 ---
 
@@ -25,7 +25,7 @@ upgrade the CLI and run `llmport upgrade`. See
 
 - **One-command production deploy** — pre-flight checks, `.env` generation,
   the release's images, database migrations, and service startup.
-- **Upgrade, backup and restore** — `llmport upgrade` backs up every database,
+- **Upgrade, backup and restore** — `faden upgrade` backs up every database,
   moves the install to the CLI's release and keeps your settings.
 - **Auto-tuning** — detects host CPU / RAM and computes optimal worker counts,
   DB pool sizes, and queue channel pools.
@@ -38,7 +38,7 @@ upgrade the CLI and run `llmport upgrade`. See
 - **Rich terminal UI** — tables, progress bars, and themed output powered by
   [Rich](https://github.com/Textualize/rich). Interactive TUI wizard via
   [Textual](https://github.com/Textualize/textual).
-- **Command abbreviation** — type `llmport st` instead of `llmport status`.
+- **Command abbreviation** — type `faden st` instead of `faden status`.
 
 ---
 
@@ -60,26 +60,26 @@ developer workflow.
 ### From PyPI
 
 ```bash
-pip install llmport-cli
+pip install fadenstack
 
 # or with uv
-uv tool install llmport-cli
+uv tool install fadenstack
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/llm-port/llm-port-core.git
-cd llm-port-core/llm_port_cli
+git clone https://github.com/fadenstack/fadenstack.git
+cd fadenstack/cli
 uv sync                   # install deps + editable entry point
-uv run llmport --help
+uv run faden --help
 ```
 
 ### Verify
 
 ```bash
-llmport version
-llmport doctor
+faden version
+faden doctor
 ```
 
 ---
@@ -90,68 +90,68 @@ llmport doctor
 
 ```bash
 # Full deploy — pre-flight, env gen, pull this release's images, migrate, start
-llmport deploy                      # into ~/llm-port
-llmport deploy /opt/llmport         # into a directory of your choice
+faden deploy                      # into ~/fadenstack
+faden deploy /opt/faden         # into a directory of your choice
 
 # Enable optional modules
-llmport deploy --modules pii,auth
+faden deploy --modules pii,auth
 
 # From a source checkout: build the images instead of pulling them
-llmport deploy --build
+faden deploy --build
 
 # Upgrade to the CLI's release (backs up first), back up, restore
-llmport upgrade
-llmport backup
-llmport restore ~/llm-port/backups/<time>
+faden upgrade
+faden backup
+faden restore ~/fadenstack/backups/<time>
 
 # Provision node-agent on this host during deploy
-llmport deploy /opt/llmport --local-node
+faden deploy /opt/faden --local-node
 
 # Provision node-agent on remote host over SSH
-llmport deploy /opt/llmport --local-node --local-node-host ubuntu@10.0.0.12
+faden deploy /opt/faden --local-node --local-node-host ubuntu@10.0.0.12
 ```
 
 ### Day-to-day operations
 
 ```bash
-llmport up                          # start all services
-llmport up --build llm-port-api     # rebuild a single service
-llmport down                        # stop all services
-llmport down --volumes              # stop + remove volumes
-llmport status                      # service table
-llmport logs -f                     # tail all logs
-llmport logs -f llm-port-backend    # tail one service
+faden up                          # start all services
+faden up --build faden-gateway     # rebuild a single service
+faden down                        # stop all services
+faden down --volumes              # stop + remove volumes
+faden status                      # service table
+faden logs -f                     # tail all logs
+faden logs -f faden-backend    # tail one service
 ```
 
 ### Modules
 
 ```bash
-llmport module list                 # show available modules
-llmport module enable pii skills    # enable modules
-llmport module disable mcp          # disable a module
+faden module list                 # show available modules
+faden module enable pii skills    # enable modules
+faden module disable mcp          # disable a module
 ```
 
 ### Configuration
 
 ```bash
-llmport config show                 # print current config
-llmport config set dev.branch main  # update a value (dot-notation)
-llmport config edit                 # open in $EDITOR
-llmport config path                 # print config file location
+faden config show                 # print current config
+faden config set dev.branch main  # update a value (dot-notation)
+faden config edit                 # open in $EDITOR
+faden config path                 # print config file location
 ```
 
 ### Auto-tuning
 
 ```bash
-llmport tune                        # detect resources, write .env
-llmport tune --profile prod         # production-grade sizing
-llmport tune --dry-run              # preview without writing
+faden tune                        # detect resources, write .env
+faden tune --profile prod         # production-grade sizing
+faden tune --dry-run              # preview without writing
 ```
 
 ### Admin utilities
 
 ```bash
-llmport admin reset-password --email admin@localhost
+faden admin reset-password --email admin@localhost
 ```
 
 ### Developer workflow
@@ -159,27 +159,27 @@ llmport admin reset-password --email admin@localhost
 ```bash
 # Bootstrap everything — clone repos, install deps, start infra,
 # run migrations, generate VS Code workspace
-llmport dev init ~/projects/llm-port
-llmport dev init ~/projects/llm-port --ssh        # SSH cloning
-llmport dev init ~/projects/llm-port --overwrite   # force pull
+faden dev init ~/projects/fadenstack
+faden dev init ~/projects/fadenstack --ssh        # SSH cloning
+faden dev init ~/projects/fadenstack --overwrite   # force pull
 
 # Start / stop / status
-llmport dev up
-llmport dev up --backend-only
-llmport dev up --modules pii,mcp,skills   # also run the optional modules
-llmport dev up --local-node
-llmport dev up --local-node --local-node-host ubuntu@10.0.0.12
-llmport dev down
-llmport dev status
+faden dev up
+faden dev up --backend-only
+faden dev up --modules pii,mcp,skills   # also run the optional modules
+faden dev up --local-node
+faden dev up --local-node --local-node-host ubuntu@10.0.0.12
+faden dev down
+faden dev status
 
 # Check dev prerequisites (optionally auto-install missing tools)
-llmport dev doctor
-llmport dev doctor --install --yes
+faden dev doctor
+faden dev doctor --install --yes
 ```
 
 `--modules` runs PII (8003), MCP (8007) and skills (8008) on the host beside
 the backend, and points the gateway and backend at them. Without it, the
-modules switched on with `llmport module enable` run; the others are switched
+modules switched on with `faden module enable` run; the others are switched
 off in the gateway and backend. See
 [What the gateway does with a chat request](../docs/gateway-pipeline.md).
 
@@ -192,37 +192,37 @@ Use `--local-node-no-sudo` to skip privileged systemd setup.
 
 | Command                                      | Description                                                   |
 | -------------------------------------------- | ------------------------------------------------------------- |
-| `llmport version`                            | Print CLI, Python, Docker, and Compose versions               |
-| `llmport doctor`                             | Run system health checks (OS, RAM, disk, Docker, GPU, ports)  |
-| `llmport deploy [DIR]`                       | Full production deployment with pre-flight checks             |
-| `llmport upgrade`                            | Back up, move to the CLI's release, restart with health gate  |
-| `llmport backup` / `llmport restore DIR`     | Dump every database and `.env` / put them back                |
-| `llmport deploy [DIR] --local-node`          | Deploy + provision node-agent (local or SSH host)            |
-| `llmport up [SERVICES...]`                   | Start services (supports `--build`, `--pull`)                 |
-| `llmport down`                               | Stop and remove containers (`--volumes`, `--all`)             |
-| `llmport status`                             | Show service state, health, and ports (`--json`)              |
-| `llmport logs [SERVICES...]`                 | Stream logs (`-f`, `-n`, `--timestamps`)                      |
-| `llmport config show\|set\|edit\|path\|init` | Manage YAML configuration                                     |
-| `llmport module list\|enable\|disable`       | Toggle optional platform modules                              |
-| `llmport tune`                               | Auto-tune worker and pool settings (`--profile`, `--dry-run`) |
-| `llmport admin reset-password`               | Reset a user password directly in the database                |
-| `llmport dev init [DIR]`                     | Bootstrap full developer workspace                            |
-| `llmport dev up`                             | Start backend, worker, and frontend dev servers               |
-| `llmport dev up --modules pii,mcp,skills`    | Also run the optional modules on the host                     |
-| `llmport dev up --local-node`                | Start dev services and provision node-agent                   |
-| `llmport dev down`                           | Stop all dev processes                                        |
-| `llmport dev status`                         | Show repo branches, infra, and dev processes                  |
-| `llmport dev doctor`                         | Check dev prerequisites (`--install`)                         |
+| `faden version`                            | Print CLI, Python, Docker, and Compose versions               |
+| `faden doctor`                             | Run system health checks (OS, RAM, disk, Docker, GPU, ports)  |
+| `faden deploy [DIR]`                       | Full production deployment with pre-flight checks             |
+| `faden upgrade`                            | Back up, move to the CLI's release, restart with health gate  |
+| `faden backup` / `faden restore DIR`     | Dump every database and `.env` / put them back                |
+| `faden deploy [DIR] --local-node`          | Deploy + provision node-agent (local or SSH host)            |
+| `faden up [SERVICES...]`                   | Start services (supports `--build`, `--pull`)                 |
+| `faden down`                               | Stop and remove containers (`--volumes`, `--all`)             |
+| `faden status`                             | Show service state, health, and ports (`--json`)              |
+| `faden logs [SERVICES...]`                 | Stream logs (`-f`, `-n`, `--timestamps`)                      |
+| `faden config show\|set\|edit\|path\|init` | Manage YAML configuration                                     |
+| `faden module list\|enable\|disable`       | Toggle optional platform modules                              |
+| `faden tune`                               | Auto-tune worker and pool settings (`--profile`, `--dry-run`) |
+| `faden admin reset-password`               | Reset a user password directly in the database                |
+| `faden dev init [DIR]`                     | Bootstrap full developer workspace                            |
+| `faden dev up`                             | Start backend, worker, and frontend dev servers               |
+| `faden dev up --modules pii,mcp,skills`    | Also run the optional modules on the host                     |
+| `faden dev up --local-node`                | Start dev services and provision node-agent                   |
+| `faden dev down`                           | Stop all dev processes                                        |
+| `faden dev status`                         | Show repo branches, infra, and dev processes                  |
+| `faden dev doctor`                         | Check dev prerequisites (`--install`)                         |
 
 ---
 
 ## Project structure
 
 ```
-llm_port_cli/
+cli/
 ├── pyproject.toml
 ├── src/
-│   └── llmport/
+│   └── faden/
 │       ├── cli.py                 # Click root group + AliasedGroup
 │       ├── commands/
 │       │   ├── version.py         # version
@@ -244,7 +244,7 @@ llm_port_cli/
 │       ├── core/                  # shared utilities
 │       │   ├── compose.py         # Docker Compose wrapper
 │       │   ├── detect.py          # OS / GPU / port detection
-│       │   ├── settings.py        # YAML config (~/.config/llmport/)
+│       │   ├── settings.py        # YAML config (~/.config/faden/)
 │       │   ├── api_client.py      # Backend REST client (httpx)
 │       │   ├── bootstrap.py       # First-admin bootstrap
 │       │   ├── env_gen.py         # .env generation (Jinja2)
@@ -264,4 +264,4 @@ llm_port_cli/
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
-Part of the [llm.port](https://github.com/llm-port) project.
+Part of the [fadenstack](https://github.com/fadenstack) project.

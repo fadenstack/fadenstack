@@ -14,11 +14,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from llm_port_api.services.gateway.mcp_client import MCPClient, ToolCatalog
+from faden_gateway.services.gateway.mcp_client import MCPClient, ToolCatalog
 
 logger = logging.getLogger(__name__)
 
-# Prefix used by llm_port_mcp to namespace tool names
+# Prefix used by faden_mcp to namespace tool names
 MCP_TOOL_PREFIX = "mcp."
 
 

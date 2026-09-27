@@ -21,11 +21,11 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray.container import (
+from faden_agent.ray.container import (
     DEFAULT_CONTAINER_NAME,
     RayContainerRuntime,
 )
-from llm_port_node_agent.runtimes import ContainerRuntimeError
+from faden_agent.runtimes import ContainerRuntimeError
 
 _DISCOVERY_PATH = "/tmp/ray/prom_metrics_service_discovery.json"
 

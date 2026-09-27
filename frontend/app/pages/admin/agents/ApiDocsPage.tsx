@@ -21,7 +21,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 export default function ApiDocsPage() {
   const { t } = useTranslation();
-  const [containerName, setContainerName] = useState("llm-port-api");
+  const [containerName, setContainerName] = useState("faden-gateway");
   // Behind nginx (a full install) the gateway's docs are same-origin under
   // /gateway-docs/docs and its own port is not published; in the dev stack
   // there is no nginx and the exposed port (:8001) is the way in.

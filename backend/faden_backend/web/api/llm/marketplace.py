@@ -16,17 +16,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.marketplace import curated as curated_mod
-from llm_port_backend.services.marketplace import fit as fit_mod
-from llm_port_backend.services.marketplace import recipes as recipes_mod
-from llm_port_backend.services.marketplace import settings as settings_mod
-from llm_port_backend.services.marketplace.hardware import cluster_hardware
-from llm_port_backend.services.marketplace.host import HostError, HostRequest, host
-from llm_port_backend.services.marketplace.hub import HubClient, HubNotFound, HubUnavailable
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
+from faden_backend.services.marketplace import curated as curated_mod
+from faden_backend.services.marketplace import fit as fit_mod
+from faden_backend.services.marketplace import recipes as recipes_mod
+from faden_backend.services.marketplace import settings as settings_mod
+from faden_backend.services.marketplace.hardware import cluster_hardware
+from faden_backend.services.marketplace.host import HostError, HostRequest, host
+from faden_backend.services.marketplace.hub import HubClient, HubNotFound, HubUnavailable
+from faden_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.web.api.rbac import require_permission
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -36,7 +36,7 @@ _READ = require_permission("llm.models", "read")
 
 async def _hub(session: AsyncSession) -> HubClient:
     """A Hub client carrying this server's Hugging Face token, when one is set."""
-    from llm_port_backend.services.llm import hf_token  # noqa: PLC0415
+    from faden_backend.services.llm import hf_token  # noqa: PLC0415
 
     token, _source = await hf_token.resolve(session)
     return HubClient(token=token)
@@ -50,9 +50,9 @@ async def _local(session: AsyncSession) -> dict[str, dict[str, Any]]:
     """
     from sqlalchemy import func, select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
-    from llm_port_backend.db.models.llm import LLMModel, ModelStatus  # noqa: PLC0415
-    from llm_port_backend.services.llm.artifacts import server_has_files  # noqa: PLC0415
+    from faden_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
+    from faden_backend.db.models.llm import LLMModel, ModelStatus  # noqa: PLC0415
+    from faden_backend.services.llm.artifacts import server_has_files  # noqa: PLC0415
 
     counts = dict((await session.execute(
         select(InferenceDeployment.model_id, func.count()).group_by(InferenceDeployment.model_id),
@@ -190,7 +190,7 @@ async def avatar(
     _user: User = Depends(_READ),
 ) -> Response:
     """The Hub picture of a model's owner, for its card; 404 when there is none."""
-    from llm_port_backend.services.marketplace.hub import fetch_avatar  # noqa: PLC0415
+    from faden_backend.services.marketplace.hub import fetch_avatar  # noqa: PLC0415
 
     found = await fetch_avatar(author)
     if found is None:
@@ -221,8 +221,8 @@ async def kept(
     """
     from sqlalchemy import func, select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import InferenceDeployment, InferenceEnvironment  # noqa: PLC0415
-    from llm_port_backend.db.models.llm import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import InferenceDeployment, InferenceEnvironment  # noqa: PLC0415
+    from faden_backend.db.models.llm import (  # noqa: PLC0415
         DownloadJob,
         LLMModel,
         LLMRuntime,
@@ -373,7 +373,7 @@ async def host_model(
     llm_service: Any = Depends(get_llm_service),
 ) -> dict[str, Any]:
     """Keep the model on this server (downloading it if needed) and deploy it to a cluster."""
-    from llm_port_backend.services.inference.service import InferenceError  # noqa: PLC0415
+    from faden_backend.services.inference.service import InferenceError  # noqa: PLC0415
 
     try:
         return await host(session, llm_service, HostRequest(

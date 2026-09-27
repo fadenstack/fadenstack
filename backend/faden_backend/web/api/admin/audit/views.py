@@ -8,10 +8,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.models.users import User
-from llm_port_backend.web.api.admin.audit.schema import AuditEventDTO
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.models.users import User
+from faden_backend.web.api.admin.audit.schema import AuditEventDTO
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 

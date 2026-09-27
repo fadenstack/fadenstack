@@ -19,7 +19,7 @@ depends_on = None
 
 def upgrade() -> None:
     # NOTE: The pgvector extension must be created by a superuser.
-    # It is provisioned in llm_port_shared/initdb/01-init.sql.
+    # It is provisioned in shared/initdb/01-init.sql.
 
     # -- Enum types (drop orphans from prior failed runs) ------------------
     op.execute("DROP TYPE IF EXISTS rag_lite_document_status")

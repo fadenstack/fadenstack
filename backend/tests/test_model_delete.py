@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.settings import settings
+from faden_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.services.llm.service import LLMService
+from faden_backend.settings import settings
 
 pytestmark = pytest.mark.anyio
 
@@ -44,7 +44,7 @@ async def _delete(session: AsyncSession, model: LLMModel, *, files: bool) -> int
 
 async def test_a_model_a_deployment_uses_is_not_deleted(dbsession: AsyncSession) -> None:
     """The database refused it anyway (RESTRICT), as an error nobody could read."""
-    from llm_port_backend.db.models.inference import InferenceControlPlane, InferenceDeployment, InferenceEnvironment
+    from faden_backend.db.models.inference import InferenceControlPlane, InferenceDeployment, InferenceEnvironment
 
     model = await _model(dbsession, "Qwen/Qwen3-8B")
     plane = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:6]}", driver="ray")

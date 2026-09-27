@@ -18,7 +18,7 @@ from collections import namedtuple
 import psutil
 import pytest
 
-from llmport.commands.dev import dev_up
+from faden_cli.commands.dev import dev_up
 
 _Addr = namedtuple("_Addr", "ip port")
 _Conn = namedtuple("_Conn", "status pid laddr")

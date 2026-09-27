@@ -5,7 +5,7 @@ from pathlib import Path
 
 import uvicorn
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 
 def set_multiproc_dir() -> None:
@@ -44,7 +44,7 @@ def main() -> None:
 
     set_multiproc_dir()
     uvicorn.run(
-        "llm_port_backend.web.application:get_app",
+        "faden_backend.web.application:get_app",
         workers=settings.workers_count,
         host=settings.host,
         port=settings.port,

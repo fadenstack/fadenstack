@@ -28,12 +28,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import InferenceDeployment, InferenceEnvironment
-from llm_port_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.dashboard.timewindows import Window
-from llm_port_backend.services.llm import residency as residency_mod
-from llm_port_backend.settings import settings
+from faden_backend.db.models.inference import InferenceDeployment, InferenceEnvironment
+from faden_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.dashboard.timewindows import Window
+from faden_backend.services.llm import residency as residency_mod
+from faden_backend.settings import settings
 
 RESIDENCY_CLASSES = (
     residency_mod.MACHINES,

@@ -15,16 +15,16 @@ from typing import Any
 
 from huggingface_hub import scan_cache_dir
 
-from llm_port_backend.services.llm.kinds import runtime_calls_tools, runtime_kind
-from llm_port_backend.db.dao.llm_dao import (
+from faden_backend.services.llm.kinds import runtime_calls_tools, runtime_kind
+from faden_backend.db.dao.llm_dao import (
     ArtifactDAO,
     DownloadJobDAO,
     ModelDAO,
     ProviderDAO,
     RuntimeDAO,
 )
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.llm import (
     DownloadJob,
     LLMModel,
     LLMProvider,
@@ -35,16 +35,16 @@ from llm_port_backend.db.models.llm import (
     ProviderType,
     RuntimeStatus,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeCommandType, NodeHealthStatus
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.llm.base import ContainerSpec
-from llm_port_backend.services.llm.gateway_sync import GatewaySyncService, _normalize_base_url
-from llm_port_backend.services.llm import remote_health
-from llm_port_backend.services.llm.monitoring import deprovision_for_runtime
-from llm_port_backend.services.llm.registry import get_adapter
-from llm_port_backend.services.llm.scanner import scan_model_directory
-from llm_port_backend.services.nodes import NodeControlService
-from llm_port_backend.settings import settings
+from faden_backend.db.models.node_control import InfraNode, NodeCommandType, NodeHealthStatus
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.llm.base import ContainerSpec
+from faden_backend.services.llm.gateway_sync import GatewaySyncService, _normalize_base_url
+from faden_backend.services.llm import remote_health
+from faden_backend.services.llm.monitoring import deprovision_for_runtime
+from faden_backend.services.llm.registry import get_adapter
+from faden_backend.services.llm.scanner import scan_model_directory
+from faden_backend.services.nodes import NodeControlService
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class LLMService:
     @staticmethod
     async def _hf_token(session: Any) -> str | None:
         """This server's Hugging Face token, for a container that may fetch model code."""
-        from llm_port_backend.services.llm import hf_token  # noqa: PLC0415
+        from faden_backend.services.llm import hf_token  # noqa: PLC0415
 
         token, _source = await hf_token.resolve(session)
         return token
@@ -102,15 +102,15 @@ class LLMService:
         """Deterministic Docker container name for node-deployed runtimes."""
         slug = runtime_name.replace("_", "-").replace("/", "-").replace(" ", "-").lower()
         slug = "".join(ch for ch in slug if ch.isalnum() or ch == "-").strip("-")
-        return f"llm-port-{slug[:48]}" if slug else "llm-port-runtime"
+        return f"faden-{slug[:48]}" if slug else "faden-runtime"
 
     @staticmethod
     async def _machine_tls_health(session: Any, endpoint_url: str) -> Any:
         """``/health`` of a model behind a machine's model-TLS proxy, presenting the gateway's certificate."""
         import httpx  # noqa: PLC0415
 
-        from llm_port_backend.services.llm.base import HealthStatus  # noqa: PLC0415
-        from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+        from faden_backend.services.llm.base import HealthStatus  # noqa: PLC0415
+        from faden_backend.services.machine_tls import store  # noqa: PLC0415
 
         try:
             ctx = await store.client_context(session, settings.settings_master_key)
@@ -130,7 +130,7 @@ class LLMService:
     @staticmethod
     def _model_tls_request(node: Any, provider_config: dict[str, Any] | None) -> dict[str, int] | None:
         """Behind the machine's model-TLS proxy, when its agent can run one: which ports."""
-        from llm_port_backend.services import machine_tls  # noqa: PLC0415
+        from faden_backend.services import machine_tls  # noqa: PLC0415
 
         if node is None or not settings.machine_tls_enabled:
             return None
@@ -313,7 +313,7 @@ class LLMService:
 
         # Dispatch async task — non-fatal if RabbitMQ is temporarily
         # unreachable; the user can retry from the Jobs page.
-        from llm_port_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
+        from faden_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
 
         try:
             await download_model_task.kiq(
@@ -1318,7 +1318,7 @@ class LLMService:
         """Names of the cluster deployments using *model_id*, deleted-but-not-yet-gone included."""
         from sqlalchemy import select  # noqa: PLC0415
 
-        from llm_port_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
+        from faden_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
 
         rows = await session.execute(select(InferenceDeployment.name).where(InferenceDeployment.model_id == model_id))
         return [str(name) for name in rows.scalars().all()]
@@ -1343,7 +1343,7 @@ class LLMService:
         from a path is the operator's own files, and anything outside the
         store is not ours to remove.
         """
-        from llm_port_backend.settings import settings  # noqa: PLC0415
+        from faden_backend.settings import settings  # noqa: PLC0415
 
         if not model.hf_repo_id or str(getattr(model.source, "value", model.source)) != "huggingface":
             return None
@@ -1418,7 +1418,7 @@ class LLMService:
         source: str = "sync_from_server",
     ) -> dict[str, Any] | None:
         """Build the ``model_sync`` dict for remote node deployment."""
-        from llm_port_backend.services.llm.artifacts import build_model_sync_payload
+        from faden_backend.services.llm.artifacts import build_model_sync_payload
 
         return build_model_sync_payload(model, source=source)
 

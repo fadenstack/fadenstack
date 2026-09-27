@@ -1,4 +1,4 @@
-"""``llmport dev pull`` — pull the latest changes from a branch.
+"""``faden dev pull`` — pull the latest changes from a branch.
 
 Fetches and fast-forwards every repository checked out in the dev
 workspace to the latest commit of the target branch (default:
@@ -9,8 +9,8 @@ just brings the checkouts up to date.
 Repositories discovered in the workspace (same convention as
 ``dev status``):
 
-* every llm-port service in the monorepo layout
-  ``<workspace>/llm-port-core/<name>``, or
+* every fadenstack service in the monorepo layout
+  ``<workspace>/fadenstack/<name>``, or
 * flat ``<workspace>/<name>`` checkouts, when that layout is in use;
 * the workspace root itself, if it is a git checkout (running the CLI
   from inside a checkout).
@@ -31,10 +31,10 @@ from pathlib import Path
 import click
 from rich.table import Table
 
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.registry import REPO_DIR_MAP
-from llmport.core.settings import load_config
-from llmport.core.workspace import find_service_dir
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.registry import REPO_DIR_MAP
+from faden_cli.core.settings import load_config
+from faden_cli.core.workspace import find_service_dir
 
 from .dev_group import dev_group
 
@@ -82,7 +82,7 @@ def _find_repo_dirs(workspace: Path) -> list[tuple[str, Path]]:
     """Return ``(display_name, repo_root)`` for each repo in the workspace.
 
     Discovery follows the ``dev status`` convention — registry-driven via
-    :func:`find_service_dir` (monorepo layout ``<ws>/llm-port-core/<name>``
+    :func:`find_service_dir` (monorepo layout ``<ws>/fadenstack/<name>``
     or flat ``<ws>/<name>``) — plus the workspace root itself when it is a
     checkout (running the CLI from inside a repo).  Candidates that live
     inside the same git repository (e.g. monorepo subdirs) collapse to the
@@ -224,10 +224,10 @@ def dev_pull(*, branch: str, force: bool, hard: bool) -> None:
 
     \b
     Examples:
-        llmport dev pull
-        llmport dev pull --branch feature-x
-        llmport dev pull -b master --force
-        llmport dev pull --hard   # destructive
+        faden dev pull
+        faden dev pull --branch feature-x
+        faden dev pull -b master --force
+        faden dev pull --hard   # destructive
     """
     cfg = load_config()
     workspace = (
@@ -245,7 +245,7 @@ def dev_pull(*, branch: str, force: bool, hard: bool) -> None:
     if not repos:
         error(
             f"No git repositories found in {workspace}. "
-            "Run [bold]llmport dev init[/bold] to bootstrap the workspace first."
+            "Run [bold]faden dev init[/bold] to bootstrap the workspace first."
         )
         raise SystemExit(1)
 
@@ -294,4 +294,4 @@ def dev_pull(*, branch: str, force: bool, hard: bool) -> None:
             )
         raise SystemExit(1)
 
-    info("Next: [bold]llmport dev up[/bold] to run the services against the new code.")
+    info("Next: [bold]faden dev up[/bold] to run the services against the new code.")

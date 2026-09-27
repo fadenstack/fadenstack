@@ -1,13 +1,13 @@
 """The install's front door: its ports, and whether it answers over HTTPS.
 
 nginx serves HTTPS whenever ``<install>/tls`` holds ``edge.crt`` and
-``edge.key``, and sends plain HTTP there (llm_port_shared/nginx/select-config.sh).
+``edge.key``, and sends plain HTTP there (shared/nginx/select-config.sh).
 Everything the CLI does against the console after ``docker compose up`` --
 the health gate, the first-admin bootstrap, a login for an enrollment token
 -- has to follow, or it talks to a redirect.
 
-The two host ports nginx is published on are ``LLM_PORT_HTTP_PORT`` and
-``LLM_PORT_HTTPS_PORT`` in the install's ``.env``; docker-compose.yaml
+The two host ports nginx is published on are ``FADEN_HTTP_PORT`` and
+``FADEN_HTTPS_PORT`` in the install's ``.env``; docker-compose.yaml
 publishes both, the HTTPS one even while nothing listens on it.
 """
 
@@ -18,8 +18,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
-HTTP_PORT_KEY = "LLM_PORT_HTTP_PORT"
-HTTPS_PORT_KEY = "LLM_PORT_HTTPS_PORT"
+HTTP_PORT_KEY = "FADEN_HTTP_PORT"
+HTTPS_PORT_KEY = "FADEN_HTTPS_PORT"
 DEFAULT_HTTP_PORT = 80
 DEFAULT_HTTPS_PORT = 443
 
@@ -65,8 +65,8 @@ def url_for(host: str, *, https: bool, env: Mapping[str, str]) -> str:
 def console_url(install_dir: Path, env: Mapping[str, str]) -> str:
     """``https://localhost[:port]`` with edge material in place, else ``http://localhost[:port]``.
 
-    *env* is the install's ``.env``; the ports follow ``LLM_PORT_HTTPS_PORT``
-    and ``LLM_PORT_HTTP_PORT`` the way docker-compose.yaml publishes them.
+    *env* is the install's ``.env``; the ports follow ``FADEN_HTTPS_PORT``
+    and ``FADEN_HTTP_PORT`` the way docker-compose.yaml publishes them.
     """
     return url_for("localhost", https=edge_material_present(install_dir), env=env)
 

@@ -13,12 +13,12 @@ from fastapi import APIRouter, Depends, Request
 from prometheus_client import REGISTRY
 from sqlalchemy import text
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.dashboard import platform
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dashboard.caching import no_store
-from llm_port_backend.web.api.admin.dashboard.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.dashboard import platform
+from faden_backend.services.docker.client import DockerService
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dashboard.caching import no_store
+from faden_backend.web.api.admin.dashboard.schema import (
     DashboardHealthDTO,
     DashboardHealthItemDTO,
     DashboardOverviewDTO,
@@ -27,7 +27,7 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     GrafanaPanelDTO,
     GrafanaPanelsDTO,
 )
-from llm_port_backend.web.api.admin.dependencies import get_docker, require_superuser
+from faden_backend.web.api.admin.dependencies import get_docker, require_superuser
 
 router = APIRouter(dependencies=[Depends(no_store)])
 
@@ -182,7 +182,7 @@ def _collect_gpu_metrics() -> dict[str, float | int | None]:
     supports NVIDIA (pynvml), AMD (Linux sysfs), and Windows perf
     counters across all GPU vendors.
     """
-    from llm_port_backend.services.gpu.metrics import collect_gpu_metrics  # noqa: PLC0415
+    from faden_backend.services.gpu.metrics import collect_gpu_metrics  # noqa: PLC0415
 
     m = collect_gpu_metrics()
     return {
@@ -433,12 +433,12 @@ async def grafana_panels(
 
 # The redesigned dashboard's endpoints, one module each. Included here so they
 # share this router's prefix, tag and no-store dependency.
-from llm_port_backend.web.api.admin.dashboard.layout import router as _layout_router  # noqa: E402
+from faden_backend.web.api.admin.dashboard.layout import router as _layout_router  # noqa: E402
 
 router.include_router(_layout_router)
-from llm_port_backend.web.api.admin.dashboard.traffic import router as _traffic_router  # noqa: E402
+from faden_backend.web.api.admin.dashboard.traffic import router as _traffic_router  # noqa: E402
 
 router.include_router(_traffic_router)
-from llm_port_backend.web.api.admin.dashboard.fleet import router as _fleet_router  # noqa: E402
+from faden_backend.web.api.admin.dashboard.fleet import router as _fleet_router  # noqa: E402
 
 router.include_router(_fleet_router)

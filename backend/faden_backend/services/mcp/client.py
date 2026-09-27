@@ -1,4 +1,4 @@
-"""HTTP client for llm_port_mcp admin APIs."""
+"""HTTP client for faden_mcp admin APIs."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import httpx
 from fastapi import HTTPException
 from starlette import status
 
-from llm_port_backend.settings import settings
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
 
 
 class MCPServiceClient:

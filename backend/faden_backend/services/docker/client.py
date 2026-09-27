@@ -17,8 +17,8 @@ def _resolve_bind_path(host_path: str) -> str:
     """Resolve a host-side bind-mount path to an absolute, Docker-compatible form.
 
     On Windows the backend may specify Linux-style paths like
-    ``/srv/llm-port/models`` that Python resolves relative to the current
-    drive (``C:\\srv\\llm-port\\models``).  Docker Desktop needs the
+    ``/srv/faden/models`` that Python resolves relative to the current
+    drive (``C:\\srv\\fadenstack\\models``).  Docker Desktop needs the
     full Windows path (with forward slashes) so it can translate it to
     the correct WSL2 / Hyper-V mount.  On Linux this is a no-op.
     """
@@ -212,8 +212,8 @@ class DockerService:
         :param labels: Optional container labels, e.g. ``{"app": "vllm"}``.
         :return: Container inspect dict.
         """
-        from llm_port_backend.services.gpu.passthrough import build_gpu_host_config  # noqa: PLC0415
-        from llm_port_backend.services.gpu.types import GpuVendor as _GpuVendor  # noqa: PLC0415
+        from faden_backend.services.gpu.passthrough import build_gpu_host_config  # noqa: PLC0415
+        from faden_backend.services.gpu.types import GpuVendor as _GpuVendor  # noqa: PLC0415
 
         config: dict[str, Any] = {"Image": image}
         if cmd:

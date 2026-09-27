@@ -16,7 +16,7 @@ import logging
 import subprocess
 import sys
 
-from llm_port_backend.services.gpu.types import GpuMetrics
+from faden_backend.services.gpu.types import GpuMetrics
 
 logger = logging.getLogger(__name__)
 

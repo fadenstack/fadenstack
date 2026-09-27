@@ -5,8 +5,8 @@ from fastapi import Depends
 from sqlalchemy import delete, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dependencies import get_db_session
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dependencies import get_db_session
+from faden_gateway.db.models.gateway import (
     LLMGatewayRequestLog,
     LLMModelAlias,
     LLMPoolMembership,
@@ -91,7 +91,7 @@ class GatewayDAO:
         """What each alias serves -- ``chat``, ``embeddings``, ``scoring`` -- or ``None``.
 
         Read from its enabled instances' ``node_metadata["task"]``, which is set
-        for what LLM.Port knows the kind of (a vLLM container it found). With
+        for what Fadenstack knows the kind of (a vLLM container it found). With
         several kinds behind one alias there is no single answer, so ``None``.
         """
         if not aliases:

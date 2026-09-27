@@ -152,7 +152,7 @@ class PortCheck:
     port: int
     label: str
     in_use: bool
-    #: Held by one of LLM.Port's own containers: not a conflict.
+    #: Held by one of Fadenstack's own containers: not a conflict.
     ours: bool = False
 
 
@@ -224,7 +224,7 @@ def detect_docker() -> DockerInfo:
     """Detect Docker Engine and Docker Compose v2.
 
     Runs against the endpoint chosen by
-    :func:`llmport.core.docker_env.ensure_docker_host` (the CLI's default
+    :func:`faden_cli.core.docker_env.ensure_docker_host` (the CLI's default
     context first, a live Rancher Desktop endpoint as a fallback).  That
     endpoint is exported to ``os.environ`` at CLI startup, so every
     ``docker`` subprocess here inherits it automatically — no re-plumbing.
@@ -391,9 +391,9 @@ def detect_disk(path: str = "/") -> DiskInfo:
     )
 
 
-# ── Port map (all ports used by llm.port) ─────────────────────────
+# ── Port map (all ports used by fadenstack) ─────────────────────────
 
-from llmport.core.registry import KNOWN_PORTS
+from faden_cli.core.registry import KNOWN_PORTS
 
 
 def check_port(port: int, label: str = "") -> PortCheck:
@@ -405,7 +405,7 @@ def check_port(port: int, label: str = "") -> PortCheck:
 
 
 def check_known_ports() -> list[PortCheck]:
-    """Check all known llm.port ports."""
+    """Check all known fadenstack ports."""
     return [check_port(port, label) for port, label in KNOWN_PORTS]
 
 
@@ -448,8 +448,8 @@ def _published_ports(compose_file: Path, env_file: Path | None) -> list[tuple[in
     return sorted(ports.items())
 
 
-def _ports_held_by_llm_port() -> set[int]:
-    """Host ports LLM.Port's own containers publish (``llm-port-*``)."""
+def _ports_held_by_faden() -> set[int]:
+    """Host ports Fadenstack's own containers publish (``faden-*``)."""
     docker = shutil.which("docker")
     if not docker:
         return set()
@@ -460,7 +460,7 @@ def _ports_held_by_llm_port() -> set[int]:
     held: set[int] = set()
     for line in (out.stdout or "").splitlines():
         name, _, ports = line.partition("\t")
-        if not name.startswith("llm-port-"):
+        if not name.startswith("faden-"):
             continue
         # "0.0.0.0:80->80/tcp, [::]:80->80/tcp, 127.0.0.1:9099->9090/tcp"
         for match in re.finditer(r":(\d+)->", ports):
@@ -473,12 +473,12 @@ def check_install_ports(compose_file: Path | None, env_file: Path | None = None)
 
     Read from the compose file the install runs, so the list is what
     ``docker compose up`` will bind -- a port held by something else stops
-    it ("port is already allocated"). Ports LLM.Port's own containers hold
+    it ("port is already allocated"). Ports Fadenstack's own containers hold
     are marked as such, not as conflicts.
     """
     published = _published_ports(compose_file, env_file) if compose_file else None
     wanted = published if published is not None else FALLBACK_INSTALL_PORTS
-    ours = _ports_held_by_llm_port()
+    ours = _ports_held_by_faden()
     checks = []
     for port, label in wanted:
         check = check_port(port, label)

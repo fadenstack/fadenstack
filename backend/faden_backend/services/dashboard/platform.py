@@ -20,8 +20,8 @@ import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.tls import default_httpx_verify
-from llm_port_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
+from faden_backend.settings import settings
 
 
 @dataclass

@@ -28,15 +28,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.node_control import (
     InfraNode,
     NodeCommandStatus,
     NodeCommandType,
     NodeHealthStatus,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
-from llm_port_backend.settings import settings
+from faden_backend.services.nodes.service import NodeControlService
+from faden_backend.settings import settings
 
 PEPPER = "test-pepper"
 
@@ -253,7 +253,7 @@ def test_the_failure_reason_comes_from_the_deployment_not_the_app() -> None:
     "application DEPLOY_FAILED:" and nothing after the colon -- for a failure
     whose cause was sitting in the deployment beneath it.
     """
-    from llm_port_backend.services.inference.drivers.ray.deployment import (
+    from faden_backend.services.inference.drivers.ray.deployment import (
         _failure_detail,
     )
 
@@ -276,7 +276,7 @@ def test_the_failure_reason_comes_from_the_deployment_not_the_app() -> None:
 
 
 def test_a_long_traceback_is_truncated_not_dumped() -> None:
-    from llm_port_backend.services.inference.drivers.ray.deployment import (
+    from faden_backend.services.inference.drivers.ray.deployment import (
         _failure_detail,
     )
 
@@ -292,14 +292,14 @@ def test_a_replica_that_failed_to_start_says_why() -> None:
     Cut at the limit, the message read "... Error: ray::ServeReplica... File
     ... return self. ..." and the operator never saw why.
     """
-    from llm_port_backend.services.inference.drivers.ray.deployment import (
+    from faden_backend.services.inference.drivers.ray.deployment import (
         _failure_detail,
     )
 
     lines = [
         "The deployment failed to start 3 times in a row. This may be due to a problem with its "
         "constructor or initial health check failing. See controller logs for details. Error:",
-        "ray::ServeReplica:llmport-a34b:LLMServer:Qwen3-0_6B.initialize_and_get_metadata() (pid=1)",
+        "ray::ServeReplica:faden-a34b:LLMServer:Qwen3-0_6B.initialize_and_get_metadata() (pid=1)",
         '  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result',
         "    return self.__get_result()",
         *(["    ^^^^^^^^^^^^^^^^^^^"] * 40),
@@ -319,7 +319,7 @@ def test_a_replica_that_failed_to_start_says_why() -> None:
 
 
 def test_no_app_means_no_claim() -> None:
-    from llm_port_backend.services.inference.drivers.ray.deployment import (
+    from faden_backend.services.inference.drivers.ray.deployment import (
         _failure_detail,
     )
 
@@ -335,7 +335,7 @@ def test_the_default_memory_fraction_fits_unified_memory() -> None:
     from. The first replica on a fresh node fits and the second does not,
     which presents as "scaling does nothing".
     """
-    from llm_port_backend.services.inference.drivers.ray.compiler import (
+    from faden_backend.services.inference.drivers.ray.compiler import (
         DEFAULT_GPU_MEMORY_UTILIZATION,
         _engine_kwargs,
     )
@@ -446,9 +446,9 @@ async def test_a_model_copy_that_died_with_the_stream_is_retried_not_waited_on(
     The deployment then waited for a copy nothing was doing, until the row
     went stale an hour later. A failed row is retried after the usual backoff.
     """
-    from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-    from llm_port_backend.db.models.inference import ModelAvailabilityStatus
-    from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+    from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+    from faden_backend.db.models.inference import ModelAvailabilityStatus
+    from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
 
     service = _service(dbsession)
     node = await _node(dbsession, status=NodeHealthStatus.HEALTHY.value)

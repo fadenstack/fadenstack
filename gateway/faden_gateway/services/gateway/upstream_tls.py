@@ -38,13 +38,13 @@ from typing import Any
 
 import httpx
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 
 #: The mode the backend sets on a provider instance served behind a machine's model-TLS proxy.
 MACHINE_MODE = "machine"
-#: What the machine CA's derived key is for (``llm_port_backend.services.machine_tls.authority``).
+#: What the machine CA's derived key is for (``faden_backend.services.machine_tls.authority``).
 _CLIENT_KEY_PURPOSE = "machine-tls-client-key"
 _GATEWAY_CLIENT = "fadenstack-gateway"
 #: Clients not used for this long, and no longer current, are closed.
@@ -88,7 +88,7 @@ def _default_trust() -> ssl.SSLContext:
 
 def _load_chain(ctx: ssl.SSLContext, cert_pem: str, key_pem: str) -> None:
     """``load_cert_chain`` wants files: write both 0600, load, remove at once."""
-    directory = Path(tempfile.mkdtemp(prefix="llmport-upstream-tls-"))
+    directory = Path(tempfile.mkdtemp(prefix="faden-upstream-tls-"))
     cert_path = directory / "cert.pem"
     key_path = directory / "key.pem"
     try:
@@ -311,7 +311,7 @@ class MachineIdentity:
         except Exception:
             logger.error(
                 "Machine TLS: the gateway's machine key cannot be opened - is "
-                "LLM_PORT_API_SETTINGS_MASTER_KEY the backend's settings master key?",
+                "FADEN_GATEWAY_SETTINGS_MASTER_KEY the backend's settings master key?",
             )
             return False
         trust = "".join(pem.rstrip("\n") + "\n" for pem in cas)

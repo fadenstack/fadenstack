@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from llmport.commands.dev.dev_init import _resolve_init_workspace
-from llmport.core.workspace import (
+from faden_cli.commands.dev.dev_init import _resolve_init_workspace
+from faden_cli.core.workspace import (
     WORKSPACE_MARKERS,
     detect_workspace,
     find_service_dir,
@@ -24,7 +24,7 @@ from llmport.core.workspace import (
 
 def _make_workspace(root: Path, *, monorepo: bool) -> Path:
     """Create the marker directories in one of the two supported layouts."""
-    base = root / "llm-port-core" if monorepo else root
+    base = root / "fadenstack" if monorepo else root
     for name in WORKSPACE_MARKERS:
         (base / name).mkdir(parents=True)
     return root
@@ -40,7 +40,7 @@ def test_is_workspace_accepts_both_layouts(tmp_path: Path, monorepo: bool) -> No
 def test_is_workspace_rejects_a_partial_checkout(tmp_path: Path) -> None:
     """Backend alone is not a workspace: the shared dir holds the compose
     file and the .env everything else is derived from."""
-    (tmp_path / "llm_port_backend").mkdir(parents=True)
+    (tmp_path / "backend").mkdir(parents=True)
     assert not is_workspace(tmp_path)
 
 
@@ -56,14 +56,14 @@ def test_detects_from_the_workspace_root(tmp_path: Path) -> None:
 def test_detects_from_inside_a_service(tmp_path: Path) -> None:
     """A developer stands in a service directory, not at the root."""
     root = _make_workspace(tmp_path / "ws", monorepo=True)
-    deep = find_service_dir(root, "llm_port_backend") / "src" / "pkg"
+    deep = find_service_dir(root, "backend") / "src" / "pkg"
     deep.mkdir(parents=True)
 
     detected = detect_workspace(deep)
     # The monorepo directory is itself a valid flat workspace, and it is the
     # nearer of the two — either root works, so assert the search resolved to
     # one of them rather than pinning the tie-break.
-    assert detected in {root.resolve(), (root / "llm-port-core").resolve()}
+    assert detected in {root.resolve(), (root / "fadenstack").resolve()}
 
 
 def test_returns_none_outside_any_checkout(tmp_path: Path) -> None:
@@ -88,7 +88,7 @@ def test_init_adopts_a_detected_checkout(tmp_path: Path, monkeypatch) -> None:
     """The default argument means "here", so an existing checkout wins over
     cloning a second copy beside it."""
     root = _make_workspace(tmp_path / "ws", monorepo=True)
-    monkeypatch.chdir(find_service_dir(root, "llm_port_backend"))
+    monkeypatch.chdir(find_service_dir(root, "backend"))
 
     resolved = _resolve_init_workspace(".", explicit=False)
     assert is_workspace(resolved)

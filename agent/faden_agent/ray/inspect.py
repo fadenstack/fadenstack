@@ -29,8 +29,8 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-#: Apps LLM.Port deploys are named ``llmport-<deployment id>``.
-APP_PREFIX = "llmport-"
+#: Apps Fadenstack deploys are named ``faden-<deployment id>``.
+APP_PREFIX = "faden-"
 
 _SCRIPT = r'''
 import json, sys, logging, warnings
@@ -187,7 +187,7 @@ def parse(stdout: str) -> dict[str, Any] | None:
 
 
 async def runtime_summary(runtime: Any, container_name: str) -> dict[str, Any] | None:
-    """Whether this machine runs LLM.Port's Ray runtime container, cheaply, for the inventory.
+    """Whether this machine runs Fadenstack's Ray runtime container, cheaply, for the inventory.
 
     ``None`` when there is no such container at all.
     """

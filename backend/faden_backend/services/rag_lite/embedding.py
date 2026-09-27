@@ -12,8 +12,8 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.db.models.rag_lite import MAX_EMBEDDING_DIM
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.db.models.rag_lite import MAX_EMBEDDING_DIM
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class EmbeddingClient:
         Parameters
         ----------
         provider:
-            An ``LLMProvider`` instance (from ``llm_port_backend.db.models.llm``).
+            An ``LLMProvider`` instance (from ``faden_backend.db.models.llm``).
         model_override:
             Explicit model name.  Falls back to ``provider.capabilities["remote_model"]``.
         base_url_override:
@@ -155,7 +155,7 @@ class EmbeddingClient:
         If *preferred_provider_id* is set, uses that provider.
         Otherwise, picks the first embedding-capable provider.
         """
-        from llm_port_backend.db.dao.llm_dao import (  # noqa: PLC0415
+        from faden_backend.db.dao.llm_dao import (  # noqa: PLC0415
             ModelDAO,
             ProviderDAO,
             RuntimeDAO,

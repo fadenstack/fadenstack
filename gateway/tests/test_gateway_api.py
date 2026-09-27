@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.models.gateway import (
     ChatSession,
     LLMGatewayRequestLog,
     LLMModelAlias,
@@ -20,12 +20,12 @@ from llm_port_api.db.models.gateway import (
     ProviderType,
     TenantLLMPolicy,
 )
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
-from llm_port_api.services.gateway.observability import GatewayTraceContext
-from llm_port_api.services.gateway.pii_client import PIIClient, SanitizeResult
-from llm_port_api.services.gateway.routing import RouterService
-from llm_port_api.services.registry import service_registry
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.observability import GatewayTraceContext
+from faden_gateway.services.gateway.pii_client import PIIClient, SanitizeResult
+from faden_gateway.services.gateway.routing import RouterService
+from faden_gateway.services.registry import service_registry
 
 TEST_JWT_SECRET = "test-secret-32-bytes-minimum-value"
 
@@ -730,7 +730,7 @@ async def test_patch_tool_policy_succeeds_for_session_owner(
 @pytest.mark.anyio
 async def test_pii_override_crud_basic(db_session: AsyncSession) -> None:
     """Create, read, and delete a PII override for a session."""
-    from llm_port_api.db.dao.gateway_dao import GatewayDAO
+    from faden_gateway.db.dao.gateway_dao import GatewayDAO
 
     dao = GatewayDAO(db_session)
     sid = await _create_chat_session(db_session, tenant_id="tenant-a", user_id="user-1")
@@ -775,7 +775,7 @@ async def test_pii_override_crud_basic(db_session: AsyncSession) -> None:
 @pytest.mark.anyio
 async def test_pii_override_ownership_scoping(db_session: AsyncSession) -> None:
     """PII override DAO must enforce session ownership."""
-    from llm_port_api.db.dao.gateway_dao import GatewayDAO
+    from faden_gateway.db.dao.gateway_dao import GatewayDAO
 
     dao = GatewayDAO(db_session)
     sid = await _create_chat_session(db_session, tenant_id="tenant-a", user_id="user-1")

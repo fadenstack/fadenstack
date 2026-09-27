@@ -1,4 +1,4 @@
-"""Admin proxy endpoints for llm_port_rag internal APIs."""
+"""Admin proxy endpoints for faden_rag internal APIs."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.rag.client import RagServiceClient, get_rag_client
-from llm_port_backend.web.api.admin.rag.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.rag.client import RagServiceClient, get_rag_client
+from faden_backend.web.api.admin.rag.schema import (
     RagAdminRunCollectorResponseDTO,
     RagCollectorListResponseDTO,
     RagContainerDTO,
@@ -32,7 +32,7 @@ from llm_port_backend.web.api.admin.rag.schema import (
     RagUploadPresignRequestDTO,
     RagUploadPresignResponseDTO,
 )
-from llm_port_backend.web.api.rbac import require_permission, require_rag_container_action
+from faden_backend.web.api.rbac import require_permission, require_rag_container_action
 
 router = APIRouter()
 
@@ -64,7 +64,7 @@ async def update_runtime_config(
     _user: Annotated[User, Depends(require_permission("rag.runtime", "update"))],
     rag_client: RagServiceClient = Depends(get_rag_client),
 ) -> RagRuntimeConfigResponse:
-    """Update active runtime config in llm_port_rag."""
+    """Update active runtime config in faden_rag."""
     payload = await rag_client.update_runtime_config(
         payload=body.payload.model_dump(mode="json"),
         embedding_secret=body.embedding_api_key,

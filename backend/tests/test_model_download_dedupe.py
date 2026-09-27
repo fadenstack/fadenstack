@@ -15,9 +15,9 @@ from typing import Any
 
 import pytest
 
-from llm_port_backend.db.models.llm import ModelStatus
-from llm_port_backend.services.llm import tasks as llm_tasks
-from llm_port_backend.services.llm.service import LLMService
+from faden_backend.db.models.llm import ModelStatus
+from faden_backend.services.llm import tasks as llm_tasks
+from faden_backend.services.llm.service import LLMService
 
 REPO = "Qwen/Qwen2.5-0.5B-Instruct"
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 import ssl
 from typing import Any
 
-from llm_port_node_agent.config import AgentConfig
+from faden_agent.config import AgentConfig
 
 
 def httpx_verify(config: AgentConfig) -> Any:

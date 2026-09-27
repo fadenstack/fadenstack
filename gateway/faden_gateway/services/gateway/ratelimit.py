@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from llm_port_api.services.cache.protocol import CacheBackend
+    from faden_gateway.services.cache.protocol import CacheBackend
 
 
 @dataclass(slots=True, frozen=True)

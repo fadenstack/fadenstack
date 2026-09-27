@@ -1,4 +1,4 @@
-"""Modular service registry for LLM Port.
+"""Modular service registry for Fadenstack.
 
 Provides a centralised way to declare, discover, and health-check
 optional sidecar services (PII, Auth, RAG, etc.).
@@ -18,7 +18,7 @@ Design principles
 
 Usage from gateway / backend code::
 
-    from llm_port_api.services.registry import service_registry
+    from faden_gateway.services.registry import service_registry
 
     if service_registry.is_enabled("pii"):
         client = service_registry.get_url("pii")

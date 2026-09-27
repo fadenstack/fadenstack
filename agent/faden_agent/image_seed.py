@@ -1,6 +1,6 @@
 """Handing the runtime image to a cluster peer, machine to machine.
 
-Every member used to pull the ~12 GB runtime image from the LLM.Port server,
+Every member used to pull the ~12 GB runtime image from the Fadenstack server,
 over whatever link the server has -- on the DGX pair a 1 Gb/s management
 network, shared by both machines at once, while the two sat next to each other
 on a 200 Gb/s RoCE fabric. A machine that already holds the image can serve it
@@ -27,7 +27,7 @@ from typing import Any, Callable
 
 import httpx
 
-from llm_port_node_agent.image_loader import (
+from faden_agent.image_loader import (
     ImageLoaderError,
     _download_resumable,
     _file_chunks,

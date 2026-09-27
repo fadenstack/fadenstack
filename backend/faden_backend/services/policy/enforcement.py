@@ -10,7 +10,7 @@ import enum
 from fastapi import HTTPException
 from starlette import status
 
-from llm_port_backend.db.models.containers import ContainerClass, ContainerPolicy
+from faden_backend.db.models.containers import ContainerClass, ContainerPolicy
 
 
 class Action(enum.StrEnum):

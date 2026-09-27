@@ -22,8 +22,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import (
     ChatAttachment,
     ChatMessage,
     ChatProject,
@@ -31,7 +31,7 @@ from llm_port_api.db.models.gateway import (
     MemoryFact,
     SessionSummary,
 )
-from llm_port_api.services.gateway.file_store import FileStore
+from faden_gateway.services.gateway.file_store import FileStore
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +364,7 @@ class ContextAssembler:
         block and everything after it. Sorted here, not in SQL, because the
         key is stored encrypted.
         """
-        from llm_port_api.db.models.gateway import MemoryFactScope  # noqa: PLC0415
+        from faden_gateway.db.models.gateway import MemoryFactScope  # noqa: PLC0415
 
         def in_key_order(scoped: list[MemoryFact]) -> list[MemoryFact]:
             return sorted(scoped, key=lambda fact: (fact.key, str(fact.id)))

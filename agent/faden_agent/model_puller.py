@@ -162,7 +162,7 @@ async def pull_model(
         ``model_id``, ``model_dir_name``, ``blobs``, ``refs``,
         ``snapshots``, and ``total_size``.
     model_store_root:
-        Local root for model storage (e.g. ``/srv/llm-port/models``).
+        Local root for model storage (e.g. ``/srv/faden/models``).
     emit_progress:
         Optional callback to report download progress.
 

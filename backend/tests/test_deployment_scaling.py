@@ -18,9 +18,9 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import NodeCommandType
-from llm_port_backend.services.inference import wakeup
-from llm_port_backend.services.inference.drivers.ray.deployment import (
+from faden_backend.db.models.node_control import NodeCommandType
+from faden_backend.services.inference import wakeup
+from faden_backend.services.inference.drivers.ray.deployment import (
     _app_deployment_readiness,
     _scaling_message,
 )
@@ -42,7 +42,7 @@ def _status(app: str, *, app_status: str, ready: int, pending: int, message: str
 
 
 async def _reconcile(dbsession: AsyncSession, dep: Any, status: dict[str, Any]) -> None:
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
         results={
@@ -65,7 +65,7 @@ def _scale(dep: Any, replicas: int) -> None:
 async def test_a_scale_up_in_progress_is_serving_not_starting(deployment_env, dbsession: AsyncSession) -> None:
     dep, _node = deployment_env
     _scale(dep, 2)
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     await _reconcile(dbsession, dep, _status(app, app_status="DEPLOYING", ready=1, pending=1))
 
@@ -79,7 +79,7 @@ async def test_a_scale_up_in_progress_is_serving_not_starting(deployment_env, db
 async def test_it_settles_when_the_count_is_reached(deployment_env, dbsession: AsyncSession) -> None:
     dep, _node = deployment_env
     _scale(dep, 2)
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     await _reconcile(dbsession, dep, _status(app, app_status="RUNNING", ready=2, pending=0))
 
@@ -93,7 +93,7 @@ async def test_it_settles_when_the_count_is_reached(deployment_env, dbsession: A
 async def test_a_scale_down_is_followed_to_the_end(deployment_env, dbsession: AsyncSession) -> None:
     dep, _node = deployment_env
     _scale(dep, 1)
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     await _reconcile(dbsession, dep, _status(app, app_status="RUNNING", ready=2, pending=0))
 
@@ -106,11 +106,11 @@ async def test_a_scale_down_is_followed_to_the_end(deployment_env, dbsession: As
 async def test_no_copy_yet_still_reads_as_starting(
     deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.services.inference.drivers.ray import deployment as ray_deployment
+    from faden_backend.services.inference.drivers.ray import deployment as ray_deployment
 
     monkeypatch.setattr(ray_deployment, "_READINESS_PASS_BUDGET_SEC", 0.0)  # one probe
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     await _reconcile(dbsession, dep, _status(app, app_status="DEPLOYING", ready=0, pending=1))
 

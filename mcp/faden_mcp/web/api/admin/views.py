@@ -10,12 +10,12 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_mcp.db.session import get_db_session
-from llm_port_mcp.services.connection_manager import MCPConnectionManager
-from llm_port_mcp.services.dao import MCPDao
-from llm_port_mcp.services.discovery import discover_tools
-from llm_port_mcp.services.transport.base import MCPConnectError, describe_failure
-from llm_port_mcp.web.api.admin.schemas import (
+from faden_mcp.db.session import get_db_session
+from faden_mcp.services.connection_manager import MCPConnectionManager
+from faden_mcp.services.dao import MCPDao
+from faden_mcp.services.discovery import discover_tools
+from faden_mcp.services.transport.base import MCPConnectError, describe_failure
+from faden_mcp.web.api.admin.schemas import (
     DiscoveredServer,
     RegisterServerRequest,
     ScanRequest,
@@ -26,7 +26,7 @@ from llm_port_mcp.web.api.admin.schemas import (
     UpdateServerRequest,
     UpdateToolRequest,
 )
-from llm_port_mcp.web.api.auth import AuthContext, get_auth_context
+from faden_mcp.web.api.auth import AuthContext, get_auth_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -667,7 +667,7 @@ async def _probe_mcp_port(
         "params": {
             "protocolVersion": "2025-03-26",
             "capabilities": {},
-            "clientInfo": {"name": "llm-port-scanner", "version": "1.0"},
+            "clientInfo": {"name": "faden-scanner", "version": "1.0"},
         },
     }
     try:

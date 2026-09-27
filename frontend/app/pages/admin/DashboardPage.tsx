@@ -1,7 +1,7 @@
 /**
  * Admin dashboard: an overview of the whole platform, built from widgets the
  * user arranges, shows, hides and resizes (spec:
- * llm-port-dev/dashboard/dashboard-redesign-spec.md).
+ * fadenstack-dev/dashboard/dashboard-redesign-spec.md).
  *
  * The page is only a frame. Each widget owns its data -- it loads, refreshes
  * and fails on its own -- so one slow or broken source never holds up the

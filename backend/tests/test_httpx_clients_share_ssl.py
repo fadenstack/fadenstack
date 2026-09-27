@@ -16,9 +16,9 @@ from pathlib import Path
 
 import httpx
 
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.tls import default_httpx_verify
 
-PACKAGE = Path(__file__).resolve().parents[1] / "llm_port_backend"
+PACKAGE = Path(__file__).resolve().parents[1] / "faden_backend"
 
 
 def _constructions_without_verify() -> list[str]:

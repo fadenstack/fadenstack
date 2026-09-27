@@ -3,7 +3,7 @@
 **Dashboard**, the first entry of the admin console, shows the whole platform
 on one page: how much traffic there was and where it was served, what is
 broken, how busy the GPU machines are, and the health of the server
-LLM.Port runs on. Only superusers see it; everyone else lands in the chat.
+Fadenstack runs on. Only superusers see it; everyone else lands in the chat.
 
 The screenshots were taken on the development install on 2026-09-26.
 

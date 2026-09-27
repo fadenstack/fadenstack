@@ -4,7 +4,7 @@
  * The chat page always streams, and the gateway dropped the token mapping on
  * the streaming path: tokenize mode showed "Hello [PERSON_1]". Needs a PII
  * policy in tokenize mode that scans requests to local models, and the PII
- * module running (`llmport dev up --modules pii`).
+ * module running (`faden dev up --modules pii`).
  */
 import { expect, test } from "@playwright/test";
 

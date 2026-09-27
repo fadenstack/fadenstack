@@ -252,7 +252,7 @@ export default function LogsPage() {
     ]);
     setNames({
       machines: new Map(nodes.map((n) => [n.host, n.agent_id] as [string, string])),
-      deployments: new Map(deployments.map((d) => [`llmport-${d.id}`, d.name] as [string, string])),
+      deployments: new Map(deployments.map((d) => [`faden-${d.id}`, d.name] as [string, string])),
     });
   }
 

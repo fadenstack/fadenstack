@@ -11,7 +11,7 @@ import { ragRuntime } from "~/api/rag";
 
 export type RagMode = "lite" | "pro";
 
-const CACHE_KEY = "llm-port-rag-mode-v1";
+const CACHE_KEY = "faden-rag-mode-v1";
 const CACHE_TTL_MS = 60_000; // 1 minute
 
 function readCache(): RagMode | null {

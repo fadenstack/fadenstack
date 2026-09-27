@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_node_agent.log_collector import LogEntry
+from faden_agent.log_collector import LogEntry
 
 log = logging.getLogger(__name__)
 

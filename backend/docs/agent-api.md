@@ -15,5 +15,5 @@ Define multi-host execution contracts while keeping local execution as the v1 de
 ## Notes
 
 - Local adapter remains default in v1.
-- Remote apply endpoint is contract-ready and feature-flagged by `LLM_PORT_BACKEND_SYSTEM_AGENT_ENABLED`.
-- Optional bearer protection for agent calls uses `LLM_PORT_BACKEND_SYSTEM_AGENT_TOKEN`.
+- Remote apply endpoint is contract-ready and feature-flagged by `FADEN_BACKEND_SYSTEM_AGENT_ENABLED`.
+- Optional bearer protection for agent calls uses `FADEN_BACKEND_SYSTEM_AGENT_TOKEN`.

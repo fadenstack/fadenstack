@@ -1,5 +1,5 @@
 /**
- * A vLLM container LLM.Port did not start, found on a machine and routed as
+ * A vLLM container Fadenstack did not start, found on a machine and routed as
  * it is (Phase 8): from the machine's page, to the providers page, to a real
  * request through the gateway, and back out again.
  *
@@ -11,7 +11,7 @@ import { expect, test, type Page } from "@playwright/test";
 const SHOTS = "../docs/images/found";
 const MACHINE = "10.250.10.71";
 const CONTAINER = "spark-llm-Qwen-Qwen3-Embedding-0.6B-8102";
-const GATEWAY = process.env.LLM_PORT_GATEWAY_URL ?? "http://127.0.0.1:8001";
+const GATEWAY = process.env.FADEN_GATEWAY_URL ?? "http://127.0.0.1:8001";
 
 async function openMachine(page: Page) {
   await page.goto("/admin/nodes");
@@ -49,7 +49,7 @@ test("a found container is routed as it is, answers through the gateway, and is 
   const started = Date.now();
   const reply = await page.request.post(`${GATEWAY}/v1/embeddings`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { model: "qwen3-embedding-0.6b", input: ["LLM.Port found this model running"] },
+    data: { model: "qwen3-embedding-0.6b", input: ["Fadenstack found this model running"] },
   });
   const body = await reply.json();
   console.log(`  gateway /v1/embeddings: ${reply.status()} in ${Date.now() - started} ms, ` +

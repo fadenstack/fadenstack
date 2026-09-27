@@ -21,7 +21,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.models.gateway import (
     ChatMessage,
     ChatSession,
     LLMModelAlias,
@@ -32,14 +32,14 @@ from llm_port_api.db.models.gateway import (
     ProviderType,
     TenantLLMPolicy,
 )
-from llm_port_api.services.gateway.lease import LeaseManager
-from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
-from llm_port_api.services.gateway.observability import GatewayTraceContext
-from llm_port_api.services.gateway.pii_client import PIIClient, SanitizeResult
-from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
-from llm_port_api.services.gateway.usage_group import UsageGroupResolver
-from llm_port_api.services.registry import service_registry
-from llm_port_api.settings import settings
+from faden_gateway.services.gateway.lease import LeaseManager
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.observability import GatewayTraceContext
+from faden_gateway.services.gateway.pii_client import PIIClient, SanitizeResult
+from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
+from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.services.registry import service_registry
+from faden_gateway.settings import settings
 
 TEST_JWT_SECRET = "test-secret-32-bytes-minimum-value"
 ALIAS = "qwen3-32b"
@@ -331,7 +331,7 @@ async def test_the_skills_a_user_picks_are_asked_for_with_their_groups(
 
 
 def test_the_audit_log_names_the_exact_version_a_chat_used() -> None:
-    from llm_port_api.services.gateway.service import _skills_used  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _skills_used  # noqa: PLC0415
 
     used = _skills_used([ResolvedSkill(
         skill_id="s1", name="Review", slug="code-review", version=3, body_markdown="b",
@@ -423,8 +423,8 @@ async def test_the_trace_is_still_scanned_when_nothing_leaves_scanned(
 
 @pytest.mark.anyio
 async def test_a_failed_lookup_stops_the_others_and_is_reported_as_itself() -> None:
-    from llm_port_api.services.gateway.errors import GatewayError
-    from llm_port_api.services.gateway.service import _together
+    from faden_gateway.services.gateway.errors import GatewayError
+    from faden_gateway.services.gateway.service import _together
 
     stopped: list[str] = []
 
@@ -453,7 +453,7 @@ async def test_the_slot_is_free_while_the_answer_is_saved(
     stream: bool, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """It was given back last, after the session write, skills calls and audit."""
-    from llm_port_api.services.gateway.service import GatewayService
+    from faden_gateway.services.gateway.service import GatewayService
 
     instance_id = await _seed(db_session, provider=ProviderType.VLLM, pii=None)
     fastapi_app.state.gateway_observability = _Observability()
@@ -555,7 +555,7 @@ async def test_the_session_and_skills_are_looked_up_side_by_side(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Each takes 0.3 s: together they take 0.3 s, not 0.6."""
-    from llm_port_api.services.gateway.service import GatewayService
+    from faden_gateway.services.gateway.service import GatewayService
 
     await _seed(db_session, provider=ProviderType.VLLM, pii=None)
     fastapi_app.state.gateway_observability = _Observability()

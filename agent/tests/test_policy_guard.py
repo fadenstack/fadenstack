@@ -1,5 +1,5 @@
-from llm_port_node_agent.policy_guard import PolicyGuard, PolicyViolationError
-from llm_port_node_agent.state_store import AgentState
+from faden_agent.policy_guard import PolicyGuard, PolicyViolationError
+from faden_agent.state_store import AgentState
 
 
 def test_policy_blocks_deploy_when_in_maintenance() -> None:

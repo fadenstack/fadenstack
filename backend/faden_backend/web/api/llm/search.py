@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.models.users import User
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 

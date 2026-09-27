@@ -6,10 +6,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$(cd "$HERE/../.." && pwd)"
 ROOT="$(cd "$BACKEND/.." && pwd)"
 
-IMAGE="${RAY_SMOKE_IMAGE:-llmport-agent-ray-smoke:2.58.0}"
-PG_CONTAINER="${RAY_SMOKE_PG_CONTAINER:-llm-port-postgres}"
-DB="${RAY_SMOKE_DB:-llm_port_smoke}"
-DB_OWNER="${RAY_SMOKE_DB_OWNER:-llm_port_backend}"
+IMAGE="${RAY_SMOKE_IMAGE:-faden-agent-ray-smoke:2.58.0}"
+PG_CONTAINER="${RAY_SMOKE_PG_CONTAINER:-faden-postgres}"
+DB="${RAY_SMOKE_DB:-faden_smoke}"
+DB_OWNER="${RAY_SMOKE_DB_OWNER:-faden_backend}"
 BROKER_PORT="${RAY_SMOKE_BROKER_PORT:-5673}"
 BACKEND_PORT="${RAY_SMOKE_BACKEND_PORT:-8000}"
 SERVE_HOST_PORT="${RAY_SMOKE_SERVE_HOST_PORT:-18000}"
@@ -35,9 +35,9 @@ users_secret() {
 }
 
 backend_env() {
-  export LLM_PORT_BACKEND_DB_BASE="$DB"
-  export LLM_PORT_BACKEND_RABBIT_HOST=127.0.0.1 LLM_PORT_BACKEND_RABBIT_PORT="$BROKER_PORT"
-  export LLM_PORT_BACKEND_RABBIT_USER=smoke LLM_PORT_BACKEND_RABBIT_PASS=smoke
+  export FADEN_BACKEND_DB_BASE="$DB"
+  export FADEN_BACKEND_RABBIT_HOST=127.0.0.1 FADEN_BACKEND_RABBIT_PORT="$BROKER_PORT"
+  export FADEN_BACKEND_RABBIT_USER=smoke FADEN_BACKEND_RABBIT_PASS=smoke
   USERS_SECRET="$(users_secret)"
   export USERS_SECRET
   PYTHONPATH="$(host_path "$BACKEND")"
@@ -52,17 +52,17 @@ start_agent() {
   docker run -d --name smoke-agent --init --gpus all --shm-size=8g \
     --add-host host.docker.internal:host-gateway \
     -p "127.0.0.1:$SERVE_HOST_PORT:8000" \
-    -v "$(host_path "$ROOT/llm_port_node_agent"):/src:ro" \
+    -v "$(host_path "$ROOT/agent"):/src:ro" \
     -v smoke-models:/models \
-    -v smoke-agent-state:/var/lib/llmport-agent \
-    -e LLM_PORT_NODE_AGENT_BACKEND_URL="http://host.docker.internal:$BACKEND_PORT" \
-    -e LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN="$(cat "$WORK/enroll_token" 2>/dev/null || true)" \
-    -e LLM_PORT_NODE_AGENT_AGENT_ID=smoke-head \
-    -e LLM_PORT_NODE_AGENT_STATE_PATH=/var/lib/llmport-agent/state.json \
-    -e LLM_PORT_NODE_AGENT_MODEL_STORE=/models \
+    -v smoke-agent-state:/var/lib/faden-agent \
+    -e FADEN_NODE_AGENT_BACKEND_URL="http://host.docker.internal:$BACKEND_PORT" \
+    -e FADEN_NODE_AGENT_ENROLLMENT_TOKEN="$(cat "$WORK/enroll_token" 2>/dev/null || true)" \
+    -e FADEN_NODE_AGENT_AGENT_ID=smoke-head \
+    -e FADEN_NODE_AGENT_STATE_PATH=/var/lib/faden-agent/state.json \
+    -e FADEN_NODE_AGENT_MODEL_STORE=/models \
     -e HF_HOME=/models/hf \
-    "$IMAGE" python -m llm_port_node_agent run >/dev/null
-  echo "smoke-agent started ($(host_path "$ROOT/llm_port_node_agent") mounted read-only)"
+    "$IMAGE" python -m faden_agent run >/dev/null
+  echo "smoke-agent started ($(host_path "$ROOT/agent") mounted read-only)"
 }
 
 usage() {
@@ -110,11 +110,11 @@ case "${1:-help}" in
   backend)
     # One worker = one reconciler loop (extra workers would idle on the lock).
     backend_env
-    export LLM_PORT_BACKEND_RELOAD=false LLM_PORT_BACKEND_WORKERS_COUNT=1
-    export LLM_PORT_BACKEND_HOST=0.0.0.0 LLM_PORT_BACKEND_PORT="$BACKEND_PORT"
+    export FADEN_BACKEND_RELOAD=false FADEN_BACKEND_WORKERS_COUNT=1
+    export FADEN_BACKEND_HOST=0.0.0.0 FADEN_BACKEND_PORT="$BACKEND_PORT"
     export PYTHONUNBUFFERED=1 NO_COLOR=1
     cd "$BACKEND"
-    "$PY" -m llm_port_backend 2>&1 | tee "$WORK/backend.log" ;;
+    "$PY" -m faden_backend 2>&1 | tee "$WORK/backend.log" ;;
   enroll)
     harness enroll-token | tail -1 > "$WORK/enroll_token"
     start_agent

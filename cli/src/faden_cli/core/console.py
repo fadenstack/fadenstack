@@ -65,7 +65,7 @@ def kv_table(title: str, rows: list[tuple[str, str]]) -> None:
     console.print(table)
 
 
-def banner(lines: list[str], *, title: str = "llm.port", border_style: str = "cyan") -> None:
+def banner(lines: list[str], *, title: str = "fadenstack", border_style: str = "cyan") -> None:
     """Print a bordered panel with the given lines."""
     body = "\n".join(lines)
     console.print(Panel(body, title=f"[bold]{title}[/bold]", border_style=border_style))

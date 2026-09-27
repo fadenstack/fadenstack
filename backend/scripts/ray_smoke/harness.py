@@ -1,7 +1,7 @@
 """Ray-migration live smoke harness (host side).
 
-Runs with the llm_port_backend venv against the isolated smoke database
-(``LLM_PORT_BACKEND_DB_BASE=llm_port_smoke``); see README.md in this
+Runs with the faden_backend venv against the isolated smoke database
+(``FADEN_BACKEND_DB_BASE=faden_smoke``); see README.md in this
 directory for the full runbook.  Each subcommand is one stage of
 
     enroll -> cluster up -> ModelAvailability -> deployment
@@ -39,32 +39,32 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from llm_port_backend.db.models import load_all_models
+from faden_backend.db.models import load_all_models
 
 load_all_models()
 
-from llm_port_backend.db.dao.inference_dao import EndpointDAO, ModelAvailabilityDAO  # noqa: E402
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: E402
-from llm_port_backend.db.models.inference import (  # noqa: E402
+from faden_backend.db.dao.inference_dao import EndpointDAO, ModelAvailabilityDAO  # noqa: E402
+from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: E402
+from faden_backend.db.models.inference import (  # noqa: E402
     InferenceDeployment,
     InferenceEnvironment,
     ModelAvailabilityStatus,
     ModelSourceKind,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus  # noqa: E402
-from llm_port_backend.db.models.node_control import InfraNode, InfraNodeCommand  # noqa: E402
-from llm_port_backend.services.inference.drivers.ray.driver import RayDriver  # noqa: E402
-from llm_port_backend.services.inference.reconciliation import (  # noqa: E402
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus  # noqa: E402
+from faden_backend.db.models.node_control import InfraNode, InfraNodeCommand  # noqa: E402
+from faden_backend.services.inference.drivers.ray.driver import RayDriver  # noqa: E402
+from faden_backend.services.inference.reconciliation import (  # noqa: E402
     ReconciliationContext,
     reconcile_deployment,
 )
-from llm_port_backend.services.inference.service import (  # noqa: E402
+from faden_backend.services.inference.service import (  # noqa: E402
     ControlPlaneService,
     DeploymentService,
     EnvironmentService,
 )
-from llm_port_backend.services.nodes.service import NodeControlService  # noqa: E402
-from llm_port_backend.settings import settings  # noqa: E402
+from faden_backend.services.nodes.service import NodeControlService  # noqa: E402
+from faden_backend.settings import settings  # noqa: E402
 
 WORKDIR = Path(os.environ.get("RAY_SMOKE_WORKDIR") or Path(__file__).with_name(".work"))
 WORKDIR.mkdir(parents=True, exist_ok=True)
@@ -338,7 +338,7 @@ async def cmd_seed_model(_: argparse.Namespace) -> None:
 
 def smoke_spec() -> dict[str, Any]:
     return {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {
             "name": "vllm",
             # TITAN RTX is Turing (sm_75): no bf16; share the GPU with the

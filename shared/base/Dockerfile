@@ -1,10 +1,10 @@
-# ── llm.port platform base image ──────────────────────────────────
+# ── fadenstack platform base image ──────────────────────────────────
 #
 # Pre-installs Python, uv, gcc, and the ~27 common packages shared
-# across all llm.port microservices.
+# across all fadenstack microservices.
 #
 # Service Dockerfiles extend this with:
-#   ARG BASE_IMAGE=ghcr.io/llm-port/base:latest
+#   ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
 #   FROM ${BASE_IMAGE} AS prod
 # ──────────────────────────────────────────────────────────────────
 

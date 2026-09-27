@@ -15,11 +15,11 @@ from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from typing import Any
 
-from llm_port_backend.services.dashboard import attention as attention_rules
-from llm_port_backend.services.dashboard import capacity as capacity_service
-from llm_port_backend.services.dashboard import timewindows as tw
-from llm_port_backend.services.dashboard import traffic
-from llm_port_backend.services.dashboard.facts import Facts
+from faden_backend.services.dashboard import attention as attention_rules
+from faden_backend.services.dashboard import capacity as capacity_service
+from faden_backend.services.dashboard import timewindows as tw
+from faden_backend.services.dashboard import traffic
+from faden_backend.services.dashboard.facts import Facts
 
 log = logging.getLogger(__name__)
 

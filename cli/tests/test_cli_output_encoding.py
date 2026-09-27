@@ -2,7 +2,7 @@
 
 Windows consoles default to cp1252. This CLI writes arrows, box rules and
 check marks in help text and progress output -- thousands of them -- and any
-one reaching a cp1252 stream raises UnicodeEncodeError. `llmport dev up
+one reaching a cp1252 stream raises UnicodeEncodeError. `faden dev up
 --help` ended in a traceback where the help should have been, and redirecting
 any command to a file did the same.
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from llmport import cli as cli_module
+from faden_cli import cli as cli_module
 
 _CLI_ROOT = Path(__file__).resolve().parents[1]
 
@@ -76,7 +76,7 @@ def test_help_prints_on_a_cp1252_console(command: list[str]) -> None:
     it to cp1252 reproduces a stock Windows terminal on any platform.
     """
     result = subprocess.run(
-        [sys.executable, "-m", "llmport.cli", *command, "--help"],
+        [sys.executable, "-m", "faden_cli.cli", *command, "--help"],
         capture_output=True,
         text=True,
         cwd=_CLI_ROOT / "src",

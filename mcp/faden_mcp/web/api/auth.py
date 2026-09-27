@@ -9,7 +9,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from llm_port_mcp.settings import settings
+from faden_mcp.settings import settings
 
 # ── JWT-based auth (for admin endpoints) ──────────────────────────────
 

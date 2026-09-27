@@ -16,7 +16,7 @@ import os
 
 import pytest
 
-from llmport.core import docker_env
+from faden_cli.core import docker_env
 
 # On macOS/Linux the Rancher Desktop fallback list has exactly these two.
 _NON_WIN_ENDPOINTS = 2

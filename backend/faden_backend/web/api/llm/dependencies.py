@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import Depends, Request
 
-from llm_port_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.services.llm.graph_service import LLMGraphService
-from llm_port_backend.services.llm.service import LLMService
+from faden_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.services.llm.graph_service import LLMGraphService
+from faden_backend.services.llm.service import LLMService
 
 
 def get_llm_service(request: Request) -> LLMService:

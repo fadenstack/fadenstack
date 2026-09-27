@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from llm_port_node_agent.model_puller import ModelPullerError, pull_model
+from faden_agent.model_puller import ModelPullerError, pull_model
 
 
 def _sha256(data: bytes) -> str:

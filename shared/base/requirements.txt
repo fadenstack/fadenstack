@@ -1,4 +1,4 @@
-# llm.port platform base — common Python packages
+# fadenstack platform base — common Python packages
 #
 # These are pre-installed in the base Docker image so that downstream
 # service images (backend, api, pii, rag, auth, mailer, docling) only

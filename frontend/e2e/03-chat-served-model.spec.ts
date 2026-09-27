@@ -18,7 +18,7 @@ import { expect, test } from "@playwright/test";
  *     is selected.  A human sees the picker fill in; a test that types
  *     immediately does not.
  *
- * Needs the dev stack up (`llmport dev up`) and a running deployment whose
+ * Needs the dev stack up (`faden dev up`) and a running deployment whose
  * spec sets `service.alias`.
  */
 
@@ -70,7 +70,7 @@ test.describe("chat against a served model", () => {
     // cluster -> streamed back into this bubble.  Asserting the *words* would
     // be testing a 0.5B model's instruction-following, which it fails
     // cheerfully -- it answered "POKE" once -- and which would make this suite
-    // red for a reason that has nothing to do with LLM.Port.
+    // red for a reason that has nothing to do with Fadenstack.
     await expect(assistantTurn).not.toBeEmpty({ timeout: 120_000 });
     const reply = ((await assistantTurn.innerText()) ?? "").trim();
     expect(reply.length, "the assistant bubble came back empty").toBeGreaterThan(0);

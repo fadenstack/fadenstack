@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: "llm-port-pii"
-  name: "llm-port-pii-redis"
+  namespace: "faden-pii"
+  name: "faden-pii-redis"
 spec:
   selector:
     matchLabels:
-      app: "llm-port-pii-redis"
+      app: "faden-pii-redis"
   template:
     metadata:
       labels:
-        app: "llm-port-pii-redis"
+        app: "faden-pii-redis"
     spec:
       containers:
         - name: redis
@@ -34,11 +34,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: "llm-port-pii"
-  name: "llm-port-pii-redis-service"
+  namespace: "faden-pii"
+  name: "faden-pii-redis-service"
 spec:
   selector:
-    app: "llm-port-pii-redis"
+    app: "faden-pii-redis"
   ports:
     - port: 6379
       targetPort: 6379

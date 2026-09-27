@@ -1,4 +1,4 @@
-"""Getting a model onto the LLM.Port server as part of deploying it.
+"""Getting a model onto the Fadenstack server as part of deploying it.
 
 A cluster's runtime cannot reach the internet, so a model has to be on this
 server before it can be copied to a machine. The onboarding guide made that a
@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.llm import DownloadJob, DownloadJobStatus, LLMModel, ModelStatus
-from llm_port_backend.settings import settings
+from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus, LLMModel, ModelStatus
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def _latest_job(session: AsyncSession, model_id) -> DownloadJob | None:
 def _waiting_message(model: LLMModel, progress: int | None) -> str:
     done = f" ({progress}%)" if progress else ""
     return (
-        f"Downloading {model.hf_repo_id} to the LLM.Port server{done}. "
+        f"Downloading {model.hf_repo_id} to the Fadenstack server{done}. "
         f"It is copied to the cluster as soon as it is there."
     )
 
@@ -92,15 +92,15 @@ async def ensure_server_copy(session: AsyncSession, model: LLMModel) -> ServerCo
         reason = job.error_message or "no reason recorded"
         return ServerCopy(
             blocker=(
-                f"Downloading {model.hf_repo_id} to the LLM.Port server failed: "
+                f"Downloading {model.hf_repo_id} to the Fadenstack server failed: "
                 f"{reason}. Retry it from Models; the deployment carries on once "
                 f"the model is there."
             )
         )
 
     # Nothing under way, and nothing failed: start it.
-    from llm_port_backend.db.dao.llm_dao import DownloadJobDAO  # noqa: PLC0415
-    from llm_port_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO  # noqa: PLC0415
+    from faden_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
 
     new_job = await DownloadJobDAO(session).create(model.id)
     model.status = ModelStatus.DOWNLOADING

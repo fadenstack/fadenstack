@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from llm_port_backend.services.llm.artifacts import (
+from faden_backend.services.llm.artifacts import (
     build_cache_manifest,
     build_model_sync_payload,
     manifest_digest,
@@ -139,7 +139,7 @@ def test_a_partial_download_is_not_a_blob(tmp_path: Path, monkeypatch: pytest.Mo
     Listed as a blob, it was sent to the machines, and the file server
     refused the name: "Invalid blob hash".
     """
-    from llm_port_backend.settings import settings
+    from faden_backend.settings import settings
 
     monkeypatch.setattr(settings, "model_store_root", str(tmp_path))
     blobs_dir = tmp_path / "models--org--half" / "blobs"
@@ -169,7 +169,7 @@ def test_build_model_sync_payload_behaviors(tmp_path: Path) -> None:
     }
 
     # model_cache_dir is None
-    with patch("llm_port_backend.services.llm.artifacts.model_cache_dir", return_value=None):
+    with patch("faden_backend.services.llm.artifacts.model_cache_dir", return_value=None):
         res_no_cache = build_model_sync_payload(model, source="sync_from_server")
         assert res_no_cache == {
             "model_id": "m2",
@@ -186,8 +186,8 @@ def test_build_model_sync_payload_behaviors(tmp_path: Path) -> None:
         "total_size": 10,
         "manifest_sha256": "fake_sha256",
     }
-    with patch("llm_port_backend.services.llm.artifacts.model_cache_dir", return_value=tmp_path):
-        with patch("llm_port_backend.services.llm.artifacts.build_cache_manifest", return_value=fake_manifest):
+    with patch("faden_backend.services.llm.artifacts.model_cache_dir", return_value=tmp_path):
+        with patch("faden_backend.services.llm.artifacts.build_cache_manifest", return_value=fake_manifest):
             res_sync = build_model_sync_payload(model, source="sync_from_server")
             assert res_sync["manifest_sha256"] == "fake_sha256"
             assert res_sync["model_id"] == "m2"

@@ -1,6 +1,6 @@
 """Policy enforcement package."""
 
-from llm_port_backend.services.policy.enforcement import (
+from faden_backend.services.policy.enforcement import (
     Action,
     PolicyEnforcer,
     PolicyError,

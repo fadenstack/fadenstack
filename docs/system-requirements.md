@@ -1,6 +1,6 @@
 # System requirements
 
-What the LLM.Port **server** needs: the machine that runs the console, the API
+What the Fadenstack **server** needs: the machine that runs the console, the API
 gateway and their databases. The machines that run models (GPU nodes) are
 sized by the models they run and are not covered here.
 
@@ -13,7 +13,7 @@ event loop costs more per request than Linux's). Chat load was the model
 answering three-sentence replies to 16 users sending one turn after another
 without pause, about 8 chat turns per second. On 2026-09-26 the VM was
 measured again with every module as a container (`ray` at `f1d98a3`, two
-workers per service as `llmport deploy` sizes them): the same 16 users made
+workers per service as `faden deploy` sizes them): the same 16 users made
 18 to 22 chat turns per second.
 
 ## Summary
@@ -95,7 +95,7 @@ runs.
 One gateway worker is one process on one core. On the workstation it served
 up to **9 chat turns per second** (8 concurrent users sending back to back)
 before its core was full; beyond that, answers wait. An install made with
-`llmport deploy` gives the gateway, the backend and PII a quarter of the
+`faden deploy` gives the gateway, the backend and PII a quarter of the
 server's physical cores as workers each (2 on the 8-core VM); started from the
 compose file alone, they run 4.
 
@@ -145,7 +145,7 @@ file (`POSTGRES_MAX_CONNECTIONS` in `.env` changes it), 100 in a Postgres of
 your own unless you raise it. What each
 service can open at its peak, workers × (connections kept + opened on demand):
 
-| Service | `llmport deploy`, 8 cores (the VM) | Compose file alone |
+| Service | `faden deploy`, 8 cores (the VM) | Compose file alone |
 |---|---|---|
 | Gateway | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
 | Backend | 2 × (5 + 5) = 20 | 4 × (5 + 5) = 40 |
@@ -171,14 +171,14 @@ The check sees one service at a time, so add the table up for the whole
 install: every configuration above fits in the shared compose file's 250. A
 Postgres of your own at its default of 100 does not fit a core install from the
 compose file alone (100) or any install with the optional modules.
-`llmport deploy` sizes the services with `llmport tune`, as `upgrade` does:
+`faden deploy` sizes the services with `faden tune`, as `upgrade` does:
 workers by the CPU share, pools the same for every worker (5 kept, 5 on
 demand), and `POSTGRES_MAX_CONNECTIONS` in `.env` as the peaks above added up,
 plus 100 for Langfuse, migrations and backups, at least 250, in steps of 50:
 250 at 8 physical cores, 350 at 32, 500 at 64. The settings per service are
 `<PREFIX>WORKERS_COUNT`, `<PREFIX>DB_POOL_SIZE` and `<PREFIX>DB_MAX_OVERFLOW`,
-with the prefixes `LLM_PORT_API_`, `LLM_PORT_BACKEND_`, `LLM_PORT_MCP_` and
-`LLM_PORT_SKILLS_`; the backend worker takes the backend's.
+with the prefixes `FADEN_GATEWAY_`, `FADEN_BACKEND_`, `FADEN_MCP_` and
+`FADEN_SKILLS_`; the backend worker takes the backend's.
 
 ## What grows with what
 

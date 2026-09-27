@@ -6,8 +6,8 @@ from typing import Any
 
 import httpx
 
-from llm_port_node_agent.config import AgentConfig
-from llm_port_node_agent.tls import httpx_cert, httpx_verify
+from faden_agent.config import AgentConfig
+from faden_agent.tls import httpx_cert, httpx_verify
 
 
 class BackendClient:

@@ -19,13 +19,13 @@ import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from llm_port_skills.services.access import KNOWN_CAPS, Principal
-from llm_port_skills.settings import settings
+from faden_skills.services.access import KNOWN_CAPS, Principal
+from faden_skills.settings import settings
 
-HEADER_USER = "x-llm-port-user"
-HEADER_GROUPS = "x-llm-port-groups"
-HEADER_CAPS = "x-llm-port-caps"
-HEADER_TENANT = "x-llm-port-tenant"
+HEADER_USER = "x-faden-user"
+HEADER_GROUPS = "x-faden-groups"
+HEADER_CAPS = "x-faden-caps"
+HEADER_TENANT = "x-faden-tenant"
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 

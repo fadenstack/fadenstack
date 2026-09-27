@@ -11,7 +11,7 @@ Core behavior:
 
 ## Security
 
-- Encryption key source: `LLM_PORT_BACKEND_SETTINGS_MASTER_KEY`.
+- Encryption key source: `FADEN_BACKEND_SETTINGS_MASTER_KEY`.
 - Secret reads return masked previews only.
 - Protected keys require active root mode when updated.
 - All setting updates are audited via admin audit log.

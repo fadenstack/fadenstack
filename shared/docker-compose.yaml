@@ -1,15 +1,15 @@
-# The project name decides the volume names (llm_port_shared_pg_data, ...).
+# The project name decides the volume names (fadenstack_pg_data, ...).
 # Fixed, so an install keeps its data whichever directory it runs from: a
-# source checkout's llm_port_shared, or the directory `llmport deploy`
-# unpacks the release into (~/llm-port by default).
-name: llm_port_shared
+# source checkout's shared, or the directory `faden deploy`
+# unpacks the release into (~/fadenstack by default).
+name: fadenstack
 
 services:
   # -----------------------------
   # Platform base image (build-only, no runtime container)
   # -----------------------------
-  llm-port-base:
-    image: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
+  faden-base:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     build:
       context: ./base
       dockerfile: Dockerfile
@@ -20,30 +20,30 @@ services:
   # -----------------------------
   nginx:
     image: nginx:1-alpine
-    container_name: llm-port-nginx
+    container_name: faden-nginx
     restart: unless-stopped
     ports:
-      - "${LLM_PORT_HTTP_PORT:-80}:80"
+      - "${FADEN_HTTP_PORT:-80}:80"
       # Served once ./tls holds a certificate and key (nginx/select-config.sh);
       # until then nothing listens here.
-      - "${LLM_PORT_HTTPS_PORT:-443}:443"
+      - "${FADEN_HTTPS_PORT:-443}:443"
     environment:
-      LLM_PORT_HTTPS_PORT: ${LLM_PORT_HTTPS_PORT:-443}
+      FADEN_HTTPS_PORT: ${FADEN_HTTPS_PORT:-443}
       # Strict-Transport-Security max-age sent over HTTPS; 0 tells browsers
       # to forget it, so HTTPS can be switched off again.
-      LLM_PORT_HSTS_MAX_AGE: ${LLM_PORT_HSTS_MAX_AGE:-0}
+      FADEN_HSTS_MAX_AGE: ${FADEN_HSTS_MAX_AGE:-0}
     # select-config.sh installs the plain-HTTP or the HTTPS server config,
     # then nginx runs as usual (the image's own entrypoint still runs first).
-    command: ["/bin/sh", "-c", "sh /etc/nginx/llmport/select-config.sh && exec nginx -g 'daemon off;'"]
+    command: ["/bin/sh", "-c", "sh /etc/nginx/faden/select-config.sh && exec nginx -g 'daemon off;'"]
     volumes:
-      - ./nginx:/etc/nginx/llmport:ro
+      - ./nginx:/etc/nginx/faden:ro
       # The edge certificate and key: written by the backend's TLS admin API
       # (/api/admin/tls), or copied in by the operator. See tls/README.md.
-      - ./tls:/etc/llmport/tls:ro
+      - ./tls:/etc/faden/tls:ro
     depends_on:
-      llm-port-backend:
+      faden-backend:
         condition: service_healthy
-      llm-port-frontend:
+      faden-frontend:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/healthz || exit 1"]
@@ -57,7 +57,7 @@ services:
   # -----------------------------
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: llm-port-postgres
+    container_name: faden-postgres
     restart: unless-stopped
     # Parallel index builds (pgvector HNSW) work in shared memory; Docker's
     # default 64 MB /dev/shm fails them ("could not resize shared memory
@@ -96,7 +96,7 @@ services:
     # (SIGILL) and the container crash-loops. Override via .env:
     # CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:<tag>
     image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.10}
-    container_name: llm-port-clickhouse
+    container_name: faden-clickhouse
     restart: unless-stopped
     user: "101:101"
     environment:
@@ -121,7 +121,7 @@ services:
 
   redis:
     image: redis:7
-    container_name: llm-port-redis
+    container_name: faden-redis
     restart: unless-stopped
     command: >
       --requirepass ${REDIS_AUTH:-myredissecret} --maxmemory-policy noeviction
@@ -135,7 +135,7 @@ services:
 
   minio:
     image: cgr.dev/chainguard/minio:latest
-    container_name: llm-port-minio
+    container_name: faden-minio
     restart: unless-stopped
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
@@ -159,7 +159,7 @@ services:
   # -----------------------------
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:3
-    container_name: llm-port-worker
+    container_name: faden-worker
     restart: unless-stopped
     depends_on:
       postgres:
@@ -208,7 +208,7 @@ services:
 
   langfuse-web:
     image: docker.io/langfuse/langfuse:3
-    container_name: llm-port-web
+    container_name: faden-web
     restart: unless-stopped
     ports:
       # LLM observability UI (traces / evals / datasets), plain HTTP: on this
@@ -260,23 +260,23 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
 
-      # Initial admin user seeding (set by llmport deploy)
+      # Initial admin user seeding (set by faden deploy)
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin}
-      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-llm-port-org}
-      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-llm-port}
-      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-llm-port-project}
-      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-llm-port}
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-faden-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-fadenstack}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-faden-project}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-fadenstack}
       LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-}
       LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-}
 
   # -----------------------------
   # Shared RabbitMQ broker (API + RAG + local backend dev)
   # -----------------------------
-  llm-port-rmq:
+  faden-rmq:
     image: rabbitmq:4.2.1-management-alpine
-    container_name: llm-port-rmq
+    container_name: faden-rmq
     restart: unless-stopped
     ports:
       - "127.0.0.1:5672:5672"
@@ -292,10 +292,10 @@ services:
       # +sbwt/+sbwtdcpu/+sbwtdio none — disable scheduler busy-waiting
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+S 2:2 +sbwt none +sbwtdcpu none +sbwtdio none"
     volumes:
-      # Per-service user definitions (generated by llmport deploy).
+      # Per-service user definitions (generated by faden deploy).
       # In dev mode these files may not exist — RabbitMQ falls back
       # to RABBITMQ_DEFAULT_USER/PASS.
-      - ./rabbitmq/10-llmport.conf:/etc/rabbitmq/conf.d/10-llmport.conf:ro
+      - ./rabbitmq/10-faden.conf:/etc/rabbitmq/conf.d/10-faden.conf:ro
       - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
     deploy:
       resources:
@@ -308,95 +308,95 @@ services:
       timeout: 3s
       retries: 50
 
-  llm-port-api-migrator:
-    image: ${REGISTRY:-ghcr.io/llm-port}/api:${VERSION:-latest}
-    container_name: llm-port-api-migrator
+  faden-gateway-migrator:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/gateway:${VERSION:-latest}
+    container_name: faden-gateway-migrator
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      LLM_PORT_API_DB_HOST: postgres
-      LLM_PORT_API_DB_PORT: 5432
-      LLM_PORT_API_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_API_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_API_DB_BASE: llm_api
+      FADEN_GATEWAY_DB_HOST: postgres
+      FADEN_GATEWAY_DB_PORT: 5432
+      FADEN_GATEWAY_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_GATEWAY_DB_BASE: faden_gateway
 
   # -----------------------------
-  # llm_port_api (OpenAI-compatible endpoint gateway)
+  # faden_gateway (OpenAI-compatible endpoint gateway)
   # -----------------------------
-  llm-port-api:
-    image: ${REGISTRY:-ghcr.io/llm-port}/api:${VERSION:-latest}
+  faden-gateway:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/gateway:${VERSION:-latest}
     build:
-      context: ../llm_port_api
+      context: ../gateway
       dockerfile: Dockerfile
       target: prod
       args:
-        BASE_IMAGE: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
-    container_name: llm-port-api
+        BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
+    container_name: faden-gateway
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      llm-port-rmq:
+      faden-rmq:
         condition: service_healthy
-      llm-port-api-migrator:
+      faden-gateway-migrator:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:8001:8000"
     environment:
-      LLM_PORT_API_HOST: 0.0.0.0
-      LLM_PORT_API_PORT: 8000
+      FADEN_GATEWAY_HOST: 0.0.0.0
+      FADEN_GATEWAY_PORT: 8000
       # Behind nginx, which sets X-Forwarded-Proto/For; uvicorn honours them
       # only from these addresses (its default is 127.0.0.1, which nginx is
       # not here). Every peer is on the compose network; the host port above
       # is loopback-only.
       FORWARDED_ALLOW_IPS: "*"
-      LLM_PORT_API_RELOAD: "false"
-      LLM_PORT_API_ENVIRONMENT: ${LLM_PORT_API_ENVIRONMENT:-production}
-      # JWT secret is read from backend DB at startup (llm_port_api.jwt_secret system setting).
+      FADEN_GATEWAY_RELOAD: "false"
+      FADEN_GATEWAY_ENVIRONMENT: ${FADEN_GATEWAY_ENVIRONMENT:-production}
+      # JWT secret is read from backend DB at startup (faden_gateway.jwt_secret system setting).
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
-      LLM_PORT_API_BACKEND_DB_BASE: llm_port_backend
-      LLM_PORT_API_SETTINGS_MASTER_KEY: ${LLM_PORT_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
-      LLM_PORT_API_JWT_ALGORITHM: HS256
-      LLM_PORT_API_DB_HOST: postgres
-      LLM_PORT_API_DB_PORT: 5432
-      LLM_PORT_API_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_API_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_API_DB_BASE: llm_api
-      LLM_PORT_API_REDIS_HOST: redis
-      LLM_PORT_API_REDIS_PORT: 6379
-      LLM_PORT_API_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
-      LLM_PORT_API_REDIS_BASE: 1
-      LLM_PORT_API_RABBIT_HOST: llm-port-rmq
-      LLM_PORT_API_RABBIT_PORT: 5672
-      LLM_PORT_API_RABBIT_USER: llmport-api
-      LLM_PORT_API_RABBIT_PASS: ${RABBITMQ_API_PASS:-guest}
-      LLM_PORT_API_RABBIT_VHOST: /
-      LLM_PORT_API_LANGFUSE_ENABLED: ${LLM_PORT_API_LANGFUSE_ENABLED:-false}
-      LLM_PORT_API_LANGFUSE_HOST: ${LLM_PORT_API_LANGFUSE_HOST:-http://langfuse-web:3000}
-      LLM_PORT_API_LANGFUSE_PUBLIC_KEY: ${LLM_PORT_API_LANGFUSE_PUBLIC_KEY:-}
-      LLM_PORT_API_LANGFUSE_SECRET_KEY: ${LLM_PORT_API_LANGFUSE_SECRET_KEY:-}
+      FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend
+      FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_GATEWAY_JWT_ALGORITHM: HS256
+      FADEN_GATEWAY_DB_HOST: postgres
+      FADEN_GATEWAY_DB_PORT: 5432
+      FADEN_GATEWAY_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_GATEWAY_DB_BASE: faden_gateway
+      FADEN_GATEWAY_REDIS_HOST: redis
+      FADEN_GATEWAY_REDIS_PORT: 6379
+      FADEN_GATEWAY_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_GATEWAY_REDIS_BASE: 1
+      FADEN_GATEWAY_RABBIT_HOST: faden-rmq
+      FADEN_GATEWAY_RABBIT_PORT: 5672
+      FADEN_GATEWAY_RABBIT_USER: faden-gateway
+      FADEN_GATEWAY_RABBIT_PASS: ${RABBITMQ_API_PASS:-guest}
+      FADEN_GATEWAY_RABBIT_VHOST: /
+      FADEN_GATEWAY_LANGFUSE_ENABLED: ${FADEN_GATEWAY_LANGFUSE_ENABLED:-false}
+      FADEN_GATEWAY_LANGFUSE_HOST: ${FADEN_GATEWAY_LANGFUSE_HOST:-http://langfuse-web:3000}
+      FADEN_GATEWAY_LANGFUSE_PUBLIC_KEY: ${FADEN_GATEWAY_LANGFUSE_PUBLIC_KEY:-}
+      FADEN_GATEWAY_LANGFUSE_SECRET_KEY: ${FADEN_GATEWAY_LANGFUSE_SECRET_KEY:-}
       # PII module integration (set via .env or COMPOSE_PROFILES)
-      LLM_PORT_API_PII_ENABLED: ${LLM_PORT_API_PII_ENABLED:-false}
-      LLM_PORT_API_PII_SERVICE_URL: ${LLM_PORT_API_PII_SERVICE_URL:-http://llm-port-pii:8000}
+      FADEN_GATEWAY_PII_ENABLED: ${FADEN_GATEWAY_PII_ENABLED:-false}
+      FADEN_GATEWAY_PII_SERVICE_URL: ${FADEN_GATEWAY_PII_SERVICE_URL:-http://faden-pii:8000}
       # MCP tool registry integration (set via .env or COMPOSE_PROFILES)
-      LLM_PORT_API_MCP_ENABLED: ${LLM_PORT_API_MCP_ENABLED:-false}
-      LLM_PORT_API_MCP_SERVICE_URL: ${LLM_PORT_API_MCP_SERVICE_URL:-http://llm-port-mcp:8000}
-      LLM_PORT_API_MCP_SERVICE_TOKEN: ${LLM_PORT_API_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_GATEWAY_MCP_ENABLED: ${FADEN_GATEWAY_MCP_ENABLED:-false}
+      FADEN_GATEWAY_MCP_SERVICE_URL: ${FADEN_GATEWAY_MCP_SERVICE_URL:-http://faden-mcp:8000}
+      FADEN_GATEWAY_MCP_SERVICE_TOKEN: ${FADEN_GATEWAY_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
       # Skills registry integration (set via .env or COMPOSE_PROFILES)
-      LLM_PORT_API_SKILLS_ENABLED: ${LLM_PORT_API_SKILLS_ENABLED:-false}
-      LLM_PORT_API_SKILLS_SERVICE_URL: ${LLM_PORT_API_SKILLS_SERVICE_URL:-http://llm-port-skills:8000}
-      LLM_PORT_API_SKILLS_SERVICE_TOKEN: ${LLM_PORT_API_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
-      # Scalability tuning (set via llmport tune)
-      LLM_PORT_API_WORKERS_COUNT: ${LLM_PORT_API_WORKERS_COUNT:-4}
-      LLM_PORT_API_DB_POOL_SIZE: ${LLM_PORT_API_DB_POOL_SIZE:-5}
-      LLM_PORT_API_DB_MAX_OVERFLOW: ${LLM_PORT_API_DB_MAX_OVERFLOW:-5}
-      LLM_PORT_API_RABBIT_POOL_SIZE: ${LLM_PORT_API_RABBIT_POOL_SIZE:-2}
-      LLM_PORT_API_RABBIT_CHANNEL_POOL_SIZE: ${LLM_PORT_API_RABBIT_CHANNEL_POOL_SIZE:-10}
+      FADEN_GATEWAY_SKILLS_ENABLED: ${FADEN_GATEWAY_SKILLS_ENABLED:-false}
+      FADEN_GATEWAY_SKILLS_SERVICE_URL: ${FADEN_GATEWAY_SKILLS_SERVICE_URL:-http://faden-skills:8000}
+      FADEN_GATEWAY_SKILLS_SERVICE_TOKEN: ${FADEN_GATEWAY_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      # Scalability tuning (set via faden tune)
+      FADEN_GATEWAY_WORKERS_COUNT: ${FADEN_GATEWAY_WORKERS_COUNT:-4}
+      FADEN_GATEWAY_DB_POOL_SIZE: ${FADEN_GATEWAY_DB_POOL_SIZE:-5}
+      FADEN_GATEWAY_DB_MAX_OVERFLOW: ${FADEN_GATEWAY_DB_MAX_OVERFLOW:-5}
+      FADEN_GATEWAY_RABBIT_POOL_SIZE: ${FADEN_GATEWAY_RABBIT_POOL_SIZE:-2}
+      FADEN_GATEWAY_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_GATEWAY_RABBIT_CHANNEL_POOL_SIZE:-10}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s
@@ -404,123 +404,123 @@ services:
       retries: 20
 
   # -----------------------------
-  # llm_port_backend (control-plane)
+  # faden_backend (control-plane)
   # -----------------------------
-  llm-port-backend-migrator:
-    image: ${REGISTRY:-ghcr.io/llm-port}/backend:${VERSION:-latest}
-    container_name: llm-port-backend-migrator
+  faden-backend-migrator:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
+    container_name: faden-backend-migrator
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      LLM_PORT_BACKEND_DB_HOST: postgres
-      LLM_PORT_BACKEND_DB_PORT: 5432
-      LLM_PORT_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_BACKEND_DB_BASE: llm_port_backend
+      FADEN_BACKEND_DB_HOST: postgres
+      FADEN_BACKEND_DB_PORT: 5432
+      FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_BASE: faden_backend
 
-  llm-port-backend:
-    image: ${REGISTRY:-ghcr.io/llm-port}/backend:${VERSION:-latest}
+  faden-backend:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
     build:
-      context: ../llm_port_backend
+      context: ../backend
       dockerfile: Dockerfile
       target: prod
       # The runtime manifests the Dockerfile copies in (see there).
       additional_contexts:
-        runtime_manifests: ../llm_port_runtime_image
+        runtime_manifests: ../runtime-image
       args:
-        BASE_IMAGE: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
-    container_name: llm-port-backend
+        BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
+    container_name: faden-backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      llm-port-rmq:
+      faden-rmq:
         condition: service_healthy
-      llm-port-backend-migrator:
+      faden-backend-migrator:
         condition: service_completed_successfully
     # No host port — accessed via nginx reverse proxy
     environment:
-      LLM_PORT_BACKEND_HOST: 0.0.0.0
-      LLM_PORT_BACKEND_PORT: 8000
+      FADEN_BACKEND_HOST: 0.0.0.0
+      FADEN_BACKEND_PORT: 8000
       # Behind nginx, which sets X-Forwarded-Proto/For; uvicorn honours them
       # only from these addresses (its default is 127.0.0.1, which nginx is
       # not here). Only the compose network reaches the backend, so any peer
       # is ours. Without this the backend believes every request is plain
       # HTTP: it would refuse a TLS upload and never mark a cookie Secure.
       FORWARDED_ALLOW_IPS: "*"
-      LLM_PORT_BACKEND_RELOAD: "false"
-      LLM_PORT_BACKEND_ENVIRONMENT: ${LLM_PORT_BACKEND_ENVIRONMENT:-production}
-      LLM_PORT_BACKEND_DB_HOST: postgres
-      LLM_PORT_BACKEND_DB_PORT: 5432
-      LLM_PORT_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_BACKEND_DB_BASE: llm_port_backend
-      LLM_PORT_BACKEND_REDIS_HOST: redis
-      LLM_PORT_BACKEND_REDIS_PORT: 6379
-      LLM_PORT_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
-      LLM_PORT_BACKEND_RABBIT_HOST: llm-port-rmq
-      LLM_PORT_BACKEND_RABBIT_PORT: 5672
-      LLM_PORT_BACKEND_RABBIT_USER: llmport-backend
-      LLM_PORT_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
-      LLM_PORT_BACKEND_RABBIT_VHOST: /
-      LLM_PORT_BACKEND_GATEWAY_URL: ${LLM_PORT_BACKEND_GATEWAY_URL:-http://llm-port-api:8000}
-      LLM_PORT_BACKEND_SETTINGS_MASTER_KEY: ${LLM_PORT_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_HOST: postgres
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_BACKEND_LOKI_BASE_URL: http://llm-port-loki:3100
-      LLM_PORT_BACKEND_COOKIE_SECURE: "false"
+      FADEN_BACKEND_RELOAD: "false"
+      FADEN_BACKEND_ENVIRONMENT: ${FADEN_BACKEND_ENVIRONMENT:-production}
+      FADEN_BACKEND_DB_HOST: postgres
+      FADEN_BACKEND_DB_PORT: 5432
+      FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_BASE: faden_backend
+      FADEN_BACKEND_REDIS_HOST: redis
+      FADEN_BACKEND_REDIS_PORT: 6379
+      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_BACKEND_RABBIT_HOST: faden-rmq
+      FADEN_BACKEND_RABBIT_PORT: 5672
+      FADEN_BACKEND_RABBIT_USER: faden-backend
+      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
+      FADEN_BACKEND_RABBIT_VHOST: /
+      FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
+      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_BACKEND_LLM_GRAPH_DB_HOST: postgres
+      FADEN_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_LOKI_BASE_URL: http://faden-loki:3100
+      FADEN_BACKEND_COOKIE_SECURE: "false"
       USERS_SECRET: ${USERS_SECRET:-}
       # Module enabled flags + service URLs (Docker-internal for health probes)
-      LLM_PORT_BACKEND_PII_ENABLED: ${LLM_PORT_BACKEND_PII_ENABLED:-false}
-      LLM_PORT_BACKEND_PII_SERVICE_URL: ${LLM_PORT_BACKEND_PII_SERVICE_URL:-http://llm-port-pii:8000/api}
-      LLM_PORT_BACKEND_MCP_ENABLED: ${LLM_PORT_BACKEND_MCP_ENABLED:-false}
-      LLM_PORT_BACKEND_MCP_SERVICE_URL: ${LLM_PORT_BACKEND_MCP_SERVICE_URL:-http://llm-port-mcp:8000}
-      LLM_PORT_BACKEND_MCP_SERVICE_TOKEN: ${LLM_PORT_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
-      LLM_PORT_BACKEND_SKILLS_ENABLED: ${LLM_PORT_BACKEND_SKILLS_ENABLED:-false}
-      LLM_PORT_BACKEND_MAILER_SERVICE_URL: ${LLM_PORT_BACKEND_MAILER_SERVICE_URL:-http://llm-port-mailer:8000}
-      LLM_PORT_BACKEND_AUTH_SERVICE_URL: ${LLM_PORT_BACKEND_AUTH_SERVICE_URL:-http://llm-port-auth:8000}
-      LLM_PORT_BACKEND_DOCLING_SERVICE_URL: ${LLM_PORT_BACKEND_DOCLING_SERVICE_URL:-http://llm-port-docling:8000}
-      LLM_PORT_BACKEND_SKILLS_SERVICE_URL: ${LLM_PORT_BACKEND_SKILLS_SERVICE_URL:-http://llm-port-skills:8000}
-      LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN: ${LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
-      # Scalability tuning (set via llmport tune)
-      LLM_PORT_BACKEND_WORKERS_COUNT: ${LLM_PORT_BACKEND_WORKERS_COUNT:-4}
-      LLM_PORT_BACKEND_DB_POOL_SIZE: ${LLM_PORT_BACKEND_DB_POOL_SIZE:-5}
-      LLM_PORT_BACKEND_DB_MAX_OVERFLOW: ${LLM_PORT_BACKEND_DB_MAX_OVERFLOW:-5}
-      LLM_PORT_BACKEND_RABBIT_POOL_SIZE: ${LLM_PORT_BACKEND_RABBIT_POOL_SIZE:-2}
-      LLM_PORT_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${LLM_PORT_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
-      LLM_PORT_BACKEND_MODEL_STORE_ROOT: /srv/llm-port/models
-      LLM_PORT_BACKEND_HOST_HF_CACHE_DIR: ${LLM_PORT_BACKEND_HOST_HF_CACHE_DIR:-}
+      FADEN_BACKEND_PII_ENABLED: ${FADEN_BACKEND_PII_ENABLED:-false}
+      FADEN_BACKEND_PII_SERVICE_URL: ${FADEN_BACKEND_PII_SERVICE_URL:-http://faden-pii:8000/api}
+      FADEN_BACKEND_MCP_ENABLED: ${FADEN_BACKEND_MCP_ENABLED:-false}
+      FADEN_BACKEND_MCP_SERVICE_URL: ${FADEN_BACKEND_MCP_SERVICE_URL:-http://faden-mcp:8000}
+      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_BACKEND_SKILLS_ENABLED: ${FADEN_BACKEND_SKILLS_ENABLED:-false}
+      FADEN_BACKEND_MAILER_SERVICE_URL: ${FADEN_BACKEND_MAILER_SERVICE_URL:-http://faden-mailer:8000}
+      FADEN_BACKEND_AUTH_SERVICE_URL: ${FADEN_BACKEND_AUTH_SERVICE_URL:-http://faden-auth:8000}
+      FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
+      FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
+      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      # Scalability tuning (set via faden tune)
+      FADEN_BACKEND_WORKERS_COUNT: ${FADEN_BACKEND_WORKERS_COUNT:-4}
+      FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
+      FADEN_BACKEND_DB_MAX_OVERFLOW: ${FADEN_BACKEND_DB_MAX_OVERFLOW:-5}
+      FADEN_BACKEND_RABBIT_POOL_SIZE: ${FADEN_BACKEND_RABBIT_POOL_SIZE:-2}
+      FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
+      FADEN_BACKEND_MODEL_STORE_ROOT: /srv/faden/models
+      FADEN_BACKEND_HOST_HF_CACHE_DIR: ${FADEN_BACKEND_HOST_HF_CACHE_DIR:-}
       # Runtime monitoring (prometheus + per-runtime dashboards).
-      # OFF by default; enable with LLM_PORT_BACKEND_LLM_MONITORING_ENABLED=true.
-      LLM_PORT_BACKEND_LLM_MONITORING_ENABLED: ${LLM_PORT_BACKEND_LLM_MONITORING_ENABLED:-false}
-      LLM_PORT_BACKEND_PROM_URL: http://prometheus:9090
-      LLM_PORT_BACKEND_PROM_TARGETS_FILE: /opt/llm-port/monitoring/prometheus/targets.json
-      LLM_PORT_BACKEND_PROM_DASHBOARD_DIR: /opt/llm-port/monitoring/dashboards
-      LLM_PORT_BACKEND_DASH_TEMPLATE: /opt/llm-port/monitoring/templates/vllm-runtime.json
-      LLM_PORT_BACKEND_DASH_FOLDER: "LLM Runtimes"
+      # OFF by default; enable with FADEN_BACKEND_LLM_MONITORING_ENABLED=true.
+      FADEN_BACKEND_LLM_MONITORING_ENABLED: ${FADEN_BACKEND_LLM_MONITORING_ENABLED:-false}
+      FADEN_BACKEND_PROM_URL: http://prometheus:9090
+      FADEN_BACKEND_PROM_TARGETS_FILE: /opt/faden/monitoring/prometheus/targets.json
+      FADEN_BACKEND_PROM_DASHBOARD_DIR: /opt/faden/monitoring/dashboards
+      FADEN_BACKEND_DASH_TEMPLATE: /opt/faden/monitoring/templates/vllm-runtime.json
+      FADEN_BACKEND_DASH_FOLDER: "LLM Runtimes"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - llm_port_models:/srv/llm-port/models
+      - faden_models:/srv/faden/models
       # Runtime monitoring — shared with the prometheus + grafana
       # services (see their mounts). The backend generates
       # prometheus/targets.json and dashboards/*.json here; grafana
       # reads the same json dir via its provisioning mount.
-      - ./prometheus/targets.json:/opt/llm-port/monitoring/prometheus/targets.json:rw
-      - ./grafana/provisioning/dashboards/json:/opt/llm-port/monitoring/dashboards:rw
-      - ./grafana/dashboards/templates:/opt/llm-port/monitoring/templates:ro
-      # Agent builds the install line hands out (llmport-agent-linux-<arch>).
+      - ./prometheus/targets.json:/opt/faden/monitoring/prometheus/targets.json:rw
+      - ./grafana/provisioning/dashboards/json:/opt/faden/monitoring/dashboards:rw
+      - ./grafana/dashboards/templates:/opt/faden/monitoring/templates:ro
+      # Agent builds the install line hands out (faden-agent-linux-<arch>).
       # Without a copy here a machine can only fetch the published release,
       # which an air-gapped site cannot reach and a new agent may not be yet.
-      - ./agent-binaries:/srv/llm-port/agent-binaries:ro
+      - ./agent-binaries:/srv/faden/agent-binaries:ro
       # The edge certificate and key the TLS admin API writes; nginx mounts
       # the same directory read-only and serves HTTPS from it.
-      - ./tls:/etc/llmport/tls:rw
+      - ./tls:/etc/faden/tls:rw
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -529,84 +529,84 @@ services:
       timeout: 5s
       retries: 20
 
-  llm-port-backend-worker:
-    image: ${REGISTRY:-ghcr.io/llm-port}/backend:${VERSION:-latest}
-    container_name: llm-port-backend-worker
+  faden-backend-worker:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
+    container_name: faden-backend-worker
     restart: unless-stopped
     command:
       - taskiq
       - worker
-      - llm_port_backend.tkq:broker
+      - faden_backend.tkq:broker
       - --fs-discover
     depends_on:
       postgres:
         condition: service_healthy
-      llm-port-rmq:
+      faden-rmq:
         condition: service_healthy
-      llm-port-backend-migrator:
+      faden-backend-migrator:
         condition: service_completed_successfully
     environment:
-      LLM_PORT_BACKEND_ENVIRONMENT: ${LLM_PORT_BACKEND_ENVIRONMENT:-production}
-      LLM_PORT_BACKEND_DB_HOST: postgres
-      LLM_PORT_BACKEND_DB_PORT: 5432
-      LLM_PORT_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_BACKEND_DB_BASE: llm_port_backend
-      LLM_PORT_BACKEND_REDIS_HOST: redis
-      LLM_PORT_BACKEND_REDIS_PORT: 6379
-      LLM_PORT_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
-      LLM_PORT_BACKEND_RABBIT_HOST: llm-port-rmq
-      LLM_PORT_BACKEND_RABBIT_PORT: 5672
-      LLM_PORT_BACKEND_RABBIT_USER: llmport-backend
-      LLM_PORT_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
-      LLM_PORT_BACKEND_RABBIT_VHOST: /
-      LLM_PORT_BACKEND_GATEWAY_URL: ${LLM_PORT_BACKEND_GATEWAY_URL:-http://llm-port-api:8000}
-      LLM_PORT_BACKEND_SETTINGS_MASTER_KEY: ${LLM_PORT_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_HOST: postgres
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_BACKEND_LOKI_BASE_URL: http://llm-port-loki:3100
-      LLM_PORT_BACKEND_COOKIE_SECURE: "false"
+      FADEN_BACKEND_ENVIRONMENT: ${FADEN_BACKEND_ENVIRONMENT:-production}
+      FADEN_BACKEND_DB_HOST: postgres
+      FADEN_BACKEND_DB_PORT: 5432
+      FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_BASE: faden_backend
+      FADEN_BACKEND_REDIS_HOST: redis
+      FADEN_BACKEND_REDIS_PORT: 6379
+      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_BACKEND_RABBIT_HOST: faden-rmq
+      FADEN_BACKEND_RABBIT_PORT: 5672
+      FADEN_BACKEND_RABBIT_USER: faden-backend
+      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
+      FADEN_BACKEND_RABBIT_VHOST: /
+      FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
+      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_BACKEND_LLM_GRAPH_DB_HOST: postgres
+      FADEN_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_LOKI_BASE_URL: http://faden-loki:3100
+      FADEN_BACKEND_COOKIE_SECURE: "false"
       USERS_SECRET: ${USERS_SECRET:-}
       # Module enabled flags + service URLs (Docker-internal for health probes)
-      LLM_PORT_BACKEND_MCP_ENABLED: ${LLM_PORT_BACKEND_MCP_ENABLED:-false}
-      LLM_PORT_BACKEND_SKILLS_ENABLED: ${LLM_PORT_BACKEND_SKILLS_ENABLED:-false}
-      LLM_PORT_BACKEND_PII_SERVICE_URL: ${LLM_PORT_BACKEND_PII_SERVICE_URL:-http://llm-port-pii:8000/api}
-      LLM_PORT_BACKEND_MCP_SERVICE_URL: ${LLM_PORT_BACKEND_MCP_SERVICE_URL:-http://llm-port-mcp:8000}
-      LLM_PORT_BACKEND_MCP_SERVICE_TOKEN: ${LLM_PORT_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
-      LLM_PORT_BACKEND_MAILER_SERVICE_URL: ${LLM_PORT_BACKEND_MAILER_SERVICE_URL:-http://llm-port-mailer:8000}
-      LLM_PORT_BACKEND_AUTH_SERVICE_URL: ${LLM_PORT_BACKEND_AUTH_SERVICE_URL:-http://llm-port-auth:8000}
-      LLM_PORT_BACKEND_DOCLING_SERVICE_URL: ${LLM_PORT_BACKEND_DOCLING_SERVICE_URL:-http://llm-port-docling:8000}
-      LLM_PORT_BACKEND_SKILLS_SERVICE_URL: ${LLM_PORT_BACKEND_SKILLS_SERVICE_URL:-http://llm-port-skills:8000}
-      LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN: ${LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
-      # Scalability tuning (set via llmport tune)
-      LLM_PORT_BACKEND_DB_POOL_SIZE: ${LLM_PORT_BACKEND_DB_POOL_SIZE:-5}
-      LLM_PORT_BACKEND_DB_MAX_OVERFLOW: ${LLM_PORT_BACKEND_DB_MAX_OVERFLOW:-5}
-      LLM_PORT_BACKEND_RABBIT_POOL_SIZE: ${LLM_PORT_BACKEND_RABBIT_POOL_SIZE:-2}
-      LLM_PORT_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${LLM_PORT_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
-      LLM_PORT_BACKEND_MODEL_STORE_ROOT: /srv/llm-port/models
-      LLM_PORT_BACKEND_HOST_HF_CACHE_DIR: ${LLM_PORT_BACKEND_HOST_HF_CACHE_DIR:-}
+      FADEN_BACKEND_MCP_ENABLED: ${FADEN_BACKEND_MCP_ENABLED:-false}
+      FADEN_BACKEND_SKILLS_ENABLED: ${FADEN_BACKEND_SKILLS_ENABLED:-false}
+      FADEN_BACKEND_PII_SERVICE_URL: ${FADEN_BACKEND_PII_SERVICE_URL:-http://faden-pii:8000/api}
+      FADEN_BACKEND_MCP_SERVICE_URL: ${FADEN_BACKEND_MCP_SERVICE_URL:-http://faden-mcp:8000}
+      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_BACKEND_MAILER_SERVICE_URL: ${FADEN_BACKEND_MAILER_SERVICE_URL:-http://faden-mailer:8000}
+      FADEN_BACKEND_AUTH_SERVICE_URL: ${FADEN_BACKEND_AUTH_SERVICE_URL:-http://faden-auth:8000}
+      FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
+      FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
+      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      # Scalability tuning (set via faden tune)
+      FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
+      FADEN_BACKEND_DB_MAX_OVERFLOW: ${FADEN_BACKEND_DB_MAX_OVERFLOW:-5}
+      FADEN_BACKEND_RABBIT_POOL_SIZE: ${FADEN_BACKEND_RABBIT_POOL_SIZE:-2}
+      FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
+      FADEN_BACKEND_MODEL_STORE_ROOT: /srv/faden/models
+      FADEN_BACKEND_HOST_HF_CACHE_DIR: ${FADEN_BACKEND_HOST_HF_CACHE_DIR:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - llm_port_models:/srv/llm-port/models
+      - faden_models:/srv/faden/models
 
   # -----------------------------
-  # llm_port_frontend (React admin console)
+  # frontend (React admin console)
   # -----------------------------
-  llm-port-frontend:
-    image: ${REGISTRY:-ghcr.io/llm-port}/frontend:${VERSION:-latest}
+  faden-frontend:
+    image: ${REGISTRY:-ghcr.io/fadenstack}/frontend:${VERSION:-latest}
     build:
-      context: ../llm_port_frontend
+      context: ../frontend
       dockerfile: Dockerfile
-    container_name: llm-port-frontend
+    container_name: faden-frontend
     restart: unless-stopped
     depends_on:
-      llm-port-backend:
+      faden-backend:
         condition: service_healthy
     # No host port — accessed via nginx reverse proxy
     environment:
-      BACKEND_URL: http://llm-port-backend:8000
-      API_URL: http://llm-port-api:8000
+      BACKEND_URL: http://faden-backend:8000
+      API_URL: http://faden-gateway:8000
 
   # =====================================================================
   # PII Protection (profile: pii)
@@ -614,62 +614,62 @@ services:
   # Core redact-only mode. EE extends with tokenize/detokenize.
   # Activate with:  --profile pii  (or COMPOSE_PROFILES=pii)
   # =====================================================================
-  llm-port-pii:
+  faden-pii:
     profiles: ["pii"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/pii:${VERSION:-latest}
+    image: ${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}
     build:
-      context: ../llm_port_pii
+      context: ../pii
       dockerfile: Dockerfile
       target: prod
       args:
-        BASE_IMAGE: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
-    container_name: llm-port-pii
+        BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
+    container_name: faden-pii
     restart: unless-stopped
     depends_on:
-      llm-port-rmq:
+      faden-rmq:
         condition: service_healthy
     environment:
-      LLM_PORT_PII_HOST: 0.0.0.0
-      LLM_PORT_PII_PORT: 8000
-      LLM_PORT_PII_RELOAD: "false"
-      LLM_PORT_PII_ENVIRONMENT: ${LLM_PORT_PII_ENVIRONMENT:-production}
-      LLM_PORT_PII_BACKEND_URL: http://llm-port-backend:8000
-      LLM_PORT_PII_RABBIT_HOST: llm-port-rmq
-      LLM_PORT_PII_RABBIT_PORT: 5672
-      LLM_PORT_PII_RABBIT_USER: llmport-pii
-      LLM_PORT_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
-      LLM_PORT_PII_RABBIT_VHOST: /
-      # Scalability tuning (set via llmport tune)
-      LLM_PORT_PII_WORKERS_COUNT: ${LLM_PORT_PII_WORKERS_COUNT:-4}
-      LLM_PORT_PII_DB_POOL_SIZE: ${LLM_PORT_PII_DB_POOL_SIZE:-5}
-      LLM_PORT_PII_DB_MAX_OVERFLOW: ${LLM_PORT_PII_DB_MAX_OVERFLOW:-5}
+      FADEN_PII_HOST: 0.0.0.0
+      FADEN_PII_PORT: 8000
+      FADEN_PII_RELOAD: "false"
+      FADEN_PII_ENVIRONMENT: ${FADEN_PII_ENVIRONMENT:-production}
+      FADEN_PII_BACKEND_URL: http://faden-backend:8000
+      FADEN_PII_RABBIT_HOST: faden-rmq
+      FADEN_PII_RABBIT_PORT: 5672
+      FADEN_PII_RABBIT_USER: faden-pii
+      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
+      FADEN_PII_RABBIT_VHOST: /
+      # Scalability tuning (set via faden tune)
+      FADEN_PII_WORKERS_COUNT: ${FADEN_PII_WORKERS_COUNT:-4}
+      FADEN_PII_DB_POOL_SIZE: ${FADEN_PII_DB_POOL_SIZE:-5}
+      FADEN_PII_DB_MAX_OVERFLOW: ${FADEN_PII_DB_MAX_OVERFLOW:-5}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  llm-port-pii-worker:
+  faden-pii-worker:
     profiles: ["pii"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/pii:${VERSION:-latest}
-    container_name: llm-port-pii-worker
+    image: ${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}
+    container_name: faden-pii-worker
     restart: unless-stopped
     command:
       - taskiq
       - worker
-      - llm_port_pii.tkq:broker
+      - faden_pii.tkq:broker
       - --fs-discover
     depends_on:
-      llm-port-rmq:
+      faden-rmq:
         condition: service_healthy
     environment:
-      LLM_PORT_PII_ENVIRONMENT: ${LLM_PORT_PII_ENVIRONMENT:-production}
-      LLM_PORT_PII_BACKEND_URL: http://llm-port-backend:8000
-      LLM_PORT_PII_RABBIT_HOST: llm-port-rmq
-      LLM_PORT_PII_RABBIT_PORT: 5672
-      LLM_PORT_PII_RABBIT_USER: llmport-pii
-      LLM_PORT_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
-      LLM_PORT_PII_RABBIT_VHOST: /
+      FADEN_PII_ENVIRONMENT: ${FADEN_PII_ENVIRONMENT:-production}
+      FADEN_PII_BACKEND_URL: http://faden-backend:8000
+      FADEN_PII_RABBIT_HOST: faden-rmq
+      FADEN_PII_RABBIT_PORT: 5672
+      FADEN_PII_RABBIT_USER: faden-pii
+      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
+      FADEN_PII_RABBIT_VHOST: /
 
   # =====================================================================
   # MCP Tool Registry (profile: mcp)
@@ -677,58 +677,58 @@ services:
   # Generic MCP server registry + tool discovery.
   # Activate with:  --profile mcp  (or COMPOSE_PROFILES=mcp)
   # =====================================================================
-  llm-port-mcp-migrator:
+  faden-mcp-migrator:
     profiles: ["mcp"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/mcp:${VERSION:-latest}
-    container_name: llm-port-mcp-migrator
+    image: ${REGISTRY:-ghcr.io/fadenstack}/mcp:${VERSION:-latest}
+    container_name: faden-mcp-migrator
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      LLM_PORT_MCP_DB_HOST: postgres
-      LLM_PORT_MCP_DB_PORT: 5432
-      LLM_PORT_MCP_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_MCP_DB_BASE: llm_mcp
+      FADEN_MCP_DB_HOST: postgres
+      FADEN_MCP_DB_PORT: 5432
+      FADEN_MCP_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_MCP_DB_BASE: faden_mcp
 
-  llm-port-mcp:
+  faden-mcp:
     profiles: ["mcp"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/mcp:${VERSION:-latest}
+    image: ${REGISTRY:-ghcr.io/fadenstack}/mcp:${VERSION:-latest}
     build:
-      context: ../llm_port_mcp
+      context: ../mcp
       dockerfile: Dockerfile
       target: prod
       args:
-        BASE_IMAGE: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
-    container_name: llm-port-mcp
+        BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
+    container_name: faden-mcp
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      llm-port-mcp-migrator:
+      faden-mcp-migrator:
         condition: service_completed_successfully
     environment:
-      LLM_PORT_MCP_HOST: 0.0.0.0
-      LLM_PORT_MCP_PORT: 8000
-      LLM_PORT_MCP_RELOAD: "false"
-      LLM_PORT_MCP_ENVIRONMENT: ${LLM_PORT_MCP_ENVIRONMENT:-production}
-      LLM_PORT_MCP_DB_HOST: postgres
-      LLM_PORT_MCP_DB_PORT: 5432
-      LLM_PORT_MCP_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_MCP_DB_BASE: llm_mcp
-      LLM_PORT_MCP_REDIS_HOST: redis
-      LLM_PORT_MCP_REDIS_PORT: 6379
-      LLM_PORT_MCP_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
-      LLM_PORT_MCP_REDIS_BASE: 3
-      LLM_PORT_MCP_PII_SERVICE_URL: ${LLM_PORT_MCP_PII_SERVICE_URL:-http://llm-port-pii:8000}
-      LLM_PORT_MCP_SERVICE_TOKEN: ${LLM_PORT_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
-      LLM_PORT_MCP_ENCRYPTION_KEY: ${LLM_PORT_MCP_ENCRYPTION_KEY:-dev-mcp-encryption-key-change-me-32b}
-      LLM_PORT_MCP_WORKERS_COUNT: ${LLM_PORT_MCP_WORKERS_COUNT:-1}
+      FADEN_MCP_HOST: 0.0.0.0
+      FADEN_MCP_PORT: 8000
+      FADEN_MCP_RELOAD: "false"
+      FADEN_MCP_ENVIRONMENT: ${FADEN_MCP_ENVIRONMENT:-production}
+      FADEN_MCP_DB_HOST: postgres
+      FADEN_MCP_DB_PORT: 5432
+      FADEN_MCP_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_MCP_DB_BASE: faden_mcp
+      FADEN_MCP_REDIS_HOST: redis
+      FADEN_MCP_REDIS_PORT: 6379
+      FADEN_MCP_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_MCP_REDIS_BASE: 3
+      FADEN_MCP_PII_SERVICE_URL: ${FADEN_MCP_PII_SERVICE_URL:-http://faden-pii:8000}
+      FADEN_MCP_SERVICE_TOKEN: ${FADEN_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_MCP_ENCRYPTION_KEY: ${FADEN_MCP_ENCRYPTION_KEY:-dev-mcp-encryption-key-change-me-32b}
+      FADEN_MCP_WORKERS_COUNT: ${FADEN_MCP_WORKERS_COUNT:-1}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s
@@ -743,56 +743,56 @@ services:
   # Centralized LLM skill management with versioning & assignments.
   # Activate with:  --profile skills  (or COMPOSE_PROFILES=skills)
   # =====================================================================
-  llm-port-skills-migrator:
+  faden-skills-migrator:
     profiles: ["skills"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/skills:${VERSION:-latest}
-    container_name: llm-port-skills-migrator
+    image: ${REGISTRY:-ghcr.io/fadenstack}/skills:${VERSION:-latest}
+    container_name: faden-skills-migrator
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      LLM_PORT_SKILLS_DB_HOST: postgres
-      LLM_PORT_SKILLS_DB_PORT: 5432
-      LLM_PORT_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_SKILLS_DB_BASE: llm_skills
+      FADEN_SKILLS_DB_HOST: postgres
+      FADEN_SKILLS_DB_PORT: 5432
+      FADEN_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_SKILLS_DB_BASE: faden_skills
 
-  llm-port-skills:
+  faden-skills:
     profiles: ["skills"]
-    image: ${REGISTRY:-ghcr.io/llm-port}/skills:${VERSION:-latest}
+    image: ${REGISTRY:-ghcr.io/fadenstack}/skills:${VERSION:-latest}
     build:
-      context: ../llm_port_skills
+      context: ../skills
       dockerfile: Dockerfile
       target: prod
       args:
-        BASE_IMAGE: ${REGISTRY:-ghcr.io/llm-port}/base:${VERSION:-latest}
-    container_name: llm-port-skills
+        BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
+    container_name: faden-skills
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      llm-port-skills-migrator:
+      faden-skills-migrator:
         condition: service_completed_successfully
     environment:
-      LLM_PORT_SKILLS_HOST: 0.0.0.0
-      LLM_PORT_SKILLS_PORT: 8000
-      LLM_PORT_SKILLS_RELOAD: "false"
-      LLM_PORT_SKILLS_ENVIRONMENT: ${LLM_PORT_SKILLS_ENVIRONMENT:-production}
-      LLM_PORT_SKILLS_DB_HOST: postgres
-      LLM_PORT_SKILLS_DB_PORT: 5432
-      LLM_PORT_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
-      LLM_PORT_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
-      LLM_PORT_SKILLS_DB_BASE: llm_skills
-      LLM_PORT_SKILLS_REDIS_HOST: redis
-      LLM_PORT_SKILLS_REDIS_PORT: 6379
-      LLM_PORT_SKILLS_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
-      LLM_PORT_SKILLS_REDIS_BASE: 4
-      LLM_PORT_SKILLS_SERVICE_TOKEN: ${LLM_PORT_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
-      LLM_PORT_SKILLS_WORKERS_COUNT: ${LLM_PORT_SKILLS_WORKERS_COUNT:-1}
+      FADEN_SKILLS_HOST: 0.0.0.0
+      FADEN_SKILLS_PORT: 8000
+      FADEN_SKILLS_RELOAD: "false"
+      FADEN_SKILLS_ENVIRONMENT: ${FADEN_SKILLS_ENVIRONMENT:-production}
+      FADEN_SKILLS_DB_HOST: postgres
+      FADEN_SKILLS_DB_PORT: 5432
+      FADEN_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_SKILLS_DB_BASE: faden_skills
+      FADEN_SKILLS_REDIS_HOST: redis
+      FADEN_SKILLS_REDIS_PORT: 6379
+      FADEN_SKILLS_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_SKILLS_REDIS_BASE: 4
+      FADEN_SKILLS_SERVICE_TOKEN: ${FADEN_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      FADEN_SKILLS_WORKERS_COUNT: ${FADEN_SKILLS_WORKERS_COUNT:-1}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s
@@ -811,7 +811,7 @@ services:
     # for debugging); omit the port entirely if you want it
     # compose-private.
     image: prom/prometheus:v2.53.0
-    container_name: llm-port-prometheus
+    container_name: faden-prometheus
     restart: unless-stopped
     ports:
       # Not 9090 on the host: MinIO's API is published there in this stack,
@@ -826,7 +826,7 @@ services:
       - --web.enable-lifecycle
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      # Generated by llm-port-backend — do not hand-edit.
+      # Generated by faden-backend — do not hand-edit.
       - ./prometheus/targets.json:/etc/prometheus/targets.json:rw
       - prom_data:/prometheus
     extra_hosts:
@@ -836,7 +836,7 @@ services:
 
   loki:
     image: grafana/loki:3.0.0
-    container_name: llm-port-loki
+    container_name: faden-loki
     restart: unless-stopped
     # Loki has no authentication — it must never be reachable from the
     # network. Default to the loopback interface only; set LOKI_BIND
@@ -850,7 +850,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.5.2
-    container_name: llm-port-grafana
+    container_name: faden-grafana
     restart: unless-stopped
     ports:
       # Dashboards, anonymous read-only (login form disabled), plain HTTP. The
@@ -881,7 +881,7 @@ services:
 
   alloy:
     image: grafana/alloy:latest
-    container_name: llm-port-alloy
+    container_name: faden-alloy
     restart: unless-stopped
     ports:
       - "127.0.0.1:12345:12345"
@@ -905,4 +905,4 @@ volumes:
   loki_data:
   grafana_data:
   prom_data:
-  llm_port_models:
+  faden_models:

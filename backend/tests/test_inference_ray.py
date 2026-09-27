@@ -32,38 +32,38 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import EnvironmentDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import EnvironmentDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceControlPlane,
     InferenceDeployment,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus
-from llm_port_backend.services.inference.drivers.ray.secrets import (
+from faden_backend.services.inference.drivers.ray.schemas import RayClusterStatus
+from faden_backend.services.inference.drivers.ray.secrets import (
     control_plane_id_from_credential_ref,
     generate_cluster_token,
     retrieve_cluster_token,
     store_cluster_token,
 )
-from llm_port_backend.services.inference.drivers.ray.status import (
+from faden_backend.services.inference.drivers.ray.status import (
     build_environment_conditions,
     map_cluster_to_environment_status,
 )
-from llm_port_backend.services.inference.reconciliation import ReconciliationContext
-from llm_port_backend.services.nodes.auth import hash_with_pepper
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.system.views import router as system_router
+from faden_backend.services.inference.reconciliation import ReconciliationContext
+from faden_backend.services.nodes.auth import hash_with_pepper
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.system.views import router as system_router
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
 
@@ -124,7 +124,7 @@ def _cp_namespace(cp_id: uuid.UUID) -> Any:
 
 
 def _ray_driver():
-    from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
+    from faden_backend.services.inference.drivers.ray.driver import RayDriver
 
     return RayDriver()
 
@@ -347,7 +347,7 @@ def test_conditions_tiers_never_reported_when_dead() -> None:
 
 
 def test_parse_cluster_status_enriched_fields() -> None:
-    from llm_port_backend.services.inference.drivers.ray.client import (
+    from faden_backend.services.inference.drivers.ray.client import (
         _parse_cluster_status,
         _parse_serve_status,
     )
@@ -367,7 +367,7 @@ def test_parse_cluster_status_enriched_fields() -> None:
 
 
 def test_parse_cluster_status_legacy_result_still_parses() -> None:
-    from llm_port_backend.services.inference.drivers.ray.client import _parse_cluster_status
+    from faden_backend.services.inference.drivers.ray.client import _parse_cluster_status
 
     legacy = _healthy_probe_result()  # flat fields only, no tiers
     parsed = _parse_cluster_status(legacy)
@@ -644,7 +644,7 @@ async def test_ray_tls_is_said_to_every_member_at_every_step(probe_env, dbsessio
     assert env.status is EnvironmentStatus.READY
     # What each machine said its container runs is kept, and is what the console shows.
     assert env.observed_status_json["ray_tls"] == {str(n.id): True for n in nodes}
-    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+    from faden_backend.services.inference import ray_tls  # noqa: PLC0415
 
     state = await ray_tls.environment_status(dbsession, env.id)
     assert state["applied"] is True and set(state["running"].values()) == {True}
@@ -747,7 +747,7 @@ async def test_environment_loop_without_node_control_is_honest(probe_env, dbsess
 async def test_reconcile_control_plane_ray_dispatches_real_probe(
     probe_env, dbsession: AsyncSession
 ) -> None:
-    from llm_port_backend.services.inference.reconciliation import reconcile_control_plane
+    from faden_backend.services.inference.reconciliation import reconcile_control_plane
 
     cp, env, _nodes = probe_env
     context = ReconciliationContext(session=dbsession, **_services_stub())
@@ -872,7 +872,7 @@ async def test_secret_endpoint_rejects_unknown_ref_format(secret_app) -> None:
 def _deployment_spec(*, replicas: int = 1, path: str = "/v1") -> dict[str, Any]:
     """A minimal valid v1alpha1 spec the compiler accepts end-to-end."""
     return {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": {}},
         "scale": {"replicas": replicas},
         "resources": {"replica": {"gpus": 1.0}},
@@ -978,10 +978,10 @@ async def deployment_env(dbsession: AsyncSession) -> tuple[InferenceDeployment, 
 async def test_deployment_active_runs_and_publishes(deployment_env, dbsession: AsyncSession) -> None:
     """Desired active compiles the spec, runs the named app, waits for
     readiness, marks RUNNING, and publishes the OpenAI endpoint."""
-    from llm_port_backend.db.dao.inference_dao import EndpointDAO
+    from faden_backend.db.dao.inference_dao import EndpointDAO
 
     dep, node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
         results={
@@ -1034,14 +1034,14 @@ async def test_deployment_active_runs_and_publishes(deployment_env, dbsession: A
 
 async def test_deployment_delete_converges_and_retires(deployment_env, dbsession: AsyncSession) -> None:
     """Desired deleted removes the named app and retires its endpoints."""
-    from llm_port_backend.db.dao.inference_dao import EndpointDAO
+    from faden_backend.db.dao.inference_dao import EndpointDAO
 
     dep, node = deployment_env
     # Seed a published endpoint so the delete has something to retire.
     ep_dao = EndpointDAO(dbsession)
     await ep_dao.create(dep.id, name="openai", address="10.0.0.1/x", path="/v1")
     dep.desired_state = "deleted"
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
@@ -1086,11 +1086,11 @@ async def test_deployment_missing_model_is_failed(deployment_env, dbsession: Asy
 async def test_reconcile_deployment_ray_dispatches_real_manager(deployment_env, dbsession: AsyncSession) -> None:
     """The reconciler seam drives a driver="ray" deployment through the real
     RayDeploymentManager instead of the Phase 1 no-op."""
-    from llm_port_backend.services.inference.reconciliation import reconcile_deployment
+    from faden_backend.services.inference.reconciliation import reconcile_deployment
 
     dep, _node = deployment_env
     context = ReconciliationContext(session=dbsession, **_services_stub())
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
         results={
@@ -1113,7 +1113,7 @@ async def test_reconcile_deployment_no_driver_is_domain_noop(
 ) -> None:
     """A deployment whose control plane uses an unregistered driver falls
     through to the domain service no-op (the Phase 1 behavior)."""
-    from llm_port_backend.services.inference.reconciliation import reconcile_deployment
+    from faden_backend.services.inference.reconciliation import reconcile_deployment
 
     dep, _node = deployment_env
     # Reparent the deployment's environment to an unregistered (noop) control
@@ -1149,7 +1149,7 @@ async def test_reconcile_deployment_no_driver_is_domain_noop(
 
 async def test_probes_never_resume_an_earlier_in_flight_probe(probe_env) -> None:
     """A probe stuck on a dead agent must not capture every later probe."""
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient
 
     _cp, _env, nodes = probe_env
     fake = _FakeNodeControl(result_json=_healthy_probe_result())
@@ -1162,7 +1162,7 @@ async def test_probes_never_resume_an_earlier_in_flight_probe(probe_env) -> None
 
 def test_ray_command_error_is_raisable() -> None:
     """Raising the error must not itself fail (``self`` was keyword-only)."""
-    from llm_port_backend.services.inference.drivers.ray.client import RayCommandError
+    from faden_backend.services.inference.drivers.ray.client import RayCommandError
 
     with pytest.raises(RayCommandError) as info:
         raise RayCommandError(
@@ -1174,7 +1174,7 @@ def test_ray_command_error_is_raisable() -> None:
 
 async def test_environment_loop_accepts_command_gateway(probe_env, dbsession: AsyncSession) -> None:
     """The reconciler hands managers a NodeCommandGateway, not a NodeControlService."""
-    from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+    from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 
     _cp, env, _nodes = probe_env
     fake = _FakeNodeControl(result_json=_healthy_probe_result())
@@ -1228,7 +1228,7 @@ async def test_deployment_waits_for_ready_environment(deployment_env, dbsession:
 
 
 def _fast_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
-    from llm_port_backend.services.inference.drivers.ray import deployment as deployment_mod
+    from faden_backend.services.inference.drivers.ray import deployment as deployment_mod
 
     monkeypatch.setattr(deployment_mod, "_READINESS_PASS_BUDGET_SEC", 0.0)
     monkeypatch.setattr(deployment_mod, "_READINESS_POLL_SEC", 0.0)
@@ -1241,7 +1241,7 @@ async def test_deployment_observes_only_then_reapplies_when_app_lost(
     app missing after a cluster restart -> re-apply."""
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
 
     def _fake(serve_result: dict[str, Any]) -> _FakeNodeControl:
         return _FakeNodeControl(
@@ -1272,7 +1272,7 @@ async def test_deployment_deploy_failed_surfaces_ray_message(
 ) -> None:
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
-    app = f"llmport-{dep.id}"
+    app = f"faden-{dep.id}"
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
         results={
@@ -1291,7 +1291,7 @@ async def test_deployment_run_timeout_stays_applying(
     deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A command timeout is 'outcome unknown', never FAILED."""
-    from llm_port_backend.services.inference.drivers.ray.client import (
+    from faden_backend.services.inference.drivers.ray.client import (
         RayClusterClient,
         RayCommandError,
     )
@@ -1314,7 +1314,7 @@ async def test_request_reconcile_preserves_driver_bookkeeping(
     deployment_env, dbsession: AsyncSession
 ) -> None:
     """The API's reconcile request must not erase the applied config hash."""
-    from llm_port_backend.services.inference.service import DeploymentService
+    from faden_backend.services.inference.service import DeploymentService
 
     dep, _node = deployment_env
     dep.observed_generation = dep.generation
@@ -1328,9 +1328,9 @@ async def test_request_reconcile_preserves_driver_bookkeeping(
 async def test_reconcile_pass_hands_context_the_session_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     """The loop must give the context its session factory so node commands are
     committed in their own transactions (visible to the stream handler)."""
-    from llm_port_backend.db.dao import inference_dao
-    from llm_port_backend.services.inference import reconciliation
-    from llm_port_backend.web import lifespan
+    from faden_backend.db.dao import inference_dao
+    from faden_backend.services.inference import reconciliation
+    from faden_backend.web import lifespan
 
     row = SimpleNamespace(id=uuid.uuid4())
 
@@ -1398,7 +1398,7 @@ async def test_a_windows_machine_gets_pinned_memory_for_vllm(probe_env, dbsessio
 
 
 def test_an_old_wsl_kernel_and_an_operator_choice_are_respected() -> None:
-    from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+    from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
 
     old = SimpleNamespace(capabilities_json={"os": "Linux-4.19.84-microsoft-standard-x86_64-with-glibc2.31"})
     assert RayEnvironmentManager._machine_env(old) == {}  # noqa: SLF001

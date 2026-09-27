@@ -1,4 +1,4 @@
-"""``llmport observe`` — observability commands for cost tracking."""
+"""``faden observe`` — observability commands for cost tracking."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import sys
 import click
 import httpx
 
-from llmport.core.api_client import ApiClient
-from llmport.core.console import console, error, info, success
-from llmport.core.settings import load_config
+from faden_cli.core.api_client import ApiClient
+from faden_cli.core.console import console, error, info, success
+from faden_cli.core.settings import load_config
 
 
 def _ensure_token(cfg) -> str | None:
@@ -74,7 +74,7 @@ def force_calculate_cmd(*, yes: bool) -> None:
 
     with ApiClient(cfg) as client:
         if not client.healthy():
-            error("Backend is not reachable. Is llm.port running?")
+            error("Backend is not reachable. Is fadenstack running?")
             sys.exit(1)
 
         info("Recalculating costs — this may take a moment…")

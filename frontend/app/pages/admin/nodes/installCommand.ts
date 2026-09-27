@@ -5,7 +5,7 @@
  * runs -- `&&` only chains the download to the run -- so it can be read first.
  *
  * A backend on HTTPS with a certificate from the install's own authority
- * (`llmport tls generate`) is one no machine trusts yet. The line then fetches
+ * (`faden tls generate`) is one no machine trusts yet. The line then fetches
  * that authority first and checks it against the fingerprint the console shows
  * (`caSha256`, from /api/install/address) before trusting anything from the
  * backend: the installer is fetched verified against it, and handed it with
@@ -22,9 +22,9 @@ export function installCommand(
     return (
       `curl -fsSLk -o ${CA_FILE} ${origin}/api/install/ca.crt && ` +
       `echo "${caSha256}  ${CA_FILE}" | sha256sum -c --quiet && ` +
-      `curl -fsSLO --cacert ${CA_FILE} ${origin}/api/install/llmport-agent.sh && ` +
-      `sudo sh llmport-agent.sh ${how} --ca-file ${CA_FILE}`
+      `curl -fsSLO --cacert ${CA_FILE} ${origin}/api/install/faden-agent.sh && ` +
+      `sudo sh faden-agent.sh ${how} --ca-file ${CA_FILE}`
     );
   }
-  return `curl -fsSLO ${origin}/api/install/llmport-agent.sh && sudo sh llmport-agent.sh ${how}`;
+  return `curl -fsSLO ${origin}/api/install/faden-agent.sh && sudo sh faden-agent.sh ${how}`;
 }

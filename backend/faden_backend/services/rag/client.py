@@ -1,4 +1,4 @@
-"""HTTP client for llm_port_rag internal APIs."""
+"""HTTP client for faden_rag internal APIs."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ import httpx
 from fastapi import HTTPException
 from starlette import status
 
-from llm_port_backend.settings import settings
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
 
 
 class RagServiceClient:
-    """Thin typed wrapper around llm_port_rag internal endpoints."""
+    """Thin typed wrapper around faden_rag internal endpoints."""
 
     def __init__(
         self,
@@ -227,7 +227,7 @@ def get_rag_client() -> RagServiceClient:
     if not settings.rag_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="RAG module is not enabled. Set LLM_PORT_BACKEND_RAG_ENABLED=true to activate.",
+            detail="RAG module is not enabled. Set FADEN_BACKEND_RAG_ENABLED=true to activate.",
         )
     return RagServiceClient(
         base_url=settings.rag_base_url,

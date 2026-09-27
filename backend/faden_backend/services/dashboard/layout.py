@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.user_preferences import UserPreference
+from faden_backend.db.models.user_preferences import UserPreference
 
 PREFERENCES_KEY = "dashboard"
 

@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-    image: llm_port_pii:${LLM_PORT_PII_VERSION:-latest}
+    image: faden_pii:${FADEN_PII_VERSION:-latest}
     restart: always
     env_file:
       - .env
@@ -13,10 +13,10 @@ services:
       rmq:
         condition: service_healthy
     environment:
-      LLM_PORT_PII_HOST: 0.0.0.0
-      LLM_PORT_PII_BACKEND_URL: ${LLM_PORT_PII_BACKEND_URL:-http://host.docker.internal:8000}
-      LLM_PORT_PII_RABBIT_HOST: llm_port_pii-rmq
-      LLM_PORT_PII_REDIS_HOST: llm_port_pii-redis
+      FADEN_PII_HOST: 0.0.0.0
+      FADEN_PII_BACKEND_URL: ${FADEN_PII_BACKEND_URL:-http://host.docker.internal:8000}
+      FADEN_PII_RABBIT_HOST: faden_pii-rmq
+      FADEN_PII_REDIS_HOST: faden_pii-redis
 
   taskiq-worker:
     <<: *main_app
@@ -24,11 +24,11 @@ services:
     command:
       - taskiq
       - worker
-      - llm_port_pii.tkq:broker
+      - faden_pii.tkq:broker
 
   redis:
     image: bitnami/redis:6.2.5
-    hostname: "llm_port_pii-redis"
+    hostname: "faden_pii-redis"
     restart: always
     environment:
       ALLOW_EMPTY_PASSWORD: "yes"
@@ -40,7 +40,7 @@ services:
 
   rmq:
     image: rabbitmq:3.9.16-alpine
-    hostname: "llm_port_pii-rmq"
+    hostname: "faden_pii-rmq"
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: "guest"

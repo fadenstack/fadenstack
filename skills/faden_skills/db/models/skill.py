@@ -212,7 +212,7 @@ class SkillVersionModel(Base):
         nullable=False,
         default=dict,
     )
-    #: ``llmport.yaml``: allowed/preferred/forbidden tools, knowledge
+    #: ``faden.yaml``: allowed/preferred/forbidden tools, knowledge
     #: sources, trigger rules. Versioned, so a rollback rolls them back too.
     manifest: Mapped[dict[str, Any]] = mapped_column(
         JSONB,

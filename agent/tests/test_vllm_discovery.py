@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.vllm_discovery import (
+from faden_agent.vllm_discovery import (
     describe,
     discover_vllm,
     looks_like_vllm,
@@ -65,7 +65,7 @@ SPARK_QWEN_FP8: dict[str, Any] = {
             "com.nvidia.vllm.version": "0.20.1",
             "spark.llm": "true",
             "spark.llm.model": "Qwen/Qwen3.8-27B-FP8",
-            "spark.llm.port": "8130",
+            "spark.fadenstack": "8130",
             "spark.llm.role": "main",
         },
     },
@@ -131,11 +131,11 @@ def test_secrets_never_leave_the_machine() -> None:
     assert found["api_key_required"] is True
 
 
-def test_llm_ports_own_containers_are_not_reported_as_found() -> None:
+def test_fadenstacks_own_containers_are_not_reported_as_found() -> None:
     info = json.loads(json.dumps(QWEN3_EMBED))
-    info["Name"] = "/llm-port-vllm-local"
+    info["Name"] = "/faden-vllm-local"
     assert describe(info) is None
-    assert looks_like_vllm({"Names": "llm-port-ray-runtime", "Image": "llmport/ray-runtime-vllm"}) is False
+    assert looks_like_vllm({"Names": "faden-ray-runtime", "Image": "faden/ray-runtime-vllm"}) is False
 
 
 @pytest.mark.parametrize(

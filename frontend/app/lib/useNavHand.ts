@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type NavHand = "left" | "right";
 
-export const NAV_HAND_KEY = "llm-port-nav-hand";
+export const NAV_HAND_KEY = "faden-nav-hand";
 
 function read(): NavHand {
   try {

@@ -32,8 +32,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.machine_tls import RayClusterCA
-from llm_port_backend.services.machine_tls import authority as auth
+from faden_backend.db.models.machine_tls import RayClusterCA
+from faden_backend.services.machine_tls import authority as auth
 
 KEY_PURPOSE = "ray-cluster-ca-key"
 _CURVES = ("secp256r1", "secp384r1")

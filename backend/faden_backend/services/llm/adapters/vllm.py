@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     ArtifactFormat,
     LLMModel,
     LLMProvider,
@@ -15,17 +15,17 @@ from llm_port_backend.db.models.llm import (
     ModelArtifact,
     ProviderType,
 )
-from llm_port_backend.services.gpu.detector import detect_gpus
-from llm_port_backend.services.gpu.types import GpuVendor
-from llm_port_backend.services.llm.base import (
+from faden_backend.services.gpu.detector import detect_gpus
+from faden_backend.services.gpu.types import GpuVendor
+from faden_backend.services.llm.base import (
     CompatResult,
     ContainerSpec,
     HealthStatus,
     ProviderAdapter,
 )
-from llm_port_backend.services.llm.registry import register_adapter
-from llm_port_backend.settings import settings
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.llm.registry import register_adapter
+from faden_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 
@@ -288,15 +288,15 @@ class VLLMAdapter(ProviderAdapter):
         }
 
         labels = {
-            "llm-port.service": "llm-runtime",
-            "llm-port.runtime_id": str(runtime.id),
-            "llm-port.provider": "vllm",
-            "llm-port.gpu_vendor": gpu_vendor.value,
+            "faden.service": "llm-runtime",
+            "faden.runtime_id": str(runtime.id),
+            "faden.provider": "vllm",
+            "faden.gpu_vendor": gpu_vendor.value,
         }
 
         return ContainerSpec(
             image=image,
-            name=f"llm-port-vllm-{runtime.name}",
+            name=f"faden-vllm-{runtime.name}",
             cmd=cmd,
             entrypoint=entrypoint,
             env=env or None,

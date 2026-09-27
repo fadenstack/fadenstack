@@ -65,5 +65,5 @@ class DriverRegistry:
 registry = DriverRegistry()
 
 # Register the Ray driver
-from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
+from faden_backend.services.inference.drivers.ray.driver import RayDriver
 registry.register(RayDriver.key, RayDriver)

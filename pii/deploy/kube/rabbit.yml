@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: "llm-port-pii"
-  name: "llm-port-pii-rmq"
+  namespace: "faden-pii"
+  name: "faden-pii-rmq"
 spec:
   selector:
     matchLabels:
-      app: "llm-port-pii-rmq"
+      app: "faden-pii-rmq"
   template:
     metadata:
       labels:
-        app: "llm-port-pii-rmq"
+        app: "faden-pii-rmq"
     spec:
       containers:
         - name: rabbit
@@ -40,11 +40,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: "llm-port-pii"
-  name: "llm-port-pii-rmq-service"
+  namespace: "faden-pii"
+  name: "faden-pii-rmq-service"
 spec:
   selector:
-    app: "llm-port-pii-rmq"
+    app: "faden-pii-rmq"
   ports:
     - port: 5672
       targetPort: amqp

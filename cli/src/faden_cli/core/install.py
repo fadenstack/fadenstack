@@ -16,7 +16,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 
-from llmport.core.console import console, error, info, success, warning
+from faden_cli.core.console import console, error, info, success, warning
 
 
 # ── Types ─────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ def check_prerequisites(
     prereqs: list[Prerequisite] | None = None,
 ) -> list[CheckResult]:
     """Check which prerequisites are present on the system."""
-    from llmport.core.detect import check_tool  # noqa: PLC0415
+    from faden_cli.core.detect import check_tool  # noqa: PLC0415
 
     prereqs = prereqs or DEV_PREREQUISITES
     platform_key = _detect_platform_key()
@@ -232,7 +232,7 @@ def install_missing(
             # Re-check after install — the binary might not be on
             # the current PATH yet (e.g. uv installer adds to
             # ~/.local/bin which isn't in this session's PATH).
-            from llmport.core.detect import check_tool  # noqa: PLC0415
+            from faden_cli.core.detect import check_tool  # noqa: PLC0415
 
             tc = check_tool(r.prereq.check_cmd)
             if tc.found:

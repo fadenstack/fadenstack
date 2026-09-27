@@ -7,7 +7,7 @@
  */
 import { useState, useCallback, useEffect } from "react";
 
-const STORAGE_KEY = "llm-port-nav-order";
+const STORAGE_KEY = "faden-nav-order";
 
 export interface NavOrderState {
   mainIds: string[];

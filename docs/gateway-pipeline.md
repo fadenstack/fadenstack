@@ -95,7 +95,7 @@ client as it is, rather than half answered.
 **PII covers the results too.** Search results pass through PII before they
 reach the model, and in tokenize mode they continue the request's tokens: a
 name the question turned into `[PERSON_1]` is `[PERSON_1]` in the results as
-well. The search itself runs with the real values, inside LLM.Port; an MCP
+well. The search itself runs with the real values, inside Fadenstack; an MCP
 tool, outside it, gets the tokens. Each passage is scanned as a text of its
 own: the PII service keeps one analysis per text, so a passage that comes
 back in a later search costs nothing to scan again (~20 ms a round against
@@ -187,7 +187,7 @@ the RAG search itself: embedding the question and searching the vectors.
 ## Every module in the dev environment
 
 ```
-llmport dev up --modules pii,mcp,skills
+faden dev up --modules pii,mcp,skills
 ```
 
 runs PII, MCP and skills on the host next to the backend and gateway, on
@@ -199,7 +199,7 @@ runs PII, MCP and skills on the host next to the backend and gateway, on
 | MCP | http://127.0.0.1:8007 |
 | Skills | http://127.0.0.1:8008 |
 
-Without `--modules`, the modules switched on with `llmport module enable`
+Without `--modules`, the modules switched on with `faden module enable`
 run. A module that is not started is switched off in the gateway and
 backend, so no request is sent to a port nothing listens on.
 

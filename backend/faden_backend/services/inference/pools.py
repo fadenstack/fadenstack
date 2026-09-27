@@ -26,11 +26,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceComputePool,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.node_control import InfraNode
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def accelerator_vendor(node: InfraNode) -> str:
     """The accelerator vendor the node reported, normalized.
 
     The agent's collectors already report ``nvidia`` / ``amd`` / ``apple``
-    (``llm_port_node_agent/gpu/``), so this reads what is there rather than
+    (``faden_agent/gpu/``), so this reads what is there rather than
     inferring from a driver name.
     """
     caps = _capability(node)

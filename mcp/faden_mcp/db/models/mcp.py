@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from llm_port_mcp.db.crypto import EncryptedJSON
+from faden_mcp.db.crypto import EncryptedJSON
 
 
 class Base(DeclarativeBase):
@@ -92,7 +92,7 @@ class MCPServerModel(Base):
         JSONB, nullable=True, default=list
     )
     working_dir: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    # Encrypted at rest with LLM_PORT_MCP_ENCRYPTION_KEY: they carry bearer
+    # Encrypted at rest with FADEN_MCP_ENCRYPTION_KEY: they carry bearer
     # tokens and API keys. They were plain Text despite the names; the type
     # still reads the plain JSON written before.
     headers_json_encrypted: Mapped[dict[str, str] | None] = mapped_column(

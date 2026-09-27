@@ -10,8 +10,8 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.system_settings import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.system_settings import (
     InfraAgent,
     InfraAgentStatus,
     SystemApplyEventResult,

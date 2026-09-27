@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import PriceCatalog
+from faden_gateway.db.models.gateway import PriceCatalog
 
 log = logging.getLogger(__name__)
 

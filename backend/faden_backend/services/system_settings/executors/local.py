@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from llm_port_backend.db.models.system_settings import SystemApplyScope
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.system_settings.executors.base import ApplyAction, ApplyExecutor
+from faden_backend.db.models.system_settings import SystemApplyScope
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.system_settings.executors.base import ApplyAction, ApplyExecutor
 
 
 class LocalApplyExecutor(ApplyExecutor):

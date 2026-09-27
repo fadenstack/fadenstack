@@ -76,7 +76,7 @@ export interface ManagedBy {
 
 /**
  * Where an owned provider is managed: a deployment's page, or -- for a vLLM
- * container LLM.Port found and routes as it is -- the page of the machine
+ * container Fadenstack found and routes as it is -- the page of the machine
  * running it.
  */
 export function ownerPath(owner: ManagedBy): string {
@@ -247,7 +247,7 @@ export interface DownloadJob {
 /** Whether this server has a Hugging Face token -- never the token itself. */
 export interface HFTokenStatus {
   configured: boolean;
-  /** "database": set in LLM.port; "environment": LLM_PORT_BACKEND_HF_TOKEN. */
+  /** "database": set in Fadenstack; "environment": FADEN_BACKEND_HF_TOKEN. */
   source: "database" | "environment" | null;
   /** False while the settings master key is the published default. */
   storage_safe: boolean;

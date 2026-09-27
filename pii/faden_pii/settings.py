@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     # Variables for the database
     db_host: str = "127.0.0.1"
     db_port: int = 5432
-    db_user: str = "llm_port_pii"
-    db_pass: str = "llm_port_pii"
+    db_user: str = "faden_pii"
+    db_pass: str = "faden_pii"
     db_base: str = "admin"
     db_echo: bool = False
     # Per process, not per CPU. Every uvicorn worker of every service holds
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # multiproc_dir. It's required for [uvi|guni]corn projects.
     # Named per service, like the backend's and gateway's. Each service clears
     # this directory on startup; with PII, MCP and skills sharing ``prom`` on
-    # one host (``llmport dev up --modules``), the one starting last could not
+    # one host (``faden dev up --modules``), the one starting last could not
     # clear files the others held open, and exited (FileExistsError).
     prometheus_dir: Path = TEMP_DIR / "prom-pii"
 
@@ -104,7 +104,7 @@ class Settings(BaseSettings):
             user=self.rabbit_user,
             password=self.rabbit_pass,
             # The vhost is the URL's path: "/" stays "/", a name gets its slash.
-            # A bare name ("llmport") used to crash start-up: yarl refuses a
+            # A bare name ("faden") used to crash start-up: yarl refuses a
             # path without one next to a host.
             path="/" + self.rabbit_vhost.lstrip("/"),
         )
@@ -151,7 +151,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_prefix="LLM_PORT_PII_",
+        env_prefix="FADEN_PII_",
         env_file_encoding="utf-8",
         extra="ignore",
     )

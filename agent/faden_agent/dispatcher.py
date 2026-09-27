@@ -7,13 +7,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.models import NodeCommandType
-from llm_port_node_agent.policy_guard import PolicyGuard, PolicyViolationError
-from llm_port_node_agent.ray.manager import RayManager
-from llm_port_node_agent.runtime_manager import RuntimeManager, RuntimeManagerError
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent import system_updater
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.models import NodeCommandType
+from faden_agent.policy_guard import PolicyGuard, PolicyViolationError
+from faden_agent.ray.manager import RayManager
+from faden_agent.runtime_manager import RuntimeManager, RuntimeManagerError
+from faden_agent.state_store import StateStore
+from faden_agent import system_updater
 
 ProgressEmitter = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -250,11 +250,11 @@ class CommandDispatcher:
         # Handled here rather than in the Ray manager: they are host network
         # facts, needed before any Ray runtime exists on the node.
         if command_type == NodeCommandType.VALIDATE_FABRIC_LISTEN.value:
-            from llm_port_node_agent.network import handle_validate_fabric_listen
+            from faden_agent.network import handle_validate_fabric_listen
 
             return await handle_validate_fabric_listen(payload)
         if command_type == NodeCommandType.VALIDATE_FABRIC_CONNECT.value:
-            from llm_port_node_agent.network import handle_validate_fabric_connect
+            from faden_agent.network import handle_validate_fabric_connect
 
             return await handle_validate_fabric_connect(payload)
 

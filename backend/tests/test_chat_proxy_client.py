@@ -13,8 +13,8 @@ import asyncio
 
 import pytest
 
-from llm_port_backend.services.chat import gateway_client
-from llm_port_backend.web.api.chat import views
+from faden_backend.services.chat import gateway_client
+from faden_backend.web.api.chat import views
 
 
 @pytest.mark.anyio()

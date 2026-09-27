@@ -556,7 +556,7 @@ export interface FoundCluster {
   head: FoundClusterMember | null;
   members: FoundClusterMember[];
   apps: FoundClusterApp[];
-  /** Apps LLM.Port did not deploy; they keep running and are not managed. */
+  /** Apps Fadenstack did not deploy; they keep running and are not managed. */
   other_apps: string[];
   can_take_over: boolean;
   /** Why it cannot be taken over, in words. */

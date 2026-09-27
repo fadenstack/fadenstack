@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
 test("the chat model picker leaves out models that cannot chat", async ({ page }) => {
   // Both are behind the gateway, each saying what it is.
   const token = (await page.context().cookies()).find((c) => c.name === "fapiauth")?.value;
-  const listed = await page.request.get(`${process.env.LLM_PORT_GATEWAY_URL ?? "http://127.0.0.1:8001"}/v1/models`, {
+  const listed = await page.request.get(`${process.env.FADEN_GATEWAY_URL ?? "http://127.0.0.1:8001"}/v1/models`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const kinds = Object.fromEntries(((await listed.json()).data as { id: string; kind: string | null }[]).map((m) => [m.id, m.kind]));

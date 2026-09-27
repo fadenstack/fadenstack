@@ -11,8 +11,8 @@ import asyncpg
 import pytest
 from alembic import command
 
-from llm_port_skills.services import bundle as fmt
-from llm_port_skills.settings import settings
+from faden_skills.services import bundle as fmt
+from faden_skills.settings import settings
 from tests.conftest import alembic_config, drop_database, recreate_database
 
 DB = "llm_skills_migration_test"

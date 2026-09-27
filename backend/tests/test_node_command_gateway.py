@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import InfraNode, NodeCommandStatus
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.db.models.node_control import InfraNode, NodeCommandStatus
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 
 
 @pytest.fixture

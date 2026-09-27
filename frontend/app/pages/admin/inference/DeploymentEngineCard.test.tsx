@@ -18,7 +18,7 @@ const DEPLOYMENT = {
   name: "qwen3-8b",
   description: null,
   spec: {
-    api_version: "inference.llmport.ai/v1alpha1",
+    api_version: "inference.fadenstack.com/v1alpha1",
     engine: { name: "vllm", config: { max_model_len: 32768, enable_auto_tool_choice: true, tool_call_parser: "hermes" } },
     scale: { replicas: 2 },
     resources: { replica: { gpus: 1 } },

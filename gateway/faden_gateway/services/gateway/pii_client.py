@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from llm_port_api.services.gateway.pii_policy import PIIPolicy
+from faden_gateway.services.gateway.pii_policy import PIIPolicy
 
 logger = logging.getLogger(__name__)
 

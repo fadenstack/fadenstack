@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from cryptography.fernet import InvalidToken
 
-from llm_port_backend.services.system_settings.crypto import SettingsCrypto
+from faden_backend.services.system_settings.crypto import SettingsCrypto
 
 
 def test_encrypt_then_decrypt_roundtrip() -> None:

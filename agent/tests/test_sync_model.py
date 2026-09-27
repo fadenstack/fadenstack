@@ -11,12 +11,12 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.model_puller import pull_model
-from llm_port_node_agent.runtime_manager import RuntimeManager, RuntimeManagerError
-from llm_port_node_agent.policy_guard import PolicyGuard
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.model_puller import pull_model
+from faden_agent.runtime_manager import RuntimeManager, RuntimeManagerError
+from faden_agent.policy_guard import PolicyGuard
+from faden_agent.state_store import StateStore
 
 
 def _sha256(data: bytes) -> str:
@@ -214,7 +214,7 @@ async def test_sync_model_refuses_to_report_a_path_that_does_not_exist(tmp_path)
     directory that does not exist; the failure then surfaces inside the engine
     at model load instead of here, where it names the cause.
     """
-    from llm_port_node_agent.runtime_manager import RuntimeManager, RuntimeManagerError
+    from faden_agent.runtime_manager import RuntimeManager, RuntimeManagerError
 
     manager = RuntimeManager.__new__(RuntimeManager)
     manager._model_store_root = str(tmp_path)

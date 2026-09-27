@@ -17,9 +17,9 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.command_verifier import _canonical_payload, derive_signing_key
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent.stream_client import StreamClient
+from faden_agent.command_verifier import _canonical_payload, derive_signing_key
+from faden_agent.state_store import StateStore
+from faden_agent.stream_client import StreamClient
 
 #: The same vector is checked by the backend's tests (test_command_signing.py there):
 #: both sides have to arrive at these bytes, or no signed command is ever accepted.
@@ -164,7 +164,7 @@ async def test_the_operator_can_require_it_or_switch_it_off(tmp_path: Path) -> N
 
 @pytest.mark.asyncio
 async def test_the_stream_is_opened_announcing_the_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from llm_port_node_agent import stream_client as module
+    from faden_agent import stream_client as module
 
     seen: dict[str, Any] = {}
 

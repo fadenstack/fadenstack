@@ -12,13 +12,13 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import EnvironmentStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.inference import EnvironmentStatus
+from faden_backend.db.models.node_control import (
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
 from tests.test_inference_env_observation import _bound_environment, _FakeNodeControl
 
 IMAGE = NodeCommandType.ENSURE_RUNTIME_IMAGE.value
@@ -68,7 +68,7 @@ async def _fleet(dbsession: AsyncSession, **kw: Any) -> tuple[Any, _Fleet]:
     fleet = _Fleet(**kw)
     from sqlalchemy import select
 
-    from llm_port_backend.db.models.node_control import InfraNode
+    from faden_backend.db.models.node_control import InfraNode
 
     for node in (await dbsession.execute(select(InfraNode))).scalars():
         fleet.agent_of[node.id] = node.agent_id

@@ -8,7 +8,7 @@ et al.).
 Version-parity note: the agent *packages* ``ray[serve]==2.58.0``.  The
 preferred binary is the packaged CLI (``shutil.which("ray")`` resolves the
 agent's own venv, or the managed venv layout under ``ray_base_path`` —
-``/opt/llm-port/ray/<version>/bin/ray``).  Using the same wheel for bootstrap
+``/opt/faden/ray/<version>/bin/ray``).  Using the same wheel for bootstrap
 *and* in-process attach guarantees SDK/cluster version parity.  When a
 managed multi-version layout is present (``ray_base_path/<version>/bin/ray``),
 that versioned CLI wins so the environment can pin a cluster to a specific
@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from llm_port_node_agent.ray import errors
+from faden_agent.ray import errors
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class RayLastError:
 class RayRuntime:
     """Drives ``ray start`` / ``ray stop`` subprocesses (bootstrap only)."""
 
-    def __init__(self, ray_base_path: str = "/opt/llm-port/ray") -> None:
+    def __init__(self, ray_base_path: str = "/opt/faden/ray") -> None:
         self.ray_base_path = Path(ray_base_path)
         self.last_error: RayLastError | None = None
 

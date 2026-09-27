@@ -11,8 +11,8 @@ from fastapi import Depends
 from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.pii import PIIScanEvent
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.pii import PIIScanEvent
 
 
 class PIIEventDAO:

@@ -1,4 +1,4 @@
-"""Ray environment management for LLM Port nodes.
+"""Ray environment management for Fadenstack nodes.
 
 Layering (spec section 2):
 
@@ -10,18 +10,18 @@ Layering (spec section 2):
 * :class:`.manager.RayManager` — the facade the dispatcher talks to.
 """
 
-from llm_port_node_agent.ray.core import RayCoreClient
-from llm_port_node_agent.ray.manager import RayManager
-from llm_port_node_agent.ray.metrics import RayMetricsDiscovery
-from llm_port_node_agent.ray.models import (
+from faden_agent.ray.core import RayCoreClient
+from faden_agent.ray.manager import RayManager
+from faden_agent.ray.metrics import RayMetricsDiscovery
+from faden_agent.ray.models import (
     RayCapabilities,
     RayEnvironmentStatus,
     RayNodeStatus,
     RayServeStatusTier,
 )
-from llm_port_node_agent.ray.runtime import RayRuntime
-from llm_port_node_agent.ray.serve import RayServeManager
-from llm_port_node_agent.ray.state import RayStateDiagnostics
+from faden_agent.ray.runtime import RayRuntime
+from faden_agent.ray.serve import RayServeManager
+from faden_agent.ray.state import RayStateDiagnostics
 
 __all__ = [
     "RayCapabilities",

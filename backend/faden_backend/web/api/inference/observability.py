@@ -12,12 +12,12 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request
 from starlette import status as http_status
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import InferenceControlPlane, InferenceEnvironment
-from llm_port_backend.services.inference.observability import ObservabilityUnsupported
-from llm_port_backend.services.inference.registry import registry
-from llm_port_backend.services.nodes.service import NodeControlService
-from llm_port_backend.settings import settings
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import InferenceControlPlane, InferenceEnvironment
+from faden_backend.services.inference.observability import ObservabilityUnsupported
+from faden_backend.services.inference.registry import registry
+from faden_backend.services.nodes.service import NodeControlService
+from faden_backend.settings import settings
 
 
 def get_node_control_service(

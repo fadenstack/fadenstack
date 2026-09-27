@@ -9,8 +9,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from llm_port_backend.services.notifications.service import NotificationService
-from llm_port_backend.settings import settings
+from faden_backend.services.notifications.service import NotificationService
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class GatewayAlertMonitor:
                     f"Threshold: {threshold}%. Window: "
                     f"{settings.mailer_alert_5xx_window_minutes} minutes."
                 ),
-                source="llm_port_backend.gateway_alert_monitor",
+                source="faden_backend.gateway_alert_monitor",
                 occurred_at=datetime.now(tz=UTC),
             )
             if queued:

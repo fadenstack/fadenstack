@@ -12,7 +12,7 @@ from typing import Any
 
 CHAT, EMBEDDINGS, SCORING = "chat", "embeddings", "scoring"
 
-#: vLLM's ``--task`` / ``--runner`` / ``--convert`` values, in LLM.Port's words.
+#: vLLM's ``--task`` / ``--runner`` / ``--convert`` values, in Fadenstack's words.
 _VLLM_TASKS = {
     "generate": CHAT,
     "embed": EMBEDDINGS,
@@ -28,11 +28,11 @@ _RAW_FLAG = re.compile(r"--(task|runner|convert)[=\s]+([A-Za-z_]+)")
 
 
 def runtime_kind(runtime: Any) -> str:
-    """The kind of a runtime LLM.Port runs, from its vLLM flags; chat otherwise.
+    """The kind of a runtime Fadenstack runs, from its vLLM flags; chat otherwise.
 
     Three places can hold the flag: ``generic_config``, the flags the runtime
     page edits (``provider_config.engine_args``), and raw ``extra_args``.
-    Without one, vLLM generates text, and LLM.Port runtimes are chat.
+    Without one, vLLM generates text, and Fadenstack runtimes are chat.
     """
     generic = getattr(runtime, "generic_config", None) or {}
     provider = getattr(runtime, "provider_config", None) or {}
@@ -82,7 +82,7 @@ def argv_calls_tools(args: list[str] | str | None) -> bool:
 
 
 def runtime_calls_tools(runtime: Any) -> bool:
-    """Whether a runtime LLM.Port runs has tool calls on, from its vLLM flags."""
+    """Whether a runtime Fadenstack runs has tool calls on, from its vLLM flags."""
     generic = getattr(runtime, "generic_config", None) or {}
     provider = getattr(runtime, "provider_config", None) or {}
     return (

@@ -1,6 +1,6 @@
 """HTTPS at the edge: material goes to nginx, which is restarted; cookies follow the scheme.
 
-nginx terminates TLS (llm_port_shared/nginx/select-config.sh serves HTTPS
+nginx terminates TLS (shared/nginx/select-config.sh serves HTTPS
 whenever the install's ./tls holds edge.crt and edge.key), the backend
 writes that directory through /api/admin/tls, and the session cookie is
 Secure exactly when the page was served over HTTPS.
@@ -25,10 +25,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.users import User, cookie_transport, current_active_user
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import get_docker, get_root_mode_active
-from llm_port_backend.web.middleware import SecureCookiesMiddleware, secured
+from faden_backend.db.models.users import User, cookie_transport, current_active_user
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import get_docker, get_root_mode_active
+from faden_backend.web.middleware import SecureCookiesMiddleware, secured
 
 TLS_URL = "/api/admin/tls"
 PASSWORD = "correct horse battery staple"  # noqa: S105
@@ -37,7 +37,7 @@ PASSWORD = "correct horse battery staple"  # noqa: S105
 def _material() -> tuple[bytes, bytes]:
     """A self-signed certificate and its key, as an operator would upload them."""
     key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "llm-port.test")])
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "faden.test")])
     now = dt.datetime.now(dt.timezone.utc)
     cert = (
         x509.CertificateBuilder()
@@ -107,7 +107,7 @@ async def test_activating_material_hands_it_to_nginx_and_restarts_it(
 ) -> None:
     tls_dir = tmp_path / "tls"
     monkeypatch.setattr(settings, "tls_edge_material_dir", str(tls_dir))
-    docker = _Docker("llm-port-backend", "llm-port-nginx")
+    docker = _Docker("faden-backend", "faden-nginx")
     fastapi_app.dependency_overrides[get_docker] = lambda: docker
     cert, key = _material()
 
@@ -122,7 +122,7 @@ async def test_activating_material_hands_it_to_nginx_and_restarts_it(
         body = activated.json()
         assert body["proxy_restarted"] is True
         assert body["restart_required"] is False
-        assert docker.restarted == ["id-llm-port-nginx"], "nginx, and only nginx"
+        assert docker.restarted == ["id-faden-nginx"], "nginx, and only nginx"
         assert (tls_dir / "edge.crt").read_bytes() == cert
         assert (tls_dir / "edge.key").read_bytes() == key
         if sys.platform != "win32":
@@ -134,7 +134,7 @@ async def test_activating_material_hands_it_to_nginx_and_restarts_it(
         assert removed.status_code == status.HTTP_204_NO_CONTENT
         assert not (tls_dir / "edge.crt").exists()
         assert not (tls_dir / "edge.key").exists()
-        assert docker.restarted == ["id-llm-port-nginx"] * 2, "and again, so nginx goes back to plain HTTP"
+        assert docker.restarted == ["id-faden-nginx"] * 2, "and again, so nginx goes back to plain HTTP"
 
 
 @pytest.mark.anyio
@@ -143,7 +143,7 @@ async def test_without_the_proxy_container_the_operator_is_told_to_restart(
 ) -> None:
     """A checkout run without compose, or a proxy run elsewhere: the material is in place all the same."""
     monkeypatch.setattr(settings, "tls_edge_material_dir", str(tmp_path / "tls"))
-    fastapi_app.dependency_overrides[get_docker] = lambda: _Docker("llm-port-backend")
+    fastapi_app.dependency_overrides[get_docker] = lambda: _Docker("faden-backend")
     cert, key = _material()
     async with _https(fastapi_app) as client:
         await client.post(f"{TLS_URL}/upload", files=_files(cert, key))

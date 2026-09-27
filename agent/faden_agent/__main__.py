@@ -1,4 +1,4 @@
-"""CLI entrypoint for llm_port_node_agent."""
+"""CLI entrypoint for faden_agent."""
 
 from __future__ import annotations
 
@@ -19,16 +19,16 @@ from pathlib import Path
 
 import psutil
 
-from llm_port_node_agent import __version__
-from llm_port_node_agent.config import AgentConfig, _default_state_path
-from llm_port_node_agent import server_trust
-from llm_port_node_agent.service import NodeAgentService
-from llm_port_node_agent.single_instance import AlreadyRunningError, SingleInstanceLock
+from faden_agent import __version__
+from faden_agent.config import AgentConfig, _default_state_path
+from faden_agent import server_trust
+from faden_agent.service import NodeAgentService
+from faden_agent.single_instance import AlreadyRunningError, SingleInstanceLock
 
-SERVICE_NAME = "llmport-agent"
+SERVICE_NAME = "faden-agent"
 #: Every name the agent runs under: the frozen binary, and the console
 #: script a source install puts in a venv.
-_AGENT_EXE_NAMES = frozenset({"llmport-agent", "llmport-agent.exe"})
+_AGENT_EXE_NAMES = frozenset({"faden-agent", "faden-agent.exe"})
 #: Interpreters that run other programs. A shell is never the agent, and on
 #: Windows psutil re-splits its long ``-c`` string into tokens that can land
 #: an agent path next to the word "run" by accident.
@@ -37,7 +37,7 @@ _SHELL_NAMES = frozenset({
     "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
 })
 _IS_WINDOWS = platform.system() == "Windows"
-_ENV_PREFIX = "LLM_PORT_NODE_AGENT_"
+_ENV_PREFIX = "FADEN_NODE_AGENT_"
 
 # Someone has to walk to a browser and click, so wait in human time.
 _JOIN_WAIT_SECONDS = 15 * 60
@@ -48,7 +48,7 @@ _AGENT_VERSION = __version__
 # ── Env-file paths (per-platform) ────────────────────────────────
 _LINUX_SYSTEM_ENV_FILE = Path(f"/etc/{SERVICE_NAME}.env")
 _LINUX_USER_ENV_FILE = Path.home() / ".config" / SERVICE_NAME / "agent.env"
-_WIN_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))) / "llmport-agent"
+_WIN_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))) / "faden-agent"
 _WIN_ENV_FILE = _WIN_DATA_DIR / "agent.env"
 
 
@@ -57,7 +57,7 @@ def _env_file_path() -> Path:
 
     On Linux, prefer the system-wide ``/etc`` file when running as root or
     when it already exists (agent running as a service).  Otherwise fall
-    back to ``~/.config/llmport-agent/agent.env`` for unprivileged users.
+    back to ``~/.config/faden-agent/agent.env`` for unprivileged users.
     """
     if _IS_WINDOWS:
         return _WIN_ENV_FILE
@@ -133,7 +133,7 @@ def _run_cmd(cmd: list[str], *, check: bool = True, quiet: bool = False) -> int:
 
 
 def _collect_env_lines() -> list[str]:
-    """Collect current LLM_PORT_NODE_AGENT_* env vars as KEY=VALUE lines."""
+    """Collect current FADEN_NODE_AGENT_* env vars as KEY=VALUE lines."""
     return [
         f"{k}={v}"
         for k, v in sorted(os.environ.items())
@@ -187,7 +187,7 @@ def _effective_env() -> dict[str, str]:
     Files, then the process environment on top.  ``run`` has always read the
     environment -- that is what ``AgentConfig.from_env`` does -- while the
     commands around it read only the files. An agent configured entirely
-    through ``LLM_PORT_NODE_AGENT_*`` variables, which is how a container or
+    through ``FADEN_NODE_AGENT_*`` variables, which is how a container or
     a unit file does it, therefore joined under its container hostname and
     advertised the wrong address, and ``join`` refused to run at all for want
     of a backend URL it had been handed.
@@ -261,7 +261,7 @@ if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
 
 
 def _banner() -> None:
-    print(f"\n{_BOLD}llmport-agent{_RESET} — llm-port node agent\n")
+    print(f"\n{_BOLD}faden-agent{_RESET} — fadenstack node agent\n")
 
 
 def _section(title: str) -> None:
@@ -319,7 +319,7 @@ def _show_config() -> dict[str, str]:
         ("ADVERTISE_HOST", ""),
         ("ADVERTISE_SCHEME", "http"),
         ("ENROLLMENT_TOKEN", ""),
-        ("MODEL_STORE", "/srv/llm-port/models"),
+        ("MODEL_STORE", "/srv/faden/models"),
         ("LOKI_URL", ""),
         ("LOG_LEVEL", "INFO"),
         ("VERIFY_TLS", "true"),
@@ -348,7 +348,7 @@ def _show_config() -> dict[str, str]:
 
     print()
     if not backend_url:
-        _warn("BACKEND_URL is not set — agent cannot connect to llm-port.")
+        _warn("BACKEND_URL is not set — agent cannot connect to faden.")
     if not loki_url:
         _warn("LOKI_URL is not set — container log forwarding disabled.")
 
@@ -390,17 +390,17 @@ def _prompt_yn(label: str, default: bool = True) -> bool:
 
 # ── Settable config keys (short name → description + prompt label) ─────────
 _SETTABLE_KEYS: dict[str, str] = {
-    "BACKEND_URL": "LLM Port backend URL",
+    "BACKEND_URL": "Fadenstack backend URL",
     "ENROLLMENT_TOKEN": "Enrollment token",
     "AGENT_ID": "Agent ID",
     "HOST": "Host identifier",
-    "ADVERTISE_HOST": "Advertise host (IP/hostname reachable from LLM Port)",
+    "ADVERTISE_HOST": "Advertise host (IP/hostname reachable from Fadenstack)",
     "ADVERTISE_SCHEME": "Advertise scheme (http/https)",
     "MODEL_STORE": "Model store path",
     "LOKI_URL": "Loki URL",
     "LOG_LEVEL": "Log level",
     "VERIFY_TLS": "Verify TLS certificates (true/false)",
-    # The server's HTTPS certificate from a private authority (llmport tls generate: tls/ca.crt).
+    # The server's HTTPS certificate from a private authority (faden tls generate: tls/ca.crt).
     "TLS_CA_BUNDLE": "CA certificate file to verify the backend with (PEM)",
     "IMAGE_ALLOWLIST": "Image allowlist (comma-separated prefixes)",
     "LOG_BATCH_SIZE": "Log batch size",
@@ -497,7 +497,7 @@ def _detect_hf_caches() -> list[tuple[Path, int]]:
     else:
         candidates.append(Path.home() / ".cache" / "huggingface" / "hub")
         # Common server-side paths
-        candidates.append(Path("/srv/llm-port/models"))
+        candidates.append(Path("/srv/faden/models"))
         candidates.append(Path("/data/hf-cache"))
 
     # 3. Current model store (if already configured)
@@ -538,7 +538,7 @@ def cmd_configure() -> None:
     _section("Connection")
 
     backend_url = _prompt(
-        "LLM Port backend URL",
+        "Fadenstack backend URL",
         default=_cur("BACKEND_URL") or "http://127.0.0.1:8000",
     )
     env[f"{_ENV_PREFIX}BACKEND_URL"] = backend_url.rstrip("/")
@@ -565,7 +565,7 @@ def cmd_configure() -> None:
     env[f"{_ENV_PREFIX}HOST"] = host
 
     advertise_host = _prompt(
-        "Advertise host (IP/hostname reachable from LLM Port)",
+        "Advertise host (IP/hostname reachable from Fadenstack)",
         default=_cur("ADVERTISE_HOST") or host,
     )
     env[f"{_ENV_PREFIX}ADVERTISE_HOST"] = advertise_host
@@ -574,7 +574,7 @@ def cmd_configure() -> None:
 
     # Auto-detect existing HuggingFace caches
     detected_caches = _detect_hf_caches()
-    default_store = "/srv/llm-port/models" if not _IS_WINDOWS else r"C:\llm-port\models"
+    default_store = "/srv/faden/models" if not _IS_WINDOWS else r"C:\fadenstack\models"
     current_store = _cur("MODEL_STORE")
 
     if detected_caches:
@@ -606,10 +606,10 @@ def cmd_configure() -> None:
     _section("Logging & Monitoring")
 
     # Determine the backend host for smart Loki default
-    # Blank is the right answer almost always: the agent then asks LLM.Port
+    # Blank is the right answer almost always: the agent then asks Fadenstack
     # where to send its logs, which keeps working if Loki moves.
     loki_url = _prompt(
-        "Loki URL (blank: LLM.Port says where to send logs)",
+        "Loki URL (blank: Fadenstack says where to send logs)",
         default=_cur("LOKI_URL") or "",
     )
     if loki_url:
@@ -646,9 +646,9 @@ def cmd_configure() -> None:
             os.environ[k] = v
 
         print(f"  Next steps:")
-        print(f"    llmport-agent init    One-time host setup (sudoers)")
-        print(f"    llmport-agent run     Run agent in foreground")
-        print(f"    llmport-agent start   Install and start as system service")
+        print(f"    faden-agent init    One-time host setup (sudoers)")
+        print(f"    faden-agent run     Run agent in foreground")
+        print(f"    faden-agent start   Install and start as system service")
     else:
         print("  Configuration not saved.")
 
@@ -734,7 +734,7 @@ def _find_service_template() -> Path | None:
 def _resolve_service_user() -> tuple[str, str, str]:
     """Return ``(username, group, home_dir)`` for the service.
 
-    When the invoking user is root and a ``llm-port-agent`` system user
+    When the invoking user is root and a ``faden-agent`` system user
     exists, use that dedicated user.  Otherwise run as the invoking user
     (or ``SUDO_USER`` when invoked via sudo).
     """
@@ -763,10 +763,10 @@ def _build_service_content(agent_bin: str) -> str:
 
     # Determine model_store from current env (may differ from default)
     merged = _effective_env()
-    model_store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/llm-port/models")
+    model_store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/faden/models")
     state_dir = merged.get(
         f"{_ENV_PREFIX}STATE_PATH",
-        f"/var/lib/llmport-agent" if svc_user == "root" else f"{home_dir}/.local/share/llmport-agent",
+        f"/var/lib/faden-agent" if svc_user == "root" else f"{home_dir}/.local/share/faden-agent",
     )
     # STATE_PATH points to the file; we need its parent directory
     if state_dir.endswith(".json"):
@@ -806,7 +806,7 @@ def _build_service_content(agent_bin: str) -> str:
     else:
         content = (
             "[Unit]\n"
-            "Description=llm-port node agent\n"
+            "Description=fadenstack node agent\n"
             "After=network-online.target docker.service\n"
             "Wants=network-online.target\n"
             # A start that can never succeed must stop retrying and say so.
@@ -846,7 +846,7 @@ _WIN_PID_FILE = _WIN_DATA_DIR / "agent.pid"
 _WIN_LOG_FILE = _WIN_DATA_DIR / "agent.log"
 _WIN_WRAPPER = _WIN_DATA_DIR / "run-agent.cmd"
 _WIN_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-_WIN_RUN_VALUE = "llmport-agent"
+_WIN_RUN_VALUE = "faden-agent"
 
 
 def _write_win_env_file(env_lines: list[str]) -> None:
@@ -908,7 +908,7 @@ def _win_remove_autostart() -> None:
 # ── Subcommands ───────────────────────────────────────────────────
 
 
-_SUDOERS_FILE = Path("/etc/sudoers.d/llmport-agent")
+_SUDOERS_FILE = Path("/etc/sudoers.d/faden-agent")
 _SUDOERS_CMDS = ["apt", "fwupdmgr"]
 
 
@@ -950,7 +950,7 @@ def cmd_license() -> None:
         return
 
     # Never imply a licence whose text we cannot actually produce.
-    _emit(f"llmport-agent {_AGENT_VERSION}")
+    _emit(f"faden-agent {_AGENT_VERSION}")
     _emit("Copyright 2026 Emagin8 UG (haftungsbeschraenkt) and contributors.")
     _emit("Licensed under the Apache License, Version 2.0.")
     _emit("http://www.apache.org/licenses/LICENSE-2.0")
@@ -995,8 +995,8 @@ def cmd_init() -> None:
 
 async def _existing_membership(config: AgentConfig) -> dict | None:
     """The fleet membership this machine already has, if its credential still works."""
-    from llm_port_node_agent.backend_client import BackendClient  # noqa: PLC0415
-    from llm_port_node_agent.state_store import StateStore  # noqa: PLC0415
+    from faden_agent.backend_client import BackendClient  # noqa: PLC0415
+    from faden_agent.state_store import StateStore  # noqa: PLC0415
 
     try:
         credential = StateStore(config.state_path).state.credential
@@ -1026,11 +1026,11 @@ async def _join_flow(config: AgentConfig) -> bool:
         True once a credential has been stored, False if it was refused or
         timed out.
     """
-    from llm_port_node_agent.backend_client import BackendClient
-    from llm_port_node_agent.gpu import detect_gpu
-    from llm_port_node_agent.preflight import build_static_capabilities
-    from llm_port_node_agent.runtimes import detect_runtime
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.backend_client import BackendClient
+    from faden_agent.gpu import detect_gpu
+    from faden_agent.preflight import build_static_capabilities
+    from faden_agent.runtimes import detect_runtime
+    from faden_agent.state_store import StateStore
 
     # The same detection the service does, and for the same reason: what a
     # node reports at join is what decides which runtime image it can run, so
@@ -1095,7 +1095,7 @@ async def _join_flow(config: AgentConfig) -> bool:
     print()
     print(f"      Code:  {code}")
     print()
-    print("  Open LLM.Port in a browser, go to Machines, and approve this")
+    print("  Open Fadenstack in a browser, go to Machines, and approve this")
     print("  request.  Check the code above matches the one on screen.")
     print()
     # Piped or over a plain ssh session, stdout is block-buffered: the code
@@ -1161,7 +1161,7 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     merged = _effective_env()
     backend = (backend_url or merged.get(f"{_ENV_PREFIX}BACKEND_URL") or "").strip()
     if not backend:
-        _err("Where is LLM.Port?  Usage: llmport-agent join http://<backend-host>:8000")
+        _err("Where is Fadenstack?  Usage: faden-agent join http://<backend-host>:8000")
         sys.exit(1)
     if "://" not in backend:
         # "10.250.10.220:8000" is what a person types; accept it.
@@ -1174,7 +1174,7 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
     _section("This machine")
     _kv("Name", agent_id)
     _kv("Address", host)
-    _kv("LLM.Port", backend)
+    _kv("Fadenstack", backend)
 
     # Build the config the same way the service will, so a join that works
     # is a guarantee the service will reach the same backend the same way.
@@ -1259,7 +1259,7 @@ def _install_ca_file(source: str) -> Path:
 
 
 def cmd_start(user: bool | None = None, ca_file: str | None = None) -> None:
-    """Install and start llmport-agent as a background service.
+    """Install and start faden-agent as a background service.
 
     ``user`` picks a ``systemd --user`` unit (no privilege needed) over the
     system unit; ``None`` decides from what this machine allows.
@@ -1270,13 +1270,13 @@ def cmd_start(user: bool | None = None, ca_file: str | None = None) -> None:
     env_lines = _collect_env_lines()
 
     if not any(line.startswith(f"{_ENV_PREFIX}BACKEND_URL=") for line in env_lines):
-        _err("BACKEND_URL is not set. Run 'llmport-agent configure' first.")
+        _err("BACKEND_URL is not set. Run 'faden-agent configure' first.")
         sys.exit(1)
 
     agent_bin = _agent_binary()
     if not agent_bin:
         print(
-            "ERROR: cannot work out where llmport-agent is installed.",
+            "ERROR: cannot work out where faden-agent is installed.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1347,7 +1347,7 @@ def _choose_user_scope(requested: bool | None) -> bool:
 def _build_user_service_content(agent_bin: str, env_file: Path) -> str:
     return (
         "[Unit]\n"
-        "Description=LLM.Port node agent (user service)\n"
+        "Description=Fadenstack node agent (user service)\n"
         "After=network-online.target\n"
         "Wants=network-online.target\n"
         "\n"
@@ -1399,7 +1399,7 @@ def _cmd_start_linux_user(agent_bin: str, env_lines: list[str]) -> None:
     print(f"\n  {SERVICE_NAME} installed and started as a user service -- no root needed.")
     print(f"  Running as: {user}")
     print(f"  View logs:  journalctl --user -u {SERVICE_NAME} -f")
-    print("  Stop:       llmport-agent stop")
+    print("  Stop:       faden-agent stop")
     if not lingering:
         print(
             f"\n  NOTE: could not enable linger for {user}, so the agent stops when\n"
@@ -1416,14 +1416,14 @@ def _agent_binary() -> str | None:
     unit does not activate anything. But the process running this code *is*
     the agent, so its own path is the answer whenever ``which`` has none.
     """
-    found = shutil.which("llmport-agent")
+    found = shutil.which("faden-agent")
     if found:
         return found
     launched = Path(sys.argv[0]).resolve()
     if launched.is_file() and os.access(launched, os.X_OK):
         return str(launched)
     # Installed as a module rather than through its console script.
-    sibling = Path(sys.executable).resolve().parent / "llmport-agent"
+    sibling = Path(sys.executable).resolve().parent / "faden-agent"
     return str(sibling) if sibling.is_file() else None
 
 
@@ -1437,8 +1437,8 @@ def _cmd_start_linux(agent_bin: str, env_lines: list[str]) -> None:
 
     # Resolve model_store to ensure state/model dirs exist with correct ownership
     merged = _effective_env()
-    model_store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/llm-port/models")
-    state_dir = "/var/lib/llmport-agent"
+    model_store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/faden/models")
+    state_dir = "/var/lib/faden-agent"
 
     tmp_svc = tmp_env = None
     try:
@@ -1480,7 +1480,7 @@ def _cmd_start_linux(agent_bin: str, env_lines: list[str]) -> None:
     print(f"\n  {SERVICE_NAME} service installed and started.")
     print(f"  Running as: {svc_user}:{svc_group}")
     print(f"  View logs:  journalctl -u {SERVICE_NAME} -f")
-    print(f"  Stop:       llmport-agent stop")
+    print(f"  Stop:       faden-agent stop")
 
 
 def _cmd_start_windows(agent_bin: str, env_lines: list[str]) -> None:
@@ -1511,14 +1511,14 @@ def _cmd_start_windows(agent_bin: str, env_lines: list[str]) -> None:
     print(f"{SERVICE_NAME} started (PID {proc.pid}).")
     print(f"  Config: {_WIN_ENV_FILE}")
     print(f"  Logs:   {_WIN_LOG_FILE}")
-    print(f"  Stop:   llmport-agent stop")
+    print(f"  Stop:   faden-agent stop")
 
 
 def _own_process_chain() -> set[int]:
     """This process and every ancestor of it.
 
     An ancestor's command line can contain the very pattern we match on --
-    ``sh -c "llmport-agent run"``, or the terminal launched from one -- and
+    ``sh -c "faden-agent run"``, or the terminal launched from one -- and
     killing an ancestor takes this process down with it.  Learned the hard
     way once already: a workspace reclaim matched a parent process and closed
     the terminal that had invoked it.
@@ -1538,7 +1538,7 @@ def _running_agents() -> list[psutil.Process]:
     Matched on the command line rather than a pidfile because the
     single-instance lock deliberately stores no pid -- the kernel releasing
     the lock is the whole mechanism, and writing into the locked byte would
-    defeat it.  ``run`` is required so that a concurrent ``llmport-agent
+    defeat it.  ``run`` is required so that a concurrent ``faden-agent
     stop`` never matches itself.
     """
     mine = _own_process_chain()
@@ -1579,7 +1579,7 @@ def _stop_stray_agents() -> int:
     """Stop agents no service manager knows about.  Returns how many.
 
     ``systemctl disable --now`` stops the unit and nothing else, so an agent
-    started by hand -- ``llmport-agent run``, which is exactly what the
+    started by hand -- ``faden-agent run``, which is exactly what the
     source install leaves you with -- outlives the uninstall.  It keeps its
     backend session open and the node keeps reporting healthy long after the
     binary, the unit and the config file have all been deleted, because it
@@ -1629,7 +1629,7 @@ def _signal_agent(proc: psutil.Process, how: str) -> None:
 
 
 def cmd_stop() -> None:
-    """Stop and remove the llmport-agent background service."""
+    """Stop and remove the faden-agent background service."""
     if _IS_WINDOWS:
         _cmd_stop_windows()
     else:
@@ -1658,7 +1658,7 @@ def _cmd_stop_windows() -> None:
     if pid is not None:
         _run_cmd(["taskkill", "/F", "/PID", str(pid)], check=False, quiet=True)
     # Also try by name in case PID file is stale
-    _run_cmd(["taskkill", "/F", "/IM", "llmport-agent.exe"], check=False, quiet=True)
+    _run_cmd(["taskkill", "/F", "/IM", "faden-agent.exe"], check=False, quiet=True)
     # taskkill matches the image name, so it never sees a source install --
     # that runs as python.exe with the agent as an argument.
     _stop_stray_agents()
@@ -1703,7 +1703,7 @@ def cmd_scan() -> None:
     """Scan and display models in the configured model store."""
     _banner()
     merged = _effective_env()
-    store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/llm-port/models")
+    store = merged.get(f"{_ENV_PREFIX}MODEL_STORE", "/srv/faden/models")
     store_path = Path(store)
 
     _section(f"Model Cache: {store}")
@@ -1786,8 +1786,8 @@ def main() -> None:
     except (AttributeError, ValueError):
         pass
     parser = argparse.ArgumentParser(
-        prog="llmport-agent",
-        description="llm-port node agent — host-side execution bridge.",
+        prog="faden-agent",
+        description="fadenstack node agent — host-side execution bridge.",
     )
     sub = parser.add_subparsers(dest="command")
     p_configure = sub.add_parser("configure", help="Interactive configuration wizard (or --set KEY=VALUE)")
@@ -1809,7 +1809,7 @@ def main() -> None:
         "backend",
         nargs="?",
         metavar="BACKEND_URL",
-        help="Where LLM.Port is, e.g. http://10.250.10.220:8000",
+        help="Where Fadenstack is, e.g. http://10.250.10.220:8000",
     )
     p_join.add_argument(
         "--user",

@@ -127,10 +127,10 @@ or in **Settings → LLM → Hugging Face**.
   receive the token. A legacy container gets it only when it is allowed
   onto the network to fetch model code (`trust-remote-code`).
 - The server will not save a token while it still uses the default settings
-  master key. `llmport deploy` generates a random one for each installation.
+  master key. `faden deploy` generates a random one for each installation.
 - Setting and removing the token are recorded in the audit log, without the
   token.
-- `LLM_PORT_BACKEND_HF_TOKEN` in the environment still works. A token saved
+- `FADEN_BACKEND_HF_TOKEN` in the environment still works. A token saved
   in the interface takes its place.
 
 ## On this server
@@ -148,7 +148,7 @@ where the models this server keeps are looked after.
 - **Download without hosting.** Open a model and press **Download to this
   server** to have it ready before anyone deploys it.
 - **Add from a path.** Register a folder on the server that already holds a
-  model's files (its `config.json` and weights). LLM.Port never deletes
+  model's files (its `config.json` and weights). Fadenstack never deletes
   those files.
 - **Models already in the store.** Models copied into the server's model
   store by other means are picked up when the tab opens, or with **Look for

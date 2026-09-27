@@ -22,9 +22,9 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent import __main__ as agent_main
-from llm_port_node_agent import backend_client, gpu, preflight, runtimes
-from llm_port_node_agent.state_store import StateStore
+from faden_agent import __main__ as agent_main
+from faden_agent import backend_client, gpu, preflight, runtimes
+from faden_agent.state_store import StateStore
 
 
 class _Backend:
@@ -58,8 +58,8 @@ def config(tmp_path: Path) -> SimpleNamespace:
         state_path=tmp_path / "state.json",
         backend_url="http://10.250.10.220:8100",
         container_runtime=None,
-        model_store_root="/srv/llm-port/models",
-        ray_session_dir="/var/lib/llm-port/ray",
+        model_store_root="/srv/faden/models",
+        ray_session_dir="/var/lib/fadenstack/ray",
         agent_id="workstation-wsl",
         advertise_host="10.250.10.220",
     )

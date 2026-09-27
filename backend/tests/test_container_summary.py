@@ -9,8 +9,8 @@ console said the create had failed; creating it again met a name conflict
 
 from __future__ import annotations
 
-from llm_port_backend.db.models.containers import ContainerClass, ContainerPolicy
-from llm_port_backend.web.api.admin.containers.views import _container_summary_from_docker
+from faden_backend.db.models.containers import ContainerClass, ContainerPolicy
+from faden_backend.web.api.admin.containers.views import _container_summary_from_docker
 
 # What Docker's inspect returns for a container just created and started.
 INSPECT = {
@@ -22,7 +22,7 @@ INSPECT = {
     "Config": {"Image": "node:22-alpine"},
     "NetworkSettings": {
         "Ports": {"3001/tcp": None},
-        "Networks": {"llm_port_shared_default": {"IPAddress": "172.18.0.30"}},
+        "Networks": {"fadenstack_default": {"IPAddress": "172.18.0.30"}},
     },
 }
 
@@ -35,7 +35,7 @@ LISTED = {
     "State": "running",
     "Status": "Up 2 minutes",
     "Ports": [{"PrivatePort": 3001, "Type": "tcp"}],
-    "NetworkSettings": {"Networks": {"llm_port_shared_default": {}}},
+    "NetworkSettings": {"Networks": {"fadenstack_default": {}}},
 }
 
 
@@ -48,7 +48,7 @@ def test_a_container_just_created_is_summarised() -> None:
     assert summary.state == "running"
     assert summary.status == "running"
     assert summary.image == "node:22-alpine"
-    assert summary.networks == ["llm_port_shared_default"]
+    assert summary.networks == ["fadenstack_default"]
     assert summary.container_class == ContainerClass.TENANT_APP
 
 

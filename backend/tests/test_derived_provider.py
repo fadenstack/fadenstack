@@ -26,7 +26,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
@@ -34,7 +34,7 @@ from llm_port_backend.db.models.inference import (
     InferenceDeployment,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     LLMModel,
     LLMProvider,
     ModelSource,
@@ -42,8 +42,8 @@ from llm_port_backend.db.models.llm import (
     ProviderTarget,
     ProviderType,
 )
-from llm_port_backend.db.dao.inference_dao import EndpointDAO
-from llm_port_backend.services.inference.publication import (
+from faden_backend.db.dao.inference_dao import EndpointDAO
+from faden_backend.services.inference.publication import (
     DERIVED_SOURCE_KIND,
     InferencePublicationCoordinator,
 )
@@ -102,7 +102,7 @@ async def _publish(
     await dao.create(
         deployment.id,
         name="openai",
-        address="http://10.250.10.71:8000/llmport-app",
+        address="http://10.250.10.71:8000/faden-app",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
     )
@@ -320,8 +320,8 @@ async def _admin(dbsession: AsyncSession, fastapi_app) -> None:
     The guard under test refuses an *authorised* caller, so the test has to
     get past authorisation first or a 401 would masquerade as a pass.
     """
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.dao.rbac_dao import RbacDAO
+    from faden_backend.db.models.users import User, current_active_user
 
     rbac = RbacDAO(dbsession)
     await rbac.seed_defaults()
@@ -341,7 +341,7 @@ async def _admin(dbsession: AsyncSession, fastapi_app) -> None:
     # dependency before the handler runs -- so without one the request fails
     # on the dependency rather than reaching the guard under test. It is never
     # called: the guard refuses first.
-    from llm_port_backend.web.api.llm.dependencies import get_llm_service
+    from faden_backend.web.api.llm.dependencies import get_llm_service
 
     fastapi_app.dependency_overrides[get_llm_service] = lambda: object()
 
@@ -476,7 +476,7 @@ async def test_the_cards_answer_for_a_cluster_backed_provider(
             "stats": {"generation_tokens_per_sec": 32.0},
         }
 
-    from llm_port_backend.services.llm.monitoring import MonitoringProvisioner
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
 
     monkeypatch.setattr(MonitoringProvisioner, "stats", fake_stats, raising=False)
 

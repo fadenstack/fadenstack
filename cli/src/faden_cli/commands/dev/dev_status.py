@@ -1,4 +1,4 @@
-"""``llmport dev status`` — show developer workspace status."""
+"""``faden dev status`` — show developer workspace status."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from pathlib import Path
 import click
 from rich.table import Table
 
-from llmport.core.compose import ComposeContext, ps as compose_ps
-from llmport.core.console import console, info
-from llmport.core.git import current_branch
-from llmport.core.registry import DEV_PROCESSES
-from llmport.core.settings import REPO_DIR_MAP, load_config
-from llmport.core.workspace import find_service_dir, resolve_shared_compose
+from faden_cli.core.compose import ComposeContext, ps as compose_ps
+from faden_cli.core.console import console, info
+from faden_cli.core.git import current_branch
+from faden_cli.core.registry import DEV_PROCESSES
+from faden_cli.core.settings import REPO_DIR_MAP, load_config
+from faden_cli.core.workspace import find_service_dir, resolve_shared_compose
 
 from .dev_group import dev_group
 
@@ -51,12 +51,12 @@ def dev_status() -> None:
       • Shared infrastructure containers
       • Running dev processes (backend, worker, frontend)
     """
-    from llmport.core.workspace import resolve_workspace
+    from faden_cli.core.workspace import resolve_workspace
 
     cfg = load_config()
     workspace = resolve_workspace()
 
-    console.print("[bold magenta]llm.port Developer Status[/bold magenta]\n")
+    console.print("[bold magenta]fadenstack Developer Status[/bold magenta]\n")
 
     # ── Repositories ──────────────────────────────────────────────
     repo_table = Table(title="Repositories", show_header=True, header_style="bold cyan")

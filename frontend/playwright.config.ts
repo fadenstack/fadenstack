@@ -18,7 +18,7 @@ import { defineConfig, devices } from "@playwright/test";
  * Deliberately not `webServer`-managed: these run against the same backend,
  * gateway and node agents the operator uses, so the thing under test is the
  * real journey rather than a mocked one. Start the stack with
- * `llmport dev up` first.
+ * `faden dev up` first.
  *
  * Kept out of the vitest run (`app/**` only) so component tests stay fast and
  * hermetic, and only this suite needs hardware.

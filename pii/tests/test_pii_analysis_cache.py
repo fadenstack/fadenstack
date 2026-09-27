@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_pii.services.pii.service import DEFAULT_ENTITIES, PIIService
+from faden_pii.services.pii.service import DEFAULT_ENTITIES, PIIService
 
 
 @pytest.fixture(scope="module")
@@ -100,7 +100,7 @@ async def test_a_setting_change_is_a_new_analysis(service: PIIService, monkeypat
 
 
 def test_the_cache_keeps_only_the_most_recent() -> None:
-    from llm_port_pii.services.pii.service import _AnalysisCache
+    from faden_pii.services.pii.service import _AnalysisCache
 
     cache = _AnalysisCache(2)
     cache.put(("a",), ())

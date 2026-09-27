@@ -1,8 +1,8 @@
 # vLLM you already run
 
-Most machines already run some vLLM before LLM.Port arrives: containers
+Most machines already run some vLLM before Fadenstack arrives: containers
 started by hand, or by another tool. The three machines this project uses had
-eleven between them. LLM.Port finds them and lets you put any running one
+eleven between them. Fadenstack finds them and lets you put any running one
 behind its gateway, under a name, without touching the container.
 
 Found and routed on the DGX pair on 2026-09-23: spark_manager's
@@ -14,7 +14,7 @@ through the gateway in 0.8 s.
 ## What is found
 
 Every machine with agent **0.1.11 or later** reports, about once a minute, the
-vLLM containers LLM.Port did not start: running or stopped, whatever started
+vLLM containers Fadenstack did not start: running or stopped, whatever started
 them. Each machine's page lists them under **vLLM on this machine**:
 
 ![The vLLM containers found on gpu-01](images/found/found-on-machine.png)
@@ -40,12 +40,12 @@ machine:
   `--api-key ***`, and the same goes for any flag with key, token, secret or
   password in its name.
 
-Containers LLM.Port started itself (`llm-port-*`) are not listed; they are
+Containers Fadenstack started itself (`faden-*`) are not listed; they are
 already on the Providers and Deployments pages.
 
 ## Routing one as it is
 
-Press **Route through LLM.Port** and give it the name clients will use. The
+Press **Route through Fadenstack** and give it the name clients will use. The
 suggestion is the name the container answers to.
 
 ![Routing the container under a name](images/found/found-route-dialog.png)
@@ -70,7 +70,7 @@ it). The container keeps running.
 
 A routed container that stops is taken out of routing within about a minute.
 It is put back when it runs again. Requests for its name fail in between, as
-they would have without LLM.Port.
+they would have without Fadenstack.
 
 ### What cannot be routed, and why
 
@@ -80,8 +80,8 @@ The button is greyed out, with the reason below it, for a container that:
 |---|---|
 | It is not running. | There is nothing to send requests to. Start it the way it is normally started. |
 | Its port is not published on the machine | Only other containers on that machine could reach it. |
-| It asks for an API key | A key is not handled yet. Routing would need LLM.Port to store it, and keys for remote providers are still stored unencrypted. |
-| No answer from ... | LLM.Port asked it `GET /v1/models` and got no answer: it is still loading, or a firewall is in the way. |
+| It asks for an API key | A key is not handled yet. Routing would need Fadenstack to store it, and keys for remote providers are still stored unencrypted. |
+| No answer from ... | Fadenstack asked it `GET /v1/models` and got no answer: it is still loading, or a firewall is in the way. |
 
 ## Several kinds of model behind one gateway
 
@@ -93,7 +93,7 @@ for (`chat`, `embeddings` or `scoring`):
 - Single-machine runtimes take it from their vLLM flags (`--task embed` means
   embeddings), and say `chat` otherwise.
 - A found container says what its flags say, or what its model's name suggests.
-- Only a remote API, which LLM.Port cannot look inside, says nothing.
+- Only a remote API, which Fadenstack cannot look inside, says nothing.
 
 What that gives you:
 

@@ -13,8 +13,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.web.api.llm.schema import (
+from faden_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.web.api.llm.schema import (
     DataUsagePerInstanceDTO,
     DataUsageSummaryDTO,
     GraphEdgeDTO,

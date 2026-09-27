@@ -1,9 +1,9 @@
 """The deployment files the CLI carries, for installs without a source checkout.
 
-``pip install llmport-cli`` brings the compose file and everything it mounts
-(packed from ``llm_port_shared`` at build time, see ``hatch_build.py``).
-``llmport deploy`` unpacks them into an install directory and runs the
-published images of the CLI's own version; ``llmport upgrade`` with a newer
+``pip install fadenstack`` brings the compose file and everything it mounts
+(packed from ``shared`` at build time, see ``hatch_build.py``).
+``faden deploy`` unpacks them into an install directory and runs the
+published images of the CLI's own version; ``faden upgrade`` with a newer
 CLI replaces them and moves the images to the new version.
 
 An install made this way is marked with :data:`MARKER`. Without the marker
@@ -18,13 +18,13 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
-from llmport import __version__
+from faden_cli import __version__
 
 #: Written into an install made from the bundle: which release it runs.
-MARKER = ".llmport-release"
+MARKER = ".faden-release"
 
-#: Where ``llmport deploy`` puts an install when it is given no directory.
-DEFAULT_INSTALL_DIR = Path.home() / "llm-port"
+#: Where ``faden deploy`` puts an install when it is given no directory.
+DEFAULT_INSTALL_DIR = Path.home() / "fadenstack"
 
 #: Files an install changes for itself. The bundle's copy is only a
 #: starting point: an upgrade never replaces them once they exist.
@@ -45,9 +45,9 @@ def bundled_files() -> Traversable | None:
     """The deployment files inside the installed CLI, or ``None`` when it has none.
 
     A CLI run from a source checkout (``pip install -e``) has none: the
-    checkout's ``llm_port_shared`` is used instead.
+    checkout's ``shared`` is used instead.
     """
-    root = resources.files("llmport") / "bundle" / "shared"
+    root = resources.files("faden") / "bundle" / "shared"
     return root if root.is_dir() and (root / "docker-compose.yaml").is_file() else None
 
 
@@ -83,7 +83,7 @@ def unpack(install_dir: Path) -> list[str]:
     """
     root = bundled_files()
     if root is None:
-        msg = "This llmport CLI carries no deployment files (it runs from a source checkout)."
+        msg = "This faden CLI carries no deployment files (it runs from a source checkout)."
         raise RuntimeError(msg)
     install_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []

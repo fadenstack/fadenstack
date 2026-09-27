@@ -13,30 +13,30 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSo
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.system_settings import InfraAgentStatus
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.nodes import NodeControlService
-from llm_port_backend.services.nodes import signing as command_signing
-from llm_port_backend.services.nodes.wakeup import get_command_notifier
-from llm_port_backend.services.system_settings import SettingsCrypto, SystemSettingsService
-from llm_port_backend.services.system_settings.executors import AgentApplyExecutor, LocalApplyExecutor
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.hardware.schema import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.system_settings import InfraAgentStatus
+from faden_backend.db.models.users import User
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.nodes import NodeControlService
+from faden_backend.services.nodes import signing as command_signing
+from faden_backend.services.nodes.wakeup import get_command_notifier
+from faden_backend.services.system_settings import SettingsCrypto, SystemSettingsService
+from faden_backend.services.system_settings.executors import AgentApplyExecutor, LocalApplyExecutor
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.hardware.schema import (
     GpuDeviceDTO,
     GpuInventoryDTO,
     GpuMetricsDTO,
     HardwareDTO,
     VllmImagePresetDTO,
 )
-from llm_port_backend.web.api.admin.hardware.views import _build_presets, _VLLM_IMAGES
-from llm_port_backend.web.api.admin.dependencies import audit_action, get_root_mode_active
-from llm_port_backend.web.api.admin.system.schema import (
+from faden_backend.web.api.admin.hardware.views import _build_presets, _VLLM_IMAGES
+from faden_backend.web.api.admin.dependencies import audit_action, get_root_mode_active
+from faden_backend.web.api.admin.system.schema import (
     AgentApplyRequest,
     AgentApplyResponse,
     AgentDTO,
@@ -75,7 +75,7 @@ from llm_port_backend.web.api.admin.system.schema import (
     WizardStepDTO,
     WizardStepsResponse,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -229,7 +229,7 @@ async def wizard_steps(
                 id="auth",
                 title="Auth and Secrets",
                 description="JWT signing/verification secrets.",
-                setting_keys=["llm_port_backend.users_secret", "llm_port_api.jwt_secret"],
+                setting_keys=["faden_backend.users_secret", "faden_gateway.jwt_secret"],
             ),
             WizardStepDTO(
                 id="gateway",
@@ -242,10 +242,10 @@ async def wizard_steps(
                 title="Langfuse / Grafana / Loki",
                 description="Observability credentials and feature switches.",
                 setting_keys=[
-                    "llm_port_api.langfuse_enabled",
-                    "llm_port_api.langfuse_host",
-                    "llm_port_api.langfuse_public_key",
-                    "llm_port_api.langfuse_secret_key",
+                    "faden_gateway.langfuse_enabled",
+                    "faden_gateway.langfuse_host",
+                    "faden_gateway.langfuse_public_key",
+                    "faden_gateway.langfuse_secret_key",
                     "shared.grafana.admin_password",
                 ],
             ),
@@ -254,8 +254,8 @@ async def wizard_steps(
                 title="PII Protection",
                 description="Enable PII detection and configure redaction policy.",
                 setting_keys=[
-                    "llm_port_api.pii_service_url",
-                    "llm_port_api.pii_default_policy",
+                    "faden_gateway.pii_service_url",
+                    "faden_gateway.pii_default_policy",
                 ],
             ),
             WizardStepDTO(
@@ -897,11 +897,11 @@ async def system_node_secret_delivery(
     """
     from sqlalchemy import select
 
-    from llm_port_backend.db.models.inference import (
+    from faden_backend.db.models.inference import (
         InferenceEnvironment,
         InferenceEnvironmentNode,
     )
-    from llm_port_backend.services.inference.drivers.ray.secrets import (
+    from faden_backend.services.inference.drivers.ray.secrets import (
         control_plane_id_from_credential_ref,
         retrieve_cluster_token,
     )
@@ -1256,7 +1256,7 @@ async def system_grafana_webhook(
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
         detail=(
             "Grafana webhook alerting requires the Observability Pro plugin. "
-            "Install llm-port-ee to enable this endpoint."
+            "Install faden-ee to enable this endpoint."
         ),
     )
 

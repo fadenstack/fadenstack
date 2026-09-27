@@ -8,8 +8,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.bundles import (  # noqa: PLC0415
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.bundles import (  # noqa: PLC0415
     CERTIFIED_DGX_SPARK_BUNDLE,
     ContainerSpec,
     RuntimeBundleManifest,
@@ -70,7 +70,7 @@ def test_certified_bundle_identity_matches_the_deployed_image() -> None:
 
 def test_the_catalogue_is_not_transcribed_beside_the_manifest() -> None:
     """There must be no second, hand-kept copy for the two to disagree with."""
-    from llm_port_backend.services.inference import bundles
+    from faden_backend.services.inference import bundles
 
     assert not hasattr(bundles, "_CERTIFIED_DGX_SPARK_RUNTIME_MANIFEST")
 
@@ -126,9 +126,9 @@ def test_container_requirements_are_semantic_not_cli_flags() -> None:
 def test_bundle_digest_is_mandatory_and_checked() -> None:
     """A bundle that cannot be pinned must not be constructible."""
     with pytest.raises(ValidationError):
-        ContainerSpec(image="llmport/ray-vllm-gb10:ray2.58-nv26.08")
+        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-nv26.08")
     with pytest.raises(ValidationError):
-        ContainerSpec(image="llmport/ray-vllm-gb10:ray2.58-nv26.08", digest="0.16.0")
+        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-nv26.08", digest="0.16.0")
 
 
 def test_bundle_generated_from_runtime_manifest() -> None:
@@ -277,7 +277,7 @@ def test_container_launch_spec_carries_semantic_requirements() -> None:
     registry = RuntimeBundleRegistry()
     spec = registry.container_launch_spec(
         CERTIFIED_DGX_SPARK_BUNDLE,
-        name="llm-port-ray-runtime",
+        name="faden-ray-runtime",
         env={"VLLM_HOST_IP": "10.100.0.1"},
     )
     assert spec["image"] == CERTIFIED_DGX_SPARK_BUNDLE.container.image
@@ -337,13 +337,13 @@ def test_a_generic_bundle_takes_its_mounts_from_the_node() -> None:
         "box",
         machine="x86_64",
         gpu_vendor="nvidia",
-        paths={"model_store": "/home/op/.cache/huggingface", "ray_session": "/var/lib/llm-port/ray"},
+        paths={"model_store": "/home/op/.cache/huggingface", "ray_session": "/var/lib/fadenstack/ray"},
     )
-    spec = registry.container_launch_spec(bundle, name="llm-port-ray-runtime", node=node)
+    spec = registry.container_launch_spec(bundle, name="faden-ray-runtime", node=node)
     by_target = {m["container_path"]: m for m in spec["mounts"]}
     assert by_target["/models"]["host_path"] == "/home/op/.cache/huggingface"
     assert by_target["/models"]["mode"] == "ro"
-    assert by_target["/tmp/ray"]["host_path"] == "/var/lib/llm-port/ray"
+    assert by_target["/tmp/ray"]["host_path"] == "/var/lib/fadenstack/ray"
     assert by_target["/tmp/ray"]["mode"] == "rw"
 
 
@@ -357,11 +357,11 @@ def test_a_bundle_that_declares_a_mount_keeps_it() -> None:
         paths={"model_store": "/somewhere/else", "ray_session": "/elsewhere"},
     )
     spec = registry.container_launch_spec(
-        CERTIFIED_DGX_SPARK_BUNDLE, name="llm-port-ray-runtime", node=node
+        CERTIFIED_DGX_SPARK_BUNDLE, name="faden-ray-runtime", node=node
     )
     by_target = {m["container_path"]: m["host_path"] for m in spec["mounts"]}
-    assert by_target["/models"] == "/srv/llm-port/models"
-    assert by_target["/tmp/ray"] == "/var/lib/llm-port/ray"
+    assert by_target["/models"] == "/srv/faden/models"
+    assert by_target["/tmp/ray"] == "/var/lib/fadenstack/ray"
 
 
 def test_a_node_with_no_reported_paths_gets_no_invented_ones() -> None:
@@ -369,5 +369,5 @@ def test_a_node_with_no_reported_paths_gets_no_invented_ones() -> None:
     registry = RuntimeBundleRegistry()
     bundle = registry.get_bundle("bundle-generic-x86_64-nvidia-v1")
     node = _node("box", machine="x86_64", gpu_vendor="nvidia")
-    spec = registry.container_launch_spec(bundle, name="llm-port-ray-runtime", node=node)
+    spec = registry.container_launch_spec(bundle, name="faden-ray-runtime", node=node)
     assert spec["mounts"] == []

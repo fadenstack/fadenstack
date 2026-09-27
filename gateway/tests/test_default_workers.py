@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_port_api import settings as settings_module
+from faden_gateway import settings as settings_module
 
 
 def test_windows_runs_one_worker(monkeypatch: pytest.MonkeyPatch) -> None:

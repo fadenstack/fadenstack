@@ -8,20 +8,20 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import (
     ModelAvailability,
     ModelAvailabilityStatus,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.services.nodes.service import NodeControlService
 
 
 @pytest.mark.anyio
@@ -110,7 +110,7 @@ async def test_sync_model_progress_and_success_ingestion(dbsession: AsyncSession
             "synced": True,
             "model_id": str(model_id),
             "hf_repo_id": "org/test-llm-model",
-            "root_path": "/srv/llm-port/models/models--org--test-llm-model/snapshots/commit-abc",
+            "root_path": "/srv/faden/models/models--org--test-llm-model/snapshots/commit-abc",
             "revision": "commit-abc",
             "manifest_sha256": "digest-alpha-123",
             "total_size": 42000000,
@@ -128,7 +128,7 @@ async def test_sync_model_progress_and_success_ingestion(dbsession: AsyncSession
     assert ready_row is not None
     assert ready_row.status == ModelAvailabilityStatus.READY.value
     assert ready_row.progress == 100.0
-    assert ready_row.root_path == "/srv/llm-port/models/models--org--test-llm-model/snapshots/commit-abc"
+    assert ready_row.root_path == "/srv/faden/models/models--org--test-llm-model/snapshots/commit-abc"
     assert ready_row.revision == "commit-abc"
     assert ready_row.manifest_sha256 == "digest-alpha-123"
     assert ready_row.size_bytes == 42000000
@@ -180,7 +180,7 @@ async def test_sync_model_failure_ingestion(dbsession: AsyncSession) -> None:
     fail_payload = {
         "success": False,
         "error_code": "disk_full",
-        "error_message": "No space left on device /srv/llm-port/models",
+        "error_message": "No space left on device /srv/faden/models",
     }
     await service.record_command_result(
         node_id=node_id,

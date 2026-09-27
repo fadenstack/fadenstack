@@ -5,8 +5,8 @@ from aio_pika.abc import AbstractChannel, AbstractRobustConnection
 from aio_pika.pool import Pool
 from fastapi import FastAPI
 
-from llm_port_api.services.tls import rewrite_amqp_url_for_tls
-from llm_port_api.settings import settings
+from faden_gateway.services.tls import rewrite_amqp_url_for_tls
+from faden_gateway.settings import settings
 
 
 def _build_rabbit_kwargs() -> dict:

@@ -6,8 +6,8 @@ from fastapi import Depends
 from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.containers import StackRevision
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import StackRevision
 
 
 class StackRevisionDAO:

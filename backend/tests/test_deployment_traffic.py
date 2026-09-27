@@ -27,14 +27,14 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.observability.service import ObservabilityService
+from faden_backend.services.observability.service import ObservabilityService
 
 pytestmark = pytest.mark.anyio()
 
 
 #: Just enough of the gateway schema for the query under test.
 #:
-#: These tables live in the ``llm_api`` database, which the backend's test
+#: These tables live in the ``faden_gateway`` database, which the backend's test
 #: fixture does not create -- so skipping when they are absent left every
 #: test here skipped, and the arithmetic (the part most worth checking)
 #: shipped unexercised. Creating them is better: Postgres DDL is

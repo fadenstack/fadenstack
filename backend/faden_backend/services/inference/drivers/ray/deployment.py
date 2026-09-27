@@ -1,6 +1,6 @@
 r"""Ray deployment lifecycle orchestrator (Phase 3).
 
-Drives an :class:`~llm_port_backend.db.models.inference.InferenceDeployment`
+Drives an :class:`~faden_backend.db.models.inference.InferenceDeployment`
 toward its desired state by compiling the stored spec into a Ray
 ``LLMServingArgs`` document (via :mod:`...drivers.ray.compiler`) and running
 a *named* Ray Serve application on the environment's head node through the
@@ -20,7 +20,7 @@ Design constraints (verified against the Phase 2/3 code):
   component that imports ``ray.serve``.  This module only builds plain
   dictionaries and talks to the node agent through node commands.
 * **Named-app semantics.** Every deployment owns a stable app name
-  (``llmport-<deployment-id>``).  Serve deploys/updates exactly that
+  (``faden-<deployment-id>``).  Serve deploys/updates exactly that
   application and leaves other named apps untouched; delete uses
   ``serve.delete(name)``.
 * **Strict mutations, best-effort probes.**  RUN/DELETE_SERVE_APP go through
@@ -56,10 +56,10 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from llm_port_backend.db.dao.inference_dao import (
+from faden_backend.db.dao.inference_dao import (
     EndpointDAO,
 )
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
@@ -68,32 +68,32 @@ from llm_port_backend.db.models.inference import (
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.llm import LLMModel
-from llm_port_backend.db.models.node_control import InfraNode, NodeHealthStatus
-from llm_port_backend.services.inference.artifacts import (
+from faden_backend.db.models.llm import LLMModel
+from faden_backend.db.models.node_control import InfraNode, NodeHealthStatus
+from faden_backend.services.inference.artifacts import (
     ArtifactReadiness,
     ModelArtifactCoordinator,
 )
-from llm_port_backend.services.inference.bundles import (
+from faden_backend.services.inference.bundles import (
     node_and_bundle_for,
     default_bundle_registry,
     translate_host_path_to_container,
 )
-from llm_port_backend.services.inference.drivers.ray.client import (
+from faden_backend.services.inference.drivers.ray.client import (
     RayClusterClient,
     RayCommandError,
 )
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
-from llm_port_backend.services.inference.drivers.ray.compiler import (
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.inference.drivers.ray.compiler import (
     ArtifactResolutionError,
     compile_deployment,
 )
-from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
-from llm_port_backend.services import machine_tls
-from llm_port_backend.settings import settings
+from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
+from faden_backend.services import machine_tls
+from faden_backend.settings import settings
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
-    from llm_port_backend.services.nodes.service import NodeControlService
+    from faden_backend.services.nodes.service import NodeControlService
 
 
 def _gateway(node_control: "NodeControlService | NodeCommandGateway") -> NodeCommandGateway:
@@ -110,7 +110,7 @@ _WILDCARD_BIND = "0.0.0.0"  # noqa: S104 - see _serve_options
 _WILDCARD_BINDS = frozenset({_WILDCARD_BIND, "::", ""})
 
 # Must match the name the environment manager starts the container under.
-_RUNTIME_CONTAINER_NAME = "llm-port-ray-runtime"
+_RUNTIME_CONTAINER_NAME = "faden-ray-runtime"
 
 # Readiness poll: how often to re-probe Serve, and the per-pass budget before
 # we give up *this pass* and leave the row pending for the next pass.  The
@@ -127,7 +127,7 @@ def app_name_for(deployment: InferenceDeployment) -> str:
     and is mutable) so rename never re-targets the live app.  Ray app names
     allow ``[a-zA-Z0-9_-]``; the UUID hex + hyphens satisfy that directly.
     """
-    return f"llmport-{deployment.id}"
+    return f"faden-{deployment.id}"
 
 
 def _serve_app_entry(status: Any, name: str) -> dict[str, Any] | None:
@@ -146,7 +146,7 @@ def _cluster_head(environment: Any) -> str | None:
 
     It changes whenever a head is started again -- a cluster re-formed after
     its head died, a head machine that rebooted -- and a new head starts with
-    no Serve applications. Taken from Ray rather than from LLM.Port's own
+    no Serve applications. Taken from Ray rather than from Fadenstack's own
     bookkeeping so a restart that happened any other way is noticed too.
     """
     observed = getattr(environment, "observed_status_json", None) or {}
@@ -1636,8 +1636,8 @@ class RayDeploymentManager:
         ``ensure`` answers with the readiness it read before acting, so a node
         it retried still reads as failed there; its row says otherwise.
         """
-        from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO  # noqa: PLC0415
-        from llm_port_backend.db.models.inference import ModelAvailabilityStatus  # noqa: PLC0415
+        from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO  # noqa: PLC0415
+        from faden_backend.db.models.inference import ModelAvailabilityStatus  # noqa: PLC0415
 
         try:
             row = await ModelAvailabilityDAO(session).get(facts.model.id, uuid.UUID(node_id))

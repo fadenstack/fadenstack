@@ -5,7 +5,7 @@ Use one shared Postgres server, with a dedicated gateway database and least-priv
 
 1. Create database:
 ```sql
-CREATE DATABASE llm_api;
+CREATE DATABASE faden_gateway;
 ```
 2. Create user:
 ```sql
@@ -13,8 +13,8 @@ CREATE USER llm_user WITH PASSWORD 'change-me';
 ```
 3. Grant minimal access:
 ```sql
-GRANT CONNECT ON DATABASE llm_api TO llm_user;
-\c llm_api
+GRANT CONNECT ON DATABASE faden_gateway TO llm_user;
+\c faden_gateway
 GRANT USAGE ON SCHEMA public TO llm_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO llm_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
@@ -29,7 +29,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO llm_user;
 - `llm_gateway_request_log`
 
 ## Migrations
-Run from `llm_port_api` root:
+Run from `faden_gateway` root:
 ```bash
 alembic upgrade head
 ```

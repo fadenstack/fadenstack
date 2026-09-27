@@ -19,19 +19,19 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeHealthStatus
-from llm_port_backend.services.inference import reconciliation
-from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
-from llm_port_backend.services.llm import monitoring
-from llm_port_backend.services.llm.monitoring import MonitoringProvisioner, dashboard_uid_for
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.db.models.node_control import InfraNode, NodeHealthStatus
+from faden_backend.services.inference import reconciliation
+from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+from faden_backend.services.llm import monitoring
+from faden_backend.services.llm.monitoring import MonitoringProvisioner, dashboard_uid_for
+from faden_backend.services.nodes.service import NodeControlService
 from tests.test_inference_env_observation import _bound_environment, _FakeNodeControl
 
 

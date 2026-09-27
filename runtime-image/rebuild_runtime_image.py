@@ -28,7 +28,7 @@ So nothing is transcribed. The manifest carries ``rootfs_layers`` (the RootFS
 layer diff IDs, which survive a save/load transfer and a registry round trip)
 and the backend derives the content digest from them through
 ``RuntimeBundleManifest.from_runtime_manifest``. The digest algorithm lives in
-exactly one place -- ``llm_port_backend.services.inference.bundles`` -- and is
+exactly one place -- ``faden_backend.services.inference.bundles`` -- and is
 deliberately *not* reimplemented here.
 
 Stack versions come from the helper inside the finished image
@@ -47,7 +47,7 @@ Usage
 
     # CI (.github/workflows/runtime-image-release.yml):
     python3 rebuild_runtime_image.py --flavor x86_64 --build --push \\
-        --tag ghcr.io/llm-port/ray-runtime-x86_64:2.58.0-1
+        --tag ghcr.io/fadenstack/ray-runtime-x86_64:2.58.0-1
 
 ``--verify-peer`` re-reads both nodes' layer lists and fails if they differ,
 which is the check that would have caught the original drift.
@@ -87,16 +87,16 @@ FLAVORS: dict[str, Flavor] = {
     "gb10": Flavor(
         dockerfile="Dockerfile",
         manifest="runtime-manifest.json",
-        default_tag="llmport/ray-vllm-gb10:ray2.58-nv26.08",
-        runtime_id="llmport-ray-vllm-gb10-ray2.58-nv26.08",
+        default_tag="faden/ray-vllm-gb10:ray2.58-nv26.08",
+        runtime_id="faden-ray-vllm-gb10-ray2.58-nv26.08",
         hardware_target="NVIDIA DGX Spark (GB10) pair",
         bundle="bundle-dgx-spark-gb10-v1",
     ),
     "x86_64": Flavor(
         dockerfile="Dockerfile.x86_64",
         manifest="runtime-manifest-x86_64.json",
-        default_tag="llmport-ray-runtime-x86_64:2.58.0",
-        runtime_id="llmport-ray-vllm-x86_64-ray2.58",
+        default_tag="faden-ray-runtime-x86_64:2.58.0",
+        runtime_id="faden-ray-vllm-x86_64-ray2.58",
         hardware_target="generic x86_64 NVIDIA",
         bundle="bundle-generic-x86_64-nvidia-v1",
         target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},

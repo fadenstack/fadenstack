@@ -26,7 +26,7 @@ describe("resolveApiDocsUrl", () => {
   });
 
   it("keeps an explicitly configured gateway address without asking", async () => {
-    vi.stubEnv("VITE_LLM_PORT_API_PORT", "9001");
+    vi.stubEnv("VITE_FADEN_GATEWAY_PORT", "9001");
     const fetcher = answers("swagger-ui");
     expect(await resolveApiDocsUrl(fetcher)).toMatch(/:9001\/api\/docs$/);
     expect(fetcher).not.toHaveBeenCalled();
@@ -38,7 +38,7 @@ describe("grafanaOverviewUrl", () => {
     vi.stubEnv("DEV", false);
     const url = new URL(grafanaOverviewUrl("dark"));
     expect(url.origin).toBe(window.location.origin);
-    expect(url.pathname).toBe("/grafana/d/llm-port-overview/llm-port-overview");
+    expect(url.pathname).toBe("/grafana/d/faden-overview/faden-overview");
     expect(url.searchParams.get("theme")).toBe("dark");
   });
 

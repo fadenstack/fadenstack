@@ -5,7 +5,7 @@ Centralized per-runtime observability for the shared-stack deployment:
 * **Scrape targets** — ``prometheus/targets.json`` (file_sd) is rebuilt
   from the set of provisionable LLM runtimes.
 * **Dashboards** — one per-runtime Grafana dashboard rendered from a
-  versioned template (``llm_port_shared/grafana/dashboards/templates/
+  versioned template (``shared/grafana/dashboards/templates/
   vllm-runtime.json``) into the dashboard file-provider directory that
   Grafana already reads.  The file provider has
   ``disableDeletion: false``, so removing the file removes the
@@ -51,13 +51,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     LLMModel,
     LLMProvider,
     LLMRuntime,
     ProviderType,
 )
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -562,7 +562,7 @@ class MonitoringProvisioner:
         startup rebuild because one query did.
         """
         try:
-            from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+            from faden_backend.db.models.inference import (  # noqa: PLC0415
                 InferenceEnvironment,
             )
 

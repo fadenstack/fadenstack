@@ -10,7 +10,7 @@ services:
     - .:/app/src/
     environment:
       # Enables autoreload.
-      LLM_PORT_PII_RELOAD: "True"
+      FADEN_PII_RELOAD: "True"
 
   taskiq-worker:
     volumes:
@@ -19,5 +19,5 @@ services:
     command:
       - taskiq
       - worker
-      - llm_port_pii.tkq:broker
+      - faden_pii.tkq:broker
       - --reload

@@ -7,19 +7,19 @@
       "tags": "administrator"
     },
     {
-      "name": "llmport-backend",
+      "name": "faden-backend",
       "password_hash": "",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     },
     {
-      "name": "llmport-api",
+      "name": "faden-gateway",
       "password_hash": "",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     },
     {
-      "name": "llmport-pii",
+      "name": "faden-pii",
       "password_hash": "",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
@@ -30,8 +30,8 @@
   ],
   "permissions": [
     {"user": "admin", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
-    {"user": "llmport-backend", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
-    {"user": "llmport-api", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
-    {"user": "llmport-pii", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"}
+    {"user": "faden-backend", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "faden-gateway", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"},
+    {"user": "faden-pii", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*"}
   ]
 }

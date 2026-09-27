@@ -4,22 +4,22 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference.bundles import default_bundle_registry
-from llm_port_backend.services.inference.registry import registry
-from llm_port_backend.web.api.inference.schema import RuntimeBundleDTO
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.users import User
+from faden_backend.services.inference.bundles import default_bundle_registry
+from faden_backend.services.inference.registry import registry
+from faden_backend.web.api.inference.schema import RuntimeBundleDTO
+from faden_backend.web.api.rbac import require_permission
 
-from llm_port_backend.web.api.inference.control_planes import (
+from faden_backend.web.api.inference.control_planes import (
     router as control_planes_router,
 )
-from llm_port_backend.web.api.inference.deployments import router as deployments_router
-from llm_port_backend.web.api.inference.environments import (
+from faden_backend.web.api.inference.deployments import router as deployments_router
+from faden_backend.web.api.inference.environments import (
     router as environments_router,
 )
-from llm_port_backend.web.api.inference.found import router as found_router
-from llm_port_backend.web.api.inference.found_clusters import router as found_clusters_router
+from faden_backend.web.api.inference.found import router as found_router
+from faden_backend.web.api.inference.found_clusters import router as found_clusters_router
 
 inference_router = APIRouter()
 inference_router.include_router(

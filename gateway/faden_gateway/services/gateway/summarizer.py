@@ -10,9 +10,9 @@ from __future__ import annotations
 import logging
 import uuid
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import ChatMessage, SessionSummary
-from llm_port_api.services.gateway.context_assembler import _estimate_tokens
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import ChatMessage, SessionSummary
+from faden_gateway.services.gateway.context_assembler import _estimate_tokens
 
 logger = logging.getLogger(__name__)
 

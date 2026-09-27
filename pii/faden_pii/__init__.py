@@ -1,4 +1,4 @@
-"""llm_port_pii package.
+"""faden_pii package.
 
 Language-aware PII detection and redaction service.
 Inline regex patterns match structured identifiers.

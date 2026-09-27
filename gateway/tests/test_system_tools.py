@@ -18,10 +18,10 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.services.gateway import system_tools
-from llm_port_api.services.gateway.skills_client import ResolvedSkill
-from llm_port_api.services.gateway.system_tools import FIND, TIME
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.services.gateway import system_tools
+from faden_gateway.services.gateway.skills_client import ResolvedSkill
+from faden_gateway.services.gateway.system_tools import FIND, TIME
 from tests.test_gateway_knowledge_tools import _ask, _call, _Model, _say, _streamed, _tool_names
 from tests.test_gateway_pipeline_combined import _session, _token
 from tests.test_session_tool_switches import CREATE, SEARCH, SYSTEM, _MCP, _ready, _switch_on
@@ -216,7 +216,7 @@ def _skill(**tools: list[str]) -> ResolvedSkill:
     ],
 )
 def test_a_skill_decides_what_can_be_found(skills: list[ResolvedSkill], allowed: set[str]) -> None:
-    from llm_port_api.services.gateway.service import _skills_allow  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _skills_allow  # noqa: PLC0415
 
     assert {name for name in (SEARCH, CREATE, FIND) if _skills_allow(skills, name)} == allowed
 
@@ -300,7 +300,7 @@ EVERYTHING = [
     [
         ("Use the get-sum tool to add 17 and 25.", ["mcp.everything.get-sum"]),
         ("Use the echo tool to echo: spindle check done.", ["mcp.everything.echo"]),
-        ("Search my repositories for llm-port.", ["mcp.github.search_repositories"]),
+        ("Search my repositories for faden.", ["mcp.github.search_repositories"]),
         ("In three sentences, list the risks of skipping the spindle check.", []),  # "list" of list_issues
         ("Get me a summary of the plan.", []),  # "get" of every get-* tool
         ("", []),

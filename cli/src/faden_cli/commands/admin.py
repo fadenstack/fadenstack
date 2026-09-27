@@ -1,4 +1,4 @@
-"""``llmport admin`` — administrative commands for a running deployment."""
+"""``faden admin`` — administrative commands for a running deployment."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import sys
 
 import click
 
-from llmport.core.console import console, error, info, success, warning
+from faden_cli.core.console import console, error, info, success, warning
 
 
 def _generate_password(length: int = 24) -> str:
@@ -26,7 +26,7 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-.]+$")
 
 @click.group("admin")
 def admin_group() -> None:
-    """Administrative commands for a running llm.port deployment."""
+    """Administrative commands for a running fadenstack deployment."""
 
 
 @admin_group.command("reset-password")
@@ -79,7 +79,7 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
 
     hash_result = subprocess.run(  # noqa: S603
         [
-            docker, "exec", "-i", "llm-port-backend",
+            docker, "exec", "-i", "faden-backend",
             "python", "-c", hash_script,
         ],
         input=new_password,
@@ -110,8 +110,8 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
 
     pg_result = subprocess.run(  # noqa: S603
         [
-            docker, "exec", "llm-port-postgres",
-            "psql", "-U", "postgres", "-d", "llm_port_backend",
+            docker, "exec", "faden-postgres",
+            "psql", "-U", "postgres", "-d", "faden_backend",
             "-c", sql,
         ],
         capture_output=True,

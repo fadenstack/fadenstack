@@ -18,8 +18,8 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from llmport.commands import upgrade as upgrade_module
-from llmport.core import bootstrap, clickhouse, compose
+from faden_cli.commands import upgrade as upgrade_module
+from faden_cli.core import bootstrap, clickhouse, compose
 
 
 def _matches(stored: str, password: str) -> bool:
@@ -29,7 +29,7 @@ def _matches(stored: str, password: str) -> bool:
 
 
 def test_the_upgrade_writes_rabbitmqs_users_from_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    shared = tmp_path / "llm_port_shared"
+    shared = tmp_path / "shared"
     (shared / "rabbitmq").mkdir(parents=True)
     (shared / "docker-compose.yaml").write_text("services: {}\n", encoding="utf-8")
     (shared / ".env").write_text(
@@ -37,12 +37,12 @@ def test_the_upgrade_writes_rabbitmqs_users_from_env(tmp_path: Path, monkeypatch
         "RABBITMQ_BACKEND_PASS=backendpw\nRABBITMQ_API_PASS=apipw\n",
         encoding="utf-8",
     )
-    stale = {"users": [{"name": "llmport-api", "password_hash": "c3RhbGU=", "tags": ""}]}
+    stale = {"users": [{"name": "faden-gateway", "password_hash": "c3RhbGU=", "tags": ""}]}
     (shared / "rabbitmq" / "definitions.json").write_text(json.dumps(stale), encoding="utf-8")
-    config = tmp_path / "llmport.yaml"
+    config = tmp_path / "faden.yaml"
     config.write_text(f"version: 1\ninstall_dir: {shared.as_posix()}\ncompose_file: docker-compose.yaml\n",
                       encoding="utf-8")
-    monkeypatch.setenv("LLMPORT_CONFIG", str(config))
+    monkeypatch.setenv("FADEN_CONFIG", str(config))
 
     # Everything that would reach Docker.
     monkeypatch.setattr(compose, "has_nvidia_gpu", lambda: False)
@@ -50,7 +50,7 @@ def test_the_upgrade_writes_rabbitmqs_users_from_env(tmp_path: Path, monkeypatch
     monkeypatch.setattr(upgrade_module, "compose_up", lambda *a, **k: 0)
     monkeypatch.setattr(clickhouse, "drop_stale_logs", lambda ctx: [])
     monkeypatch.setattr(bootstrap, "wait_for_backend", lambda *a, **k: True)
-    from llmport.commands import deploy
+    from faden_cli.commands import deploy
 
     monkeypatch.setattr(deploy, "_sync_postgres_password", lambda *a, **k: None)
 
@@ -62,6 +62,6 @@ def test_the_upgrade_writes_rabbitmqs_users_from_env(tmp_path: Path, monkeypatch
     users: dict[str, Any] = {
         u["name"]: u for u in json.loads((shared / "rabbitmq" / "definitions.json").read_text())["users"]
     }
-    assert _matches(users["llmport-api"]["password_hash"], env["RABBITMQ_API_PASS"])
-    assert _matches(users["llmport-backend"]["password_hash"], env["RABBITMQ_BACKEND_PASS"])
+    assert _matches(users["faden-gateway"]["password_hash"], env["RABBITMQ_API_PASS"])
+    assert _matches(users["faden-backend"]["password_hash"], env["RABBITMQ_BACKEND_PASS"])
     assert env["RABBITMQ_API_PASS"] == "apipw", "the secrets in .env were kept"

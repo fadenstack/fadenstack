@@ -23,25 +23,25 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     NodeCommandStatus,
     NodeCommandType,
 )
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.inference.drivers.ray.compiler import (
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.inference.drivers.ray.compiler import (
     DeploymentValidationError,
     compile_deployment,
 )
-from llm_port_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
-from llm_port_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS
+from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+from faden_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
 API = "/api/inference"
@@ -310,7 +310,7 @@ async def test_end_to_end_zero_config_multi_node_flow(
     assert len(image_cmds) == 2
     for cmd in image_cmds:
         bundle = cmd["payload"]["runtime_bundle"]
-        assert bundle["image"] == "llmport/ray-vllm-gb10:ray2.58-nv26.08"
+        assert bundle["image"] == "faden/ray-vllm-gb10:ray2.58-nv26.08"
         assert bundle["digest"].startswith("sha256:")
         assert bundle["requirements"]["network_mode"] == "host"
         assert bundle["requirements"]["ipc_mode"] == "host"
@@ -349,7 +349,7 @@ async def test_end_to_end_zero_config_multi_node_flow(
     # 8. Multi-Node Placement Strategy Verification (Compiler Lock)
     # Default multi-node uses Ray default placement group scheduling
     multi_node_auto_spec = {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": {}},
         "scale": {"replicas": 1},
         "resources": {"replica": {}},
@@ -388,7 +388,7 @@ async def test_end_to_end_zero_config_multi_node_flow(
 
     # Verify STRICT_PACK rejection on multi-node to prevent deadlock
     invalid_spec = {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": {}},
         "scale": {"replicas": 1},
         "resources": {"placement": "STRICT_PACK", "replica": {"gpus": 2}},

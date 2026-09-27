@@ -1,6 +1,6 @@
 /**
  * Which catalogue price the gateway charges a model with -- the same rule it
- * applies (llm_port_api services/gateway/pricing.py): the entry for the
+ * applies (faden_gateway services/gateway/pricing.py): the entry for the
  * provider and the name clients call the model by; failing that, the model's
  * only entry, whoever it is filed under.
  */

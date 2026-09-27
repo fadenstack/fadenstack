@@ -1,12 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for llmport-agent single-file executable.
+"""PyInstaller spec for faden-agent single-file executable.
 
 Build:
     pyinstaller node_agent.spec
 
 Output:
-    dist/llmport-agent       (Linux/macOS)
-    dist/llmport-agent.exe   (Windows)
+    dist/faden-agent       (Linux/macOS)
+    dist/faden-agent.exe   (Windows)
 """
 
 import sys
@@ -46,7 +46,7 @@ _LICENCE_FILES = [
 ]
 
 a = Analysis(
-    ["llm_port_node_agent/__main__.py"],
+    ["faden_agent/__main__.py"],
     pathex=["."],
     binaries=[],
     datas=_LICENCE_FILES,
@@ -107,10 +107,10 @@ if sys.platform == "win32":
                 StringStruct("CompanyName", COMPANY),
                 StringStruct("FileDescription", DESCRIPTION),
                 StringStruct("FileVersion", VERSION),
-                StringStruct("InternalName", "llmport-agent"),
+                StringStruct("InternalName", "faden-agent"),
                 StringStruct("LegalCopyright", COPYRIGHT),
-                StringStruct("OriginalFilename", "llmport-agent.exe"),
-                StringStruct("ProductName", "LLM.Port Node Agent"),
+                StringStruct("OriginalFilename", "faden-agent.exe"),
+                StringStruct("ProductName", "Fadenstack Node Agent"),
                 StringStruct("ProductVersion", VERSION),
             ])]),
             VarFileInfo([VarStruct("Translation", [0x0409, 1200])]),
@@ -123,7 +123,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="llmport-agent",
+    name="faden-agent",
     debug=False,
     bootloader_ignore_signals=False,
     strip=sys.platform != "win32",  # strip symbols on Linux/macOS

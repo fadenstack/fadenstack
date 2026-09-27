@@ -17,7 +17,7 @@ export type MCPServerStatus =
   | "disabled";
 export type PIIMode = "allow" | "redact" | "block";
 
-// Field names are the MCP service's own (llm_port_mcp web/api/admin/schemas.py).
+// Field names are the MCP service's own (faden_mcp web/api/admin/schemas.py).
 // They were the database column names here -- command_json, headers_json and
 // so on -- which the service ignores: a stdio server could not be registered
 // from the console, and headers and env could never be sent.

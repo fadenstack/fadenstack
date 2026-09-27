@@ -20,9 +20,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import LLMGatewayRequestLog, ProviderType
-from llm_port_api.services.gateway.context_assembler import _replayed_exchange
-from llm_port_api.services.gateway.service import _assistant_turn
+from faden_gateway.db.models.gateway import LLMGatewayRequestLog, ProviderType
+from faden_gateway.services.gateway.context_assembler import _replayed_exchange
+from faden_gateway.services.gateway.service import _assistant_turn
 from tests.test_gateway_knowledge_tools import _ask, _Model, _say
 from tests.test_gateway_pipeline_combined import ALIAS, _Observability, _seed, _session, _token
 from tests.test_llm_adapter_direct import _engine

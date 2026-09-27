@@ -12,9 +12,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from llm_port_backend.services.module_registry import ModuleDef, module_registry
-from llm_port_backend.services.system_settings import SystemSettingsService
-from llm_port_backend.settings import settings
+from faden_backend.services.module_registry import ModuleDef, module_registry
+from faden_backend.services.system_settings import SystemSettingsService
+from faden_backend.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,22 +29,22 @@ async def _sync_pii_enabled(
     enabled: bool,
     actor_id: Any,
 ) -> list[str]:
-    """Sync ``llm_port_api.pii_enabled`` and trigger gateway apply flow."""
+    """Sync ``faden_gateway.pii_enabled`` and trigger gateway apply flow."""
     try:
         result = await service.update_value(
-            key="llm_port_api.pii_enabled",
+            key="faden_gateway.pii_enabled",
             value=enabled,
             actor_id=actor_id,
             root_mode_active=False,
             target_host="local",
         )
     except Exception as exc:
-        logger.exception("Failed to sync llm_port_api.pii_enabled")
-        return [f"Failed to sync llm_port_api.pii_enabled: {exc}"]
+        logger.exception("Failed to sync faden_gateway.pii_enabled")
+        return [f"Failed to sync faden_gateway.pii_enabled: {exc}"]
 
     if result.apply_status != "success":
         details = "; ".join(result.messages) if result.messages else "unknown apply failure"
-        return [f"Failed to apply llm_port_api.pii_enabled={enabled}: {details}"]
+        return [f"Failed to apply faden_gateway.pii_enabled={enabled}: {details}"]
     return []
 
 
@@ -77,22 +77,22 @@ async def _sync_sessions_enabled(
     enabled: bool,
     actor_id: Any,
 ) -> list[str]:
-    """Sync ``llm_port_api.sessions_enabled`` as module lifecycle flag."""
+    """Sync ``faden_gateway.sessions_enabled`` as module lifecycle flag."""
     try:
         result = await service.update_value(
-            key="llm_port_api.sessions_enabled",
+            key="faden_gateway.sessions_enabled",
             value=enabled,
             actor_id=actor_id,
             root_mode_active=False,
             target_host="local",
         )
     except Exception as exc:
-        logger.exception("Failed to sync llm_port_api.sessions_enabled")
-        return [f"Failed to sync llm_port_api.sessions_enabled: {exc}"]
+        logger.exception("Failed to sync faden_gateway.sessions_enabled")
+        return [f"Failed to sync faden_gateway.sessions_enabled: {exc}"]
 
     if result.apply_status != "success":
         details = "; ".join(result.messages) if result.messages else "unknown apply failure"
-        return [f"Failed to apply llm_port_api.sessions_enabled={enabled}: {details}"]
+        return [f"Failed to apply faden_gateway.sessions_enabled={enabled}: {details}"]
     return []
 
 
@@ -101,22 +101,22 @@ async def _sync_mcp_enabled(
     enabled: bool,
     actor_id: Any,
 ) -> list[str]:
-    """Sync ``llm_port_api.mcp_enabled`` and trigger gateway apply flow."""
+    """Sync ``faden_gateway.mcp_enabled`` and trigger gateway apply flow."""
     try:
         result = await service.update_value(
-            key="llm_port_api.mcp_enabled",
+            key="faden_gateway.mcp_enabled",
             value=enabled,
             actor_id=actor_id,
             root_mode_active=False,
             target_host="local",
         )
     except Exception as exc:
-        logger.exception("Failed to sync llm_port_api.mcp_enabled")
-        return [f"Failed to sync llm_port_api.mcp_enabled: {exc}"]
+        logger.exception("Failed to sync faden_gateway.mcp_enabled")
+        return [f"Failed to sync faden_gateway.mcp_enabled: {exc}"]
 
     if result.apply_status != "success":
         details = "; ".join(result.messages) if result.messages else "unknown apply failure"
-        return [f"Failed to apply llm_port_api.mcp_enabled={enabled}: {details}"]
+        return [f"Failed to apply faden_gateway.mcp_enabled={enabled}: {details}"]
     return []
 
 
@@ -125,22 +125,22 @@ async def _sync_skills_enabled(
     enabled: bool,
     actor_id: Any,
 ) -> list[str]:
-    """Sync ``llm_port_api.skills_enabled`` and trigger gateway apply flow."""
+    """Sync ``faden_gateway.skills_enabled`` and trigger gateway apply flow."""
     try:
         result = await service.update_value(
-            key="llm_port_api.skills_enabled",
+            key="faden_gateway.skills_enabled",
             value=enabled,
             actor_id=actor_id,
             root_mode_active=False,
             target_host="local",
         )
     except Exception as exc:
-        logger.exception("Failed to sync llm_port_api.skills_enabled")
-        return [f"Failed to sync llm_port_api.skills_enabled: {exc}"]
+        logger.exception("Failed to sync faden_gateway.skills_enabled")
+        return [f"Failed to sync faden_gateway.skills_enabled: {exc}"]
 
     if result.apply_status != "success":
         details = "; ".join(result.messages) if result.messages else "unknown apply failure"
-        return [f"Failed to apply llm_port_api.skills_enabled={enabled}: {details}"]
+        return [f"Failed to apply faden_gateway.skills_enabled={enabled}: {details}"]
     return []
 
 
@@ -193,13 +193,13 @@ def register_core_modules() -> None:
             health_url_fn=lambda: f"{settings.pii_service_url}/health",
             compose_profile="pii",
             compose_services=[
-                "llm-port-pii",
-                "llm-port-pii-worker",
-                "llm-port-pii-migrator",
+                "faden-pii",
+                "faden-pii-worker",
+                "faden-pii-migrator",
             ],
             container_names=[
-                "llm-port-pii",
-                "llm-port-pii-worker",
+                "faden-pii",
+                "faden-pii-worker",
             ],
             on_enable=_sync_pii_enabled,
             on_disable=_sync_pii_enabled,
@@ -217,11 +217,11 @@ def register_core_modules() -> None:
             health_url_fn=lambda: f"{settings.mcp_service_url}/api/health",
             compose_profile="mcp",
             compose_services=[
-                "llm-port-mcp",
-                "llm-port-mcp-migrator",
+                "faden-mcp",
+                "faden-mcp-migrator",
             ],
             container_names=[
-                "llm-port-mcp",
+                "faden-mcp",
             ],
             on_enable=_sync_mcp_enabled,
             on_disable=_sync_mcp_enabled,
@@ -240,11 +240,11 @@ def register_core_modules() -> None:
             health_url_fn=lambda: f"{settings.skills_service_url}/api/health",
             compose_profile="skills",
             compose_services=[
-                "llm-port-skills",
-                "llm-port-skills-migrator",
+                "faden-skills",
+                "faden-skills-migrator",
             ],
             container_names=[
-                "llm-port-skills",
+                "faden-skills",
             ],
             on_enable=_sync_skills_enabled,
             on_disable=_sync_skills_enabled,

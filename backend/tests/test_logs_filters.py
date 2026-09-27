@@ -14,14 +14,14 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.web.api.logs import views
-from llm_port_backend.web.api.logs.views import _selector
+from faden_backend.web.api.logs import views
+from faden_backend.web.api.logs.views import _selector
 
 LOKI_LABELS = ["__stream_shard__", "container_id", "host", "job", "app", "level"]
 LOKI_VALUES = {
     "host": ["10.250.10.49", "10.250.10.71"],
     "job": ["docker", "node-agent", "ray-serve"],
-    "app": ["llmport-e783c0c2"],
+    "app": ["faden-e783c0c2"],
     "level": ["info", "error"],
 }
 
@@ -47,8 +47,8 @@ def signed_in(fastapi_app: FastAPI) -> Any:
     import uuid
     from unittest.mock import AsyncMock, MagicMock
 
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.dao.rbac_dao import RbacDAO
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id = uuid.uuid4()

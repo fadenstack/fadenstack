@@ -14,7 +14,7 @@ and platform workarounds from deployment specifications:
   on GB10 unified memory).
 
 Bundle identity is **generated from the build/certification artifacts**
-(``runtime-manifest.json`` produced by the image build in ``llm_port_runtime_image``)
+(``runtime-manifest.json`` produced by the image build in ``runtime-image``)
 via :meth:`RuntimeBundleManifest.from_runtime_manifest` — never hand-written,
 because a hand-written digest that disagrees with the artifact makes the
 catalog authoritative-looking and wrong at the same time.
@@ -34,7 +34,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from llm_port_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.node_control import InfraNode
 
 log = logging.getLogger(__name__)
 
@@ -252,7 +252,7 @@ class RuntimeBundleManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "bundle.llmport.ai/v1alpha1"
+    schema_version: str = "bundle.fadenstack.com/v1alpha1"
     bundle_id: str
     display_name: str
     description: str = ""
@@ -373,9 +373,9 @@ def _load_runtime_manifest(name: str) -> dict[str, Any]:
     here = Path(__file__).resolve()
     roots = (
         # Canonical: the runtime image component of this repo.
-        here.parents[4] / "llm_port_runtime_image",
+        here.parents[4] / "runtime-image",
         # A deployment that vendors the manifests beside the backend.
-        here.parents[3] / "llm_port_runtime_image",
+        here.parents[3] / "runtime-image",
     )
     for root in roots:
         candidate = root / name
@@ -409,7 +409,7 @@ CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
         "Ray 2.58 + vLLM 0.27.1 (NVIDIA nv26.08 build) image with "
         "Blackwell GB10 support over 200 Gb/s RoCE"
     ),
-    report_ref="llm_port_runtime_image/runtime-manifest.json",
+    report_ref="runtime-image/runtime-manifest.json",
     target_architecture=TargetArchitecture(
         cpu="aarch64",
         os="linux",
@@ -429,7 +429,7 @@ CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
         capabilities=["IPC_LOCK"],
     ),
     mounts=[
-        ContainerMount(host_path="/srv/llm-port/models", container_path="/models", mode="ro"),
+        ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
         # Mounted at Hugging Face's own default location rather than nested
         # under /models.  The previous target, /models/huggingface, sat inside
         # the read-only bind mount above, and the host source of that mount has
@@ -455,7 +455,7 @@ CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
         # Read-write because Ray owns the directory and writes to it; a
         # read-only mount would stop the cluster starting at all.
         ContainerMount(
-            host_path="/var/lib/llm-port/ray",
+            host_path="/var/lib/fadenstack/ray",
             container_path="/tmp/ray",
             mode="rw",
         ),
@@ -521,7 +521,7 @@ try:
                 "x86_64, from Turing (sm_75) to Blackwell (sm_120)"
             ),
             driver="ray",
-            report_ref="llm_port_runtime_image/runtime-manifest-x86_64.json",
+            report_ref="runtime-image/runtime-manifest-x86_64.json",
             target_architecture=TargetArchitecture(
                 cpu="x86_64",
                 os="linux",
@@ -831,7 +831,7 @@ default_bundle_registry = RuntimeBundleRegistry()
 #: One name on every node, deliberately: the image behind it differs per
 #: platform, but an operator reading ``docker ps`` on any member of a cluster
 #: should see the same thing running.
-RUNTIME_CONTAINER_NAME = "llm-port-ray-runtime"
+RUNTIME_CONTAINER_NAME = "faden-ray-runtime"
 
 
 async def runtime_bundle_payload_for(
@@ -895,7 +895,7 @@ async def _node_row(
     """The node row behind an id, or ``None`` for anything unusable."""
     if node_id is None:
         return None
-    from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
     try:
         key = node_id if isinstance(node_id, uuid.UUID) else uuid.UUID(str(node_id))

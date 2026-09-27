@@ -1,6 +1,6 @@
 """Admin auth-provider endpoints and the external auth module's callback.
 
-Provider management is forwarded to the ``llm_port_auth`` micro-service
+Provider management is forwarded to the ``faden_auth`` micro-service
 (``settings.auth_service_url``).  OAuth ``authorize`` redirects to the
 auth module, which handles the full IdP exchange and sends signed
 ``OAuthUserClaims`` back to the ``/external-callback`` endpoint here,
@@ -24,18 +24,18 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.oauth import OAuthAccount
-from llm_port_backend.db.models.users import User, get_jwt_strategy
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.auth_providers.schema import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.oauth import OAuthAccount
+from faden_backend.db.models.users import User, get_jwt_strategy
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.auth_providers.schema import (
     AuthProviderDTO,
     AuthProviderPublicDTO,
     CreateAuthProviderRequest,
     UpdateAuthProviderRequest,
 )
-from llm_port_backend.web.api.admin.dependencies import require_superuser
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ async def oauth_external_callback(
             token,
             settings.users_secret,
             algorithms=["HS256"],
-            issuer="llm-port-auth",
+            issuer="faden-auth",
         )
     except jwt.ExpiredSignatureError:
         logger.warning("External callback token expired")
@@ -279,7 +279,7 @@ async def _process_oauth_login(
     from sqlalchemy import select  # noqa: PLC0415
     from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: PLC0415
 
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
 
     # Find or create the user
     user_result = await session.execute(

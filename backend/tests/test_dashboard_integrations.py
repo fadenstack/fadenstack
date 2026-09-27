@@ -12,12 +12,12 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.dashboard import attention as attention_rules
-from llm_port_backend.services.dashboard import integrations
-from llm_port_backend.services.dashboard.traffic import Attribution
-from llm_port_backend.services.mcp.client import MCPServiceClient
-from llm_port_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.dashboard import attention as attention_rules
+from faden_backend.services.dashboard import integrations
+from faden_backend.services.dashboard.traffic import Attribution
+from faden_backend.services.mcp.client import MCPServiceClient
+from faden_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
 
 pytestmark = pytest.mark.anyio()
 

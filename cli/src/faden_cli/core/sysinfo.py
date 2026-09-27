@@ -2,7 +2,7 @@
 
 Uses ``psutil`` to detect host hardware (CPU cores, RAM) and derives
 optimal worker counts, DB pool sizes, and message-queue pool sizes
-for all llm.port services.
+for all fadenstack services.
 
 The control plane is sized to use only a fraction of the host
 (``DEFAULT_RESOURCE_PCT``, default 25 %) so that the majority of
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import psutil
 
 # ── Resource budget ───────────────────────────────────────────────
-# Percentage of total host resources reserved for the llm.port
+# Percentage of total host resources reserved for the fadenstack
 # control plane.  The remainder is left for inference / ML workloads.
 DEFAULT_RESOURCE_PCT: float = 0.25
 
@@ -27,16 +27,16 @@ DEFAULT_RESOURCE_PCT: float = 0.25
 # Heavy services handle high-volume request traffic or CPU-bound work.
 # Light services are low-traffic or background-only.
 
-HEAVY_SERVICES = ("backend", "api", "pii")
+HEAVY_SERVICES = ("backend", "gateway", "pii")
 LIGHT_SERVICES: tuple[str, ...] = ()
 ALL_SERVICES = HEAVY_SERVICES + LIGHT_SERVICES
 
 # Services whose PostgreSQL pool the CLI sizes. PII has pool settings but
 # opens no connection: its database layer is unused.
-DB_SERVICES = ("backend", "api")
+DB_SERVICES = ("backend", "gateway")
 
 # Services that use a RabbitMQ connection pool.
-RABBIT_SERVICES = ("backend", "api")
+RABBIT_SERVICES = ("backend", "gateway")
 
 # ── Pools: per worker process, whatever the number of workers ─────
 # Each worker process keeps its own pools. They were sized by the worker
@@ -110,9 +110,9 @@ class TuneProfile:
     # ── Prefix map ────────────────────────────────────────────
     _ENV_PREFIX: dict[str, str] = field(
         default_factory=lambda: {
-            "backend": "LLM_PORT_BACKEND_",
-            "api": "LLM_PORT_API_",
-            "pii": "LLM_PORT_PII_",
+            "backend": "FADEN_BACKEND_",
+            "gateway": "FADEN_GATEWAY_",
+            "pii": "FADEN_PII_",
         },
         repr=False,
     )
@@ -137,12 +137,12 @@ class TuneProfile:
         return max(MIN_MAX_CONNECTIONS, math.ceil(needed / 50) * 50)
 
     def to_env_dict(self) -> dict[str, str]:
-        """Flatten into a dict of ``LLM_PORT_*`` env var → value."""
+        """Flatten into a dict of ``FADEN_*`` env var → value."""
         env: dict[str, str] = {
             "POSTGRES_MAX_CONNECTIONS": str(self.max_connections),
             # What deploy and upgrade tune with again.
-            "LLMPORT_TUNE_PROFILE": self.profile,
-            "LLMPORT_TUNE_RESOURCE_PCT": str(self.resource_pct),
+            "FADEN_TUNE_PROFILE": self.profile,
+            "FADEN_TUNE_RESOURCE_PCT": str(self.resource_pct),
         }
 
         for svc in ALL_SERVICES:

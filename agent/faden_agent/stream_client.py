@@ -11,24 +11,24 @@ from urllib.parse import urlparse
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from llm_port_node_agent import __version__
-from llm_port_node_agent.collectors import collect_gpu_snapshot, collect_inventory, collect_utilization
-from llm_port_node_agent.command_verifier import (
+from faden_agent import __version__
+from faden_agent.collectors import collect_gpu_snapshot, collect_inventory, collect_utilization
+from faden_agent.command_verifier import (
     SIGNING_HEADER,
     SIGNING_SCHEME,
     derive_signing_key,
     validate_command_age,
     verify_command_signature,
 )
-from llm_port_node_agent.backend_client import BackendClient
-from llm_port_node_agent.config import AgentConfig
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.gpu import GpuCollector, NullCollector
-from llm_port_node_agent.health_supervisor import HealthSupervisor
-from llm_port_node_agent.runtimes import ContainerRuntime
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent.tls import websockets_ssl
+from faden_agent.backend_client import BackendClient
+from faden_agent.config import AgentConfig
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.gpu import GpuCollector, NullCollector
+from faden_agent.health_supervisor import HealthSupervisor
+from faden_agent.runtimes import ContainerRuntime
+from faden_agent.state_store import StateStore
+from faden_agent.tls import websockets_ssl
 
 log = logging.getLogger(__name__)
 
@@ -197,11 +197,11 @@ class StreamClient:
                 pass
 
     async def _find_vllm(self) -> list[dict[str, Any]]:
-        """vLLM containers this machine runs that LLM.Port did not start.
+        """vLLM containers this machine runs that Fadenstack did not start.
 
         Bounded, and never able to hold up the inventory it rides along with.
         """
-        from llm_port_node_agent.vllm_discovery import discover_vllm  # noqa: PLC0415
+        from faden_agent.vllm_discovery import discover_vllm  # noqa: PLC0415
 
         try:
             return await asyncio.wait_for(discover_vllm(self._runtime), timeout=30)
@@ -210,13 +210,13 @@ class StreamClient:
             return []
 
     async def _ray_runtime(self) -> dict[str, Any] | None:
-        """Whether this machine runs LLM.Port's Ray runtime -- what a new server looks for.
+        """Whether this machine runs Fadenstack's Ray runtime -- what a new server looks for.
 
         Cheap (one ``inspect``), bounded, and never able to hold up the
         inventory: ``None`` when there is no runtime container or no answer.
         """
-        from llm_port_node_agent.ray.container import DEFAULT_CONTAINER_NAME  # noqa: PLC0415
-        from llm_port_node_agent.ray.inspect import runtime_summary  # noqa: PLC0415
+        from faden_agent.ray.container import DEFAULT_CONTAINER_NAME  # noqa: PLC0415
+        from faden_agent.ray.inspect import runtime_summary  # noqa: PLC0415
 
         try:
             return await asyncio.wait_for(runtime_summary(self._runtime, DEFAULT_CONTAINER_NAME), timeout=10)

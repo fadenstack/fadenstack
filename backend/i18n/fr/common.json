@@ -577,11 +577,11 @@
       },
       "tls_certificate_expiring": {
         "title": "Le certificat HTTPS expire dans {{days}} jours",
-        "detail": "Le {{until}}. llmport tls status indique comment il est renouvelé."
+        "detail": "Le {{until}}. faden tls status indique comment il est renouvelé."
       },
       "tls_certificate_expired": {
         "title": "Le certificat HTTPS a expiré le {{until}}",
-        "detail": "Les navigateurs et les machines refusent la console. Renouvelez-le : llmport tls renew ou llmport tls use CERT KEY."
+        "detail": "Les navigateurs et les machines refusent la console. Renouvelez-le : faden tls renew ou faden tls use CERT KEY."
       },
       "model_traffic_unencrypted": {
         "title": "Le trafic des modèles vers {{cluster}} n'est pas chiffré",
@@ -730,8 +730,8 @@
     "confirm_title": "Remplacer {{name}} ?",
     "confirm_body": "Docker ne peut pas modifier ces paramètres sur un conteneur existant : un nouveau conteneur est donc créé avec eux, et l'ancien est supprimé dès que le nouveau tourne. Le conteneur reçoit un nouvel ID, et les fichiers qu'il a écrits hors de ses volumes sont perdus. Si le nouveau ne peut pas être créé ou démarré, l'ancien est remis tel qu'il était.",
     "confirm_replace": "Remplacer",
-    "compose_note": "Fadenstack exécute ce conteneur à partir de son fichier compose : le prochain llmport deploy ou upgrade le recrée à partir du fichier compose et de .env, sans ces modifications.",
-    "backend_note": "Le backend tourne dans ce conteneur et ne peut pas le remplacer. Modifiez ses paramètres dans .env et exécutez llmport upgrade.",
+    "compose_note": "Fadenstack exécute ce conteneur à partir de son fichier compose : le prochain faden deploy ou upgrade le recrée à partir du fichier compose et de .env, sans ces modifications.",
+    "backend_note": "Le backend tourne dans ce conteneur et ne peut pas le remplacer. Modifiez ses paramètres dans .env et exécutez faden upgrade.",
     "load_failed": "Impossible de charger les paramètres du conteneur."
   },
   "images": {
@@ -1275,7 +1275,7 @@
   },
   "rag_runtime": {
     "title": "Config. d'exécution RAG",
-    "description": "Les paramètres d'embedding et de découpage sont transmis de Fadenstack core à llm_port_rag.",
+    "description": "Les paramètres d'embedding et de découpage sont transmis de Fadenstack core à faden_rag.",
     "failed_load": "Échec du chargement de la configuration d'exécution.",
     "failed_save": "Échec de l'enregistrement de la configuration d'exécution.",
     "saved": "Configuration d'exécution mise à jour.",
@@ -1541,7 +1541,7 @@
   "pii_policy": {
     "system_section": "Politique PII (par défaut système)",
     "pii_service_url": "URL du service PII",
-    "pii_service_url_help": "URL interne de llm_port_pii (par exemple http://llm-port-pii:8000/api).",
+    "pii_service_url_help": "URL interne de faden_pii (par exemple http://faden-pii:8000/api).",
     "hidden_when_disabled": "Les paramètres PII sont masqués car le module PII est actuellement désactivé.",
     "tenants_title": "Politiques PII des locataires",
     "tenants_description": "Remplacer la politique PII par défaut pour un locataire spécifique.",
@@ -2868,8 +2868,8 @@
     "signed_in_as": "Connecté à Hugging Face en tant que {{username}}",
     "token_named": "jeton « {{name}} »",
     "role_write": "Ce jeton peut aussi écrire sur Hugging Face. Ce serveur n'a besoin que d'un accès en lecture : mieux vaut le remplacer par un jeton en lecture seule.",
-    "from_environment": "Ce jeton vient de LLM_PORT_BACKEND_HF_TOKEN dans l'environnement du serveur. Un jeton enregistré ici le remplace.",
-    "storage_unsafe": "Ce serveur utilise encore la clé maître de paramètres par défaut : un jeton enregistré ne serait donc pas protégé. Donnez une valeur aléatoire à LLM_PORT_BACKEND_SETTINGS_MASTER_KEY et redémarrez avant d'en enregistrer un.",
+    "from_environment": "Ce jeton vient de FADEN_BACKEND_HF_TOKEN dans l'environnement du serveur. Un jeton enregistré ici le remplace.",
+    "storage_unsafe": "Ce serveur utilise encore la clé maître de paramètres par défaut : un jeton enregistré ne serait donc pas protégé. Donnez une valeur aléatoire à FADEN_BACKEND_SETTINGS_MASTER_KEY et redémarrez avant d'en enregistrer un.",
     "token_label": "Jeton d'accès",
     "replace_label": "Remplacer par un nouveau jeton",
     "create_hint": "Créez un jeton en lecture sur",

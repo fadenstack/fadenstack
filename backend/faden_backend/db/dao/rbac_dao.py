@@ -7,8 +7,8 @@ from sqlalchemy import delete, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.rbac import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.rbac import (
     Permission,
     Role,
     RolePermission,
@@ -348,7 +348,7 @@ class RbacDAO:
 
     async def get_user_permissions(self, user_id: uuid.UUID) -> list[Permission]:
         """Return the union of all permissions from the user's direct roles AND group-inherited roles."""
-        from llm_port_backend.db.models.groups import (  # noqa: PLC0415
+        from faden_backend.db.models.groups import (  # noqa: PLC0415
             GroupRole,
             UserGroup,
         )
@@ -399,7 +399,7 @@ class RbacDAO:
         action: str,
     ) -> bool:
         """Check whether any of the user's direct or group-inherited roles grants (resource, action)."""
-        from llm_port_backend.db.models.groups import (  # noqa: PLC0415
+        from faden_backend.db.models.groups import (  # noqa: PLC0415
             GroupRole,
             UserGroup,
         )

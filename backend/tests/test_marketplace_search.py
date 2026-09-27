@@ -12,7 +12,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.services.marketplace import curated, hub, settings
+from faden_backend.services.marketplace import curated, hub, settings
 
 pytestmark = pytest.mark.anyio
 
@@ -83,7 +83,7 @@ async def test_wildcards_match_the_whole_name() -> None:
 
 
 async def test_the_search_endpoint_takes_an_author(fastapi_app: FastAPI, client: AsyncClient) -> None:
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
@@ -140,7 +140,7 @@ async def test_an_avatar_that_could_run_script_or_lives_elsewhere_is_refused() -
 async def test_the_avatar_endpoint_serves_the_picture_safely(
     fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
@@ -244,7 +244,7 @@ async def test_a_dropped_connection_is_tried_once_more() -> None:
 async def test_the_host_dialog_keeps_the_size_the_list_already_had(
     fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True

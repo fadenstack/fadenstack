@@ -10,8 +10,8 @@ from fastapi import Depends
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     InfraNodeCommandEvent,
@@ -27,7 +27,7 @@ from llm_port_backend.db.models.node_control import (
     JoinRequestStatus,
     NodeCommandStatus,
 )
-from llm_port_backend.db.models.system_settings import InfraAgent
+from faden_backend.db.models.system_settings import InfraAgent
 
 
 #: Event phases that mean *the agent* did something.

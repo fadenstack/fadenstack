@@ -19,10 +19,10 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
-from llm_port_api.services.gateway.rag_lite_client import RagLiteClient
-from llm_port_api.settings import settings
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
+from faden_gateway.settings import settings
 from tests.test_gateway_pipeline_combined import (
     ALIAS,
     _history,
@@ -342,7 +342,7 @@ async def test_search_results_use_the_questions_tokens(
     r = await _ask(client, stream=stream, messages=[{"role": "user", "content": "What does Alice lead?"}])
     text = _streamed(r.text)[0] if stream else r.json()["choices"][0]["message"]["content"]
 
-    assert knowledge.searches[0]["query"] == "what does Alice lead", "searched inside LLM.Port with the name"
+    assert knowledge.searches[0]["query"] == "what does Alice lead", "searched inside Fadenstack with the name"
     assert fake.continued[-1] == {"[PERSON_1]": "Alice"}, "the result continued the question's tokens"
     sent_back = model.sent[1]["messages"][-1]["content"]
     assert "Alice" not in sent_back and "[PERSON_1] leads the launch" in sent_back

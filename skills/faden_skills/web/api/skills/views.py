@@ -16,21 +16,21 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_skills.db.models.skill import SkillModel
-from llm_port_skills.db.session import get_db_session
-from llm_port_skills.services import bundle as fmt
-from llm_port_skills.services.access import Access, Principal
-from llm_port_skills.services.dao import (
+from faden_skills.db.models.skill import SkillModel
+from faden_skills.db.session import get_db_session
+from faden_skills.services import bundle as fmt
+from faden_skills.services.access import Access, Principal
+from faden_skills.services.dao import (
     VIEW_ALL,
     VIEWS,
     GrantSpec,
     SkillDao,
     VersionContent,
 )
-from llm_port_skills.services.errors import ConflictError, ForbiddenError
-from llm_port_skills.settings import settings
-from llm_port_skills.web.api.auth import get_principal
-from llm_port_skills.web.api.skills.schemas import (
+from faden_skills.services.errors import ConflictError, ForbiddenError
+from faden_skills.settings import settings
+from faden_skills.web.api.auth import get_principal
+from faden_skills.web.api.skills.schemas import (
     CompletionsResponse,
     CreateAssignmentRequest,
     CreateSkillRequest,

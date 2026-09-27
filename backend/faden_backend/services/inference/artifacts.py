@@ -17,17 +17,17 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.models.inference import (
     InferenceEnvironment,
     InferenceEnvironmentNode,
     ModelAvailability,
     ModelAvailabilityStatus,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeCommandType
-from llm_port_backend.settings import settings
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
-from llm_port_backend.services.llm.artifacts import (
+from faden_backend.db.models.node_control import InfraNode, NodeCommandType
+from faden_backend.settings import settings
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.llm.artifacts import (
     build_cache_manifest,
     build_model_sync_payload,
     model_sync_carries_files,
@@ -36,7 +36,7 @@ from llm_port_backend.services.llm.artifacts import (
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-    from llm_port_backend.db.models.llm import LLMModel
+    from faden_backend.db.models.llm import LLMModel
 
 log = logging.getLogger(__name__)
 
@@ -299,7 +299,7 @@ class ModelArtifactCoordinator:
         fetch_to_server: bool,
     ) -> dict[str, Any] | None:
         """The SYNC_MODEL payload for *model*, or None with *readiness* saying why not."""
-        from llm_port_backend.services.inference.server_copy import (  # noqa: PLC0415
+        from faden_backend.services.inference.server_copy import (  # noqa: PLC0415
             download_under_way,
             ensure_server_copy,
         )

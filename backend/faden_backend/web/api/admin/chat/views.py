@@ -1,6 +1,6 @@
 """Admin endpoints for Chat & Sessions management.
 
-Queries the gateway database (``llm_api``) via the secondary engine
+Queries the gateway database (``faden_gateway``) via the secondary engine
 set up in ``app.state.llm_graph_trace_session_factory``, using raw SQL
 to avoid coupling with the gateway's ORM models.
 
@@ -20,8 +20,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.db.models.users import User
+from faden_backend.web.api.admin.dependencies import require_superuser
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _is_missing_table(exc: ProgrammingError) -> bool:
 
 
 async def _get_gateway_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Yield a session against the gateway (llm_api) database."""
+    """Yield a session against the gateway (faden_gateway) database."""
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
         raise HTTPException(status_code=503, detail="Gateway database not available")

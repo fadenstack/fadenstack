@@ -22,8 +22,8 @@ from typing import Any
 
 import pytest
 
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.services.llm.artifacts import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.services.llm.artifacts import (
     build_model_sync_payload,
     model_sync_carries_files,
 )
@@ -81,7 +81,7 @@ class TestBuilder:
 
         ``ensure`` only checked for ``None``, so this went out to every node.
         """
-        import llm_port_backend.services.llm.artifacts as mod
+        import faden_backend.services.llm.artifacts as mod
 
         monkeypatch.setattr(mod, "model_cache_dir", lambda _repo: None)
         payload = build_model_sync_payload(_model())
@@ -98,7 +98,7 @@ class TestBuilder:
         This is what both DGX nodes had: the folder for the model, 0 files,
         66 bytes, no ``refs/`` and no ``snapshots/``.
         """
-        import llm_port_backend.services.llm.artifacts as mod
+        import faden_backend.services.llm.artifacts as mod
 
         hollow = tmp_path / "models--Qwen--Qwen2.5-0.5B-Instruct"
         hollow.mkdir()
@@ -108,7 +108,7 @@ class TestBuilder:
         assert not model_sync_carries_files(build_model_sync_payload(_model()))
 
     def test_a_real_cache_yields_files(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        import llm_port_backend.services.llm.artifacts as mod
+        import faden_backend.services.llm.artifacts as mod
 
         real = tmp_path / "models--Qwen--Qwen2.5-0.5B-Instruct"
         real.mkdir()

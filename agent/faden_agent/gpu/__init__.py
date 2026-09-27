@@ -129,13 +129,13 @@ def detect_gpu(*, preferred: str | None = None) -> GpuCollector:
 
     for vendor in unique:
         if vendor == "nvidia" and find_tool("nvidia-smi") is not None:
-            from llm_port_node_agent.gpu.nvidia import NvidiaCollector
+            from faden_agent.gpu.nvidia import NvidiaCollector
             return NvidiaCollector()
         if vendor == "apple" and sys.platform == "darwin":
-            from llm_port_node_agent.gpu.apple import AppleMetalCollector
+            from faden_agent.gpu.apple import AppleMetalCollector
             return AppleMetalCollector()
         if vendor == "amd" and shutil.which("rocm-smi") is not None:
-            from llm_port_node_agent.gpu.amd import RocmCollector
+            from faden_agent.gpu.amd import RocmCollector
             return RocmCollector()
 
     return NullCollector()

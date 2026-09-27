@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from llm_port_api.services.gateway.rag_lite_client import RagLiteClient
+from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
 
 SEARCH = "knowledge_search"
 OPEN = "knowledge_open"

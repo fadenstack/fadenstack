@@ -23,17 +23,17 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.machine_tls import RayClusterCA
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.machine_tls import authority as auth
-from llm_port_backend.services.machine_tls import ray_ca
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.node_files import views
+from faden_backend.db.models.machine_tls import RayClusterCA
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.machine_tls import authority as auth
+from faden_backend.services.machine_tls import ray_ca
+from faden_backend.settings import settings
+from faden_backend.web.api.node_files import views
 
 MASTER = "test-master-key"
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
@@ -207,7 +207,7 @@ async def test_only_members_of_a_cluster_with_ray_tls_on(
 
 @pytest.mark.anyio
 async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference import ray_tls
+    from faden_backend.services.inference import ray_tls
 
     env, node = await _cluster(dbsession, ray_tls=False)
     node.capabilities_json = {**node.capabilities_json, "ray_tls": 2}
@@ -233,7 +233,7 @@ async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -
 
 @pytest.mark.anyio
 async def test_a_lab_build_that_does_not_report_cannot_switch_it_on(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference import ray_tls
+    from faden_backend.services.inference import ray_tls
 
     env, node = await _cluster(dbsession, ray_tls=False)
     node.capabilities_json = {**node.capabilities_json, "ray_tls": 1}
@@ -245,7 +245,7 @@ async def test_a_lab_build_that_does_not_report_cannot_switch_it_on(dbsession: A
 
 @pytest.mark.anyio
 async def test_not_on_while_an_agent_cannot(dbsession: AsyncSession) -> None:
-    from llm_port_backend.services.inference import ray_tls
+    from faden_backend.services.inference import ray_tls
 
     env, _node = await _cluster(dbsession, ray_tls=False)
     before = env.generation

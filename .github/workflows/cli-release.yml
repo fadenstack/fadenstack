@@ -1,11 +1,11 @@
-# Publish llmport-cli to PyPI, with standalone executables, for a release.
+# Publish fadenstack to PyPI, with standalone executables, for a release.
 #
 # The CLI *is* the release a user installs: it carries the deployment files
-# (llm_port_shared, packed by llm_port_cli/hatch_build.py) and `llmport deploy`
+# (shared, packed by cli/hatch_build.py) and `faden deploy`
 # runs the images tagged with its own version. So:
 #
-#   1. Set the version in llm_port_cli/pyproject.toml and
-#      llm_port_cli/src/llmport/__init__.py (e.g. 0.3.0).
+#   1. Set the version in cli/pyproject.toml and
+#      cli/src/faden_cli/__init__.py (e.g. 0.3.0).
 #   2. Tag and push:  git tag v0.3.0 && git push origin v0.3.0
 #      docker-publish.yml builds the images 0.3.0 from the same tag; this
 #      workflow waits until they exist before publishing the CLI, so nobody
@@ -14,8 +14,8 @@
 # (cli-v* tags still publish the CLI alone, for a CLI-only fix; the images of
 # the version it pins must already exist.)
 #
-# Prerequisite: a repository secret PYPI_API_TOKEN that may upload llmport-cli
-# and llmport-agent -- node-agent-release.yml publishes the agent with it too.
+# Prerequisite: a repository secret PYPI_API_TOKEN that may upload fadenstack
+# and faden-agent -- node-agent-release.yml publishes the agent with it too.
 
 name: Release CLI
 
@@ -31,8 +31,8 @@ permissions:
   packages: read
 
 env:
-  CLI_DIR: llm_port_cli
-  REGISTRY: ghcr.io/llm-port
+  CLI_DIR: cli
+  REGISTRY: ghcr.io/fadenstack
 
 jobs:
   build:
@@ -43,10 +43,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # The deployment files the wheel carries come from llm_port_shared.
+          # The deployment files the wheel carries come from shared.
           sparse-checkout: |
-            llm_port_cli
-            llm_port_shared
+            cli
+            shared
 
       - uses: actions/setup-python@v5
         with:
@@ -59,9 +59,9 @@ jobs:
         run: |
           set -euo pipefail
           PYPROJECT=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          PACKAGE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/llmport/__init__.py)
+          PACKAGE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/faden_cli/__init__.py)
           if [ "$PYPROJECT" != "$PACKAGE" ]; then
-            echo "::error::pyproject says $PYPROJECT, src/llmport/__init__.py says $PACKAGE"
+            echo "::error::pyproject says $PYPROJECT, src/faden_cli/__init__.py says $PACKAGE"
             exit 1
           fi
           TAG="${GITHUB_REF#refs/tags/}"
@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           python -m zipfile -l dist/*.whl > contents.txt
           for f in docker-compose.yaml nginx/nginx.conf initdb/01-init.sql prometheus/prometheus.yml; do
-            grep -q "llmport/bundle/shared/$f" contents.txt || { echo "::error::wheel lacks $f"; exit 1; }
+            grep -q "faden/bundle/shared/$f" contents.txt || { echo "::error::wheel lacks $f"; exit 1; }
           done
           if grep -qE "bundle/shared/(\.env|\.bootstrap-credentials|backups/)" contents.txt; then
             echo "::error::wheel carries install state"; exit 1
@@ -98,7 +98,7 @@ jobs:
           path: ${{ env.CLI_DIR }}/dist/*
 
   images-exist:
-    # `llmport deploy` pulls <registry>/<service>:<version>. Publishing a CLI
+    # `faden deploy` pulls <registry>/<service>:<version>. Publishing a CLI
     # before its images exist hands users a deploy that cannot pull.
     needs: build
     runs-on: ubuntu-latest
@@ -144,7 +144,7 @@ jobs:
           pip install --upgrade twine
           # PyPI's reason as a public annotation; the log needs a sign-in.
           if ! twine upload --non-interactive dist/* 2>&1 | tee twine.log; then
-            echo "::error title=PyPI refused llmport-cli::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
+            echo "::error title=PyPI refused fadenstack::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
             exit 1
           fi
 
@@ -152,15 +152,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "LLM.Port ${{ needs.build.outputs.version }}"
+          name: "Fadenstack ${{ needs.build.outputs.version }}"
           generate_release_notes: true
           body: |
             ```bash
-            pipx install llmport-cli==${{ needs.build.outputs.version }}
-            llmport deploy
+            pipx install fadenstack==${{ needs.build.outputs.version }}
+            faden deploy
             ```
             Runs the images `${{ env.REGISTRY }}/*:${{ needs.build.outputs.version }}`.
-            Upgrading an install: install this CLI, then `llmport upgrade`.
+            Upgrading an install: install this CLI, then `faden upgrade`.
           files: dist/*
 
   executables:
@@ -172,14 +172,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            name: llmport-linux-amd64
-            artifact: llmport-linux-amd64
+            name: faden-linux-amd64
+            artifact: faden-linux-amd64
           - os: windows-latest
-            name: llmport-windows-amd64
-            artifact: llmport-windows-amd64.exe
+            name: faden-windows-amd64
+            artifact: faden-windows-amd64.exe
           - os: macos-latest
-            name: llmport-macos-arm64
-            artifact: llmport-macos-arm64
+            name: faden-macos-arm64
+            artifact: faden-macos-arm64
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -195,10 +195,10 @@ jobs:
         run: |
           pip install --upgrade pip pyinstaller
           pip install dist/*.whl
-          ENTRY=$(python -c "import llmport.cli, sys; print(llmport.cli.__file__)")
+          ENTRY=$(python -c "import faden_cli.cli, sys; print(faden_cli.cli.__file__)")
           # --collect-data: the deployment files are package data.
           pyinstaller --onefile --clean --name "${{ matrix.name }}" \
-            --collect-submodules llmport --collect-data llmport "$ENTRY"
+            --collect-submodules faden --collect-data faden "$ENTRY"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2

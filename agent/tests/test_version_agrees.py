@@ -11,16 +11,16 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-import llm_port_node_agent
-from llm_port_node_agent import __main__ as agent_main
+import faden_agent
+from faden_agent import __main__ as agent_main
 
 _PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
 
 
 def test_the_package_version_is_the_project_version() -> None:
     project = tomllib.loads(_PYPROJECT.read_text(encoding="utf-8"))["project"]
-    assert llm_port_node_agent.__version__ == project["version"]
+    assert faden_agent.__version__ == project["version"]
 
 
 def test_the_cli_reports_the_package_version() -> None:
-    assert agent_main._AGENT_VERSION == llm_port_node_agent.__version__
+    assert agent_main._AGENT_VERSION == faden_agent.__version__

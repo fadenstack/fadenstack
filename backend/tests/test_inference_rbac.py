@@ -19,8 +19,8 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.users import User, current_active_user
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.users import User, current_active_user
 
 API = "/api/inference"
 
@@ -120,7 +120,7 @@ async def test_operator_can_operate_but_not_create(
     # Seed a control plane and an environment via the DAO so the operator has
     # something to "operate" on without needing create permission.
     _viewer, operator = await _seed_viewer_operator(dbsession)
-    from llm_port_backend.db.dao.inference_dao import (  # noqa: PLC0415
+    from faden_backend.db.dao.inference_dao import (  # noqa: PLC0415
         ControlPlaneDAO,
         EnvironmentDAO,
     )
@@ -161,8 +161,8 @@ async def test_operator_runs_the_environment_lifecycle(
     one is not: teardown stays with admin.
     """
     _viewer, operator = await _seed_viewer_operator(dbsession)
-    from llm_port_backend.db.dao.inference_dao import ControlPlaneDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.db.dao.inference_dao import ControlPlaneDAO  # noqa: PLC0415
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
     cp = await ControlPlaneDAO(dbsession).create(name="op-lifecycle-cp", driver="ray")
     node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex}", host="node-host")

@@ -8,7 +8,7 @@ This document describes request/response flow for the OpenAI-compatible gateway 
 sequenceDiagram
     autonumber
     participant C as Client
-    participant API as llm_port_api
+    participant API as faden_gateway
     participant AUTH as Auth
     participant DAO as GatewayDAO (Postgres)
 
@@ -26,7 +26,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant C as Client
-    participant API as llm_port_api
+    participant API as faden_gateway
     participant AUTH as Auth
     participant DAO as GatewayDAO (Postgres)
     participant RL as RateLimiter (Redis)
@@ -65,7 +65,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant C as Client
-    participant API as llm_port_api
+    participant API as faden_gateway
     participant AUTH as Auth
     participant DAO as GatewayDAO (Postgres)
     participant RL as RateLimiter (Redis)
@@ -104,7 +104,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant C as Client
-    participant API as llm_port_api
+    participant API as faden_gateway
     participant AUTH as Auth
     participant DAO as GatewayDAO (Postgres)
     participant RL as RateLimiter (Redis)
@@ -146,5 +146,5 @@ All endpoint failures are returned in OpenAI-compatible shape:
 
 ## Admin Graph Consumption
 
-`llm_port_backend` consumes `llm_gateway_request_log` from the `llm_api` database to power `/api/llm/graph/traces` and `/api/llm/graph/traces/stream`.
+`faden_backend` consumes `llm_gateway_request_log` from the `faden_gateway` database to power `/api/llm/graph/traces` and `/api/llm/graph/traces/stream`.
 The frontend visualizer (`/admin/llm/graph`) subscribes to backend SSE only; it never calls Langfuse directly.

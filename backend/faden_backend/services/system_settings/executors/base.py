@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from llm_port_backend.db.models.system_settings import SystemApplyScope
+from faden_backend.db.models.system_settings import SystemApplyScope
 
 
 @dataclass(frozen=True)

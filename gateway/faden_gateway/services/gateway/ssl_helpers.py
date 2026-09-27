@@ -8,7 +8,7 @@ LiteLLM (since v1.x) accepts two SSL-related per-call kwargs:
   cert + key concatenated) for mTLS.
 
 We support storing PEM material **encrypted** in the DB on
-:class:`~llm_port_api.db.models.gateway.LLMProviderInstance` and
+:class:`~faden_gateway.db.models.gateway.LLMProviderInstance` and
 materialising it to a process-local temp file the first time it is
 needed.  Files are cached by provider instance ``id`` and refreshed
 when the encrypted ciphertext changes (cheap content hash).
@@ -25,7 +25,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ _FILE_CACHE: dict[tuple[uuid.UUID, str, str], Path] = {}
 def _cache_dir() -> Path:
     global _CACHE_DIR
     if _CACHE_DIR is None:
-        _CACHE_DIR = Path(tempfile.mkdtemp(prefix="llmport-tls-out-"))
+        _CACHE_DIR = Path(tempfile.mkdtemp(prefix="faden-tls-out-"))
         atexit.register(_cleanup)
     return _CACHE_DIR
 

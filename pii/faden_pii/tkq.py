@@ -2,7 +2,7 @@ import taskiq_fastapi
 from taskiq import AsyncBroker, InMemoryBroker
 from taskiq_aio_pika import AioPikaBroker
 
-from llm_port_pii.settings import settings
+from faden_pii.settings import settings
 
 broker: AsyncBroker = AioPikaBroker(
     str(settings.rabbit_url),
@@ -16,5 +16,5 @@ if settings.environment.lower() == "pytest":
 
 taskiq_fastapi.init(
     broker,
-    "llm_port_pii.web.application:get_app",
+    "faden_pii.web.application:get_app",
 )

@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from llm_port_skills.services.resolve import (
+from faden_skills.services.resolve import (
     Candidate,
     RequestContext,
     choose,

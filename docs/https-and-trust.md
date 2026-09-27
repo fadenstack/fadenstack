@@ -34,7 +34,7 @@ TLS next, see [Connections and TLS](connections-and-tls.md).
 |---|---|
 | **Where TLS ends** | nginx, the one front door: the console, the API (`/api`), the OpenAI-compatible gateway (`/v1`), their WebSockets, and everything the machines' agents do with the server. |
 | **Protocols** | TLS 1.3 and 1.2 only; TLS 1.1 and older are refused by the server. HTTP/2. |
-| **Certificates** | Made on the server by its own certificate authority (`llmport tls generate`), or yours -- from a public issuer or a company CA (`llmport tls use`). |
+| **Certificates** | Made on the server by its own certificate authority (`faden tls generate`), or yours -- from a public issuer or a company CA (`faden tls use`). |
 | **Machines** | Agents 0.1.14 and later learn the server's authority while connected and move to HTTPS by themselves when it is switched on. They never move back by themselves. |
 | **Commands** | Every command the server sends a machine is signed (HMAC-SHA256, keyed by the machine's credential); agents 0.1.15 and later refuse one without a valid signature. |
 | **Model traffic** | The gateway reaches the models on the machines over mutual TLS: each machine runs nginx in front of its models, which accepts only the gateway's certificate. Agents 0.1.16 and later (0.1.17 for a vLLM found running); its own certificate authority, kept by the backend, renewed and rotated automatically. On whether HTTPS is on or not. |
@@ -42,9 +42,9 @@ TLS next, see [Connections and TLS](connections-and-tls.md).
 | **Logs** | The machines push their logs through nginx and the backend (agents 0.1.17), never straight to Loki. |
 | **New machines** | The install line pins the server's authority by its SHA-256 fingerprint; a mismatch stops it before anything is downloaded or run. |
 | **Renewal** | Daily and automatic. Certificates made on the server are issued again 30 days before they run out; yours are taken again from the files your tooling renews. Renewing does not interrupt the machines. |
-| **Warnings** | `llmport tls status`, `llmport doctor`, and the console's dashboard before a certificate runs out. |
+| **Warnings** | `faden tls status`, `faden doctor`, and the console's dashboard before a certificate runs out. |
 | **Keys** | The authority's key never enters a container. Backups carry the certificate material; keys stay readable by their owner only. |
-| **Default** | `llmport deploy` switches HTTPS on with a certificate made here (`--tls off` for plain HTTP). An install upgraded from before keeps what it had; `llmport tls generate` switches it on. |
+| **Default** | `faden deploy` switches HTTPS on with a certificate made here (`--tls off` for plain HTTP). An install upgraded from before keeps what it had; `faden tls generate` switches it on. |
 
 **Keep HTTPS on.** Without it, everything between the browsers, the API
 clients, the machines and the server -- sign-ins, API keys, prompts, the
@@ -64,8 +64,8 @@ With HTTPS on:
 | Agents downloading models and runtime images from the server | Yes | Same connection and verification as the stream. |
 | Grafana through the console (`/grafana/`) | Yes | The dashboard's embedded panel goes through nginx. |
 | Grafana's own port `3001`, Langfuse `3002` | Not on the network | Plain HTTP, published on `127.0.0.1` only by default; the console reaches Grafana at `/grafana/`. `GRAFANA_BIND` / `LANGFUSE_BIND` publish them. |
-| The gateway to the models on the machines (Ray Serve, and vLLM that LLM.Port starts) | Yes, mutual TLS | Agents 0.1.16 and later; a cluster from before is moved with one button (see [Model traffic](#model-traffic-the-gateway-and-the-machines)). Independent of HTTPS on the front door. |
-| The gateway to a vLLM LLM.Port found running and did not start | Yes, mutual TLS | Through the machine's proxy (agents 0.1.17). The server's own port stays open: LLM.Port did not start it and does not close it. |
+| The gateway to the models on the machines (Ray Serve, and vLLM that Fadenstack starts) | Yes, mutual TLS | Agents 0.1.16 and later; a cluster from before is moved with one button (see [Model traffic](#model-traffic-the-gateway-and-the-machines)). Independent of HTTPS on the front door. |
+| The gateway to a vLLM Fadenstack found running and did not start | Yes, mutual TLS | Through the machine's proxy (agents 0.1.17). The server's own port stays open: Fadenstack did not start it and does not close it. |
 | Ray between machines (cluster, object transfer) | Once switched on | Always authenticated with the cluster's token; mutual TLS once the cluster's **Traffic between machines** switch is on (see [Ray between the machines](#ray-between-the-machines)). |
 | Agents pushing their logs | Yes | Through nginx and the backend (agents 0.1.17), authenticated by the machine's credential; Loki stays on the server. HTTPS once HTTPS is on. |
 | Between the containers on the server | **No** | Docker's internal network. |
@@ -86,15 +86,15 @@ Three parties have to trust the server: **browsers**, **API clients** and the
 **agents** on the machines. What they trust is one file the CLI publishes,
 `tls/ca.crt`:
 
-- the install's own **certificate authority** (made by `llmport deploy` or
-  `llmport upgrade`, even while HTTPS is off);
+- the install's own **certificate authority** (made by `faden deploy` or
+  `faden upgrade`, even while HTTPS is off);
 - the authority **before a rotation**, while it is still valid;
 - a **company CA's root**, when you serve a certificate it issued.
 
 | What | Made by | Key | Lifetime |
 |---|---|---|---|
-| Install CA | `llmport deploy` / `upgrade`, on first use | EC P-256, `tls-ca/ca.key`, `0600`, never in a container | 10 years, `CA:TRUE, pathlen:0`, `keyCertSign` |
-| Server certificate (made here) | `llmport tls generate`, `llmport tls renew` | EC P-256, `tls/edge.key`, `0600` | 825 days, `serverAuth`, names: `localhost`, the host names and every address outside Docker's bridges, plus `--name` |
+| Install CA | `faden deploy` / `upgrade`, on first use | EC P-256, `tls-ca/ca.key`, `0600`, never in a container | 10 years, `CA:TRUE, pathlen:0`, `keyCertSign` |
+| Server certificate (made here) | `faden tls generate`, `faden tls renew` | EC P-256, `tls/edge.key`, `0600` | 825 days, `serverAuth`, names: `localhost`, the host names and every address outside Docker's bridges, plus `--name` |
 | Your certificate | you | yours, checked before use | yours |
 
 **Browsers and API clients** are told to trust `tls/ca.crt` once: import it
@@ -116,7 +116,7 @@ with the pinned install line, to close that gap.
 
 ## Switching HTTPS on
 
-A new install from `llmport deploy` starts on HTTPS. This is for one that does
+A new install from `faden deploy` starts on HTTPS. This is for one that does
 not: an install upgraded from before, or one deployed with `--tls off`.
 
 Before: plain HTTP. The server's authority already exists -- the upgrade made
@@ -129,12 +129,12 @@ it -- and the machines have fetched it.
 One command makes a certificate for the server, restarts nginx, and schedules
 the daily renewal:
 
-![llmport tls generate](images/https/03-tls-generate.png)
+![faden tls generate](images/https/03-tls-generate.png)
 
 From then on, plain HTTP answers only the proxy's own health check and
 redirects everything else with `307 Temporary Redirect` (not `301`: browsers
 keep a `301` for good and would keep going to HTTPS after it is switched off).
-The HSTS header is sent with `max-age=0` until you set `LLM_PORT_HSTS_MAX_AGE`,
+The HSTS header is sent with `max-age=0` until you set `FADEN_HSTS_MAX_AGE`,
 so switching HTTPS off again cannot lock browsers out.
 
 Seen from another machine on the network -- without the authority the
@@ -170,7 +170,7 @@ The rules an agent follows:
   agent trusts. A certificate it cannot verify leaves it where it is, with the
   reason in its log.
 - The move is kept for the address it was configured with. Setting another
-  address by hand (`llmport-agent configure --set BACKEND_URL=...`) forgets it.
+  address by hand (`faden-agent configure --set BACKEND_URL=...`) forgets it.
 - An agent on HTTPS **never falls back to plain HTTP** by itself. A fallback
   would be a downgrade anyone between the machine and the server could force by
   blocking one port.
@@ -194,7 +194,7 @@ copy of its database signs nothing.
   stripping the signatures off stops working.
 - A command older than five minutes is refused as well, unless the server
   re-sends one still running; the agent never runs the same command twice.
-- `LLM_PORT_NODE_AGENT_REQUIRE_SIGNED_COMMANDS=true` requires signatures from
+- `FADEN_NODE_AGENT_REQUIRE_SIGNED_COMMANDS=true` requires signatures from
   the first connection; `false` switches the check off, for a server rolled
   back to one that does not sign.
 
@@ -210,9 +210,9 @@ front door and on whether HTTPS is switched on or not:
 
 - **Each machine runs nginx in front of its models** (`nginx:1.31.6-alpine`,
   pinned by content per architecture, the same product as the server's front
-  door), in its own container `llm-port-model-tls`, with host networking. It
+  door), in its own container `faden-model-tls`, with host networking. It
   listens on the port the model is published on; the model itself -- Ray
-  Serve's proxy, or a vLLM container LLM.Port starts -- listens on the loopback
+  Serve's proxy, or a vLLM container Fadenstack starts -- listens on the loopback
   address only, at that port plus 20000 (8010 -> 28010).
 - **The proxy demands a client certificate** (`ssl_verify_client on`) from the
   machine CA and lets only the gateway's name through (`CN=fadenstack-gateway`);
@@ -241,7 +241,7 @@ All of it maintains itself:
 | A machine's agent connects, and every minute | It asks whether it needs a new certificate: none held, ten days before the end, another CA signing, another address. If so it gets one and reloads nginx -- no connection is dropped. |
 | Hourly, in the backend | The gateway's certificate is renewed ten days before its end. A year before the CA ends the next one is made, trusted everywhere two days before it signs anything; the old one is retired once all it signed has expired. |
 | A database restored without its `.env` | The CA's key cannot be opened with the new master key: a new CA is made, and the machines fetch new certificates within a minute. |
-| Suspected leak | `llmport tls machine-ca --replace` (or `POST /api/admin/tls/machine-ca/rotate` as a superuser): a new CA at once, every other one distrusted at once. `llmport tls machine-ca` alone shows the CAs, the gateway's certificate and each machine's. |
+| Suspected leak | `faden tls machine-ca --replace` (or `POST /api/admin/tls/machine-ca/rotate` as a superuser): a new CA at once, every other one distrusted at once. `faden tls machine-ca` alone shows the CAs, the gateway's certificate and each machine's. |
 
 A cluster started before its head machine's agent was 0.1.16 keeps its Ray
 Serve listening on the network: Serve binds once, when it starts. The server
@@ -253,8 +253,8 @@ models again behind the proxy; they are down while they load.
 ![The cluster page after the move](images/https/18-model-traffic-encrypted.png)
 
 The proxy's image reaches an air-gapped machine the way the runtime image does:
-`llmport runtime-images` (also run by `deploy` and `upgrade`) holds a copy per
-architecture on the server (`llmport/model-tls-nginx:1.31.6-alpine-<arch>`), the
+`faden runtime-images` (also run by `deploy` and `upgrade`) holds a copy per
+architecture on the server (`faden/model-tls-nginx:1.31.6-alpine-<arch>`), the
 agent fetches it from there and checks it against the pin, and only falls back to
 the registry, by digest.
 
@@ -278,11 +278,11 @@ cluster serving `qwen-chat` on two machines):
   now", fetched new certificates and reloaded nginx.
 
 **A vLLM found running** on a machine -- started by someone else, which
-LLM.Port finds and can route as it is -- goes through the same proxy (agents
+Fadenstack finds and can route as it is -- goes through the same proxy (agents
 0.1.17): the proxy serves the server's port plus 20000 (8102 -> 28102) with
 the gateway's certificate required, and forwards to the port the server
-listens on. That port stays open: LLM.Port did not start the server and does
-not close it -- firewall it to the machine, or start the model under LLM.Port
+listens on. That port stays open: Fadenstack did not start the server and does
+not close it -- firewall it to the machine, or start the model under Fadenstack
 instead. Measured on the DGX pair: embeddings through the gateway in 1.45 s;
 the proxy port without the gateway's certificate, over TLS or plain, refused
 (400); releasing the route took the port off the proxy.
@@ -319,7 +319,7 @@ between machines** switch on, Ray also encrypts them: mutual TLS, Ray's own
   reaches it by -- the cluster's fabric address, the machine's own address and
   host name, `127.0.0.1` and `localhost` -- whatever the request asked for. It
   may act as server and client, as Ray needs. The files sit in
-  `~/.local/share/llmport-agent/ray-tls/<cluster>/` on the machine (the key
+  `~/.local/share/faden-agent/ray-tls/<cluster>/` on the machine (the key
   readable by its owner only) and are mounted into the container read-only.
 - **Only members get one.** The backend signs for a machine that belongs to the
   cluster, and only while the cluster's switch is on.
@@ -366,8 +366,8 @@ the console shows; only then does it trust anything from the server:
 ```bash
 curl -fsSLk -o server-ca.crt https://<server>/api/install/ca.crt &&
 echo "<sha256>  server-ca.crt" | sha256sum -c --quiet &&
-curl -fsSLO --cacert server-ca.crt https://<server>/api/install/llmport-agent.sh &&
-sudo sh llmport-agent.sh --join https://<server> --ca-file server-ca.crt
+curl -fsSLO --cacert server-ca.crt https://<server>/api/install/faden-agent.sh &&
+sudo sh faden-agent.sh --join https://<server> --ca-file server-ca.crt
 ```
 
 - `-k` is used for the authority's file alone, and that file is checked against
@@ -392,7 +392,7 @@ through a certificate warning.
 
 ## Your own certificate, and a company CA
 
-`llmport tls use CERT KEY` checks a certificate before it is served: the key
+`faden tls use CERT KEY` checks a certificate before it is served: the key
 belongs to it and has no passphrase, it is valid today, a full-chain file is
 split into the certificate and its chain. A certificate that names none of the
 server's own names or addresses is installed with a warning.
@@ -411,13 +411,13 @@ the plain one.
 
 ## Renewal, rotation and warnings
 
-`llmport tls renew` runs every morning (a systemd user timer; cron where there
+`faden tls renew` runs every morning (a systemd user timer; cron where there
 is no systemd) and changes nothing until something is due:
 
 - **Made here:** issued again 30 days before it runs out, or as soon as the
   server has an address it does not list. Same authority, same names: browsers
   and machines notice nothing.
-- **Yours:** taken again from the files `llmport tls use` was given, whenever
+- **Yours:** taken again from the files `faden tls use` was given, whenever
   they change there. Point it at the files your tooling renews in place --
   certbot's `/etc/letsencrypt/live/<name>/fullchain.pem` and `privkey.pem`,
   acme.sh, a company agent. Renewed files that fail the checks are not taken.
@@ -434,9 +434,9 @@ Across the renewal below, the machine logged no reconnect at all.
 
 The dashboard warns 30 days before a certificate runs out -- 21 when it renews
 by itself, which only a failing renewal reaches -- and turns critical in the
-last week. `llmport doctor` checks it too, and a daily run that cannot renew
+last week. `faden doctor` checks it too, and a daily run that cannot renew
 anything exits with an error (`systemctl --user --failed`), its output in
-`~/llm-port/logs/tls-renew.log`.
+`~/fadenstack/logs/tls-renew.log`.
 
 ![The dashboard: the certificate runs out in 19 days](images/https/13-dashboard-warning.png)
 
@@ -452,9 +452,9 @@ anything exits with an error (`systemctl --user --failed`), its output in
 | `tls/ca.crt` | `0644` | the backend, served to machines and at `/api/install/ca.crt` | what everyone trusts; public |
 | `tls/edge.json` | `0644` | the backend | the host's addresses and ports, for the install line |
 
-On a machine: `~/.local/share/llmport-agent/server-ca.pem` (what it fetched),
+On a machine: `~/.local/share/faden-agent/server-ca.pem` (what it fetched),
 `server-address.json` (its move to HTTPS), and
-`~/.config/llmport-agent/llmport-agent-server-ca.crt` when it was installed
+`~/.config/faden-agent/faden-agent-server-ca.crt` when it was installed
 with `--ca-file`; `ray-tls/<cluster>/node.key` (mode 600), `node.crt` and
 `ca.pem` beside them for a cluster with Ray TLS on.
 
@@ -473,10 +473,10 @@ private as `.env`: they hold private keys.
 
 ## Switching HTTPS off
 
-`llmport tls off` removes the served certificate and restarts nginx; the
+`faden tls off` removes the served certificate and restarts nginx; the
 authority is kept for next time, and the daily renewal stops:
 
-![llmport tls off](images/https/16-tls-off.png)
+![faden tls off](images/https/16-tls-off.png)
 
 Machines that followed the server to HTTPS stay there -- by design, see above.
 Point each back and restart it:
@@ -504,7 +504,7 @@ Point each back and restart it:
   there for anyone on the network.
 - **A remote provider pointed at a machine's model address stops working**
   once that model moves behind the proxy: the proxy refuses plain HTTP, and a
-  remote provider has no machine certificate. Route the model LLM.Port serves
+  remote provider has no machine certificate. Route the model Fadenstack serves
   instead (its deployment's name), and delete the remote provider.
 - **Serving a standalone vLLM behind the proxy was checked by tests, not on the
   DGX pair**, which had no memory left beside qwen-chat; refusing a busy port
@@ -527,19 +527,19 @@ Point each back and restart it:
 - **HSTS is off** (`max-age=0`) until you choose, so HTTPS can be switched off
   again without locking browsers out.
 - **No built-in ACME.** Use certbot or acme.sh and hand the files to
-  `llmport tls use`; the daily run picks up every renewal.
+  `faden tls use`; the daily run picks up every renewal.
 - **Agents before 0.1.14** neither learn the authority nor follow; before
   0.1.15 they do not check signatures.
 
 ## Hardening checklist
 
-1. `llmport tls generate` (or `llmport tls use` with your certificate) before
+1. `faden tls generate` (or `faden tls use` with your certificate) before
    adding machines.
 2. Import `tls/ca.crt` into the browsers the console is used from, instead of
    accepting the warning -- the install line's fingerprint is only as good as
    the page it came from.
-3. Once HTTPS stays, set HSTS in `~/llm-port/.env` --
-   `LLM_PORT_HSTS_MAX_AGE=31536000` -- and apply it with `llmport up nginx`
+3. Once HTTPS stays, set HSTS in `~/fadenstack/.env` --
+   `FADEN_HSTS_MAX_AGE=31536000` -- and apply it with `faden up nginx`
    (a restart alone keeps the old setting).
 4. Leave Grafana and Langfuse on the server (the default): don't set
    `GRAFANA_BIND` or `LANGFUSE_BIND` to `0.0.0.0`. Grafana is in the console at
@@ -561,9 +561,9 @@ Point each back and restart it:
 ## Verify it yourself
 
 ```bash
-llmport tls status                     # served certificate, until when, how it renews
-llmport doctor | grep HTTPS
-systemctl --user list-timers | grep llmport-tls-renew
+faden tls status                     # served certificate, until when, how it renews
+faden doctor | grep HTTPS
+systemctl --user list-timers | grep faden-tls-renew
 
 # from another machine, with the server's authority
 curl -sI http://<server>/v1/models                          # 307 to https
@@ -573,6 +573,6 @@ openssl s_client -brief -connect <server>:443 -tls1_1       # alert protocol ver
 openssl s_client -brief -connect <server>:443 -CAfile ca.crt </dev/null | head -3
 
 # on a machine
-llmport-agent show                     # moved to HTTPS? which authority it trusts
-journalctl --user -u llmport-agent | grep -E "moved|Stored|Connecting"
+faden-agent show                     # moved to HTTPS? which authority it trusts
+journalctl --user -u faden-agent | grep -E "moved|Stored|Connecting"
 ```

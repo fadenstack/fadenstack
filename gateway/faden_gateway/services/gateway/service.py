@@ -13,45 +13,45 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway.audit import AuditService
-from llm_port_api.services.gateway.usage_group import UsageGroupResolver
-from llm_port_api.services.gateway.auth import AuthContext
-from llm_port_api.services.gateway import attachment_search, knowledge, skill_files, system_tools
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter, reasoning_of
-from llm_port_api.services.gateway.observability import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway.audit import AuditService
+from faden_gateway.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.services.gateway.auth import AuthContext
+from faden_gateway.services.gateway import attachment_search, knowledge, skill_files, system_tools
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
+from faden_gateway.services.gateway.observability import (
     GatewayObservability,
 )
-from llm_port_api.services.gateway.mcp_client import MCPClient
-from llm_port_api.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
-from llm_port_api.services.gateway.pii_client import PIIClient
-from llm_port_api.services.gateway.session_titles import title_from_message
-from llm_port_api.services.gateway.pii_policy import PIIPolicy, parse_pii_policy
-from llm_port_api.services.gateway.pii_restore import (
+from faden_gateway.services.gateway.mcp_client import MCPClient
+from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
+from faden_gateway.services.gateway.pii_client import PIIClient
+from faden_gateway.services.gateway.session_titles import title_from_message
+from faden_gateway.services.gateway.pii_policy import PIIPolicy, parse_pii_policy
+from faden_gateway.services.gateway.pii_restore import (
     redact_tokens,
     restore_payload,
     restore_sse,
     restore_text,
 )
-from llm_port_api.services.gateway.proxy import UpstreamProxy, UpstreamResult
-from llm_port_api.services.gateway.rag_lite_client import RagLiteClient
-from llm_port_api.services.gateway.ratelimit import RateLimiter
-from llm_port_api.services.gateway.routing import RouterService, RoutingDecision
-from llm_port_api.services.gateway.skills_client import ResolvedSkill, SkillsClient
-from llm_port_api.services.gateway.stream import StreamStats, wrap_sse_stream
-from llm_port_api.services.gateway.stream_buffer import StreamBuffer
-from llm_port_api.services.gateway.tool_stream import DONE, ToolCalls, sse, sse_events
-from llm_port_api.services.gateway.usage import (
+from faden_gateway.services.gateway.proxy import UpstreamProxy, UpstreamResult
+from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
+from faden_gateway.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.gateway.routing import RouterService, RoutingDecision
+from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillsClient
+from faden_gateway.services.gateway.stream import StreamStats, wrap_sse_stream
+from faden_gateway.services.gateway.stream_buffer import StreamBuffer
+from faden_gateway.services.gateway.tool_stream import DONE, ToolCalls, sse, sse_events
+from faden_gateway.services.gateway.usage import (
     estimate_input_tokens,
     usage_from_payload,
 )
-from llm_port_api.services.gateway.file_store import FileStore
-from llm_port_api.services.gateway.tool_availability import ToolAvailabilityService
-from llm_port_api.services.gateway.tool_router import ToolRouter
-from llm_port_api.settings import settings
+from faden_gateway.services.gateway.file_store import FileStore
+from faden_gateway.services.gateway.tool_availability import ToolAvailabilityService
+from faden_gateway.services.gateway.tool_router import ToolRouter
+from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ def _in_model_format(candidate: Any, alias: str, query: str, documents: list[str
 def _rerank_routes(alias: str, candidates: list[Any]) -> list[Any]:
     """The routes that can take a rerank request.
 
-    A model LLM.Port serves on a cluster runs under Ray Serve, whose API has
+    A model Fadenstack serves on a cluster runs under Ray Serve, whose API has
     ``/v1/score`` and no ``/v1/rerank``.
     """
     routes = [c for c in candidates if getattr(c, "source_kind", None) != "inference_deployment"]
@@ -825,7 +825,7 @@ class GatewayService:
                     "alias": alias.alias,
                     "object": "model",
                     "created": int(alias.created_at.timestamp()),
-                    "owned_by": "llm-port",
+                    "owned_by": "fadenstack",
                     "description": alias.description,
                     "enabled": alias.enabled,
                     "kind": kinds.get(alias.alias),
@@ -917,7 +917,7 @@ class GatewayService:
                             payload=req.egress_payload,
                             stream=False,
                         )
-                    from llm_port_api.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
+                    from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
                     assert isinstance(adapter_result, CompletionResult)  # noqa: S101
                     result = UpstreamResult(
                         status_code=adapter_result.status_code,
@@ -1692,7 +1692,7 @@ class GatewayService:
 
         import uuid as _uuid  # noqa: PLC0415
 
-        from llm_port_api.services.gateway.context_assembler import ContextAssembler  # noqa: PLC0415
+        from faden_gateway.services.gateway.context_assembler import ContextAssembler  # noqa: PLC0415
 
         try:
             sid = _uuid.UUID(session_id_str)
@@ -2201,7 +2201,7 @@ class GatewayService:
 
     async def _complete(self, req: _Prepared, payload: dict[str, Any]) -> UpstreamResult:
         """One whole model call; an error from upstream is raised, not answered."""
-        from llm_port_api.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
+        from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
 
         assert req.decision is not None  # noqa: S101
         adapter_result = await self.adapter.completion(
@@ -2254,7 +2254,7 @@ class GatewayService:
             if own is not None:
                 content, is_error = own
             elif name in knowledge.NAMES:
-                # Searched inside LLM.Port, like the session store: with the
+                # Searched inside Fadenstack, like the session store: with the
                 # values tokenize mode took out, or it would look for
                 # "[PERSON_1]". A tool elsewhere (MCP) gets the tokens.
                 if req.token_mapping:
@@ -2580,7 +2580,7 @@ class GatewayService:
         # disconnect can close/rollback it), so we create an independent one.
         engine = self.session_dao.session.bind  # AsyncEngine
         from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
-        from llm_port_api.db.models.gateway import ChatMessage  # noqa: PLC0415
+        from faden_gateway.db.models.gateway import ChatMessage  # noqa: PLC0415
 
         async with AsyncSession(engine, expire_on_commit=False) as fresh_session:
             msg = ChatMessage(
@@ -2628,7 +2628,7 @@ def _resolve_pii_policy(
     When *session_override* (a ``SessionPIIOverrideRow``) is provided,
     ``clamp_and_merge`` is applied on top of the floor policy.
     """
-    from llm_port_api.settings import settings as _settings
+    from faden_gateway.settings import settings as _settings
 
     raw = policy.pii_config if policy and getattr(policy, "pii_config", None) else None
     floor: PIIPolicy | None = None
@@ -2643,7 +2643,7 @@ def _resolve_pii_policy(
         return None
 
     if session_override is not None:
-        from llm_port_api.services.gateway.pii_policy import (  # noqa: PLC0415
+        from faden_gateway.services.gateway.pii_policy import (  # noqa: PLC0415
             SessionPIIOverride,
             clamp_and_merge,
         )

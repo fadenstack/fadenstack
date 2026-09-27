@@ -6,15 +6,15 @@ https://agentskills.io/specification -- ``SKILL.md`` is YAML frontmatter
 ``references/``, ``assets/`` and ``scripts/``. Claude Code, Codex and Open
 WebUI read the same folders.
 
-What llm.port adds -- the title, tags, priority, when the skill comes into a
+What fadenstack adds -- the title, tags, priority, when the skill comes into a
 chat, the tool lists, knowledge sources and triggers -- lives in
-``llmport.yaml`` beside ``SKILL.md`` rather than in its frontmatter, so a
+``faden.yaml`` beside ``SKILL.md`` rather than in its frontmatter, so a
 skill exported from here is a plain Agent Skill anywhere else, and one
 written elsewhere imports as is. In particular the spec's ``allowed-tools``
-(``Bash(git:*) Read``) is kept but not applied: read as llm.port's
+(``Bash(git:*) Read``) is kept but not applied: read as fadenstack's
 ``allowed_tools`` it would strip every MCP tool from a chat.
 
-Older llm.port documents put those fields in the frontmatter itself; they are
+Older fadenstack documents put those fields in the frontmatter itself; they are
 still read, and moved where they belong.
 """
 
@@ -33,10 +33,10 @@ from typing import Any
 
 import yaml
 
-from llm_port_skills.settings import settings
+from faden_skills.settings import settings
 
 SKILL_FILE = "SKILL.md"
-EXTENSION_FILE = "llmport.yaml"
+EXTENSION_FILE = "faden.yaml"
 
 NAME_MAX = 64
 DESCRIPTION_MAX = 1024
@@ -44,7 +44,7 @@ TITLE_MAX = 255
 
 _NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-#: ``llmport.yaml`` fields that are part of a version (a rollback restores them).
+#: ``faden.yaml`` fields that are part of a version (a rollback restores them).
 MANIFEST_KEYS = (
     "allowed_tools",
     "preferred_tools",
@@ -52,11 +52,11 @@ MANIFEST_KEYS = (
     "knowledge_sources",
     "trigger_rules",
 )
-#: ``llmport.yaml`` fields that describe the skill in the catalog. They seed a
+#: ``faden.yaml`` fields that describe the skill in the catalog. They seed a
 #: new skill on import; afterwards they are edited on the skill itself.
 CATALOG_KEYS = ("title", "tags", "priority", "activation")
 
-#: Keys older llm.port documents put in the frontmatter that only this
+#: Keys older fadenstack documents put in the frontmatter that only this
 #: service ever used; dropped on import, never exported.
 _LEGACY_ONLY_KEYS = ("scope", "status", "enabled", "visibility")
 
@@ -96,9 +96,9 @@ class SkillBundle:
     body: str
     #: SKILL.md's other frontmatter fields, as written.
     frontmatter: dict[str, Any] = field(default_factory=dict)
-    #: ``llmport.yaml``'s versioned fields (``MANIFEST_KEYS``).
+    #: ``faden.yaml``'s versioned fields (``MANIFEST_KEYS``).
     manifest: dict[str, Any] = field(default_factory=dict)
-    #: ``llmport.yaml``'s catalog fields (``CATALOG_KEYS``).
+    #: ``faden.yaml``'s catalog fields (``CATALOG_KEYS``).
     catalog: dict[str, Any] = field(default_factory=dict)
     #: ``{path: {"text": ...} | {"base64": ...}}``, paths relative to the folder.
     files: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -176,7 +176,7 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 
 
 def from_markdown(text: str, *, default_name: str | None = None) -> SkillBundle:
-    """A bundle from one ``SKILL.md`` (or an older llm.port skill document)."""
+    """A bundle from one ``SKILL.md`` (or an older fadenstack skill document)."""
     fm, body = split_frontmatter(text)
     fm = dict(fm)
     extension = {
@@ -221,7 +221,7 @@ def _name_and_title(
 ) -> tuple[str, str | None]:
     """The skill name, and a title when the document's name was one.
 
-    Older llm.port documents used ``name`` for the display title ("Financial
+    Older fadenstack documents used ``name`` for the display title ("Financial
     Analysis"); a name that is not a valid skill name is read as that.
     """
     candidate = _text(raw_name).strip()
@@ -235,11 +235,11 @@ def _name_and_title(
     raise BundleError(msg)
 
 
-# ── llmport.yaml ──────────────────────────────────────────────────────
+# ── faden.yaml ──────────────────────────────────────────────────────
 
 
 def split_extension(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """``(manifest, catalog)`` from ``llmport.yaml``'s fields, checked."""
+    """``(manifest, catalog)`` from ``faden.yaml``'s fields, checked."""
     manifest = normalize_manifest(
         {key: data[key] for key in MANIFEST_KEYS if key in data},
     )
@@ -260,7 +260,7 @@ def split_extension(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any
 
 
 def extension_yaml(bundle: SkillBundle) -> str | None:
-    """The bundle's ``llmport.yaml``, or ``None`` when there is nothing in it."""
+    """The bundle's ``faden.yaml``, or ``None`` when there is nothing in it."""
     data = {**bundle.catalog, **bundle.manifest}
     if not data:
         return None

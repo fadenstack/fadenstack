@@ -1,7 +1,7 @@
 """HTTP-level security middleware (HSTS, headers, host allowlist, CORS).
 
 The middleware here is a pluggable bundle wired into the FastAPI app
-in :func:`llm_port_api.web.lifespan.lifespan_setup` between
+in :func:`faden_gateway.web.lifespan.lifespan_setup` between
 ``app.middleware_stack = None`` and ``app.build_middleware_stack()``.
 
 Components

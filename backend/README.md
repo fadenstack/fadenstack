@@ -1,4 +1,4 @@
-# llm-port-backend
+# faden-backend
 
 This project was generated using fastapi_template.
 
@@ -11,7 +11,7 @@ To run the project use this set of commands:
 
 ```bash
 uv sync --locked
-uv run -m llm_port_backend
+uv run -m faden_backend
 ```
 
 This will start the server on the configured host.
@@ -46,8 +46,8 @@ docker-compose build
 ## Project structure
 
 ```bash
-$ tree "llm_port_backend"
-llm_port_backend
+$ tree "faden_backend"
+faden_backend
 ├── conftest.py  # Fixtures for all tests.
 ├── db  # module contains db configurations
 │   ├── dao  # Data Access Objects. Contains different classes to interact with database.
@@ -71,39 +71,39 @@ This application can be configured with environment variables.
 You can create `.env` file in the root directory and place all
 environment variables here. 
 
-All environment variables should start with "LLM_PORT_BACKEND_" prefix.
+All environment variables should start with "FADEN_BACKEND_" prefix.
 
-For example if you see in your "llm_port_backend/settings.py" a variable named like
-`random_parameter`, you should provide the "LLM_PORT_BACKEND_RANDOM_PARAMETER" 
+For example if you see in your "faden_backend/settings.py" a variable named like
+`random_parameter`, you should provide the "FADEN_BACKEND_RANDOM_PARAMETER" 
 variable to configure the value. This behaviour can be changed by overriding `env_prefix` property
-in `llm_port_backend.settings.Settings.Config`.
+in `faden_backend.settings.Settings.Config`.
 
 An example of .env file:
 ```bash
-LLM_PORT_BACKEND_RELOAD="True"
-LLM_PORT_BACKEND_PORT="8000"
-LLM_PORT_BACKEND_ENVIRONMENT="dev"
-LLM_PORT_GRAFANA_URL="http://localhost:3001"
-LLM_PORT_GRAFANA_DASHBOARD_UID_OVERVIEW=""
-LLM_PORT_GRAFANA_PANELS_OVERVIEW=""
-LLM_PORT_BACKEND_LOKI_BASE_URL="http://loki:3100"
-LLM_PORT_BACKEND_LOGS_MAX_LIMIT="5000"
-LLM_PORT_BACKEND_LOGS_DEFAULT_LIMIT="200"
-LLM_PORT_BACKEND_LOGS_ALLOWED_LABELS="compose_service,container,job,host,level"
-LLM_PORT_BACKEND_I18N_DIR="i18n"
+FADEN_BACKEND_RELOAD="True"
+FADEN_BACKEND_PORT="8000"
+FADEN_BACKEND_ENVIRONMENT="dev"
+FADEN_GRAFANA_URL="http://localhost:3001"
+FADEN_GRAFANA_DASHBOARD_UID_OVERVIEW=""
+FADEN_GRAFANA_PANELS_OVERVIEW=""
+FADEN_BACKEND_LOKI_BASE_URL="http://loki:3100"
+FADEN_BACKEND_LOGS_MAX_LIMIT="5000"
+FADEN_BACKEND_LOGS_DEFAULT_LIMIT="200"
+FADEN_BACKEND_LOGS_ALLOWED_LABELS="compose_service,container,job,host,level"
+FADEN_BACKEND_I18N_DIR="i18n"
 ```
 
 You can read more about BaseSettings class here: https://pydantic-docs.helpmanual.io/usage/settings/
 
-## Breaking Rename Migration (`llm-port` -> `llm-port`)
+## Breaking Rename Migration (`fadenstack` -> `fadenstack`)
 
-This release switches backend configuration names to `LLM_PORT_BACKEND_*` and removes support for the old
-`llm_port_*` variable namespace.
+This release switches backend configuration names to `FADEN_BACKEND_*` and removes support for the old
+`faden_*` variable namespace.
 
 Required migration actions:
-1. Rename all backend env vars from `llm_port_backend_*` to `LLM_PORT_BACKEND_*`.
-2. Rename Grafana env vars from `llm_port_GRAFANA_*` to `LLM_PORT_GRAFANA_*`.
-3. Recreate containers/volumes if you rely on old docker identifiers (`llm_port_backend-*`).
+1. Rename all backend env vars from `faden_backend_*` to `FADEN_BACKEND_*`.
+2. Rename Grafana env vars from `faden_GRAFANA_*` to `FADEN_GRAFANA_*`.
+3. Recreate containers/volumes if you rely on old docker identifiers (`faden_backend-*`).
 4. Redeploy backend and worker together to avoid mixed env namespace usage.
 
 ## Logs API (Loki Proxy)
@@ -127,14 +127,14 @@ The backend now exposes graph data for the admin React Flow visualizer:
 
 All endpoints require RBAC permission `llm.graph:read` (superusers bypass checks).
 
-The traces endpoints read from the gateway (`llm_port_api`) request log DB:
+The traces endpoints read from the gateway (`faden_gateway`) request log DB:
 
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_HOST`
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_PORT`
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_USER`
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_PASS`
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_BASE`
-- `LLM_PORT_BACKEND_LLM_GRAPH_DB_URL_OVERRIDE` (optional full DSN override)
+- `FADEN_BACKEND_LLM_GRAPH_DB_HOST`
+- `FADEN_BACKEND_LLM_GRAPH_DB_PORT`
+- `FADEN_BACKEND_LLM_GRAPH_DB_USER`
+- `FADEN_BACKEND_LLM_GRAPH_DB_PASS`
+- `FADEN_BACKEND_LLM_GRAPH_DB_BASE`
+- `FADEN_BACKEND_LLM_GRAPH_DB_URL_OVERRIDE` (optional full DSN override)
 
 ## System Settings + Init Wizard APIs
 
@@ -151,10 +151,10 @@ The backend now exposes a system control plane used by `/admin/settings`:
 - `GET /api/admin/system/agents`
 
 Related env variables:
-- `LLM_PORT_BACKEND_SETTINGS_MASTER_KEY`
-- `LLM_PORT_BACKEND_SYSTEM_COMPOSE_FILE`
-- `LLM_PORT_BACKEND_SYSTEM_AGENT_ENABLED`
-- `LLM_PORT_BACKEND_SYSTEM_AGENT_TOKEN` (optional)
+- `FADEN_BACKEND_SETTINGS_MASTER_KEY`
+- `FADEN_BACKEND_SYSTEM_COMPOSE_FILE`
+- `FADEN_BACKEND_SYSTEM_AGENT_ENABLED`
+- `FADEN_BACKEND_SYSTEM_AGENT_TOKEN` (optional)
 
 Docs:
 - `docs/system-settings.md`
@@ -168,10 +168,10 @@ The frontend loads translations at runtime from backend endpoints:
 - `GET /api/i18n/languages`
 - `GET /api/i18n/{lang}/{namespace}`
 
-By default the backend reads bundles from `llm_port_backend/i18n` (configurable via `LLM_PORT_BACKEND_I18N_DIR`).
+By default the backend reads bundles from `backend/i18n` (configurable via `FADEN_BACKEND_I18N_DIR`).
 
 To add a language without frontend recompilation:
-1. Create `llm_port_backend/i18n/<lang>/common.json`.
+1. Create `backend/i18n/<lang>/common.json`.
 2. Refresh the frontend; the new language appears in the language selector.
 ## OpenTelemetry 
 
@@ -258,7 +258,7 @@ For running tests on your local machine.
 
 I prefer doing it with docker:
 ```
-docker run -p "5432:5432" -e "POSTGRES_PASSWORD=llm_port_backend" -e "POSTGRES_USER=llm_port_backend" -e "POSTGRES_DB=llm_port_backend" postgres:18.1-bookworm
+docker run -p "5432:5432" -e "POSTGRES_PASSWORD=faden_backend" -e "POSTGRES_USER=faden_backend" -e "POSTGRES_DB=faden_backend" postgres:18.1-bookworm
 ```
 
 

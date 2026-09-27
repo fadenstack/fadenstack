@@ -2,7 +2,7 @@
 
 When a runtime is created, started, stopped, or deleted in the backend,
 this service mirrors the relevant records into the *API gateway* database
-(``llm_api``) so the gateway can route ``/v1/chat/completions`` requests
+(``faden_gateway``) so the gateway can route ``/v1/chat/completions`` requests
 to the correct upstream endpoint.
 
 The gateway database owns three core routing tables:
@@ -140,7 +140,7 @@ class GatewaySyncService:
         *tools* is whether the model answers with tool calls (``kinds``); the
         gateway offers its own tools only where it does.
 
-        Also routes a vLLM container LLM.Port found on a machine rather than
+        Also routes a vLLM container Fadenstack found on a machine rather than
         started (``source_kind='found_container'``, ``source_id`` its adoption):
         to the gateway it is the same thing, an address that serves a model.
 

@@ -9,9 +9,9 @@ import jwt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
-from llm_port_api.settings import settings
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
+from faden_gateway.settings import settings
 
 
 @dataclass(slots=True, frozen=True)

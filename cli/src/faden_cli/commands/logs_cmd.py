@@ -1,4 +1,4 @@
-"""``llmport logs`` — stream container logs."""
+"""``faden logs`` — stream container logs."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import sys
 
 import click
 
-from llmport.core.compose import build_context_from_config, logs as compose_logs
-from llmport.core.settings import load_config
+from faden_cli.core.compose import build_context_from_config, logs as compose_logs
+from faden_cli.core.settings import load_config
 
 
 @click.command("logs")
@@ -22,7 +22,7 @@ def logs_cmd(
     timestamps: bool,
     services: tuple[str, ...],
 ) -> None:
-    """View logs from llm.port services.
+    """View logs from fadenstack services.
 
     Pass one or more SERVICE names to filter, or omit to see all.
     """

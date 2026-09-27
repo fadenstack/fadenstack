@@ -11,7 +11,7 @@ Provides two SQLAlchemy ``TypeDecorator`` types:
 
 Key management
 --------------
-A single master key (``LLM_PORT_API_ENCRYPTION_KEY``) is stretched via
+A single master key (``FADEN_GATEWAY_ENCRYPTION_KEY``) is stretched via
 HKDF-SHA256 into independent per-purpose subkeys.  Each column declares
 a *purpose* label (e.g. ``"chat-content"``, ``"chat-memory"``) so that
 compromise of one derived key cannot decrypt columns tagged with a
@@ -66,7 +66,7 @@ def configure(master_key: str) -> None:
     if not master_key:
         logger.warning(
             "ENCRYPTION_KEY is not set — chat data stored in plaintext. "
-            "Set LLM_PORT_API_ENCRYPTION_KEY in production.",
+            "Set FADEN_GATEWAY_ENCRYPTION_KEY in production.",
         )
         return
 

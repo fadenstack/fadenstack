@@ -12,10 +12,10 @@ showed "Starting" for a model that was already answering requests.
 
 from __future__ import annotations
 
-from llm_port_backend.services.inference.drivers.ray.client import _parse_serve_status
-from llm_port_backend.services.inference.drivers.ray.deployment import _serve_app_entry
+from faden_backend.services.inference.drivers.ray.client import _parse_serve_status
+from faden_backend.services.inference.drivers.ray.deployment import _serve_app_entry
 
-APP = "llmport-b64e389b-58ae-4b1d-a754-1f9f48e22220"
+APP = "faden-b64e389b-58ae-4b1d-a754-1f9f48e22220"
 
 _APP_ENTRY = {
     "status": "RUNNING",

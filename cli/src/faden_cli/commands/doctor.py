@@ -1,7 +1,7 @@
-"""``llmport doctor`` — diagnose the host environment.
+"""``faden doctor`` — diagnose the host environment.
 
 Runs comprehensive checks on the system and reports whether all
-prerequisites are satisfied for running llm.port.
+prerequisites are satisfied for running fadenstack.
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ import click
 from rich.panel import Panel
 from rich.table import Table
 
-from llmport.core.console import console
-from llmport.core.detect import (
+from faden_cli.core.console import console
+from faden_cli.core.detect import (
     check_install_ports,
     full_report,
 )
@@ -96,7 +96,7 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
         console.print("[cyan]i[/cyan]  GPU: none on this server (models run on the machines you add)")
 
     # ── Ports ─────────────────────────────────────────────────────
-    # Developer tools (git, uv, node) are `llmport dev doctor`'s: a server
+    # Developer tools (git, uv, node) are `faden dev doctor`'s: a server
     # running the published images needs none of them.
     conflicts = [pc for pc in port_checks if pc.in_use and not pc.ours]
     if port_checks:
@@ -110,15 +110,15 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
             if not pc.in_use:
                 status = "[green]available[/green]"
             elif pc.ours:
-                status = "[green]LLM.Port[/green]"
+                status = "[green]Fadenstack[/green]"
             else:
                 status = "[red]in use by something else[/red]"
             port_table.add_row(str(pc.port), pc.label, status)
         console.print(port_table)
         if conflicts:
             console.print(
-                "[dim]  A port held by something else stops `llmport deploy`: free it, or change\n"
-                "  the port (llmport ports --http/--https; PROM_PORT, ... in .env).[/dim]"
+                "[dim]  A port held by something else stops `faden deploy`: free it, or change\n"
+                "  the port (faden ports --http/--https; PROM_PORT, ... in .env).[/dim]"
             )
 
     # ── HTTPS ─────────────────────────────────────────────────────
@@ -139,15 +139,15 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
     else:
         console.print("[bold red]Some prerequisites are missing — see above.[/bold red]")
 
-    console.print("[dim]Developer tools: llmport dev doctor[/dim]")
+    console.print("[dim]Developer tools: faden dev doctor[/dim]")
     if verbose:
         console.print(f"\n[dim]Report generated with {len(port_checks)} port checks.[/dim]")
 
 
 def _install_compose() -> tuple[Path | None, Path | None]:
     """The compose file and .env of the configured install, or of this CLI's release."""
-    from llmport.core.bundle import bundled_files  # noqa: PLC0415
-    from llmport.core.settings import load_config  # noqa: PLC0415
+    from faden_cli.core.bundle import bundled_files  # noqa: PLC0415
+    from faden_cli.core.settings import load_config  # noqa: PLC0415
 
     cfg = load_config()
     if cfg.install_dir and cfg.compose_path.is_file():
@@ -162,9 +162,9 @@ def _https_check() -> None:
     """HTTPS on or off, how long the certificate lasts, and whether it renews by itself."""
     from datetime import UTC, datetime  # noqa: PLC0415
 
-    from llmport.commands.tls import renewal_scheduled  # noqa: PLC0415
-    from llmport.core import tls  # noqa: PLC0415
-    from llmport.core.settings import load_config  # noqa: PLC0415
+    from faden_cli.commands.tls import renewal_scheduled  # noqa: PLC0415
+    from faden_cli.core import tls  # noqa: PLC0415
+    from faden_cli.core.settings import load_config  # noqa: PLC0415
 
     cfg = load_config()
     if not cfg.install_dir:
@@ -175,12 +175,12 @@ def _https_check() -> None:
         console.print(f"\n{_check_mark(False)}  HTTPS: {exc}")
         return
     if served is None:
-        console.print(f"\n{_check_mark(True)}  HTTPS: off (llmport tls generate switches it on)")
+        console.print(f"\n{_check_mark(True)}  HTTPS: off (faden tls generate switches it on)")
         return
     left = (served.not_after - datetime.now(UTC)).days
     renews = renewal_scheduled() and (served.made_here or tls.source(Path(cfg.install_dir)) is not None)
     ok = left >= tls.EXPIRY_WARNING_DAYS or (renews and left > 0)
-    how = "renews by itself" if renews else "renewed by hand (llmport tls status)"
+    how = "renews by itself" if renews else "renewed by hand (faden tls status)"
     console.print(
         f"\n{_check_mark(ok)}  HTTPS: on until [bold]{served.not_after:%Y-%m-%d}[/bold] ({left} days), {how}"
     )

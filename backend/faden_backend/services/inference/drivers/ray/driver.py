@@ -9,20 +9,20 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.services.inference.capabilities import CapabilityDocument
-from llm_port_backend.services.inference.contracts import InferenceDriver
-from llm_port_backend.services.inference.drivers.ray.client import (
+from faden_backend.services.inference.capabilities import CapabilityDocument
+from faden_backend.services.inference.contracts import InferenceDriver
+from faden_backend.services.inference.drivers.ray.client import (
     _INTERACTIVE_PROBE_BUDGET_SEC,
     RayClusterClient,
 )
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
-from llm_port_backend.services.inference.drivers.ray.logs import RayLogReader
-from llm_port_backend.services.inference.observability import (
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.inference.drivers.ray.logs import RayLogReader
+from faden_backend.services.inference.observability import (
     DeploymentMetrics,
     EnvironmentMetrics,
     LogPage,
@@ -32,17 +32,17 @@ from llm_port_backend.services.inference.observability import (
     ReplicaMetrics,
     ScrapeTarget,
 )
-from llm_port_backend.services.inference.drivers.ray.deployment import (
+from faden_backend.services.inference.drivers.ray.deployment import (
     RayDeploymentManager,
 )
-from llm_port_backend.services.inference.drivers.ray.environment import (
+from faden_backend.services.inference.drivers.ray.environment import (
     RayEnvironmentManager,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from llm_port_backend.services.nodes.service import NodeControlService
+    from faden_backend.services.nodes.service import NodeControlService
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class RayDriver(InferenceDriver):
     """InferenceDriver implementation for Ray clusters.
 
     The driver is constructed with no arguments by the
-    :class:`~llm_port_backend.services.inference.registry.DriverRegistry`;
+    :class:`~faden_backend.services.inference.registry.DriverRegistry`;
     everything it needs at call time (a DB session and a node control
     service) is handed in by the reconciliation layer, which owns them.
     """
@@ -197,7 +197,7 @@ class RayDriver(InferenceDriver):
             },
             "artifacts": {
                 "local_path": True,
-                "llmport_sync": True,
+                "faden_sync": True,
             },
         })
 
@@ -217,7 +217,7 @@ class RayDriver(InferenceDriver):
         behind it is not, and a payload built from the wrong one addressed a
         container that was never started.
         """
-        from llm_port_backend.services.inference.bundles import (  # noqa: PLC0415
+        from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             runtime_bundle_payload_for,
         )
 
@@ -227,7 +227,7 @@ class RayDriver(InferenceDriver):
         self, session: "AsyncSession", deployment: Any
     ) -> "tuple[InferenceEnvironment | None, uuid.UUID | None, str]":
         """Resolve (environment, head node, app name) for a deployment."""
-        from llm_port_backend.services.inference.drivers.ray.deployment import app_name_for
+        from faden_backend.services.inference.drivers.ray.deployment import app_name_for
 
         environment = await session.get(InferenceEnvironment, deployment.environment_id)
         head_node_id = getattr(environment, "head_node_id", None) if environment else None
@@ -295,7 +295,7 @@ class RayDriver(InferenceDriver):
         node_control: object | None = None,
     ) -> DeploymentMetrics:
         """Aggregate the Serve application and replica tiers for *deployment*."""
-        from llm_port_backend.services.inference.drivers.ray.deployment import (
+        from faden_backend.services.inference.drivers.ray.deployment import (
             _model_server_deployments,
             _serve_app_entry,
         )
@@ -426,7 +426,7 @@ class RayDriver(InferenceDriver):
         about the cluster -- and translated here, at the one point where the
         address has to be dialled rather than described.
         """
-        from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+        from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
         # ``node_id`` on a Ray target is *Ray's* node id, not ours, so it
         # cannot be looked up directly.  The fabric plan is the bridge: it
@@ -482,7 +482,7 @@ class RayDriver(InferenceDriver):
         than one that leads to a Grafana that is not running.
         """
         try:
-            from llm_port_backend.services.llm.monitoring import (  # noqa: PLC0415
+            from faden_backend.services.llm.monitoring import (  # noqa: PLC0415
                 get_monitoring_provisioner,
             )
 

@@ -1,14 +1,14 @@
-# Feature: PII Protection Pipeline (Gateway + Separate `llm_port_pii` Service)
+# Feature: PII Protection Pipeline (Gateway + Separate `faden_pii` Service)
 
 Status: **Proposed (MVP-ready)**  
-Owners: `llm_port_api` (Gateway), `llm_port_pii` (PII Service)  
+Owners: `faden_gateway` (Gateway), `faden_pii` (PII Service)  
 Primary goal: Prevent sensitive data from leaving the system unprotected **and** prevent accidental leakage via **Langfuse / logs / audit tables**.
 
 ---
 
 ## 1. Summary
 
-`llm.port` adds an optional PII protection layer that can be enabled per **tenant/workspace**. When enabled:
+`fadenstack` adds an optional PII protection layer that can be enabled per **tenant/workspace**. When enabled:
 
 1) **Telemetry Sanitization (recommended default)**  
 All prompt/response content sent to **Langfuse** (and any DB audit tables containing text) is sanitized, **even for local LLM routes**.
@@ -16,7 +16,7 @@ All prompt/response content sent to **Langfuse** (and any DB audit tables contai
 2) **Egress Sanitization (for cloud routes)**  
 If the chosen provider is a **cloud provider**, the request is sanitized before it is sent upstream.
 
-PII detection + transformation runs in a separate internal FastAPI service: **`llm_port_pii`**, using **Microsoft Presidio**.
+PII detection + transformation runs in a separate internal FastAPI service: **`faden_pii`**, using **Microsoft Presidio**.
 
 ---
 
@@ -30,7 +30,7 @@ PII detection + transformation runs in a separate internal FastAPI service: **`l
 - Allow tenant/workspace policies to control:
   - enablement, modes, entity types, thresholds
   - behavior on failure (`block`, `fallback_to_local`, etc.)
-- Keep `llm_port_pii` **internal-only** (no public exposure).
+- Keep `faden_pii` **internal-only** (no public exposure).
 
 ---
 
@@ -47,12 +47,12 @@ PII detection + transformation runs in a separate internal FastAPI service: **`l
 
 ### 4.1 Components
 
-- **Gateway** (`llm_port_api`)
+- **Gateway** (`faden_gateway`)
   - Resolves tenant/workspace policy and route decision
-  - Calls `llm_port_pii` for sanitization/transform
+  - Calls `faden_pii` for sanitization/transform
   - Ensures Langfuse + DB logs only receive sanitized/metrics-only data
 
-- **PII Service** (`llm_port_pii`)
+- **PII Service** (`faden_pii`)
   - FastAPI wrapper around Presidio Analyzer + Anonymizer
   - Accepts OpenAI-shaped payloads, sanitizes text-bearing fields
   - Returns sanitized payload + PII report + optional mapping reference
@@ -123,11 +123,11 @@ For privacy-heavy tenants:
 
 ## 6. Admin UX and Runtime Controls
 
-- `llm_port_api.pii_enabled` is controlled from the **Modules tab** (enable/disable PII module), not from raw settings editors.
-- Settings UI now uses a structured policy form for `llm_port_api.pii_default_policy` and hides PII controls when the PII module is disabled.
+- `faden_gateway.pii_enabled` is controlled from the **Modules tab** (enable/disable PII module), not from raw settings editors.
+- Settings UI now uses a structured policy form for `faden_gateway.pii_default_policy` and hides PII controls when the PII module is disabled.
 - Policy precedence:
   1. tenant override: `tenant_llm_policy.pii_config`
-  2. system default: `llm_port_api.pii_default_policy`
+  2. system default: `faden_gateway.pii_default_policy`
   3. none
 - `GET /api/v1/pii/options` provides runtime-supported entities/languages/modes for admin UIs.
 

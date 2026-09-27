@@ -4,7 +4,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from llm_port_pii.web.application import get_app
+from faden_pii.web.application import get_app
 
 # No database: the service opens none (its DB layer is unused template code,
 # and no install gives it credentials). The fixtures created one, so every

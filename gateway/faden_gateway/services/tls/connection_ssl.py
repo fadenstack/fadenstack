@@ -1,6 +1,6 @@
 """Reusable TLS configuration helpers for backing-store connections.
 
-Mirror of :mod:`llm_port_backend.services.tls.connection_ssl`. Kept in
+Mirror of :mod:`faden_backend.services.tls.connection_ssl`. Kept in
 each package because the two services have no shared Python library.
 """
 

@@ -577,11 +577,11 @@
       },
       "tls_certificate_expiring": {
         "title": "HTTPS 证书将在 {{days}} 天后过期",
-        "detail": "到期日：{{until}}。llmport tls status 显示其续期方式。"
+        "detail": "到期日：{{until}}。faden tls status 显示其续期方式。"
       },
       "tls_certificate_expired": {
         "title": "HTTPS 证书已于 {{until}} 过期",
-        "detail": "浏览器和机器会拒绝访问控制台。请续期：llmport tls renew 或 llmport tls use CERT KEY。"
+        "detail": "浏览器和机器会拒绝访问控制台。请续期：faden tls renew 或 faden tls use CERT KEY。"
       },
       "model_traffic_unencrypted": {
         "title": "到 {{cluster}} 的模型流量未加密",
@@ -735,8 +735,8 @@
     "confirm_title": "替换 {{name}}？",
     "confirm_body": "Docker 无法修改现有容器的这些设置，因此会用这些设置创建一个新容器，并在新容器运行后删除旧容器。容器会获得新的 ID，它写在卷以外的文件将会丢失。如果新容器无法创建或启动，旧容器会恢复原样。",
     "confirm_replace": "替换",
-    "compose_note": "Fadenstack 通过 compose 文件运行此容器：下一次 llmport deploy 或 upgrade 会根据 compose 文件和 .env 重新创建它，不包含这些更改。",
-    "backend_note": "后端运行在此容器中，无法替换它。请在 .env 中修改其设置并运行 llmport upgrade。",
+    "compose_note": "Fadenstack 通过 compose 文件运行此容器：下一次 faden deploy 或 upgrade 会根据 compose 文件和 .env 重新创建它，不包含这些更改。",
+    "backend_note": "后端运行在此容器中，无法替换它。请在 .env 中修改其设置并运行 faden upgrade。",
     "load_failed": "无法加载容器的设置。"
   },
   "images": {
@@ -1407,7 +1407,7 @@
   "pii_policy": {
     "system_section": "PII 策略（系统默认）",
     "pii_service_url": "PII 服务 URL",
-    "pii_service_url_help": "llm_port_pii 的内部地址（例如 http://llm-port-pii:8000/api）。",
+    "pii_service_url_help": "faden_pii 的内部地址（例如 http://faden-pii:8000/api）。",
     "hidden_when_disabled": "PII 模块当前已禁用，因此 PII 设置已隐藏。",
     "tenants_title": "租户 PII 策略",
     "tenants_description": "为指定租户覆盖系统默认 PII 策略。",
@@ -2204,7 +2204,7 @@
   },
   "rag_runtime": {
     "title": "RAG 运行时配置",
-    "description": "嵌入和分块设置由 Fadenstack core 推送到 llm_port_rag。",
+    "description": "嵌入和分块设置由 Fadenstack core 推送到 faden_rag。",
     "failed_load": "无法加载运行时配置。",
     "failed_save": "无法保存运行时配置。",
     "saved": "运行时配置已更新。",
@@ -2868,8 +2868,8 @@
     "signed_in_as": "已以 {{username}} 身份登录 Hugging Face",
     "token_named": "令牌“{{name}}”",
     "role_write": "此令牌还能向 Hugging Face 写入。本服务器只需要读取权限：建议换成只读令牌。",
-    "from_environment": "此令牌来自服务器环境变量 LLM_PORT_BACKEND_HF_TOKEN。在此保存的令牌会取代它。",
-    "storage_unsafe": "本服务器仍在使用默认的设置主密钥，保存的令牌将得不到保护。请先将 LLM_PORT_BACKEND_SETTINGS_MASTER_KEY 设为随机值并重启，再保存令牌。",
+    "from_environment": "此令牌来自服务器环境变量 FADEN_BACKEND_HF_TOKEN。在此保存的令牌会取代它。",
+    "storage_unsafe": "本服务器仍在使用默认的设置主密钥，保存的令牌将得不到保护。请先将 FADEN_BACKEND_SETTINGS_MASTER_KEY 设为随机值并重启，再保存令牌。",
     "token_label": "访问令牌",
     "replace_label": "替换为新令牌",
     "create_hint": "在此创建只读令牌：",

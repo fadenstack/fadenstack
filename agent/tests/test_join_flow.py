@@ -1,4 +1,4 @@
-"""`llmport-agent join`: the path that needs no clipboard.
+"""`faden-agent join`: the path that needs no clipboard.
 
 The value of this command is entirely in what it does *not* ask for. The
 operator types a backend address; no token, no checksum, no environment
@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.backend_client import BackendClient
+from faden_agent.backend_client import BackendClient
 
 
 class _FakeResponse:
@@ -118,7 +118,7 @@ async def test_a_malformed_answer_is_refused_rather_than_half_used() -> None:
 
 def test_join_waits_in_human_time() -> None:
     """Someone has to walk to a browser; a 30-second timeout would be useless."""
-    from llm_port_node_agent import __main__ as cli
+    from faden_agent import __main__ as cli
 
     assert cli._JOIN_WAIT_SECONDS >= 10 * 60
     assert 1.0 <= cli._JOIN_POLL_SECONDS <= 10.0
@@ -126,7 +126,7 @@ def test_join_waits_in_human_time() -> None:
 
 def test_join_accepts_a_bare_host_and_port() -> None:
     """`10.250.10.220:8000` is what a person types; it should just work."""
-    from llm_port_node_agent import __main__ as cli
+    from faden_agent import __main__ as cli
     import inspect
 
     source = inspect.getsource(cli.cmd_join)

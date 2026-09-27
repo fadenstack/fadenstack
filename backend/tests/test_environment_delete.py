@@ -11,8 +11,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.service import EnvironmentService, InferenceError
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.service import EnvironmentService, InferenceError
 from tests.test_inference_env_observation import _bound_environment
 
 

@@ -9,12 +9,12 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from llm_port_skills.log import configure_logging
-from llm_port_skills.services.bundle import BundleError
-from llm_port_skills.services.errors import SkillError
-from llm_port_skills.settings import settings
-from llm_port_skills.web.api.router import api_router
-from llm_port_skills.web.lifespan import lifespan_setup
+from faden_skills.log import configure_logging
+from faden_skills.services.bundle import BundleError
+from faden_skills.services.errors import SkillError
+from faden_skills.settings import settings
+from faden_skills.web.api.router import api_router
+from faden_skills.web.lifespan import lifespan_setup
 
 APP_ROOT = Path(__file__).parent.parent
 
@@ -37,8 +37,8 @@ def get_app() -> FastAPI:
             ],
         )
     app = FastAPI(
-        title="llm_port_skills",
-        version=metadata.version("llm_port_skills"),
+        title="faden_skills",
+        version=metadata.version("faden_skills"),
         lifespan=lifespan_setup,
         docs_url=None,
         redoc_url=None,

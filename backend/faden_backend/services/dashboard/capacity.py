@@ -26,14 +26,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import (
     EnvironmentDesiredState,
     EnvironmentStatus,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeHealthStatus
+from faden_backend.db.models.node_control import InfraNode, NodeHealthStatus
 
 #: A machine that reported healthy but has been silent this long is "stale":
 #: three missed heartbeats at the agent's default 15 s.

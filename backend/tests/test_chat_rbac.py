@@ -13,10 +13,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from starlette import status
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.web.application import get_app
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.web.application import get_app
 
 
 def _make_user(*, superuser: bool) -> User:

@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray.container import (
+from faden_agent.ray.container import (
     RayContainerRuntime,
     RuntimeBundleSpec,
     RuntimeDigestMismatch,
@@ -31,8 +31,8 @@ OTHER_LAYERS = ["sha256:" + "cc" * 32]
 
 def _payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "name": "llm-port-ray-runtime",
-        "image": "llmport/ray-vllm-gb10:ray2.58-nv26.08",
+        "name": "faden-ray-runtime",
+        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
         "digest": DIGEST,
         "rootfs_digest": ROOTFS_DIGEST,
         "runtime_handler": "docker",
@@ -44,7 +44,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
             "capabilities": ["IPC_LOCK"],
         },
         "mounts": [
-            {"host_path": "/srv/llm-port/models", "container_path": "/models", "mode": "ro"},
+            {"host_path": "/srv/faden/models", "container_path": "/models", "mode": "ro"},
         ],
         "env": {},
     }
@@ -134,7 +134,7 @@ class _FakeRuntime:
 async def test_start_head_runs_inside_the_pinned_container() -> None:
     """The whole bootstrap happens via exec into the image - no host Ray."""
     runtime = _FakeRuntime()
-    container = RayContainerRuntime(runtime=runtime, token_path="/var/run/llm-port/ray/cluster.token")
+    container = RayContainerRuntime(runtime=runtime, token_path="/var/run/fadenstack/ray/cluster.token")
     spec = RuntimeBundleSpec.from_payload(_payload())
 
     await container.ensure_image(spec)
@@ -150,7 +150,7 @@ async def test_start_head_runs_inside_the_pinned_container() -> None:
     )
 
     assert result["head_address"] == "10.100.0.1:6379"
-    assert result["in_container"] == "llm-port-ray-runtime"
+    assert result["in_container"] == "faden-ray-runtime"
 
     ray_exec = next(e for e in runtime.execs if e["command"][:2] == ["ray", "start"])
     assert "--head" in ray_exec["command"]
@@ -175,9 +175,9 @@ async def test_semantic_requirements_become_handler_flags() -> None:
     assert flags[flags.index("--device") + 1] == "/dev/infiniband"
     assert flags[flags.index("--cap-add") + 1] == "IPC_LOCK"
     assert run["gpus"] == "all"
-    assert "/srv/llm-port/models:/models:ro" in run["volumes"]
+    assert "/srv/faden/models:/models:ro" in run["volumes"]
     # The cluster token file is mounted read-only so the container can attach.
-    assert any(v.startswith("/var/run/llm-port/ray:") for v in run["volumes"])
+    assert any(v.startswith("/var/run/fadenstack/ray:") for v in run["volumes"])
     assert run["env"]["RAY_AUTH_TOKEN_PATH"].endswith("cluster.token")
 
 
@@ -251,9 +251,9 @@ async def test_ensure_runtime_reports_installed_with_no_host_ray(tmp_path) -> No
     ``RayManager.ensure_runtime`` must answer ``installed=True`` from the
     container's own CLI even though nothing on this host has Ray.
     """
-    from llm_port_node_agent.event_buffer import EventBuffer
-    from llm_port_node_agent.ray.manager import RayManager
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.event_buffer import EventBuffer
+    from faden_agent.ray.manager import RayManager
+    from faden_agent.state_store import StateStore
 
     runtime = _FakeRuntime()
     manager = RayManager(

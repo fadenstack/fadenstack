@@ -6,8 +6,8 @@ from fastapi import Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.llm import (
     ArtifactFormat,
     DownloadJob,
     DownloadJobStatus,
@@ -468,7 +468,7 @@ class RuntimeDAO:
         Used by the enriched models listing to show where each model is
         deployed without N+1 queries.
         """
-        from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+        from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
         stmt = (
             select(LLMRuntime, LLMProvider, InfraNode)

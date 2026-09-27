@@ -2,7 +2,7 @@
 
 Generates a production ``.env`` file with cryptographically random
 secrets replacing every ``CHANGEME_*`` placeholder in the template.
-The user can then override individual values via ``llmport config set``.
+The user can then override individual values via ``faden config set``.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from llmport.core.registry import module_env_vars
-from llmport.core.sysinfo import calculate_tune_profile
+from faden_cli.core.registry import module_env_vars
+from faden_cli.core.sysinfo import calculate_tune_profile
 
 # Keys that contain cryptographic secrets. These must never be replaced
 # when regenerating an .env file because changing them would make
@@ -32,22 +32,22 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "LANGFUSE_NEXTAUTH_SECRET",
     "LANGFUSE_SALT",
     "LANGFUSE_ENCRYPTION_KEY",
-    "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY",
-    "LLM_PORT_API_ENCRYPTION_KEY",
-    "LLM_PORT_MCP_ENCRYPTION_KEY",
+    "FADEN_BACKEND_SETTINGS_MASTER_KEY",
+    "FADEN_GATEWAY_ENCRYPTION_KEY",
+    "FADEN_MCP_ENCRYPTION_KEY",
     "USERS_SECRET",
     # Inter-service auth tokens — each downstream service has one shared
     # value across (api → service), (backend → service), (service receiver).
     # All three keys per service MUST stay in lock-step, so they're listed
     # together here to be preserved as a group on .env regeneration.
-    "LLM_PORT_API_MCP_SERVICE_TOKEN",
-    "LLM_PORT_BACKEND_MCP_SERVICE_TOKEN",
-    "LLM_PORT_MCP_SERVICE_TOKEN",
-    "LLM_PORT_API_SKILLS_SERVICE_TOKEN",
-    "LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN",
-    "LLM_PORT_SKILLS_SERVICE_TOKEN",
-    "LLM_PORT_BACKEND_RAG_SERVICE_TOKEN",
-    "LLM_PORT_RAG_SERVICE_TOKEN",
+    "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
+    "FADEN_BACKEND_MCP_SERVICE_TOKEN",
+    "FADEN_MCP_SERVICE_TOKEN",
+    "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
+    "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
+    "FADEN_SKILLS_SERVICE_TOKEN",
+    "FADEN_BACKEND_RAG_SERVICE_TOKEN",
+    "FADEN_RAG_SERVICE_TOKEN",
 })
 
 
@@ -92,7 +92,7 @@ def dev_env_vars(
     """Build env vars with standard dev credentials.
 
     Uses ``devpassword`` everywhere — matches the existing
-    ``llm_port_shared/.env`` used during development.
+    ``shared/.env`` used during development.
     """
     pw = "devpassword"
 
@@ -122,27 +122,27 @@ def dev_env_vars(
         "RABBITMQ_API_PASS": pw,
         "RABBITMQ_PII_PASS": pw,
         # Settings master key — used to encrypt/decrypt secrets stored in the DB.
-        # Must match LLM_PORT_BACKEND_SETTINGS_MASTER_KEY in the backend .env.
+        # Must match FADEN_BACKEND_SETTINGS_MASTER_KEY in the backend .env.
         # JWT secrets are seeded automatically in the DB on first startup.
-        "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
-        "LLM_PORT_API_ENCRYPTION_KEY": "dev-encryption-key-change-me",
-        "LLM_PORT_API_LANGFUSE_ENABLED": "false",
-        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:8000",
+        "FADEN_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
+        "FADEN_GATEWAY_ENCRYPTION_KEY": "dev-encryption-key-change-me",
+        "FADEN_GATEWAY_LANGFUSE_ENABLED": "false",
+        "FADEN_BACKEND_GATEWAY_URL": "http://faden-gateway:8000",
         # Dev stacks opt IN to dev mode (seeded admin, /auth/dev-login); the
         # services and compose default to production.
-        "LLM_PORT_BACKEND_ENVIRONMENT": "dev",
-        "LLM_PORT_API_ENVIRONMENT": "dev",
-        "LLM_PORT_PII_ENVIRONMENT": "dev",
-        "LLM_PORT_MCP_ENVIRONMENT": "dev",
-        "LLM_PORT_SKILLS_ENVIRONMENT": "dev",
+        "FADEN_BACKEND_ENVIRONMENT": "dev",
+        "FADEN_GATEWAY_ENVIRONMENT": "dev",
+        "FADEN_PII_ENVIRONMENT": "dev",
+        "FADEN_MCP_ENVIRONMENT": "dev",
+        "FADEN_SKILLS_ENVIRONMENT": "dev",
         # Langfuse initial admin seeding
         "LANGFUSE_INIT_USER_EMAIL": "",
         "LANGFUSE_INIT_USER_PASSWORD": "",
         "LANGFUSE_INIT_USER_NAME": "Admin",
-        "LANGFUSE_INIT_ORG_ID": "llm-port-org",
-        "LANGFUSE_INIT_ORG_NAME": "llm-port",
-        "LANGFUSE_INIT_PROJECT_ID": "llm-port-project",
-        "LANGFUSE_INIT_PROJECT_NAME": "llm-port",
+        "LANGFUSE_INIT_ORG_ID": "faden-org",
+        "LANGFUSE_INIT_ORG_NAME": "fadenstack",
+        "LANGFUSE_INIT_PROJECT_ID": "faden-project",
+        "LANGFUSE_INIT_PROJECT_NAME": "fadenstack",
         "LANGFUSE_INIT_PROJECT_PUBLIC_KEY": "",
         "LANGFUSE_INIT_PROJECT_SECRET_KEY": "",
     }
@@ -213,43 +213,43 @@ def default_env_vars(
         "RABBITMQ_PII_PASS": _random_password(24),
         # Settings master key — used to encrypt/decrypt secrets stored in the DB.
         # JWT secrets are seeded automatically in the DB on first startup.
-        "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY": _random_secret(),
-        "LLM_PORT_API_ENCRYPTION_KEY": _random_secret(),
-        "LLM_PORT_API_LANGFUSE_ENABLED": "false",
-        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:8000",
-        "LLM_PORT_BACKEND_ENVIRONMENT": "production",
-        "LLM_PORT_API_ENVIRONMENT": "production",
-        "LLM_PORT_PII_ENVIRONMENT": "production",
-        "LLM_PORT_MCP_ENVIRONMENT": "production",
-        "LLM_PORT_SKILLS_ENVIRONMENT": "production",
+        "FADEN_BACKEND_SETTINGS_MASTER_KEY": _random_secret(),
+        "FADEN_GATEWAY_ENCRYPTION_KEY": _random_secret(),
+        "FADEN_GATEWAY_LANGFUSE_ENABLED": "false",
+        "FADEN_BACKEND_GATEWAY_URL": "http://faden-gateway:8000",
+        "FADEN_BACKEND_ENVIRONMENT": "production",
+        "FADEN_GATEWAY_ENVIRONMENT": "production",
+        "FADEN_PII_ENVIRONMENT": "production",
+        "FADEN_MCP_ENVIRONMENT": "production",
+        "FADEN_SKILLS_ENVIRONMENT": "production",
         "USERS_SECRET": _random_secret(),
         # Inter-service auth tokens (see comment above). Each pair of
         # caller env vars must equal the receiver's env var.
-        "LLM_PORT_API_MCP_SERVICE_TOKEN": mcp_service_token,
-        "LLM_PORT_BACKEND_MCP_SERVICE_TOKEN": mcp_service_token,
-        "LLM_PORT_MCP_SERVICE_TOKEN": mcp_service_token,
-        "LLM_PORT_API_SKILLS_SERVICE_TOKEN": skills_service_token,
-        "LLM_PORT_BACKEND_SKILLS_SERVICE_TOKEN": skills_service_token,
-        "LLM_PORT_SKILLS_SERVICE_TOKEN": skills_service_token,
-        "LLM_PORT_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
-        "LLM_PORT_RAG_SERVICE_TOKEN": rag_service_token,
+        "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp_service_token,
+        "FADEN_BACKEND_MCP_SERVICE_TOKEN": mcp_service_token,
+        "FADEN_MCP_SERVICE_TOKEN": mcp_service_token,
+        "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN": skills_service_token,
+        "FADEN_BACKEND_SKILLS_SERVICE_TOKEN": skills_service_token,
+        "FADEN_SKILLS_SERVICE_TOKEN": skills_service_token,
+        "FADEN_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
+        "FADEN_RAG_SERVICE_TOKEN": rag_service_token,
         # Encrypts the credentials MCP stores. Without it the compose file
         # falls back to a fixed dev key, the same for every install.
-        "LLM_PORT_MCP_ENCRYPTION_KEY": _random_secret(),
+        "FADEN_MCP_ENCRYPTION_KEY": _random_secret(),
         # Langfuse initial admin seeding (populated during bootstrap)
         "LANGFUSE_INIT_USER_EMAIL": "",
         "LANGFUSE_INIT_USER_PASSWORD": "",
         "LANGFUSE_INIT_USER_NAME": "Admin",
-        "LANGFUSE_INIT_ORG_ID": "llm-port-org",
-        "LANGFUSE_INIT_ORG_NAME": "llm-port",
-        "LANGFUSE_INIT_PROJECT_ID": "llm-port-project",
-        "LANGFUSE_INIT_PROJECT_NAME": "llm-port",
+        "LANGFUSE_INIT_ORG_ID": "faden-org",
+        "LANGFUSE_INIT_ORG_NAME": "fadenstack",
+        "LANGFUSE_INIT_PROJECT_ID": "faden-project",
+        "LANGFUSE_INIT_PROJECT_NAME": "fadenstack",
         "LANGFUSE_INIT_PROJECT_PUBLIC_KEY": "",
         "LANGFUSE_INIT_PROJECT_SECRET_KEY": "",
     }
 
     # Worker counts and pools are not set here: deploy, upgrade and
-    # ``up --gen-env`` size them with ``llmport tune`` (core/tune.py).
+    # ``up --gen-env`` size them with ``faden tune`` (core/tune.py).
 
     # Module activation
     profs = profiles or []
@@ -307,15 +307,15 @@ def write_env_file(
                 f"postgresql://{user}:{pw}@postgres:5432/{db}"
             )
     lines: list[str] = []
-    lines.append("# Generated by llmport init — do not edit manually unless you know what you're doing.")
+    lines.append("# Generated by faden init — do not edit manually unless you know what you're doing.")
     lines.append(f"# Generated at: {_timestamp()}")
     lines.append("")
 
     # Group by prefix for readability
     groups: dict[str, list[tuple[str, str]]] = {"core": []}
     for key, value in variables.items():
-        if key.startswith("LLM_PORT_"):
-            group = "llm_port"
+        if key.startswith("FADEN_"):
+            group = "faden"
         elif key.startswith("LANGFUSE_"):
             group = "langfuse"
         elif key.startswith("CLICKHOUSE_"):
@@ -328,10 +328,10 @@ def write_env_file(
         "core": "Core Infrastructure",
         "langfuse": "Langfuse",
         "clickhouse": "ClickHouse",
-        "llm_port": "llm.port Services",
+        "faden": "fadenstack Services",
     }
 
-    for group_key in ["core", "langfuse", "clickhouse", "llm_port"]:
+    for group_key in ["core", "langfuse", "clickhouse", "faden"]:
         items = groups.get(group_key, [])
         if not items:
             continue
@@ -360,7 +360,7 @@ def set_module_env(
     data may already be encrypted with them. Returns the keys it set, never
     their values.
 
-    ``llmport module enable`` used to record the module in llmport.yaml
+    ``faden module enable`` used to record the module in faden.yaml
     only. Its containers started, but the gateway and the backend kept the
     compose file's ``*_ENABLED=false`` and answered "MCP module is not
     enabled.", and MCP encrypted with the compose file's fixed dev key.
@@ -378,7 +378,7 @@ def set_module_env(
     if appended:
         if lines and lines[-1].strip():
             lines.append("")
-        lines += ["# ── Modules (llmport module enable) ──", *appended]
+        lines += ["# ── Modules (faden module enable) ──", *appended]
     # LF, like write_env_file: the file is read by Linux containers.
     env_path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
     return list(changes)
@@ -396,7 +396,7 @@ def _key_lines(lines: list[str]) -> dict[str, int]:
 
 def _enabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
     """The settings and missing secrets that switch *names* on."""
-    from llmport.core.registry import MODULES  # noqa: PLC0415
+    from faden_cli.core.registry import MODULES  # noqa: PLC0415
 
     changes: dict[str, str] = {}
     for name in names:
@@ -410,7 +410,7 @@ def _enabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> di
 
 def _disabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
     """The switches that turn *names* off; their secrets stay."""
-    from llmport.core.registry import MODULES  # noqa: PLC0415
+    from faden_cli.core.registry import MODULES  # noqa: PLC0415
 
     return {
         key: "false"

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_port_node_agent.runtimes.accelerators import (
+from faden_agent.runtimes.accelerators import (
     accelerator_cdi_flags,
     accelerator_run_flags,
 )
@@ -103,7 +103,7 @@ def test_find_tool_searches_beyond_path(tmp_path, monkeypatch) -> None:
     when run as a service -- and a node with no accelerator resolves to no
     runtime bundle, so its cluster refused it.
     """
-    from llm_port_node_agent.gpu import find_tool
+    from faden_agent.gpu import find_tool
 
     wsl_lib = tmp_path / "wsl" / "lib"
     wsl_lib.mkdir(parents=True)
@@ -113,14 +113,14 @@ def test_find_tool_searches_beyond_path(tmp_path, monkeypatch) -> None:
 
     monkeypatch.setattr("shutil.which", lambda _name: None)
     monkeypatch.setattr(
-        "llm_port_node_agent.gpu._TOOL_SEARCH_PATH", (str(wsl_lib),)
+        "faden_agent.gpu._TOOL_SEARCH_PATH", (str(wsl_lib),)
     )
     assert find_tool("nvidia-smi") == str(smi)
 
 
 def test_find_tool_prefers_path(monkeypatch) -> None:
     """A tool on PATH is the answer; the extra locations are a fallback."""
-    from llm_port_node_agent.gpu import find_tool
+    from faden_agent.gpu import find_tool
 
     monkeypatch.setattr("shutil.which", lambda _name: "/usr/bin/nvidia-smi")
     assert find_tool("nvidia-smi") == "/usr/bin/nvidia-smi"
@@ -128,10 +128,10 @@ def test_find_tool_prefers_path(monkeypatch) -> None:
 
 def test_find_tool_reports_nothing_when_absent(monkeypatch, tmp_path) -> None:
     """Absent is absent -- never a bare name the caller would shell out to."""
-    from llm_port_node_agent.gpu import find_tool
+    from faden_agent.gpu import find_tool
 
     monkeypatch.setattr("shutil.which", lambda _name: None)
     monkeypatch.setattr(
-        "llm_port_node_agent.gpu._TOOL_SEARCH_PATH", (str(tmp_path),)
+        "faden_agent.gpu._TOOL_SEARCH_PATH", (str(tmp_path),)
     )
     assert find_tool("nvidia-smi") is None

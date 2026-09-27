@@ -1,6 +1,6 @@
-# LLM.Port Ray runtime image
+# Fadenstack Ray runtime image
 
-The container LLM.Port runs models in. Ray 2.58 + Ray Serve LLM + vLLM, built
+The container Fadenstack runs models in. Ray 2.58 + Ray Serve LLM + vLLM, built
 as one thin layer on top of NVIDIA's own vLLM image.
 
 This is a release artifact, not a test fixture. The backend reads
@@ -8,7 +8,7 @@ This is a release artifact, not a test fixture. The backend reads
 catalogue, so nothing here is optional: without it the catalogue cannot be
 constructed and no deployment can resolve a runtime.
 
-It used to live in `llm-port-dev/llm_port_ray_migration/runtime_image/`, which
+It used to live in `fadenstack-dev/llm_port_ray_migration/runtime_image/`, which
 meant a core checkout had to have the dev repo beside it to start. The
 certification suite -- the scripts that prove a built image works on real DGX
 hardware, and the reports they produced -- stayed there, because that is what
@@ -44,15 +44,15 @@ python rebuild_runtime_image.py --flavor x86_64 --build   # x86_64, on any x86_6
 
 Then certify the result against real hardware before the catalogue points at
 it -- the suite for that is in
-`llm-port-dev/llm_port_ray_migration/runtime_image/`.
+`fadenstack-dev/llm_port_ray_migration/runtime_image/`.
 
 ## Releases
 
-A `runtime-v<version>` tag (pushed by `llm-port-dev/scripts/release-runtime.ps1`)
+A `runtime-v<version>` tag (pushed by `fadenstack-dev/scripts/release-runtime.ps1`)
 runs `.github/workflows/runtime-image-release.yml`: each image is built on a
 runner of its own architecture, pushed to
-`ghcr.io/llm-port/ray-runtime-gb10:<version>` and
-`ghcr.io/llm-port/ray-runtime-x86_64:<version>`, and its manifest -- minted by
+`ghcr.io/fadenstack/ray-runtime-gb10:<version>` and
+`ghcr.io/fadenstack/ray-runtime-x86_64:<version>`, and its manifest -- minted by
 the same script, with the registry digest -- is attached to the
 `runtime-v<version>` GitHub release.
 

@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.policy_guard import PolicyGuard, PolicyViolationError
-from llm_port_node_agent.runtime_manager import RuntimeManagerError
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.policy_guard import PolicyGuard, PolicyViolationError
+from faden_agent.runtime_manager import RuntimeManagerError
+from faden_agent.state_store import StateStore
 
 
 @pytest.fixture()

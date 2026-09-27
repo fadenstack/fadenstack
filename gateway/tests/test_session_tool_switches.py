@@ -21,17 +21,17 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.models.gateway import (
     ChatSession,
     ExecutionMode,
     ProviderType,
     SessionToolOverride,
 )
-from llm_port_api.services.gateway.mcp_client import MCPClient, ToolCallResult, ToolCatalog
-from llm_port_api.services.gateway.system_tools import FIND, TIME
-from llm_port_api.services.registry import service_registry
-from llm_port_api.settings import settings
+from faden_gateway.services.gateway.mcp_client import MCPClient, ToolCallResult, ToolCatalog
+from faden_gateway.services.gateway.system_tools import FIND, TIME
+from faden_gateway.services.registry import service_registry
+from faden_gateway.settings import settings
 from tests.test_gateway_knowledge_tools import (
     CAN_CALL_TOOLS,
     _ask,
@@ -297,7 +297,7 @@ async def test_a_tool_named_twice_in_one_update_takes_the_last_value(
 )
 def test_a_tool_is_run_by_its_whole_name(called: str, runs: str) -> None:
     """Hyphens are part of a name; a model's appended markup is not."""
-    from llm_port_api.services.gateway.service import _tool_name  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _tool_name  # noqa: PLC0415
 
     assert _tool_name({"function": {"name": called}}) == runs
 
@@ -369,7 +369,7 @@ async def test_a_turn_without_tools_gets_the_history_without_them(
 
 def test_a_long_tool_result_is_kept_cut(monkeypatch: pytest.MonkeyPatch) -> None:
     """One GitHub response can be tens of kilobytes; the history keeps the start."""
-    from llm_port_api.services.gateway.service import _exchange_record  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _exchange_record  # noqa: PLC0415
 
     monkeypatch.setattr(settings, "session_tool_result_max_chars", 10)
     record = _exchange_record([

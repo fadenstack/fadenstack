@@ -19,16 +19,16 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from llm_port_backend.db.models.inference import InferenceDeployment
-from llm_port_backend.db.models.node_control import NodeCommandType
-from llm_port_backend.services.inference.observability import (
+from faden_backend.db.models.inference import InferenceDeployment
+from faden_backend.db.models.node_control import NodeCommandType
+from faden_backend.services.inference.observability import (
     LogLine,
     LogPage,
     LogSource,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
-    from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+    from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 
 log = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ class RayLogReader:
             )
 
         try:
-            from llm_port_backend.web.api.logs.views import (  # noqa: PLC0415
+            from faden_backend.web.api.logs.views import (  # noqa: PLC0415
                 LokiUpstreamError,
                 _request_loki_json,
             )
@@ -274,7 +274,7 @@ class RayLogReader:
             # Name the container explicitly.  Under the Ray driver there is no
             # per-deployment container: every replica runs inside the runtime
             # bundle's one.  Without this the agent derives
-            # "llm-port-<app_name>", finds nothing, and every log read returns
+            # "faden-<app_name>", finds nothing, and every log read returns
             # "Container ... does not exist on this node" -- a successful
             # fetch of the wrong thing.
             bundle_container = runtime_bundle.get("name")

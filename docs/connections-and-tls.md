@@ -20,7 +20,7 @@ server to HTTPS, renewal, signed commands -- is in
 | Line | Meaning |
 |---|---|
 | Green, solid | TLS, always: calls out to the internet, and the gateway to the models on the machines (mutual TLS), found vLLM included. |
-| Green, dashed | TLS once switched on: into nginx (HTTPS; `llmport deploy` switches it on by default), and Ray between the machines (the cluster's **Traffic between machines** switch, mutual TLS). |
+| Green, dashed | TLS once switched on: into nginx (HTTPS; `faden deploy` switches it on by default), and Ray between the machines (the cluster's **Traffic between machines** switch, mutual TLS). |
 | Amber, dashed | Plain across the network, low value: metrics, or content already checked by digest. |
 | Purple, dotted | Cannot be TLS: keep the network isolated. GPU-to-GPU tensor traffic over RDMA. |
 | Grey, thin | Plain, never leaves the host: the Docker network, a local socket or the loopback address. |
@@ -41,7 +41,7 @@ flowchart LR
     API["API clients<br/>SDKs, curl"]
   end
 
-  subgraph SERVER["Server · one host · Docker network llm_port_shared"]
+  subgraph SERVER["Server · one host · Docker network shared"]
     NG["nginx :80 / :443<br/>the only public port"]
     subgraph APPS["Application"]
       FE["frontend :3000"]
@@ -159,9 +159,9 @@ flowchart LR
 
 | Priority | Connection | What crosses it | Today | Recommended |
 |---|---|---|---|---|
-| Done | Gateway → models on the machines: Ray Serve and the vLLM LLM.Port starts | Every prompt and every completion | Mutual TLS since agent 0.1.16: each machine's nginx accepts only the gateway's certificate from the machine CA; the model listens on 127.0.0.1. Clusters started before are moved with one button. | Nothing. Measured on the DGX pair: chat as fast as before; plain HTTP, no certificate, a foreign CA and another machine's key all refused; a CA replacement interrupts about 35 s. |
-| Done | Gateway → a vLLM found running on a machine (not started by LLM.Port) | Every prompt and every completion | Routed through the machine's proxy too (agents 0.1.17+): the gateway reaches it over mutual TLS on its port plus 20000. Its own port stays open: it is not LLM.Port's to close. | Firewall the found server's own port to the machine, or start the model under LLM.Port. |
-| Default | Browsers, API clients and agents → nginx | Sign-ins, API keys, prompts, machine credentials | `llmport deploy` switches HTTPS on by default (a certificate from the install's own CA); an install upgraded from before keeps what it had. | `llmport tls generate` on an install still on plain HTTP; the machines follow by themselves. |
+| Done | Gateway → models on the machines: Ray Serve and the vLLM Fadenstack starts | Every prompt and every completion | Mutual TLS since agent 0.1.16: each machine's nginx accepts only the gateway's certificate from the machine CA; the model listens on 127.0.0.1. Clusters started before are moved with one button. | Nothing. Measured on the DGX pair: chat as fast as before; plain HTTP, no certificate, a foreign CA and another machine's key all refused; a CA replacement interrupts about 35 s. |
+| Done | Gateway → a vLLM found running on a machine (not started by Fadenstack) | Every prompt and every completion | Routed through the machine's proxy too (agents 0.1.17+): the gateway reaches it over mutual TLS on its port plus 20000. Its own port stays open: it is not Fadenstack's to close. | Firewall the found server's own port to the machine, or start the model under Fadenstack. |
+| Default | Browsers, API clients and agents → nginx | Sign-ins, API keys, prompts, machine credentials | `faden deploy` switches HTTPS on by default (a certificate from the install's own CA); an install upgraded from before keeps what it had. | `faden tls generate` on an install still on plain HTTP; the machines follow by themselves. |
 | Done | Agents → Loki | Container logs; vLLM can log request text | Pushed through the server (agents 0.1.17+): nginx, then the backend, authenticated by the machine's credential and stamped with its address. Loki stays on 127.0.0.1. HTTPS once the server serves it. | Nothing. |
 | Switch | Ray between machines: GCS, raylet, object manager, worker ports | Cluster control, objects, and Serve's calls into replicas on the other machine, prompts included | Token-authenticated always. Mutual TLS (`RAY_USE_TLS`) once the cluster's <b>Traffic between machines</b> switch is on (agents 0.1.18+): each cluster has its own CA; switching restarts the cluster. | Switch it on unless bulk object transfer matters: on the DGX pair it halves peak object throughput (1 GB best 0.28 → 0.54 s); task calls and chat are unchanged. |
 | Low | Prometheus → Ray metrics on each machine | Numbers | Plain HTTP pull over the LAN. | Later: scrape through the agent, or TLS with the machine certificate. |

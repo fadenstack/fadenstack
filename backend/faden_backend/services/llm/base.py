@@ -6,8 +6,8 @@ import dataclasses
 from abc import ABC, abstractmethod
 from typing import Any
 
-from llm_port_backend.db.models.llm import LLMModel, LLMProvider, LLMRuntime, ModelArtifact
-from llm_port_backend.services.gpu.types import GpuVendor
+from faden_backend.db.models.llm import LLMModel, LLMProvider, LLMRuntime, ModelArtifact
+from faden_backend.services.gpu.types import GpuVendor
 
 
 @dataclasses.dataclass(frozen=True)

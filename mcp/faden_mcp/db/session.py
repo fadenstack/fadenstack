@@ -1,11 +1,11 @@
-"""Database engine and session factory for llm_port_mcp."""
+"""Database engine and session factory for faden_mcp."""
 
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from llm_port_mcp.settings import settings
+from faden_mcp.settings import settings
 
 engine = create_async_engine(
     str(settings.db_url),

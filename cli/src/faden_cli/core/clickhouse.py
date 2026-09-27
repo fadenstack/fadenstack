@@ -1,6 +1,6 @@
 """ClickHouse housekeeping: its own diagnostic logs.
 
-``llm_port_shared/clickhouse/config.d/system-logs.xml`` turns off the system
+``shared/clickhouse/config.d/system-logs.xml`` turns off the system
 log tables Langfuse never reads. Off, a table stops growing but keeps what it
 holds -- 41 GB of ``trace_log`` on one install, which had filled its disk --
 so an upgrade drops them. So too the numbered copies (``query_log_0``)
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from llmport.core.compose import ComposeContext, _run
+from faden_cli.core.compose import ComposeContext, _run
 
 #: The system log tables ``system-logs.xml`` turns off.
 DISABLED_LOGS = (

@@ -14,8 +14,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.groups import Group
-from llm_port_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.groups import Group
+from faden_backend.db.models.users import User, current_active_user
 
 
 async def _seed_user(dbsession: AsyncSession, *, email: str, is_superuser: bool) -> User:

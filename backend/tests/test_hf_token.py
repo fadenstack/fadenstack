@@ -12,12 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.containers import AuditEvent
-from llm_port_backend.db.models.system_settings import SystemSettingSecret
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.llm import hf_token
-from llm_port_backend.services.system_settings.crypto import SettingsCrypto
-from llm_port_backend.settings import settings
+from faden_backend.db.models.containers import AuditEvent
+from faden_backend.db.models.system_settings import SystemSettingSecret
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.llm import hf_token
+from faden_backend.services.system_settings.crypto import SettingsCrypto
+from faden_backend.settings import settings
 
 TOKEN = "hf_abcdefghijklmnopqrstuvwxyz0123456789"
 URL = "/api/llm/settings/hf-token"
@@ -64,7 +64,7 @@ async def _stored(dbsession: AsyncSession) -> SystemSettingSecret | None:
 async def test_a_good_token_is_kept_encrypted_and_never_answered_back(
     client: AsyncClient, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="sachith", token_name="llm-port", role="read"))
+    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="sachith", token_name="fadenstack", role="read"))
 
     response = await client.put(URL, json={"token": f"  {TOKEN}  "})
     assert response.status_code == status.HTTP_200_OK
@@ -149,9 +149,9 @@ def test_whoami_reads_the_status_code_not_the_text(monkeypatch: pytest.MonkeyPat
     assert hf_token._whoami_sync(TOKEN).check == "offline"
     hub(401, {"error": "Invalid user token"})
     assert hf_token._whoami_sync(TOKEN).check == "invalid"
-    hub(200, {"name": "sachith", "auth": {"accessToken": {"displayName": "llm-port", "role": "read"}}})
+    hub(200, {"name": "sachith", "auth": {"accessToken": {"displayName": "fadenstack", "role": "read"}}})
     assert hf_token._whoami_sync(TOKEN) == hf_token.Identity(
-        check="ok", username="sachith", token_name="llm-port", role="read",
+        check="ok", username="sachith", token_name="fadenstack", role="read",
     )
 
 

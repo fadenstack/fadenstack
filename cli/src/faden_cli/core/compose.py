@@ -6,7 +6,7 @@ dependency on Docker libraries and works on any system that has the
 ``docker`` binary.
 
 Environment and profile arguments are built from the
-:class:`~llmport.core.settings.LlmportConfig` dataclass so callers
+:class:`~faden_cli.core.settings.FadenConfig` dataclass so callers
 never need to assemble raw CLI flags.
 """
 
@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from llmport.core.console import console, error
+from faden_cli.core.console import console, error
 
 
 # ── GPU detection ─────────────────────────────────────────────────
@@ -148,7 +148,7 @@ def pull_base_images() -> None:
 def build_base_image(ctx: ComposeContext, *, no_cache: bool = False) -> int:
     """Build the shared platform base image via compose.
 
-    Uses the ``llm-port-base`` service (gated behind the ``_build``
+    Uses the ``faden-base`` service (gated behind the ``_build``
     profile) so the image lands in the same BuildKit context that
     subsequent service builds use.
     """
@@ -158,7 +158,7 @@ def build_base_image(ctx: ComposeContext, *, no_cache: bool = False) -> int:
         project_dir=ctx.project_dir,
         profiles=["_build"],
     )
-    return build(base_ctx, services=["llm-port-base"], no_cache=no_cache)
+    return build(base_ctx, services=["faden-base"], no_cache=no_cache)
 
 
 def _run(
@@ -414,20 +414,20 @@ def run_cmd(
     return _run(cmd, capture=capture)
 
 
-def _resolve_compose_path(cfg: "LlmportConfig") -> Path:
-    """Resolve the compose file, falling back to llm_port_shared/."""
+def _resolve_compose_path(cfg: "FadenConfig") -> Path:
+    """Resolve the compose file, falling back to shared/."""
     primary = cfg.compose_path
     if primary.exists():
         return primary
-    # Check inside llm_port_shared relative to install path
+    # Check inside shared relative to install path
     for name in ("docker-compose.yaml", "docker-compose.yml"):
-        candidate = cfg.install_path / "llm_port_shared" / name
+        candidate = cfg.install_path / "shared" / name
         if candidate.exists():
             return candidate
     return primary
 
 
-def build_context_from_config(cfg: "LlmportConfig", *, gpu: bool | None = None) -> ComposeContext:
+def build_context_from_config(cfg: "FadenConfig", *, gpu: bool | None = None) -> ComposeContext:
     """Build a ComposeContext from the current config.
 
     *gpu* controls whether the GPU overlay is included:

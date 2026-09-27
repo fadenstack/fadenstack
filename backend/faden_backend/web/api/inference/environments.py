@@ -16,17 +16,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference import takeover
-from llm_port_backend.services.inference.artifacts import ArtifactReadiness
-from llm_port_backend.services.inference.planner import InferenceEnvironmentPlan
-from llm_port_backend.services.inference.service import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
+from faden_backend.services.inference import takeover
+from faden_backend.services.inference.artifacts import ArtifactReadiness
+from faden_backend.services.inference.planner import InferenceEnvironmentPlan
+from faden_backend.services.inference.service import (
     EnvironmentService,
     InferenceError,
 )
-from llm_port_backend.web.api.inference.control_planes import _map_inference_error
-from llm_port_backend.web.api.inference.schema import (
+from faden_backend.web.api.inference.control_planes import _map_inference_error
+from faden_backend.web.api.inference.schema import (
     ApplyPlanRequest,
     ComputePoolDTO,
     EnvironmentCreate,
@@ -35,18 +35,18 @@ from llm_port_backend.web.api.inference.schema import (
     EnvironmentNodeDTO,
     EnvironmentUpdate,
 )
-from llm_port_backend.services.inference.observability import (
+from faden_backend.services.inference.observability import (
     EnvironmentMetrics,
     ObservabilityUnsupported,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
-from llm_port_backend.web.api.inference.observability import (
+from faden_backend.services.nodes.service import NodeControlService
+from faden_backend.web.api.inference.observability import (
     get_node_control_service,
     resolve_driver_for_environment,
     unsupported,
 )
-from llm_port_backend.web.api.inference.found_clusters import _gateway as _command_gateway
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.inference.found_clusters import _gateway as _command_gateway
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 _ENV = "inference.environments"
@@ -219,7 +219,7 @@ async def list_environment_pools(
     except InferenceError as exc:
         raise _map_inference_error(exc)
 
-    from llm_port_backend.services.inference.pools import ComputePoolCoordinator
+    from faden_backend.services.inference.pools import ComputePoolCoordinator
 
     coordinator = ComputePoolCoordinator(service.session)
     pools = await coordinator.list_for_environment(environment_id)
@@ -279,7 +279,7 @@ async def plan_environment(
     if validate is not False:
         factory = getattr(request.app.state, "db_session_factory", None)
         if factory is not None:
-            from llm_port_backend.services.inference.drivers.ray.commands import (
+            from faden_backend.services.inference.drivers.ray.commands import (
                 NodeCommandGateway,
             )
 
@@ -333,7 +333,7 @@ async def sync_environment_artifact(
     gateway = None
     factory = getattr(request.app.state, "db_session_factory", None)
     if factory is not None:
-        from llm_port_backend.services.inference.drivers.ray.commands import (
+        from faden_backend.services.inference.drivers.ray.commands import (
             NodeCommandGateway,
         )
 
@@ -401,7 +401,7 @@ async def get_environment_metrics(
 class TakeOverModelsRequest(BaseModel):
     """Which of a cluster's stray models to take over, and their gateway names."""
 
-    #: The Ray apps to take over, as the list names them (``llmport-<id>``).
+    #: The Ray apps to take over, as the list names them (``faden-<id>``).
     app_names: list[str] = Field(min_length=1)
     #: The name each is offered under at the gateway, by app name; the
     #: model's own name, lower-cased, where none is given.
@@ -452,7 +452,7 @@ async def model_tls_status(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Which of this cluster's models the gateway reaches over mutual TLS, and which not yet."""
-    from llm_port_backend.services.inference import model_tls  # noqa: PLC0415
+    from faden_backend.services.inference import model_tls  # noqa: PLC0415
 
     try:
         return await model_tls.environment_status(session, environment_id)
@@ -471,7 +471,7 @@ async def move_behind_model_tls(
 
     The models stop and load again -- minutes for a large one.
     """
-    from llm_port_backend.services.inference import model_tls  # noqa: PLC0415
+    from faden_backend.services.inference import model_tls  # noqa: PLC0415
 
     try:
         return await model_tls.move(session, _command_gateway(request), environment_id)
@@ -492,7 +492,7 @@ async def ray_tls_status(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Whether Ray's traffic between this cluster's machines is encrypted (mutual TLS)."""
-    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+    from faden_backend.services.inference import ray_tls  # noqa: PLC0415
 
     try:
         return await ray_tls.environment_status(session, environment_id)
@@ -508,7 +508,7 @@ async def switch_ray_tls(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Switch Ray's mutual TLS between the machines on or off. The cluster restarts."""
-    from llm_port_backend.services.inference import ray_tls  # noqa: PLC0415
+    from faden_backend.services.inference import ray_tls  # noqa: PLC0415
 
     try:
         return await ray_tls.switch(session, environment_id, on=body.on)

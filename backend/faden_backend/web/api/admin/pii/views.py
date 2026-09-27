@@ -17,12 +17,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from starlette import status
 
-from llm_port_backend.db.dao.pii_event_dao import PIIEventDAO
-from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
-from llm_port_backend.db.models.users import User
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import require_superuser
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.db.dao.pii_event_dao import PIIEventDAO
+from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
+from faden_backend.db.models.users import User
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ async def _system_default_policy(
     dao: SystemSettingsDAO,
 ) -> dict[str, Any] | None:
     """Read system default PII policy from backend system settings."""
-    row = await dao.get_value("llm_port_api.pii_default_policy")
+    row = await dao.get_value("faden_gateway.pii_default_policy")
     if row is None:
         return None
     value = _normalize_setting_value(row.value_json)

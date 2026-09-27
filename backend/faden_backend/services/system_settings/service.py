@@ -8,27 +8,27 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
-from llm_port_backend.db.models.system_settings import (
+from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
+from faden_backend.db.models.system_settings import (
     InfraAgentStatus,
     SystemApplyEventResult,
     SystemApplyScope,
     SystemApplyStatus,
 )
-from llm_port_backend.services.system_settings.crypto import SettingsCrypto
-from llm_port_backend.services.system_settings.executors import ApplyAction, ApplyExecutor
-from llm_port_backend.services.system_settings.runtime_mapping import (
+from faden_backend.services.system_settings.crypto import SettingsCrypto
+from faden_backend.services.system_settings.executors import ApplyAction, ApplyExecutor
+from faden_backend.services.system_settings.runtime_mapping import (
     register_runtime_secret_key,
     register_runtime_value_key,
     resolve_runtime_attr,
 )
-from llm_port_backend.services.system_settings.registry import (
+from faden_backend.services.system_settings.registry import (
     SETTINGS_REGISTRY,
     SettingDefinition,
     registry_by_key,
     validate_value,
 )
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -455,7 +455,7 @@ class SystemSettingsService:
         rollback_ok: bool,
     ) -> None:
         try:
-            from llm_port_backend.services.notifications import NotificationService  # noqa: PLC0415
+            from faden_backend.services.notifications import NotificationService  # noqa: PLC0415
 
             services = ",".join(action.services) if action.services else "none"
             keys = ",".join(action.changed_keys)
@@ -466,7 +466,7 @@ class SystemSettingsService:
                 fingerprint=f"system_apply_failed:{scope.value}:{keys}",
                 summary=f"System apply failed for services={services}.",
                 details=reason,
-                source="llm_port_backend.system_settings.apply",
+                source="faden_backend.system_settings.apply",
                 occurred_at=datetime.now(tz=UTC),
             )
             if not rollback_ok:
@@ -477,7 +477,7 @@ class SystemSettingsService:
                         fingerprint=f"system_apply_rollback_failed:{scope.value}:{keys}",
                         summary=f"Rollback failed for services={services}.",
                         details=reason,
-                        source="llm_port_backend.system_settings.rollback",
+                        source="faden_backend.system_settings.rollback",
                         occurred_at=datetime.now(tz=UTC),
                     )
                     or queued

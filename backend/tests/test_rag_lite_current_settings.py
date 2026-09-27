@@ -12,10 +12,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.system_settings import SystemSettingValue
-from llm_port_backend.services.rag_lite.embedding import EmbeddingClient, api_base
-from llm_port_backend.services.system_settings.runtime_mapping import refresh_runtime_values
-from llm_port_backend.settings import settings
+from faden_backend.db.models.system_settings import SystemSettingValue
+from faden_backend.services.rag_lite.embedding import EmbeddingClient, api_base
+from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values
+from faden_backend.settings import settings
 
 
 def test_a_provider_url_with_or_without_v1_reaches_the_api() -> None:

@@ -9,8 +9,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from llm_port_api.services.gateway.client_ws import broker_tool_call
-from llm_port_api.services.gateway.tool_router import ToolCallResult, ToolRealm
+from faden_gateway.services.gateway.client_ws import broker_tool_call
+from faden_gateway.services.gateway.tool_router import ToolCallResult, ToolRealm
 
 
 class ClientToolBroker:

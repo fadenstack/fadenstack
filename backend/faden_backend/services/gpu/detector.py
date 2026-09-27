@@ -31,7 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from llm_port_backend.services.gpu.types import (
+from faden_backend.services.gpu.types import (
     GpuComputeApi,
     GpuDevice,
     GpuInventory,
@@ -696,7 +696,7 @@ def _detect_via_docker() -> list[GpuDevice]:
 
         c2 = _UnixConn(sock_str)
         c2.request(
-            "POST", "/containers/create?name=llm-port-gpu-probe",
+            "POST", "/containers/create?name=faden-gpu-probe",
             body=create_body,
             headers={"Content-Type": "application/json"},
         )

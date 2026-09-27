@@ -11,8 +11,8 @@ import json
 import logging
 import uuid
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import MemoryFact, MemoryFactScope, MemoryFactStatus
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import MemoryFact, MemoryFactScope, MemoryFactStatus
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-# llm_port_pii
+# faden_pii
 
 This project was generated using fastapi_template.
 
@@ -11,7 +11,7 @@ To run the project use this set of commands:
 
 ```bash
 poetry install
-poetry run python -m llm_port_pii
+poetry run python -m faden_pii
 ```
 
 This will start the server on the configured host.
@@ -46,8 +46,8 @@ docker-compose build
 ## Project structure
 
 ```bash
-$ tree "llm_port_pii"
-llm_port_pii
+$ tree "faden_pii"
+faden_pii
 ├── conftest.py  # Fixtures for all tests.
 ├── db  # module contains db configurations
 │   ├── dao  # Data Access Objects. Contains different classes to interact with database.
@@ -71,18 +71,18 @@ This application can be configured with environment variables.
 You can create `.env` file in the root directory and place all
 environment variables here. 
 
-All environment variables should start with "LLM_PORT_PII_" prefix.
+All environment variables should start with "FADEN_PII_" prefix.
 
-For example if you see in your "llm_port_pii/settings.py" a variable named like
-`random_parameter`, you should provide the "LLM_PORT_PII_RANDOM_PARAMETER" 
+For example if you see in your "faden_pii/settings.py" a variable named like
+`random_parameter`, you should provide the "FADEN_PII_RANDOM_PARAMETER" 
 variable to configure the value. This behaviour can be changed by overriding `env_prefix` property
-in `llm_port_pii.settings.Settings.Config`.
+in `faden_pii.settings.Settings.Config`.
 
 An example of .env file:
 ```bash
-LLM_PORT_PII_RELOAD="True"
-LLM_PORT_PII_PORT="8000"
-LLM_PORT_PII_ENVIRONMENT="dev"
+FADEN_PII_RELOAD="True"
+FADEN_PII_PORT="8000"
+FADEN_PII_ENVIRONMENT="dev"
 ```
 
 You can read more about BaseSettings class here: https://pydantic-docs.helpmanual.io/usage/settings/
@@ -137,7 +137,7 @@ If you haven't pushed to docker registry yet, you can build image locally.
 
 ```bash
 docker-compose build
-docker save --output llm_port_pii.tar llm_port_pii:latest
+docker save --output faden_pii.tar faden_pii:latest
 ```
 
 ## Migrations
@@ -188,7 +188,7 @@ For running tests on your local machine.
 
 I prefer doing it with docker:
 ```
-docker run -p "5432:5432" -e "POSTGRES_PASSWORD=llm_port_pii" -e "POSTGRES_USER=llm_port_pii" -e "POSTGRES_DB=llm_port_pii" postgres:16.3-bullseye
+docker run -p "5432:5432" -e "POSTGRES_PASSWORD=faden_pii" -e "POSTGRES_USER=faden_pii" -e "POSTGRES_DB=faden_pii" postgres:16.3-bullseye
 ```
 
 

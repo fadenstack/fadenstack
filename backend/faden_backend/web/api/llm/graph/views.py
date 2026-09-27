@@ -5,15 +5,15 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.llm.graph_service import (
+from faden_backend.db.models.users import User
+from faden_backend.services.llm.graph_service import (
     TRACE_DEFAULT_LIMIT,
     TRACE_MAX_LIMIT,
     LLMGraphService,
 )
-from llm_port_backend.web.api.llm.dependencies import get_llm_graph_service
-from llm_port_backend.web.api.llm.schema import DataUsageSummaryDTO, TopologyResponseDTO, TraceSnapshotResponseDTO
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.llm.dependencies import get_llm_graph_service
+from faden_backend.web.api.llm.schema import DataUsageSummaryDTO, TopologyResponseDTO, TraceSnapshotResponseDTO
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -61,6 +61,6 @@ async def stream_traces(
         status_code=402,
         detail=(
             "Gateway trace SSE streaming requires the Observability Pro plugin. "
-            "Install llm-port-ee to enable this endpoint."
+            "Install faden-ee to enable this endpoint."
         ),
     )

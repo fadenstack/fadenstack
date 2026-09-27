@@ -2,7 +2,7 @@
 
 Usage::
 
-    from llm_port_backend.services.docling import DoclingClient
+    from faden_backend.services.docling import DoclingClient
 
     async with DoclingClient() as client:
         result = await client.convert(
@@ -22,8 +22,8 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.settings import settings
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
 

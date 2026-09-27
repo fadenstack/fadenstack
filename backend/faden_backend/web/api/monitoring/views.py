@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 router = APIRouter()
 

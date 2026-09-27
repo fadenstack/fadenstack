@@ -10,7 +10,7 @@ RUN apt-get update \
 # Pinned stack exactly as ray[llm]==2.58.0 resolves it (vllm 0.26.0) — the
 # same set the agent's ``llm`` extra installs on GPU nodes.
 RUN pip install "ray[serve,llm]==2.58.0"
-# Agent runtime deps (llm_port_node_agent/pyproject.toml).
+# Agent runtime deps (agent/pyproject.toml).
 RUN pip install "httpx>=0.27,<1.0" "psutil>=5.9,<8.0" "websockets>=12,<16" "jinja2>=3.1,<4"
 ENV PYTHONPATH=/src
 WORKDIR /work

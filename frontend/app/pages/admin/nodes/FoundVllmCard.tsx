@@ -1,5 +1,5 @@
 /**
- * The vLLM a machine already runs that LLM.Port did not start (Phase 8).
+ * The vLLM a machine already runs that Fadenstack did not start (Phase 8).
  *
  * Listed from what the machine's agent reports, with each running one asked
  * what it serves. Routing one puts it behind the gateway under a name and

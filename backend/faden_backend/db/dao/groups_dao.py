@@ -8,9 +8,9 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.groups import Group, GroupRole, UserGroup
-from llm_port_backend.db.models.rbac import Role
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.groups import Group, GroupRole, UserGroup
+from faden_backend.db.models.rbac import Role
 
 
 class GroupDAO:

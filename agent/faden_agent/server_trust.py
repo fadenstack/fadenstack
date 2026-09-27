@@ -1,6 +1,6 @@
 """What this agent trusts the backend with, and following the backend to HTTPS.
 
-A backend on HTTPS with a certificate from its own authority (``llmport tls
+A backend on HTTPS with a certificate from its own authority (``faden tls
 generate``) is one no operating system trusts. The agent learns that
 authority from the backend itself, over the connection it already has, and
 keeps it beside its state (:data:`CA_FILE`); from then on it is trusted next to
@@ -33,7 +33,7 @@ from urllib.parse import urlsplit
 import httpx
 
 if TYPE_CHECKING:
-    from llm_port_node_agent.config import AgentConfig
+    from faden_agent.config import AgentConfig
 
 log = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ class ServerTrust:
             log.error(
                 "The backend moved to %s, but its certificate is not one this machine trusts (%s). "
                 "It learns the backend's own authority while connected; point it there by hand with "
-                "llmport-agent configure --set BACKEND_URL=%s --set TLS_CA_BUNDLE=<the server's tls/ca.crt>.",
+                "faden-agent configure --set BACKEND_URL=%s --set TLS_CA_BUNDLE=<the server's tls/ca.crt>.",
                 target, exc, target,
             )
             return None

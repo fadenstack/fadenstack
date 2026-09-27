@@ -24,7 +24,7 @@ repos:
           #   language: system
           #   pass_filenames: false
           #   always_run: true
-          #   args: ["check", "llm_port_backend", "tests", "--fix"]
+          #   args: ["check", "faden_backend", "tests", "--fix"]
 
           # - id: mypy
           #   name: Validate types with MyPy
@@ -33,5 +33,5 @@ repos:
           #   types: [python]
           #   pass_filenames: false
           #   args:
-          #     - "llm_port_backend"
+          #     - "faden_backend"
           #     - "tests"

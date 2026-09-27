@@ -27,7 +27,7 @@ export interface SkillTriggerRules {
   intents?: string[];
 }
 
-/** llm.port's part of a version (llmport.yaml): tools, knowledge, triggers. */
+/** fadenstack's part of a version (faden.yaml): tools, knowledge, triggers. */
 export interface SkillManifest {
   allowed_tools?: string[];
   preferred_tools?: string[];

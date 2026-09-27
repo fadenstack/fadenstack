@@ -25,7 +25,7 @@ void i18n
     },
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],
-      lookupLocalStorage: "llm-port-lang",
+      lookupLocalStorage: "faden-lang",
       caches: ["localStorage"],
     },
     react: {

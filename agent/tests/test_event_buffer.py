@@ -1,6 +1,6 @@
 """Tests for EventBuffer."""
 
-from llm_port_node_agent.event_buffer import EventBuffer
+from faden_agent.event_buffer import EventBuffer
 
 
 def test_add_and_drain() -> None:

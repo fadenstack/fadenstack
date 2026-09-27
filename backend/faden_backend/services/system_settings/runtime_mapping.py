@@ -9,13 +9,13 @@ from __future__ import annotations
 from typing import Any
 
 _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
-    "llm_port_api.pii_enabled": "pii_enabled",
-    "llm_port_api.pii_service_url": "pii_service_url",
-    "llm_port_api.mcp_enabled": "mcp_enabled",
-    "llm_port_api.mcp_service_url": "mcp_service_url",
-    "llm_port_api.skills_enabled": "skills_enabled",
-    "llm_port_api.skills_service_url": "skills_service_url",
-    "llm_port_api.sessions_enabled": "sessions_enabled",
+    "faden_gateway.pii_enabled": "pii_enabled",
+    "faden_gateway.pii_service_url": "pii_service_url",
+    "faden_gateway.mcp_enabled": "mcp_enabled",
+    "faden_gateway.mcp_service_url": "mcp_service_url",
+    "faden_gateway.skills_enabled": "skills_enabled",
+    "faden_gateway.skills_service_url": "skills_service_url",
+    "faden_gateway.sessions_enabled": "sessions_enabled",
     "rag_lite.enabled": "rag_lite_enabled",
     "rag_lite.embedding_provider_id": "rag_lite_embedding_provider_id",
     "rag_lite.embedding_model": "rag_lite_embedding_model",
@@ -33,9 +33,9 @@ _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
 }
 
 _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {
-    "llm_port_backend.users_secret": "users_secret",
-    "llm_port_api.mcp_service_token": "mcp_service_token",
-    "llm_port_api.skills_service_token": "skills_service_token",
+    "faden_backend.users_secret": "users_secret",
+    "faden_gateway.mcp_service_token": "mcp_service_token",
+    "faden_gateway.skills_service_token": "skills_service_token",
 }
 
 
@@ -75,7 +75,7 @@ async def refresh_runtime_values(session: Any, *, prefix: str) -> None:
     """
     from sqlalchemy import text  # noqa: PLC0415
 
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     keys = {k: a for k, a in get_runtime_value_key_map().items() if k.startswith(prefix)}
     if not keys:

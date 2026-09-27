@@ -21,9 +21,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
+from faden_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
 
 async def switch(session: AsyncSession, environment_id: Any, *, on: bool) -> dict[str, Any]:
     """Have the cluster run Ray with TLS, or without; the next pass restarts it that way."""
-    from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
 
     env = await session.get(InferenceEnvironment, environment_id)
     if env is None:

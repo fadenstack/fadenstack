@@ -1,13 +1,13 @@
-"""``llmport status`` — show running service status."""
+"""``faden status`` — show running service status."""
 
 from __future__ import annotations
 
 import click
 from rich.table import Table
 
-from llmport.core.compose import build_context_from_config, ps as compose_ps
-from llmport.core.console import console
-from llmport.core.settings import load_config
+from faden_cli.core.compose import build_context_from_config, ps as compose_ps
+from faden_cli.core.console import console
+from faden_cli.core.settings import load_config
 
 
 def _health_style(health: str) -> str:
@@ -33,7 +33,7 @@ def _state_style(state: str) -> str:
 @click.command("status")
 @click.option("--json", "as_json", is_flag=True, help="Output raw JSON from docker compose.")
 def status_cmd(*, as_json: bool) -> None:
-    """Show the status of llm.port services."""
+    """Show the status of fadenstack services."""
     cfg = load_config()
     ctx = build_context_from_config(cfg)
 
@@ -50,7 +50,7 @@ def status_cmd(*, as_json: bool) -> None:
         return
 
     table = Table(
-        title="llm.port Services",
+        title="fadenstack Services",
         show_header=True,
         header_style="bold cyan",
     )

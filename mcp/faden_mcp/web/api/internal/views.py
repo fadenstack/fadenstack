@@ -1,4 +1,4 @@
-"""Internal API endpoints consumed by the llm_port_api gateway."""
+"""Internal API endpoints consumed by the gateway."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_mcp.db.session import get_db_session
-from llm_port_mcp.services.arguments import coerce_to_schema
-from llm_port_mcp.services.connection_manager import MCPConnectionManager
-from llm_port_mcp.services.dao import MCPDao
-from llm_port_mcp.services.privacy_proxy import PrivacyProxy
-from llm_port_mcp.web.api.auth import verify_service_token
+from faden_mcp.db.session import get_db_session
+from faden_mcp.services.arguments import coerce_to_schema
+from faden_mcp.services.connection_manager import MCPConnectionManager
+from faden_mcp.services.dao import MCPDao
+from faden_mcp.services.privacy_proxy import PrivacyProxy
+from faden_mcp.web.api.auth import verify_service_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(verify_service_token)])
@@ -76,7 +76,7 @@ async def _get_catalog_version(request: Request, tenant_id: str) -> int:
 
 def _get_privacy_proxy(request: Request) -> PrivacyProxy | None:
     """Build a PrivacyProxy if PII service is configured."""
-    from llm_port_mcp.settings import settings
+    from faden_mcp.settings import settings
 
     if not settings.pii_service_url:
         return None

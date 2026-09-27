@@ -8,8 +8,8 @@ import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO, RoutedInstance
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO, RoutedInstance
+from faden_gateway.db.models.gateway import (
     LLMGatewayRequestLog,
     LLMModelAlias,
     LLMPoolMembership,
@@ -17,9 +17,9 @@ from llm_port_api.db.models.gateway import (
     ProviderHealthStatus,
     ProviderType,
 )
-from llm_port_api.services.gateway.lease import LeaseManager
-from llm_port_api.services.gateway.proxy import UpstreamProxy
-from llm_port_api.services.gateway.routing import RouterService
+from faden_gateway.services.gateway.lease import LeaseManager
+from faden_gateway.services.gateway.proxy import UpstreamProxy
+from faden_gateway.services.gateway.routing import RouterService
 
 
 class InMemoryCache:
@@ -78,7 +78,7 @@ async def test_mixed_pool_candidate_resolution(db_session: AsyncSession):
     ray_inst = LLMProviderInstance(
         id=ray_inst_id,
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/llmport-dep1",
+        base_url="http://10.250.10.49:8000/faden-dep1",
         enabled=True,
         weight=2.0,
         max_concurrency=32,
@@ -106,7 +106,7 @@ async def test_mixed_pool_candidate_resolution(db_session: AsyncSession):
     ray_cand = next(c for c in candidates if c.source_kind == "inference_deployment")
     assert ray_cand.instance_id == ray_inst_id
     assert ray_cand.source_id == ray_dep_id
-    assert ray_cand.base_url == "http://10.250.10.49:8000/llmport-dep1"
+    assert ray_cand.base_url == "http://10.250.10.49:8000/faden-dep1"
     assert ray_cand.weight == 2.0
     assert ray_cand.max_concurrency == 32
 
@@ -133,7 +133,7 @@ async def test_failover_when_ray_deployment_unhealthy(db_session: AsyncSession):
     ray_inst = LLMProviderInstance(
         id=ray_inst_id,
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/llmport-dep1",
+        base_url="http://10.250.10.49:8000/faden-dep1",
         enabled=True,
         health_status=ProviderHealthStatus.HEALTHY,
         source_kind="inference_deployment",
@@ -167,7 +167,7 @@ async def test_failover_when_ray_deployment_unhealthy(db_session: AsyncSession):
     assert len(candidates_recovered) == 2
 
 
-from llm_port_api.services.cache.noop import NoOpCache
+from faden_gateway.services.cache.noop import NoOpCache
 
 
 @pytest.mark.anyio
@@ -210,15 +210,15 @@ async def test_router_service_pick_and_lease_mixed_pool(db_session: AsyncSession
 async def test_upstream_proxy_path_formatting():
     """UpstreamProxy correctly formats OpenAI routes with application prefixes without /v1/v1."""
     # Test normalization function directly
-    raw_url_with_v1 = "http://10.250.10.49:8000/llmport-dep1/v1"
+    raw_url_with_v1 = "http://10.250.10.49:8000/faden-dep1/v1"
     normalized = raw_url_with_v1.rstrip("/").removesuffix("/v1")
-    assert normalized == "http://10.250.10.49:8000/llmport-dep1"
+    assert normalized == "http://10.250.10.49:8000/faden-dep1"
 
     # When UpstreamProxy proxies path "/v1/chat/completions",
-    # the target URL is f"{base_url}{path}" -> "http://10.250.10.49:8000/llmport-dep1/v1/chat/completions"
+    # the target URL is f"{base_url}{path}" -> "http://10.250.10.49:8000/faden-dep1/v1/chat/completions"
     target_path = "/v1/chat/completions"
     full_url = f"{normalized}{target_path}"
-    assert full_url == "http://10.250.10.49:8000/llmport-dep1/v1/chat/completions"
+    assert full_url == "http://10.250.10.49:8000/faden-dep1/v1/chat/completions"
     assert "/v1/v1" not in full_url
 
 
@@ -232,7 +232,7 @@ async def test_audit_log_records_logical_provider(db_session: AsyncSession):
     inst = LLMProviderInstance(
         id=inst_id,
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/llmport-dep1",
+        base_url="http://10.250.10.49:8000/faden-dep1",
         enabled=True,
         health_status=ProviderHealthStatus.HEALTHY,
         source_kind="inference_deployment",

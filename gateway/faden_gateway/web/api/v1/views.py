@@ -9,22 +9,22 @@ from pydantic import ValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette import status
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.services.gateway.audit import AuditService
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
-from llm_port_api.services.gateway.errors import GatewayError, error_response
-from llm_port_api.services.gateway.lease import LeaseManager
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter
-from llm_port_api.services.gateway.observability import GatewayObservability
-from llm_port_api.services.gateway.mcp_client import MCPClient
-from llm_port_api.services.gateway.mcp_tool_cache import MCPToolCache
-from llm_port_api.services.gateway.pii_client import PIIClient
-from llm_port_api.services.gateway.skills_client import SkillsClient
-from llm_port_api.services.gateway.proxy import UpstreamProxy
-from llm_port_api.services.gateway.ratelimit import RateLimiter
-from llm_port_api.services.gateway.routing import RouterService
-from llm_port_api.services.gateway.schemas import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.services.gateway.audit import AuditService
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.errors import GatewayError, error_response
+from faden_gateway.services.gateway.lease import LeaseManager
+from faden_gateway.services.gateway.llm_adapter import LLMAdapter
+from faden_gateway.services.gateway.observability import GatewayObservability
+from faden_gateway.services.gateway.mcp_client import MCPClient
+from faden_gateway.services.gateway.mcp_tool_cache import MCPToolCache
+from faden_gateway.services.gateway.pii_client import PIIClient
+from faden_gateway.services.gateway.skills_client import SkillsClient
+from faden_gateway.services.gateway.proxy import UpstreamProxy
+from faden_gateway.services.gateway.ratelimit import RateLimiter
+from faden_gateway.services.gateway.routing import RouterService
+from faden_gateway.services.gateway.schemas import (
     ChatCompletionRequest,
     EmbeddingsRequest,
     RerankRequest,
@@ -35,9 +35,9 @@ from llm_port_api.services.gateway.schemas import (
     SessionToolPolicyPatchDTO,
     ToolAvailabilityResponse,
 )
-from llm_port_api.services.gateway.service import GatewayService
-from llm_port_api.services.registry import service_registry
-from llm_port_api.settings import settings
+from faden_gateway.services.gateway.service import GatewayService
+from faden_gateway.services.registry import service_registry
+from faden_gateway.settings import settings
 
 router = APIRouter()
 
@@ -111,7 +111,7 @@ def get_gateway_service(
         )
 
     # RAG Lite client (optional - when RAG Lite is enabled)
-    from llm_port_api.services.gateway.rag_lite_client import RagLiteClient  # noqa: PLC0415
+    from faden_gateway.services.gateway.rag_lite_client import RagLiteClient  # noqa: PLC0415
 
     rag_lite_client: RagLiteClient | None = None
     if settings.rag_lite_enabled and not settings.rag_enabled:
@@ -121,13 +121,13 @@ def get_gateway_service(
         )
 
     # Tool Router (optional – when MCP or client tools are available)
-    from llm_port_api.services.gateway.tool_router import (  # noqa: PLC0415
+    from faden_gateway.services.gateway.tool_router import (  # noqa: PLC0415
         ServerToolExecutor,
         ToolRouter,
         ToolRouterConfig,
     )
-    from llm_port_api.services.gateway.client_broker import ClientToolBroker  # noqa: PLC0415
-    from llm_port_api.services.gateway.policy_engine import PolicyEngine  # noqa: PLC0415
+    from faden_gateway.services.gateway.client_broker import ClientToolBroker  # noqa: PLC0415
+    from faden_gateway.services.gateway.policy_engine import PolicyEngine  # noqa: PLC0415
 
     tool_router: ToolRouter | None = None
     if mcp_client:
@@ -212,7 +212,7 @@ async def get_tool_catalog(
     Used for pre-session discovery so users can browse available tools
     before starting a conversation.
     """
-    from llm_port_api.services.gateway.tool_availability import (  # noqa: PLC0415
+    from faden_gateway.services.gateway.tool_availability import (  # noqa: PLC0415
         ToolAvailabilityService,
     )
 
@@ -258,7 +258,7 @@ async def get_available_tools(
     Merges MCP tools with session execution policy and per-tool overrides
     to compute effective availability for each tool.
     """
-    from llm_port_api.services.gateway.tool_availability import (  # noqa: PLC0415
+    from faden_gateway.services.gateway.tool_availability import (  # noqa: PLC0415
         ToolAvailabilityService,
     )
 
@@ -374,7 +374,7 @@ async def patch_session_tool_policy(
     body = await _get_json_payload(request)
     patch = SessionToolPolicyPatchDTO.model_validate(body)
 
-    from llm_port_api.db.models.gateway import ExecutionMode  # noqa: PLC0415
+    from faden_gateway.db.models.gateway import ExecutionMode  # noqa: PLC0415
 
     # Update execution policy
     mode_arg = ExecutionMode(patch.execution_mode.value) if patch.execution_mode else None
@@ -425,7 +425,7 @@ def _override_row_to_dto(row: Any) -> SessionPIIOverrideDTO:
 
 
 def _row_to_session_override(row: Any) -> "SessionPIIOverride":
-    from llm_port_api.services.gateway.pii_policy import SessionPIIOverride  # noqa: PLC0415
+    from faden_gateway.services.gateway.pii_policy import SessionPIIOverride  # noqa: PLC0415
 
     return SessionPIIOverride(
         pii_enabled=row.pii_enabled,
@@ -453,7 +453,7 @@ async def get_pii_defaults(
     This lets the frontend show PII controls before a session exists,
     mirroring the pre-session tool-catalog pattern.
     """
-    from llm_port_api.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
 
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
     floor = _resolve_pii_policy(tenant_policy)
@@ -478,8 +478,8 @@ async def get_session_pii_policy(
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
     """Return the session PII policy: floor, override, and effective."""
-    from llm_port_api.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
-    from llm_port_api.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    from faden_gateway.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
 
     sid = _parse_session_id(session_id)
     await _require_session_owner(sid, auth, dao)
@@ -524,8 +524,8 @@ async def patch_session_pii_policy(
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
     """Create or update a session PII override."""
-    from llm_port_api.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
-    from llm_port_api.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    from faden_gateway.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
+    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
 
     sid = _parse_session_id(session_id)
     await _require_session_owner(sid, auth, dao)
@@ -594,7 +594,7 @@ async def client_websocket(
     dao: GatewayDAO = Depends(),
 ) -> None:
     """WebSocket channel for local agentic client connections."""
-    from llm_port_api.services.gateway.client_ws import handle_client_websocket  # noqa: PLC0415
+    from faden_gateway.services.gateway.client_ws import handle_client_websocket  # noqa: PLC0415
 
     await handle_client_websocket(ws, dao)
 
@@ -763,7 +763,7 @@ async def stream_status(
     auth: AuthContext = Depends(get_auth_context),
 ) -> JSONResponse:
     """Check whether a streaming response is still in progress for a session."""
-    from llm_port_api.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
+    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
     buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
     if buf and buf.has_buffer(session_id):
         return JSONResponse({"active": buf.is_active(session_id)})
@@ -781,7 +781,7 @@ async def stream_resume(
     Replays all buffered chunks, then tails live chunks until the
     stream completes.  Returns 204 if no buffer exists.
     """
-    from llm_port_api.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
+    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
     buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
     if not buf or not buf.has_buffer(session_id):
         return Response(status_code=status.HTTP_204_NO_CONTENT)

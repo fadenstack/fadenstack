@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from llm_port_node_agent.model_puller import ModelPullerError, _safe_join
+from faden_agent.model_puller import ModelPullerError, _safe_join
 
 NAME = "models--Qwen--Qwen2.5-0.5B-Instruct"
 

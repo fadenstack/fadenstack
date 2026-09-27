@@ -13,7 +13,7 @@ Material lifecycle
    and writes them to ``settings.tls_edge_material_dir``: the install's
    ``./tls`` directory, which nginx mounts read-only and serves HTTPS
    from whenever it holds a certificate and key
-   (``llm_port_shared/nginx/select-config.sh``). nginx is then restarted
+   (``shared/nginx/select-config.sh``). nginx is then restarted
    so the switch happens at once; without the container (a checkout run
    outside compose) the answer says a restart is still needed.
 4. **Status** (``GET /admin/tls/status``) — reports whether material
@@ -42,20 +42,20 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.system_settings.crypto import SettingsCrypto
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.users import User
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.system_settings.crypto import SettingsCrypto
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import (
     audit_action,
     get_docker,
     get_root_mode_active,
     require_superuser,
 )
-from llm_port_backend.web.api.admin.tls.schema import (
+from faden_backend.web.api.admin.tls.schema import (
     TlsActivateResponseDTO,
     TlsCertSummaryDTO,
     TlsStatusDTO,
@@ -252,7 +252,7 @@ async def _restart_edge_proxy(docker: DockerService) -> bool:
     """Restart nginx so it picks the material up, or drops it.
 
     nginx chooses between plain HTTP and HTTPS when it starts
-    (``llm_port_shared/nginx/select-config.sh``), so this restart is the
+    (``shared/nginx/select-config.sh``), so this restart is the
     whole switch. Best-effort: without the container -- a checkout run
     outside compose, a proxy run elsewhere -- the caller reports that a
     restart is still needed; the material is in place either way.
@@ -465,7 +465,7 @@ async def machine_ca_status(
     Behind the TLS between the gateway and the models on the machines
     (services/machine_tls); it looks after itself, this only shows it.
     """
-    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import store  # noqa: PLC0415
 
     return {"enabled": settings.machine_tls_enabled, **(await store.status(dao.session))}
 
@@ -482,7 +482,7 @@ async def machine_ca_rotate(
     The gateway picks the new certificate up within a minute and every machine
     asks for a new one within a minute; model calls fail in between.
     """
-    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import store  # noqa: PLC0415
 
     if not settings.machine_tls_enabled:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Model traffic TLS is switched off.")

@@ -1,7 +1,7 @@
 """CLI entry point — Click root group and subcommand registration.
 
-This module defines the ``llmport`` command group and wires up all
-subcommands.  Run ``llmport --help`` for the full command tree.
+This module defines the ``faden`` command group and wires up all
+subcommands.  Run ``faden --help`` for the full command tree.
 """
 
 from __future__ import annotations
@@ -10,13 +10,13 @@ import sys
 
 import click
 
-from llmport import __version__
+from faden_cli import __version__
 
 
 class AliasedGroup(click.Group):
     """Click group that supports command abbreviations.
 
-    For instance ``llmport st`` resolves to ``llmport status`` if no
+    For instance ``faden st`` resolves to ``faden status`` if no
     other command starts with ``st``.
     """
 
@@ -36,18 +36,18 @@ class AliasedGroup(click.Group):
 @click.group(cls=AliasedGroup, invoke_without_command=True)
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output.")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress informational output.")
-@click.version_option(version=__version__, prog_name="llmport")
+@click.version_option(version=__version__, prog_name="faden")
 @click.pass_context
 def cli(ctx: click.Context, *, verbose: bool, quiet: bool) -> None:
-    """llmport — CLI installer and management tool for llm.port."""
-    from llmport.core.detect import ensure_tool_path
+    """faden — CLI installer and management tool for fadenstack."""
+    from faden_cli.core.detect import ensure_tool_path
 
     # Make tools installed to ~/.local/bin / ~/.cargo/bin visible to
     # every child subprocess, even when the current shell PATH lacks them
     # (typical for fresh SSH sessions and GUI-launched terminals).
     ensure_tool_path()
 
-    from llmport.core.docker_env import ensure_docker_host
+    from faden_cli.core.docker_env import ensure_docker_host
 
     # If the configured Docker endpoint is dead but Rancher Desktop's
     # answers, export DOCKER_HOST so every docker subprocess (detect,
@@ -72,26 +72,26 @@ def register_core_commands(group: click.Group | None = None) -> None:
     """
     target = group or cli
 
-    from llmport.commands.version import version_cmd
-    from llmport.commands.doctor import doctor_cmd
-    from llmport.commands.status import status_cmd
-    from llmport.commands.up import up_cmd
-    from llmport.commands.down import down_cmd
-    from llmport.commands.logs_cmd import logs_cmd
-    from llmport.commands.config import config_group
-    from llmport.commands.module import module_group
-    from llmport.commands.tune import tune_cmd
-    from llmport.commands.deploy import deploy_cmd
-    from llmport.commands.rebuild import rebuild_cmd
-    from llmport.commands.backup import backup_cmd
-    from llmport.commands.restore import restore_cmd
-    from llmport.commands.upgrade import upgrade_cmd
-    from llmport.commands.dev.dev_group import dev_group
-    from llmport.commands.admin import admin_group
-    from llmport.commands.observe import observe_group
-    from llmport.commands.runtime_images import runtime_images_cmd
-    from llmport.commands.tls import tls_group
-    from llmport.commands.ports import ports_cmd
+    from faden_cli.commands.version import version_cmd
+    from faden_cli.commands.doctor import doctor_cmd
+    from faden_cli.commands.status import status_cmd
+    from faden_cli.commands.up import up_cmd
+    from faden_cli.commands.down import down_cmd
+    from faden_cli.commands.logs_cmd import logs_cmd
+    from faden_cli.commands.config import config_group
+    from faden_cli.commands.module import module_group
+    from faden_cli.commands.tune import tune_cmd
+    from faden_cli.commands.deploy import deploy_cmd
+    from faden_cli.commands.rebuild import rebuild_cmd
+    from faden_cli.commands.backup import backup_cmd
+    from faden_cli.commands.restore import restore_cmd
+    from faden_cli.commands.upgrade import upgrade_cmd
+    from faden_cli.commands.dev.dev_group import dev_group
+    from faden_cli.commands.admin import admin_group
+    from faden_cli.commands.observe import observe_group
+    from faden_cli.commands.runtime_images import runtime_images_cmd
+    from faden_cli.commands.tls import tls_group
+    from faden_cli.commands.ports import ports_cmd
 
     target.add_command(version_cmd, "version")
     target.add_command(doctor_cmd, "doctor")
@@ -124,7 +124,7 @@ def _use_utf8_output() -> None:
     Windows consoles default to cp1252, and this CLI writes arrows, box rules
     and check marks -- some 17,000 non-ASCII characters across its sources.
     Any one of them reaching a cp1252 stream raises UnicodeEncodeError, so
-    ``llmport dev up --help`` ended in a traceback instead of printing help,
+    ``faden dev up --help`` ended in a traceback instead of printing help,
     and redirecting any command to a file did the same.
 
     ``errors="replace"`` rather than a hard switch: where a terminal genuinely

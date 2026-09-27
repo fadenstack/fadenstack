@@ -30,7 +30,7 @@ const names: NameLookups = {
     ["10.250.10.71", "gpu-01"],
     ["10.250.10.49", "gpu-02"],
   ]),
-  deployments: new Map([["llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e", "qwen-chat"]]),
+  deployments: new Map([["faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e", "qwen-chat"]]),
 };
 
 describe("the filters", () => {
@@ -53,8 +53,8 @@ describe("label values", () => {
   });
 
   it("name the deployment behind a Ray app, or say it is gone", () => {
-    expect(valueTitle("app", "llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e", names, t)).toBe("qwen-chat");
-    expect(valueTitle("app", "llmport-b64e389b-58ae-4b1d-a754-1f9f48e22220", names, t)).toBe(
+    expect(valueTitle("app", "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e", names, t)).toBe("qwen-chat");
+    expect(valueTitle("app", "faden-b64e389b-58ae-4b1d-a754-1f9f48e22220", names, t)).toBe(
       "Deleted deployment (b64e389b)",
     );
   });
@@ -62,7 +62,7 @@ describe("label values", () => {
   it("call a machine's journal its system log, not a container", () => {
     // What the page used to show under "container": the machine's journal.
     expect(valueTitle("container", "node-gpu-01", names, t)).toBe("gpu-01 system log");
-    expect(valueTitle("container", "llm-port-postgres", names, t)).toBe("llm-port-postgres");
+    expect(valueTitle("container", "faden-postgres", names, t)).toBe("faden-postgres");
   });
 
   it("read a model's components in words", () => {
@@ -78,7 +78,7 @@ describe("the table's machine and source", () => {
     const labels = {
       job: "ray-serve",
       host: "10.250.10.71",
-      app: "llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
+      app: "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
       deployment: "OpenAiIngress",
     };
     expect(machineOf(labels, names)).toBe("gpu-01");
@@ -93,7 +93,7 @@ describe("the table's machine and source", () => {
   });
 
   it("name a server container by its service", () => {
-    expect(sourceOf({ job: "docker", container: "llm-port-postgres" }, names, t)).toBe("llm-port-postgres");
+    expect(sourceOf({ job: "docker", container: "faden-postgres" }, names, t)).toBe("faden-postgres");
   });
 });
 

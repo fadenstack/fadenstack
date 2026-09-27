@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from llm_port_api.services.gateway.usage import Usage, usage_from_payload
+from faden_gateway.services.gateway.usage import Usage, usage_from_payload
 
 
 @dataclass(slots=True)

@@ -13,9 +13,9 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.services.chat import gateway_client
-from llm_port_backend.services.chat.gateway_client import GatewayChatClient
-from llm_port_backend.web.api.chat import views as chat_views
+from faden_backend.services.chat import gateway_client
+from faden_backend.services.chat.gateway_client import GatewayChatClient
+from faden_backend.web.api.chat import views as chat_views
 
 pytestmark = pytest.mark.anyio()
 

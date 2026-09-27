@@ -6,9 +6,9 @@ import asyncio
 import logging
 from typing import Any
 
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.runtimes import ContainerRuntime
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.runtimes import ContainerRuntime
+from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
 

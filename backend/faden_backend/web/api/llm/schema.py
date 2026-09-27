@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     ArtifactFormat,
     DownloadJobStatus,
     ModelSource,
@@ -384,7 +384,7 @@ class HFTokenStatusDTO(BaseModel):
     """Whether an HF token is configured, and whom it belongs to -- never the token."""
 
     configured: bool
-    # "database" (set here) or "environment" (LLM_PORT_BACKEND_HF_TOKEN).
+    # "database" (set here) or "environment" (FADEN_BACKEND_HF_TOKEN).
     source: Literal["database", "environment"] | None = None
     # False while the settings master key is the published default.
     storage_safe: bool = True

@@ -1,8 +1,8 @@
-"""A new Ray cluster keeps clear of the ports LLM.Port itself holds.
+"""A new Ray cluster keeps clear of the ports Fadenstack itself holds.
 
 Found in an end-to-end run on a Windows workstation that is both the server
 and the GPU node: Ray's head failed on "port 6379 ... Address already in use"
--- LLM.Port's Redis -- and was retried on the same port every minute.
+-- Fadenstack's Redis -- and was retried on the same port every minute.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import InferenceControlPlane
-from llm_port_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS, RayEnvironmentConfig
-from llm_port_backend.services.inference.service import EnvironmentService
+from faden_backend.db.models.inference import InferenceControlPlane
+from faden_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS, RayEnvironmentConfig
+from faden_backend.services.inference.service import EnvironmentService
 
 
 async def _control_plane(dbsession: AsyncSession, driver: str) -> InferenceControlPlane:

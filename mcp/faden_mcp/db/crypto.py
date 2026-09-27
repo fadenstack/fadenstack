@@ -3,7 +3,7 @@
 Provides EncryptedText and EncryptedJSON TypeDecorators that encrypt
 values at rest using Fernet with HKDF-derived per-purpose subkeys.
 
-Mirrors the pattern from llm_port_api.db.crypto.
+Mirrors the pattern from faden_gateway.db.crypto.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def configure(master_key: str) -> None:
     if not master_key:
         logger.warning(
             "ENCRYPTION_KEY is not set — MCP secrets stored in plaintext. "
-            "Set LLM_PORT_MCP_ENCRYPTION_KEY in production.",
+            "Set FADEN_MCP_ENCRYPTION_KEY in production.",
         )
         return
 

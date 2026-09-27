@@ -1,4 +1,4 @@
-"""Phase 8.2: routing a vLLM container LLM.Port found, as it is.
+"""Phase 8.2: routing a vLLM container Fadenstack found, as it is.
 
 The containers come from the agent's inventory (``vllm_containers``); the
 gateway and the container's own ``/v1/models`` answer are faked. Nothing here
@@ -14,10 +14,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import InferenceAdoption
-from llm_port_backend.db.models.llm import LLMProvider
-from llm_port_backend.db.models.node_control import InfraNode, InfraNodeInventorySnapshot
-from llm_port_backend.services.inference import found as found_vllm
+from faden_backend.db.models.inference import InferenceAdoption
+from faden_backend.db.models.llm import LLMProvider
+from faden_backend.db.models.node_control import InfraNode, InfraNodeInventorySnapshot
+from faden_backend.services.inference import found as found_vllm
 
 
 def _embed(**over: Any) -> dict[str, Any]:
@@ -263,7 +263,7 @@ async def test_a_container_that_was_removed_stops_being_routed(dbsession: AsyncS
 
 async def test_the_gateway_record_names_its_source() -> None:
     """publish_runtime carries a found container's own kind and id to the gateway."""
-    from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
+    from faden_backend.services.llm.gateway_sync import GatewaySyncService
 
     executed: list[dict[str, Any]] = []
 
@@ -306,13 +306,13 @@ async def test_the_gateway_record_names_its_source() -> None:
 def test_a_runtime_declares_its_kind_from_its_flags(generic: dict, provider: dict, kind: str) -> None:
     from types import SimpleNamespace
 
-    from llm_port_backend.services.llm.kinds import runtime_kind
+    from faden_backend.services.llm.kinds import runtime_kind
 
     assert runtime_kind(SimpleNamespace(generic_config=generic, provider_config=provider)) == kind
 
 
 async def test_a_deployment_declares_itself_a_chat_model() -> None:
-    from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
+    from faden_backend.services.llm.gateway_sync import GatewaySyncService
 
     executed: list[dict[str, Any]] = []
 
@@ -367,7 +367,7 @@ class _Proxy:
 async def test_a_found_container_is_reached_through_the_proxy_where_the_machine_has_one(
     dbsession: AsyncSession, answers: dict, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient
 
     node = await _machine(dbsession, [_embed()])
     node.capabilities_json = {"model_tls": 1}
@@ -391,7 +391,7 @@ async def test_a_found_container_is_reached_through_the_proxy_where_the_machine_
 async def test_when_the_proxy_cannot_take_it_it_is_routed_as_before_and_says_so(
     dbsession: AsyncSession, answers: dict, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient
 
     node = await _machine(dbsession, [_embed()])
     node.capabilities_json = {"model_tls": 1}

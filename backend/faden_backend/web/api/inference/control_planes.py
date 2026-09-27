@@ -11,19 +11,19 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference.service import (
+from faden_backend.db.models.users import User
+from faden_backend.services.inference.service import (
     ConflictError,
     ControlPlaneService,
     InferenceError,
     NotFoundError,
 )
-from llm_port_backend.web.api.inference.schema import (
+from faden_backend.web.api.inference.schema import (
     ControlPlaneCreate,
     ControlPlaneDTO,
     ControlPlaneUpdate,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 _CP = "inference.control_planes"

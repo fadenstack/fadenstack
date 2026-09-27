@@ -1,17 +1,17 @@
 """Unit tests for the pure Ray Serve deployment compiler."""
 
 import pytest
-from llm_port_backend.services.inference.drivers.ray.compiler import (
+from faden_backend.services.inference.drivers.ray.compiler import (
     DeploymentValidationError,
     compile_deployment,
     validate_spec,
 )
-from llm_port_backend.services.inference.schemas import parse_inference_deployment_spec
+from faden_backend.services.inference.schemas import parse_inference_deployment_spec
 
 
 def _base_spec(**overrides) -> dict:
     base = {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": "vllm", "config": {}},
         "scale": {"replicas": 1},
         "resources": {"replica": {"gpus": 1.0}},

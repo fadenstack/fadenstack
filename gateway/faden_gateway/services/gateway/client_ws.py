@@ -1,6 +1,6 @@
 """WebSocket protocol for local agentic client connections.
 
-Provides a persistent channel between LLM.port and connected local agents
+Provides a persistent channel between Fadenstack and connected local agents
 so that client-local tools can be brokered in real time.
 
 Protocol messages (JSON over WS):
@@ -27,8 +27,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.services.gateway.tool_router import ToolCallResult
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.services.gateway.tool_router import ToolCallResult
 
 logger = logging.getLogger(__name__)
 

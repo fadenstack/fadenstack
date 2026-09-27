@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 router = APIRouter()
 

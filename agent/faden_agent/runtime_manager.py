@@ -15,9 +15,9 @@ import httpx
 
 ProgressEmitter = Callable[[dict[str, Any]], Awaitable[None]]
 
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.runtimes import ContainerRuntime
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.runtimes import ContainerRuntime
+from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ _LOGS_TAIL_MAX_LINES = 200  # hard cap on log-tail line counts sent to the backe
 
 
 #: Identifiers allowed to reach the log glob unquoted.  Covers our own
-#: deployment app names ("llmport-<uuid>") and Ray's replica ids.
+#: deployment app names ("faden-<uuid>") and Ray's replica ids.
 _SAFE_LOG_TOKEN = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 
@@ -73,7 +73,7 @@ class RuntimeManager:
         events: EventBuffer,
         advertise_host: str,
         advertise_scheme: str = "http",
-        model_store_root: str = "/srv/llm-port/models",
+        model_store_root: str = "/srv/faden/models",
         model_puller: Callable[..., Any] | None = None,
         image_loader: Callable[..., Any] | None = None,
         model_tls: Any = None,
@@ -254,8 +254,8 @@ class RuntimeManager:
 
         # Build env dict and extra_args for the runtime
         run_env: dict[str, str] = {
-            "LLM_PORT_RUNTIME_ID": runtime_id,
-            "LLM_PORT_PROVIDER_TYPE": provider_type,
+            "FADEN_RUNTIME_ID": runtime_id,
+            "FADEN_PROVIDER_TYPE": provider_type,
         }
         # Bypass NGC entrypoint driver-version check when the image ships
         # CUDA forward-compat libs (e.g. nvcr.io containers).  The compat
@@ -589,7 +589,7 @@ class RuntimeManager:
         """
         # The glob has to reach the shell unquoted to expand, so the app name
         # cannot be shell-quoted into it.  It is checked instead: these are
-        # our own generated identifiers ("llmport-<uuid>", and Serve's own
+        # our own generated identifiers ("faden-<uuid>", and Serve's own
         # replica ids), and anything outside that alphabet is refused rather
         # than escaped -- there is no legitimate value this rejects, and it
         # leaves no way to end the glob and start a command.
@@ -762,7 +762,7 @@ class RuntimeManager:
         slug = "".join(ch for ch in slug if ch.isalnum() or ch == "-").strip("-")
         if not slug:
             slug = runtime_id.replace("-", "")
-        return f"llm-port-{slug[:48]}"
+        return f"faden-{slug[:48]}"
 
     @classmethod
     def _sanitize_command_args(cls, args: list[str]) -> None:

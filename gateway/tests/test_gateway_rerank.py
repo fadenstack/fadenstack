@@ -14,8 +14,8 @@ from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import LLMProviderInstance, ProviderType
-from llm_port_api.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.db.models.gateway import LLMProviderInstance, ProviderType
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from tests.test_gateway_pipeline_combined import ALIAS, _install_pii, _Observability, _pii, _seed, _token
 
 SCORING = {"task": "scoring"}

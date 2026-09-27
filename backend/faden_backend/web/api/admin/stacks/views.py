@@ -7,23 +7,23 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.stacks_dao import StackRevisionDAO
-from llm_port_backend.db.models.containers import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.stacks_dao import StackRevisionDAO
+from faden_backend.db.models.containers import (
     AuditResult,
     ContainerClass,
     ContainerPolicy,
 )
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.policy.enforcement import Action, PolicyEnforcer
-from llm_port_backend.web.api.admin.dependencies import (
+from faden_backend.db.models.users import User
+from faden_backend.services.policy.enforcement import Action, PolicyEnforcer
+from faden_backend.web.api.admin.dependencies import (
     audit_action,
     get_policy_enforcer,
     get_root_mode_active,
     require_superuser,
 )
-from llm_port_backend.web.api.rbac import require_permission
-from llm_port_backend.web.api.admin.stacks.schema import (
+from faden_backend.web.api.rbac import require_permission
+from faden_backend.web.api.admin.stacks.schema import (
     DeployStackRequest,
     RollbackStackRequest,
     StackDiffDTO,

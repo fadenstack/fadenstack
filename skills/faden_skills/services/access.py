@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import ColumnElement, and_, exists, false, or_, tuple_
 
-from llm_port_skills.db.models.skill import (
+from faden_skills.db.models.skill import (
     GrantAccess,
     PrincipalType,
     SkillGrantModel,

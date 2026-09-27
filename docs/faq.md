@@ -27,7 +27,7 @@ waiting, run the same line again for a new code.
 Leave `sudo` out of the line:
 
 ```bash
-curl -fsSLO http://<llm-port>:8000/api/install/llmport-agent.sh && sh llmport-agent.sh --join http://<llm-port>:8000
+curl -fsSLO http://<fadenstack>:8000/api/install/faden-agent.sh && sh faden-agent.sh --join http://<fadenstack>:8000
 ```
 
 Run as yourself, the script installs the agent in `~/.local/bin` and runs it
@@ -64,14 +64,14 @@ service. There is nothing to approve:
 Deleting a machine in **Machines** revokes its membership. For that machine
 the same line asks to join again, as it did the first time.
 
-After upgrading LLM.Port, do this on each machine: a release can expect a
+After upgrading Fadenstack, do this on each machine: a release can expect a
 newer agent than the machines run. If the server keeps its own agent builds
 in `agent-binaries/`, replace those first -- see
 [Update the machines' agents](upgrading.md#update-the-machines-agents).
 
 ### The Add a machine panel lists several addresses. Which one do I use?
 
-Use the one the machine can reach. A workstation running LLM.Port usually has
+Use the one the machine can reach. A workstation running Fadenstack usually has
 several: Wi-Fi, a VPN, Docker and VM bridges. Each is listed with its
 interface name. Pick the one on the network you share with the machine, and
 the command updates to use it. The panel never offers `localhost` or
@@ -88,8 +88,8 @@ URLs (`/admin/nodes`) and the agent's own messages still say *node*.
 ### I already run vLLM on this machine. Do I have to start over?
 
 No. Once its agent is 0.1.11 or later, the machine's page lists the vLLM
-containers it runs that LLM.Port did not start, and **Route through
-LLM.Port** puts a running one behind the gateway under a name, as it is. The
+containers it runs that Fadenstack did not start, and **Route through
+Fadenstack** puts a running one behind the gateway under a name, as it is. The
 container is not touched. See [vLLM you already run](found-vllm.md).
 
 ## Clusters
@@ -105,7 +105,7 @@ No model restarts. See
 
 ### My cluster says it is restarting itself.
 
-Part of it stopped: Ray on the head, or a worker dropped out. LLM.Port
+Part of it stopped: Ray on the head, or a worker dropped out. Fadenstack
 checks every cluster once a minute, and when it finds one broken it looks a
 second time before it restarts anything. It re-forms a lost head and rejoins a
 lost worker, then applies the models again. You do not have to do anything.
@@ -167,8 +167,8 @@ It should go **offline** as soon as its agent stops. The server marks a
 machine offline the moment its connection closes. A machine that goes quiet
 without closing it, such as one that lost power, is marked offline after five
 minutes of silence. If it stays healthy longer than that, the agent is still
-running somewhere. Run `pgrep -af llmport-agent` on the machine. An agent
-started by hand with `llmport-agent run` is not a service, and removing the
+running somewhere. Run `pgrep -af faden-agent` on the machine. An agent
+started by hand with `faden-agent run` is not a service, and removing the
 service does not stop it.
 
 ---
@@ -212,7 +212,7 @@ retried in place.
 ### My deployment is serving, but it is not in chat.
 
 A deployment is offered in chat only under a name someone chose for it.
-LLM.Port never makes one up. The deploy dialog now proposes one (**Offer in
+Fadenstack never makes one up. The deploy dialog now proposes one (**Offer in
 chat as**), but a deployment made before that, or with the field cleared,
 serves only at its endpoint. Its page says so:
 
@@ -265,10 +265,10 @@ It shows how many copies are ready, not where they are. Ray reports copy
 counts per deployment, not placement. On a pair of DGX Sparks with one
 accelerator each, two one-accelerator copies are necessarily one per machine.
 
-### The deployment says it is downloading the model to the LLM.Port server.
+### The deployment says it is downloading the model to the Fadenstack server.
 
 The model was not on the server yet. A cluster that cannot reach the internet
-gets its models from the LLM.Port server, so the server downloads the model
+gets its models from the Fadenstack server, so the server downloads the model
 first. The deployment waits for that and then copies the model to the
 machines, and the page shows the download's progress. If the server's
 download fails (for example a gated model without a token, or a mistyped
@@ -305,7 +305,7 @@ the chat's history was scanned on earlier turns and is not scanned again.
 
 On the machine's page, press **Open in Logs**. It opens **Logs** with that
 machine already chosen. On the Logs page itself, pick it under **Machine**:
-machines are listed by name, with the address LLM.Port knows them by.
+machines are listed by name, with the address Fadenstack knows them by.
 
 ![The logs of one machine](images/logs/logs-one-machine.png)
 
@@ -317,21 +317,21 @@ time range contains. Choosing one narrows the others. With a machine chosen,
 
 | Source | What it is |
 |---|---|
-| System log | The machine's own system journal: every service on it, not only LLM.Port |
+| System log | The machine's own system journal: every service on it, not only Fadenstack |
 | Model serving | The model's copies on the cluster. **Deployment** and **Component** narrow it to one deployment, and to its model server or its API entry |
-| LLM.Port services | The containers of LLM.Port itself, on the server |
+| Fadenstack services | The containers of Fadenstack itself, on the server |
 | Model containers | Models run the older way, one container per model |
 
 ### A machine's logs are missing.
 
-A machine asks LLM.Port where to send its logs when its agent starts. For the
-logs to arrive, the machine must be able to reach LLM.Port's log store
+A machine asks Fadenstack where to send its logs when its agent starts. For the
+logs to arrive, the machine must be able to reach Fadenstack's log store
 (Loki) on port 3100:
 
-- In development, set `LOKI_BIND=0.0.0.0` in `llm_port_shared/.env` and
+- In development, set `LOKI_BIND=0.0.0.0` in `shared/.env` and
   restart the shared stack. By default Loki listens only on the server itself.
 - Where Loki lives on another host or behind another name, set
-  `LLM_PORT_BACKEND_AGENT_LOKI_URL` on the backend to an address the machines
+  `FADEN_BACKEND_AGENT_LOKI_URL` on the backend to an address the machines
   can reach.
 
 Machines installed with the one-line install before agent 0.1.10 sent no logs
@@ -341,12 +341,12 @@ at all. Run the same install line again to upgrade them.
 
 The model's copies write log lines when something happens (starting,
 stopping, an error), not for every request. Ray records each request in its
-proxy log, which is not sent to LLM.Port.
+proxy log, which is not sent to Fadenstack.
 
 ### The browser console shows "Cannot read properties of undefined (reading 'keys')".
 
 It comes from Grafana, in the dashboard panel on the console's front page,
-not from LLM.Port. Grafana (11.5 and later) calls the browser's `caches`
+not from Fadenstack. Grafana (11.5 and later) calls the browser's `caches`
 API, which browsers only offer on a secure page: HTTPS, or `localhost`.
 Opened over plain HTTP at the server's address, `caches` is missing and
 Grafana logs this error. Every Grafana page does it, its own login page

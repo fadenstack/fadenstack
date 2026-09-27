@@ -5,7 +5,7 @@ Covers two layers:
 1. ``_do_download`` — the pure download+register pipeline.  All DAO imports
    and the HF download / directory scan are function-local, so we patch the
    real module attributes (``ModelDAO``, ``DownloadJobDAO``, ``ArtifactDAO``
-   on ``llm_port_backend.db.dao.llm_dao``) and the top-level
+   on ``faden_backend.db.dao.llm_dao``) and the top-level
    ``_run_download_sync`` and ``scan_model_directory``.
 
 2. ``download_model_task`` — the taskiq-wrapped task's crash handler, which
@@ -25,11 +25,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import llm_port_backend.db.dao.llm_dao as llm_dao_mod
-import llm_port_backend.services.llm.scanner as scanner_mod
-import llm_port_backend.services.llm.tasks as tasks_mod
-from llm_port_backend.db.models.llm import DownloadJobStatus, ModelStatus
-from llm_port_backend.tkq import broker
+import faden_backend.db.dao.llm_dao as llm_dao_mod
+import faden_backend.services.llm.scanner as scanner_mod
+import faden_backend.services.llm.tasks as tasks_mod
+from faden_backend.db.models.llm import DownloadJobStatus, ModelStatus
+from faden_backend.tkq import broker
 
 
 _MODEL_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")

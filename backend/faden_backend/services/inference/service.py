@@ -23,23 +23,23 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from llm_port_backend.services.inference.planner import InferenceEnvironmentPlan
+    from faden_backend.services.inference.planner import InferenceEnvironmentPlan
 
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import (
+from faden_backend.db.dao.inference_dao import (
     ControlPlaneDAO,
     DeploymentDAO,
     EndpointDAO,
     EnvironmentDAO,
     EnvironmentNodeDAO,
 )
-from llm_port_backend.db.dao.llm_dao import ModelDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.llm_dao import ModelDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     EnvironmentDesiredState,
     EnvironmentNodeRole,
@@ -48,16 +48,16 @@ from llm_port_backend.db.models.inference import (
     InferenceEndpoint,
     InferenceEnvironment,
 )
-from llm_port_backend.services.inference.reconciliation import (
+from faden_backend.services.inference.reconciliation import (
     control_plane_observation,
     deployment_observation,
     environment_observation,
 )
-from llm_port_backend.services.inference.schemas import (
+from faden_backend.services.inference.schemas import (
     InferenceDeploymentSpecV1Alpha1,
     parse_inference_deployment_spec,
 )
-from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit
+from faden_backend.services.inference.wakeup import wake_reconciler_after_commit
 
 log = logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ class ControlPlaneService:
 async def _forget_cluster_metrics(environment_id: uuid.UUID) -> None:
     """Drop a deleted cluster's scrape targets and dashboard (best-effort)."""
     try:
-        from llm_port_backend.services.llm.monitoring import (  # noqa: PLC0415
+        from faden_backend.services.llm.monitoring import (  # noqa: PLC0415
             get_monitoring_provisioner,
         )
 
@@ -283,7 +283,7 @@ class EnvironmentService:
         if not control_plane:
             raise NotFoundError("control plane", control_plane_id)
         if control_plane.driver == "ray":
-            from llm_port_backend.services.inference.drivers.ray.schemas import (  # noqa: PLC0415
+            from faden_backend.services.inference.drivers.ray.schemas import (  # noqa: PLC0415
                 NEW_CLUSTER_PORTS,
             )
 
@@ -372,8 +372,8 @@ class EnvironmentService:
                 "node is already a member of this environment or unknown"
             ) from exc
 
-        from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-        from llm_port_backend.services.inference.pools import ComputePoolCoordinator
+        from faden_backend.db.dao.node_control_dao import NodeControlDAO
+        from faden_backend.services.inference.pools import ComputePoolCoordinator
 
         node = await NodeControlDAO(self.session).get_node_by_id(node_id)
         if node is not None:
@@ -412,7 +412,7 @@ class EnvironmentService:
         receives its runtime image on both at once, and a single "latest"
         line would flick between them every few seconds.
         """
-        from llm_port_backend.db.models.node_control import (  # noqa: PLC0415
+        from faden_backend.db.models.node_control import (  # noqa: PLC0415
             InfraNodeCommand,
             InfraNodeCommandEvent,
             NodeCommandStatus,
@@ -513,7 +513,7 @@ class EnvironmentService:
 
         Deleting the row does not reach the machines. A cluster deleted while
         running would leave its Ray head and workers going on the hardware
-        with nothing in LLM.Port left to stop them -- so it has to be stopped
+        with nothing in Fadenstack left to stop them -- so it has to be stopped
         first, which the console does for the operator before deleting.
         """
         environment = await self.get(environment_id)
@@ -532,7 +532,7 @@ class EnvironmentService:
         await _forget_cluster_metrics(environment_id)
 
     async def _no_member_reachable(self, environment_id: uuid.UUID) -> bool:
-        from llm_port_backend.db.models.node_control import InfraNode, NodeHealthStatus  # noqa: PLC0415
+        from faden_backend.db.models.node_control import InfraNode, NodeHealthStatus  # noqa: PLC0415
 
         members = await self.node_dao.list_for_environment(environment_id)
         if not members:
@@ -556,7 +556,7 @@ class EnvironmentService:
         ``gateway`` enables the cheap agent-to-agent reachability challenge; a
         plan produced without one says so in its ``warnings``.
         """
-        from llm_port_backend.services.inference.planner import MultiNodeFabricPlanner
+        from faden_backend.services.inference.planner import MultiNodeFabricPlanner
 
         planner = MultiNodeFabricPlanner(self.session, gateway=gateway)
         return await planner.plan_environment(environment_id, validate=validate)
@@ -573,7 +573,7 @@ class EnvironmentService:
         The plan is re-derived server-side; *plan* is the approval receipt used
         for stale detection only.
         """
-        from llm_port_backend.services.inference.planner import MultiNodeFabricPlanner
+        from faden_backend.services.inference.planner import MultiNodeFabricPlanner
 
         planner = MultiNodeFabricPlanner(self.session)
         return await planner.apply_plan(
@@ -597,7 +597,7 @@ class EnvironmentService:
         if model is None:
             raise NotFoundError("model", model_id)
 
-        from llm_port_backend.services.inference.artifacts import ModelArtifactCoordinator
+        from faden_backend.services.inference.artifacts import ModelArtifactCoordinator
 
         coordinator = ModelArtifactCoordinator(self.session)
         nodes = await coordinator.eligible_nodes(environment)
@@ -621,7 +621,7 @@ class EnvironmentService:
         if model is None:
             raise NotFoundError("model", model_id)
 
-        from llm_port_backend.services.inference.artifacts import ModelArtifactCoordinator
+        from faden_backend.services.inference.artifacts import ModelArtifactCoordinator
 
         coordinator = ModelArtifactCoordinator(self.session, gateway=gateway)
         nodes = await coordinator.eligible_nodes(environment)
@@ -779,7 +779,7 @@ class DeploymentService:
         Done before the row is gone, because after it there is nothing left
         to identify the provider by.
         """
-        from llm_port_backend.services.inference.publication import (  # noqa: PLC0415
+        from faden_backend.services.inference.publication import (  # noqa: PLC0415
             InferencePublicationCoordinator,
         )
 
@@ -793,7 +793,7 @@ class DeploymentService:
         if _may_be_on_the_cluster(deployment):
             # Deleting the row used to be all this did, and the model went on
             # running on the machines -- found on the DGX pair, holding its
-            # share of a GB10 with nothing in LLM.Port left to stop it. The
+            # share of a GB10 with nothing in Fadenstack left to stop it. The
             # reconciler removes the application for a deployment desired
             # deleted, and purges the row once it is gone (see
             # reconciliation.reconcile_deployment). Lists already hide it.

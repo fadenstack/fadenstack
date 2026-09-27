@@ -12,8 +12,8 @@ from typing import Any
 import httpx
 import pytest
 
-from llm_port_node_agent import __main__ as agent_main
-from llm_port_node_agent.backend_client import BackendClient
+from faden_agent import __main__ as agent_main
+from faden_agent.backend_client import BackendClient
 
 
 class _Config:

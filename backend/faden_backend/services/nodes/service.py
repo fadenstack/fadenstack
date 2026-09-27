@@ -12,11 +12,11 @@ from sqlalchemy import select
 
 log = logging.getLogger(__name__)
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import ModelAvailabilityStatus
-from llm_port_backend.db.models.llm import LLMModel, LLMProvider, LLMRuntime, ModelStatus, RuntimeStatus
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import ModelAvailabilityStatus
+from faden_backend.db.models.llm import LLMModel, LLMProvider, LLMRuntime, ModelStatus, RuntimeStatus
+from faden_backend.db.models.node_control import (
     InfraNode,
     InfraNodeCommand,
     InfraNodeCredential,
@@ -28,13 +28,13 @@ from llm_port_backend.db.models.node_control import (
     NodeCommandType,
     NodeHealthStatus,
 )
-from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
-from llm_port_backend.services.llm.monitoring import (
+from faden_backend.services.llm.gateway_sync import GatewaySyncService
+from faden_backend.services.llm.monitoring import (
     deprovision_for_runtime,
     provision_for_runtime,
 )
-from llm_port_backend.services.nodes.wakeup import get_command_notifier
-from llm_port_backend.services.nodes.auth import constant_time_equal, hash_with_pepper, random_secret
+from faden_backend.services.nodes.wakeup import get_command_notifier
+from faden_backend.services.nodes.auth import constant_time_equal, hash_with_pepper, random_secret
 
 
 class NodeControlService:
@@ -434,11 +434,11 @@ class NodeControlService:
         still read "ready" -- with Prometheus still scraping it. A machine
         leaving, or coming back, is exactly when its clusters need looking at.
         """
-        from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+        from faden_backend.db.models.inference import (  # noqa: PLC0415
             InferenceEnvironment,
             InferenceEnvironmentNode,
         )
-        from llm_port_backend.services.inference.service import (  # noqa: PLC0415
+        from faden_backend.services.inference.service import (  # noqa: PLC0415
             _queue_for_reconcile,
         )
 
@@ -461,7 +461,7 @@ class NodeControlService:
         for cluster in clusters:
             _queue_for_reconcile(cluster)
         if clusters:
-            from llm_port_backend.services.inference.wakeup import (  # noqa: PLC0415
+            from faden_backend.services.inference.wakeup import (  # noqa: PLC0415
                 wake_reconciler_after_commit,
             )
 
@@ -1134,7 +1134,7 @@ class NodeControlService:
             # A takeover asks the machine for its cluster's token. Stored as it
             # arrived, it would sit in plain text in the command and its event;
             # it is sealed with the settings key before either is written.
-            from llm_port_backend.services.inference.drivers.ray.secrets import seal_token  # noqa: PLC0415
+            from faden_backend.services.inference.drivers.ray.secrets import seal_token  # noqa: PLC0415
 
             result_json = dict(result_json)
             result_json["cluster_token_sealed"] = seal_token(str(result_json.pop("cluster_token")))
@@ -1762,7 +1762,7 @@ class NodeControlService:
             model.status = ModelStatus.AVAILABLE
 
     async def _publish_runtime_to_gateway(self, *, runtime: LLMRuntime) -> None:
-        from llm_port_backend.services.llm.kinds import runtime_calls_tools, runtime_kind  # noqa: PLC0415
+        from faden_backend.services.llm.kinds import runtime_calls_tools, runtime_kind  # noqa: PLC0415
 
         if self._gateway_sync is None or not runtime.endpoint_url:
             return

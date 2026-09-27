@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
-from llm_port_api.services.gateway.errors import GatewayError, error_response
-from llm_port_api.services.gateway.session_schemas import (
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.errors import GatewayError, error_response
+from faden_gateway.services.gateway.session_schemas import (
     MessageDTO,
     ProjectCreateRequest,
     ProjectDTO,
@@ -61,7 +61,7 @@ async def create_project(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 message=(
                     f"Project limit reached ({limit}). "
-                    "Upgrade to LLM.port Enterprise for unlimited projects."
+                    "Upgrade to Fadenstack Enterprise for unlimited projects."
                 ),
                 code="resource_limit_reached",
             )
@@ -159,7 +159,7 @@ async def list_sessions(
     auth: AuthContext = Depends(get_auth_context),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
-    from llm_port_api.db.models.gateway import SessionStatus  # noqa: PLC0415
+    from faden_gateway.db.models.gateway import SessionStatus  # noqa: PLC0415
 
     status_enum = None
     if session_status:
@@ -235,7 +235,7 @@ async def update_session(
     auth: AuthContext = Depends(get_auth_context),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
-    from llm_port_api.db.models.gateway import SessionStatus  # noqa: PLC0415
+    from faden_gateway.db.models.gateway import SessionStatus  # noqa: PLC0415
 
     fields = body.model_dump(exclude_unset=True)
     # Moving a chat into a project: only one of the user's own. The move was

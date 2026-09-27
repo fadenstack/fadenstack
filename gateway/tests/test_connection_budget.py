@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from llm_port_api.db.connection_budget import assess, check_connection_budget
+from faden_gateway.db.connection_budget import assess, check_connection_budget
 
-PREFIX = "LLM_PORT_API_"
+PREFIX = "FADEN_GATEWAY_"
 
 
 def _assess(**changes: Any) -> Any:

@@ -5,10 +5,10 @@ This project uses runtime i18n with `react-i18next`.
 - Frontend reads translations from: `/api/i18n/{lang}/{namespace}`
 - Current namespace: `common`
 - Source bundles are stored in backend (runtime-loaded):
-  - `llm_port_backend/i18n/en/common.json`
-  - `llm_port_backend/i18n/es/common.json`
-  - `llm_port_backend/i18n/de/common.json`
-  - `llm_port_backend/i18n/zh/common.json`
+  - `backend/i18n/en/common.json`
+  - `backend/i18n/es/common.json`
+  - `backend/i18n/de/common.json`
+  - `backend/i18n/zh/common.json`
 
 ## 1. Add or Update UI Text in Code
 
@@ -29,7 +29,7 @@ Rules:
 ## 2. Add or Update Translation Keys
 
 1. Add new keys to English first:
-   - `llm_port_backend/i18n/en/common.json`
+   - `backend/i18n/en/common.json`
 2. Add the same keys to other languages:
    - `es`, `de`, `zh`
 3. Keep JSON structure aligned across languages.
@@ -44,12 +44,12 @@ Recommended key style:
 ## 3. Add a New Language
 
 1. Create folder:
-   - `llm_port_backend/i18n/<lang-code>/`
+   - `backend/i18n/<lang-code>/`
 2. Add file:
-   - `llm_port_backend/i18n/<lang-code>/common.json`
+   - `backend/i18n/<lang-code>/common.json`
 3. Start by copying English `common.json`, then translate values.
 4. (Optional) add display name in backend map:
-   - `llm_port_backend/llm_port_backend/web/api/i18n/views.py`
+   - `backend/faden_backend/web/api/i18n/views.py`
    - `_LANGUAGE_NAMES`
 
 If not added there, language still works but may show raw code as display name.
@@ -58,8 +58,8 @@ If not added there, language still works but may show raw code as display name.
 
 Frontend i18n uses versioned load path and reload on language switch.
 
-- Config file: `llm_port_frontend/app/i18n.ts`
-- Language key in localStorage: `llm-port-lang`
+- Config file: `frontend/app/i18n.ts`
+- Language key in localStorage: `faden-lang`
 - Optional env var to force cache bust:
   - `VITE_I18N_VERSION=2` (any new value)
 

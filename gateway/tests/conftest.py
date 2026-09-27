@@ -13,14 +13,14 @@ from httpx import ASGITransport, AsyncClient
 from redis.asyncio import ConnectionPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from llm_port_api.db.dependencies import get_db_session
-from llm_port_api.db.meta import meta
-from llm_port_api.db.models import load_all_models
-from llm_port_api.services.cache.redis import RedisCache
-from llm_port_api.services.gateway.observability import GatewayObservability
-from llm_port_api.services.rabbit.dependencies import get_rmq_channel_pool
-from llm_port_api.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
-from llm_port_api.web.application import get_app
+from faden_gateway.db.dependencies import get_db_session
+from faden_gateway.db.meta import meta
+from faden_gateway.db.models import load_all_models
+from faden_gateway.services.cache.redis import RedisCache
+from faden_gateway.services.gateway.observability import GatewayObservability
+from faden_gateway.services.rabbit.dependencies import get_rmq_channel_pool
+from faden_gateway.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
+from faden_gateway.web.application import get_app
 
 
 @pytest.fixture(scope="session")

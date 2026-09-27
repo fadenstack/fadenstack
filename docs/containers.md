@@ -1,7 +1,7 @@
 # Containers
 
-The **Containers** pages manage Docker on the LLM.Port server: the containers
-LLM.Port itself runs, and any you add next to it, such as an MCP server or a
+The **Containers** pages manage Docker on the Fadenstack server: the containers
+Fadenstack itself runs, and any you add next to it, such as an MCP server or a
 small service your models call. They do not manage the GPU machines; their
 runtimes are deployments (see [Deploying models](model-marketplace.md)).
 
@@ -14,7 +14,7 @@ development install at `4544c24`).
 ## The list
 
 **Containers → Containers** lists every container on the server, the ones
-LLM.Port runs included. Four tiles above the list count them:
+Fadenstack runs included. Four tiles above the list count them:
 
 ![The state tiles above the list](images/dashboard/05-containers-tiles.png)
 
@@ -48,7 +48,7 @@ A container's class decides what the console lets anyone do with it:
 | Class | For | View, logs | Start, restart | Stop | Pause, exec, delete |
 |---|---|---|---|---|---|
 | `SYSTEM_CORE` | Postgres, Redis, nginx, RabbitMQ, the observability stack | yes | yes | no | no |
-| `SYSTEM_AUX` | LLM.Port's own services (backend, gateway, modules) | yes | yes | yes | no |
+| `SYSTEM_AUX` | Fadenstack's own services (backend, gateway, modules) | yes | yes | yes | no |
 | `MCP` | MCP servers | yes | yes | yes | no |
 | `TENANT_APP` | Containers you run | yes | yes | yes | yes |
 | `UNTRUSTED` | Anything not classified | yes | no | no | no |
@@ -56,7 +56,7 @@ A container's class decides what the console lets anyone do with it:
 Every class can be **edited** (below), unless its policy is locked.
 
 A container created elsewhere is classified by its name the first time the
-list sees it: `llm-port-*` services and the infrastructure above are system
+list sees it: `faden-*` services and the infrastructure above are system
 containers, a name starting `mcp-` is `MCP`, anything else is `UNTRUSTED`.
 
 **Root mode** lifts the class limits for the admin who activates it, for
@@ -89,7 +89,7 @@ greeting on port 8088 from a one-line Node server:
 
 - **Image**: the image and tag; suggestions come from the images on the
   server.
-- **Container Name**: how it is addressed. On LLM.Port's network another
+- **Container Name**: how it is addressed. On Fadenstack's network another
   container reaches it by this name (`http://docs-demo:8080`).
 - **Command Override**: the command to run instead of the image's default,
   written as in a shell; quoted parts stay one argument.
@@ -101,7 +101,7 @@ greeting on port 8088 from a one-line Node server:
 ![Ports, environment, volumes and the network](images/containers/05-create-form-bottom.png)
 
 - **Port Bindings**: publish a container port on the server
-  (`8088 → 8080/tcp`). Leave it empty when only LLM.Port's services need to
+  (`8088 → 8080/tcp`). Leave it empty when only Fadenstack's services need to
   reach it: they do so by name over the network. A host port must be free;
   on the shared install 3001 is Grafana's.
 - **Environment Variables**: key and value, passed to the process
@@ -109,7 +109,7 @@ greeting on port 8088 from a one-line Node server:
   put secrets you would not show them here.
 - **Volume Mounts**: a host path and where it appears in the container.
 - **Start immediately after creation**: otherwise it is created stopped.
-- **Networks**: **`llm_port_shared_default`** puts it on LLM.Port's own
+- **Networks**: **`fadenstack_default`** puts it on Fadenstack's own
   network, where the gateway, backend and MCP service can reach it by name.
   Without one it joins Docker's default bridge.
 
@@ -177,18 +177,18 @@ replace** replaces it, after a confirmation:
 Class, policy and scope move to the new container. A container with a
 **locked** policy cannot be edited.
 
-LLM.Port's own containers can be edited too, for a test or a quick fix: the
-next `llmport deploy` or `llmport upgrade` makes them again from the compose
+Fadenstack's own containers can be edited too, for a test or a quick fix: the
+next `faden deploy` or `faden upgrade` makes them again from the compose
 file and `.env`, without the edits, and the form says so. The backend's own
 container cannot be edited from the console, since the backend would stop
-itself half way: change its settings in `.env` and run `llmport upgrade`.
+itself half way: change its settings in `.env` and run `faden upgrade`.
 
 ---
 
 ## Networks
 
-**Containers → Networks** lists Docker's networks. `llm_port_shared_default`
-is LLM.Port's; its count is the containers on it. The others are Docker's own.
+**Containers → Networks** lists Docker's networks. `fadenstack_default`
+is Fadenstack's; its count is the containers on it. The others are Docker's own.
 
 ![Docker networks](images/containers/11-networks.png)
 

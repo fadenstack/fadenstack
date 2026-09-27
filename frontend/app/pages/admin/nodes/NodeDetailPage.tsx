@@ -745,11 +745,11 @@ export default function NodeDetailPage() {
                   }}
                 >
                   {`# On the remote node:
-rm ~/.local/share/llmport-agent/state.json
-# Add to ~/.config/llmport-agent/agent.env:
-LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN=${enrollToken.token}
+rm ~/.local/share/faden-agent/state.json
+# Add to ~/.config/faden-agent/agent.env:
+FADEN_NODE_AGENT_ENROLLMENT_TOKEN=${enrollToken.token}
 # Then restart:
-llmport-agent run`}
+faden-agent run`}
                 </Box>
               </Stack>
             </CardContent>
@@ -890,7 +890,7 @@ llmport-agent run`}
         </Card>
       </Stack>
 
-      {/* ── vLLM this machine runs that LLM.Port did not start ──── */}
+      {/* ── vLLM this machine runs that Fadenstack did not start ──── */}
       <FoundVllmCard
         nodeId={node.id}
         reported={"vllm_containers" in ((node.latest_inventory ?? {}) as Record<string, unknown>)}

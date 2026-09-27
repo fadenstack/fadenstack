@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: llm-port-pii
-  name: llm-port-pii-db
+  namespace: faden-pii
+  name: faden-pii-db
 spec:
   selector:
     matchLabels:
-      app: llm-port-pii-db
+      app: faden-pii-db
   template:
     metadata:
       labels:
-        app: llm-port-pii-db
+        app: faden-pii-db
     spec:
       containers:
         - name: database
@@ -22,22 +22,22 @@ spec:
               cpu: "200m"
           env:
             - name: POSTGRES_PASSWORD
-              value: "llm_port_pii"
+              value: "faden_pii"
             - name: POSTGRES_USER
-              value: "llm_port_pii"
+              value: "faden_pii"
             - name: POSTGRES_DB
-              value: "llm_port_pii"
+              value: "faden_pii"
           ports:
             - containerPort: 5432
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: llm-port-pii
-  name: "llm-port-pii-db-service"
+  namespace: faden-pii
+  name: "faden-pii-db-service"
 spec:
   selector:
-    app: llm-port-pii-db
+    app: faden-pii-db
   ports:
     - port: 5432
       targetPort: 5432
@@ -45,15 +45,15 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  namespace: llm-port-pii
-  name: llm-port-pii-migrator
+  namespace: faden-pii
+  name: faden-pii-migrator
 spec:
   ttlSecondsAfterFinished: 100
   template:
     spec:
       containers:
       - name: migrator
-        image: llm_port_pii:latest
+        image: faden_pii:latest
         command:
           - "alembic"
           - "upgrade"
@@ -63,12 +63,12 @@ spec:
             memory: "200Mi"
             cpu: "250m"
         env:
-          - name: "LLM_PORT_PII_DB_HOST"
-            value: "llm-port-pii-db-service"
+          - name: "FADEN_PII_DB_HOST"
+            value: "faden-pii-db-service"
       initContainers:
         - name: wait-for-db
           image: toschneck/wait-for-it:latest
-          command: ["./wait-for-it.sh", "-t", "60", "llm-port-pii-db-service:5432"]
+          command: ["./wait-for-it.sh", "-t", "60", "faden-pii-db-service:5432"]
       restartPolicy: Never
 
 ---

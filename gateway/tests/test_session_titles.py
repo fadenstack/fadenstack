@@ -13,9 +13,9 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db import crypto
-from llm_port_api.db.models.gateway import ChatSession, ProviderType
-from llm_port_api.services.gateway.session_titles import TITLE_MAX_CHARS, title_from_message
+from faden_gateway.db import crypto
+from faden_gateway.db.models.gateway import ChatSession, ProviderType
+from faden_gateway.services.gateway.session_titles import TITLE_MAX_CHARS, title_from_message
 from tests.test_gateway_pipeline_combined import ALIAS, _model_answers, _Observability, _seed, _token
 
 

@@ -1,7 +1,7 @@
 """Reclaiming the terminals that host the dev services.
 
 Stopping a service's leaf process is not enough. ``dev up`` starts each one
-inside a shell tab -- ``pwsh -NoExit -Command uv run -m llm_port_backend`` --
+inside a shell tab -- ``pwsh -NoExit -Command uv run -m faden_backend`` --
 and that host inherits the listening socket. Kill only the leaf and the port
 stays bound by a process that no longer exists, the replacement cannot bind,
 it exits without a word, and the previous code keeps answering.
@@ -18,7 +18,7 @@ from pathlib import Path
 import psutil
 import pytest
 
-from llmport.commands.dev import dev_up
+from faden_cli.commands.dev import dev_up
 
 
 class _FakeProc:
@@ -46,8 +46,8 @@ def test_stops_the_shell_hosting_a_service(
     """The case that kept the socket alive."""
     host = _FakeProc(
         900,
-        ["pwsh.EXE", "-NoExit", "-Command", "uv run -m llm_port_backend"],
-        str(tmp_path / "llm_port_backend"),
+        ["pwsh.EXE", "-NoExit", "-Command", "uv run -m faden_backend"],
+        str(tmp_path / "backend"),
     )
     _patch(monkeypatch, [host])
 
@@ -58,9 +58,9 @@ def test_stops_the_shell_hosting_a_service(
 @pytest.mark.parametrize(
     "command",
     [
-        "uv run -m llm_port_backend",
-        "uv run -m llm_port_api",
-        "uv run taskiq worker llm_port_backend.tkq:broker",
+        "uv run -m faden_backend",
+        "uv run -m faden_gateway",
+        "uv run taskiq worker faden_backend.tkq:broker",
         "npm run dev",
     ],
 )
@@ -80,7 +80,7 @@ def test_leaves_a_second_checkout_alone(
     other = tmp_path.parent / "another-checkout"
     other.mkdir(exist_ok=True)
     host = _FakeProc(
-        2, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m llm_port_backend"], str(other)
+        2, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m faden_backend"], str(other)
     )
     _patch(monkeypatch, [host])
 
@@ -97,8 +97,8 @@ def test_ignores_a_shell_that_merely_mentions_a_module(
     terminal driving it.
     """
     procs = [
-        _FakeProc(3, ["bash", "-c", "grep -rn x llm_port_backend/"], str(tmp_path)),
-        _FakeProc(4, ["python", "-c", "import llm_port_backend"], str(tmp_path)),
+        _FakeProc(3, ["bash", "-c", "grep -rn x faden_backend/"], str(tmp_path)),
+        _FakeProc(4, ["python", "-c", "import faden_backend"], str(tmp_path)),
     ]
     _patch(monkeypatch, procs)
 
@@ -110,7 +110,7 @@ def test_never_stops_its_own_process_chain(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     host = _FakeProc(
-        5, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m llm_port_backend"], str(tmp_path)
+        5, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m faden_backend"], str(tmp_path)
     )
     monkeypatch.setattr(dev_up.psutil, "process_iter", lambda _a: [host])
     monkeypatch.setattr(dev_up, "_own_process_chain", lambda: {5})
@@ -127,7 +127,7 @@ def test_a_process_that_denies_inspection_is_skipped(
             raise psutil.AccessDenied(self.pid)
 
     denied = _Denied(
-        6, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m llm_port_backend"], "?"
+        6, ["pwsh.EXE", "-NoExit", "-Command", "uv run -m faden_backend"], "?"
     )
     _patch(monkeypatch, [denied])
 
@@ -140,7 +140,7 @@ def test_matches_on_the_workspace_in_the_command_line_too(
     """A host started elsewhere but naming this workspace still counts."""
     host = _FakeProc(
         7,
-        ["pwsh.EXE", "-NoExit", "-Command", f"cd {tmp_path}; uv run -m llm_port_api"],
+        ["pwsh.EXE", "-NoExit", "-Command", f"cd {tmp_path}; uv run -m faden_gateway"],
         "C:\\",
     )
     _patch(monkeypatch, [host])

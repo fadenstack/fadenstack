@@ -10,10 +10,10 @@ import pytest
 from click.testing import CliRunner
 from test_tls import NAMES, _issue
 
-from llmport.commands import tls as tls_cmd
-from llmport.core import schedule, tls
-from llmport.core.env_gen import write_env_file
-from llmport.core.settings import LlmportConfig
+from faden_cli.commands import tls as tls_cmd
+from faden_cli.core import schedule, tls
+from faden_cli.core.env_gen import write_env_file
+from faden_cli.core.settings import FadenConfig
 
 pytestmark = pytest.mark.usefixtures("fixed_machine")
 
@@ -154,22 +154,22 @@ def test_the_backend_is_told_this_hosts_addresses_and_ports(install: Path) -> No
 
 
 def test_the_renewal_runs_every_morning_as_a_user_timer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(schedule, "_cli", lambda: ["/home/ops/.local/bin/llmport"])
+    monkeypatch.setattr(schedule, "_cli", lambda: ["/home/ops/.local/bin/faden"])
     job = schedule.tls_renewal(tmp_path / "logs" / "tls-renew.log")
-    units = schedule.job_units(job, tmp_path / "llmport.yaml")
-    service = units["llmport-tls-renew.service"]
-    assert "ExecStart=/home/ops/.local/bin/llmport tls renew" in service
-    assert f"LLMPORT_CONFIG={tmp_path / 'llmport.yaml'}" in service
-    timer = units["llmport-tls-renew.timer"]
+    units = schedule.job_units(job, tmp_path / "faden.yaml")
+    service = units["faden-tls-renew.service"]
+    assert "ExecStart=/home/ops/.local/bin/faden tls renew" in service
+    assert f"FADEN_CONFIG={tmp_path / 'faden.yaml'}" in service
+    timer = units["faden-tls-renew.timer"]
     assert "OnCalendar=*-*-* 04:40:00" in timer
     assert "Persistent=true" in timer
-    assert schedule.job_entry(job, None).endswith("# llmport-tls-renew")
+    assert schedule.job_entry(job, None).endswith("# faden-tls-renew")
 
 
 def test_renew_says_what_it_did_and_fails_when_it_cannot_help(
     install: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    cfg = LlmportConfig(install_dir=str(install))
+    cfg = FadenConfig(install_dir=str(install))
     monkeypatch.setattr(tls_cmd, "load_config", lambda: cfg)
     restarted: list[Path] = []
     monkeypatch.setattr(tls_cmd, "apply_to_proxy", lambda d, **_k: restarted.append(d) or True)
@@ -200,7 +200,7 @@ def test_a_new_certificate_while_https_stays_on_reloads_instead_of_restarting(
     install: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A restart cut the machines' streams; they noticed a minute later, when their keepalive gave up."""
-    from llmport.core import bootstrap, compose
+    from faden_cli.core import bootstrap, compose
 
     ran: list[list[str]] = []
     restarts: list[object] = []
@@ -214,11 +214,11 @@ def test_a_new_certificate_while_https_stays_on_reloads_instead_of_restarting(
     monkeypatch.setattr(compose, "build_context_from_config", lambda _cfg: object())
     monkeypatch.setattr(compose, "restart", lambda _ctx, **_k: restarts.append(_k) or 0)
     monkeypatch.setattr(bootstrap, "wait_for_backend", lambda *_a, **_k: True)
-    monkeypatch.setattr(tls_cmd, "load_config", lambda: LlmportConfig(install_dir=str(install)))
+    monkeypatch.setattr(tls_cmd, "load_config", lambda: FadenConfig(install_dir=str(install)))
 
     monkeypatch.setattr(tls_cmd.subprocess, "run", lambda cmd, **_k: ran.append(cmd) or _Done(0))
     assert tls_cmd.apply_to_proxy(install, reload=True)
-    assert ran == [["/usr/bin/docker", "exec", "llm-port-nginx", "sh", "-c", tls_cmd.RELOAD_COMMAND]]
+    assert ran == [["/usr/bin/docker", "exec", "faden-nginx", "sh", "-c", tls_cmd.RELOAD_COMMAND]]
     assert restarts == []
 
     # A reload nginx refuses falls back to the restart; switching modes always restarts.

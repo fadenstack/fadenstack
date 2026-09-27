@@ -7,7 +7,7 @@
  * which this hook adopts, keeping the user's version on hand for "Keep mine".
  * No client clock is consulted.
  *
- * The local mirror (`llm-port-dashboard-layout-v2:<user>`) holds the layout,
+ * The local mirror (`faden-dashboard-layout-v2:<user>`) holds the layout,
  * the revision it was based on and whether it has unsaved edits. It is per
  * user: the v1 key was not, so on a shared browser one admin's layout showed
  * up for the next. A `storage` event keeps tabs of the same browser in step.
@@ -22,8 +22,8 @@ import {
   type Profile,
 } from "~/lib/dashboardLayoutModel";
 
-const MIRROR_PREFIX = "llm-port-dashboard-layout-v2:";
-const V1_KEY = "llm-port-dashboard-layout";
+const MIRROR_PREFIX = "faden-dashboard-layout-v2:";
+const V1_KEY = "faden-dashboard-layout";
 const SAVE_DEBOUNCE_MS = 800;
 
 interface Mirror {

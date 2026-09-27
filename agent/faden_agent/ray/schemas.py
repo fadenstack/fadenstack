@@ -1,7 +1,7 @@
 """Pydantic schemas for Ray node command payloads.
 
 The status *result* contract is the enriched
-:class:`~llm_port_node_agent.ray.models.RayEnvironmentStatus` produced by the
+:class:`~faden_agent.ray.models.RayEnvironmentStatus` produced by the
 SDK layer; :class:`RayStatusResult` remains for importers/tests and is a
 backwards-compatible projection of the flat fields.
 """
@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from llm_port_node_agent.ray.models import RayEnvironmentStatus
+from faden_agent.ray.models import RayEnvironmentStatus
 
 
 class RuntimeBundlePayload(BaseModel):
@@ -23,7 +23,7 @@ class RuntimeBundlePayload(BaseModel):
     handler flags is the agent's job.
     """
 
-    name: str = "llm-port-ray-runtime"
+    name: str = "faden-ray-runtime"
     image: str
     digest: str
     repo_digest: str | None = None
@@ -168,7 +168,7 @@ class RayStatusResult(BaseModel):
     """Backwards-compatible flat status (legacy consumers/tests).
 
     New consumers should use
-    :class:`~llm_port_node_agent.ray.models.RayEnvironmentStatus` directly.
+    :class:`~faden_agent.ray.models.RayEnvironmentStatus` directly.
     """
 
     alive: bool

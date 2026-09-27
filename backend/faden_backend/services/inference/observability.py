@@ -9,7 +9,7 @@ is.
 
 Metrics follow the plan's aggregation requirement (Ray environment / Serve
 application-deployment / vLLM replica) without turning the backend into a
-Prometheus proxy: a normalized snapshot of what LLM.Port already observes,
+Prometheus proxy: a normalized snapshot of what Fadenstack already observes,
 plus the scrape targets a real Prometheus should collect.  Putting the backend
 on the data path for every panel refresh would make a half-scraped cluster look
 like a backend error rather than the partial it is.

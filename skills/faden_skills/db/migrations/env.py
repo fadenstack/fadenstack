@@ -5,8 +5,8 @@ from alembic import context
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlalchemy.future import Connection
 
-from llm_port_skills.db.models.skill import Base
-from llm_port_skills.settings import settings
+from faden_skills.db.models.skill import Base
+from faden_skills.settings import settings
 
 config = context.config
 

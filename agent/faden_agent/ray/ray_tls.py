@@ -5,7 +5,7 @@ server and as client -- and trusts only the cluster's CA. The backend keeps a
 CA per cluster (``services/machine_tls/ray_ca.py``); the agent makes the key
 here, has the backend sign it (the names are the backend's: the fabric
 address, the machine's own, loopback) and puts the files where the runtime
-container reads them, ``/etc/llmport-ray-tls``.
+container reads them, ``/etc/faden-ray-tls``.
 
 Ray reads them when a process starts and never again, so they are written
 only when the runtime container is (re)created -- rewritten under a running
@@ -25,7 +25,7 @@ import httpx
 
 CERTIFICATE_PATH = "/api/node-files/ray-tls/certificate"
 #: Where the runtime container sees the files.
-MOUNT = "/etc/llmport-ray-tls"
+MOUNT = "/etc/faden-ray-tls"
 KEY_FILE = "node.key"
 CERT_FILE = "node.crt"
 CA_FILE = "ca.pem"

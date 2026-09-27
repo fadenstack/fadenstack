@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-    image: llm_port_api:${LLM_PORT_API_VERSION:-latest}
+    image: faden_gateway:${FADEN_GATEWAY_VERSION:-latest}
     restart: always
     env_file:
       - .env
@@ -13,9 +13,9 @@ services:
       rmq:
         condition: service_healthy
     environment:
-      LLM_PORT_API_HOST: 0.0.0.0
-      LLM_PORT_API_RABBIT_HOST: llm_port_api-rmq
-      LLM_PORT_API_REDIS_HOST: llm_port_api-redis
+      FADEN_GATEWAY_HOST: 0.0.0.0
+      FADEN_GATEWAY_RABBIT_HOST: faden_gateway-rmq
+      FADEN_GATEWAY_REDIS_HOST: faden_gateway-redis
 
   taskiq-worker:
     <<: *main_app
@@ -23,11 +23,11 @@ services:
     command:
       - taskiq
       - worker
-      - llm_port_api.tkq:broker
+      - faden_gateway.tkq:broker
 
   redis:
     image: bitnami/redis:6.2.5
-    hostname: "llm_port_api-redis"
+    hostname: "faden_gateway-redis"
     restart: always
     environment:
       ALLOW_EMPTY_PASSWORD: "yes"
@@ -39,7 +39,7 @@ services:
 
   rmq:
     image: rabbitmq:3.9.16-alpine
-    hostname: "llm_port_api-rmq"
+    hostname: "faden_gateway-rmq"
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: "guest"

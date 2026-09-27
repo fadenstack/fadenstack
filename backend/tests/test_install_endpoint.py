@@ -20,7 +20,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_backend.web.api import install as install_api
+from faden_backend.web.api import install as install_api
 
 ORIGIN = "http://10.250.10.220:8000"
 
@@ -115,7 +115,7 @@ async def test_plan_serves_the_local_copy_when_there_is_one(
     that the digest is ours either way -- so a release that is not the build
     this deployment expects is refused wherever it came from.
     """
-    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary = tmp_path / "faden-agent-linux-aarch64"
     binary.write_bytes(b"not really a binary, but it hashes")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
     monkeypatch.setattr(install_api, "published_digest", _no_published_digest)  # an offline server
@@ -146,7 +146,7 @@ async def test_a_local_copy_from_an_older_version_is_set_aside(
     script's check and the update stopped -- and a machine without internet
     got the 0.1.12 copy from the fallback.
     """
-    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary = tmp_path / "faden-agent-linux-aarch64"
     binary.write_bytes(b"agent 0.1.12")
     release = hashlib.sha256(b"agent 0.1.13").hexdigest()
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
@@ -168,7 +168,7 @@ async def test_a_developers_own_build_is_never_set_aside(
     tmp_path: Path,
 ) -> None:
     """A build in the checkout's dist/ differs from the release by construction."""
-    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary = tmp_path / "faden-agent-linux-aarch64"
     binary.write_bytes(b"agent 0.1.13, built just now")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
     monkeypatch.setattr(install_api, "_source_checkout_binary_dir", lambda: tmp_path)
@@ -189,7 +189,7 @@ async def test_a_local_copy_of_this_version_is_still_served(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    binary = tmp_path / "llmport-agent-linux-aarch64"
+    binary = tmp_path / "faden-agent-linux-aarch64"
     binary.write_bytes(b"agent 0.1.13")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
 
@@ -213,7 +213,7 @@ async def test_the_published_digest_is_read_from_the_release_and_remembered(
     def _handler(request: httpx.Request) -> httpx.Response:
         asked.append(str(request.url))
         if "aarch64" in str(request.url):
-            return httpx.Response(200, text=f"{digest}  llmport-agent-linux-aarch64\n")
+            return httpx.Response(200, text=f"{digest}  faden-agent-linux-aarch64\n")
         raise httpx.ConnectError("no route", request=request)
 
     real = httpx.AsyncClient
@@ -224,7 +224,7 @@ async def test_the_published_digest_is_read_from_the_release_and_remembered(
     assert await install_api.published_digest("linux-aarch64") == digest
     assert await install_api.published_digest("linux-aarch64") == digest
     assert len(asked) == 1, "asked once, then remembered"
-    assert asked[0].endswith(f"node-agent-v{install_api.AGENT_VERSION}/llmport-agent-linux-aarch64.sha256")
+    assert asked[0].endswith(f"node-agent-v{install_api.AGENT_VERSION}/faden-agent-linux-aarch64.sha256")
     assert await install_api.published_digest("linux-x86_64") is None, "an offline server has no answer"
     install_api._published_digests.clear()
 
@@ -255,9 +255,9 @@ async def test_the_script_is_downloadable_without_a_login(
     client: AsyncClient, fastapi_app: FastAPI
 ) -> None:
     """A machine that has never enrolled has no credential to present."""
-    r = await client.get("/api/install/llmport-agent.sh")
+    r = await client.get("/api/install/faden-agent.sh")
     assert r.status_code == 200
-    assert "llmport-agent.sh" in r.headers.get("content-disposition", "")
+    assert "faden-agent.sh" in r.headers.get("content-disposition", "")
     assert "#!/bin/sh" in r.text
 
 
@@ -280,7 +280,7 @@ async def test_the_installer_unescapes_the_urls_it_is_given(
     using bad/illegal format" -- from both sources, so the installer could
     never fetch the agent at all.
     """
-    script = (await client.get("/api/install/llmport-agent.sh")).text
+    script = (await client.get("/api/install/faden-agent.sh")).text
     assert r"sed 's|\\/|/|g'" in script, "the plan's escaped slashes are never undone"
 
 
@@ -295,7 +295,7 @@ async def test_enrolling_as_root_is_not_handed_a_bare_flag(
     already been installed. It read as a broken agent rather than a broken
     installer.
     """
-    script = (await client.get("/api/install/llmport-agent.sh")).text
+    script = (await client.get("/api/install/faden-agent.sh")).text
     assert "$SUDO -E " not in script
     assert "SUDO_E=\"\"" in script and 'SUDO_E="sudo -E"' in script
 
@@ -306,7 +306,7 @@ async def test_enrolling_as_root_is_not_handed_a_bare_flag(
 class TestBinaryResolution:
     """One built file, not two that are supposed to match.
 
-    `build-binary.sh` writes into llm_port_node_agent/dist/. That output used
+    `build-binary.sh` writes into agent/dist/. That output used
     to be copied into `agent_binary_dir` by hand, and the served copy drifted
     a build behind the built one with nothing to say so -- the served x86_64
     agent was a build old and carried no licence, while the aarch64 build
@@ -368,7 +368,7 @@ class TestBinaryResolution:
         checkout = tmp_path / "dist"
         checkout.mkdir()
         for build in ("linux-x86_64", "linux-aarch64"):
-            (checkout / f"llmport-agent-{build}").write_bytes(b"ELF")
+            (checkout / f"faden-agent-{build}").write_bytes(b"ELF")
         monkeypatch.setattr(
             install_api.settings,
             "agent_binary_dir",
@@ -387,7 +387,7 @@ class TestBinaryResolution:
         found = install_api._source_checkout_binary_dir()
         assert found is not None, "running from a checkout, so this must resolve"
         assert found.name == "dist"
-        assert found.parent.name == "llm_port_node_agent"
+        assert found.parent.name == "faden_agent"
         assert (found.parent / "build-binary.sh").is_file()
 
 
@@ -416,7 +416,7 @@ class TestInstallAddress:
             ("[::1]:8000", True),
             ("10.250.10.220", False),
             ("10.250.10.220:8000", False),
-            ("llmport.internal", False),
+            ("faden.internal", False),
         ],
     )
     def test_knows_which_addresses_mean_only_this_machine(
@@ -509,7 +509,7 @@ def test_the_logger_can_print_the_characters_this_service_uses() -> None:
     """
     import io
 
-    from llm_port_backend import log as backend_log
+    from faden_backend import log as backend_log
 
     class _Cp1252Stdout(io.TextIOWrapper):
         def __init__(self) -> None:
@@ -553,7 +553,7 @@ def _decide(tmp_path: Path, *, sudo_ok: bool, uid: int = 1000, extra: str = "") 
     harness = tmp_path / "decide.sh"
     harness.write_text(
         "set -eu\n"
-        'INSTALL_PATH="/usr/local/bin/llmport-agent"\n'
+        'INSTALL_PATH="/usr/local/bin/faden-agent"\n'
         "INSTALL_PATH_SET=0\nFORCE_USER=0\n"
         f"{extra}\n"
         + _privilege_block()
@@ -582,12 +582,12 @@ class TestInstallingWithoutRoot:
     def test_no_root_and_no_passwordless_sudo_means_a_home_install(self, tmp_path: Path) -> None:
         decided = _decide(tmp_path, sudo_ok=False)
         assert decided["ROOTLESS"] == "1"
-        assert decided["INSTALL_PATH"] == "/home/tester/.local/bin/llmport-agent"
+        assert decided["INSTALL_PATH"] == "/home/tester/.local/bin/faden-agent"
 
     def test_passwordless_sudo_keeps_the_system_install(self, tmp_path: Path) -> None:
         decided = _decide(tmp_path, sudo_ok=True)
         assert decided["ROOTLESS"] == "0"
-        assert decided["INSTALL_PATH"] == "/usr/local/bin/llmport-agent"
+        assert decided["INSTALL_PATH"] == "/usr/local/bin/faden-agent"
 
     def test_root_is_a_system_install(self, tmp_path: Path) -> None:
         decided = _decide(tmp_path, sudo_ok=False, uid=0)
@@ -601,9 +601,9 @@ class TestInstallingWithoutRoot:
         decided = _decide(
             tmp_path,
             sudo_ok=False,
-            extra='INSTALL_PATH="/opt/me/llmport-agent"\nINSTALL_PATH_SET=1',
+            extra='INSTALL_PATH="/opt/me/faden-agent"\nINSTALL_PATH_SET=1',
         )
-        assert decided["INSTALL_PATH"] == "/opt/me/llmport-agent"
+        assert decided["INSTALL_PATH"] == "/opt/me/faden-agent"
 
     def test_the_service_it_starts_is_a_user_one(self) -> None:
         script = _script()
@@ -618,7 +618,7 @@ def test_the_backend_expects_the_agent_version_the_checkout_builds() -> None:
     """
     import tomllib
 
-    agent_pyproject = Path(install_api.__file__).resolve().parents[5] / "llm_port_node_agent" / "pyproject.toml"
+    agent_pyproject = Path(install_api.__file__).resolve().parents[5] / "agent" / "pyproject.toml"
     if not agent_pyproject.is_file():
         pytest.skip("no agent source beside this backend")
     version = tomllib.loads(agent_pyproject.read_text(encoding="utf-8"))["project"]["version"]

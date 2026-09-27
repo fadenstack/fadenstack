@@ -23,24 +23,24 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 )
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from llm_port_api.db.connection_budget import check_connection_budget
-from llm_port_api.services.gateway.file_store import LocalFileStore
-from llm_port_api.services.gateway.observability import GatewayObservability
-from llm_port_api.services.gateway.pricing import PricingService
-from llm_port_api.services.gateway.proxy import create_shared_http_client
-from llm_port_api.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
-from llm_port_api.services.gateway.settings_loader import load_system_settings_from_backend_db
-from llm_port_api.services.gateway.usage_group import build_user_resolvers
-from llm_port_api.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
-from llm_port_api.services.cache import NoOpCache, RedisCache
-from llm_port_api.services.registry import service_registry
-from llm_port_api.services.tls import build_asyncpg_ssl, build_redis_ssl_kwargs
-from llm_port_api.settings import settings
-from llm_port_api.tkq import broker
+from faden_gateway.db.connection_budget import check_connection_budget
+from faden_gateway.services.gateway.file_store import LocalFileStore
+from faden_gateway.services.gateway.observability import GatewayObservability
+from faden_gateway.services.gateway.pricing import PricingService
+from faden_gateway.services.gateway.proxy import create_shared_http_client
+from faden_gateway.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
+from faden_gateway.services.gateway.settings_loader import load_system_settings_from_backend_db
+from faden_gateway.services.gateway.usage_group import build_user_resolvers
+from faden_gateway.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
+from faden_gateway.services.cache import NoOpCache, RedisCache
+from faden_gateway.services.registry import service_registry
+from faden_gateway.services.tls import build_asyncpg_ssl, build_redis_ssl_kwargs
+from faden_gateway.settings import settings
+from faden_gateway.tkq import broker
 
 # ── Optional EE plugin ────────────────────────────────────────────
 try:
-    from llm_port_ee.plugins.gateway import gateway_plugin  # type: ignore[import-untyped]
+    from faden_ee.plugins.gateway import gateway_plugin  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover
     gateway_plugin = None
 # ──────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ def setup_opentelemetry(app: FastAPI) -> None:  # pragma: no cover
     tracer_provider = TracerProvider(
         resource=Resource(
             attributes={
-                SERVICE_NAME: "llm_port_api",
+                SERVICE_NAME: "faden_gateway",
                 TELEMETRY_SDK_LANGUAGE: "python",
                 DEPLOYMENT_ENVIRONMENT: settings.environment,
             },
@@ -172,7 +172,7 @@ def _setup_db(app: FastAPI) -> None:  # pragma: no cover
 def _probe_observability_pro() -> bool:
     """Check whether enterprise observability is available.
 
-    Returns ``True`` when the ``llm_port_ee`` gateway plugin is
+    Returns ``True`` when the ``faden_ee`` gateway plugin is
     installed, indicating enterprise observability features are
     available in-process.
     """
@@ -232,7 +232,7 @@ async def lifespan_setup(
     :return: function that actually performs actions.
     """
 
-    from llm_port_api.db.crypto import configure as configure_crypto
+    from faden_gateway.db.crypto import configure as configure_crypto
 
     app.middleware_stack = None
     configure_crypto(settings.encryption_key)
@@ -278,7 +278,7 @@ async def lifespan_setup(
     await check_connection_budget(
         app.state.db_engine,
         service="the gateway",
-        env_prefix="LLM_PORT_API_",
+        env_prefix="FADEN_GATEWAY_",
         workers=settings.workers_count,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
@@ -303,7 +303,7 @@ async def lifespan_setup(
     else:
         app.state.chat_file_store = None
     # Stream reconnection buffer
-    from llm_port_api.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
+    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
     app.state.stream_buffer = StreamBuffer()
     setup_opentelemetry(app)
     _init_cache(app)
@@ -312,7 +312,7 @@ async def lifespan_setup(
     # Security middleware (HSTS, security headers, host allowlist, CORS,
     # optional HTTPS redirect for strict mode). Must be added BEFORE
     # build_middleware_stack() so it's part of the dispatch chain.
-    from llm_port_api.web.middleware import register_security_middleware  # noqa: PLC0415
+    from faden_gateway.web.middleware import register_security_middleware  # noqa: PLC0415
 
     register_security_middleware(app, settings)
     app.middleware_stack = app.build_middleware_stack()
@@ -332,7 +332,7 @@ async def lifespan_setup(
     pricing_task = asyncio.create_task(_pricing_refresh_loop())
     # The machines' mutual TLS: the gateway's certificate and the machine CAs,
     # read from the backend every minute (services/gateway/upstream_tls.py).
-    from llm_port_api.services.gateway import upstream_tls  # noqa: PLC0415
+    from faden_gateway.services.gateway import upstream_tls  # noqa: PLC0415
 
     await upstream_tls.machine_identity.refresh()
     machine_tls_task = asyncio.create_task(upstream_tls.refresh_loop(), name="machine_tls")

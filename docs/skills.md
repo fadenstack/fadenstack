@@ -8,7 +8,7 @@ write-up. It is a set of instructions that goes into a chat when it is needed.
 - **RAG** is what it knows (documents).
 - **Skills** are how it should work (instructions).
 
-Skills are an optional module (`llmport module enable skills`, or
+Skills are an optional module (`faden module enable skills`, or
 **Modules** in the admin console).
 
 ---
@@ -131,7 +131,7 @@ which Claude Code, Codex and Open WebUI read too. A skill is a folder:
 incident-review/
 ├── SKILL.md        name, description (+ license, compatibility, metadata)
 │                   and the instructions
-├── llmport.yaml    llm.port's settings: title, tags, activation,
+├── faden.yaml    fadenstack's settings: title, tags, activation,
 │                   trigger_rules, allowed/preferred/forbidden tools,
 │                   knowledge_sources
 ├── references/     further documents
@@ -140,12 +140,12 @@ incident-review/
 ```
 
 **Export** gives the zipped folder, or the `SKILL.md` alone. **Import** takes
-either; a skill from anywhere else imports as it is, and an older llm.port
+either; a skill from anywhere else imports as it is, and an older fadenstack
 `.md` (with its settings in the frontmatter) is read too.
 
 - `SKILL.md`'s own `allowed-tools` (for example `Bash(git:*) Read`) is kept
-  for export but not applied: llm.port's tool lists are in `llmport.yaml`.
-- Nothing in llm.port runs a skill's scripts. They are kept so the skill can
+  for export but not applied: fadenstack's tool lists are in `faden.yaml`.
+- Nothing in fadenstack runs a skill's scripts. They are kept so the skill can
   be exported to agents that do, and the editor marks them.
 - The chat gets the `SKILL.md` instructions, and the skill's other files
   when it needs them. A model that calls tools sees the files listed with the
@@ -188,7 +188,7 @@ organization sees; people's private skills do not count against it.
 
 ## Limits
 
-| Setting (`LLM_PORT_SKILLS_…`) | Default | |
+| Setting (`FADEN_SKILLS_…`) | Default | |
 |---|---|---|
 | `MAX_PUBLISHED_SKILLS_PER_TENANT` | 25 | Published skills the whole organization sees |
 | `MAX_SKILLS_PER_USER` | 200 | Skills one person owns |

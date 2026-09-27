@@ -15,8 +15,8 @@ from typing import Any
 
 import pytest
 
-from llmport.core import clickhouse, compose
-from llmport.core.compose import ComposeContext
+from faden_cli.core import clickhouse, compose
+from faden_cli.core.compose import ComposeContext
 
 
 def _ctx() -> ComposeContext:
@@ -38,9 +38,9 @@ def _answers(monkeypatch: pytest.MonkeyPatch, answer: Any) -> list[list[str]]:
 
 
 def test_a_container_made_outside_this_project_is_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = {"name": "llm_port_shared", "services": {
-        "prometheus": {"container_name": "llm-port-prometheus"},
-        "postgres": {"container_name": "llm-port-postgres"},
+    config = {"name": "shared", "services": {
+        "prometheus": {"container_name": "faden-prometheus"},
+        "postgres": {"container_name": "faden-postgres"},
         "backend": {},
     }}
 
@@ -48,13 +48,13 @@ def test_a_container_made_outside_this_project_is_found(monkeypatch: pytest.Monk
         if "config" in cmd:
             return 0, json.dumps(config)
         return 0, (
-            "llm-port-prometheus\t\n"            # docker run
-            "llm-port-postgres\tllm_port_shared\n"  # ours
+            "faden-prometheus\t\n"            # docker run
+            "faden-postgres\tfadenstack\n"  # ours
             "some-other-app\t\n"                  # not a name we use
         )
 
     _answers(monkeypatch, answer)
-    assert compose.foreign_containers(_ctx()) == [("llm-port-prometheus", "")]
+    assert compose.foreign_containers(_ctx()) == [("faden-prometheus", "")]
 
 
 def test_nothing_is_reported_when_compose_cannot_be_read(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -88,7 +88,7 @@ def test_clickhouse_that_cannot_be_asked_is_reported(monkeypatch: pytest.MonkeyP
 
 
 def test_the_shipped_clickhouse_config_turns_off_what_the_cli_drops() -> None:
-    config = Path(__file__).parents[2] / "llm_port_shared" / "clickhouse" / "config.d" / "system-logs.xml"
+    config = Path(__file__).parents[2] / "shared" / "clickhouse" / "config.d" / "system-logs.xml"
     text = config.read_text(encoding="utf-8")
     for name in clickhouse.DISABLED_LOGS:
         assert f'<{name} remove="1"/>' in text
@@ -96,24 +96,24 @@ def test_the_shipped_clickhouse_config_turns_off_what_the_cli_drops() -> None:
 
 def test_a_backup_takes_the_databases_the_server_has(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The fixed list named ``pii`` (absent: a failed dump) and missed ``rag`` (never backed up)."""
-    from llmport.core import backup
+    from faden_cli.core import backup
 
     dumped: list[str] = []
 
     def run(cmd: list[str], **_: Any) -> subprocess.CompletedProcess[bytes]:
         if "psql" in cmd:
-            return subprocess.CompletedProcess(cmd, 0, b"langfuse\nllm_api\nllm_port_backend\nrag\n", b"")
+            return subprocess.CompletedProcess(cmd, 0, b"langfuse\nfaden_gateway\nfaden_backend\nrag\n", b"")
         dumped.append(cmd[-1])
         return subprocess.CompletedProcess(cmd, 0, b"dump", b"")
 
     monkeypatch.setattr(backup.subprocess, "run", run)
     monkeypatch.setattr(backup, "_docker_bin", lambda: "docker")
-    assert set(backup.dump_databases(tmp_path)) == {"langfuse", "llm_api", "llm_port_backend", "rag"}
-    assert dumped == ["langfuse", "llm_api", "llm_port_backend", "rag"]
+    assert set(backup.dump_databases(tmp_path)) == {"langfuse", "faden_gateway", "faden_backend", "rag"}
+    assert dumped == ["langfuse", "faden_gateway", "faden_backend", "rag"]
 
 
 def test_the_fixed_list_is_the_fallback(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from llmport.core import backup
+    from faden_cli.core import backup
 
     dumped: list[str] = []
 
@@ -126,4 +126,4 @@ def test_the_fixed_list_is_the_fallback(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(backup.subprocess, "run", run)
     monkeypatch.setattr(backup, "_docker_bin", lambda: "docker")
     backup.dump_databases(tmp_path)
-    assert "llm_port_backend" in dumped
+    assert "faden_backend" in dumped

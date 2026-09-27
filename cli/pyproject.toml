@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/llmport"]
+packages = ["src/faden_cli"]
 
-# Packs ../llm_port_shared into the package (see hatch_build.py).
+# Packs ../shared into the package (see hatch_build.py).
 [tool.hatch.build.hooks.custom]
 
 [project]
-name = "llmport-cli"
-version = "0.3.0"
+name = "fadenstack"
+version = "0.4.0"
 requires-python = ">=3.12,<4.0"
-description = "CLI installer and management tool for the llm.port platform"
+description = "CLI installer and management tool for the Fadenstack platform"
 authors = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },
 ]
@@ -41,18 +41,19 @@ dependencies = [
     "pyyaml >=6.0,<7",
     "jinja2 >=3.1,<4",
     "psutil >=6.0,<7",
-    # llmport tls: certificates made here, and checks of the operator's own.
+    # faden tls: certificates made here, and checks of the operator's own.
     "cryptography >=43",
 ]
 
 [project.urls]
-Homepage = "https://llm-port.github.io"
-Repository = "https://github.com/llm-port/llm-port-cli"
-Documentation = "https://llm-port.github.io/docs"
-Issues = "https://github.com/llm-port/llm-port-cli/issues"
+Homepage = "https://fadenstack.github.io"
+Repository = "https://github.com/fadenstack/fadenstack"
+Documentation = "https://fadenstack.github.io/docs"
+Issues = "https://github.com/fadenstack/fadenstack/issues"
 
 [project.scripts]
-llmport = "llmport.cli:main"
+faden = "faden_cli.cli:main"
+fadenstack = "faden_cli.cli:main"
 
 [dependency-groups]
 dev = [

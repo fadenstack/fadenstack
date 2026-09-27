@@ -8,16 +8,16 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO, RuntimeDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.llm import ProviderType
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.llm.monitoring import get_monitoring_provisioner
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.web.api.admin.dependencies import audit_action
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
-from llm_port_backend.web.api.llm.schema import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO, RuntimeDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.llm import ProviderType
+from faden_backend.db.models.users import User
+from faden_backend.services.llm.monitoring import get_monitoring_provisioner
+from faden_backend.services.llm.service import LLMService
+from faden_backend.web.api.admin.dependencies import audit_action
+from faden_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.web.api.llm.schema import (
     ArtifactDTO,
     DownloadJobDTO,
     DownloadResponseDTO,
@@ -28,7 +28,7 @@ from llm_port_backend.web.api.llm.schema import (
     ModelRegisterRequest,
     ModelWithInstancesDTO,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 

@@ -1,13 +1,13 @@
-"""``llmport rebuild`` — rebuild and redeploy individual services.
+"""``faden rebuild`` — rebuild and redeploy individual services.
 
 Rebuild one or more services without touching the rest of the stack.
 Useful for developers who changed frontend code, backend code, etc.
-and want a quick turnaround without a full ``llmport deploy``.
+and want a quick turnaround without a full ``faden deploy``.
 
 Examples:
-    llmport rebuild frontend          # rebuild + restart frontend only
-    llmport rebuild backend api       # rebuild backend and api
-    llmport rebuild --all             # rebuild all app services
+    faden rebuild frontend          # rebuild + restart frontend only
+    faden rebuild backend api       # rebuild backend and api
+    faden rebuild --all             # rebuild all app services
 """
 
 from __future__ import annotations
@@ -16,38 +16,38 @@ import sys
 
 import click
 
-from llmport.core.compose import (
+from faden_cli.core.compose import (
     ComposeContext,
     build as compose_build,
     build_context_from_config,
     up as compose_up,
 )
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.settings import load_config
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.settings import load_config
 
 
 # Map friendly names → compose service names.
-# Keeps the CLI developer-friendly (``llmport rebuild frontend``)
+# Keeps the CLI developer-friendly (``faden rebuild frontend``)
 # while resolving to the actual compose service name.
 SERVICE_ALIASES: dict[str, list[str]] = {
-    "frontend": ["llm-port-frontend"],
-    "backend": ["llm-port-backend-migrator", "llm-port-backend", "llm-port-backend-worker"],
-    "api": ["llm-port-api-migrator", "llm-port-api"],
-    "mcp": ["llm-port-mcp"],
-    "skills": ["llm-port-skills"],
-    "pii": ["llm-port-pii", "llm-port-pii-worker"],
-    "rag": ["llm-port-rag"],
-    "auth": ["llm-port-auth"],
-    "mailer": ["llm-port-mailer"],
-    "docling": ["llm-port-docling"],
-    "nginx": ["llm-port-nginx"],
+    "frontend": ["faden-frontend"],
+    "backend": ["faden-backend-migrator", "faden-backend", "faden-backend-worker"],
+    "gateway": ["faden-gateway-migrator", "faden-gateway"],
+    "mcp": ["faden-mcp"],
+    "skills": ["faden-skills"],
+    "pii": ["faden-pii", "faden-pii-worker"],
+    "rag": ["faden-rag"],
+    "auth": ["faden-auth"],
+    "mailer": ["faden-mailer"],
+    "docling": ["faden-docling"],
+    "nginx": ["faden-nginx"],
 }
 
 # Services that don't have a build context (they reuse another service's image).
 # compose_build() skips these; they just need their container recreated.
 _NO_BUILD_SERVICES: frozenset[str] = frozenset({
-    "llm-port-backend-migrator",
-    "llm-port-api-migrator",
+    "faden-backend-migrator",
+    "faden-gateway-migrator",
 })
 
 
@@ -58,11 +58,11 @@ def _resolve_services(names: tuple[str, ...]) -> list[str]:
         name = name.lower().strip()
         if name in SERVICE_ALIASES:
             resolved.extend(SERVICE_ALIASES[name])
-        elif name.startswith("llm-port-"):
+        elif name.startswith("faden-"):
             resolved.append(name)
         else:
             # Try with prefix
-            prefixed = f"llm-port-{name}"
+            prefixed = f"faden-{name}"
             resolved.append(prefixed)
     return list(dict.fromkeys(resolved))  # dedupe, preserve order
 
@@ -89,19 +89,19 @@ def rebuild_cmd(
 
     \b
     Examples:
-        llmport rebuild frontend           # just the React UI
-        llmport rebuild backend            # backend + worker
-        llmport rebuild backend api        # multiple services
-        llmport rebuild --all              # all app images
-        llmport rebuild frontend --no-cache  # clean build
+        faden rebuild frontend           # just the React UI
+        faden rebuild backend            # backend + worker
+        faden rebuild backend api        # multiple services
+        faden rebuild --all              # all app images
+        faden rebuild frontend --no-cache  # clean build
     """
     if not services and not rebuild_all:
         # Show available aliases
         console.print("[bold cyan]Available services:[/bold cyan]")
         for alias, targets in sorted(SERVICE_ALIASES.items()):
             console.print(f"  [bold]{alias:12s}[/bold] → {', '.join(targets)}")
-        console.print("\n[dim]Usage: llmport rebuild <service> [service...][/dim]")
-        console.print("[dim]       llmport rebuild --all[/dim]")
+        console.print("\n[dim]Usage: faden rebuild <service> [service...][/dim]")
+        console.print("[dim]       faden rebuild --all[/dim]")
         return
 
     cfg = load_config()
@@ -133,7 +133,7 @@ def rebuild_cmd(
     # deploy-remote.sh updated the .env or a manual edit).
     env_path = ctx.env_file
     if env_path and env_path.exists():
-        from llmport.commands.deploy import _sync_postgres_password  # noqa: PLC0415
+        from faden_cli.commands.deploy import _sync_postgres_password  # noqa: PLC0415
 
         _sync_postgres_password(ctx, env_path)
 
@@ -155,4 +155,4 @@ def rebuild_cmd(
     success("Services rebuilt and redeployed.")
     if target_services:
         console.print(f"  [dim]Rebuilt: {', '.join(target_services)}[/dim]")
-    console.print("  [dim]Tip: use 'llmport logs <service>' to follow logs.[/dim]")
+    console.print("  [dim]Tip: use 'faden logs <service>' to follow logs.[/dim]")

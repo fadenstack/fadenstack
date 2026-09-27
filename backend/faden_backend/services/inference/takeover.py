@@ -1,12 +1,12 @@
 """Taking over Ray clusters a server's machines still run, after the server lost them.
 
-When an LLM.Port server is rebuilt without its database -- or with an old
+When an Fadenstack server is rebuilt without its database -- or with an old
 backup -- its machines go on running the clusters and models the old server
 started. Recreating them restarts every model, and while the old serving apps
 run they hold their GPUs, so a recreated deployment often cannot even fit.
 This module lets the new server take them over as they are.
 
-The machines' agents report whether they run LLM.Port's Ray runtime; for one
+The machines' agents report whether they run Fadenstack's Ray runtime; for one
 that does, the agent reads the cluster from Ray itself (``inspect.py`` on the
 agent): its members, and for each model it serves the ``LLMConfig`` it was
 deployed with. From that this module rebuilds what the old server had --
@@ -26,13 +26,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from llm_port_backend.services.inference.drivers.ray.compiler import (
+from faden_backend.services.inference.drivers.ray.compiler import (
     DEFAULT_LOGGING_CONFIG,
 )
 
-#: Apps LLM.Port deploys are named ``llmport-<deployment id>``.
-APP_PREFIX = "llmport-"
-_APP = re.compile(r"^llmport-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
+#: Apps Fadenstack deploys are named ``faden-<deployment id>``.
+APP_PREFIX = "faden-"
+_APP = re.compile(r"^faden-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
 #: A Hugging Face cache directory: ``models--<org>--<name>``.
 _HF_CACHE_DIR = re.compile(r"models--([^/]+?)--([^/]+)")
 
@@ -40,7 +40,7 @@ _TOPOLOGY_KEYS = {"tensor_parallel_size", "pipeline_parallel_size"}
 
 
 def deployment_id_of(app_name: str) -> str | None:
-    """The deployment id an app is named after, or ``None`` for an app LLM.Port did not deploy."""
+    """The deployment id an app is named after, or ``None`` for an app Fadenstack did not deploy."""
     match = _APP.match(app_name or "")
     return match.group(1) if match else None
 
@@ -70,7 +70,7 @@ class RecoveredDeployment:
 def spec_from_llm_config(llm_config: dict[str, Any], *, alias: str | None = None) -> tuple[dict[str, Any], list[str]]:
     """The deployment spec that compiles to *llm_config*, and what it could not carry.
 
-    The inverse of ``compiler.compile_spec`` for what LLM.Port itself emits.
+    The inverse of ``compiler.compile_spec`` for what Fadenstack itself emits.
     Whether it truly compiles back to the same configuration is checked by the
     agent against the running app before anything is recorded as applied --
     this function need not be trusted blindly.
@@ -105,7 +105,7 @@ def spec_from_llm_config(llm_config: dict[str, Any], *, alias: str | None = None
         if replicas == 0:
             notes.append("It runs with no copies (stopped); taken over as one copy.")
     if deployment_config.get("logging_config") not in (None, DEFAULT_LOGGING_CONFIG):
-        notes.append("Its logging settings are not LLM.Port's; they will be LLM.Port's on the next deploy.")
+        notes.append("Its logging settings are not Fadenstack's; they will be Fadenstack's on the next deploy.")
 
     # Resources: one GPU per device unless a placement says otherwise.
     replica: dict[str, Any] = {"gpus": devices}
@@ -138,7 +138,7 @@ def spec_from_llm_config(llm_config: dict[str, Any], *, alias: str | None = None
     )
 
     spec: dict[str, Any] = {
-        "api_version": "inference.llmport.ai/v1alpha1",
+        "api_version": "inference.fadenstack.com/v1alpha1",
         "engine": {"name": str(llm_config.get("llm_engine") or "vllm").lower(), "config": engine_kwargs},
         "scale": scale,
         "resources": resources,
@@ -153,7 +153,7 @@ def spec_from_llm_config(llm_config: dict[str, Any], *, alias: str | None = None
 
 
 def recover_deployment(app: dict[str, Any], *, alias: str | None = None) -> RecoveredDeployment | None:
-    """A served app as a deployment to take over, or ``None`` when it is not one of LLM.Port's."""
+    """A served app as a deployment to take over, or ``None`` when it is not one of Fadenstack's."""
     deployment_id = deployment_id_of(app.get("name", ""))
     configs = app.get("llm_configs") or []
     if deployment_id is None or not configs:
@@ -318,7 +318,7 @@ def view(
 async def _machines(session: Any) -> list[Any]:
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
     return list((await session.execute(select(InfraNode))).scalars())
 
@@ -326,7 +326,7 @@ async def _machines(session: Any) -> list[Any]:
 async def _members_elsewhere(session: Any) -> set[Any]:
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import InferenceEnvironmentNode  # noqa: PLC0415
+    from faden_backend.db.models.inference import InferenceEnvironmentNode  # noqa: PLC0415
 
     return set((await session.execute(select(InferenceEnvironmentNode.node_id))).scalars())
 
@@ -334,13 +334,13 @@ async def _members_elsewhere(session: Any) -> set[Any]:
 async def _deployment_ids(session: Any) -> set[str]:
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
+    from faden_backend.db.models.inference import InferenceDeployment  # noqa: PLC0415
 
     return {str(i) for i in (await session.execute(select(InferenceDeployment.id))).scalars()}
 
 
 def _client(gateway: Any) -> Any:
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
 
     return RayClusterClient(gateway)
 
@@ -348,14 +348,14 @@ def _client(gateway: Any) -> Any:
 async def find(session: Any, gateway: Any) -> dict[str, list[dict[str, Any]]]:
     """The Ray clusters this server's machines run and it does not manage.
 
-    Asks each machine that reports LLM.Port's Ray runtime running, and is in
+    Asks each machine that reports Fadenstack's Ray runtime running, and is in
     no cluster here, what its cluster serves; machines in the same cluster
     are listed once. Machines that could not say are listed apart
     (``unreadable``), with why.
     """
     import asyncio  # noqa: PLC0415
 
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
 
     machines = await _machines(session)
     elsewhere = await _members_elsewhere(session)
@@ -398,7 +398,7 @@ async def find(session: Any, gateway: Any) -> dict[str, list[dict[str, Any]]]:
 
 def serving_args(recovered: RecoveredDeployment, model: Any) -> dict[str, Any]:
     """What the deployment reconciler will compile for this deployment -- the same call."""
-    from llm_port_backend.services.inference.drivers.ray.compiler import compile_deployment  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.compiler import compile_deployment  # noqa: PLC0415
 
     return compile_deployment(
         spec_data=recovered.spec,
@@ -423,8 +423,8 @@ async def _model_for(session: Any, recovered: RecoveredDeployment) -> Any:
     """The catalogue's record of the model, or a new one that compiles to the same served name."""
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus  # noqa: PLC0415
-    from llm_port_backend.services.inference.drivers.ray.compiler import _sanitize_model_id  # noqa: PLC0415
+    from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.compiler import _sanitize_model_id  # noqa: PLC0415
 
     for model in (await session.execute(select(LLMModel))).scalars():
         same_repo = recovered.hf_repo_id is None or model.hf_repo_id == recovered.hf_repo_id
@@ -450,8 +450,8 @@ async def _control_plane_for(session: Any, name: str, token: str) -> Any:
     """A Ray control plane holding *token*: the first one if it has none yet, else one of its own."""
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import ControlPlaneStatus, InferenceControlPlane  # noqa: PLC0415
-    from llm_port_backend.services.inference.drivers.ray.secrets import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import ControlPlaneStatus, InferenceControlPlane  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.secrets import (  # noqa: PLC0415
         retrieve_cluster_token,
         store_cluster_token,
     )
@@ -482,7 +482,7 @@ async def _control_plane_for(session: Any, name: str, token: str) -> Any:
 
 def cluster_status(doc: dict[str, Any]) -> Any:
     """The cluster as the environment reconciler records an observation of it."""
-    from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.schemas import RayClusterStatus  # noqa: PLC0415
 
     alive = [n for n in doc.get("nodes") or [] if n.get("alive")]
     return RayClusterStatus(
@@ -523,21 +523,21 @@ async def take_over(
 
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         EnvironmentDesiredState,
         EnvironmentNodeRole,
         EnvironmentStatus,
         InferenceEnvironment,
         InferenceEnvironmentNode,
     )
-    from llm_port_backend.services.inference.drivers.ray.driver import RayDriver  # noqa: PLC0415
-    from llm_port_backend.services.inference.drivers.ray.secrets import unseal_token  # noqa: PLC0415
-    from llm_port_backend.services.inference.drivers.ray.status import (  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.driver import RayDriver  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.secrets import unseal_token  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.status import (  # noqa: PLC0415
         build_environment_conditions,
     )
-    from llm_port_backend.services.inference.planner import MultiNodeFabricPlanner  # noqa: PLC0415
-    from llm_port_backend.services.inference.pools import ComputePoolCoordinator  # noqa: PLC0415
-    from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+    from faden_backend.services.inference.planner import MultiNodeFabricPlanner  # noqa: PLC0415
+    from faden_backend.services.inference.pools import ComputePoolCoordinator  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
 
     name = (name or "").strip()
     if not name:
@@ -674,7 +674,7 @@ async def take_over(
 
 
 async def _plans_for(session: Any, apps: list[dict[str, Any]], aliases: dict[str, str]) -> list[tuple]:
-    """For each of LLM.Port's apps: what this server would deploy for it, and under which alias."""
+    """For each of Fadenstack's apps: what this server would deploy for it, and under which alias."""
     plans = []
     for app in apps:
         alias = aliases.get(str(app.get("name")))
@@ -730,7 +730,7 @@ async def _record_deployments(
 
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         DeploymentDesiredState,
         DeploymentPhase,
         InferenceDeployment,
@@ -787,7 +787,7 @@ async def _record_deployments(
 
 
 async def _managed_cluster(session: Any, environment_id: Any) -> Any:
-    from llm_port_backend.db.models.inference import InferenceEnvironment  # noqa: PLC0415
+    from faden_backend.db.models.inference import InferenceEnvironment  # noqa: PLC0415
 
     env = await session.get(InferenceEnvironment, environment_id)
     if env is None:
@@ -831,7 +831,7 @@ async def take_over_models(
     """
     from datetime import UTC, datetime  # noqa: PLC0415
 
-    from llm_port_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
 
     env = await _managed_cluster(session, environment_id)
     if not app_names:
@@ -847,7 +847,7 @@ async def take_over_models(
         app = running.get(app_name)
         recovered = recover_deployment(app) if app is not None else None
         if recovered is None:
-            raise TakeoverError(f"{env.name} runs no model of LLM.Port's called {app_name}.")
+            raise TakeoverError(f"{env.name} runs no model of Fadenstack's called {app_name}.")
         if recovered.deployment_id in existing:
             raise TakeoverError(f"{app_name} already has its deployment here.")
         chosen.append(app)

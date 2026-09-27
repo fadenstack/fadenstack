@@ -1,5 +1,5 @@
 # install-windows-service.ps1
-# Registers the llm-port node agent as a Windows service using NSSM.
+# Registers the fadenstack node agent as a Windows service using NSSM.
 # Requires: NSSM (https://nssm.cc) on PATH and Administrator privileges.
 # Usage: .\install-windows-service.ps1 [-PythonExe <path>] [-EnvFile <path>]
 
@@ -9,7 +9,7 @@ param(
     [string]$EnvFile   = ""
 )
 
-$ServiceName = "llm-port-node-agent"
+$ServiceName = "faden-node-agent"
 $ErrorActionPreference = "Stop"
 
 # ── Pre-checks ──────────────────────────────────────────────────────────
@@ -29,17 +29,17 @@ if (-not $PythonExe -or -not (Test-Path $PythonExe)) {
 }
 
 # ── Resolve the entry-point module ──────────────────────────────────────
-$ModuleArgs = "-m llm_port_node_agent"
+$ModuleArgs = "-m faden_agent"
 
 # ── Install service ─────────────────────────────────────────────────────
 Write-Host "Installing service '$ServiceName' ..."
 nssm install $ServiceName $PythonExe $ModuleArgs
 
-nssm set $ServiceName DisplayName "LLM Port Node Agent"
+nssm set $ServiceName DisplayName "Fadenstack Node Agent"
 nssm set $ServiceName Description  "Manages LLM workloads on this node"
 nssm set $ServiceName Start        SERVICE_AUTO_START
-nssm set $ServiceName AppStdout    "$env:ProgramData\llm-port-node-agent\service.log"
-nssm set $ServiceName AppStderr    "$env:ProgramData\llm-port-node-agent\service.log"
+nssm set $ServiceName AppStdout    "$env:ProgramData\faden-node-agent\service.log"
+nssm set $ServiceName AppStderr    "$env:ProgramData\faden-node-agent\service.log"
 nssm set $ServiceName AppRotateFiles 1
 nssm set $ServiceName AppRotateBytes 10485760   # 10 MB
 
@@ -60,7 +60,7 @@ if ($EnvFile -and (Test-Path $EnvFile)) {
 }
 
 # ── Data directory ──────────────────────────────────────────────────────
-$DataDir = "$env:ProgramData\llm-port-node-agent"
+$DataDir = "$env:ProgramData\faden-node-agent"
 if (-not (Test-Path $DataDir)) {
     New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
 }
@@ -72,7 +72,7 @@ icacls $DataDir /grant:r "$env:USERNAME:(OI)(CI)(F)" | Out-Null
 
 Write-Host ""
 Write-Host "Service installed. Configure environment variables before starting:"
-Write-Host "  nssm set $ServiceName AppEnvironmentExtra 'LLM_PORT_NODE_AGENT_BACKEND_URL=https://...\nLLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN=...'"
+Write-Host "  nssm set $ServiceName AppEnvironmentExtra 'FADEN_NODE_AGENT_BACKEND_URL=https://...\nFADEN_NODE_AGENT_ENROLLMENT_TOKEN=...'"
 Write-Host ""
 Write-Host "Then start with:  nssm start $ServiceName"
 Write-Host "Status:           nssm status $ServiceName"

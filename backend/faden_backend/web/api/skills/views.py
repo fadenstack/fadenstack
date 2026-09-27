@@ -28,18 +28,18 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.groups import Group, UserGroup
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.chat.gateway_client import shared_client
-from llm_port_backend.services.skills import drafting
-from llm_port_backend.services.skills.client import (
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.groups import Group, UserGroup
+from faden_backend.db.models.users import User
+from faden_backend.services.chat.gateway_client import shared_client
+from faden_backend.services.skills import drafting
+from faden_backend.services.skills.client import (
     SkillsPrincipal,
     SkillsServiceClient,
     get_skills_client,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 logger = logging.getLogger(__name__)
 

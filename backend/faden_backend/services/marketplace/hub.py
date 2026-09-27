@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from llm_port_backend.services.marketplace import facts
+from faden_backend.services.marketplace import facts
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def wildcard_parts(query: str) -> tuple[str, list[str]] | None:
 #: Not the Hugging Face cache: a folder there is how the server recognises a
 #: model it keeps, so reading a model's details left a stub of it behind, and
 #: "On this server" then listed every model anyone had opened as ready to host.
-METADATA_CACHE = Path(tempfile.gettempdir()) / "llmport-hub-metadata"
+METADATA_CACHE = Path(tempfile.gettempdir()) / "faden-hub-metadata"
 
 _EXPAND = [
     "safetensors", "config", "cardData", "tags", "gated", "downloads", "likes", "trendingScore",
@@ -535,7 +535,7 @@ async def fetch_avatar(author: str, *, client: Any = None) -> tuple[str, bytes] 
 
     import httpx  # noqa: PLC0415
 
-    from llm_port_backend.services.tls import default_httpx_verify  # noqa: PLC0415
+    from faden_backend.services.tls import default_httpx_verify  # noqa: PLC0415
 
     own = client is None
     client = client or httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=default_httpx_verify())

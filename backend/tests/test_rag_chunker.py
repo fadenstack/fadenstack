@@ -8,7 +8,7 @@ by ``max(max_chars - overlap_chars, 1)``.
 
 from __future__ import annotations
 
-from llm_port_backend.services.rag_lite.chunker import Chunk, ChunkerConfig, chunk_text
+from faden_backend.services.rag_lite.chunker import Chunk, ChunkerConfig, chunk_text
 
 
 def test_blank_input_returns_empty_list() -> None:

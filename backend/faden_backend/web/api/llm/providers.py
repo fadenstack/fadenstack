@@ -13,14 +13,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.inference import (
     InferenceDeployment,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     LLMModel,
     LLMProvider,
     LLMRuntime,
@@ -29,16 +29,16 @@ from llm_port_backend.db.models.llm import (
     ProviderTarget,
     ProviderType,
 )
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.llm import remote_health
-from llm_port_backend.services.llm import residency as residency_mod
-from llm_port_backend.services.llm.gateway_sync import _normalize_base_url
-from llm_port_backend.services.llm.monitoring import get_monitoring_provisioner
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.services.tls import default_httpx_verify
-from llm_port_backend.web.api.admin.dependencies import audit_action
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
-from llm_port_backend.web.api.llm.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.llm import remote_health
+from faden_backend.services.llm import residency as residency_mod
+from faden_backend.services.llm.gateway_sync import _normalize_base_url
+from faden_backend.services.llm.monitoring import get_monitoring_provisioner
+from faden_backend.services.llm.service import LLMService
+from faden_backend.services.tls import default_httpx_verify
+from faden_backend.web.api.admin.dependencies import audit_action
+from faden_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.web.api.llm.schema import (
     ManagedByDTO,
     ProviderCreateRequest,
     ProviderDTO,
@@ -48,7 +48,7 @@ from llm_port_backend.web.api.llm.schema import (
     TestEndpointRequest,
     TestEndpointResponse,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 log = logging.getLogger(__name__)
 
@@ -191,8 +191,8 @@ async def _residencies(
     session: AsyncSession, providers: list[LLMProvider]
 ) -> dict[str, ResidencyDTO]:
     """Where each provider's prompts go, in one pass: machines read once, DNS resolved together."""
-    from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     nodes = list((await session.execute(select(InfraNode))).scalars().all())
     ctx = residency_mod.Context(
@@ -247,12 +247,12 @@ async def _resolve_owners(
                 model_name=(model.display_name if model is not None else None),
             )
 
-    # A vLLM container LLM.Port found on a machine and routes as it is: the
+    # A vLLM container Fadenstack found on a machine and routes as it is: the
     # container is the owner, and whether it runs is its state.
     found_ids = ids_of("found_container")
     if found_ids:
-        from llm_port_backend.db.models.inference import InferenceAdoption  # noqa: PLC0415
-        from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+        from faden_backend.db.models.inference import InferenceAdoption  # noqa: PLC0415
+        from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
         rows = await session.execute(
             select(InferenceAdoption, InfraNode)

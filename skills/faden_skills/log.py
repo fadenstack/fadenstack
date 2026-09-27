@@ -5,7 +5,7 @@ from typing import Any, Union
 from loguru import logger
 from opentelemetry.trace import INVALID_SPAN, INVALID_SPAN_CONTEXT, get_current_span
 
-from llm_port_skills.settings import settings
+from faden_skills.settings import settings
 
 
 class InterceptHandler(logging.Handler):

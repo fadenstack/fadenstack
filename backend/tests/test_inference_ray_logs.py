@@ -13,13 +13,13 @@ from typing import Any
 
 import pytest
 
-from llm_port_backend.services.inference.drivers.ray.logs import (
+from faden_backend.services.inference.drivers.ray.logs import (
     RayLogReader,
     _result_text,
     normalize_log_text,
     parse_log_line,
 )
-from llm_port_backend.services.inference.observability import LogSource
+from faden_backend.services.inference.observability import LogSource
 
 
 def test_parses_iso_timestamp_and_level() -> None:
@@ -121,7 +121,7 @@ async def test_reader_normalizes_agent_output() -> None:
         _deployment(),
         source=LogSource.RUNTIME_CONTAINER,
         head_node_id=uuid.uuid4(),
-        app_name="llm-port-app",
+        app_name="faden-app",
         tail=100,
     )
 

@@ -21,11 +21,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.container_registry_dao import ContainerRegistryDAO
-from llm_port_backend.db.models.containers import AuditEvent, ContainerClass, ContainerPolicy
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.docker import recreate
-from llm_port_backend.web.api.admin.dependencies import get_docker
+from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
+from faden_backend.db.models.containers import AuditEvent, ContainerClass, ContainerPolicy
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.docker import recreate
+from faden_backend.web.api.admin.dependencies import get_docker
 
 OLD_ID = "a" * 64
 NEW_ID = "b" * 64
@@ -56,19 +56,19 @@ def _raw(**config: Any) -> dict[str, Any]:
             "Cmd": ["npx", "-y", "@modelcontextprotocol/server-everything", "streamableHttp"],
             "Entrypoint": ["docker-entrypoint.sh"],
             "WorkingDir": "/app",
-            "Labels": {"maintainer": "node", "com.docker.compose.project": "llm_port_shared"},
+            "Labels": {"maintainer": "node", "com.docker.compose.project": "fadenstack"},
             "Tty": False,
             **config,
         },
         "HostConfig": {
-            "NetworkMode": "llm_port_shared_default",
+            "NetworkMode": "fadenstack_default",
             "PortBindings": {"3001/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3101"}]},
             "Binds": ["/srv/data:/data"],
             "RestartPolicy": {"Name": "unless-stopped"},
             "DeviceRequests": [{"Driver": "nvidia", "Count": -1, "Capabilities": [["gpu"]]}],
         },
         "NetworkSettings": {"Networks": {
-            "llm_port_shared_default": {"Aliases": ["mcp-everything", "everything", OLD_ID[:12]]},
+            "fadenstack_default": {"Aliases": ["mcp-everything", "everything", OLD_ID[:12]]},
             "monitoring": {"Aliases": ["mcp"], "IPAMConfig": {"IPv4Address": "172.30.0.9"}},
         }},
     }
@@ -82,7 +82,7 @@ def test_the_form_shows_what_the_container_set_not_its_image() -> None:
     assert own.env == ["PORT=3001"]
     assert own.cmd == ["npx", "-y", "@modelcontextprotocol/server-everything", "streamableHttp"]
     assert own.ports == {"3001/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3101"}]}
-    assert (own.network, own.start, own.name) == ("llm_port_shared_default", True, "mcp-everything")
+    assert (own.network, own.start, own.name) == ("fadenstack_default", True, "mcp-everything")
 
 
 def test_a_command_the_image_supplies_is_not_shown_as_an_override() -> None:
@@ -98,7 +98,7 @@ def test_the_new_container_keeps_what_the_old_one_was_created_with() -> None:
     assert config["Env"] == ["PORT=3001", "DEBUG=1"]  # the new image brings PATH and its own
     for supplied in ("Entrypoint", "WorkingDir", "Hostname"):
         assert supplied not in config, supplied
-    assert config["Labels"] == {"com.docker.compose.project": "llm_port_shared"}
+    assert config["Labels"] == {"com.docker.compose.project": "fadenstack"}
     host = config["HostConfig"]
     assert host["RestartPolicy"] == {"Name": "unless-stopped"}
     assert host["DeviceRequests"][0]["Driver"] == "nvidia"
@@ -115,7 +115,7 @@ def test_it_joins_its_networks_under_the_same_names() -> None:
     """Compose's aliases are how other containers reach it ("postgres"); its old id is not one."""
     config, others = recreate.replacement(_raw(), IMAGE, recreate.own_settings(_raw(), IMAGE))
     assert config["NetworkingConfig"] == {"EndpointsConfig": {
-        "llm_port_shared_default": {"Aliases": ["mcp-everything", "everything"]},
+        "fadenstack_default": {"Aliases": ["mcp-everything", "everything"]},
     }}
     assert others == [("monitoring", {"Aliases": ["mcp"], "IPAMConfig": {"IPv4Address": "172.30.0.9"}})]
 
@@ -246,7 +246,7 @@ def _edited(**changes: Any) -> dict[str, Any]:
         "owner_scope": "platform", "policy": "free", "auto_start": True,
         "ports": [{"host_port": "3101", "container_port": "3001/tcp"}],
         "env": ["PORT=3001", "DEBUG=1"], "volumes": ["/srv/data:/data"],
-        "network": "llm_port_shared_default", **changes,
+        "network": "fadenstack_default", **changes,
     }
 
 
@@ -307,7 +307,7 @@ async def test_the_backend_does_not_replace_the_container_it_runs_in(
     monkeypatch.setattr(recreate, "own_container_id", lambda: OLD_ID)
     r = await client.put(app.url_path_for("update_container", container_id=OLD_ID), json=_edited())
     assert r.status_code == status.HTTP_409_CONFLICT
-    assert "llmport upgrade" in r.json()["detail"]
+    assert "faden upgrade" in r.json()["detail"]
     docker.rename.assert_not_called()
 
 
@@ -336,9 +336,9 @@ async def test_deleting_a_running_container_says_to_stop_it(
 
 def test_a_named_volume_stays_a_volume() -> None:
     """Resolved as a path, Loki's volume became a folder under the backend's working directory."""
-    from llm_port_backend.services.docker.client import resolve_binds  # noqa: PLC0415
+    from faden_backend.services.docker.client import resolve_binds  # noqa: PLC0415
 
-    assert resolve_binds(["llm_port_shared_loki_data:/loki:rw"]) == ["llm_port_shared_loki_data:/loki:rw"]
+    assert resolve_binds(["fadenstack_loki_data:/loki:rw"]) == ["fadenstack_loki_data:/loki:rw"]
     (drive,) = resolve_binds(["C:/models:/models"])  # a Windows path, not a volume named "C"
     assert drive.endswith(":/models")
     assert drive[1] == ":"

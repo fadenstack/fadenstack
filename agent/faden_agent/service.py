@@ -13,25 +13,25 @@ import psutil
 from httpx import HTTPStatusError
 from websockets.exceptions import InvalidStatus
 
-from llm_port_node_agent.backend_client import BackendClient
-from llm_port_node_agent.config import AgentConfig
-from llm_port_node_agent.container_log_forwarder import ContainerLogForwarder
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.gpu import detect_gpu
-from llm_port_node_agent.log_collector import LogCollector
-from llm_port_node_agent.loki_client import LokiClient
-from llm_port_node_agent.ray_log_forwarder import RayServeLogForwarder
-from llm_port_node_agent.image_loader import load_image_from_backend
-from llm_port_node_agent.model_puller import pull_model
-from llm_port_node_agent.model_tls import ModelTls
-from llm_port_node_agent.policy_guard import PolicyGuard
-from llm_port_node_agent.preflight import build_static_capabilities
-from llm_port_node_agent.runtimes import detect_runtime
-from llm_port_node_agent.runtime_manager import RuntimeManager
-from llm_port_node_agent.server_trust import ServerTrust
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent.stream_client import StreamClient
+from faden_agent.backend_client import BackendClient
+from faden_agent.config import AgentConfig
+from faden_agent.container_log_forwarder import ContainerLogForwarder
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.gpu import detect_gpu
+from faden_agent.log_collector import LogCollector
+from faden_agent.loki_client import LokiClient
+from faden_agent.ray_log_forwarder import RayServeLogForwarder
+from faden_agent.image_loader import load_image_from_backend
+from faden_agent.model_puller import pull_model
+from faden_agent.model_tls import ModelTls
+from faden_agent.policy_guard import PolicyGuard
+from faden_agent.preflight import build_static_capabilities
+from faden_agent.runtimes import detect_runtime
+from faden_agent.runtime_manager import RuntimeManager
+from faden_agent.server_trust import ServerTrust
+from faden_agent.state_store import StateStore
+from faden_agent.stream_client import StreamClient
 
 log = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ class NodeAgentService:
 
         self._model_tls.refresher = _refresh_now
 
-        from llm_port_node_agent.ray.manager import RayManager
+        from faden_agent.ray.manager import RayManager
 
         # Reuse the agent's configured backend HTTP client (TLS + base URL)
         # to fetch the decrypted Ray cluster token for each command.
@@ -168,7 +168,7 @@ class NodeAgentService:
         )
         self._ray_manager = ray_manager
         ray_manager.model_tls = self._model_tls
-        from llm_port_node_agent.ray.ray_tls import RayTls  # noqa: PLC0415
+        from faden_agent.ray.ray_tls import RayTls  # noqa: PLC0415
 
         ray_manager.ray_tls = RayTls(
             base_dir=Path(self._config.state_path).parent / "ray-tls",
@@ -208,7 +208,7 @@ class NodeAgentService:
         stream._dispatcher = dispatcher
         self._stream = stream
 
-        # Log forwarding to Loki. An explicit LLM_PORT_NODE_AGENT_LOKI_URL wins;
+        # Log forwarding to Loki. An explicit FADEN_NODE_AGENT_LOKI_URL wins;
         # otherwise the backend says where to send logs. The one-line install
         # writes no Loki address, so machines installed that way forwarded
         # nothing at all -- the logs page went silent for them without a word.
@@ -459,7 +459,7 @@ class NodeAgentService:
                 raise RuntimeError(
                     "Enrollment token rejected (401). The token was likely already "
                     "consumed or has expired. Generate a new enrollment token in "
-                    "the admin UI and update LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN."
+                    "the admin UI and update FADEN_NODE_AGENT_ENROLLMENT_TOKEN."
                 ) from exc
             raise
         credential = payload.get("credential")

@@ -10,7 +10,7 @@ services:
     - .:/app/src/
     environment:
       # Enables autoreload.
-      LLM_PORT_API_RELOAD: "True"
+      FADEN_GATEWAY_RELOAD: "True"
 
   taskiq-worker:
     volumes:
@@ -19,5 +19,5 @@ services:
     command:
       - taskiq
       - worker
-      - llm_port_api.tkq:broker
+      - faden_gateway.tkq:broker
       - --reload

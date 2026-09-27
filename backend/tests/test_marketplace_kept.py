@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     ArtifactFormat,
     DownloadJob,
     DownloadJobStatus,
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.anyio
 
 @pytest.fixture()
 def authed(fastapi_app: FastAPI) -> FastAPI:
-    from llm_port_backend.db.models.users import User, current_active_user
+    from faden_backend.db.models.users import User, current_active_user
 
     user = MagicMock(spec=User)
     user.id, user.is_active, user.is_superuser, user.is_verified = uuid.uuid4(), True, True, True
@@ -36,7 +36,7 @@ def authed(fastapi_app: FastAPI) -> FastAPI:
 async def test_each_kept_model_says_its_size_its_download_and_what_uses_it(
     authed: FastAPI, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:
-    from llm_port_backend.db.models.inference import InferenceControlPlane, InferenceDeployment, InferenceEnvironment
+    from faden_backend.db.models.inference import InferenceControlPlane, InferenceDeployment, InferenceEnvironment
 
     ready = LLMModel(display_name="Qwen3-0.6B", source=ModelSource.HUGGINGFACE, status=ModelStatus.AVAILABLE,
                      hf_repo_id="Qwen/Qwen3-0.6B")

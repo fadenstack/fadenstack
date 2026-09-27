@@ -66,41 +66,41 @@ function containerStateColor(
 }
 
 function isPiiSettingKey(key: string): boolean {
-  return key.startsWith("llm_port_api.pii_");
+  return key.startsWith("faden_gateway.pii_");
 }
 
 function isMailerSettingKey(key: string): boolean {
-  return key.startsWith("llm_port_mailer.");
+  return key.startsWith("faden_mailer.");
 }
 
 function isMcpSettingKey(key: string): boolean {
-  return key.startsWith("llm_port_api.mcp_") || key.startsWith("llm_port_mcp.");
+  return key.startsWith("faden_gateway.mcp_") || key.startsWith("faden_mcp.");
 }
 
 function isSkillsSettingKey(key: string): boolean {
   return (
-    key.startsWith("llm_port_api.skills_") || key.startsWith("llm_port_skills.")
+    key.startsWith("faden_gateway.skills_") || key.startsWith("faden_skills.")
   );
 }
 
 function isRagLiteSettingKey(key: string): boolean {
   return (
-    key.startsWith("llm_port_api.rag_lite_") || key.startsWith("llm_port_rag.")
+    key.startsWith("faden_gateway.rag_lite_") || key.startsWith("faden_rag.")
   );
 }
 
 function isModuleEnableFlag(key: string): boolean {
   const explicitModuleFlags = new Set([
-    "llm_port_api.pii_enabled",
-    "llm_port_api.mailer_enabled",
-    "llm_port_api.mcp_enabled",
-    "llm_port_api.skills_enabled",
-    "llm_port_api.rag_lite_enabled",
-    "llm_port_pii.enabled",
-    "llm_port_mailer.enabled",
-    "llm_port_mcp.enabled",
-    "llm_port_skills.enabled",
-    "llm_port_rag.enabled",
+    "faden_gateway.pii_enabled",
+    "faden_gateway.mailer_enabled",
+    "faden_gateway.mcp_enabled",
+    "faden_gateway.skills_enabled",
+    "faden_gateway.rag_lite_enabled",
+    "faden_pii.enabled",
+    "faden_mailer.enabled",
+    "faden_mcp.enabled",
+    "faden_skills.enabled",
+    "faden_rag.enabled",
   ]);
   if (explicitModuleFlags.has(key)) return true;
   return /(?:^|\.)(pii|mailer|mcp|skills|rag_lite)_enabled$/.test(key);
@@ -184,7 +184,7 @@ export default function ModulesTab() {
   const piiPolicyValue = useMemo(
     () =>
       normalizePIIPolicy(
-        settingsValues["llm_port_api.pii_default_policy"],
+        settingsValues["faden_gateway.pii_default_policy"],
         piiOptions ?? undefined,
       ),
     [settingsValues, piiOptions],
@@ -544,7 +544,7 @@ export default function ModulesTab() {
                         moduleSettingsFor(svc.name, settingsSchema).map(
                           (item) => {
                             if (
-                              item.key === "llm_port_api.pii_default_policy"
+                              item.key === "faden_gateway.pii_default_policy"
                             ) {
                               return (
                                 <Box key={item.key}>

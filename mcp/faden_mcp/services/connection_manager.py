@@ -11,8 +11,8 @@ import anyio
 import httpx
 from mcp.shared.exceptions import McpError
 
-from llm_port_mcp.db.models.mcp import MCPServerModel
-from llm_port_mcp.services.transport.base import GenericMCPServer, MCPServerConfig
+from faden_mcp.db.models.mcp import MCPServerModel
+from faden_mcp.services.transport.base import GenericMCPServer, MCPServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -59,15 +59,15 @@ def _server_config_from_model(server: MCPServerModel) -> MCPServerConfig:
 def _create_adapter(config: MCPServerConfig) -> GenericMCPServer:
     """Factory: select transport adapter based on config.transport."""
     if config.transport == "stdio":
-        from llm_port_mcp.services.transport.stdio import StdioMCPServer
+        from faden_mcp.services.transport.stdio import StdioMCPServer
 
         return StdioMCPServer(config)
     if config.transport == "sse":
-        from llm_port_mcp.services.transport.sse import SSEMCPServer
+        from faden_mcp.services.transport.sse import SSEMCPServer
 
         return SSEMCPServer(config)
     if config.transport == "streamable_http":
-        from llm_port_mcp.services.transport.streamable_http import (
+        from faden_mcp.services.transport.streamable_http import (
             StreamableHTTPMCPServer,
         )
 

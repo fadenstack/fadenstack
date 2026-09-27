@@ -1,8 +1,8 @@
 """The optional modules -- PII, MCP, skills -- in the dev environment.
 
-``llmport dev up`` runs the backend and gateway on the host. The modules were
+``faden dev up`` runs the backend and gateway on the host. The modules were
 only ever wired for the container stack: each was addressed by its Docker
-name (``http://llm-port-pii:8000``) and published no port, so a gateway on
+name (``http://faden-pii:8000``) and published no port, so a gateway on
 the host could not reach one even when it was started by hand, and
 ``dev up`` had no way to start one at all. The backend's own defaults already
 expected them on the host (``http://127.0.0.1:8003/api`` for PII), on the
@@ -17,7 +17,7 @@ dicts, so it can be tested without starting anything.
 
 from __future__ import annotations
 
-from llmport.core.registry import MODULES, ModuleInfo
+from faden_cli.core.registry import MODULES, ModuleInfo
 
 #: Where the host-run modules listen and where the shared infra is reached.
 #: Never "localhost": see ``registry.INFRA_LOOPBACK``.
@@ -37,7 +37,7 @@ def select_modules(requested: str | None, profiles: list[str] | None) -> list[Mo
     """The modules to run.
 
     *requested* is ``--modules``: a comma-separated list, or ``none``. Without
-    it, the modules switched on with ``llmport module enable`` (the config's
+    it, the modules switched on with ``faden module enable`` (the config's
     profiles) are the ones that run.
     """
     runnable = {m.name: m for m in dev_modules()}
@@ -68,7 +68,7 @@ def service_token(module: ModuleInfo, shared: dict[str, str]) -> str:
     One value for all three sides, or the calls are refused. The shared
     ``.env`` wins, so a workspace that set its own keeps it.
     """
-    return shared.get(f"LLM_PORT_{module.name.upper()}_SERVICE_TOKEN") or module.dev_service_token
+    return shared.get(f"FADEN_{module.name.upper()}_SERVICE_TOKEN") or module.dev_service_token
 
 
 def module_env(
@@ -78,7 +78,7 @@ def module_env(
     running: list[ModuleInfo],
 ) -> dict[str, str]:
     """The settings *module* runs with, for its own ``.env``."""
-    p = f"LLM_PORT_{module.name.upper()}_"
+    p = f"FADEN_{module.name.upper()}_"
     env = {
         p + "HOST": _HOST,
         p + "PORT": str(module.port),
@@ -136,7 +136,7 @@ def caller_env(
     on = {m.name for m in running}
     env: dict[str, str] = {}
     for module in dev_modules():
-        p = f"LLM_PORT_{service}_{module.name.upper()}_"
+        p = f"FADEN_{service}_{module.name.upper()}_"
         env[p + "ENABLED"] = "true" if module.name in on else "false"
         if module.name not in on:
             continue

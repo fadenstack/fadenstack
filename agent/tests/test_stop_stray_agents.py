@@ -1,7 +1,7 @@
 """Stopping an agent that no service manager knows about.
 
-``llmport-agent stop`` used to run ``systemctl disable --now`` and consider
-the job done. An agent started by hand -- ``llmport-agent run``, which is
+``faden-agent stop`` used to run ``systemctl disable --now`` and consider
+the job done. An agent started by hand -- ``faden-agent run``, which is
 what the source install in the onboarding docs leaves behind -- is not a
 unit, so it survived the uninstall untouched.
 
@@ -18,7 +18,7 @@ import os
 import psutil
 import pytest
 
-from llm_port_node_agent import __main__ as agent_main
+from faden_agent import __main__ as agent_main
 
 
 class _FakeProc:
@@ -45,7 +45,7 @@ class TestMatching:
     def test_finds_a_frozen_binary_running_in_the_foreground(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _patch_scan(monkeypatch, [_FakeProc(4242, ["/usr/local/bin/llmport-agent", "run"])])
+        _patch_scan(monkeypatch, [_FakeProc(4242, ["/usr/local/bin/faden-agent", "run"])])
         monkeypatch.setattr(agent_main, "_own_process_chain", lambda: {os.getpid()})
 
         assert [p.pid for p in agent_main._running_agents()] == [4242]
@@ -56,12 +56,12 @@ class TestMatching:
         """The case that actually escaped.
 
         On Linux systemctl never knew about it; on Windows taskkill with
-        ``/IM llmport-agent.exe`` cannot see it either, because the image
+        ``/IM faden-agent.exe`` cannot see it either, because the image
         name is python.
         """
         cmdline = [
-            "/home/sachi/.local/llmport-agent-venv/bin/python3",
-            "/home/sachi/.local/llmport-agent-venv/bin/llmport-agent",
+            "/home/sachi/.local/faden-agent-venv/bin/python3",
+            "/home/sachi/.local/faden-agent-venv/bin/faden-agent",
             "run",
         ]
         _patch_scan(monkeypatch, [_FakeProc(1782905, cmdline)])
@@ -72,8 +72,8 @@ class TestMatching:
     def test_never_matches_a_concurrent_stop_invocation(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Stop must not kill itself: its own argv says llmport-agent too."""
-        _patch_scan(monkeypatch, [_FakeProc(5, ["/usr/local/bin/llmport-agent", "stop"])])
+        """Stop must not kill itself: its own argv says faden-agent too."""
+        _patch_scan(monkeypatch, [_FakeProc(5, ["/usr/local/bin/faden-agent", "stop"])])
         monkeypatch.setattr(agent_main, "_own_process_chain", lambda: {os.getpid()})
 
         assert agent_main._running_agents() == []
@@ -88,9 +88,9 @@ class TestMatching:
         """
         parent, grandparent = 111, 222
         procs = [
-            _FakeProc(parent, ["sh", "-c", "llmport-agent run"]),
-            _FakeProc(grandparent, ["/usr/local/bin/llmport-agent", "run"]),
-            _FakeProc(999, ["/usr/local/bin/llmport-agent", "run"]),
+            _FakeProc(parent, ["sh", "-c", "faden-agent run"]),
+            _FakeProc(grandparent, ["/usr/local/bin/faden-agent", "run"]),
+            _FakeProc(999, ["/usr/local/bin/faden-agent", "run"]),
         ]
         _patch_scan(monkeypatch, procs)
         monkeypatch.setattr(
@@ -103,8 +103,8 @@ class TestMatching:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         procs = [
-            _FakeProc(7, ["tail", "-f", "/var/log/llmport-agent.log"]),
-            _FakeProc(8, ["vim", "llmport-agent.spec"]),
+            _FakeProc(7, ["tail", "-f", "/var/log/faden-agent.log"]),
+            _FakeProc(8, ["vim", "faden-agent.spec"]),
             _FakeProc(9, None),
         ]
         _patch_scan(monkeypatch, procs)
@@ -122,7 +122,7 @@ class TestStopping:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """SIGTERM first, so the agent closes its backend session cleanly."""
-        stray = _FakeProc(4242, ["/usr/local/bin/llmport-agent", "run"])
+        stray = _FakeProc(4242, ["/usr/local/bin/faden-agent", "run"])
         calls = iter([[stray], []])
         monkeypatch.setattr(agent_main, "_running_agents", lambda: next(calls))
         monkeypatch.setattr(agent_main.psutil, "wait_procs", lambda procs, timeout: (procs, []))
@@ -134,7 +134,7 @@ class TestStopping:
     def test_escalates_to_kill_when_it_will_not_go(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        stray = _FakeProc(4242, ["/usr/local/bin/llmport-agent", "run"])
+        stray = _FakeProc(4242, ["/usr/local/bin/faden-agent", "run"])
         calls = iter([[stray], []])
         monkeypatch.setattr(agent_main, "_running_agents", lambda: next(calls))
         monkeypatch.setattr(agent_main.psutil, "wait_procs", lambda procs, timeout: ([], procs))
@@ -150,7 +150,7 @@ class TestStopping:
         Silence here is what let a node keep reporting healthy after it had
         supposedly been removed.
         """
-        stray = _FakeProc(4242, ["/usr/local/bin/llmport-agent", "run"])
+        stray = _FakeProc(4242, ["/usr/local/bin/faden-agent", "run"])
         monkeypatch.setattr(agent_main, "_running_agents", lambda: [stray])
         monkeypatch.setattr(agent_main.psutil, "wait_procs", lambda procs, timeout: ([], procs))
 
@@ -174,7 +174,7 @@ class TestStopping:
             def terminate(self) -> None:
                 raise psutil.AccessDenied(self.pid)
 
-        stray = _Denied(4242, ["/usr/local/bin/llmport-agent", "run"])
+        stray = _Denied(4242, ["/usr/local/bin/faden-agent", "run"])
         issued: list[list[str]] = []
         monkeypatch.setattr(agent_main, "_IS_WINDOWS", False)
         monkeypatch.setattr(agent_main, "_sudo_prefix", lambda: ["sudo"])
@@ -191,7 +191,7 @@ class TestStopping:
             def terminate(self) -> None:
                 raise psutil.NoSuchProcess(self.pid)
 
-        agent_main._signal_agent(_Gone(4242, ["llmport-agent", "run"]), "terminate")
+        agent_main._signal_agent(_Gone(4242, ["faden-agent", "run"]), "terminate")
 
 
 class TestCommandLineShape:
@@ -206,26 +206,26 @@ class TestCommandLineShape:
     @pytest.mark.parametrize(
         ("cmdline", "expected", "why"),
         [
-            (["/usr/local/bin/llmport-agent", "run"], True, "frozen binary"),
+            (["/usr/local/bin/faden-agent", "run"], True, "frozen binary"),
             (
-                ["/h/venv/bin/python3", "/h/venv/bin/llmport-agent", "run"],
+                ["/h/venv/bin/python3", "/h/venv/bin/faden-agent", "run"],
                 True,
                 "source install",
             ),
-            (["uv", "run", "llmport-agent", "run"], True, "wrapper still found"),
-            (["python", "/x/bin/llmport-agent", "run", "--verbose"], True, "with flags"),
-            (["/usr/local/bin/llmport-agent", "stop"], False, "a stop invocation"),
-            (["/usr/local/bin/llmport-agent"], False, "no subcommand"),
-            (["tail", "-f", "/var/log/llmport-agent.log"], False, "mentions the log"),
-            (["vim", "llmport-agent.spec"], False, "editing the spec"),
+            (["uv", "run", "faden-agent", "run"], True, "wrapper still found"),
+            (["python", "/x/bin/faden-agent", "run", "--verbose"], True, "with flags"),
+            (["/usr/local/bin/faden-agent", "stop"], False, "a stop invocation"),
+            (["/usr/local/bin/faden-agent"], False, "no subcommand"),
+            (["tail", "-f", "/var/log/faden-agent.log"], False, "mentions the log"),
+            (["vim", "faden-agent.spec"], False, "editing the spec"),
             (
-                ["bash", "-c", "nohup", "/usr/local/bin/llmport-agent", "run", "&"],
+                ["bash", "-c", "nohup", "/usr/local/bin/faden-agent", "run", "&"],
                 False,
                 "a shell launching it is not it",
             ),
-            (["cmd.exe", "/c", "/x/llmport-agent", "run"], False, "windows shell"),
+            (["cmd.exe", "/c", "/x/faden-agent", "run"], False, "windows shell"),
             (
-                ["bash", "-c", "cd", "/x/llmport-agent", "&&", "./thing", "run"],
+                ["bash", "-c", "cd", "/x/faden-agent", "&&", "./thing", "run"],
                 False,
                 "split shell blob, no adjacency",
             ),

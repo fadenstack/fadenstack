@@ -46,7 +46,7 @@ CA_PREVIOUS_FILE = "ca-previous.crt"
 ROOTS_FILE = "roots.pem"
 #: Where the operator's certificate came from, so ``tls renew`` can take the renewed one.
 SOURCE_FILE = "source.json"
-#: The operator chose plain HTTP (``llmport tls off``, ``deploy --tls off``): deploy keeps it.
+#: The operator chose plain HTTP (``faden tls off``, ``deploy --tls off``): deploy keeps it.
 OFF_CHOICE_FILE = "https-off"
 #: A certificate made here is re-issued this many days before it runs out.
 RENEW_BEFORE_DAYS = 30
@@ -261,7 +261,7 @@ def remember_off(install_dir: Path) -> None:
     """Record that plain HTTP is the operator's choice, not a default nobody changed."""
     tls = Path(install_dir) / TLS_DIR
     tls.mkdir(parents=True, exist_ok=True)
-    note = b"HTTPS was switched off on purpose; llmport deploy keeps it off.\n"
+    note = b"HTTPS was switched off on purpose; faden deploy keeps it off.\n"
     _write(tls / OFF_CHOICE_FILE, note, mode=0o644)
 
 
@@ -765,7 +765,7 @@ def renew(
     if left < days:
         return Renewal(
             "expiring",
-            f"It runs out in {left} days. Install the renewed one: llmport tls use CERT KEY.",
+            f"It runs out in {left} days. Install the renewed one: faden tls use CERT KEY.",
             served,
         )
     return Renewal("current", f"Valid for {left} more days.", served)

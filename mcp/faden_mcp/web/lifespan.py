@@ -19,10 +19,10 @@ from prometheus_fastapi_instrumentator.instrumentation import (
     PrometheusFastApiInstrumentator,
 )
 
-from llm_port_mcp.db import crypto
-from llm_port_mcp.db.connection_budget import check_connection_budget
-from llm_port_mcp.db.session import engine
-from llm_port_mcp.settings import settings
+from faden_mcp.db import crypto
+from faden_mcp.db.connection_budget import check_connection_budget
+from faden_mcp.db.session import engine
+from faden_mcp.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def setup_opentelemetry(app: FastAPI) -> None:  # pragma: no cover
     tracer_provider = TracerProvider(
         resource=Resource(
             attributes={
-                SERVICE_NAME: "llm_port_mcp",
+                SERVICE_NAME: "faden_mcp",
                 TELEMETRY_SDK_LANGUAGE: "python",
                 DEPLOYMENT_ENVIRONMENT: settings.environment,
             },
@@ -88,14 +88,14 @@ def _init_cache(app: FastAPI) -> None:
 
 async def _init_connection_manager(app: FastAPI) -> None:
     """Initialise MCP connection manager and connect enabled servers."""
-    from llm_port_mcp.services.connection_manager import MCPConnectionManager
+    from faden_mcp.services.connection_manager import MCPConnectionManager
 
     manager = MCPConnectionManager()
     app.state.connection_manager = manager
 
     # Connect to all enabled servers from DB
-    from llm_port_mcp.db.session import async_session_factory
-    from llm_port_mcp.services.dao import MCPDao
+    from faden_mcp.db.session import async_session_factory
+    from faden_mcp.services.dao import MCPDao
 
     async with async_session_factory() as session:
         dao = MCPDao(session)
@@ -171,7 +171,7 @@ async def lifespan_setup(
     await check_connection_budget(
         engine,
         service="MCP",
-        env_prefix="LLM_PORT_MCP_",
+        env_prefix="FADEN_MCP_",
         workers=settings.workers_count,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,

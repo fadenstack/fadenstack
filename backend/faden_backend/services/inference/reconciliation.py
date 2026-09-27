@@ -7,12 +7,12 @@ This module is the stable place where driver-backed reconciliation plugs in:
   target); they are persisted into the ``*_observed_status_json`` columns;
 * :class:`ReconciliationContext` bundles everything a single reconciliation
   pass needs — the session, the three domain services, and a lazily-built
-  :class:`~llm_port_backend.services.nodes.service.NodeControlService`;
+  :class:`~faden_backend.services.nodes.service.NodeControlService`;
 * the :func:`reconcile_control_plane` / :func:`reconcile_environment` /
   :func:`reconcile_deployment` functions are the per-item entry points.
 
 Each per-item function resolves the driver through
-:class:`~llm_port_backend.services.inference.registry.DriverRegistry`.  When
+:class:`~faden_backend.services.inference.registry.DriverRegistry`.  When
 the driver is registered **and** the target can be reached, the driver is
 driven for real.  Otherwise an honest no-op observation (``reconciled=False``)
 is recorded at the current generation.
@@ -37,31 +37,31 @@ log = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus
-from llm_port_backend.services.inference.registry import registry
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.drivers.ray.schemas import RayClusterStatus
+from faden_backend.services.inference.registry import registry
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only, avoids a runtime cycle
-    from llm_port_backend.db.models.inference import InferenceDeployment
-    from llm_port_backend.services.inference.service import (
+    from faden_backend.db.models.inference import InferenceDeployment
+    from faden_backend.services.inference.service import (
         ControlPlaneService,
         DeploymentService,
         EnvironmentService,
     )
-    from llm_port_backend.services.nodes.service import NodeControlService
+    from faden_backend.services.nodes.service import NodeControlService
 
 
 def _accepts_param(func: Callable, name: str) -> bool:
     """Return True if ``func`` can be called with a keyword named ``name``.
 
-    The neutral :class:`~llm_port_backend.services.inference.contracts`
+    The neutral :class:`~faden_backend.services.inference.contracts`
     protocols declare minimal signatures (e.g. ``probe(control_plane)``), but
     concrete Phase 2 drivers extend them with ``session`` / ``node_control``
     kwargs so the reconciliation layer can hand them live resources.  This
@@ -161,7 +161,7 @@ class ReconciliationContext:
     def command_gateway(self) -> Any:
         """Lazily built command gateway using session_factory (or session fallback)."""
         if self._command_gateway is None:
-            from llm_port_backend.services.inference.drivers.ray.commands import (  # noqa: PLC0415
+            from faden_backend.services.inference.drivers.ray.commands import (  # noqa: PLC0415
                 NodeCommandGateway,
             )
 
@@ -178,7 +178,7 @@ class ReconciliationContext:
     ) -> ReconciliationContext:
         # Lazy import: ``service`` imports the observation builders from *this*
         # module, so importing the services at module top would be a cycle.
-        from llm_port_backend.services.inference.service import (  # noqa: PLC0415
+        from faden_backend.services.inference.service import (  # noqa: PLC0415
             ControlPlaneService,
             DeploymentService,
             EnvironmentService,
@@ -203,15 +203,15 @@ def _build_node_control_service(session: AsyncSession) -> Any:
     """Lazily construct a session-scoped :class:`NodeControlService`.
 
     Mirrors the construction used by the node-command reaper loop in
-    :mod:`llm_port_backend.web.lifespan` so the reconciler and the reaper
+    :mod:`faden_backend.web.lifespan` so the reconciler and the reaper
     agree on timeouts, enrollment TTL and the auth pepper.  Imported lazily to
     avoid any import cycle with the services package.
     """
-    from llm_port_backend.db.dao.node_control_dao import (  # noqa: PLC0415
+    from faden_backend.db.dao.node_control_dao import (  # noqa: PLC0415
         NodeControlDAO,
     )
-    from llm_port_backend.settings import settings  # noqa: PLC0415
-    from llm_port_backend.services.nodes.service import (  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.nodes.service import (  # noqa: PLC0415
         NodeControlService,
     )
 
@@ -387,14 +387,14 @@ async def _requeue_deployments(
     with the old head -- while its deployments went on reading "running"
     and nothing re-applied them.
     """
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         DeploymentDesiredState,
         InferenceDeployment,
     )
-    from llm_port_backend.services.inference.service import (  # noqa: PLC0415
+    from faden_backend.services.inference.service import (  # noqa: PLC0415
         _queue_for_reconcile,
     )
-    from llm_port_backend.services.inference.wakeup import (  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import (  # noqa: PLC0415
         wake_reconciler_after_commit,
     )
 
@@ -522,7 +522,7 @@ async def _sync_prometheus_targets(
     cluster is fine either way and a failed reconcile would stop real work.
     """
     try:
-        from llm_port_backend.services.llm.monitoring import (  # noqa: PLC0415
+        from faden_backend.services.llm.monitoring import (  # noqa: PLC0415
             get_monitoring_provisioner,
         )
 
@@ -636,7 +636,7 @@ async def reconcile_deployment(
     # record and has to exist either way. It skips the routing half itself
     # when there is no gateway.
     try:
-        from llm_port_backend.services.inference.publication import (  # noqa: PLC0415
+        from faden_backend.services.inference.publication import (  # noqa: PLC0415
             InferencePublicationCoordinator,
         )
 

@@ -11,13 +11,13 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.dashboard import kpis as kpi_service
-from llm_port_backend.services.dashboard import timewindows as tw
-from llm_port_backend.services.dashboard import traffic
-from llm_port_backend.services.dashboard.facts import Facts, GatewayUnavailableError
-from llm_port_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
-from llm_port_backend.web.api.admin.dashboard.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.dashboard import kpis as kpi_service
+from faden_backend.services.dashboard import timewindows as tw
+from faden_backend.services.dashboard import traffic
+from faden_backend.services.dashboard.facts import Facts, GatewayUnavailableError
+from faden_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
+from faden_backend.web.api.admin.dashboard.schema import (
     DestinationDTO,
     ErrorsDTO,
     KpiItemDTO,
@@ -29,7 +29,7 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     TrafficSeriesDTO,
     WindowDTO,
 )
-from llm_port_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
 

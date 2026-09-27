@@ -12,9 +12,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.models.gateway import ExecutionMode, ToolRealm
-from llm_port_api.services.gateway.policy_engine import PolicyAction
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.models.gateway import ExecutionMode, ToolRealm
+from faden_gateway.services.gateway.policy_engine import PolicyAction
 
 logger = logging.getLogger(__name__)
 

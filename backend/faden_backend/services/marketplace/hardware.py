@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from llm_port_backend.services.marketplace.fit import ClusterHardware, Gpu, Machine
+from faden_backend.services.marketplace.fit import ClusterHardware, Gpu, Machine
 
 MIB = 1024**2
 
@@ -52,13 +52,13 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
     """Every cluster this server manages, with its machines' accelerators."""
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         InferenceEnvironment,
         InferenceEnvironmentNode,
     )
-    from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
-    from llm_port_backend.services.inference.bundles import default_bundle_registry  # noqa: PLC0415
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.services.inference.bundles import default_bundle_registry  # noqa: PLC0415
 
     environments = list((await session.execute(
         select(InferenceEnvironment).order_by(InferenceEnvironment.name),

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from llm_port_backend.services.observability.pricing_service import PricingCRUDService
+from faden_backend.services.observability.pricing_service import PricingCRUDService
 
 
 class _Session:

@@ -1,7 +1,7 @@
 """Inference deployment CRUD endpoints.
 
 Phase 1: desired-state only.  Create/update validate the versioned spec
-(``inference.llmport.ai/v1alpha1``) and persist it.  The reconcile endpoint is
+(``inference.fadenstack.com/v1alpha1``) and persist it.  The reconcile endpoint is
 an honest stub; no replica is scheduled or contacted.
 """
 
@@ -13,9 +13,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Request
 from starlette import status
 
-from llm_port_backend.db.models.inference import InferenceEnvironment
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference.observability import (
+from faden_backend.db.models.inference import InferenceEnvironment
+from faden_backend.db.models.users import User
+from faden_backend.services.inference.observability import (
     DeploymentMetrics,
     GatewayTraffic,
     LogPage,
@@ -23,26 +23,26 @@ from llm_port_backend.services.inference.observability import (
     MetricsPartial,
     ObservabilityUnsupported,
 )
-from llm_port_backend.services.llm.monitoring import get_monitoring_provisioner
-from llm_port_backend.services.observability.service import ObservabilityService
-from llm_port_backend.services.inference.service import (
+from faden_backend.services.llm.monitoring import get_monitoring_provisioner
+from faden_backend.services.observability.service import ObservabilityService
+from faden_backend.services.inference.service import (
     DeploymentService,
     InferenceError,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
-from llm_port_backend.web.api.inference.observability import (
+from faden_backend.services.nodes.service import NodeControlService
+from faden_backend.web.api.inference.observability import (
     get_node_control_service,
     resolve_driver_for_environment,
     unsupported,
 )
-from llm_port_backend.web.api.inference.control_planes import _map_inference_error
-from llm_port_backend.web.api.inference.schema import (
+from faden_backend.web.api.inference.control_planes import _map_inference_error
+from faden_backend.web.api.inference.schema import (
     DeploymentCreate,
     DeploymentDTO,
     DeploymentUpdate,
     EndpointDTO,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 log = logging.getLogger(__name__)
 

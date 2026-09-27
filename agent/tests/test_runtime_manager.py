@@ -10,9 +10,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.runtime_manager import RuntimeManager, RuntimeManagerError
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.runtime_manager import RuntimeManager, RuntimeManagerError
+from faden_agent.state_store import StateStore
 
 
 class FakeRuntime:
@@ -105,7 +105,7 @@ def healthy_health(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     Deploys now *fail* if the container never becomes ready, so every test
     that exercises a full deploy must stub the health endpoint.
     """
-    from llm_port_node_agent import runtime_manager as rm
+    from faden_agent import runtime_manager as rm
 
     class _OKResponse:
         status_code = 200
@@ -150,7 +150,7 @@ def test_sanitize_allows_clean_args() -> None:
 def test_container_name_is_deterministic() -> None:
     runtime_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     name = RuntimeManager._container_name(runtime_id, runtime_name="test-model")
-    assert name == "llm-port-test-model"
+    assert name == "faden-test-model"
     # Same name regardless of runtime_id
     name2 = RuntimeManager._container_name("11111111-2222-3333-4444-555555555555", runtime_name="test-model")
     assert name == name2
@@ -330,7 +330,7 @@ async def test_deploy_readiness_timeout_fails_with_log_tail(
     """If the health endpoint never returns 200 the deploy must report a
     failure and include the container's log tail."""
     # Make the health probe return 500 forever.
-    from llm_port_node_agent import runtime_manager as rm
+    from faden_agent import runtime_manager as rm
 
     class _BadResponse:
         status_code = 500
@@ -439,7 +439,7 @@ class _Proxy:
 async def test_a_protected_vllm_listens_on_loopback_behind_the_proxy(
     tmp_path: Path, fake_runtime: FakeRuntime, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from llm_port_node_agent import runtime_manager as rm
+    from faden_agent import runtime_manager as rm
 
     probed: list[str] = []
 

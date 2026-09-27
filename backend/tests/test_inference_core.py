@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock
 import pydantic
 import pytest
 
-from llm_port_backend.services.inference import (
+from faden_backend.services.inference import (
     API_VERSION_V1ALPHA1,
     DEFAULT_CAPABILITY_SECTIONS,
     CapabilityDocument,
@@ -23,7 +23,7 @@ from llm_port_backend.services.inference import (
     parse_inference_deployment_spec,
     registry,
 )
-from llm_port_backend.services.inference.reconciliation import (
+from faden_backend.services.inference.reconciliation import (
     ReconciliationContext,
     reconcile_control_plane,
     reconcile_deployment,
@@ -134,7 +134,7 @@ def test_capability_from_dict_and_sections() -> None:
             "deployment": {"fixed_replicas": True},
             "topology": {"multi_node": True},
             "routing": {"kv_aware": "experimental"},
-            "artifacts": {"llmport_sync": True},
+            "artifacts": {"faden_sync": True},
         },
     )
     assert doc.driver == "ray"

@@ -1,6 +1,6 @@
-# llM.Port Frontend
+# Fadenstack Frontend
 
-This is the React-based admin console for llm.port, providing a unified UI to manage containers and LLM infrastructure, configure system settings and initialization workflows, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
+This is the React-based admin console for fadenstack, providing a unified UI to manage containers and LLM infrastructure, configure system settings and initialization workflows, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
 
 ## Getting Started
 
@@ -93,7 +93,7 @@ Make sure to deploy the output of `npm run build`
 - Bundles are loaded from:
   - `/api/i18n/languages`
   - `/api/i18n/{lang}/{namespace}`
-- Language selection is available in the admin top bar and persisted in `localStorage` (`llm-port-lang`).
+- Language selection is available in the admin top bar and persisted in `localStorage` (`faden-lang`).
 - New languages can be added on backend bundle files without rebuilding frontend assets.
 
 ## LLM Graph Visualizer
@@ -112,9 +112,9 @@ Make sure to deploy the output of `npm run build`
 sequenceDiagram
     autonumber
     participant User
-    participant Frontend as llm_port_frontend
-    participant Backend as llm_port_backend
-    participant Gateway as llm_port_api
+    participant Frontend as frontend
+    participant Backend as faden_backend
+    participant Gateway as faden_gateway
     participant Shared as Shared Stack (Postgres/Redis/Loki/Langfuse)
     participant Provider as LLM Providers
 
@@ -137,7 +137,7 @@ sequenceDiagram
 ## LLM Endpoint Admin Page
 
 - Route: `/admin/llm/endpoint`
-- Embeds `llm_port_api` Swagger UI and includes container lifecycle controls (`Start`, `Stop`, `Restart`).
+- Embeds `faden_gateway` Swagger UI and includes container lifecycle controls (`Start`, `Stop`, `Restart`).
 - Uses backend container admin APIs only (no direct Docker access from browser).
 
 ## System Settings + Wizard
@@ -149,10 +149,10 @@ sequenceDiagram
   - Step-based system initialization wizard (`/api/admin/system/wizard/*`)
   - Uses the same backend settings update/apply path as General settings.
 
-## Breaking Rename Migration (`llm-port` -> `llm-port`)
+## Breaking Rename Migration (`fadenstack` -> `fadenstack`)
 
-- Frontend branding is now `llm-port`.
+- Frontend branding is now `fadenstack`.
 - Local storage keys changed:
-  - `llm-port-lang` -> `llm-port-lang`
-  - `llm-port-theme-mode` -> `llm-port-theme-mode`
+  - `faden-lang` -> `faden-lang`
+  - `faden-theme-mode` -> `faden-theme-mode`
 - Existing browsers may need one fresh login/theme/language re-selection after upgrade.

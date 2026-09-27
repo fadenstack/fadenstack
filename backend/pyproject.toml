@@ -1,6 +1,6 @@
 [project]
-name = "llm-port-backend"
-version = "0.3.0"
+name = "faden-backend"
+version = "0.4.0"
 requires-python = ">=3.12,<4.0"
 description = ""
 authors = [
@@ -88,7 +88,7 @@ default-groups = ["dev"]
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-src_paths = ["llm_port_backend",]
+src_paths = ["faden_backend",]
 
 [tool.mypy]
 python_version = "3.12"
@@ -115,9 +115,9 @@ filterwarnings = [
 ]
 anyio_mode = "auto"
 env = [
-    "LLM_PORT_BACKEND_ENVIRONMENT=pytest",
-    "LLM_PORT_BACKEND_DB_BASE=llm_port_backend_test",
-    "LLM_PORT_BACKEND_SENTRY_DSN=",
+    "FADEN_BACKEND_ENVIRONMENT=pytest",
+    "FADEN_BACKEND_DB_BASE=faden_backend_test",
+    "FADEN_BACKEND_SENTRY_DSN=",
 ]
 
 [tool.ruff]
@@ -167,7 +167,7 @@ lint.ignore = [
 ]
 lint.mccabe = { max-complexity = 10 }
 exclude = [
-    "llm_port_backend/db/migrations",
+    "faden_backend/db/migrations",
     ".venv/"
 ]
 line-length = 110
@@ -197,7 +197,7 @@ extend-immutable-calls = [
 ]
 
 [fastapi-template.options]
-project_name = "llm-port-backend"
+project_name = "faden-backend"
 api_type = "rest"
 enable_redis = "None"
 enable_rmq = "True"

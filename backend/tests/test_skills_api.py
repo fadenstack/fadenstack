@@ -15,14 +15,14 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from llm_port_backend.db.dao.rbac_dao import _DEFAULT_ROLES, RbacDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.skills import drafting
-from llm_port_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient, get_skills_client
-from llm_port_backend.web.api.skills import views as skills_views
-from llm_port_backend.web.api.skills.views import skills_principal, user_caps
-from llm_port_backend.web.application import get_app
+from faden_backend.db.dao.rbac_dao import _DEFAULT_ROLES, RbacDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.skills import drafting
+from faden_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient, get_skills_client
+from faden_backend.web.api.skills import views as skills_views
+from faden_backend.web.api.skills.views import skills_principal, user_caps
+from faden_backend.web.application import get_app
 
 PRINCIPAL = SkillsPrincipal(user_id="u-1", group_ids=("g-1", "g-2"), caps=("create", "share"))
 
@@ -88,9 +88,9 @@ async def test_a_request_goes_to_the_service_as_the_signed_in_user(
     assert sent.url.path == "/api/skills"
     assert dict(sent.url.params) == {"view": "mine", "usable": "true"}
     assert sent.headers["authorization"] == "Bearer svc-token"
-    assert sent.headers["x-llm-port-user"] == "u-1"
-    assert sent.headers["x-llm-port-groups"] == "g-1,g-2"
-    assert sent.headers["x-llm-port-caps"] == "create,share"
+    assert sent.headers["x-faden-user"] == "u-1"
+    assert sent.headers["x-faden-groups"] == "g-1,g-2"
+    assert sent.headers["x-faden-caps"] == "create,share"
 
 
 @pytest.mark.anyio

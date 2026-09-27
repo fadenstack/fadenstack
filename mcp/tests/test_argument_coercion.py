@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_mcp.services.arguments import coerce_to_schema
+from faden_mcp.services.arguments import coerce_to_schema
 
 SCHEMA: dict[str, Any] = {
     "type": "object",

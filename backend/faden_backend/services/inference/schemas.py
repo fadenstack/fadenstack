@@ -18,7 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-API_VERSION_V1ALPHA1 = "inference.llmport.ai/v1alpha1"
+API_VERSION_V1ALPHA1 = "inference.fadenstack.com/v1alpha1"
 
 
 class EngineSpec(BaseModel):
@@ -132,7 +132,7 @@ class ArtifactDeliverySpec(BaseModel):
 
     source: str = Field(
         default="sync",
-        description="'sync' (LLM.Port-managed), 'local_path' (pre-existing), or 'remote'.",
+        description="'sync' (Fadenstack-managed), 'local_path' (pre-existing), or 'remote'.",
     )
     root_path: str | None = Field(None, description="Required when source='local_path'.")
     revision: str | None = Field(None, description="Optional model revision to sync.")
@@ -165,7 +165,7 @@ class InferenceDeploymentSpecV1Alpha1(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    api_version: Literal["inference.llmport.ai/v1alpha1"] = API_VERSION_V1ALPHA1
+    api_version: Literal["inference.fadenstack.com/v1alpha1"] = API_VERSION_V1ALPHA1
     engine: EngineSpec = Field(default_factory=EngineSpec)
     scale: ScaleSpec
     resources: ResourceSpec = Field(default_factory=ResourceSpec)

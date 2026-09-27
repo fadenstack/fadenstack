@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_user: str = "llm_user"
     db_pass: str = "llm_user"
-    db_base: str = "llm_skills"
+    db_base: str = "faden_skills"
     db_echo: bool = False
     # Per process, not per CPU. Every uvicorn worker of every service holds
     # its own pool, and all of them share one Postgres (max_connections 100
@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     # ── Observability ──
     # Named per service, like the backend's and gateway's. Each service clears
     # this directory on startup; with PII, MCP and skills sharing ``prom`` on
-    # one host (``llmport dev up --modules``), the one starting last could not
+    # one host (``faden dev up --modules``), the one starting last could not
     # clear files the others held open, and exited (FileExistsError).
     prometheus_dir: Path = TEMP_DIR / "prom-skills"
     sentry_dsn: Optional[str] = None
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_prefix="LLM_PORT_SKILLS_",
+        env_prefix="FADEN_SKILLS_",
         env_file_encoding="utf-8",
     )
 

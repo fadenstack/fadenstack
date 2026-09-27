@@ -1,6 +1,6 @@
 # Taking over clusters your machines still run
 
-If an LLM.Port server is rebuilt without its database, or restored from a
+If an Fadenstack server is rebuilt without its database, or restored from a
 backup older than its clusters, its machines keep running the clusters and
 models it started. The new server does not know about them. Recreating them
 restarts every model. While the old apps run they also keep their GPUs, so the
@@ -42,7 +42,7 @@ The new server:
 1. **Reads the cluster from Ray on the machine.** It gets the members and,
    for each model, the configuration it was deployed with.
 2. **Rebuilds each deployment from that configuration.** The deployment keeps
-   its original id, which is part of the app's name in Ray (`llmport-<id>`).
+   its original id, which is part of the app's name in Ray (`faden-<id>`).
 3. **Checks the rebuilt configuration.** It asks the cluster to compare the
    configuration it would deploy for each model with what runs, using Ray's
    own configuration model. If anything differs, the takeover stops, names the
@@ -65,9 +65,9 @@ the cluster's interconnect, so the health check finds every member there.
   step 3.
 - **History.** Logs, metrics, and past requests stay with the old server's
   database.
-- **Apps LLM.Port did not deploy.** An app whose name is not `llmport-<id>`
+- **Apps Fadenstack did not deploy.** An app whose name is not `faden-<id>`
   keeps running and is listed, but is not managed.
-- **A second model in one app.** LLM.Port deploys one model per app. For an
+- **A second model in one app.** Fadenstack deploys one model per app. For an
   app with several models, only the first is taken over, and the card says so.
 
 ## When a cluster cannot be taken over
@@ -85,5 +85,5 @@ If the check at step 3 finds a difference, the dialog shows the setting and
 both values, for example
 `llm_configs.0.engine_kwargs.max_model_len: running 8192, would deploy 32768`.
 Nothing was recorded. This means the model was deployed by a version of
-LLM.Port that compiled its settings differently. You can either redeploy it
+Fadenstack that compiled its settings differently. You can either redeploy it
 from this server (it restarts), or leave it running unmanaged.

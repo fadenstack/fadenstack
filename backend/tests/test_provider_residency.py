@@ -17,11 +17,11 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.llm import residency as r
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.llm import residency as r
 
 
 def _provider(url: str | None = None, *, target: str = "remote_endpoint", ptype: str = "vllm",

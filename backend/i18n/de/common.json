@@ -577,11 +577,11 @@
       },
       "tls_certificate_expiring": {
         "title": "HTTPS-Zertifikat läuft in {{days}} Tagen ab",
-        "detail": "Am {{until}}. llmport tls status zeigt, wie es erneuert wird."
+        "detail": "Am {{until}}. faden tls status zeigt, wie es erneuert wird."
       },
       "tls_certificate_expired": {
         "title": "HTTPS-Zertifikat ist am {{until}} abgelaufen",
-        "detail": "Browser und Maschinen lehnen die Konsole ab. Erneuern: llmport tls renew oder llmport tls use CERT KEY."
+        "detail": "Browser und Maschinen lehnen die Konsole ab. Erneuern: faden tls renew oder faden tls use CERT KEY."
       },
       "model_traffic_unencrypted": {
         "title": "Modellverkehr zu {{cluster}} ist nicht verschlüsselt",
@@ -735,8 +735,8 @@
     "confirm_title": "{{name}} ersetzen?",
     "confirm_body": "Docker kann diese Einstellungen an einem bestehenden Container nicht ändern. Deshalb wird ein neuer Container mit ihnen erstellt und der alte entfernt, sobald der neue läuft. Der Container erhält eine neue ID, und Dateien, die er außerhalb seiner Volumes geschrieben hat, gehen verloren. Kann der neue nicht erstellt oder gestartet werden, wird der alte wiederhergestellt, wie er war.",
     "confirm_replace": "Ersetzen",
-    "compose_note": "Fadenstack betreibt diesen Container über seine Compose-Datei: Das nächste llmport deploy oder upgrade erstellt ihn aus der Compose-Datei und .env neu, ohne diese Änderungen.",
-    "backend_note": "Das Backend läuft in diesem Container und kann ihn nicht ersetzen. Ändern Sie seine Einstellungen in .env und führen Sie llmport upgrade aus.",
+    "compose_note": "Fadenstack betreibt diesen Container über seine Compose-Datei: Das nächste faden deploy oder upgrade erstellt ihn aus der Compose-Datei und .env neu, ohne diese Änderungen.",
+    "backend_note": "Das Backend läuft in diesem Container und kann ihn nicht ersetzen. Ändern Sie seine Einstellungen in .env und führen Sie faden upgrade aus.",
     "load_failed": "Die Einstellungen des Containers konnten nicht geladen werden."
   },
   "images": {
@@ -1407,7 +1407,7 @@
   "pii_policy": {
     "system_section": "PII-Richtlinie (Systemstandard)",
     "pii_service_url": "PII-Service-URL",
-    "pii_service_url_help": "Interne URL fuer llm_port_pii (z. B. http://llm-port-pii:8000/api).",
+    "pii_service_url_help": "Interne URL fuer faden_pii (z. B. http://faden-pii:8000/api).",
     "hidden_when_disabled": "PII-Einstellungen sind ausgeblendet, weil das PII-Modul derzeit deaktiviert ist.",
     "tenants_title": "Mandanten-PII-Richtlinien",
     "tenants_description": "Ueberschreibt die Standard-PII-Richtlinie fuer einen bestimmten Mandanten.",
@@ -2204,7 +2204,7 @@
   },
   "rag_runtime": {
     "title": "RAG-Runtime-Konfiguration",
-    "description": "Embedding- und Chunking-Einstellungen werden von Fadenstack core an llm_port_rag übertragen.",
+    "description": "Embedding- und Chunking-Einstellungen werden von Fadenstack core an faden_rag übertragen.",
     "failed_load": "Runtime-Konfiguration konnte nicht geladen werden.",
     "failed_save": "Runtime-Konfiguration konnte nicht gespeichert werden.",
     "saved": "Runtime-Konfiguration aktualisiert.",
@@ -2868,8 +2868,8 @@
     "signed_in_as": "Bei Hugging Face angemeldet als {{username}}",
     "token_named": "Token „{{name}}“",
     "role_write": "Dieses Token darf auch auf Hugging Face schreiben. Dieser Server braucht nur Lesezugriff: Ersetzen Sie es besser durch ein reines Lese-Token.",
-    "from_environment": "Dieses Token stammt aus LLM_PORT_BACKEND_HF_TOKEN in der Umgebung des Servers. Ein hier gespeichertes Token ersetzt es.",
-    "storage_unsafe": "Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen, ein gespeichertes Token wäre also nicht geschützt. Setzen Sie LLM_PORT_BACKEND_SETTINGS_MASTER_KEY auf einen zufälligen Wert und starten Sie neu, bevor Sie eines speichern.",
+    "from_environment": "Dieses Token stammt aus FADEN_BACKEND_HF_TOKEN in der Umgebung des Servers. Ein hier gespeichertes Token ersetzt es.",
+    "storage_unsafe": "Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen, ein gespeichertes Token wäre also nicht geschützt. Setzen Sie FADEN_BACKEND_SETTINGS_MASTER_KEY auf einen zufälligen Wert und starten Sie neu, bevor Sie eines speichern.",
     "token_label": "Zugriffstoken",
     "replace_label": "Durch ein neues Token ersetzen",
     "create_hint": "Ein Lese-Token erstellen Sie unter",

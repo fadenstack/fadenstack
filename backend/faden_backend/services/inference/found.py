@@ -1,13 +1,13 @@
 """vLLM a machine already runs, found by its agent, and taken over (Phase 8).
 
 The agent reports every vLLM container it did not start (``vllm_containers``
-in its inventory; see ``llm_port_node_agent/vllm_discovery.py``). This module
-reads those reports and does the one thing LLM.Port can safely do without
+in its inventory; see ``faden_agent/vllm_discovery.py``). This module
+reads those reports and does the one thing Fadenstack can safely do without
 touching the container: route it at the gateway under a name, as it is, and
 stop routing it again. The container keeps running exactly as before, and
 stays whoever's it was.
 
-The plan is ``llm-port-dev/llm_port_ray_migration/phase8_concrete_implementation_plan.md``.
+The plan is ``fadenstack-dev/llm_port_ray_migration/phase8_concrete_implementation_plan.md``.
 """
 
 from __future__ import annotations
@@ -22,19 +22,19 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.inference import (
     OPEN_ADOPTION_STATES,
     AdoptionState,
     InferenceAdoption,
 )
-from llm_port_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.llm.kinds import argv_calls_tools
+from faden_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.llm.kinds import argv_calls_tools
 
 log = logging.getLogger(__name__)
 
-#: What the gateway calls a route that LLM.Port found rather than started.
+#: What the gateway calls a route that Fadenstack found rather than started.
 SOURCE_KIND = "found_container"
 
 #: How long asking a found container what it serves may take.
@@ -64,7 +64,7 @@ def _host(node: InfraNode) -> str | None:
 
 
 def base_url(node: InfraNode, container: dict[str, Any]) -> str | None:
-    """Where LLM.Port reaches a found container: the machine, the published port."""
+    """Where Fadenstack reaches a found container: the machine, the published port."""
     host, port = _host(node), container.get("host_port")
     if not host or not port:
         return None
@@ -95,7 +95,7 @@ async def probe(url: str) -> dict[str, Any]:
     """Ask a found container what it serves: ``GET /v1/models``."""
     import httpx  # noqa: PLC0415
 
-    from llm_port_backend.services.tls import default_httpx_verify  # noqa: PLC0415
+    from faden_backend.services.tls import default_httpx_verify  # noqa: PLC0415
 
     try:
         async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SEC, verify=default_httpx_verify()) as client:
@@ -136,7 +136,7 @@ async def _open_adoptions(session: AsyncSession) -> dict[tuple[str, str], Infere
 async def found(session: AsyncSession, *, check: bool = True) -> list[dict[str, Any]]:
     """Every vLLM container the machines reported, and what can be done with it.
 
-    With *check*, each running one that LLM.Port can reach is asked what it
+    With *check*, each running one that Fadenstack can reach is asked what it
     serves, all at once and briefly, so a list of many is not a wait of many.
     """
     adoptions = await _open_adoptions(session)
@@ -180,7 +180,7 @@ async def found(session: AsyncSession, *, check: bool = True) -> list[dict[str, 
 
 def proxy_port(container_port: int) -> int:
     """The port a machine's model-TLS proxy serves a found container on: its own port plus 20000."""
-    from llm_port_backend.services import machine_tls  # noqa: PLC0415
+    from faden_backend.services import machine_tls  # noqa: PLC0415
 
     return machine_tls.internal_port(container_port)
 
@@ -190,12 +190,12 @@ async def _behind_the_proxy(
 ) -> tuple[str, dict[str, Any]] | None:
     """Have the machine's proxy serve the container: ``(https base URL, route)``, or ``None``.
 
-    The container keeps listening on its own port -- it is not LLM.Port's to
+    The container keeps listening on its own port -- it is not Fadenstack's to
     change -- but the gateway's traffic to it goes over mutual TLS.
     """
-    from llm_port_backend.services import machine_tls  # noqa: PLC0415
-    from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services import machine_tls  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     if commands is None or not settings.machine_tls_enabled or not machine_tls.supported(node.capabilities_json):
         return None
@@ -317,7 +317,7 @@ async def route(
         source_kind=SOURCE_KIND,
         source_id=adoption.id,
         # Unknown stays unknown: a found container that says nothing is not
-        # declared chat on LLM.Port's guess.
+        # declared chat on Fadenstack's guess.
         task=container.get("task"),
         tools=argv_calls_tools(container.get("args")),
         machine_tls=protected is not None,
@@ -336,7 +336,7 @@ async def release(
         await gateway_sync.unpublish_runtime(runtime_id=adoption.id, alias=adoption.alias)
     route_info = (adoption.detail_json or {}).get("model_tls")
     if commands is not None and route_info and adoption.node_id is not None:
-        from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
+        from faden_backend.services.inference.drivers.ray.client import RayClusterClient  # noqa: PLC0415
 
         done = await RayClusterClient(commands).model_tls_route(
             node_id=adoption.node_id, public_port=int(route_info["public_port"]), remove=True,

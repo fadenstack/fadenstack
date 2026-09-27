@@ -40,7 +40,7 @@ const EVERYTHING: ContainerSettings = {
   env: ["PORT=3001", "GREETING=hello world"],
   ports: [],
   volumes: ["/srv/data:/data:ro"],
-  network: "llm_port_shared_default",
+  network: "fadenstack_default",
   running: true,
   container_class: "MCP",
   owner_scope: "platform",
@@ -87,12 +87,12 @@ describe("editing a container", () => {
       cmd: ["npx", "-y", "@modelcontextprotocol/server-everything", "streamableHttp"],
       env: ["PORT=3001", "GREETING=hello world"],
       volumes: ["/srv/data:/data:ro"],
-      network: "llm_port_shared_default",
+      network: "fadenstack_default",
     });
   });
 
   it("does not offer to replace the container the backend runs in", async () => {
-    editPage({ ...EVERYTHING, name: "llm-port-backend", backend_runs_here: true });
+    editPage({ ...EVERYTHING, name: "faden-backend", backend_runs_here: true });
 
     expect(await screen.findByText(/cannot replace it/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save and replace" })).toBeDisabled();
@@ -100,7 +100,7 @@ describe("editing a container", () => {
 
   it("says that Fadenstack's own containers come back from the compose file", async () => {
     editPage({ ...EVERYTHING, managed_by_compose: true });
-    expect(await screen.findByText(/next llmport deploy or upgrade/)).toBeInTheDocument();
+    expect(await screen.findByText(/next faden deploy or upgrade/)).toBeInTheDocument();
   });
 });
 

@@ -12,7 +12,7 @@ The host therefore never needs a Ray Python distribution: on certified
 hardware ``import ray`` fails on the DGX OS by design, and the whole air-gap
 direction rests on the runtime living inside a digest-pinned image.
 
-This module is the mirror image of :class:`~llm_port_node_agent.ray.runtime.RayRuntime`
+This module is the mirror image of :class:`~faden_agent.ray.runtime.RayRuntime`
 (``ray start --head`` / ``ray start --address`` / ``ray stop``), except that
 every command is executed **inside** the bundle container via the runtime
 handler's ``exec``.  The bundle's semantic requirements (``network_mode``,
@@ -33,13 +33,16 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from llm_port_node_agent.runtimes import ContainerRuntime, ContainerRuntimeError, detect_runtime
+from faden_agent.runtimes import ContainerRuntime, ContainerRuntimeError, detect_runtime
 
 log = logging.getLogger(__name__)
 
 # Long-lived container that hosts this node's Ray processes.  One per node:
 # Ray's own head/worker split is decided by which ``ray start`` we exec.
-DEFAULT_CONTAINER_NAME = "llm-port-ray-runtime"
+DEFAULT_CONTAINER_NAME = "faden-ray-runtime"
+#: The helper command baked into the certified runtime image (pinned by digest). It keeps the old
+#: product name until the next runtime image release; the container it runs in is renamed.
+RUNTIME_CLI = "llm-port-ray-runtime"
 
 # ``sleep infinity`` keeps the container alive so ``ray start`` (which
 # daemonizes and returns) has a stable process namespace to live in.
@@ -74,7 +77,7 @@ def compute_rootfs_digest(layer_diff_ids: list[str]) -> str:
     """Content identity of an image from its ordered RootFS layer diff IDs.
 
     Must stay byte-for-byte identical to the backend's
-    ``llm_port_backend.services.inference.bundles.compute_rootfs_digest``.
+    ``faden_backend.services.inference.bundles.compute_rootfs_digest``.
     """
     return "sha256:" + hashlib.sha256("\n".join(layer_diff_ids).encode()).hexdigest()
 
@@ -217,7 +220,7 @@ class RayContainerRuntime:
         self,
         *,
         runtime: ContainerRuntime | None = None,
-        token_path: str = "/var/run/llm-port/ray/cluster.token",
+        token_path: str = "/var/run/fadenstack/ray/cluster.token",
         handler_hint: str = "docker",
     ) -> None:
         self._runtime = runtime
@@ -316,7 +319,7 @@ class RayContainerRuntime:
         """Report what else on this host could break the runtime container.
 
         This is a *diagnostic*, not a gate: a node may legitimately run other
-        workloads, and LLM.Port's own legacy single-node runtimes coexist with
+        workloads, and Fadenstack's own legacy single-node runtimes coexist with
         Ray by design, so refusing to start whenever a GPU is busy would be
         wrong.  What was wrong was starting blind - on the DGX worker an
         unmanaged ``tmux`` loop kept relaunching old containers that held GPU
@@ -433,11 +436,11 @@ class RayContainerRuntime:
         the pinned digest is the contract.
 
         *ray_tls*: ``None`` -- not said, leave the container as it is; ``False``
-        -- Ray without TLS; a :class:`~llm_port_node_agent.ray.ray_tls.RayTlsMaterial`
+        -- Ray without TLS; a :class:`~faden_agent.ray.ray_tls.RayTlsMaterial`
         -- Ray with mutual TLS, its certificate made just before the container
         is (re)created. Switching either way recreates the container.
         """
-        from llm_port_node_agent.ray import ray_tls as ray_tls_mod  # noqa: PLC0415
+        from faden_agent.ray import ray_tls as ray_tls_mod  # noqa: PLC0415
 
         handler = self._handler(spec)
         merged_env = dict(spec.env)
@@ -922,7 +925,7 @@ class RayContainerRuntime:
         is running, and the host never imports Ray.
         """
         handler = self._handler(self._spec_for(container_name))
-        command = ["llm-port-ray-runtime", *args]
+        command = [RUNTIME_CLI, *args]
         code, out, err = await handler.exec_(
             container_name,
             command,

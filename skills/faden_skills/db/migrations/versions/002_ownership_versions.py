@@ -6,7 +6,7 @@
   and triggers move into each version, so a rollback rolls them back.
   A slug is unique per owner instead of per tenant.
 - ``skill_versions``: ``description``, ``frontmatter`` (SKILL.md's other
-  fields), ``manifest`` (llm.port's), ``files`` and ``content_sha256``;
+  fields), ``manifest`` (fadenstack's), ``files`` and ``content_sha256``;
   ``frontmatter_yaml`` is taken apart into them.
 - ``skill_grants``: sharing with users and groups.
 - ``skill_usage_daily``: how often each version reached a chat.
@@ -45,8 +45,8 @@ _MANIFEST_KEYS = (
     "knowledge_sources",
     "trigger_rules",
 )
-#: Frontmatter keys only the old llm.port documents had.
-_LLMPORT_KEYS = {
+#: Frontmatter keys only the old fadenstack documents had.
+_FADEN_KEYS = {
     "name",
     "description",
     "scope",
@@ -330,7 +330,7 @@ def _move_data() -> None:
             else:
                 manifest = _manifest({**row_manifest, **fm})
                 description = str(fm.get("description") or skill["description"] or "")
-            extra = _json_safe({k: v for k, v in fm.items() if k not in _LLMPORT_KEYS})
+            extra = _json_safe({k: v for k, v in fm.items() if k not in _FADEN_KEYS})
             body = version["body_markdown"] or ""
             digest = _content_sha256(
                 name=skill["slug"],

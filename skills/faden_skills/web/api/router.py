@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from llm_port_skills.web.api.internal.views import router as internal_router
-from llm_port_skills.web.api.skills.views import router as skills_router
+from faden_skills.web.api.internal.views import router as internal_router
+from faden_skills.web.api.skills.views import router as skills_router
 
 api_router = APIRouter()
 

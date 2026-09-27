@@ -56,14 +56,14 @@
       "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
     ],
     "tags": [
-      "llmport/ray-vllm-gb10:ray2.58-nv26.08"
+      "faden/ray-vllm-gb10:ray2.58-nv26.08"
     ]
   },
   "gpu-02": {
     "id": "sha256:7dc13b9aff5a00dc447251d550a29bcddf9480cc7efad1509cfbd9a0c661a9d8",
     "present": true,
     "repo_digests": [
-      "llmport/ray-vllm-gb10@sha256:7dc13b9aff5a00dc447251d550a29bcddf9480cc7efad1509cfbd9a0c661a9d8"
+      "faden/ray-vllm-gb10@sha256:7dc13b9aff5a00dc447251d550a29bcddf9480cc7efad1509cfbd9a0c661a9d8"
     ],
     "rootfs_layers": [
       "sha256:646eea22414270d74b0c9e9d6d3b9550701ae62e658a099825d4d15045a3630b",
@@ -118,7 +118,7 @@
       "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
     ],
     "tags": [
-      "llmport/ray-vllm-gb10:ray2.58-nv26.08"
+      "faden/ray-vllm-gb10:ray2.58-nv26.08"
     ]
   }
 }

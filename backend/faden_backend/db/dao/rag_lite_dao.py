@@ -11,8 +11,8 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.rag_lite import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.rag_lite import (
     RagLiteChunk,
     RagLiteCollection,
     RagLiteDocument,

@@ -5,12 +5,12 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO, RoutedInstance
-from llm_port_api.services.gateway.errors import GatewayError
-from llm_port_api.services.gateway.lease import LeaseManager
+from faden_gateway.db.dao.gateway_dao import GatewayDAO, RoutedInstance
+from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.lease import LeaseManager
 
 if TYPE_CHECKING:
-    from llm_port_api.services.cache.protocol import CacheBackend
+    from faden_gateway.services.cache.protocol import CacheBackend
 
 
 @dataclass(slots=True, frozen=True)

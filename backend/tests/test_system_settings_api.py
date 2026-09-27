@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from starlette import status
 
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.settings import settings
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.settings import settings
 
 
 def _superuser() -> User:
@@ -105,7 +105,7 @@ async def test_system_settings_update_protected_key_requires_root_mode(
     fastapi_app: FastAPI,
 ) -> None:
     fastapi_app.dependency_overrides[current_active_user] = _override_superuser
-    url = fastapi_app.url_path_for("system_settings_update", key="llm_port_api.jwt_secret")
+    url = fastapi_app.url_path_for("system_settings_update", key="faden_gateway.jwt_secret")
     response = await client.put(url, json={"value": "secret-value", "target_host": "local"})
     assert response.status_code == status.HTTP_403_FORBIDDEN
 

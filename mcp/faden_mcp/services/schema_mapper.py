@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any
 
-from llm_port_mcp.services.transport.base import MCPToolDescriptor
+from faden_mcp.services.transport.base import MCPToolDescriptor
 
 
 def to_openai_tool(descriptor: MCPToolDescriptor) -> dict[str, Any]:

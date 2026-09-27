@@ -16,17 +16,17 @@ import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.mcp.client import MCPServiceClient, get_mcp_client
-from llm_port_backend.web.api.admin.dependencies import get_docker, require_superuser
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.db.models.users import User
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.mcp.client import MCPServiceClient, get_mcp_client
+from faden_backend.web.api.admin.dependencies import get_docker, require_superuser
+from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Name of the MCP service container — used to discover its network.
-_MCP_SERVICE_CONTAINER = "llm-port-mcp"
+_MCP_SERVICE_CONTAINER = "faden-mcp"
 
 
 async def _ensure_container_network(
@@ -37,7 +37,7 @@ async def _ensure_container_network(
 
     Parses the hostname from the URL, looks up whether a Docker container
     with that name exists, and — if so — connects it to the same network
-    as the ``llm-port-mcp`` container so they can communicate via DNS.
+    as the ``faden-mcp`` container so they can communicate via DNS.
     This is a best-effort operation: failures are logged but never raised.
     """
     try:
@@ -297,7 +297,7 @@ async def _probe_mcp_port(
         "params": {
             "protocolVersion": "2025-03-26",
             "capabilities": {},
-            "clientInfo": {"name": "llm-port-scanner", "version": "1.0"},
+            "clientInfo": {"name": "faden-scanner", "version": "1.0"},
         },
     }
     headers = {

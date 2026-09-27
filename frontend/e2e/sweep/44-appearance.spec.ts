@@ -38,7 +38,7 @@ test.describe("the brand and the accent", () => {
     await expect(page.getByText("fadenstack", { exact: true }).first()).toBeVisible();
     await expect(page.locator("svg[data-brand-mark]").first()).toBeVisible();
     await expect(page.locator('link[rel="icon"][href="/favicon.svg"]')).toHaveCount(1);
-    await expect(page.locator("body")).not.toContainText(/llm\.port|llm-port\b(?!-)/i);
+    await expect(page.locator("body")).not.toContainText(/llm\.port|fadenstack\b(?!-)/i);
     await w.inspect();
     await w.report("brand: dashboard");
     expect(w.failures()).toEqual([]);
@@ -47,9 +47,9 @@ test.describe("the brand and the accent", () => {
   test("an accent picked in Settings is taken at once and kept over a reload", async ({ page, baseURL }) => {
     const w = watch(page, baseURL);
     await page.goto("/admin/settings?tab=appearance");
-    await page.evaluate(() => localStorage.setItem("llm-port-theme-mode", "dark"));
+    await page.evaluate(() => localStorage.setItem("faden-theme-mode", "dark"));
     await page.reload();
-    const before = (await page.evaluate(() => localStorage.getItem("llm-port-accent"))) ?? "frost";
+    const before = (await page.evaluate(() => localStorage.getItem("faden-accent"))) ?? "frost";
 
     try {
       for (const accent of ["aurora", "graphite", "frost"] as const) {
@@ -60,13 +60,13 @@ test.describe("the brand and the accent", () => {
 
         await page.reload();
         await expect(page.getByRole("radio", { name })).toBeChecked();
-        expect(await page.evaluate(() => localStorage.getItem("llm-port-accent"))).toBe(accent);
+        expect(await page.evaluate(() => localStorage.getItem("faden-accent"))).toBe(accent);
         expect(await page.evaluate(() => document.documentElement.dataset.accent)).toBe(accent);
         await expect.poll(() => navFill(page)).toBe(NAV_FILL[accent]);
         expect(await threadStroke(page)).toBe(THREAD_ON_DARK);
       }
     } finally {
-      await page.evaluate((a) => localStorage.setItem("llm-port-accent", a), before);
+      await page.evaluate((a) => localStorage.setItem("faden-accent", a), before);
     }
     await w.inspect();
     await w.report("brand: accent");

@@ -1,4 +1,4 @@
-"""``llmport dev init`` — bootstrap a full development workspace.
+"""``faden dev init`` — bootstrap a full development workspace.
 
 Clones all repositories, installs dependencies, starts shared
 infrastructure, runs migrations, and generates a VS Code workspace file.
@@ -19,13 +19,13 @@ from pathlib import Path
 import click
 from click.core import ParameterSource
 
-from llmport.core.compose import ComposeContext, up as compose_up
-from llmport.core.console import console, success, warning, error, info
-from llmport.core.detect import detect_docker
-from llmport.core.env_gen import dev_env_vars, read_env_file, write_env_file
-from llmport.core.git import clone_all_repos
-from llmport.core.install import ensure_prerequisites
-from llmport.core.registry import (
+from faden_cli.core.compose import ComposeContext, up as compose_up
+from faden_cli.core.console import console, success, warning, error, info
+from faden_cli.core.detect import detect_docker
+from faden_cli.core.env_gen import dev_env_vars, read_env_file, write_env_file
+from faden_cli.core.git import clone_all_repos
+from faden_cli.core.install import ensure_prerequisites
+from faden_cli.core.registry import (
     BACKEND_DEV_ENV,
     DATABASES,
     INFRA_SERVICES,
@@ -33,22 +33,22 @@ from llmport.core.registry import (
     POSTGRES_CONTAINER,
     backend_dev_env_for,
 )
-from llmport.core.rmq import (
+from faden_cli.core.rmq import (
     write_definitions as _write_rmq_definitions,
 )
-from llmport.core.settings import (
+from faden_cli.core.settings import (
     DevConfig,
-    LlmportConfig,
+    FadenConfig,
     REPO_DIR_MAP,
     load_config,
     save_config,
 )
-from llmport.core.workspace import detect_workspace, find_service_dir, resolve_shared_compose
+from faden_cli.core.workspace import detect_workspace, find_service_dir, resolve_shared_compose
 
 from .dev_group import dev_group
 
 # Backwards-compatible aliases — the canonical implementations live in
-# llmport.core.workspace so dev_up / dev_status resolve paths identically.
+# faden_cli.core.workspace so dev_up / dev_status resolve paths identically.
 _find_service_dir = find_service_dir
 _resolve_shared_compose = resolve_shared_compose
 
@@ -96,12 +96,12 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 def _backend_db_creds(backend_dir: Path) -> tuple[str, str, str]:
     """Resolve backend DB user/password/database from backend .env or defaults."""
-    defaults = ("llm_port_backend", "llm_port_backend", "llm_port_backend")
+    defaults = ("faden_backend", "faden_backend", "faden_backend")
     env_values = _parse_env_file(backend_dir / ".env")
     return (
-        env_values.get("LLM_PORT_BACKEND_DB_USER", defaults[0]),
-        env_values.get("LLM_PORT_BACKEND_DB_PASS", defaults[1]),
-        env_values.get("LLM_PORT_BACKEND_DB_BASE", defaults[2]),
+        env_values.get("FADEN_BACKEND_DB_USER", defaults[0]),
+        env_values.get("FADEN_BACKEND_DB_PASS", defaults[1]),
+        env_values.get("FADEN_BACKEND_DB_BASE", defaults[2]),
     )
 
 
@@ -274,11 +274,11 @@ def _run_migrations(backend_dir: Path) -> None:
     db_user, db_pass, db_base = _backend_db_creds(backend_dir)
     env = os.environ.copy()
     # Ensure backend Alembic connects with the right credentials.
-    env.setdefault("LLM_PORT_BACKEND_DB_HOST", "127.0.0.1")  # not localhost: see INFRA_LOOPBACK
-    env.setdefault("LLM_PORT_BACKEND_DB_PORT", "5432")
-    env.setdefault("LLM_PORT_BACKEND_DB_USER", db_user)
-    env.setdefault("LLM_PORT_BACKEND_DB_PASS", db_pass)
-    env.setdefault("LLM_PORT_BACKEND_DB_BASE", db_base)
+    env.setdefault("FADEN_BACKEND_DB_HOST", "127.0.0.1")  # not localhost: see INFRA_LOOPBACK
+    env.setdefault("FADEN_BACKEND_DB_PORT", "5432")
+    env.setdefault("FADEN_BACKEND_DB_USER", db_user)
+    env.setdefault("FADEN_BACKEND_DB_PASS", db_pass)
+    env.setdefault("FADEN_BACKEND_DB_BASE", db_base)
     result = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=str(backend_dir), env=env)
     if result.returncode != 0:
         warning("Backend Alembic migration exited with non-zero code.")
@@ -286,7 +286,7 @@ def _run_migrations(backend_dir: Path) -> None:
         success("Backend migrations up to date.")
 
     # API gateway migrations (creates llm_gateway_request_log, etc.)
-    api_dir = backend_dir.parent / "llm_port_api"
+    api_dir = backend_dir.parent / "gateway"
     if api_dir.exists() and (api_dir / "alembic.ini").exists():
         console.print("[cyan]Running API gateway migrations…[/cyan]")
         result = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=str(api_dir), env=env)
@@ -298,7 +298,7 @@ def _run_migrations(backend_dir: Path) -> None:
 
 def _generate_vscode_workspace(workspace: Path) -> None:
     """Create a VS Code multi-root workspace file."""
-    workspace_file = workspace / "llm-port.code-workspace"
+    workspace_file = workspace / "fadenstack.code-workspace"
 
     folders = []
     for _gh_name, local_name in sorted(REPO_DIR_MAP.items()):
@@ -331,11 +331,11 @@ def _resync_rmq_credentials(shared_dir: Path, *, skip_infra: bool) -> None:
     """Regenerate RMQ ``definitions.json`` from the shared ``.env`` and
     restart the broker so the on-disk users match the in-env passwords.
 
-    The repo ships a checked-in ``llm_port_shared/rabbitmq/definitions.json``
+    The repo ships a checked-in ``shared/rabbitmq/definitions.json``
     (deploy-time hashes from its original author). A fresh ``dev init``
     writes a new shared ``.env`` (random ``RABBITMQ_*_PASS`` values), so the
     broker's users drift out of sync and the backend/worker — which are
-    told to log in as ``llmport-backend`` / ``RABBITMQ_BACKEND_PASS`` — get
+    told to log in as ``faden-backend`` / ``RABBITMQ_BACKEND_PASS`` — get
     ``ACCESS_REFUSED`` from the mgmt API / AMQP layer.
 
     Skipped when ``--skip-infra`` (no broker to restart), docker is
@@ -372,7 +372,7 @@ def _resync_rmq_credentials(shared_dir: Path, *, skip_infra: bool) -> None:
         info("Docker not ready — RMQ definitions will load on next broker start.")
         return
 
-    container = "llm-port-rmq"  # explicit container_name in the shared compose
+    container = "faden-rmq"  # explicit container_name in the shared compose
     running = subprocess.run(
         [docker, "inspect", "-f", "{{.State.Running}}", container],
         capture_output=True,
@@ -400,9 +400,9 @@ def _resync_rmq_credentials(shared_dir: Path, *, skip_infra: bool) -> None:
         env_file=str(env_path),
         project_dir=str(shared_dir),
     )
-    rc = compose_up(ctx, services=["llm-port-rmq"], detach=True)
+    rc = compose_up(ctx, services=["faden-rmq"], detach=True)
     if rc != 0:
-        warning("docker compose up llm-port-rmq failed — retry after infra is up.")
+        warning("docker compose up faden-rmq failed — retry after infra is up.")
         return
     # Wait until the broker accepts logins with the new service user.
     # rabbitmqctl prints "… ok" (3.x) or "… Success" (4.x); either is
@@ -411,15 +411,15 @@ def _resync_rmq_credentials(shared_dir: Path, *, skip_infra: bool) -> None:
         time.sleep(2)
         rc = subprocess.run(
             [docker, "exec", container, "rabbitmqctl",
-             "authenticate_user", "llmport-backend", backend_pass],
+             "authenticate_user", "faden-backend", backend_pass],
             capture_output=True,
             text=True,
         )
         out = (rc.stdout or "").lower()
         if rc.returncode == 0 and ("ok" in out or "success" in out):
-            success("RMQ credentials resynced (llmport-backend accepts login).")
+            success("RMQ credentials resynced (faden-backend accepts login).")
             return
-    warning("RMQ broker restarted; could not confirm llmport-backend login within 120s.")
+    warning("RMQ broker restarted; could not confirm faden-backend login within 120s.")
 
 
 def _resolve_init_workspace(workspace: str, *, explicit: bool) -> Path:
@@ -472,14 +472,14 @@ def dev_init(
     force_env: bool,
     install_prereqs: bool,
 ) -> None:
-    """Bootstrap a full llm.port development workspace.
+    """Bootstrap a full fadenstack development workspace.
 
     Clones all repositories, installs dependencies, starts shared
     infrastructure, runs migrations, and generates a VS Code workspace.
 
     \b
     Steps:
-      1. Clone all llm.port repositories
+      1. Clone all fadenstack repositories
       2. Generate .env with dev credentials
       3. Start shared infrastructure (Postgres, Redis, RabbitMQ, …)
       4. Ensure databases exist
@@ -489,7 +489,7 @@ def dev_init(
 
     Example:
 
-        llmport dev init --workspace ~/projects/llm-port --branch feature/my-work
+        faden dev init --workspace ~/projects/fadenstack --branch feature/my-work
     """
     explicit = (
         click.get_current_context().get_parameter_source("workspace")
@@ -508,7 +508,7 @@ def dev_init(
             else:
                 warning(f"Unknown module '{m}'. Available: {', '.join(MODULES_COMPAT)}")
 
-    console.print(f"\n[bold magenta]llm.port Developer Workspace Setup[/bold magenta]")
+    console.print(f"\n[bold magenta]fadenstack Developer Workspace Setup[/bold magenta]")
     console.print(f"[dim]Workspace: {workspace_path}[/dim]")
     if profiles:
         console.print(f"[dim]Modules:   {', '.join(profiles)}[/dim]")
@@ -520,7 +520,7 @@ def dev_init(
     if not all_ok:
         error(
             "Some prerequisites are missing.\n"
-            "  Run: llmport dev doctor --install"
+            "  Run: faden dev doctor --install"
         )
         sys.exit(1)
 
@@ -557,9 +557,9 @@ def dev_init(
     console.print("\n[bold cyan]Step 2: Generating .env files…[/bold cyan]")
 
     # ── 2a. Shared infrastructure .env ────────────────────────────
-    shared_dir = workspace_path / "llm_port_shared"
+    shared_dir = workspace_path / "shared"
     if not shared_dir.is_dir():
-        shared_dir = workspace_path / "llm-port-core" / "llm_port_shared"
+        shared_dir = workspace_path / "fadenstack" / "shared"
     env_path = shared_dir / ".env"
     if env_path.exists() and not force_env:
         warning(f".env already exists at {env_path} — skipping (use --force-env to regenerate).")
@@ -569,14 +569,14 @@ def dev_init(
         success(f".env written to {env_path}")
 
     # ── 2b. Backend local .env (so uv run uses localhost) ─────────
-    backend_dir = _find_service_dir(workspace_path, "llm_port_backend")
+    backend_dir = _find_service_dir(workspace_path, "backend")
     backend_env_path = backend_dir / ".env"
     # Resolve the broker credentials from the shared env BEFORE writing the
     # backend env, so the backend logs in as the per-service AMQP user that
-    # the shared RabbitMQ definitions create (llmport-backend /
+    # the shared RabbitMQ definitions create (faden-backend /
     # RABBITMQ_BACKEND_PASS), not the hard-coded guest/guest default.
     shared_env_path = env_path if env_path.exists() else (
-        workspace_path / "llm_port_shared" / ".env"
+        workspace_path / "shared" / ".env"
     )
     backend_env = backend_dev_env_for(shared_env_path)
     if backend_env_path.exists() and not force_env:
@@ -590,7 +590,7 @@ def dev_init(
     # hashes from its original author, while the fresh .env has new
     # random RABBITMQ_*_PASS values. Regenerate definitions.json from
     # the shared .env and recreate the broker so the backend and
-    # worker can authenticate as llmport-backend / RABBITMQ_BACKEND_PASS.
+    # worker can authenticate as faden-backend / RABBITMQ_BACKEND_PASS.
     _resync_rmq_credentials(shared_dir, skip_infra=skip_infra)
 
     # ── 3. Start shared infrastructure ────────────────────────────
@@ -628,8 +628,8 @@ def dev_init(
     # ── 5. Install dependencies ───────────────────────────────────
     if not skip_deps:
         console.print("\n[bold cyan]Step 5: Installing dependencies…[/bold cyan]")
-        backend_dir = _find_service_dir(workspace_path, "llm_port_backend")
-        frontend_dir = _find_service_dir(workspace_path, "llm_port_frontend")
+        backend_dir = _find_service_dir(workspace_path, "backend")
+        frontend_dir = _find_service_dir(workspace_path, "frontend")
 
         if backend_dir.exists():
             _install_backend_deps(backend_dir)
@@ -646,7 +646,7 @@ def dev_init(
     # ── 6. Migrations ─────────────────────────────────────────────
     if not skip_migrations and not skip_infra:
         console.print("\n[bold cyan]Step 6: Running migrations…[/bold cyan]")
-        backend_dir = _find_service_dir(workspace_path, "llm_port_backend")
+        backend_dir = _find_service_dir(workspace_path, "backend")
         if backend_dir.exists():
             _run_migrations(backend_dir)
         else:
@@ -701,9 +701,9 @@ def dev_init(
     console.print(
         "\n[dim]Next steps:\n"
         "  cd {workspace}\n"
-        "  llmport dev up        # start backend + frontend\n"
-        "  llmport dev status    # check service status\n"
-        "  code llm-port.code-workspace  # open in VS Code[/dim]".format(
+        "  faden dev up        # start backend + frontend\n"
+        "  faden dev status    # check service status\n"
+        "  code fadenstack.code-workspace  # open in VS Code[/dim]".format(
             workspace=workspace_path
         )
     )

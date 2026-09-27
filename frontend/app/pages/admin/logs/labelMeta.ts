@@ -15,7 +15,7 @@ import type { TFunction } from "i18next";
 export interface NameLookups {
   /** host (the address the backend knows a machine by) -> machine name */
   machines: Map<string, string>;
-  /** Ray application name (``llmport-<deployment id>``) -> deployment name */
+  /** Ray application name (``faden-<deployment id>``) -> deployment name */
   deployments: Map<string, string>;
 }
 
@@ -64,7 +64,7 @@ export function valueTitle(key: string, value: string, names: NameLookups, t: TF
     case "app": {
       const name = names.deployments.get(value);
       if (name) return name;
-      if (value.startsWith("llmport-") && names.deployments.size > 0) {
+      if (value.startsWith("faden-") && names.deployments.size > 0) {
         return t("logs.deleted_deployment", { id: value.slice(8, 16), defaultValue: value });
       }
       return value;

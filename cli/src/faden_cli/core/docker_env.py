@@ -132,14 +132,14 @@ def ensure_docker_host(verbose: bool = False, quiet: bool = False) -> str | None
     host = resolve_docker_host()
     if host is None:
         if verbose:
-            from llmport.core.console import warning  # noqa: PLC0415 — late import avoids cycle
+            from faden_cli.core.console import warning  # noqa: PLC0415 — late import avoids cycle
             warning("No reachable Docker endpoint (Docker Desktop or Rancher Desktop).")
         return None
 
     if host != current:
         os.environ["DOCKER_HOST"] = host
         if not quiet:
-            from llmport.core.console import info  # noqa: PLC0415 — late import avoids cycle
+            from faden_cli.core.console import info  # noqa: PLC0415 — late import avoids cycle
             if is_windows() and host == "npipe:////./pipe/docker_engine":
                 info("Docker Desktop endpoint not found — using Rancher Desktop.")
             else:

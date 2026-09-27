@@ -1,4 +1,4 @@
-"""LLM.Port-owned DTOs for the node agent's Ray integration.
+"""Fadenstack-owned DTOs for the node agent's Ray integration.
 
 These models are the wire contract between the node agent and the backend
 reconciler.  They are deliberately plain ``pydantic`` (no Ray types leak

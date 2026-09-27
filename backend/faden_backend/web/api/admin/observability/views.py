@@ -1,6 +1,6 @@
 """Admin endpoints for Observability — cost dashboard + pricing editor.
 
-Queries the gateway database (``llm_api``) via the secondary engine
+Queries the gateway database (``faden_gateway``) via the secondary engine
 set up in ``app.state.llm_graph_trace_session_factory``, using raw SQL
 to avoid coupling with the gateway's ORM models.
 """
@@ -16,10 +16,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.observability.pricing_service import PricingCRUDService
-from llm_port_backend.services.observability.service import ObservabilityService
-from llm_port_backend.web.api.admin.observability.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.observability.pricing_service import PricingCRUDService
+from faden_backend.services.observability.service import ObservabilityService
+from faden_backend.web.api.admin.observability.schema import (
     PaginatedRequestsDTO,
     PerformanceDTO,
     PricingCreateDTO,
@@ -31,7 +31,7 @@ from llm_port_backend.web.api.admin.observability.schema import (
     TimeseriesBucketDTO,
     ToolCallLogDTO,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ MAX_RANGE_DAYS = 90
 
 
 async def _get_gateway_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """Yield a session against the gateway (llm_api) database."""
+    """Yield a session against the gateway (faden_gateway) database."""
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
         raise HTTPException(status_code=503, detail="Gateway database not available")
@@ -407,8 +407,8 @@ async def pricing_history(
 
 
 _EE_DETAIL = {
-    "detail": "This feature requires LLM.port Enterprise Edition",
-    "upgrade_url": "https://llmport.com/pricing",
+    "detail": "This feature requires Fadenstack Enterprise Edition",
+    "upgrade_url": "https://fadenstack.com/pricing",
 }
 
 

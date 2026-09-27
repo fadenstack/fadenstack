@@ -1,7 +1,7 @@
 # Gateway Architecture (MVP)
 
 ## Purpose
-`llm_port_api` is a separate OpenAI-compatible gateway that routes `/v1/*` traffic to model providers.
+`faden_gateway` is a separate OpenAI-compatible gateway that routes `/v1/*` traffic to model providers.
 
 ## Public Endpoints
 - `GET /health`

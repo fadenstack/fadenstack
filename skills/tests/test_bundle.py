@@ -1,4 +1,4 @@
-"""SKILL.md, llmport.yaml and zipped skill folders."""
+"""SKILL.md, faden.yaml and zipped skill folders."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from llm_port_skills.services import bundle as fmt
+from faden_skills.services import bundle as fmt
 
 
 def test_a_spec_skill_reads_as_written() -> None:
@@ -30,7 +30,7 @@ def test_a_spec_skill_reads_as_written() -> None:
         "metadata": {"author": "example-org"},
     }
     # The spec's allowed-tools is another agent's permission list; read as
-    # llm.port's it would strip every MCP tool from the chat.
+    # fadenstack's it would strip every MCP tool from the chat.
     assert parsed.manifest == {}
 
 
@@ -48,7 +48,7 @@ def test_invalid_frontmatter_is_an_error_not_an_empty_one() -> None:
         fmt.from_markdown("---\nname: [unclosed\n---\nBody")
 
 
-def test_an_old_llm_port_document_moves_its_fields_where_they_belong() -> None:
+def test_an_old_faden_document_moves_its_fields_where_they_belong() -> None:
     parsed = fmt.from_markdown(
         "---\n"
         "name: Financial Analysis\n"

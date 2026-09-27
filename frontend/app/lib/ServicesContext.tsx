@@ -23,7 +23,7 @@ import {
 } from "~/api/services";
 
 // ── Cache ────────────────────────────────────────────────────────────
-const CACHE_KEY = "llm-port-services-v1";
+const CACHE_KEY = "faden-services-v1";
 const CACHE_TTL_MS = 60_000; // 1 minute
 
 interface CacheEntry {

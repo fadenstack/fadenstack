@@ -19,9 +19,9 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter, openai_chunk
-from llm_port_api.services.gateway.pii_restore import restore_sse
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway.llm_adapter import LLMAdapter, openai_chunk
+from faden_gateway.services.gateway.pii_restore import restore_sse
 from tests.test_gateway_knowledge_tools import CAN_CALL_TOOLS, _ask, _chunk
 from tests.test_gateway_pipeline_combined import _Observability, _seed
 

@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from test_tls import NAMES
 
-from llmport.core import backup, tls
+from faden_cli.core import backup, tls
 
 
 @pytest.fixture(autouse=True)

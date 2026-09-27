@@ -1,14 +1,14 @@
 """Find the vLLM this machine already runs (Phase 8.1).
 
 A new machine almost always has some: containers somebody started by hand, or
-that another tool manages. They are reported with the inventory so LLM.Port
+that another tool manages. They are reported with the inventory so Fadenstack
 can offer to take them over; the three machines this project runs on had
 eleven between them.
 
 Read-only: ``ps`` and ``inspect``, nothing else. Two things are never sent:
 environment variables (``HF_TOKEN`` and the like live there) and the value of
-any flag whose name says it is a secret. LLM.Port's own containers
-(``llm-port-*``) are skipped; they are already known.
+any flag whose name says it is a secret. Fadenstack's own containers
+(``faden-*``) are skipped; they are already known.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 #: At most this many containers are described per report.
 MAX_CONTAINERS = 50
 
-_OURS = "llm-port-"
+_OURS = "faden-"
 _SECRET_FLAG = re.compile(r"key|token|secret|password", re.IGNORECASE)
 _REDACTED = "***"
 
@@ -37,7 +37,7 @@ _BOOLEAN_FLAGS = frozenset({
     "async-scheduling", "enable-expert-parallel", "enable-sleep-mode", "headless",
 })
 
-#: vLLM's ``--task`` / ``--runner`` / ``--convert`` values, in LLM.Port's words.
+#: vLLM's ``--task`` / ``--runner`` / ``--convert`` values, in Fadenstack's words.
 _TASKS = {
     "generate": "chat",
     "embed": "embeddings",
@@ -236,7 +236,7 @@ def _gpus(host_config: dict[str, Any]) -> str | None:
 
 
 def describe(info: dict[str, Any]) -> dict[str, Any] | None:
-    """One container, as LLM.Port needs to know it, or ``None`` if it is not vLLM."""
+    """One container, as Fadenstack needs to know it, or ``None`` if it is not vLLM."""
     config = info.get("Config") or {}
     image = str(config.get("Image") or info.get("Image") or "")
     name = str(info.get("Name") or "").lstrip("/")
@@ -278,7 +278,7 @@ def describe(info: dict[str, Any]) -> dict[str, Any] | None:
 
 
 async def discover_vllm(runtime: Any) -> list[dict[str, Any]]:
-    """Every vLLM container on this machine that LLM.Port did not start."""
+    """Every vLLM container on this machine that Fadenstack did not start."""
     found: list[dict[str, Any]] = []
     try:
         rows = await runtime.ps(all_=True)

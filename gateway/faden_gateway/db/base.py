@@ -1,6 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase
 
-from llm_port_api.db.meta import meta
+from faden_gateway.db.meta import meta
 
 
 class Base(DeclarativeBase):

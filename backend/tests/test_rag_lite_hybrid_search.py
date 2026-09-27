@@ -20,10 +20,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.rag_lite_dao import RagLiteChunkDAO
-from llm_port_backend.db.models.rag_lite import RagLiteChunk, RagLiteCollection, RagLiteDocument
-from llm_port_backend.services.rag_lite.rerank import NONE, QWEN3, RerankClient, fuse, template_for
-from llm_port_backend.services.rag_lite.service import RagLiteService
+from faden_backend.db.dao.rag_lite_dao import RagLiteChunkDAO
+from faden_backend.db.models.rag_lite import RagLiteChunk, RagLiteCollection, RagLiteDocument
+from faden_backend.services.rag_lite.rerank import NONE, QWEN3, RerankClient, fuse, template_for
+from faden_backend.services.rag_lite.service import RagLiteService
 
 
 def _hit(chunk_id: str, text: str = "") -> dict[str, Any]:
@@ -276,8 +276,8 @@ async def test_a_reranker_without_a_shared_client_does_not_build_an_ssl_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A default httpx client loads the CA bundle: ~500 ms per search, on the event loop."""
-    from llm_port_backend.services.rag_lite import rerank as rerank_module
-    from llm_port_backend.services.tls import default_httpx_verify
+    from faden_backend.services.rag_lite import rerank as rerank_module
+    from faden_backend.services.tls import default_httpx_verify
 
     made: list[Any] = []
     real = httpx.AsyncClient
@@ -312,7 +312,7 @@ async def test_past_the_budget_only_the_rarest_words_find_candidates(
     dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """On 200,000 chunks, scoring every chunk with any word of the query took 1.9 s."""
-    from llm_port_backend.db.dao import rag_lite_dao
+    from faden_backend.db.dao import rag_lite_dao
 
     monkeypatch.setattr(rag_lite_dao, "_CANDIDATE_BUDGET", 2)
     collection = await _collection_of(dbsession, [

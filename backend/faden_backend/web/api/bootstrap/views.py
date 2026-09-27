@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
 
 log = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ async def bootstrap(
     await session.flush()
 
     # ── Assign the built-in admin role ────────────────────────
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
 
     rbac_dao = RbacDAO(session)
     admin_role = await rbac_dao.get_role_by_name("admin")
@@ -148,8 +148,8 @@ async def bootstrap(
 
         import jwt as pyjwt  # noqa: PLC0415
 
-        from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-        from llm_port_backend.settings import settings  # noqa: PLC0415
+        from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+        from faden_backend.settings import settings  # noqa: PLC0415
 
         # Resolve the JWT signing secret (same logic as the token endpoint).
         # Use the secret WITHOUT stripping — JWTStrategy uses it as-is.
@@ -157,7 +157,7 @@ async def bootstrap(
         if not secret and settings.settings_master_key:
             row = await session.execute(
                 text("SELECT ciphertext FROM system_setting_secret WHERE key = :k"),
-                {"k": "llm_port_backend.users_secret"},
+                {"k": "faden_backend.users_secret"},
             )
             ciphertext = row.scalar_one_or_none()
             if ciphertext:

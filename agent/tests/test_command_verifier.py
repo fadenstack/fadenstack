@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from llm_port_node_agent.command_verifier import (
+from faden_agent.command_verifier import (
     _canonical_payload,
     derive_signing_key,
     validate_command_age,

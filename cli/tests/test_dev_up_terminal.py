@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from llmport.commands.dev import dev_up
+from faden_cli.commands.dev import dev_up
 
 
 class _Recorder:
@@ -47,7 +47,7 @@ def test_every_service_lands_in_one_named_window(
     windows_with_wt: _Recorder, tmp_path: Path
 ) -> None:
     """Four services, four tabs, one window."""
-    for title in ("Backend", "Worker", "API Gateway", "Frontend"):
+    for title in ("Backend", "Worker", "Gateway", "Frontend"):
         assert dev_up._launch_terminal(title, tmp_path, "echo hi", headless=False)
 
     assert len(windows_with_wt.calls) == 4
@@ -58,7 +58,7 @@ def test_every_service_lands_in_one_named_window(
         assert argv[3] == "new-tab", argv
 
     titles = [argv[argv.index("--title") + 1] for argv in windows_with_wt.calls]
-    assert titles == ["Backend", "Worker", "API Gateway", "Frontend"]
+    assert titles == ["Backend", "Worker", "Gateway", "Frontend"]
 
 
 def test_the_window_is_named_not_most_recent(
@@ -76,7 +76,7 @@ def test_each_tab_still_starts_where_the_service_lives(
 ) -> None:
     """Sharing a window must not mean sharing a working directory."""
     backend, frontend = tmp_path / "backend", tmp_path / "frontend"
-    dev_up._launch_terminal("Backend", backend, "uv run -m llm_port_backend", headless=False)
+    dev_up._launch_terminal("Backend", backend, "uv run -m faden_backend", headless=False)
     dev_up._launch_terminal("Frontend", frontend, "npm run dev", headless=False)
 
     dirs = [

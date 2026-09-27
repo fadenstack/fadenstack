@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import uuid
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.services.gateway.pricing import PricingService
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.services.gateway.pricing import PricingService
 
 logger = logging.getLogger(__name__)
 

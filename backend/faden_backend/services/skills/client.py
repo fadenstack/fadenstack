@@ -20,15 +20,15 @@ import httpx
 from fastapi import HTTPException
 from starlette import status
 
-from llm_port_backend.services.tls import default_httpx_verify
-from llm_port_backend.settings import settings
+from faden_backend.services.tls import default_httpx_verify
+from faden_backend.settings import settings
 
 logger = logging.getLogger(__name__)
 
-HEADER_USER = "X-LLM-Port-User"
-HEADER_GROUPS = "X-LLM-Port-Groups"
-HEADER_CAPS = "X-LLM-Port-Caps"
-HEADER_TENANT = "X-LLM-Port-Tenant"
+HEADER_USER = "X-Faden-User"
+HEADER_GROUPS = "X-Faden-Groups"
+HEADER_CAPS = "X-Faden-Caps"
+HEADER_TENANT = "X-Faden-Tenant"
 
 
 @dataclass(frozen=True)

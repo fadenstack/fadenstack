@@ -1,12 +1,12 @@
 # When something fails
 
-What LLM.Port does when part of a cluster fails, what you see while it does
+What Fadenstack does when part of a cluster fails, what you see while it does
 it, and how long it takes. The walk-through that sets up the cluster used here
 is [Adding a machine and serving a model on it](onboarding-a-node.md).
 
 ---
 
-## How LLM.Port notices
+## How Fadenstack notices
 
 Every minute it looks at each cluster that is up and each model that is
 serving. It also looks when a machine reconnects and when a backend starts.
@@ -29,7 +29,7 @@ failed until someone changed something.
 
 ## What happens for each failure
 
-| What fails | What you see | What LLM.Port does |
+| What fails | What you see | What Fadenstack does |
 |---|---|---|
 | A model copy crashes | The model reads fewer copies, then all of them | Nothing: Ray Serve restarts the copy |
 | Ray stops on a worker | **Degraded**: "gpu-02 has dropped out of the cluster" | Takes the worker out and joins it again. Copies on the head keep serving |
@@ -37,17 +37,17 @@ failed until someone changed something.
 | The head machine reboots | The machine reads **Offline** (after 30 s), then as above once it is back | As above: the runtime comes back without Ray in it |
 | A worker's fabric link goes down | As for Ray stopping on a worker | As for Ray stopping on a worker, once the link is back |
 | The agent on a machine restarts | Nothing | Looks at the cluster, finds it healthy, restarts nothing |
-| The LLM.Port backend restarts | Nothing | Waits up to two minutes for the machines to reconnect, then looks. Nothing is restarted or re-applied |
+| The Fadenstack backend restarts | Nothing | Waits up to two minutes for the machines to reconnect, then looks. Nothing is restarted or re-applied |
 | The gateway restarts | Chat fails while it is down | Nothing needed: routes are stored, not held in memory |
 
 ### Measured on the DGX pair, 2026-09-23
 
 Every failure above was caused by hand on the two DGX Sparks while
-`llm_port_backend/scripts/resilience/faults.py watch` recorded what LLM.Port
+`backend/scripts/resilience/faults.py watch` recorded what Fadenstack
 showed and whether a real chat through the gateway got an answer. The model
 was Qwen2.5-0.5B-Instruct on two copies, one per machine.
 
-Times are from the first sign of trouble in LLM.Port.
+Times are from the first sign of trouble in Fadenstack.
 
 | Failure | First sign | Cluster ready again | Model on both copies again | Chat failed for |
 |---|---|---|---|---|
@@ -101,12 +101,12 @@ against it.
 After three attempts, the second 30 s after the first and the third 60 s
 after that, the cluster reads **Failed**:
 
-> Ray on gpu-01, the cluster's head, is not running. LLM.Port restarted it
+> Ray on gpu-01, the cluster's head, is not running. Fadenstack restarted it
 > 3 times and it did not come back (last: …). It tries again every 15
 > minutes; use Try again once the cause is fixed.
 
 It keeps trying every 15 minutes because the cause may be fixed without
-anyone telling LLM.Port, for example a network link that comes back.
+anyone telling Fadenstack, for example a network link that comes back.
 **Try again** on the cluster page starts over at once.
 
 ### What it does not restart on
@@ -137,4 +137,4 @@ Two changes stop this:
 
 | Setting | Default | What it does |
 |---|---|---|
-| `LLM_PORT_BACKEND_INFERENCE_HEALTH_CHECK_SEC` | `60` | How often clusters and models that are up are looked at. `0` turns the checks off |
+| `FADEN_BACKEND_INFERENCE_HEALTH_CHECK_SEC` | `60` | How often clusters and models that are up are looked at. `0` turns the checks off |

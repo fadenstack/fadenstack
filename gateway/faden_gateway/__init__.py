@@ -1,4 +1,4 @@
-"""llm_port_api package.
+"""faden_gateway package.
 
 Lightweight gateway proxy for LLM inference requests.
 Intelligent request routing with rate-limiting support.

@@ -23,15 +23,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from llm_port_node_agent.dispatcher import CommandDispatcher
-from llm_port_node_agent.event_buffer import EventBuffer
-from llm_port_node_agent.policy_guard import PolicyGuard
-from llm_port_node_agent.runtime_manager import RuntimeManagerError
-from llm_port_node_agent.state_store import StateStore
-from llm_port_node_agent.ray import errors
-from llm_port_node_agent.ray.manager import RayManager
-from llm_port_node_agent.ray.runtime import RayRuntime
-from llm_port_node_agent.ray.schemas import (
+from faden_agent.dispatcher import CommandDispatcher
+from faden_agent.event_buffer import EventBuffer
+from faden_agent.policy_guard import PolicyGuard
+from faden_agent.runtime_manager import RuntimeManagerError
+from faden_agent.state_store import StateStore
+from faden_agent.ray import errors
+from faden_agent.ray.manager import RayManager
+from faden_agent.ray.runtime import RayRuntime
+from faden_agent.ray.schemas import (
     EnsureRayRuntimePayload,
     JoinRayClusterPayload,
     StartRayHeadPayload,
@@ -150,7 +150,7 @@ async def test_dispatcher_ray_error_is_normalized_not_double_wrapped(state: Stat
     success=False / error_code='runtime_error' — not as success=True."""
     ray = RayManager(
         state_store=state, events=EventBuffer(),
-        ray_base_path="/opt/llm-port/ray", token_dir=Path("/tmp/llm-port-ray-test-tok"),
+        ray_base_path="/opt/faden/ray", token_dir=Path("/tmp/faden-ray-test-tok"),
     )
 
     async def _boom(*_a: Any, **_kw: Any) -> dict:
@@ -233,7 +233,7 @@ async def test_write_token_requires_node_credential(state: StateStore, tmp_path:
     state.state.credential = None
     manager = RayManager(
         state_store=state, events=EventBuffer(),
-        ray_base_path="/opt/llm-port/ray", token_dir=tmp_path / "tok",
+        ray_base_path="/opt/faden/ray", token_dir=tmp_path / "tok",
     )
     manager._http = MagicMock()
     with pytest.raises(RuntimeError, match="credential"):
@@ -432,7 +432,7 @@ def test_rayruntime_missing_binary_falls_back_to_managed_marker(tmp_path: Path, 
     the requested version is returned as a not-found marker."""
     rt = RayRuntime(ray_base_path=str(tmp_path / "ray-none"))
     monkeypatch.setattr("shutil.which", lambda _name: None)
-    monkeypatch.setattr("llm_port_node_agent.ray.runtime._venv_ray_binaries", lambda: [])
+    monkeypatch.setattr("faden_agent.ray.runtime._venv_ray_binaries", lambda: [])
     result = rt.ray_binary_path("2.58.0")
     assert result == tmp_path / "ray-none" / "2.58.0" / "bin" / "ray"
     assert not result.exists()
@@ -446,7 +446,7 @@ def test_rayruntime_missing_binary_falls_back_to_managed_marker(tmp_path: Path, 
 @pytest.mark.asyncio()
 async def test_stop_is_best_effort_never_raises() -> None:
     """A failing `ray stop` is reported, never raised (idempotency rule)."""
-    rt = RayRuntime(ray_base_path="/opt/llm-port/ray")
+    rt = RayRuntime(ray_base_path="/opt/faden/ray")
     rt._exec = AsyncMock(side_effect=errors.RayRuntimeError("stop failed (exit 1): something"))
     result = await rt.stop(version="2.58.0", force=True)
     assert result == {"stopped": False, "best_effort": True, "detail": "stop failed (exit 1): something"}
@@ -454,7 +454,7 @@ async def test_stop_is_best_effort_never_raises() -> None:
 
 @pytest.mark.asyncio()
 async def test_stop_success_path() -> None:
-    rt = RayRuntime(ray_base_path="/opt/llm-port/ray")
+    rt = RayRuntime(ray_base_path="/opt/faden/ray")
     rt._exec = AsyncMock(return_value=MagicMock(returncode=0, stdout=b"", stderr=b""))
     result = await rt.stop(version="2.58.0")
     assert result == {"stopped": True}
@@ -480,7 +480,7 @@ def test_run_app_places_proxy_before_non_blocking_deploy(monkeypatch: pytest.Mon
     import sys
     import types
 
-    from llm_port_node_agent.ray.serve import RayServeManager
+    from faden_agent.ray.serve import RayServeManager
 
     fake_llm = types.ModuleType("ray.serve.llm")
     fake_llm.build_openai_app = lambda args: ("app", args)  # type: ignore[attr-defined]
@@ -495,7 +495,7 @@ def test_run_app_places_proxy_before_non_blocking_deploy(monkeypatch: pytest.Mon
     monkeypatch.setattr(manager, "_serve_module", lambda: serve)
 
     result = manager.run_app(
-        "llmport-x",
+        "faden-x",
         {"llm_configs": []},
         proxy_location="HeadOnly",
         http_options={"host": "10.0.0.1", "port": 8000},
@@ -507,10 +507,10 @@ def test_run_app_places_proxy_before_non_blocking_deploy(monkeypatch: pytest.Mon
     )
     targets, kwargs = calls[1][1]
     assert calls[1][0] == "run_many"
-    assert targets[0]["name"] == "llmport-x"
-    assert targets[0]["route_prefix"] == "/llmport-x"
+    assert targets[0]["name"] == "faden-x"
+    assert targets[0]["route_prefix"] == "/faden-x"
     assert kwargs == {"wait_for_applications_running": False}
-    assert result == {"app": "llmport-x", "deployed": True}
+    assert result == {"app": "faden-x", "deployed": True}
 
 
 @pytest.mark.asyncio()
@@ -519,7 +519,7 @@ async def test_ensure_runtime_reports_llm_stack_without_importing_it(
 ) -> None:
     """ENSURE reads distribution metadata instead of importing vLLM/torch into
     the agent process (seconds per call, blocking the command loop)."""
-    from llm_port_node_agent.ray import manager as manager_mod
+    from faden_agent.ray import manager as manager_mod
 
     versions = {"vllm": "0.26.0", "torch": "2.11.0", "pyarrow": "25.0.1"}
     monkeypatch.setattr(manager_mod, "_dist_version", versions.get)

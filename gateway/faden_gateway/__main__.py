@@ -6,7 +6,7 @@ from typing import Any
 
 import uvicorn
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 
 def _reset_multiproc_dir(directory: Path) -> None:
@@ -131,7 +131,7 @@ def main() -> None:
     # second process on settings.port without TLS.
     port = settings.tls_edge_https_port if ssl_kwargs else settings.port
     uvicorn.run(
-        "llm_port_api.web.application:get_app",
+        "faden_gateway.web.application:get_app",
         workers=settings.workers_count,
         host=settings.host,
         port=port,

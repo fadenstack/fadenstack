@@ -7,7 +7,7 @@ import logging
 import threading
 import uuid
 
-from llm_port_backend.tkq import broker
+from faden_backend.tkq import broker
 
 log = logging.getLogger(__name__)
 
@@ -62,8 +62,8 @@ def files_to_fetch(names: list[str]) -> list[str]:
 
 
 async def _resolve_hf_token() -> str | None:
-    """The token this server uses: the stored one, else ``LLM_PORT_BACKEND_HF_TOKEN``, else anonymous."""
-    from llm_port_backend.services.llm import hf_token  # noqa: PLC0415
+    """The token this server uses: the stored one, else ``FADEN_BACKEND_HF_TOKEN``, else anonymous."""
+    from faden_backend.services.llm import hf_token  # noqa: PLC0415
 
     app = broker.state.fastapi_app
     session = app.state.db_session_factory()
@@ -195,8 +195,8 @@ async def download_model_task(
     The HF token is resolved at runtime from the encrypted system settings
     (or env-var fallback) -- it is never transmitted over RabbitMQ.
     """
-    from llm_port_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.llm import ModelStatus  # noqa: PLC0415
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
+    from faden_backend.db.models.llm import ModelStatus  # noqa: PLC0415
 
     _model_id = uuid.UUID(model_id)
     _job_id = uuid.UUID(job_id)
@@ -247,9 +247,9 @@ async def _do_download(
     hf_token: str | None,
 ) -> dict:
     """Inner download logic — any exception propagates to caller."""
-    from llm_port_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.llm import DownloadJobStatus, ModelStatus  # noqa: PLC0415
-    from llm_port_backend.services.llm.scanner import scan_model_directory  # noqa: PLC0415
+    from faden_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO  # noqa: PLC0415
+    from faden_backend.db.models.llm import DownloadJobStatus, ModelStatus  # noqa: PLC0415
+    from faden_backend.services.llm.scanner import scan_model_directory  # noqa: PLC0415
 
     model_dao = ModelDAO(session)  # type: ignore[arg-type]
     job_dao = DownloadJobDAO(session)  # type: ignore[arg-type]

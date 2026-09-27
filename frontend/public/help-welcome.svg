@@ -6,7 +6,7 @@
     </linearGradient>
   </defs>
   <rect width="1200" height="600" fill="url(#bg)"/>
-  <text x="600" y="260" fill="#e2e8f0" font-size="56" font-family="Segoe UI, Arial, sans-serif" text-anchor="middle" font-weight="600">Welcome to llm.port</text>
+  <text x="600" y="260" fill="#e2e8f0" font-size="56" font-family="Segoe UI, Arial, sans-serif" text-anchor="middle" font-weight="600">Welcome to fadenstack</text>
   <text x="600" y="310" fill="#a5b4fc" font-size="24" font-family="Segoe UI, Arial, sans-serif" text-anchor="middle">Your self-hosted AI platform</text>
   <text x="600" y="380" fill="#64748b" font-size="18" font-family="Segoe UI, Arial, sans-serif" text-anchor="middle">Replace with generated image</text>
 </svg>

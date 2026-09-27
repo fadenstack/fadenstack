@@ -70,7 +70,7 @@ export const DRAWER_WIDTH_OPEN = 240;
 export const DRAWER_WIDTH_CLOSED = 64;
 
 // ── Auth caching ─────────────────────────────────────────────────
-export const ACCESS_CACHE_KEY = "llm-port-admin-access-v1";
+export const ACCESS_CACHE_KEY = "faden-admin-access-v1";
 export const ACCESS_CACHE_TTL_MS = 5 * 60_000;
 
 export interface AccessCacheEntry {

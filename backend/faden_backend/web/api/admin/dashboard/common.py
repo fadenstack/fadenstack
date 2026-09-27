@@ -6,9 +6,9 @@ from datetime import datetime
 
 from fastapi import HTTPException, Request
 
-from llm_port_backend.services.dashboard import timewindows as tw
-from llm_port_backend.services.dashboard.cache import get_fact_cache
-from llm_port_backend.services.dashboard.facts import Facts, floored_now
+from faden_backend.services.dashboard import timewindows as tw
+from faden_backend.services.dashboard.cache import get_fact_cache
+from faden_backend.services.dashboard.facts import Facts, floored_now
 
 
 def dashboard_now() -> datetime:

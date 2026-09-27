@@ -19,9 +19,9 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.runtime_manager import RuntimeManager
+from faden_agent.runtime_manager import RuntimeManager
 
-APP = "llmport-b64e389b-58ae-4b1d-a754-1f9f48e22220"
+APP = "faden-b64e389b-58ae-4b1d-a754-1f9f48e22220"
 SERVE_DIR = "/tmp/ray/session_latest/logs/serve"
 
 REPLICA_OUTPUT = (
@@ -90,12 +90,12 @@ async def _read(manager: RuntimeManager, **overrides: Any) -> dict[str, Any]:
     payload = {
         "runtime_id": "b64e389b-58ae-4b1d-a754-1f9f48e22220",
         "runtime_name": APP,
-        "container_name": "llm-port-ray-runtime",
+        "container_name": "faden-ray-runtime",
         "tail": 50,
     }
     payload.update(overrides)
     manager._require_runtime_id = lambda p: p["runtime_id"]  # noqa: SLF001
-    manager._lookup_container = lambda *_a, **_k: "llm-port-ray-runtime"  # noqa: SLF001
+    manager._lookup_container = lambda *_a, **_k: "faden-ray-runtime"  # noqa: SLF001
     return await manager.fetch_container_logs(payload)
 
 

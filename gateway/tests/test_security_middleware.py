@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from llm_port_api.web.middleware.security import (
+from faden_gateway.web.middleware.security import (
     HTTPSRedirectMiddleware,
     SecurityHeadersMiddleware,
 )

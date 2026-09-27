@@ -9,11 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.user_preferences import UserPreference
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.dashboard.layout import PREFERENCES_KEY as DASHBOARD_PREFERENCES_KEY
-from llm_port_backend.web.api.admin.users.schema import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.user_preferences import UserPreference
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.dashboard.layout import PREFERENCES_KEY as DASHBOARD_PREFERENCES_KEY
+from faden_backend.web.api.admin.users.schema import (
     UserPreferencesRead,
     UserPreferencesUpdate,
 )

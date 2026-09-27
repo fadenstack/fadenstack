@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select, text
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EnvironmentDesiredState,
@@ -30,7 +30,7 @@ from llm_port_backend.db.models.inference import (
     InferenceDeployment,
     InferenceEnvironment,
 )
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     DownloadJob,
     DownloadJobStatus,
     LLMProvider,
@@ -38,11 +38,11 @@ from llm_port_backend.db.models.llm import (
     ProviderTarget,
     RuntimeStatus,
 )
-from llm_port_backend.db.models.node_control import InfraNodeJoinRequest, JoinRequestStatus
-from llm_port_backend.settings import settings
+from faden_backend.db.models.node_control import InfraNodeJoinRequest, JoinRequestStatus
+from faden_backend.settings import settings
 
 if TYPE_CHECKING:
-    from llm_port_backend.services.dashboard.facts import Facts
+    from faden_backend.services.dashboard.facts import Facts
 
 log = logging.getLogger(__name__)
 
@@ -355,7 +355,7 @@ async def rag_jobs(facts: Facts) -> list[Item]:
     """RAG Lite ingestion jobs that failed in the last day."""
     if not settings.rag_lite_enabled:
         return []
-    from llm_port_backend.db.models.rag_lite import RagLiteIngestJob, RagLiteJobStatus  # noqa: PLC0415
+    from faden_backend.db.models.rag_lite import RagLiteIngestJob, RagLiteJobStatus  # noqa: PLC0415
 
     async def query(session: Any) -> list[Item]:
         count, latest = (
@@ -405,7 +405,7 @@ async def mcp_servers(facts: Facts) -> list[Item]:
 
 
 #: Warned about this long before a certificate runs out; less when it renews by itself
-#: (llmport tls renew runs daily and acts 30 days before), which only a failing renewal reaches.
+#: (faden tls renew runs daily and acts 30 days before), which only a failing renewal reaches.
 CERT_WARNING_DAYS = 30
 CERT_WARNING_DAYS_RENEWING = 21
 CERT_CRITICAL_DAYS = 7
@@ -413,7 +413,7 @@ CERT_CRITICAL_DAYS = 7
 
 async def edge_certificate(facts: Facts) -> list[Item]:
     """The certificate HTTPS is served with: close to its end, or past it."""
-    from llm_port_backend.services import edge_trust  # noqa: PLC0415
+    from faden_backend.services import edge_trust  # noqa: PLC0415
 
     until = edge_trust.served_until()
     if until is None:
@@ -439,9 +439,9 @@ async def model_traffic(facts: Facts) -> list[Item]:
     """Models reached over plain HTTP where TLS is possible, and model-TLS certificates not renewing."""
 
     async def query(session: Any) -> list[Item]:
-        from llm_port_backend.db.models.inference import InferenceEndpoint  # noqa: PLC0415
-        from llm_port_backend.db.models.machine_tls import MachineCertificate, MachineTlsClient  # noqa: PLC0415
-        from llm_port_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+        from faden_backend.db.models.inference import InferenceEndpoint  # noqa: PLC0415
+        from faden_backend.db.models.machine_tls import MachineCertificate, MachineTlsClient  # noqa: PLC0415
+        from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
         items: list[Item] = []
         if not settings.machine_tls_enabled:

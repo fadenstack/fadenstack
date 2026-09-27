@@ -176,7 +176,7 @@ describe("clusterReadiness while a cluster comes up and when it cannot", () => {
       ...environment,
       status: "preparing",
       progress: {
-        message: "Receiving llmport/ray-vllm-gb10: 4.0 GiB of 12.0 GiB (33%) at 21.0 MiB/s",
+        message: "Receiving faden/ray-vllm-gb10: 4.0 GiB of 12.0 GiB (33%) at 21.0 MiB/s",
         progress_pct: 33,
         step: "ensure_runtime_image",
         node_id: "n1",

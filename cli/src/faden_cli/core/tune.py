@@ -1,6 +1,6 @@
 """Size the services for this host and write it to ``.env``.
 
-The one place that does it: ``llmport tune`` calls it, and so do ``deploy``,
+The one place that does it: ``faden tune`` calls it, and so do ``deploy``,
 ``upgrade`` and ``up --gen-env``. Deploy had its own copy -- the sizing baked
 into a newly generated ``.env`` -- so an existing install was never sized
 again, and a fix to the sizing reached no one who had deployed already.
@@ -12,9 +12,9 @@ from pathlib import Path
 
 from rich.table import Table
 
-from llmport.core.console import console, success
-from llmport.core.env_gen import read_env_file, write_env_file
-from llmport.core.sysinfo import (
+from faden_cli.core.console import console, success
+from faden_cli.core.env_gen import read_env_file, write_env_file
+from faden_cli.core.sysinfo import (
     ALL_SERVICES,
     DB_SERVICES,
     DEFAULT_RESOURCE_PCT,
@@ -24,20 +24,20 @@ from llmport.core.sysinfo import (
     detect_system,
 )
 
-#: The CPU share ``llmport tune --resource-pct`` accepts.
+#: The CPU share ``faden tune --resource-pct`` accepts.
 _PCT_MIN, _PCT_MAX = 0.1, 1.0
 
 
 def _profile_of(env: dict[str, str]) -> str:
     """The profile the install was tuned with, else the one its services run in."""
-    if env.get("LLMPORT_TUNE_PROFILE") in {"dev", "prod"}:
-        return env["LLMPORT_TUNE_PROFILE"]
-    return "dev" if env.get("LLM_PORT_BACKEND_ENVIRONMENT") == "dev" else "prod"
+    if env.get("FADEN_TUNE_PROFILE") in {"dev", "prod"}:
+        return env["FADEN_TUNE_PROFILE"]
+    return "dev" if env.get("FADEN_BACKEND_ENVIRONMENT") == "dev" else "prod"
 
 
 def _resource_pct_of(env: dict[str, str]) -> float:
     try:
-        pct = float(env.get("LLMPORT_TUNE_RESOURCE_PCT") or DEFAULT_RESOURCE_PCT)
+        pct = float(env.get("FADEN_TUNE_RESOURCE_PCT") or DEFAULT_RESOURCE_PCT)
     except ValueError:
         return DEFAULT_RESOURCE_PCT
     return pct if _PCT_MIN <= pct <= _PCT_MAX else DEFAULT_RESOURCE_PCT
@@ -53,7 +53,7 @@ def tune_env(
     """Size the services for this host, show it, and write it to *env_path*.
 
     *profile* and *resource_pct* default to what the install was last tuned
-    with, so deploy and upgrade keep what ``llmport tune`` chose. The rest of
+    with, so deploy and upgrade keep what ``faden tune`` chose. The rest of
     the file -- secrets included -- is kept.
     """
     env = read_env_file(env_path)

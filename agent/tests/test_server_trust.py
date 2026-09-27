@@ -2,7 +2,7 @@
 
 Against real sockets: an HTTPS server with a certificate from an authority no
 system trusts, and a plain-HTTP one that redirects to it, the way nginx does
-once ``llmport tls generate`` has run.
+once ``faden tls generate`` has run.
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from llm_port_node_agent import server_trust
-from llm_port_node_agent.config import AgentConfig
-from llm_port_node_agent.server_trust import ServerTrust, https_target
+from faden_agent import server_trust
+from faden_agent.config import AgentConfig
+from faden_agent.server_trust import ServerTrust, https_target
 
 
 def _authority(tmp: Path) -> tuple[str, Path, Path]:
@@ -104,13 +104,13 @@ def _redirect_to(port: int) -> Callable[[str], bytes]:
 
 
 def _config(tmp: Path, backend_url: str, monkeypatch: pytest.MonkeyPatch) -> AgentConfig:
-    monkeypatch.setenv("LLM_PORT_NODE_AGENT_BACKEND_URL", backend_url)
-    monkeypatch.setenv("LLM_PORT_NODE_AGENT_STATE_PATH", str(tmp / "state" / "state.json"))
-    monkeypatch.setenv("LLM_PORT_NODE_AGENT_REQUEST_TIMEOUT_SEC", "5")
+    monkeypatch.setenv("FADEN_NODE_AGENT_BACKEND_URL", backend_url)
+    monkeypatch.setenv("FADEN_NODE_AGENT_STATE_PATH", str(tmp / "state" / "state.json"))
+    monkeypatch.setenv("FADEN_NODE_AGENT_REQUEST_TIMEOUT_SEC", "5")
     # Other tests leave agent settings in the process environment.
-    monkeypatch.setenv("LLM_PORT_NODE_AGENT_VERIFY_TLS", "true")
+    monkeypatch.setenv("FADEN_NODE_AGENT_VERIFY_TLS", "true")
     for name in ("TLS_CA_BUNDLE", "TLS_CLIENT_CERT", "TLS_CLIENT_KEY"):
-        monkeypatch.delenv(f"LLM_PORT_NODE_AGENT_{name}", raising=False)
+        monkeypatch.delenv(f"FADEN_NODE_AGENT_{name}", raising=False)
     return AgentConfig.from_env()
 
 

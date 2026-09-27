@@ -2,7 +2,7 @@
 
 The service is JSONB, row locks and SQL visibility rules; a fake database
 would test none of them. The database is ``llm_skills_test`` (pytest-env in
-pyproject); the connection comes from the usual ``LLM_PORT_SKILLS_DB_*``
+pyproject); the connection comes from the usual ``FADEN_SKILLS_DB_*``
 variables or ``.env``.
 """
 
@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-from llm_port_skills.settings import settings
+from faden_skills.settings import settings
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_TOKEN = "test-service-token"
@@ -56,7 +56,7 @@ async def drop_database(name: str) -> None:
 def alembic_config() -> Config:
     """The service's Alembic configuration, wherever pytest runs from."""
     cfg = Config(str(ROOT / "alembic.ini"))
-    cfg.set_main_option("script_location", str(ROOT / "llm_port_skills/db/migrations"))
+    cfg.set_main_option("script_location", str(ROOT / "faden_skills/db/migrations"))
     return cfg
 
 
@@ -73,7 +73,7 @@ def _database() -> Iterator[None]:
 async def _clean() -> AsyncIterator[None]:
     """Each test starts with no skills; the pool is closed with its loop."""
     yield
-    from llm_port_skills.db.session import engine  # noqa: PLC0415
+    from faden_skills.db.session import engine  # noqa: PLC0415
 
     async with engine.begin() as conn:
         await conn.execute(
@@ -88,7 +88,7 @@ async def _clean() -> AsyncIterator[None]:
 @pytest.fixture
 def app() -> FastAPI:
     """The application."""
-    from llm_port_skills.web.application import get_app  # noqa: PLC0415
+    from faden_skills.web.application import get_app  # noqa: PLC0415
 
     return get_app()
 
@@ -115,12 +115,12 @@ def as_user(
 ) -> dict[str, str]:
     """The headers the backend sends for *user_id*."""
     headers = {
-        "X-LLM-Port-User": user_id,
-        "X-LLM-Port-Groups": ",".join(groups),
-        "X-LLM-Port-Caps": ",".join(caps),
+        "X-Faden-User": user_id,
+        "X-Faden-Groups": ",".join(groups),
+        "X-Faden-Caps": ",".join(caps),
     }
     if tenant:
-        headers["X-LLM-Port-Tenant"] = tenant
+        headers["X-Faden-Tenant"] = tenant
     return headers
 
 

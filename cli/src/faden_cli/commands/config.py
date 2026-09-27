@@ -1,4 +1,4 @@
-"""``llmport config`` — view and manage configuration."""
+"""``faden config`` — view and manage configuration."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ import yaml
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from llmport.core.console import console, success, error
-from llmport.core.settings import load_config, save_config, config_path
+from faden_cli.core.console import console, success, error
+from faden_cli.core.settings import load_config, save_config, config_path
 
 
 @click.group("config")
 def config_group() -> None:
-    """Manage llmport configuration."""
+    """Manage faden configuration."""
 
 
 @config_group.command("show")
@@ -51,9 +51,9 @@ def config_set(key: str, value: str) -> None:
 
     Examples:
 
-        llmport config set install_dir /opt/llmport
+        faden config set install_dir /opt/faden
 
-        llmport config set dev.branch main
+        faden config set dev.branch main
     """
     cfg = load_config()
     import dataclasses
@@ -90,11 +90,11 @@ def config_set(key: str, value: str) -> None:
     target[final_key] = value_typed
 
     # Rebuild config
-    from llmport.core.settings import LlmportConfig, DevConfig
+    from faden_cli.core.settings import FadenConfig, DevConfig
 
     dev_data = cfg_dict.pop("dev", {}) or {}
     dev_cfg = DevConfig(**{k: v for k, v in dev_data.items() if k in DevConfig.__dataclass_fields__})
-    new_cfg = LlmportConfig(**cfg_dict, dev=dev_cfg)
+    new_cfg = FadenConfig(**cfg_dict, dev=dev_cfg)
 
     save_config(new_cfg)
     success(f"Set {key} = {value_typed}")

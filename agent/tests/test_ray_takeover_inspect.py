@@ -19,10 +19,10 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray import inspect
-from llm_port_node_agent.ray.container import DEFAULT_CONTAINER_NAME, RayContainerRuntime
+from faden_agent.ray import inspect
+from faden_agent.ray.container import DEFAULT_CONTAINER_NAME, RayContainerRuntime
 
-APP = "llmport-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"
+APP = "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"
 LLM_CONFIG = {
     "model_loading_config": {"model_id": "Qwen2.5-0.5B-Instruct",
                              "model_source": "/root/.cache/huggingface/models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae5"},
@@ -119,7 +119,7 @@ def test_the_script_reads_members_and_each_apps_configuration(fake_ray: Path) ->
     assert ours["llm_configs"][0]["engine_kwargs"]["tool_call_parser"] == "hermes"
     assert len(ours["llm_configs"]) == 1, "the ingress's handles are not taken for configurations"
     other = next(a for a in doc["apps"] if a["name"] == "someone-elses-app")
-    assert other["llm_configs"] == [], "an app LLM.Port did not deploy is listed, not read"
+    assert other["llm_configs"] == [], "an app Fadenstack did not deploy is listed, not read"
 
 
 def test_a_candidate_that_compiles_to_what_runs_is_equal(fake_ray: Path) -> None:
@@ -157,7 +157,7 @@ class _Runtime:
         return True
 
     async def inspect(self, name: str, **_: Any) -> dict[str, Any]:
-        return {"State": {"Running": self.running, "StartedAt": "t"}, "Config": {"Image": "llmport/ray:2.58"},
+        return {"State": {"Running": self.running, "StartedAt": "t"}, "Config": {"Image": "faden/ray:2.58"},
                 "Image": "sha256:abc"}
 
     async def exec_(self, name: str, command: list[str], *, stdin: str | None = None, **_: Any) -> tuple[int, str, str]:
@@ -167,9 +167,9 @@ class _Runtime:
 
 
 def _manager(tmp_path: Path, runtime: _Runtime) -> Any:
-    from llm_port_node_agent.event_buffer import EventBuffer
-    from llm_port_node_agent.ray.manager import RayManager
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.event_buffer import EventBuffer
+    from faden_agent.ray.manager import RayManager
+    from faden_agent.state_store import StateStore
 
     manager = RayManager(state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
                          ray_base_path=str(tmp_path / "ray-base"), token_dir=tmp_path / "ray-tokens")
@@ -232,10 +232,10 @@ async def test_the_token_goes_back_on_the_reply_and_nowhere_else(tmp_path: Path)
     """Not into the agent's replay cache on disk, not into the events the backend stores."""
     from unittest.mock import AsyncMock, MagicMock
 
-    from llm_port_node_agent.dispatcher import CommandDispatcher
-    from llm_port_node_agent.event_buffer import EventBuffer
-    from llm_port_node_agent.policy_guard import PolicyGuard
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.dispatcher import CommandDispatcher
+    from faden_agent.event_buffer import EventBuffer
+    from faden_agent.policy_guard import PolicyGuard
+    from faden_agent.state_store import StateStore
 
     manager = _manager(tmp_path, _Runtime(_DOC))
     state = StateStore(tmp_path / "agent-state.json")

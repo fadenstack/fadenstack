@@ -5,8 +5,8 @@ from alembic import context
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlalchemy.future import Connection
 
-from llm_port_mcp.db.models.mcp import Base
-from llm_port_mcp.settings import settings
+from faden_mcp.db.models.mcp import Base
+from faden_mcp.settings import settings
 
 config = context.config
 

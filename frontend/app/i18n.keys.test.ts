@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 
 // Vitest runs from the frontend's root (jsdom gives no file URL to resolve from).
 const APP = resolve("app");
-const I18N = resolve("../llm_port_backend/i18n");
+const I18N = resolve("../backend/i18n");
 const NAMESPACES = ["common", "chat", "tour"] as const;
 const LANGUAGES = ["de", "es", "fr", "zh"] as const;
 

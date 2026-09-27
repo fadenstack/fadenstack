@@ -7,11 +7,11 @@ import os
 import uuid
 from typing import Any
 
-from llm_port_api.db.dao.session_dao import SessionDAO
-from llm_port_api.db.models.gateway import AttachmentScope, ExtractionStatus
-from llm_port_api.services.gateway.docling_client import ChatDoclingClient
-from llm_port_api.services.gateway.file_store import FileStore
-from llm_port_api.settings import settings
+from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import AttachmentScope, ExtractionStatus
+from faden_gateway.services.gateway.docling_client import ChatDoclingClient
+from faden_gateway.services.gateway.file_store import FileStore
+from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 

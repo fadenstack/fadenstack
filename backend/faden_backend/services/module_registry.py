@@ -8,7 +8,7 @@ Two module types are supported:
 
 * **container** – managed via Docker Compose profiles.  Status is
   determined by inspecting container state and probing a health URL.
-* **plugin** – loaded in-process (e.g. from ``llm_port_ee``).  Status
+* **plugin** – loaded in-process (e.g. from ``faden_ee``).  Status
   is determined by calling ``is_available_fn`` and ``health_fn``.
 """
 
@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal
 
 if TYPE_CHECKING:
-    from llm_port_backend.services.system_settings import SystemSettingsService
+    from faden_backend.services.system_settings import SystemSettingsService
 
 logger = logging.getLogger(__name__)
 

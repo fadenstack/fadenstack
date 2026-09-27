@@ -4,7 +4,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any
 
-from llm_port_api.db.models.gateway import PrivacyMode
+from faden_gateway.db.models.gateway import PrivacyMode
 
 try:  # pragma: no cover - import guard for optional runtime integration.
     from langfuse import Langfuse

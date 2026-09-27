@@ -13,7 +13,7 @@ from sqlalchemy import DateTime, Float, Integer, String, Boolean, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from llm_port_pii.db.base import Base
+from faden_pii.db.base import Base
 
 
 class PIIScanEvent(Base):

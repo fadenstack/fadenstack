@@ -1,11 +1,11 @@
-"""``llmport dev doctor`` — check and optionally install prerequisites."""
+"""``faden dev doctor`` — check and optionally install prerequisites."""
 
 from __future__ import annotations
 
 import click
 
-from llmport.core.console import console, success, warning
-from llmport.core.install import ensure_prerequisites
+from faden_cli.core.console import console, success, warning
+from faden_cli.core.install import ensure_prerequisites
 
 from .dev_group import dev_group
 
@@ -29,9 +29,9 @@ def dev_doctor(*, install: bool, yes: bool) -> None:
 
     \b
     Examples:
-        llmport dev doctor
-        llmport dev doctor --install
-        llmport dev doctor --install -y
+        faden dev doctor
+        faden dev doctor --install
+        faden dev doctor --install -y
     """
     console.print("\n[bold cyan]Checking prerequisites…[/bold cyan]")
     all_ok = ensure_prerequisites(install=install, auto_confirm=yes)
@@ -41,6 +41,6 @@ def dev_doctor(*, install: bool, yes: bool) -> None:
     else:
         warning(
             "\nSome prerequisites are missing. "
-            "Run [bold]llmport dev doctor --install[/bold] to install them."
+            "Run [bold]faden dev doctor --install[/bold] to install them."
         )
         raise SystemExit(1)

@@ -577,11 +577,11 @@
       },
       "tls_certificate_expiring": {
         "title": "HTTPS certificate runs out in {{days}} days",
-        "detail": "On {{until}}. llmport tls status says how it is renewed."
+        "detail": "On {{until}}. faden tls status says how it is renewed."
       },
       "tls_certificate_expired": {
         "title": "HTTPS certificate ran out on {{until}}",
-        "detail": "Browsers and machines refuse the console. Renew it: llmport tls renew, or llmport tls use CERT KEY."
+        "detail": "Browsers and machines refuse the console. Renew it: faden tls renew, or faden tls use CERT KEY."
       },
       "model_traffic_unencrypted": {
         "title": "Model traffic to {{cluster}} is not encrypted",
@@ -730,8 +730,8 @@
     "confirm_title": "Replace {{name}}?",
     "confirm_body": "Docker cannot change these settings in a container that exists, so a new container is made with them, and the old one is removed once the new one runs. The container gets a new ID, and files it wrote outside its volumes are lost. If the new one cannot be made or started, the old one is put back as it was.",
     "confirm_replace": "Replace",
-    "compose_note": "Fadenstack runs this container from its compose file: the next llmport deploy or upgrade makes it again from the compose file and .env, without these changes.",
-    "backend_note": "The backend runs in this container and cannot replace it. Change its settings in .env and run llmport upgrade.",
+    "compose_note": "Fadenstack runs this container from its compose file: the next faden deploy or upgrade makes it again from the compose file and .env, without these changes.",
+    "backend_note": "The backend runs in this container and cannot replace it. Change its settings in .env and run faden upgrade.",
     "load_failed": "Could not load the container's settings."
   },
   "images": {
@@ -1273,7 +1273,7 @@
   },
   "rag_runtime": {
     "title": "RAG Runtime Config",
-    "description": "Embedding and chunking settings are pushed from Fadenstack core to llm_port_rag.",
+    "description": "Embedding and chunking settings are pushed from Fadenstack core to faden_rag.",
     "failed_load": "Failed to load runtime config.",
     "failed_save": "Failed to save runtime config.",
     "saved": "Runtime config updated.",
@@ -1539,7 +1539,7 @@
   "pii_policy": {
     "system_section": "PII Policy (System Default)",
     "pii_service_url": "PII Service URL",
-    "pii_service_url_help": "Internal URL for llm_port_pii (for example http://llm-port-pii:8000/api).",
+    "pii_service_url_help": "Internal URL for faden_pii (for example http://faden-pii:8000/api).",
     "hidden_when_disabled": "PII settings are hidden because the PII module is currently disabled.",
     "tenants_title": "Tenant PII Policies",
     "tenants_description": "Override the default PII policy for a specific tenant.",
@@ -2866,8 +2866,8 @@
     "signed_in_as": "Signed in to Hugging Face as {{username}}",
     "token_named": "token “{{name}}”",
     "role_write": "This token can also write to Hugging Face. Read access is all this server needs: consider replacing it with a read-only token.",
-    "from_environment": "This token comes from LLM_PORT_BACKEND_HF_TOKEN in the server's environment. A token saved here takes its place.",
-    "storage_unsafe": "This server still uses the default settings master key, so a saved token would not be protected. Set LLM_PORT_BACKEND_SETTINGS_MASTER_KEY to a random value and restart before saving one.",
+    "from_environment": "This token comes from FADEN_BACKEND_HF_TOKEN in the server's environment. A token saved here takes its place.",
+    "storage_unsafe": "This server still uses the default settings master key, so a saved token would not be protected. Set FADEN_BACKEND_SETTINGS_MASTER_KEY to a random value and restart before saving one.",
     "token_label": "Access token",
     "replace_label": "Replace with a new token",
     "create_hint": "Create a read token at",

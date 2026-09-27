@@ -16,13 +16,13 @@ from typing import Any
 import httpx
 import pytest
 
-from llm_port_mcp.services.transport import streamable_http
-from llm_port_mcp.services.transport.base import (
+from faden_mcp.services.transport import streamable_http
+from faden_mcp.services.transport.base import (
     MCPConnectError,
     MCPServerConfig,
     describe_failure,
 )
-from llm_port_mcp.services.transport.streamable_http import StreamableHTTPMCPServer
+from faden_mcp.services.transport.streamable_http import StreamableHTTPMCPServer
 
 URL = "https://mcp.example.test/mcp"
 

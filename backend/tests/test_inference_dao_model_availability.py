@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
 import importlib
 
 migration_mod = importlib.import_module(
-    "llm_port_backend.db.migrations.versions.2026-09-20-13-00_m0d3lav41l"
+    "faden_backend.db.migrations.versions.2026-09-20-13-00_m0d3lav41l"
 )
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     ModelAvailability,
     ModelAvailabilityStatus,
 )
@@ -84,8 +84,8 @@ async def test_dao_list_for_nodes_queries() -> None:
 
 
 async def _model_and_node(session) -> tuple[uuid.UUID, uuid.UUID]:
-    from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-    from llm_port_backend.db.models.node_control import InfraNode
+    from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+    from faden_backend.db.models.node_control import InfraNode
 
     model = LLMModel(display_name="m", source=ModelSource.HUGGINGFACE, status=ModelStatus.AVAILABLE,
                      hf_repo_id=f"org/m-{uuid.uuid4().hex[:6]}")
@@ -130,8 +130,8 @@ async def test_two_writers_marking_the_same_model_do_not_collide(_engine) -> Non
     from sqlalchemy import delete, select
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    from llm_port_backend.db.models.llm import LLMModel
-    from llm_port_backend.db.models.node_control import InfraNode
+    from faden_backend.db.models.llm import LLMModel
+    from faden_backend.db.models.node_control import InfraNode
 
     maker = async_sessionmaker(_engine, expire_on_commit=False)
     async with maker() as setup:

@@ -1,14 +1,14 @@
 # Build and release the node agent: the binaries the install line fetches.
 #
 # The backend's install plan points machines at
-#   https://github.com/llm-port/llm-port-core/releases/download/node-agent-v<version>/llmport-agent-<platform>
+#   https://github.com/fadenstack/fadenstack/releases/download/node-agent-v<version>/faden-agent-<platform>
 # for <platform> linux-x86_64 and linux-aarch64 (see
-# llm_port_backend/web/api/install/__init__.py, RELEASE_URL and AGENT_VERSION).
+# backend/faden_backend/web/api/install/__init__.py, RELEASE_URL and AGENT_VERSION).
 # This workflow makes exactly those files.
 #
 # Release:
-#   1. Bump the version in llm_port_node_agent/pyproject.toml and
-#      llm_port_node_agent/llm_port_node_agent/__init__.py, and AGENT_VERSION in
+#   1. Bump the version in agent/pyproject.toml and
+#      agent/faden_agent/__init__.py, and AGENT_VERSION in
 #      the backend -- the backend is what tells machines which agent to install.
 #   2. Tag and push: git tag node-agent-v0.1.12 && git push origin node-agent-v0.1.12
 #
@@ -29,7 +29,7 @@ permissions:
   contents: write
 
 env:
-  AGENT_DIR: llm_port_node_agent
+  AGENT_DIR: agent
 
 jobs:
   version:
@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           PYPROJECT=$(python3 -c "import tomllib; print(tomllib.load(open('$AGENT_DIR/pyproject.toml','rb'))['project']['version'])")
-          PACKAGE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$AGENT_DIR/llm_port_node_agent/__init__.py")
-          BACKEND=$(sed -n 's/^AGENT_VERSION = "\(.*\)"/\1/p' llm_port_backend/llm_port_backend/web/api/install/__init__.py)
+          PACKAGE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$AGENT_DIR/faden_agent/__init__.py")
+          BACKEND=$(sed -n 's/^AGENT_VERSION = "\(.*\)"/\1/p' backend/faden_backend/web/api/install/__init__.py)
           echo "pyproject=$PYPROJECT package=$PACKAGE backend=$BACKEND"
           if [ "$PYPROJECT" != "$PACKAGE" ] || [ "$PYPROJECT" != "$BACKEND" ]; then
             echo "::error::Versions differ: pyproject $PYPROJECT, package $PACKAGE, backend AGENT_VERSION $BACKEND"
@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: llm_port_node_agent
+          sparse-checkout: agent
 
       - name: Build
         working-directory: ${{ env.AGENT_DIR }}
@@ -82,19 +82,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BIN="dist/llmport-agent-${{ matrix.platform }}"
+          BIN="dist/faden-agent-${{ matrix.platform }}"
           chmod +x "$BIN"
           # It must start, parse its arguments and print its licence -- in the
           # oldest environment it claims to support, not only on this runner.
-          docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/llmport-agent-${{ matrix.platform }}" license | head -5
+          docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/faden-agent-${{ matrix.platform }}" license | head -5
           sha256sum "$BIN" | awk '{print $1}' > "$BIN.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: llmport-agent-${{ matrix.platform }}
+          name: faden-agent-${{ matrix.platform }}
           path: |
-            ${{ env.AGENT_DIR }}/dist/llmport-agent-${{ matrix.platform }}
-            ${{ env.AGENT_DIR }}/dist/llmport-agent-${{ matrix.platform }}.sha256
+            ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}
+            ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}.sha256
           retention-days: 30
 
   release:
@@ -115,7 +115,7 @@ jobs:
           generate_release_notes: true
           body: |
             Standalone agent binaries for Linux, no Python needed. Machines normally
-            get them through the install line on the LLM.Port **Machines → Add a
+            get them through the install line on the Fadenstack **Machines → Add a
             machine** page, which checks the SHA-256 against the server's own copy.
 
             Built in Debian bookworm (glibc 2.36), so they run on that and newer.
@@ -124,7 +124,7 @@ jobs:
   pypi:
     # Optional: only when the repository has a PyPI token. The binaries above
     # are what installs use; this must never hold them back. The token is the
-    # CLI's (PYPI_API_TOKEN), so it must be allowed to upload llmport-agent too.
+    # CLI's (PYPI_API_TOKEN), so it must be allowed to upload faden-agent too.
     needs: [version, release]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/node-agent-v')
@@ -134,7 +134,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: llm_port_node_agent
+          sparse-checkout: agent
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -151,6 +151,6 @@ jobs:
           # nothing but "exit code 1" readable). --skip-existing lets a
           # release be run again once the version is on PyPI.
           if ! twine upload --non-interactive --skip-existing dist/* 2>&1 | tee twine.log; then
-            echo "::error title=PyPI refused llmport-agent::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
+            echo "::error title=PyPI refused faden-agent::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
             exit 1
           fi

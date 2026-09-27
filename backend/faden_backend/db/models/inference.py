@@ -44,7 +44,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from llm_port_backend.db.base import Base
+from faden_backend.db.base import Base
 
 # ---------------------------------------------------------------------------
 # Shared vocabulary
@@ -416,7 +416,7 @@ class InferenceDeployment(Base):
 
     The portable deployment contract lives in ``spec_json`` and is
     validated with the versioned Pydantic schemas in
-    ``llm_port_backend.services.inference.schemas``.  Identity fields
+    ``faden_backend.services.inference.schemas``.  Identity fields
     (``model_id``, ``environment_id``, ``name``, ``desired_state``) are
     kept in indexed columns so reconciliation queries stay efficient.
 
@@ -540,7 +540,7 @@ class AdoptionState(enum.StrEnum):
     ABANDONED = "abandoned"
 
 
-#: States in which LLM.Port routes, or is moving, the container: one per container.
+#: States in which Fadenstack routes, or is moving, the container: one per container.
 OPEN_ADOPTION_STATES = frozenset({
     AdoptionState.ROUTED.value,
     AdoptionState.DEPLOYING.value,
@@ -552,10 +552,10 @@ OPEN_ADOPTION_STATES = frozenset({
 
 
 class InferenceAdoption(Base):
-    """A vLLM container LLM.Port found on a machine and took over.
+    """A vLLM container Fadenstack found on a machine and took over.
 
     Found by the agent (``vllm_containers`` in the inventory), not started by
-    LLM.Port. Its own table rather than columns on a provider or deployment:
+    Fadenstack. Its own table rather than columns on a provider or deployment:
     the reconciler rewrites a deployment's observed state every pass, and a
     second writer there would lose updates. Foreign keys are ``SET NULL`` so
     the record outlives the machine, the provider and the deployment.

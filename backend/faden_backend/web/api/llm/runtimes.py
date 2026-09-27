@@ -10,28 +10,28 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 from starlette import status
 from sqlalchemy import select
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.node_control import NodeCommandStatus, NodeCommandType
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.llm.monitoring import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.node_control import NodeCommandStatus, NodeCommandType
+from faden_backend.db.models.users import User
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.llm.monitoring import (
     get_monitoring_provisioner,
 )
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.services.nodes.service import NodeControlService
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import audit_action, get_docker
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
-from llm_port_backend.web.api.llm.schema import (
+from faden_backend.services.llm.service import LLMService
+from faden_backend.services.nodes.service import NodeControlService
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import audit_action, get_docker
+from faden_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.web.api.llm.schema import (
     RuntimeCreateRequest,
     RuntimeDTO,
     RuntimeHealthDTO,
     RuntimeUpdateRequest,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -66,8 +66,8 @@ async def list_runtimes(
     # runtimes are scraped, so we gate the badge on the provider type.
     prov = get_monitoring_provisioner()
     if prov is not None and out:
-        from llm_port_backend.db.models.llm import LLMProvider, ProviderType  # noqa: PLC0415
-        from llm_port_backend.web.api.llm.schema import (  # noqa: PLC0415
+        from faden_backend.db.models.llm import LLMProvider, ProviderType  # noqa: PLC0415
+        from faden_backend.web.api.llm.schema import (  # noqa: PLC0415
             RuntimeMonitoringDTO,
         )
 
@@ -106,7 +106,7 @@ async def runtime_monitoring_stats(
     prov = get_monitoring_provisioner()
     if prov is None:
         return {"enabled": False, "stale": True, "stats": {}, "dashboard_url": None}
-    from llm_port_backend.db.models.llm import LLMProvider, ProviderType  # noqa: PLC0415
+    from faden_backend.db.models.llm import LLMProvider, ProviderType  # noqa: PLC0415
 
     prov_res = await runtime_dao.session.execute(
         select(LLMProvider).where(LLMProvider.id == runtime.provider_id),

@@ -15,11 +15,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.inference import InferenceAdoption
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference import found as found_vllm
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.inference import InferenceAdoption
+from faden_backend.db.models.users import User
+from faden_backend.services.inference import found as found_vllm
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 _DEP = "inference.deployments"
@@ -37,7 +37,7 @@ def _gateway_sync(request: Request) -> Any:
 
 def _commands(request: Request) -> Any:
     """The channel to the machines (for their model-TLS proxy); ``None`` without a database."""
-    from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway  # noqa: PLC0415
 
     factory = getattr(request.app.state, "db_session_factory", None)
     return NodeCommandGateway(factory) if factory is not None else None
@@ -84,7 +84,7 @@ async def list_routed(
     _user: User = Depends(require_permission(_DEP, "read")),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
-    """Found containers LLM.Port routes, and ones it used to."""
+    """Found containers Fadenstack routes, and ones it used to."""
     rows = await session.execute(select(InferenceAdoption).order_by(InferenceAdoption.created_at.desc()))
     return [found_vllm.describe(a) for a in rows.scalars()]
 

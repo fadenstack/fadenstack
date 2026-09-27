@@ -1,6 +1,6 @@
 """An agent with no Loki address asks the backend for one.
 
-The one-line install writes no ``LLM_PORT_NODE_AGENT_LOKI_URL``, and an
+The one-line install writes no ``FADEN_NODE_AGENT_LOKI_URL``, and an
 agent without one forwarded nothing -- both DGX nodes went silent in Loki the
 day they were reinstalled that way.
 """
@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 import pytest
 
-from llm_port_node_agent.backend_client import BackendClient
-from llm_port_node_agent import service as service_module
+from faden_agent.backend_client import BackendClient
+from faden_agent import service as service_module
 
 
 async def _log_sink_with(status: int, body: dict[str, Any] | None = None) -> str | None:
@@ -131,7 +131,7 @@ def test_requests_are_not_logged_line_by_line() -> None:
     """Every Loki push logged a line, which the next push shipped to Loki."""
     import logging
 
-    from llm_port_node_agent import __main__ as agent_main
+    from faden_agent import __main__ as agent_main
 
     agent_main._configure_logging("INFO")
     assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
@@ -145,8 +145,8 @@ def test_requests_are_not_logged_line_by_line() -> None:
 async def test_pushes_through_the_backend_carry_the_credential_and_follow_its_address() -> None:
     import httpx
 
-    from llm_port_node_agent.log_collector import LogEntry
-    from llm_port_node_agent.loki_client import LokiClient
+    from faden_agent.log_collector import LogEntry
+    from faden_agent.loki_client import LokiClient
 
     seen: list[httpx.Request] = []
 

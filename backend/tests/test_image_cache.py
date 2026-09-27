@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
-from llm_port_backend.services.inference import image_cache
-from llm_port_backend.services.inference.bundles import compute_rootfs_digest
+from faden_backend.services.inference import image_cache
+from faden_backend.services.inference.bundles import compute_rootfs_digest
 
 LAYERS = ["sha256:" + "a" * 64, "sha256:" + "b" * 64]
 

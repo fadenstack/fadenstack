@@ -19,10 +19,10 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from llm_port_backend.services import edge_trust
-from llm_port_backend.services.dashboard import attention
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api import install as install_api
+from faden_backend.services import edge_trust
+from faden_backend.services.dashboard import attention
+from faden_backend.settings import settings
+from faden_backend.web.api import install as install_api
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
 
@@ -79,9 +79,9 @@ def test_machines_are_shown_the_hosts_addresses_not_the_containers(
     tls_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tls_dir / "edge.json").write_text(json.dumps(
-        {"hosts": ["llm-port", "10.250.10.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
+        {"hosts": ["fadenstack", "10.250.10.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
     ))
-    assert edge_trust.host_urls() == ["http://10.250.10.61:8080", "http://llm-port:8080"], "an address first"
+    assert edge_trust.host_urls() == ["http://10.250.10.61:8080", "http://fadenstack:8080"], "an address first"
     _serve(tls_dir, until=NOW + timedelta(days=90))
     assert edge_trust.host_urls()[0] == "https://10.250.10.61:8443"
     # The interfaces are not asked at all: from a container they are the container's.

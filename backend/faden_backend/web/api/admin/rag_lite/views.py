@@ -13,18 +13,18 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from starlette import status
 
-from llm_port_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.db.dao.rag_lite_dao import (
+from faden_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.db.dao.rag_lite_dao import (
     RagLiteChunkDAO,
     RagLiteCollectionDAO,
     RagLiteDocumentDAO,
     RagLiteIngestJobDAO,
 )
-from llm_port_backend.db.models.rag_lite import RagLiteDocumentStatus, RagLiteIngestJob
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.rag_lite.tasks import rag_lite_ingest_task
-from llm_port_backend.services.system_settings.runtime_mapping import refresh_runtime_values
-from llm_port_backend.web.api.admin.rag_lite.schema import (
+from faden_backend.db.models.rag_lite import RagLiteDocumentStatus, RagLiteIngestJob
+from faden_backend.db.models.users import User
+from faden_backend.services.rag_lite.tasks import rag_lite_ingest_task
+from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values
+from faden_backend.web.api.admin.rag_lite.schema import (
     RagLiteCollectionCreate,
     RagLiteCollectionDTO,
     RagLiteCollectionUpdate,
@@ -46,7 +46,7 @@ from llm_port_backend.web.api.admin.rag_lite.schema import (
     RagLiteSummaryResponse,
     RagLiteUploadResponse,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -74,7 +74,7 @@ async def get_rag_lite_config(
     runtime_dao: RuntimeDAO = Depends(),
     model_dao: ModelDAO = Depends(),
 ) -> RagLiteConfigDTO:
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     embedding_model = settings.rag_lite_embedding_model
     embedding_provider_id = settings.rag_lite_embedding_provider_id
@@ -135,7 +135,7 @@ async def upload_file(
     rag_service = request.app.state.rag_lite_service
 
     # Read file bytes (enforce size limit)
-    from llm_port_backend.settings import settings as _settings  # noqa: PLC0415
+    from faden_backend.settings import settings as _settings  # noqa: PLC0415
 
     max_mb = _settings.rag_lite_upload_max_file_mb
     file_bytes = await file.read()
@@ -351,9 +351,9 @@ async def search(
     rag_service = request.app.state.rag_lite_service
 
     # Resolve embedding client at request time
-    from llm_port_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     # As they are now, not as this process last heard: with several workers,
     # a settings change reaches only the one that handled it.
@@ -375,7 +375,7 @@ async def search(
         http_client=http_client,
     )
 
-    from llm_port_backend.services.rag_lite.rerank import RerankClient  # noqa: PLC0415
+    from faden_backend.services.rag_lite.rerank import RerankClient  # noqa: PLC0415
 
     hybrid = settings.rag_lite_hybrid_search if body.mode is None else body.mode == "hybrid"
     reranker = (
@@ -587,9 +587,9 @@ async def update_document_summary(
 
 async def _get_completion_client(session: Any) -> Any:
     """Resolve a CompletionClient from available providers."""
-    from llm_port_backend.services.rag_lite.completion import CompletionClient  # noqa: PLC0415
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.rag_lite.completion import CompletionClient  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     crypto = SettingsCrypto(settings.settings_master_key)
     return await CompletionClient.auto_detect(session, crypto=crypto)
@@ -674,9 +674,9 @@ async def graph_search(
 
     Level 2: Run chunk-level vector search within those collections.
     """
-    from llm_port_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
     # As they are now, not as this process last heard: with several workers,
     # a settings change reaches only the one that handled it.

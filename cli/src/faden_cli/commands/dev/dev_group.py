@@ -1,4 +1,4 @@
-"""``llmport dev`` — developer workflow commands."""
+"""``faden dev`` — developer workflow commands."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ def dev_group() -> None:
 def _register_dev_commands() -> None:
     """Import and register dev subcommands."""
     # Importing these modules triggers the @dev_group.command() decorators
-    from llmport.commands.dev import dev_doctor as _doctor  # noqa: F401
-    from llmport.commands.dev import dev_down as _down  # noqa: F401
-    from llmport.commands.dev import dev_init as _init  # noqa: F401
-    from llmport.commands.dev import dev_pull as _pull  # noqa: F401
-    from llmport.commands.dev import dev_up as _up  # noqa: F401
-    from llmport.commands.dev import dev_status as _status  # noqa: F401
+    from faden_cli.commands.dev import dev_doctor as _doctor  # noqa: F401
+    from faden_cli.commands.dev import dev_down as _down  # noqa: F401
+    from faden_cli.commands.dev import dev_init as _init  # noqa: F401
+    from faden_cli.commands.dev import dev_pull as _pull  # noqa: F401
+    from faden_cli.commands.dev import dev_up as _up  # noqa: F401
+    from faden_cli.commands.dev import dev_status as _status  # noqa: F401
 
 
 _register_dev_commands()

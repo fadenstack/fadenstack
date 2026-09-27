@@ -13,10 +13,10 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from llm_port_pii.services.pii.service import DEFAULT_ENTITIES, SUPPORTED_LANGUAGES
-from llm_port_pii.services.pii.service import PIIService
-from llm_port_pii.settings import settings
-from llm_port_pii.web.api.pii.schema import (
+from faden_pii.services.pii.service import DEFAULT_ENTITIES, SUPPORTED_LANGUAGES
+from faden_pii.services.pii.service import PIIService
+from faden_pii.settings import settings
+from faden_pii.web.api.pii.schema import (
     DetectedEntityDTO,
     PIIDetokenizeRequest,
     PIIDetokenizeResponse,

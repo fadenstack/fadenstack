@@ -1,7 +1,7 @@
-# Installing LLM.Port
+# Installing Fadenstack
 
-LLM.Port runs as a set of containers on one Linux server. Its command-line
-tool, `llmport`, installs it, upgrades it and backs it up. The machines with
+Fadenstack runs as a set of containers on one Linux server. Its command-line
+tool, `faden`, installs it, upgrades it and backs it up. The machines with
 GPUs join afterwards, each through a one-line install from the console.
 
 ---
@@ -23,35 +23,35 @@ GPUs join afterwards, each through a one-line install from the console.
 ## Install
 
 ```bash
-pipx install llmport-cli        # or: uv tool install llmport-cli
-llmport deploy
+pipx install fadenstack        # or: uv tool install fadenstack
+faden deploy
 ```
 
-`llmport deploy`:
+`faden deploy`:
 
 1. checks Docker;
-2. writes the deployment files into `~/llm-port` (or the directory you pass:
-   `llmport deploy /opt/llm-port`);
+2. writes the deployment files into `~/fadenstack` (or the directory you pass:
+   `faden deploy /opt/faden`);
 3. generates `.env` there, with a random password for every service;
 4. asks whether to serve HTTPS -- with a certificate it makes for this
    machine, or with yours -- and checks that its ports are free (see
    [Enabling HTTPS](#enabling-https) and [Changing the ports](#changing-the-ports));
 5. pulls the images for the CLI's own version, for example
-   `ghcr.io/llm-port/backend:0.3.0`;
+   `ghcr.io/fadenstack/backend:0.3.0`;
 6. starts everything and creates the first admin. It asks for the admin's
    email and a password (leave the password blank to have one generated),
    then shows both;
 7. pulls the **runtime images**: the containers the machines run models in,
-   `ghcr.io/llm-port/ray-runtime-x86_64` and `ray-runtime-gb10` (NVIDIA DGX
+   `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (NVIDIA DGX
    Spark). Machines download theirs from this server, not from the internet,
    so the server keeps one per kind of machine -- about 10 GB each. Only
-   x86_64 machines? `llmport deploy --runtime-images x86_64`; the choice is
-   remembered for upgrades. `llmport runtime-images --check` shows what the
+   x86_64 machines? `faden deploy --runtime-images x86_64`; the choice is
+   remembered for upgrades. `faden runtime-images --check` shows what the
    server holds.
 
-With `llmport deploy -y` nothing is asked. The admin is `admin@localhost`
+With `faden deploy -y` nothing is asked. The admin is `admin@localhost`
 with a generated password, and both are saved in
-`~/llm-port/.bootstrap-credentials`. Store them somewhere safe, then delete
+`~/fadenstack/.bootstrap-credentials`. Store them somewhere safe, then delete
 that file.
 
 Open `http://<server>` in a browser and sign in.
@@ -60,14 +60,14 @@ Open `http://<server>` in a browser and sign in.
 
 | | |
 |---|---|
-| `~/llm-port/` | the deployment: compose file, `.env`, service configuration |
-| `~/llm-port/.env` | every password and setting; keep it private |
-| `~/llm-port/backups/` | backups (see below) |
-| `~/.config/llmport/llmport.yaml` | the CLI's own settings: where the install is, which modules are on |
+| `~/fadenstack/` | the deployment: compose file, `.env`, service configuration |
+| `~/fadenstack/.env` | every password and setting; keep it private |
+| `~/fadenstack/backups/` | backups (see below) |
+| `~/.config/faden/faden.yaml` | the CLI's own settings: where the install is, which modules are on |
 
-The data lives in Docker volumes named `llm_port_shared_*` (for example
-`llm_port_shared_pg_data`). `llmport down` keeps them; only
-`llmport down --volumes` removes them.
+The data lives in Docker volumes named `fadenstack_*` (for example
+`fadenstack_pg_data`). `faden down` keeps them; only
+`faden down --volumes` removes them.
 
 ## Add the machines that run the models
 
@@ -77,17 +77,17 @@ same page. See [Onboarding a node](onboarding-a-node.md).
 
 The line installs the node agent from the server itself, or from the
 project's GitHub releases when the server has no copy. For machines without
-internet access, put the agent builds in `~/llm-port/agent-binaries/`
-(`llmport-agent-linux-x86_64`, `llmport-agent-linux-aarch64`, from the
-[releases page](https://github.com/llm-port/llm-port-core/releases)), and
+internet access, put the agent builds in `~/fadenstack/agent-binaries/`
+(`faden-agent-linux-x86_64`, `faden-agent-linux-aarch64`, from the
+[releases page](https://github.com/fadenstack/fadenstack/releases)), and
 replace them with the new release's builds whenever you upgrade -- see
 [Update the machines' agents](upgrading.md#update-the-machines-agents).
 
 ## Upgrade
 
 ```bash
-pipx upgrade llmport-cli        # or: uv tool upgrade llmport-cli
-llmport upgrade
+pipx upgrade fadenstack        # or: uv tool upgrade fadenstack
+faden upgrade
 ```
 
 The upgrade backs up every database, replaces the deployment files with the
@@ -98,30 +98,30 @@ are replaced, so keep your changes in `.env`.
 
 An upgrade only moves forward: the databases are migrated to the new
 release. To go back, restore the backup the upgrade made. See
-[Upgrading LLM.Port](upgrading.md).
+[Upgrading Fadenstack](upgrading.md).
 
 ## Back up and restore
 
 ```bash
-llmport backup                          # into ~/llm-port/backups/<time>/
-llmport restore ~/llm-port/backups/<time>
+faden backup                          # into ~/fadenstack/backups/<time>/
+faden restore ~/fadenstack/backups/<time>
 ```
 
 A backup holds a dump of every database, the `.env`, and the migration
 versions. Keep copies off the server: a backup on the same disk doesn't
 survive losing the disk.
 
-`llmport deploy` offers a nightly backup (at 03:00, keeping the last 7), and
+`faden deploy` offers a nightly backup (at 03:00, keeping the last 7), and
 turns it on with `-y`. To change or stop it:
 
 ```bash
-llmport backup schedule --at 01:30 --retain 14
-llmport backup schedule --off
+faden backup schedule --at 01:30 --retain 14
+faden backup schedule --off
 ```
 
 It runs as a systemd user timer (`systemctl --user list-timers`), or from
 your crontab where there is no systemd. The output goes to
-`~/llm-port/backups/backup.log`.
+`~/fadenstack/backups/backup.log`.
 
 If the server itself is lost, install a new one, restore the backup onto it,
 and re-run the install line on each machine. Clusters that were created
@@ -133,21 +133,21 @@ them over without restarting any model. See
 
 The console, the API and the gateway (`/v1`) are served on port 80, and on
 443 once HTTPS is on. Both are published even while HTTPS is off, so both
-must be free. `llmport deploy` asks for another port when one is taken, or
+must be free. `faden deploy` asks for another port when one is taken, or
 takes them up front:
 
 ```bash
-llmport deploy --http-port 8080 --https-port 8443
+faden deploy --http-port 8080 --https-port 8443
 ```
 
 On an install that is running:
 
 ```bash
-llmport ports                          # show them
-llmport ports --http 8080 --https 8443 # change them; the proxy moves at once
+faden ports                          # show them
+faden ports --http 8080 --https 8443 # change them; the proxy moves at once
 ```
 
-They are `LLM_PORT_HTTP_PORT` and `LLM_PORT_HTTPS_PORT` in `~/llm-port/.env`.
+They are `FADEN_HTTP_PORT` and `FADEN_HTTPS_PORT` in `~/fadenstack/.env`.
 
 ## Enabling HTTPS
 
@@ -158,23 +158,23 @@ answers the proxy's own health check).
 What is protected and what is not, how the machines come to trust the server,
 where the keys are and a hardening checklist: [HTTPS and trust](https-and-trust.md).
 
-`llmport deploy` serves HTTPS by default, with a certificate made here. It
+`faden deploy` serves HTTPS by default, with a certificate made here. It
 asks when it runs interactively (`generate` is the default answer), and takes
 the choice up front:
 
 ```bash
-llmport deploy --tls generate                 # a certificate made here (the default)
-llmport deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
-llmport deploy --tls off                      # plain HTTP; remembered, so a later deploy -y keeps it
+faden deploy --tls generate                 # a certificate made here (the default)
+faden deploy --tls own --tls-cert fullchain.pem --tls-key key.pem
+faden deploy --tls off                      # plain HTTP; remembered, so a later deploy -y keeps it
 ```
 
 On an install that is running:
 
 ```bash
-llmport tls status                            # on or off, and the certificate
-llmport tls generate [--name console.example.org]
-llmport tls use fullchain.pem key.pem [--chain intermediates.pem] [--ca root.pem]
-llmport tls off                               # back to plain HTTP
+faden tls status                            # on or off, and the certificate
+faden tls generate [--name console.example.org]
+faden tls use fullchain.pem key.pem [--chain intermediates.pem] [--ca root.pem]
+faden tls off                               # back to plain HTTP
 ```
 
 Switching between HTTP and HTTPS restarts the proxy (the only container it
@@ -184,12 +184,12 @@ connections stay up. Either way the CLI waits until the console answers.
 **A certificate made here** (`generate`) names `localhost`, the server's
 host names and every address it has, plus any `--name` you add. It is signed
 by a certificate authority the CLI makes for this install on first use:
-`~/llm-port/tls/ca.crt` is what everyone trusts, and its key stays in
-`~/llm-port/tls-ca/`, which no container sees. Import `ca.crt` into the
+`~/fadenstack/tls/ca.crt` is what everyone trusts, and its key stays in
+`~/fadenstack/tls-ca/`, which no container sees. Import `ca.crt` into the
 browsers the console is used from (or accept their warning), and hand it to
 API clients (`curl --cacert ca.crt`, `SSL_CERT_FILE=ca.crt`). A new
 certificate later -- another address, a renewal -- is signed by the same
-authority, so nothing has to be trusted again; `llmport tls off` keeps it too.
+authority, so nothing has to be trusted again; `faden tls off` keeps it too.
 
 **Your own certificate** (`use`) is checked before it is installed: the key
 must belong to it (and have no passphrase), and it must be valid today. The
@@ -197,15 +197,15 @@ certificate file may carry its intermediates after it. A certificate that
 names none of the server's own names or addresses is installed with a
 warning, since the console may be reached by a name only DNS knows.
 From a **private issuer** (a company CA), give its root with `--ca root.pem`
-(or `llmport deploy --tls-ca`); a root at the end of the certificate file is
+(or `faden deploy --tls-ca`); a root at the end of the certificate file is
 taken as well. The machines are handed that root like the install's own
 authority, so they trust the certificate without anyone copying files to
 them.
 
 ### Renewing
 
-Nothing is left to remember: once HTTPS is on, `llmport tls renew` runs every
-morning (a systemd user timer, `llmport-tls-renew.timer`, or a crontab line)
+Nothing is left to remember: once HTTPS is on, `faden tls renew` runs every
+morning (a systemd user timer, `faden-tls-renew.timer`, or a crontab line)
 and changes nothing until something is due.
 
 - **A certificate made here** lasts 825 days and is issued again 30 days
@@ -213,7 +213,7 @@ and changes nothing until something is due.
   list. It keeps every name it had and comes from the same authority, so
   neither the browsers nor the machines notice.
 - **Your own certificate** is taken again from the files you gave
-  `llmport tls use` whenever they change there. Point it at the files your
+  `faden tls use` whenever they change there. Point it at the files your
   renewal tool rewrites in place (certbot's
   `/etc/letsencrypt/live/<name>/fullchain.pem` and `privkey.pem`, acme.sh,
   your company's tooling) and a renewal is served the next morning. Renewed
@@ -222,40 +222,40 @@ and changes nothing until something is due.
   stays published beside the new one while it is valid, and the machines
   fetch both before anything the new one signed is served.
 
-`llmport tls status` shows until when the certificate is valid and how it is
-renewed; `llmport doctor` and the console's dashboard warn before it runs out
+`faden tls status` shows until when the certificate is valid and how it is
+renewed; `faden doctor` and the console's dashboard warn before it runs out
 (the dashboard 30 days before, or 21 when it renews by itself -- then only a
-failing renewal gets that far). `llmport tls renew --force` renews now. The
+failing renewal gets that far). `faden tls renew --force` renews now. The
 daily run exits with an error when a certificate is close to its end and
 nothing here can renew it, so `systemctl --user --failed` shows it too; its
-output is in `~/llm-port/logs/tls-renew.log`.
+output is in `~/fadenstack/logs/tls-renew.log`.
 
 An administrator in root mode can do the same through the console's API:
 `POST /api/admin/tls/upload` with the files, then `POST /api/admin/tls/activate`,
-which writes them to `~/llm-port/tls/` and restarts the proxy itself
+which writes them to `~/fadenstack/tls/` and restarts the proxy itself
 (`DELETE /api/admin/tls` goes back). Whichever wrote last is what is served.
 
-`LLM_PORT_HSTS_MAX_AGE` in `~/llm-port/.env` (seconds, default 0) turns on
+`FADEN_HSTS_MAX_AGE` in `~/fadenstack/.env` (seconds, default 0) turns on
 HTTP Strict Transport Security once you are sure HTTPS stays; 0 tells
 browsers to forget it again. The redirect from plain HTTP is temporary
 (307), so browsers do not remember it after HTTPS is switched off.
 
-**The machines follow by themselves** (agent 0.1.14 or later). `llmport
-deploy` and `llmport upgrade` make the install's certificate authority even
+**The machines follow by themselves** (agent 0.1.14 or later). `faden
+deploy` and `faden upgrade` make the install's certificate authority even
 while HTTPS is off, and every agent fetches it from the server while it is
 connected (and again every minute). When HTTPS is switched on, an agent on
 the plain-HTTP address is redirected, checks the HTTPS address against the
 authority it holds, and moves there; it remembers the move across restarts.
-Nothing has to be done on the machines. `llmport-agent show` says when an
+Nothing has to be done on the machines. `faden-agent show` says when an
 agent has moved.
 
 An agent never moves back by itself: plain HTTP after HTTPS would be a
 downgrade anyone between the machine and the server could force by blocking
-a port. After `llmport tls off`, point each machine back and restart it:
+a port. After `faden tls off`, point each machine back and restart it:
 
 ```bash
-llmport-agent configure --set BACKEND_URL=http://<server>
-systemctl --user restart llmport-agent   # or: sudo systemctl restart llmport-agent
+faden-agent configure --set BACKEND_URL=http://<server>
+systemctl --user restart faden-agent   # or: sudo systemctl restart faden-agent
 ```
 
 **Machines you add** while HTTPS is on get an install line that fetches the
@@ -269,10 +269,10 @@ one.
 copied over:
 
 ```bash
-llmport-agent configure --set BACKEND_URL=https://<server>
+faden-agent configure --set BACKEND_URL=https://<server>
 # 0.1.13 and earlier do not take TLS_CA_BUNDLE there: add
-# LLM_PORT_NODE_AGENT_TLS_CA_BUNDLE=/path/to/ca.crt to the environment file
-# llmport-agent show names, then restart the agent.
+# FADEN_NODE_AGENT_TLS_CA_BUNDLE=/path/to/ca.crt to the environment file
+# faden-agent show names, then restart the agent.
 ```
 
 ## Installing from source
@@ -281,11 +281,11 @@ To build the images yourself, for example to run changes of your own, deploy
 from a checkout instead:
 
 ```bash
-git clone https://github.com/llm-port/llm-port-core.git
-cd llm-port-core
-pipx install ./llm_port_cli
-llmport deploy --build
+git clone https://github.com/fadenstack/fadenstack.git
+cd fadenstack
+pipx install ./cli
+faden deploy --build
 ```
 
-An install from a checkout builds its images on every `llmport upgrade`.
+An install from a checkout builds its images on every `faden upgrade`.
 Pull new code first (`git pull`).

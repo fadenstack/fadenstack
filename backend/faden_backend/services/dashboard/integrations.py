@@ -17,14 +17,14 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from llm_port_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
-from llm_port_backend.services.dashboard.traffic import RESIDENCY_CLASSES
-from llm_port_backend.services.mcp.client import MCPServiceClient
-from llm_port_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
-from llm_port_backend.settings import settings
+from faden_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
+from faden_backend.services.dashboard.traffic import RESIDENCY_CLASSES
+from faden_backend.services.mcp.client import MCPServiceClient
+from faden_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient
+from faden_backend.settings import settings
 
 if TYPE_CHECKING:
-    from llm_port_backend.services.dashboard.facts import Facts
+    from faden_backend.services.dashboard.facts import Facts
 
 log = logging.getLogger(__name__)
 

@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 
-from llm_port_node_agent.collectors import (
+from faden_agent.collectors import (
     _disk_root,
     collect_gpu_snapshot,
     collect_inventory,
     collect_utilization,
 )
-from llm_port_node_agent.gpu import GpuCollector, GpuSnapshot, GpuDevice, NullCollector
+from faden_agent.gpu import GpuCollector, GpuSnapshot, GpuDevice, NullCollector
 
 
 class FakeGpuCollector:
@@ -87,7 +87,7 @@ async def test_gpu_snapshot_with_collector() -> None:
 
 
 @pytest.mark.asyncio()
-@patch("llm_port_node_agent.collectors.psutil")
+@patch("faden_agent.collectors.psutil")
 async def test_collect_inventory_with_gpu_snapshot(mock_psutil: MagicMock) -> None:
     mock_psutil.virtual_memory.return_value = _fake_vmem()
     mock_psutil.disk_usage.return_value = _fake_disk()
@@ -103,7 +103,7 @@ async def test_collect_inventory_with_gpu_snapshot(mock_psutil: MagicMock) -> No
 
 
 @pytest.mark.asyncio()
-@patch("llm_port_node_agent.collectors.psutil")
+@patch("faden_agent.collectors.psutil")
 async def test_collect_utilization_with_gpu_snapshot(mock_psutil: MagicMock) -> None:
     mock_psutil.cpu_percent.return_value = 25.0
     mock_psutil.virtual_memory.return_value = _fake_vmem()
@@ -118,7 +118,7 @@ async def test_collect_utilization_with_gpu_snapshot(mock_psutil: MagicMock) -> 
 
 
 @pytest.mark.asyncio()
-@patch("llm_port_node_agent.collectors.psutil")
+@patch("faden_agent.collectors.psutil")
 async def test_collect_utilization_network_fields(mock_psutil: MagicMock) -> None:
     mock_psutil.cpu_percent.return_value = 10.0
     mock_psutil.virtual_memory.return_value = _fake_vmem()
@@ -130,13 +130,13 @@ async def test_collect_utilization_network_fields(mock_psutil: MagicMock) -> Non
     assert util["network"]["packets_recv"] == 20
 
 
-@patch("llm_port_node_agent.collectors.sys")
+@patch("faden_agent.collectors.sys")
 def test_disk_root_unix(mock_sys: MagicMock) -> None:
     mock_sys.platform = "linux"
     assert _disk_root() == "/"
 
 
-@patch("llm_port_node_agent.collectors.sys")
+@patch("faden_agent.collectors.sys")
 @patch.dict("os.environ", {"SystemDrive": "D:"})
 def test_disk_root_windows(mock_sys: MagicMock) -> None:
     mock_sys.platform = "win32"

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase
 
-from llm_port_pii.db.meta import meta
+from faden_pii.db.meta import meta
 
 
 class Base(DeclarativeBase):

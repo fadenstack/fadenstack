@@ -16,7 +16,7 @@ const NONE: HFTokenStatus = {
 };
 const SIGNED_IN: HFTokenStatus = {
   configured: true, source: "database", storage_safe: true, check: "ok",
-  username: "sachith", token_name: "llm-port", role: "read",
+  username: "sachith", token_name: "fadenstack", role: "read",
 };
 
 afterEach(() => vi.restoreAllMocks());

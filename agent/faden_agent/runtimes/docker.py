@@ -8,8 +8,8 @@ import logging
 import shutil
 from typing import Any
 
-from llm_port_node_agent.runtimes import ContainerRuntimeError
-from llm_port_node_agent.runtimes.accelerators import accelerator_run_flags
+from faden_agent.runtimes import ContainerRuntimeError
+from faden_agent.runtimes.accelerators import accelerator_run_flags
 
 log = logging.getLogger(__name__)
 

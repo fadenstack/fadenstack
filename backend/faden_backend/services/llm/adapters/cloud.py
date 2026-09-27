@@ -14,21 +14,21 @@ from typing import Any
 
 import httpx
 
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.models.llm import (
     LLMModel,
     LLMProvider,
     LLMRuntime,
     ModelArtifact,
     ProviderType,
 )
-from llm_port_backend.services.llm.base import (
+from faden_backend.services.llm.base import (
     CompatResult,
     ContainerSpec,
     HealthStatus,
     ProviderAdapter,
 )
-from llm_port_backend.services.llm.registry import register_adapter
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.llm.registry import register_adapter
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 

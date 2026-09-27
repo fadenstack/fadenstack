@@ -11,18 +11,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.container_registry_dao import ContainerRegistryDAO
-from llm_port_backend.db.models.containers import (
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
+from faden_backend.db.models.containers import (
     AuditResult,
     ContainerClass,
     ContainerPolicy,
 )
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.docker import recreate
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.policy.enforcement import Action, PolicyEnforcer
-from llm_port_backend.web.api.admin.containers.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.docker import recreate
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.policy.enforcement import Action, PolicyEnforcer
+from faden_backend.web.api.admin.containers.schema import (
     ContainerDetailDTO,
     ContainerSettingsDTO,
     ContainerSummaryDTO,
@@ -32,7 +32,7 @@ from llm_port_backend.web.api.admin.containers.schema import (
     PortBinding,
     RegisterContainerRequest,
 )
-from llm_port_backend.web.api.admin.dependencies import (
+from faden_backend.web.api.admin.dependencies import (
     audit_action,
     get_docker,
     get_policy_enforcer,
@@ -40,7 +40,7 @@ from llm_port_backend.web.api.admin.dependencies import (
     get_root_mode_active,
     require_superuser,
 )
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -79,28 +79,28 @@ _AUTO_CLASS_RULES: list[tuple[list[str], ContainerClass, str]] = [
             "rabbitmq", "rmq",                            # message broker
             "minio",                                      # object storage
             "loki", "grafana", "alloy",                   # observability
-            "langfuse", "llm-port-worker", "llm-port-web",  # LLM tracing
+            "langfuse", "faden-worker", "faden-web",  # LLM tracing
         ],
         ContainerClass.SYSTEM_CORE,
         "platform",
     ),
     # SYSTEM_AUX — application services (checked before MCP so that
-    # "llm-port-mcp-migrator" doesn't accidentally match the generic
+    # "faden-mcp-migrator" doesn't accidentally match the generic
     # "mcp-" pattern below).
     (
         [
-            "llm-port-api",
-            "llm_port_api",
-            "llm-port-backend",
-            "llm-port-frontend",
-            "llm-port-mcp",
-            "llm-port-skills",
-            "llm-port-pii",
-            "llm-port-rag",
-            "llm-port-auth",
-            "llm-port-mailer",
-            "llm-port-docling",
-            "llm-port-ee",
+            "faden-gateway",
+            "faden_gateway",
+            "faden-backend",
+            "faden-frontend",
+            "faden-mcp",
+            "faden-skills",
+            "faden-pii",
+            "faden-rag",
+            "faden-auth",
+            "faden-mailer",
+            "faden-docling",
+            "faden-ee",
             "migrator",
         ],
         ContainerClass.SYSTEM_AUX,
@@ -439,7 +439,7 @@ async def update_container(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "The backend runs in this container and cannot replace it. Change its settings "
-                "in .env and run llmport upgrade."
+                "in .env and run faden upgrade."
             ),
         )
     image = await _image_of(docker, raw)

@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.node_control import InfraNode
 
 from tests.test_inference_api import (  # noqa: F401  (fixtures)
     API,

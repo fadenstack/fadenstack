@@ -13,9 +13,9 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from llm_port_node_agent.loki_client import LokiClient
-from llm_port_node_agent.runtimes import ContainerRuntime
-from llm_port_node_agent.state_store import StateStore
+from faden_agent.loki_client import LokiClient
+from faden_agent.runtimes import ContainerRuntime
+from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
 

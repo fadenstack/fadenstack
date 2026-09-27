@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/llm-port/base:latest
+ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
 FROM ${BASE_IMAGE} AS prod
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -11,7 +11,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --inexact --no-dev
 
-CMD ["/usr/local/bin/python", "-m", "llm_port_skills"]
+CMD ["/usr/local/bin/python", "-m", "faden_skills"]
 
 FROM prod AS dev
 

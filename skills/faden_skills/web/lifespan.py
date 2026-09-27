@@ -18,9 +18,9 @@ from prometheus_fastapi_instrumentator.instrumentation import (
     PrometheusFastApiInstrumentator,
 )
 
-from llm_port_skills.db.connection_budget import check_connection_budget
-from llm_port_skills.db.session import engine
-from llm_port_skills.settings import settings
+from faden_skills.db.connection_budget import check_connection_budget
+from faden_skills.db.session import engine
+from faden_skills.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def setup_opentelemetry(app: FastAPI) -> None:  # pragma: no cover
     tracer_provider = TracerProvider(
         resource=Resource(
             attributes={
-                SERVICE_NAME: "llm_port_skills",
+                SERVICE_NAME: "faden_skills",
                 TELEMETRY_SDK_LANGUAGE: "python",
                 DEPLOYMENT_ENVIRONMENT: settings.environment,
             },
@@ -94,7 +94,7 @@ async def lifespan_setup(
     await check_connection_budget(
         engine,
         service="skills",
-        env_prefix="LLM_PORT_SKILLS_",
+        env_prefix="FADEN_SKILLS_",
         workers=settings.workers_count,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,

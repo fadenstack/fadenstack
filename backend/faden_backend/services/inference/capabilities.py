@@ -14,7 +14,7 @@ Example (Ray 2.58-class environment)::
       "deployment": {"fixed_replicas": true, "autoscaling": true},
       "topology": {"multi_node": true, "tensor_parallel": true, "pipeline_parallel": true},
       "routing": {"strategies": ["default", "prefix_affinity"], "kv_aware": "experimental"},
-      "artifacts": {"local_path": true, "llmport_sync": true},
+      "artifacts": {"local_path": true, "faden_sync": true},
     }
 """
 

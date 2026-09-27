@@ -1,6 +1,6 @@
 """Git clone and checkout helpers for dev mode.
 
-Provides functions to clone repositories from the ``llm-port`` GitHub
+Provides functions to clone repositories from the ``fadenstack`` GitHub
 organisation, with support for HTTPS (default) and SSH clone methods.
 """
 
@@ -12,8 +12,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.registry import CORE_REPO, REPO_DIR_MAP, core_repo_clone_url, repo_clone_url
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.registry import CORE_REPO, REPO_DIR_MAP, core_repo_clone_url, repo_clone_url
 
 
 @dataclass
@@ -163,7 +163,7 @@ def clone_all_repos(
             error(f"{CORE_REPO} → {core_result.error}")
 
     # Clone any remaining repos not in the monorepo (e.g. EE repos)
-    monorepo_dirs = {r.local_dir for r in __import__("llmport.core.registry", fromlist=["REPOS"]).REPOS}
+    monorepo_dirs = {r.local_dir for r in __import__("faden_cli.core.registry", fromlist=["REPOS"]).REPOS}
     extra_repos = [r for r in repos if REPO_DIR_MAP.get(r, r) not in monorepo_dirs]
 
     if extra_repos:

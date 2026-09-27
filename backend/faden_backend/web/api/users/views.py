@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
-from llm_port_backend.db.models.users import (
+from faden_backend.db.models.users import (
     UserCreate,  # type: ignore
     UserRead,  # type: ignore
     UserUpdate,  # type: ignore
@@ -10,7 +10,7 @@ from llm_port_backend.db.models.users import (
     auth_jwt,  # type: ignore
     get_jwt_strategy,  # type: ignore
 )
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 router = APIRouter()
 
@@ -52,7 +52,7 @@ async def dev_login(request: Request) -> Response:
 
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.users import User  # noqa: PLC0415
+    from faden_backend.db.models.users import User  # noqa: PLC0415
 
     async with request.app.state.db_session_factory() as session:
         result = await session.execute(

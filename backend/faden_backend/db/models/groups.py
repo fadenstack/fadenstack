@@ -7,8 +7,8 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from llm_port_backend.db.base import Base
-from llm_port_backend.db.models.rbac import Role
+from faden_backend.db.base import Base
+from faden_backend.db.models.rbac import Role
 
 
 class Group(Base):

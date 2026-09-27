@@ -20,7 +20,7 @@
 #
 # The result lands in dist/, named the way /api/install/plan expects:
 #
-#   dist/llmport-agent-linux-aarch64
+#   dist/faden-agent-linux-aarch64
 #
 # That is the whole publish step. A backend running from this checkout reads
 # dist/ directly, so every node install -- online or air-gapped -- verifies
@@ -60,7 +60,7 @@ case "$PLATFORM" in
 esac
 
 SRC=$(cd "$(dirname "$0")" && pwd)
-ARTIFACT="llmport-agent-$PLATFORM"
+ARTIFACT="faden-agent-$PLATFORM"
 
 # The build itself, as one string, so the local and remote paths run exactly
 # the same thing. A difference between them would show up as a binary that
@@ -84,7 +84,7 @@ MSYS_NO_PATHCONV=1 docker run --rm --platform "$DOCKER_PLATFORM" -v "\$SRCDIR:/s
     apt-get update -qq && apt-get install -y -qq binutils >/dev/null
     pip install --quiet --no-cache-dir pyinstaller .
     pyinstaller --clean --noconfirm node_agent.spec
-    mv dist/llmport-agent "dist/$ARTIFACT"
+    mv dist/faden-agent "dist/$ARTIFACT"
     # Hand the output back to whoever owns the source.
     #
     # The container is root and the source is a bind mount, so everything it
@@ -135,7 +135,7 @@ case "$PLATFORM:$REMOTE_ARCH" in
     ;;
 esac
 
-REMOTE_DIR=$($SSH "$REMOTE" 'mktemp -d -t llmport-build-XXXXXX')
+REMOTE_DIR=$($SSH "$REMOTE" 'mktemp -d -t faden-build-XXXXXX')
 
 # Clean up, and say so when it does not work.
 #

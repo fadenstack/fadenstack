@@ -11,8 +11,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.pii_event_dao import PIIEventDAO
-from llm_port_backend.db.models.pii import PIIScanEvent
+from faden_backend.db.dao.pii_event_dao import PIIEventDAO
+from faden_backend.db.models.pii import PIIScanEvent
 
 pytestmark = pytest.mark.anyio()
 

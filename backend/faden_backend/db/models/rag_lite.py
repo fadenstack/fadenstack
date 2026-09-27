@@ -23,7 +23,7 @@ from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from llm_port_backend.db.base import Base
+from faden_backend.db.base import Base
 
 # Max pgvector column width – covers OpenAI ada-002 (1536), nomic (768),
 # text-embedding-3-small (1536), etc.  Must be ≤2000 for HNSW indexes.

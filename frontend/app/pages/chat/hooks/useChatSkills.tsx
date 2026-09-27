@@ -53,7 +53,7 @@ export function useChatSkills(): ChatSkills {
   return useContext(ChatSkillsContext);
 }
 
-const STORAGE_PREFIX = "llm-port-chat-skills:";
+const STORAGE_PREFIX = "faden-chat-skills:";
 /** The key for a chat not started yet. */
 export const NEW_CHAT = "new";
 

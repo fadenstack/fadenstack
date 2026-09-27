@@ -13,10 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from llm_port_mcp.db import crypto
-from llm_port_mcp.db.crypto import EncryptedJSON
-from llm_port_mcp.db.models.mcp import MCPServerModel
-from llm_port_mcp.web.api.admin.views import _merged, _server_to_response
+from faden_mcp.db import crypto
+from faden_mcp.db.crypto import EncryptedJSON
+from faden_mcp.db.models.mcp import MCPServerModel
+from faden_mcp.web.api.admin.views import _merged, _server_to_response
 
 TOKEN = {"Authorization": "Bearer t0ken"}
 

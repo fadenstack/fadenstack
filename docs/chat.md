@@ -1,7 +1,7 @@
 # The chat
 
 The chat is where everyone in the organization talks to the models
-LLM.Port serves: `http://<server>/chat`. Users land in it after signing in;
+Fadenstack serves: `http://<server>/chat`. Users land in it after signing in;
 administrators reach it from the console too.
 
 The screenshots were taken on the development install on 2026-09-26.

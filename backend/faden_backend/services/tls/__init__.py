@@ -1,6 +1,6 @@
 """TLS helpers shared across backend connection sites."""
 
-from llm_port_backend.services.tls.connection_ssl import (
+from faden_backend.services.tls.connection_ssl import (
     SSLMode,
     build_asyncpg_ssl,
     build_httpx_verify,

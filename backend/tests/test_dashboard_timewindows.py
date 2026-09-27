@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from llm_port_backend.services.dashboard import timewindows as tw
+from faden_backend.services.dashboard import timewindows as tw
 
 BERLIN = tw.parse_tz("Europe/Berlin")
 NEW_YORK = tw.parse_tz("America/New_York")

@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 
-from llm_port_api.db.models.gateway import PrivacyMode
-from llm_port_api.services.gateway.observability import GatewayObservability
+from faden_gateway.db.models.gateway import PrivacyMode
+from faden_gateway.services.gateway.observability import GatewayObservability
 
 
 class _DummyObservation:

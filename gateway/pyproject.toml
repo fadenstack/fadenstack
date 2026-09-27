@@ -1,6 +1,6 @@
 [project]
-name = "llm_port_api"
-version = "0.3.0"
+name = "faden_gateway"
+version = "0.4.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.11,<4"
@@ -79,7 +79,7 @@ build-backend = "hatchling.build"
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-src_paths = ["llm_port_api",]
+src_paths = ["faden_gateway",]
 
 [tool.mypy]
 strict = true
@@ -113,11 +113,11 @@ filterwarnings = [
     "ignore:Using `httpx` with `starlette.testclient`:starlette.exceptions.StarletteDeprecationWarning",
 ]
 env = [
-    "LLM_PORT_API_ENVIRONMENT=pytest",
-    "LLM_PORT_API_DB_BASE=llm_port_api_test",
-    "LLM_PORT_API_DB_URL_OVERRIDE=sqlite+aiosqlite:///:memory:",
-    "LLM_PORT_API_SENTRY_DSN=",
-    "LLM_PORT_API_JWT_SECRET=test-secret-32-bytes-minimum-value",
+    "FADEN_GATEWAY_ENVIRONMENT=pytest",
+    "FADEN_GATEWAY_DB_BASE=faden_gateway_test",
+    "FADEN_GATEWAY_DB_URL_OVERRIDE=sqlite+aiosqlite:///:memory:",
+    "FADEN_GATEWAY_SENTRY_DSN=",
+    "FADEN_GATEWAY_JWT_SECRET=test-secret-32-bytes-minimum-value",
 ]
 
 [tool.ruff]
@@ -182,7 +182,7 @@ line-length = 110
     "Q003", # Escaped string style in tests
     "RUF100", # Allow noqa in tests when needed
 ]
-"llm_port_api/db/migrations/versions/*" = [
+"faden_gateway/db/migrations/versions/*" = [
     "N999",
     "E501",
     "S608",
@@ -197,7 +197,7 @@ allow-magic-value-types = ["int", "str", "float", "bytes"]
 
 
 [fastapi-template.options]
-project_name = "llm_port_api"
+project_name = "faden_gateway"
 api_type = "rest"
 enable_redis = "True"
 enable_rmq = "True"
@@ -205,7 +205,7 @@ ci_type = "none"
 enable_migrations = "None"
 enable_taskiq = "True"
 enable_kube = "None"
-kube_name = "llm-port-api"
+kube_name = "faden-gateway"
 enable_routers = "True"
 enable_kafka = "None"
 enable_loguru = "True"

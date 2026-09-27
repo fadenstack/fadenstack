@@ -35,7 +35,7 @@ TEMP_DIR = Path(gettempdir())
 #: Named rather than inlined so the install endpoint can tell "an operator
 #: chose this directory" from "nobody set one" -- only in the second case is
 #: it free to prefer a source checkout's build output.
-DEFAULT_AGENT_BINARY_DIR = "/srv/llm-port/agent-binaries"
+DEFAULT_AGENT_BINARY_DIR = "/srv/faden/agent-binaries"
 
 
 def _default_model_store_root() -> str:
@@ -45,7 +45,7 @@ def _default_model_store_root() -> str:
     on Windows when available, ``~/.cache/huggingface`` elsewhere) so an
     unprivileged install owns its model store without a root-owned
     ``/srv`` path. Containerized deployments override this via
-    ``LLM_PORT_BACKEND_MODEL_STORE_ROOT`` in their compose env.
+    ``FADEN_BACKEND_MODEL_STORE_ROOT`` in their compose env.
     """
     if sys.platform == "win32":
         local = os.environ.get("LOCALAPPDATA")
@@ -101,9 +101,9 @@ class Settings(BaseSettings):
     # Variables for the database
     db_host: str = "127.0.0.1"
     db_port: int = 5432
-    db_user: str = "llm_port_backend"
-    db_pass: str = "llm_port_backend"  # noqa: S105
-    db_base: str = "llm_port_backend"
+    db_user: str = "faden_backend"
+    db_pass: str = "faden_backend"  # noqa: S105
+    db_base: str = "faden_backend"
     db_echo: bool = False
     # Per process, not per CPU. Every uvicorn worker of every service holds
     # its own pool, and all of them share one Postgres (max_connections 100
@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     db_ssl_ca_bundle: str | None = None
 
     # Variables for RabbitMQ
-    rabbit_host: str = "llm-port-rmq"
+    rabbit_host: str = "faden-rmq"
     rabbit_port: int = 5672
     rabbit_user: str = "guest"
     rabbit_pass: str = "guest"  # noqa: S105
@@ -157,14 +157,14 @@ class Settings(BaseSettings):
     # Where the admin "TLS activate" endpoint writes the decrypted edge
     # certificate and key: the install's ./tls directory, which nginx
     # mounts read-only and serves HTTPS from whenever it holds both
-    # (llm_port_shared/nginx/select-config.sh, docker-compose.yaml).
-    tls_edge_material_dir: str = "/etc/llmport/tls"
+    # (shared/nginx/select-config.sh, docker-compose.yaml).
+    tls_edge_material_dir: str = "/etc/faden/tls"
     tls_edge_cert_basename: str = "edge.crt"
     tls_edge_key_basename: str = "edge.key"
     tls_edge_chain_basename: str = "edge-chain.pem"
     # The container that terminates TLS, restarted when material is
     # activated or removed so the switch needs no operator step.
-    tls_edge_proxy_container: str = "llm-port-nginx"
+    tls_edge_proxy_container: str = "faden-nginx"
 
     # ── Model traffic TLS (gateway <-> machines) ─────────────────────
     # The machine CA (services/machine_tls) issues each machine a
@@ -176,9 +176,9 @@ class Settings(BaseSettings):
 
     # LLM Server settings
     # Defaults to the standard HuggingFace cache in the user's home so
-    # unprivileged host-process deployments (e.g. ``llmport dev up``) can
+    # unprivileged host-process deployments (e.g. ``faden dev up``) can
     # own the store; containerized deployments override it via
-    # ``LLM_PORT_BACKEND_MODEL_STORE_ROOT``.
+    # ``FADEN_BACKEND_MODEL_STORE_ROOT``.
     model_store_root: str = _default_model_store_root()
 
     # Where this deployment keeps its own copies of the node agent, served by
@@ -227,7 +227,7 @@ class Settings(BaseSettings):
     llm_graph_db_port: int = 5432
     llm_graph_db_user: str = "llm_user"
     llm_graph_db_pass: str = "llm_user"  # noqa: S105
-    llm_graph_db_base: str = "llm_api"
+    llm_graph_db_base: str = "faden_gateway"
     llm_graph_db_url_override: str | None = None
     rag_base_url: str = "http://127.0.0.1:8002/api"
     rag_service_token: str = "dev-rag-service-token"  # noqa: S105
@@ -257,8 +257,8 @@ class Settings(BaseSettings):
     mailer_smtp_password: str = ""
     mailer_smtp_starttls: bool = True
     mailer_smtp_ssl: bool = False
-    mailer_from_email: str = "noreply@llm-port.local"
-    mailer_from_name: str = "LLM Port"
+    mailer_from_email: str = "noreply@faden.local"
+    mailer_from_name: str = "Fadenstack"
 
     # External Auth module settings (enterprise SSO)
     auth_enabled: bool = False
@@ -280,7 +280,7 @@ class Settings(BaseSettings):
 
     # RAG Lite module settings (embedded pgvector-based RAG)
     rag_lite_enabled: bool = False
-    rag_lite_file_store_root: str = "/data/llm-port/rag-lite"
+    rag_lite_file_store_root: str = "/data/fadenstack/rag-lite"
     rag_lite_embedding_provider_id: str = ""
     rag_lite_embedding_model: str = ""
     rag_lite_embedding_dim: int = 768
@@ -317,22 +317,22 @@ class Settings(BaseSettings):
     grafana_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "LLM_PORT_BACKEND_GRAFANA_URL",
-            "LLM_PORT_GRAFANA_URL",
+            "FADEN_BACKEND_GRAFANA_URL",
+            "FADEN_GRAFANA_URL",
         ),
     )
     grafana_dashboard_uid_overview: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "LLM_PORT_BACKEND_GRAFANA_DASHBOARD_UID_OVERVIEW",
-            "LLM_PORT_GRAFANA_DASHBOARD_UID_OVERVIEW",
+            "FADEN_BACKEND_GRAFANA_DASHBOARD_UID_OVERVIEW",
+            "FADEN_GRAFANA_DASHBOARD_UID_OVERVIEW",
         ),
     )
     grafana_panels_overview: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "LLM_PORT_BACKEND_GRAFANA_PANELS_OVERVIEW",
-            "LLM_PORT_GRAFANA_PANELS_OVERVIEW",
+            "FADEN_BACKEND_GRAFANA_PANELS_OVERVIEW",
+            "FADEN_GRAFANA_PANELS_OVERVIEW",
         ),
     )
     loki_base_url: str = "http://127.0.0.1:3100"
@@ -349,11 +349,11 @@ class Settings(BaseSettings):
     logs_default_limit: int = 200
     logs_allowed_labels_raw: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("LLM_PORT_BACKEND_LOGS_ALLOWED_LABELS"),
+        validation_alias=AliasChoices("FADEN_BACKEND_LOGS_ALLOWED_LABELS"),
     )
     i18n_dir: str = "i18n"
     settings_master_key: str = "dev-settings-master-key-change-me"
-    system_compose_file: str = "../llm_port_shared/docker-compose.yaml"
+    system_compose_file: str = "../shared/docker-compose.yaml"
     system_agent_enabled: bool = False
     system_agent_token: str | None = None
     node_cluster_enabled: bool = False
@@ -384,13 +384,13 @@ class Settings(BaseSettings):
     prom_url: str = "http://127.0.0.1:9090"
     # Host path of the generated file_sd targets file (mounted into
     # both the prometheus and backend containers in the shared stack).
-    prom_targets_file: str = "llm_port_shared/prometheus/targets.json"
+    prom_targets_file: str = "shared/prometheus/targets.json"
     # Host directory the Grafana dashboard file provider reads; rendered
     # per-runtime dashboards (vllm-rt-*.json) are written here.
-    prom_dashboard_dir: str = "llm_port_shared/grafana/provisioning/dashboards/json"
+    prom_dashboard_dir: str = "shared/grafana/provisioning/dashboards/json"
     # Reusable Grafana dashboard JSON template (see
-    # llm_port_shared/grafana/dashboards/templates/vllm-runtime.json).
-    dash_template: str = "llm_port_shared/grafana/dashboards/templates/vllm-runtime.json"
+    # shared/grafana/dashboards/templates/vllm-runtime.json).
+    dash_template: str = "shared/grafana/dashboards/templates/vllm-runtime.json"
     # Grafana folder (title) used when provisioning runtime dashboards.
     dash_folder: str = "LLM Runtimes"
 
@@ -424,7 +424,7 @@ class Settings(BaseSettings):
             user=self.rabbit_user,
             password=self.rabbit_pass,
             # The vhost is the URL's path: "/" stays "/", a name gets its slash.
-            # A bare name ("llmport") used to crash start-up: yarl refuses a
+            # A bare name ("faden") used to crash start-up: yarl refuses a
             # path without one next to a host.
             path="/" + self.rabbit_vhost.lstrip("/"),
         )
@@ -460,8 +460,8 @@ class Settings(BaseSettings):
         return Path(__file__).resolve().parent.parent / base
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "llm_port_backend/.env"),
-        env_prefix="LLM_PORT_BACKEND_",
+        env_file=(".env", "backend/.env"),
+        env_prefix="FADEN_BACKEND_",
         env_file_encoding="utf-8",
         extra="ignore",
     )

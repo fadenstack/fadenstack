@@ -20,20 +20,20 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceDeployment,
     InferenceEnvironment,
 )
-from llm_port_backend.services.inference.capabilities import CapabilityDocument
-from llm_port_backend.services.inference.observability import (
+from faden_backend.services.inference.capabilities import CapabilityDocument
+from faden_backend.services.inference.observability import (
     DeploymentMetrics,
     EnvironmentMetrics,
     LogPage,
     LogSource,
     ObservabilityUnsupported,
 )
-from llm_port_backend.services.inference.schemas import InferenceDeploymentSpecV1Alpha1
+from faden_backend.services.inference.schemas import InferenceDeploymentSpecV1Alpha1
 
 
 class InferenceDriver(Protocol):

@@ -1,4 +1,4 @@
-"""HTTP client for the llm.port backend REST API.
+"""HTTP client for the fadenstack backend REST API.
 
 Used by commands that need to interact with a running backend instance
 (``provider``, ``user``, ``model``, ``config``, etc.).  The client
@@ -11,13 +11,13 @@ from typing import Any
 
 import httpx
 
-from llmport.core.settings import LlmportConfig
+from faden_cli.core.settings import FadenConfig
 
 
 class ApiClient:
     """Thin wrapper around ``httpx.Client`` targeting the backend API."""
 
-    def __init__(self, cfg: LlmportConfig, *, timeout: float = 30.0) -> None:
+    def __init__(self, cfg: FadenConfig, *, timeout: float = 30.0) -> None:
         self.base_url = cfg.api_url.rstrip("/")
         self.token = cfg.api_token
         self._client = httpx.Client(

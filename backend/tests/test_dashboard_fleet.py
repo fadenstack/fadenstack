@@ -21,16 +21,16 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode, InfraNodeInventorySnapshot
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.dashboard import attention as attention_rules
-from llm_port_backend.services.dashboard import capacity as cap
-from llm_port_backend.web.api.admin.dashboard.common import dashboard_now
+from faden_backend.db.models.node_control import InfraNode, InfraNodeInventorySnapshot
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.dashboard import attention as attention_rules
+from faden_backend.services.dashboard import capacity as cap
+from faden_backend.web.api.admin.dashboard.common import dashboard_now
 
 pytestmark = pytest.mark.anyio()
 
@@ -349,8 +349,8 @@ async def test_capacity_and_attention_never_ask_ray_or_probe_a_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A live Ray status takes 10-25 s here; the dashboard reads what the reconciler stored."""
-    from llm_port_backend.services.inference.drivers.ray import client as ray_client
-    from llm_port_backend.services.llm import remote_health
+    from faden_backend.services.inference.drivers.ray import client as ray_client
+    from faden_backend.services.llm import remote_health
 
     def forbidden(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("the dashboard must not contact Ray or a runtime")

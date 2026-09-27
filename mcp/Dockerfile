@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/llm-port/base:latest
+ARG BASE_IMAGE=ghcr.io/fadenstack/base:latest
 FROM ${BASE_IMAGE} AS prod
 
 # Node.js runtime for npx-based MCP servers
@@ -16,7 +16,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --inexact --no-dev
 
-CMD ["/usr/local/bin/python", "-m", "llm_port_mcp"]
+CMD ["/usr/local/bin/python", "-m", "faden_mcp"]
 
 FROM prod AS dev
 

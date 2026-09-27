@@ -35,8 +35,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO
+from faden_backend.db.models.llm import (
     DownloadJob,
     DownloadJobStatus,
     LLMModel,
@@ -48,10 +48,10 @@ from llm_port_backend.db.models.llm import (
     ProviderType,
     RuntimeStatus,
 )
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.llm.gateway_sync import GatewaySyncService
+from faden_backend.services.llm.service import LLMService
+from faden_backend.web.api.llm.dependencies import get_llm_service
 
 
 # ---------------------------------------------------------------------------

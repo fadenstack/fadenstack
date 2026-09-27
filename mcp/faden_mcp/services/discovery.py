@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_mcp.services.dao import MCPDao
-from llm_port_mcp.services.schema_mapper import compute_schema_hash, to_openai_tool
-from llm_port_mcp.services.transport.base import GenericMCPServer, MCPToolDescriptor
+from faden_mcp.services.dao import MCPDao
+from faden_mcp.services.schema_mapper import compute_schema_hash, to_openai_tool
+from faden_mcp.services.transport.base import GenericMCPServer, MCPToolDescriptor
 
 logger = logging.getLogger(__name__)
 

@@ -9,11 +9,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.dashboard import layout as layout_store
-from llm_port_backend.web.api.admin.dashboard.caching import NO_STORE
-from llm_port_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
+from faden_backend.services.dashboard import layout as layout_store
+from faden_backend.web.api.admin.dashboard.caching import NO_STORE
+from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
 

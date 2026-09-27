@@ -2,7 +2,7 @@
 
 These are request/response DTOs only.  The versioned deployment spec
 (``InferenceDeploymentSpecV1Alpha1``) lives in
-``llm_port_backend.services.inference.schemas`` and is exposed through the
+``faden_backend.services.inference.schemas`` and is exposed through the
 ``spec`` field of the deployment create/update bodies.
 """
 
@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from llm_port_backend.services.inference.planner import InferenceEnvironmentPlan
+from faden_backend.services.inference.planner import InferenceEnvironmentPlan
 
 # ---------------------------------------------------------------------------
 # Control planes

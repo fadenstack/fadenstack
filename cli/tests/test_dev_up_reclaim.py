@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from llmport.commands.dev import dev_up
+from faden_cli.commands.dev import dev_up
 
 
 def test_reclaim_reports_what_it_stopped(
@@ -117,7 +117,7 @@ def test_reclaim_spares_the_shell_that_launched_it(
 ) -> None:
     """The regression: ``dev up`` killed its own terminal mid-reclaim.
 
-    It runs as ``uv run -m llmport``, so ``uv.exe`` is its parent and that
+    It runs as ``uv run -m faden_cli``, so ``uv.exe`` is its parent and that
     parent's command line names the workspace exactly as a service's does.
     Sparing only our own pid left the parent to be killed, which took the
     terminal down with nothing started and no explanation printed.

@@ -5,7 +5,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from llm_port_api.services.cache.protocol import CacheBackend
+    from faden_gateway.services.cache.protocol import CacheBackend
 
 log = logging.getLogger(__name__)
 

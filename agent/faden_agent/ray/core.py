@@ -2,7 +2,7 @@
 
 Spec rule (section 2): live cluster status/controls go through Ray **Core
 Python APIs**; the CLI is reserved for bootstrap/process (``ray start`` /
-``ray stop``) in :mod:`llm_port_node_agent.ray.runtime`.
+``ray stop``) in :mod:`faden_agent.ray.runtime`.
 
 This module is the ONLY place in the agent that calls into the Ray SDK for
 cluster state.  Everything else (``manager``/``serve``/``metrics``) consumes
@@ -44,8 +44,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Mapping
 
-from llm_port_node_agent.ray import errors, models
-from llm_port_node_agent.ray.models import RayNodeStatus
+from faden_agent.ray import errors, models
+from faden_agent.ray.models import RayNodeStatus
 
 log = logging.getLogger(__name__)
 

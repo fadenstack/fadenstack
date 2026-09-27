@@ -15,10 +15,10 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 if TYPE_CHECKING:
-    from llm_port_backend.db.models.llm import LLMModel
+    from faden_backend.db.models.llm import LLMModel
 
 log = logging.getLogger(__name__)
 
@@ -192,7 +192,7 @@ def build_model_sync_payload(
     if source == "download_from_hf":
         return base
 
-    from llm_port_backend.web.api.node_files import views as node_files_views
+    from faden_backend.web.api.node_files import views as node_files_views
 
     # Support legacy tests monkeypatching node_files_views while honoring module patches
     views_cache_mod = getattr(getattr(node_files_views, "_model_cache_dir", None), "__module__", None)

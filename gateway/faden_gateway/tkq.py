@@ -4,7 +4,7 @@ import taskiq_fastapi
 from taskiq import AsyncBroker, InMemoryBroker
 from taskiq_aio_pika import AioPikaBroker
 
-from llm_port_api.settings import settings
+from faden_gateway.settings import settings
 
 broker: AsyncBroker
 
@@ -26,5 +26,5 @@ else:
 
 taskiq_fastapi.init(
     broker,
-    "llm_port_api.web.application:get_app",
+    "faden_gateway.web.application:get_app",
 )

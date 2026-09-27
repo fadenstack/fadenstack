@@ -41,38 +41,38 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     EnvironmentStatus,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     InfraNode,
     NodeCommandStatus,
     NodeCommandType,
     NodeHealthStatus,
 )
-from llm_port_backend.services.inference.drivers.ray.client import RayClusterClient
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
-from llm_port_backend.services.inference.drivers.ray.schemas import (
+from faden_backend.services.inference.drivers.ray.client import RayClusterClient
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.inference.drivers.ray.schemas import (
     RayClusterStatus,
     RayEnvironmentConfig,
 )
-from llm_port_backend.services.inference.drivers.ray.secrets import (
+from faden_backend.services.inference.drivers.ray.secrets import (
     generate_cluster_token,
     store_cluster_token,
 )
-from llm_port_backend.services.inference.drivers.ray.status import (
+from faden_backend.services.inference.drivers.ray.status import (
     build_environment_conditions,
     map_cluster_to_environment_status,
 )
-from llm_port_backend.services.inference.ray_tls import supported as ray_tls_supported
+from faden_backend.services.inference.ray_tls import supported as ray_tls_supported
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from llm_port_backend.services.nodes.service import NodeControlService
+    from faden_backend.services.nodes.service import NodeControlService
 
 log = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ _IMAGE_ABSENT = frozenset({"runtime_image_missing", "runtime_image_mismatch"})
 
 # One runtime container per node; the head/worker split is decided by which
 # ``ray start`` the agent execs inside it.
-_RUNTIME_CONTAINER_NAME = "llm-port-ray-runtime"
+_RUNTIME_CONTAINER_NAME = "faden-ray-runtime"
 
 
 #: Failures that come back identically however often they are retried, for
@@ -131,7 +131,7 @@ _RETRY_CAP_SEC = 30 * 60
 #: when anything inside it does.
 _PERMANENT_RECHECK_SEC = 60 * 60
 
-#: Restarts LLM.Port makes on its own before it declares a cluster failed.
+#: Restarts Fadenstack makes on its own before it declares a cluster failed.
 _MAX_RECOVERY_ATTEMPTS = 3
 #: How long a failed health check waits for a second look before anything is
 #: restarted. One probe that timed out on a busy head is not a dead cluster,
@@ -142,7 +142,7 @@ _CONFIRM_AFTER_SEC = 20
 _RECOVERY_BACKOFF_SEC = 30
 #: Once the attempts are used up, how often it is still looked at -- and
 #: restarted once more if still down. What stopped it may have been fixed
-#: without anyone telling LLM.Port: a network link back, a machine repaired.
+#: without anyone telling Fadenstack: a network link back, a machine repaired.
 _GAVE_UP_RECHECK_SEC = 15 * 60
 #: After a restart, how long the cluster has to show every member before the
 #: attempt counts as not having worked, and how often it is looked at.
@@ -571,7 +571,7 @@ class RayEnvironmentManager:
                 status,
                 expected_nodes=len(nodes),
                 reason=(
-                    f"{what}. LLM.Port restarted it {attempt} times and it did not "
+                    f"{what}. Fadenstack restarted it {attempt} times and it did not "
                     f"come back (last: {error}). It tries again every "
                     f"{_GAVE_UP_RECHECK_SEC // 60} minutes; use Try again once the "
                     f"cause is fixed."
@@ -612,7 +612,7 @@ class RayEnvironmentManager:
         """Members with no live record in the cluster.
 
         Ray names a node by the address it was started on -- the fabric link
-        here, not the address LLM.Port knows the machine by -- so both are
+        here, not the address Fadenstack knows the machine by -- so both are
         tried. An agent too old to list nodes gives only a count, which
         cannot say who is missing: nothing is restarted on it.
         """
@@ -991,7 +991,7 @@ class RayEnvironmentManager:
         import hashlib  # noqa: PLC0415
         import hmac  # noqa: PLC0415
 
-        from llm_port_backend.settings import settings  # noqa: PLC0415
+        from faden_backend.settings import settings  # noqa: PLC0415
 
         message = f"image-seed:{environment.id}:{environment.generation}:{node_id}".encode()
         return hmac.new(settings.settings_master_key.encode(), message, hashlib.sha256).hexdigest()
@@ -1086,7 +1086,7 @@ class RayEnvironmentManager:
 
         if exc.permanent:
             return (
-                f"{exc.detail} This will not change by retrying, so LLM.Port is "
+                f"{exc.detail} This will not change by retrying, so Fadenstack is "
                 f"not retrying it on its own until the runtime image or the "
                 f"cluster changes; it re-checks every hour. Use Try again once "
                 f"you have fixed it."
@@ -1247,7 +1247,7 @@ class RayEnvironmentManager:
         runtime does not exist, so the cluster would fail later and blame the
         wrong thing.
         """
-        from llm_port_backend.services.inference.bundles import (  # noqa: PLC0415
+        from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             node_and_bundle_for,
         )
 
@@ -1353,7 +1353,7 @@ class RayEnvironmentManager:
         against it -- the image is the bundle's, the host paths are the
         node's -- and looking it up twice would be the only alternative.
         """
-        from llm_port_backend.services.inference.bundles import (  # noqa: PLC0415
+        from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             node_and_bundle_for,
         )
 
@@ -1383,7 +1383,7 @@ class RayEnvironmentManager:
         """Merge the bundle's certified platform tuning into ``env_vars``."""
         if bundle is None:
             return env_vars
-        from llm_port_backend.services.inference.bundles import default_bundle_registry
+        from faden_backend.services.inference.bundles import default_bundle_registry
 
         # Diagnostics (verbose NCCL tracing and friends) stay opt-in per
         # environment; they are not a runtime default.
@@ -1401,7 +1401,7 @@ class RayEnvironmentManager:
         """Render the bundle into the agent's container launch contract."""
         if bundle is None:
             return None
-        from llm_port_backend.services.inference.bundles import default_bundle_registry
+        from faden_backend.services.inference.bundles import default_bundle_registry
 
         return default_bundle_registry.container_launch_spec(
             bundle, name=_RUNTIME_CONTAINER_NAME, env=env_vars or {}, node=node,
@@ -1628,7 +1628,7 @@ class RayEnvironmentManager:
     async def _refresh_capabilities(self, environment, config) -> None:
         """Persist the static Ray capability snapshot (step 7)."""
         try:
-            from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
+            from faden_backend.services.inference.drivers.ray.driver import RayDriver
 
             doc = await RayDriver().capabilities(environment)
             raw = doc.raw or {}

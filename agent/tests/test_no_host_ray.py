@@ -28,16 +28,16 @@ _AGENT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 # are included deliberately: their SDK imports are lazy so a missing runtime
 # surfaces as a command result, not an ImportError that kills the agent.
 _MUST_IMPORT_WITHOUT_RAY = [
-    "llm_port_node_agent.collectors",
-    "llm_port_node_agent.network",
-    "llm_port_node_agent.dispatcher",
-    "llm_port_node_agent.ray.container",
-    "llm_port_node_agent.ray.manager",
-    "llm_port_node_agent.ray.runtime",
-    "llm_port_node_agent.ray.core",
-    "llm_port_node_agent.ray.serve",
-    "llm_port_node_agent.ray.state",
-    "llm_port_node_agent.runtimes.docker",
+    "faden_agent.collectors",
+    "faden_agent.network",
+    "faden_agent.dispatcher",
+    "faden_agent.ray.container",
+    "faden_agent.ray.manager",
+    "faden_agent.ray.runtime",
+    "faden_agent.ray.core",
+    "faden_agent.ray.serve",
+    "faden_agent.ray.state",
+    "faden_agent.runtimes.docker",
 ]
 
 
@@ -46,7 +46,7 @@ def test_ray_is_not_a_base_dependency() -> None:
     pyproject = (_AGENT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     base = pyproject.split("dependencies = [", 1)[1].split("]", 1)[0]
     # Compare declared requirements, not the raw block: a comment mentioning a
-    # module path such as ``llm_port_node_agent.ray.models`` is not a
+    # module path such as ``faden_agent.ray.models`` is not a
     # dependency, and a substring check fails on it.
     names = []
     for line in base.splitlines():
@@ -116,10 +116,10 @@ print("OK")
 @pytest.mark.anyio()
 async def test_containerized_ensure_runtime_needs_no_host_ray(tmp_path, monkeypatch) -> None:
     """The Phase 4B exit criterion, with the host import actually broken."""
-    from llm_port_node_agent.event_buffer import EventBuffer
-    from llm_port_node_agent.ray.container import RayContainerRuntime
-    from llm_port_node_agent.ray.manager import RayManager
-    from llm_port_node_agent.state_store import StateStore
+    from faden_agent.event_buffer import EventBuffer
+    from faden_agent.ray.container import RayContainerRuntime
+    from faden_agent.ray.manager import RayManager
+    from faden_agent.state_store import StateStore
 
     from tests.test_ray_container import _FakeRuntime, _payload
 

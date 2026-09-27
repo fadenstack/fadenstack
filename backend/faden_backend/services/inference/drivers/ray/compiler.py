@@ -1,7 +1,7 @@
-"""Deterministic compiler from an LLM.Port deployment spec to a Ray config.
+"""Deterministic compiler from an Fadenstack deployment spec to a Ray config.
 
-Phase 3 turns an :class:`~llm_port_backend.services.inference.schemas.InferenceDeploymentSpecV1Alpha1`
-plus the resolved :class:`~llm_port_backend.db.models.llm.LLMModel` record into the
+Phase 3 turns an :class:`~faden_backend.services.inference.schemas.InferenceDeploymentSpecV1Alpha1`
+plus the resolved :class:`~faden_backend.db.models.llm.LLMModel` record into the
 ``LLMServingArgs``-shaped dictionary that the head-node agent hands to
 ``ray.serve.llm.build_openai_app`` and deploys with ``serve.run``.
 
@@ -39,7 +39,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from llm_port_backend.services.inference.schemas import (
+from faden_backend.services.inference.schemas import (
     InferenceDeploymentSpecV1Alpha1,
     parse_inference_deployment_spec,
 )

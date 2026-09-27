@@ -44,7 +44,7 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-CONTAINER = "llm-port-model-tls"
+CONTAINER = "faden-model-tls"
 INFO_PATH = "/api/node-files/machine-tls"
 CERTIFICATE_PATH = "/api/node-files/machine-tls/certificate"
 
@@ -57,11 +57,11 @@ NGINX_ROOTFS = {
     "x86_64": "sha256:268c8b4b4baa285e4082ade32c9f2f69a013617ea0b7d0ff25f711bdb10750e7",
     "aarch64": "sha256:2f89fd28b672e74bd0d11deb485485881ca606ccc04a6a14b05cca1272f0459a",
 }
-#: The name the server holds each architecture's copy under (``llmport`` CLI prepares them).
-SERVER_IMAGE = "llmport/model-tls-nginx"
+#: The name the server holds each architecture's copy under (``faden`` CLI prepares them).
+SERVER_IMAGE = "faden/model-tls-nginx"
 
 #: Inside the container.
-_MOUNT = "/etc/llmport-model-tls"
+_MOUNT = "/etc/faden-model-tls"
 KEY_FILE = "machine.key"
 CERT_FILE = "machine.crt"
 TRUST_FILE = "trust.pem"
@@ -96,7 +96,7 @@ def render_conf(routes: dict[int, int], *, client_name: str, ipv6: bool) -> str:
         servers.append(
             "    server {\n"
             + listen
-            + "        if ($llmport_client_ok = 0) { return 403; }\n"
+            + "        if ($faden_client_ok = 0) { return 403; }\n"
             "        location / {\n"
             f"            proxy_pass http://127.0.0.1:{internal};\n"
             "            proxy_set_header Host $http_host;\n"
@@ -109,7 +109,7 @@ def render_conf(routes: dict[int, int], *, client_name: str, ipv6: bool) -> str:
     return (
         "# Written by the node agent (model_tls.py); rewritten on every change.\n"
         "worker_processes auto;\n"
-        "pid /tmp/llmport-model-tls.pid;\n"
+        "pid /tmp/faden-model-tls.pid;\n"
         "error_log stderr notice;\n"
         "events { worker_connections 4096; }\n"
         "http {\n"
@@ -128,7 +128,7 @@ def render_conf(routes: dict[int, int], *, client_name: str, ipv6: bool) -> str:
         "    ssl_verify_client on;\n"
         "    ssl_verify_depth 1;\n"
         "    ssl_session_cache shared:modeltls:1m;\n"
-        "    map $ssl_client_s_dn $llmport_client_ok {\n"
+        "    map $ssl_client_s_dn $faden_client_ok {\n"
         "        default 0;\n"
         f'        "~(^|,)CN={name}(,|$)" 1;\n'
         "    }\n"

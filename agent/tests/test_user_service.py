@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent import __main__ as agent_main
+from faden_agent import __main__ as agent_main
 
 
 class TestChoosingTheScope:
@@ -57,9 +57,9 @@ class TestChoosingTheScope:
 
 def test_the_user_unit_runs_the_agent_and_restarts_it(tmp_path: Path) -> None:
     unit = agent_main._build_user_service_content(
-        "/home/sachi/.local/bin/llmport-agent", tmp_path / "agent.env"
+        "/home/sachi/.local/bin/faden-agent", tmp_path / "agent.env"
     )
-    assert "ExecStart=/home/sachi/.local/bin/llmport-agent run" in unit
+    assert "ExecStart=/home/sachi/.local/bin/faden-agent run" in unit
     assert f"EnvironmentFile={tmp_path / 'agent.env'}" in unit
     assert "Restart=always" in unit
     # default.target is the user manager's; multi-user.target does not exist there.
@@ -79,14 +79,14 @@ class TestStopping:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         issued = self._record(monkeypatch)
-        unit = tmp_path / "llmport-agent.service"
+        unit = tmp_path / "faden-agent.service"
         unit.write_text("[Service]\n")
         monkeypatch.setattr(agent_main, "_user_unit_path", lambda: unit)
         monkeypatch.setattr(agent_main, "_system_unit_path", lambda: tmp_path / "absent.service")
 
         agent_main._cmd_stop_linux()
 
-        assert ["systemctl", "--user", "disable", "--now", "llmport-agent"] in issued
+        assert ["systemctl", "--user", "disable", "--now", "faden-agent"] in issued
         assert not any(cmd[0] == "sudo" for cmd in issued), "no system unit, no password"
         assert not unit.exists()
 
@@ -101,7 +101,7 @@ class TestStopping:
 
         agent_main._cmd_stop_linux()
 
-        assert ["sudo", "systemctl", "disable", "--now", "llmport-agent"] in issued
+        assert ["sudo", "systemctl", "disable", "--now", "faden-agent"] in issued
 
 
 def test_start_installs_a_user_unit_and_asks_for_linger(
@@ -114,13 +114,13 @@ def test_start_installs_a_user_unit_and_asks_for_linger(
     monkeypatch.setattr(agent_main, "_LINUX_USER_ENV_FILE", tmp_path / "cfg" / "agent.env")
     monkeypatch.setattr(agent_main.getpass, "getuser", lambda: "sachi")
 
-    agent_main._cmd_start_linux_user("/opt/llmport-agent", ["LLM_PORT_NODE_AGENT_BACKEND_URL=http://x"])
+    agent_main._cmd_start_linux_user("/opt/faden-agent", ["FADEN_NODE_AGENT_BACKEND_URL=http://x"])
 
-    assert (tmp_path / "units" / "llmport-agent.service").is_file()
+    assert (tmp_path / "units" / "faden-agent.service").is_file()
     assert "BACKEND_URL=http://x" in (tmp_path / "cfg" / "agent.env").read_text()
-    assert ["systemctl", "--user", "enable", "llmport-agent"] in issued
+    assert ["systemctl", "--user", "enable", "faden-agent"] in issued
     # An upgrade must run the new build: "enable --now" leaves a running
     # service on the old one.
-    assert ["systemctl", "--user", "restart", "llmport-agent"] in issued
+    assert ["systemctl", "--user", "restart", "faden-agent"] in issued
     assert ["loginctl", "enable-linger", "sachi"] in issued
     assert not any(cmd[0] == "sudo" for cmd in issued)

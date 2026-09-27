@@ -10,10 +10,10 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from llm_port_mcp.log import configure_logging
-from llm_port_mcp.settings import settings
-from llm_port_mcp.web.api.router import api_router
-from llm_port_mcp.web.lifespan import lifespan_setup
+from faden_mcp.log import configure_logging
+from faden_mcp.settings import settings
+from faden_mcp.web.api.router import api_router
+from faden_mcp.web.lifespan import lifespan_setup
 
 APP_ROOT = Path(__file__).parent.parent
 
@@ -36,8 +36,8 @@ def get_app() -> FastAPI:
             ],
         )
     app = FastAPI(
-        title="llm_port_mcp",
-        version=metadata.version("llm_port_mcp"),
+        title="faden_mcp",
+        version=metadata.version("faden_mcp"),
         lifespan=lifespan_setup,
         docs_url=None,
         redoc_url=None,

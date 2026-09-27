@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from llm_port_api.services.gateway.usage_group import UsageGroupResolver
+from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 
 
 class _Clock:
@@ -129,6 +129,6 @@ async def test_group_memberships_are_cached_like_the_usage_group() -> None:
 def test_without_a_backend_database_there_is_nothing_to_resolve() -> None:
     from types import SimpleNamespace  # noqa: PLC0415
 
-    from llm_port_api.services.gateway.usage_group import build_user_resolvers  # noqa: PLC0415
+    from faden_gateway.services.gateway.usage_group import build_user_resolvers  # noqa: PLC0415
 
     assert build_user_resolvers(SimpleNamespace(backend_db_base="")) == (None, None)

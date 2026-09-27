@@ -1,14 +1,14 @@
 from fastapi.routing import APIRouter
 
-from llm_port_backend.web.api import docs, i18n, logs, monitoring, users
-from llm_port_backend.web.api.admin import admin_router
-from llm_port_backend.web.api.bootstrap.views import router as bootstrap_router
-from llm_port_backend.web.api.chat.views import router as chat_router
-from llm_port_backend.web.api.inference import inference_router
-from llm_port_backend.web.api.install import router as install_router
-from llm_port_backend.web.api.llm import llm_router
-from llm_port_backend.web.api.node_files import router as node_files_router
-from llm_port_backend.web.api.skills.views import router as skills_router
+from faden_backend.web.api import docs, i18n, logs, monitoring, users
+from faden_backend.web.api.admin import admin_router
+from faden_backend.web.api.bootstrap.views import router as bootstrap_router
+from faden_backend.web.api.chat.views import router as chat_router
+from faden_backend.web.api.inference import inference_router
+from faden_backend.web.api.install import router as install_router
+from faden_backend.web.api.llm import llm_router
+from faden_backend.web.api.node_files import router as node_files_router
+from faden_backend.web.api.skills.views import router as skills_router
 
 api_router = APIRouter()
 api_router.include_router(monitoring.router)

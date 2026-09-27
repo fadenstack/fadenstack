@@ -24,14 +24,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.models.llm import ProviderTarget
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.dashboard import kpis as kpi_service
-from llm_port_backend.services.dashboard import timewindows as tw
-from llm_port_backend.services.dashboard import traffic
-from llm_port_backend.services.dashboard.cache import FactCache
-from llm_port_backend.services.dashboard.facts import Facts
-from llm_port_backend.web.api.admin.dashboard.common import dashboard_now
+from faden_backend.db.models.llm import ProviderTarget
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.dashboard import kpis as kpi_service
+from faden_backend.services.dashboard import timewindows as tw
+from faden_backend.services.dashboard import traffic
+from faden_backend.services.dashboard.cache import FactCache
+from faden_backend.services.dashboard.facts import Facts
+from faden_backend.web.api.admin.dashboard.common import dashboard_now
 
 pytestmark = pytest.mark.anyio()
 

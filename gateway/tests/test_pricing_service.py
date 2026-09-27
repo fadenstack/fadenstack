@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import pytest
 
-from llm_port_api.services.gateway.pricing import CostEstimate, PriceCatalogEntry, PricingService
+from faden_gateway.services.gateway.pricing import CostEstimate, PriceCatalogEntry, PricingService
 
 
 def _make_entry(

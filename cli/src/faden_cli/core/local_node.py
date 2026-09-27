@@ -13,11 +13,11 @@ from urllib.parse import urlparse
 
 import httpx
 
-from llmport.core.console import error, info, success, warning
-from llmport.core.registry import CORE_REPO, core_repo_clone_url, repo_clone_url
+from faden_cli.core.console import error, info, success, warning
+from faden_cli.core.registry import CORE_REPO, core_repo_clone_url, repo_clone_url
 
-_NODE_AGENT_REPO = "llm-port-node-agent"
-_NODE_AGENT_DIR = "llm_port_node_agent"
+_NODE_AGENT_REPO = "faden-node-agent"
+_NODE_AGENT_DIR = "faden_agent"
 
 
 def create_enrollment_token(
@@ -55,7 +55,7 @@ def remove_local_node_agent(*, workspace: Path, use_sudo: bool = True) -> bool:
     """Stop the local node agent (systemd service and/or running process).
 
     The cloned source directory is intentionally left in place so that
-    unpushed work is never destroyed by ``llmport down --all``.
+    unpushed work is never destroyed by ``faden down --all``.
 
     Returns True if cleanup succeeded (or nothing to clean up).
     """
@@ -67,14 +67,14 @@ def remove_local_node_agent(*, workspace: Path, use_sudo: bool = True) -> bool:
         if systemctl:
             # Check if the service unit exists before trying to stop it
             probe = subprocess.run(  # noqa: S603
-                ["systemctl", "list-unit-files", "llmport-agent.service"],
+                ["systemctl", "list-unit-files", "faden-agent.service"],
                 capture_output=True, text=True,
             )
-            if "llmport-agent.service" in (probe.stdout or ""):
-                info("Stopping llmport-agent systemd service…")
-                _run(["sudo", "systemctl", "disable", "--now", "llmport-agent"], check=False)
-                _run(["sudo", "rm", "-f", "/etc/systemd/system/llmport-agent.service"], check=False)
-                _run(["sudo", "rm", "-f", "/etc/llmport-agent.env"], check=False)
+            if "faden-agent.service" in (probe.stdout or ""):
+                info("Stopping faden-agent systemd service…")
+                _run(["sudo", "systemctl", "disable", "--now", "faden-agent"], check=False)
+                _run(["sudo", "rm", "-f", "/etc/systemd/system/faden-agent.service"], check=False)
+                _run(["sudo", "rm", "-f", "/etc/faden-agent.env"], check=False)
                 _run(["sudo", "systemctl", "daemon-reload"], check=False)
                 removed_anything = True
 
@@ -82,14 +82,14 @@ def remove_local_node_agent(*, workspace: Path, use_sudo: bool = True) -> bool:
     if platform.system() == "Windows":
         # Best-effort: kill by process name
         kill_result = subprocess.run(  # noqa: S603
-            ["taskkill", "/F", "/IM", "llmport-agent.exe"],
+            ["taskkill", "/F", "/IM", "faden-agent.exe"],
             capture_output=True, text=True,
         )
         if kill_result.returncode == 0:
             removed_anything = True
     else:
         kill_result = subprocess.run(  # noqa: S603
-            ["pkill", "-f", "llm.port.node.agent"],
+            ["pkill", "-f", "fadenstack.node.agent"],
             capture_output=True, text=True,
         )
         if kill_result.returncode == 0:
@@ -118,13 +118,13 @@ def _build_env_lines(
     """Build the common env lines for all provisioning paths."""
     loki_url = _derive_loki_url(backend_url)
     lines = [
-        f"LLM_PORT_NODE_AGENT_BACKEND_URL={backend_url}",
-        f"LLM_PORT_NODE_AGENT_LOKI_URL={loki_url}",
+        f"FADEN_NODE_AGENT_BACKEND_URL={backend_url}",
+        f"FADEN_NODE_AGENT_LOKI_URL={loki_url}",
     ]
     if advertise_host:
-        lines.append(f"LLM_PORT_NODE_AGENT_ADVERTISE_HOST={advertise_host}")
+        lines.append(f"FADEN_NODE_AGENT_ADVERTISE_HOST={advertise_host}")
     if enrollment_token:
-        lines.append(f"LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN={enrollment_token}")
+        lines.append(f"FADEN_NODE_AGENT_ENROLLMENT_TOKEN={enrollment_token}")
     else:
         warning("No enrollment token provided. Agent will require later onboarding.")
     return lines
@@ -133,10 +133,10 @@ def _build_env_lines(
 def _find_agent_binary(workspace: Path) -> Path | None:
     """Locate a pre-built node agent binary in the workspace."""
     candidates = [
-        workspace / _NODE_AGENT_DIR / "dist" / "llmport-agent",
-        workspace / _NODE_AGENT_DIR / "dist" / "llmport-agent.exe",
-        workspace / "dist" / "llmport-agent",
-        workspace / "dist" / "llmport-agent.exe",
+        workspace / _NODE_AGENT_DIR / "dist" / "faden-agent",
+        workspace / _NODE_AGENT_DIR / "dist" / "faden-agent.exe",
+        workspace / "dist" / "faden-agent",
+        workspace / "dist" / "faden-agent.exe",
     ]
     for path in candidates:
         if path.is_file():
@@ -231,7 +231,7 @@ def _provision_local(
         info("No sudo — starting node agent as user background process.")
         return _start_agent_foreground(repo_dir, env_lines)
 
-    service_file = repo_dir / "deploy" / "systemd" / "llmport-agent.service"
+    service_file = repo_dir / "deploy" / "systemd" / "faden-agent.service"
     if not service_file.exists():
         error(f"Systemd service file missing: {service_file}")
         return False
@@ -247,13 +247,13 @@ def _provision_local(
         temp_env = Path(handle.name)
 
     try:
-        if _run(["sudo", "install", "-m", "0644", str(service_file), "/etc/systemd/system/llmport-agent.service"]) != 0:
+        if _run(["sudo", "install", "-m", "0644", str(service_file), "/etc/systemd/system/faden-agent.service"]) != 0:
             return False
-        if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/llmport-agent.env"]) != 0:
+        if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/faden-agent.env"]) != 0:
             return False
         if _run(["sudo", "systemctl", "daemon-reload"]) != 0:
             return False
-        if _run(["sudo", "systemctl", "enable", "--now", "llmport-agent"]) != 0:
+        if _run(["sudo", "systemctl", "enable", "--now", "faden-agent"]) != 0:
             return False
     finally:
         try:
@@ -279,7 +279,7 @@ def _provision_local_binary(
     env_lines = _build_env_lines(backend_url, advertise_host, enrollment_token)
 
     is_linux = platform.system() == "Linux"
-    install_path = Path("/usr/local/bin/llmport-agent") if is_linux else binary
+    install_path = Path("/usr/local/bin/faden-agent") if is_linux else binary
 
     if is_linux and use_sudo:
         # Install binary to /usr/local/bin
@@ -297,13 +297,13 @@ def _provision_local_binary(
             temp_env = Path(handle.name)
 
         # Install systemd service (use the template from workspace if available)
-        service_src = workspace / _NODE_AGENT_DIR / "deploy" / "systemd" / "llmport-agent.service"
+        service_src = workspace / _NODE_AGENT_DIR / "deploy" / "systemd" / "faden-agent.service"
         if not service_src.exists():
             # Write a minimal service file inline
             with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".service") as sf:
                 sf.write(
                     "[Unit]\n"
-                    "Description=llm-port node agent\n"
+                    "Description=fadenstack node agent\n"
                     "After=network-online.target docker.service\n"
                     "Wants=network-online.target\n"
                     # A start that can never succeed must stop retrying and say so.
@@ -318,7 +318,7 @@ def _provision_local_binary(
                     "StartLimitBurst=10\n\n"
                     "[Service]\n"
                     "Type=simple\n"
-                    "EnvironmentFile=-/etc/llmport-agent.env\n"
+                    "EnvironmentFile=-/etc/faden-agent.env\n"
                     f"ExecStart={install_path}\n"
                     "Restart=always\n"
                     "RestartSec=5\n\n"
@@ -328,13 +328,13 @@ def _provision_local_binary(
                 service_src = Path(sf.name)
 
         try:
-            if _run(["sudo", "install", "-m", "0644", str(service_src), "/etc/systemd/system/llmport-agent.service"]) != 0:
+            if _run(["sudo", "install", "-m", "0644", str(service_src), "/etc/systemd/system/faden-agent.service"]) != 0:
                 return False
-            if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/llmport-agent.env"]) != 0:
+            if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/faden-agent.env"]) != 0:
                 return False
             if _run(["sudo", "systemctl", "daemon-reload"]) != 0:
                 return False
-            if _run(["sudo", "systemctl", "enable", "--now", "llmport-agent"]) != 0:
+            if _run(["sudo", "systemctl", "enable", "--now", "faden-agent"]) != 0:
                 return False
         finally:
             try:
@@ -407,13 +407,13 @@ def _start_agent_foreground(repo_dir: Path, env_lines: list[str]) -> bool:
 
     # When running as a non-root user, override the default state path
     # (/var/lib/...) to a writable location inside the repo dir.
-    if "LLM_PORT_NODE_AGENT_STATE_PATH" not in proc_env:
+    if "FADEN_NODE_AGENT_STATE_PATH" not in proc_env:
         state_dir = repo_dir / ".agent-state"
         state_dir.mkdir(parents=True, exist_ok=True)
-        proc_env["LLM_PORT_NODE_AGENT_STATE_PATH"] = str(state_dir / "state.json")
+        proc_env["FADEN_NODE_AGENT_STATE_PATH"] = str(state_dir / "state.json")
 
     # Launch as detached background process
-    cmd = [str(venv_python), "-m", "llm_port_node_agent"]
+    cmd = [str(venv_python), "-m", "faden_agent"]
     if platform.system() == "Windows":
         # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
         creationflags = 0x00000008 | 0x00000200
@@ -454,7 +454,7 @@ def _provision_remote(
         error("ssh is not installed or not on PATH.")
         return False
 
-    workdir = (workdir_override or "").strip() or "/opt/llm_port_node_agent"
+    workdir = (workdir_override or "").strip() or "/opt/faden_agent"
     script = _build_remote_script(
         repo_url=repo_url,
         branch=branch,
@@ -558,12 +558,12 @@ fi
 SVC_USER="$(id -un)"
 SVC_GROUP="$(id -gn)"
 HOME_DIR="$(eval echo ~"$SVC_USER")"
-STATE_DIR="$HOME_DIR/.local/share/llmport-agent"
-[ "$(id -u)" -eq 0 ] && STATE_DIR="/var/lib/llmport-agent"
-CONFIG_DIR="$HOME_DIR/.config/llmport-agent"
+STATE_DIR="$HOME_DIR/.local/share/faden-agent"
+[ "$(id -u)" -eq 0 ] && STATE_DIR="/var/lib/faden-agent"
+CONFIG_DIR="$HOME_DIR/.config/faden-agent"
 # Model store: standard HuggingFace cache in the service user's home, so the
 # agent owns it without a root-owned /srv path (see
-# llm_port_node_agent.config._default_model_store_root).
+# faden_agent.config._default_model_store_root).
 MODEL_STORE="$HOME_DIR/.cache/huggingface"
 PROTECT_HOME="yes"
 RW_PATHS="$MODEL_STORE $STATE_DIR"
@@ -573,12 +573,12 @@ USER_ENV_FILE="$CONFIG_DIR/agent.env"
 
 # Find the agent binary for ExecStart
 AGENT_BIN=""
-if [ -x "$WORKDIR/.venv/bin/llmport-agent" ]; then
-  AGENT_BIN="$WORKDIR/.venv/bin/llmport-agent"
-elif command -v llmport-agent >/dev/null 2>&1; then
-  AGENT_BIN="$(command -v llmport-agent)"
+if [ -x "$WORKDIR/.venv/bin/faden-agent" ]; then
+  AGENT_BIN="$WORKDIR/.venv/bin/faden-agent"
+elif command -v faden-agent >/dev/null 2>&1; then
+  AGENT_BIN="$(command -v faden-agent)"
 else
-  AGENT_BIN="/usr/local/bin/llmport-agent"
+  AGENT_BIN="/usr/local/bin/faden-agent"
 fi
 
 TMP_SVC="$(mktemp)"
@@ -588,12 +588,12 @@ sed -e "s|@@USER@@|$SVC_USER|g" \
     -e "s|@@READ_WRITE_PATHS@@|$RW_PATHS|g" \
     -e "s|@@USER_ENV_FILE@@|$USER_ENV_FILE|g" \
     -e "s|^ExecStart=.*|ExecStart=$AGENT_BIN run|" \
-    "$WORKDIR/deploy/systemd/llmport-agent.service" > "$TMP_SVC"
+    "$WORKDIR/deploy/systemd/faden-agent.service" > "$TMP_SVC"
 
 if [ -n "$SUDO_BIN" ]; then
-  $SUDO_BIN install -m 0644 "$TMP_SVC" /etc/systemd/system/llmport-agent.service
+  $SUDO_BIN install -m 0644 "$TMP_SVC" /etc/systemd/system/faden-agent.service
 else
-  install -m 0644 "$TMP_SVC" /etc/systemd/system/llmport-agent.service
+  install -m 0644 "$TMP_SVC" /etc/systemd/system/faden-agent.service
 fi
 rm -f "$TMP_SVC"
 
@@ -615,24 +615,24 @@ LOKI_URL="${{BACKEND_SCHEME}}://${{BACKEND_HOST}}:3100"
 
 TMP_ENV="$(mktemp)"
 {{
-  printf "LLM_PORT_NODE_AGENT_BACKEND_URL=%s\\n" "$BACKEND_URL"
-  printf "LLM_PORT_NODE_AGENT_LOKI_URL=%s\\n" "$LOKI_URL"
+  printf "FADEN_NODE_AGENT_BACKEND_URL=%s\\n" "$BACKEND_URL"
+  printf "FADEN_NODE_AGENT_LOKI_URL=%s\\n" "$LOKI_URL"
   if [ -n "$ADVERTISE_HOST" ]; then
-    printf "LLM_PORT_NODE_AGENT_ADVERTISE_HOST=%s\\n" "$ADVERTISE_HOST"
+    printf "FADEN_NODE_AGENT_ADVERTISE_HOST=%s\\n" "$ADVERTISE_HOST"
   fi
   if [ -n "$ENROLLMENT_TOKEN" ]; then
-    printf "LLM_PORT_NODE_AGENT_ENROLLMENT_TOKEN=%s\\n" "$ENROLLMENT_TOKEN"
+    printf "FADEN_NODE_AGENT_ENROLLMENT_TOKEN=%s\\n" "$ENROLLMENT_TOKEN"
   fi
 }} >"$TMP_ENV"
 
 if [ -n "$SUDO_BIN" ]; then
-  $SUDO_BIN install -m 0644 "$TMP_ENV" /etc/llmport-agent.env
+  $SUDO_BIN install -m 0644 "$TMP_ENV" /etc/faden-agent.env
   $SUDO_BIN systemctl daemon-reload
-  $SUDO_BIN systemctl enable --now llmport-agent
+  $SUDO_BIN systemctl enable --now faden-agent
 else
-  install -m 0644 "$TMP_ENV" /etc/llmport-agent.env
+  install -m 0644 "$TMP_ENV" /etc/faden-agent.env
   systemctl daemon-reload
-  systemctl enable --now llmport-agent
+  systemctl enable --now faden-agent
 fi
 rm -f "$TMP_ENV"
 

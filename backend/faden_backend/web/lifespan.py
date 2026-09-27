@@ -32,33 +32,33 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from taskiq.instrumentation import TaskiqInstrumentor
 
-from llm_port_backend.db.connection_budget import check_connection_budget
-from llm_port_backend.services.docker.client import DockerService
-from llm_port_backend.services.llm.gateway_sync import GatewaySyncService
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.services.notifications import (
+from faden_backend.db.connection_budget import check_connection_budget
+from faden_backend.services.docker.client import DockerService
+from faden_backend.services.llm.gateway_sync import GatewaySyncService
+from faden_backend.services.llm.service import LLMService
+from faden_backend.services.notifications import (
     GatewayAlertMonitor,
     MailerClient,
     NotificationDispatcher,
 )
-from llm_port_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
-from llm_port_backend.services.system_settings.runtime_mapping import (
+from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
+from faden_backend.services.system_settings.runtime_mapping import (
     get_runtime_secret_key_map,
     get_runtime_value_key_map,
     register_runtime_secret_key,
     register_runtime_value_key,
 )
-from llm_port_backend.services.tls import build_asyncpg_ssl
-from llm_port_backend.settings import settings
-from llm_port_backend.tkq import broker
-from llm_port_backend.services.tls import default_httpx_verify
+from faden_backend.services.tls import build_asyncpg_ssl
+from faden_backend.settings import settings
+from faden_backend.tkq import broker
+from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
 
 # ── Optional EE plugin ────────────────────────────────────────────
 try:
-    from llm_port_ee import setup_ee, teardown_ee  # type: ignore[import-untyped]
-    from llm_port_ee.plugins.backend import backend_plugin  # type: ignore[import-untyped]
+    from faden_ee import setup_ee, teardown_ee  # type: ignore[import-untyped]
+    from faden_ee.plugins.backend import backend_plugin  # type: ignore[import-untyped]
 
     _EE_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -113,10 +113,10 @@ def _setup_db(app: FastAPI) -> None:  # pragma: no cover
 
 
 async def _ensure_api_secret_read_grants(app: FastAPI) -> None:  # pragma: no cover
-    """Ensure llm_port_api DB role can read backend secret settings.
+    """Ensure faden_gateway DB role can read backend secret settings.
 
-    llm_port_api loads its JWT verification secret from
-    ``llm_port_backend.system_setting_secret`` at startup. If the
+    faden_gateway loads its JWT verification secret from
+    ``faden_backend.system_setting_secret`` at startup. If the
     ``llm_user`` role lacks SELECT rights, API falls back to empty secret
     and returns ``JWT secret is not configured``.
     """
@@ -135,7 +135,7 @@ async def _ensure_api_secret_read_grants(app: FastAPI) -> None:  # pragma: no co
             await session.execute(text("GRANT SELECT ON TABLE system_setting_secret TO llm_user"))
             await session.execute(
                 text(
-                    "ALTER DEFAULT PRIVILEGES FOR ROLE llm_port_backend IN SCHEMA public "
+                    "ALTER DEFAULT PRIVILEGES FOR ROLE faden_backend IN SCHEMA public "
                     "GRANT SELECT ON TABLES TO llm_user",
                 ),
             )
@@ -156,7 +156,7 @@ def setup_opentelemetry(app: FastAPI) -> None:  # pragma: no cover
 
     otlp_resource = Resource(
         attributes={
-            SERVICE_NAME: "llm-port-backend",
+            SERVICE_NAME: "faden-backend",
             TELEMETRY_SDK_LANGUAGE: "python",
             DEPLOYMENT_ENVIRONMENT: settings.environment,
         }
@@ -260,7 +260,7 @@ def setup_prometheus(app: FastAPI) -> None:  # pragma: no cover
 
 async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no cover
     """Load runtime settings from DB-backed system_setting tables."""
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         from sqlalchemy import text  # noqa: PLC0415
@@ -366,10 +366,10 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
             await asyncio.sleep(interval_sec)
             if broker.is_worker_process:
                 return
-            from llm_port_backend.db.dao.node_control_dao import (  # noqa: PLC0415
+            from faden_backend.db.dao.node_control_dao import (  # noqa: PLC0415
                 NodeControlDAO,
             )
-            from llm_port_backend.services.nodes.service import (  # noqa: PLC0415
+            from faden_backend.services.nodes.service import (  # noqa: PLC0415
                 NodeControlService,
             )
 
@@ -415,7 +415,7 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
 
 def _start_command_notify_listener(app: FastAPI) -> None:
     """Hold a Postgres LISTEN open so queued commands dispatch immediately."""
-    from llm_port_backend.services.nodes.wakeup import (  # noqa: PLC0415
+    from faden_backend.services.nodes.wakeup import (  # noqa: PLC0415
         dsn_for_asyncpg,
         get_command_notifier,
     )
@@ -449,10 +449,10 @@ async def _inference_reconciler_loop(app: FastAPI) -> None:
     """
     from sqlalchemy import text  # noqa: PLC0415
 
-    from llm_port_backend.services.inference.wakeup import wait_for_work  # noqa: PLC0415
+    from faden_backend.services.inference.wakeup import wait_for_work  # noqa: PLC0415
 
     interval_sec = 30
-    lock_sql = "hashtext('llmport.inference_reconciler')"
+    lock_sql = "hashtext('faden.inference_reconciler')"
     while True:
         try:
             # Sleeps the interval, or less when a change commits: a scale
@@ -523,14 +523,14 @@ async def _queue_health_checks(session: Any) -> None:
     """
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         DeploymentDesiredState,
         DeploymentPhase,
         EnvironmentStatus,
         InferenceDeployment,
         InferenceEnvironment,
     )
-    from llm_port_backend.services.inference.service import (  # noqa: PLC0415
+    from faden_backend.services.inference.service import (  # noqa: PLC0415
         _queue_for_reconcile,
     )
 
@@ -563,7 +563,7 @@ async def _run_inference_reconcile_pass(app: FastAPI) -> None:
     handler immediately); the pass session only carries the rows' observed
     state and is committed after each resource.
     """
-    from llm_port_backend.db.dao.inference_dao import (  # noqa: PLC0415
+    from faden_backend.db.dao.inference_dao import (  # noqa: PLC0415
         DeploymentDAO,
         EnvironmentDAO,
     )
@@ -589,11 +589,11 @@ async def _reconcile_resources(
     session: Any, factory: Any, gateway_sync: Any, env_ids: list[Any], dep_ids: list[Any],
 ) -> None:
     """Reconcile the environments and deployments that have work, each in its own commit."""
-    from llm_port_backend.db.models.inference import (  # noqa: PLC0415
+    from faden_backend.db.models.inference import (  # noqa: PLC0415
         InferenceDeployment,
         InferenceEnvironment,
     )
-    from llm_port_backend.services.inference.reconciliation import (  # noqa: PLC0415
+    from faden_backend.services.inference.reconciliation import (  # noqa: PLC0415
         ReconciliationContext,
         reconcile_deployment,
         reconcile_environment,
@@ -627,7 +627,7 @@ async def _reconcile_resources(
 
 async def _follow_remote_runtimes(session: Any, gateway_sync: Any) -> None:
     """Hold remote runtimes to whether their endpoints answer (services/llm/remote_health.py)."""
-    from llm_port_backend.services.llm.remote_health import follow_remote_runtimes  # noqa: PLC0415
+    from faden_backend.services.llm.remote_health import follow_remote_runtimes  # noqa: PLC0415
 
     try:
         await follow_remote_runtimes(session, gateway_sync)
@@ -642,7 +642,7 @@ async def _follow_found_containers(session: Any, gateway_sync: Any) -> None:
     A routed container that stopped is taken out of routing, and put back when
     it runs again; its state comes from the machine's latest inventory.
     """
-    from llm_port_backend.services.inference.found import follow_containers  # noqa: PLC0415
+    from faden_backend.services.inference.found import follow_containers  # noqa: PLC0415
 
     try:
         await follow_containers(session, gateway_sync)
@@ -663,7 +663,7 @@ async def _prepare_runtime_image_exports(app: FastAPI) -> None:
     first run until the image is rebuilt -- and the rebuild's predecessor,
     twelve gigabytes of it, is removed here rather than left to accumulate.
     """
-    from llm_port_backend.services.inference import bundles, image_cache  # noqa: PLC0415
+    from faden_backend.services.inference import bundles, image_cache  # noqa: PLC0415
 
     catalogued = [
         bundle
@@ -726,7 +726,7 @@ async def _machine_tls_loop(app: FastAPI) -> None:
     advisory lock, so every uvicorn worker may run this and only one acts at
     a time; it is idempotent.
     """
-    from llm_port_backend.services.machine_tls import store  # noqa: PLC0415
+    from faden_backend.services.machine_tls import store  # noqa: PLC0415
 
     interval_sec = 3600
     while True:
@@ -772,9 +772,9 @@ def _init_rag_lite(app: FastAPI) -> None:
     if not settings.rag_lite_enabled:
         return
 
-    from llm_port_backend.services.rag_lite.chunker import ChunkerConfig  # noqa: PLC0415
-    from llm_port_backend.services.rag_lite.file_store import LocalFileStore  # noqa: PLC0415
-    from llm_port_backend.services.rag_lite.service import RagLiteService  # noqa: PLC0415
+    from faden_backend.services.rag_lite.chunker import ChunkerConfig  # noqa: PLC0415
+    from faden_backend.services.rag_lite.file_store import LocalFileStore  # noqa: PLC0415
+    from faden_backend.services.rag_lite.service import RagLiteService  # noqa: PLC0415
 
     file_root = settings.rag_lite_file_store_root
     chunk_max = settings.rag_lite_chunk_max_tokens
@@ -803,10 +803,10 @@ async def _reconcile_monitoring_on_startup(app: FastAPI) -> None:
     must never block startup; lifecycle hooks keep things in sync
     afterwards.
     """
-    from llm_port_backend.services.llm.monitoring import (  # noqa: PLC0415
+    from faden_backend.services.llm.monitoring import (  # noqa: PLC0415
         provision_all_on_startup,
     )
-    from llm_port_backend.settings import settings as _settings  # noqa: PLC0415
+    from faden_backend.settings import settings as _settings  # noqa: PLC0415
 
     if not _settings.llm_monitoring_enabled:
         return
@@ -828,7 +828,7 @@ async def _recover_orphaned_downloads(app: FastAPI) -> None:
     """
     from sqlalchemy import update  # noqa: PLC0415
 
-    from llm_port_backend.db.models.llm import (  # noqa: PLC0415
+    from faden_backend.db.models.llm import (  # noqa: PLC0415
         DownloadJob,
         DownloadJobStatus,
         LLMModel,
@@ -886,7 +886,7 @@ async def lifespan_setup(
     app.middleware_stack = None
 
     # Register built-in optional modules before any request is served.
-    from llm_port_backend.services.core_modules import register_core_modules  # noqa: PLC0415
+    from faden_backend.services.core_modules import register_core_modules  # noqa: PLC0415
 
     register_core_modules()
 
@@ -921,7 +921,7 @@ async def lifespan_setup(
         await check_connection_budget(
             app.state.db_engine,
             service="the backend",
-            env_prefix="LLM_PORT_BACKEND_",
+            env_prefix="FADEN_BACKEND_",
             workers=settings.workers_count,
             pool_size=settings.db_pool_size,
             max_overflow=settings.db_max_overflow,
@@ -1070,7 +1070,7 @@ async def lifespan_setup(
 
     # Flush/cancel any pending debounced Prometheus reloads.
     try:
-        from llm_port_backend.services.llm.monitoring import (  # noqa: PLC0415
+        from faden_backend.services.llm.monitoring import (  # noqa: PLC0415
             get_monitoring_provisioner,
         )
 
@@ -1084,7 +1084,7 @@ async def lifespan_setup(
     if http_client is not None:
         await http_client.aclose()
 
-    from llm_port_backend.services.chat.gateway_client import (  # noqa: PLC0415
+    from faden_backend.services.chat.gateway_client import (  # noqa: PLC0415
         close_shared_client,
     )
 
@@ -1104,7 +1104,7 @@ async def lifespan_setup(
 async def _seed_secrets(app: FastAPI) -> None:  # pragma: no cover
     """Auto-generate and store JWT / auth secrets if they are missing (dev mode).
 
-    ``llm_port_backend.users_secret`` and ``llm_port_api.jwt_secret`` are
+    ``faden_backend.users_secret`` and ``faden_gateway.jwt_secret`` are
     seeded with the **same** random value so that tokens signed by the
     backend can be verified by the API gateway.
 
@@ -1116,7 +1116,7 @@ async def _seed_secrets(app: FastAPI) -> None:  # pragma: no cover
 
     from sqlalchemy import text  # noqa: PLC0415
 
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
 
     if not settings.settings_master_key:
         log.warning("Cannot seed secrets: SETTINGS_MASTER_KEY is empty.")
@@ -1125,18 +1125,18 @@ async def _seed_secrets(app: FastAPI) -> None:  # pragma: no cover
     crypto = SettingsCrypto(settings.settings_master_key)
 
     # Both keys share the same value so the backend can sign and the API can verify.
-    jwt_keys = ("llm_port_backend.users_secret", "llm_port_api.jwt_secret")
+    jwt_keys = ("faden_backend.users_secret", "faden_gateway.jwt_secret")
 
     async with app.state.db_session_factory() as session:
         # Serialize secret seeding across concurrent startup processes.
         await session.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext('llm_port_backend_seed_secrets'))"),
+            text("SELECT pg_advisory_xact_lock(hashtext('faden_backend_seed_secrets'))"),
         )
 
         # Prefer existing backend secret if present; otherwise generate a new shared secret.
         current_row = await session.execute(
             text("SELECT ciphertext FROM system_setting_secret WHERE key = :k"),
-            {"k": "llm_port_backend.users_secret"},
+            {"k": "faden_backend.users_secret"},
         )
         current_ciphertext = current_row.scalar_one_or_none()
 
@@ -1176,7 +1176,7 @@ async def _seed_dev_user(app: FastAPI) -> None:
     from sqlalchemy import select  # noqa: PLC0415
     from sqlalchemy.exc import IntegrityError  # noqa: PLC0415
 
-    from llm_port_backend.db.models.users import User  # noqa: PLC0415
+    from faden_backend.db.models.users import User  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         result = await session.execute(
@@ -1215,7 +1215,7 @@ async def _seed_dev_user(app: FastAPI) -> None:
 
 async def _seed_rbac(app: FastAPI) -> None:
     """Seed built-in RBAC roles and permissions (idempotent)."""
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         rbac_dao = RbacDAO(session)
@@ -1269,15 +1269,15 @@ async def _seed_default_settings(app: FastAPI) -> None:
 
     Idempotent — only inserts if the key has no value yet.
     """
-    from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+    from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         dao = SystemSettingsDAO(session)
 
-        existing = await dao.get_value("llm_port_api.pii_default_policy")
+        existing = await dao.get_value("faden_gateway.pii_default_policy")
         if existing is None:
             await dao.upsert_value(
-                key="llm_port_api.pii_default_policy",
+                key="faden_gateway.pii_default_policy",
                 value_json={"value": _CORE_DEFAULT_PII_POLICY},
                 updated_by=None,
             )
@@ -1291,8 +1291,8 @@ async def _assign_dev_admin_role(app: FastAPI) -> None:
     """Assign the admin role to the dev user (dev mode only)."""
     from sqlalchemy import select  # noqa: PLC0415
 
-    from llm_port_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
-    from llm_port_backend.db.models.users import User  # noqa: PLC0415
+    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+    from faden_backend.db.models.users import User  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         rbac_dao = RbacDAO(session)

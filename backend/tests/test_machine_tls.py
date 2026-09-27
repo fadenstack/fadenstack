@@ -21,10 +21,10 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.machine_tls import MachineCA, MachineTlsClient
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.machine_tls import authority as auth
-from llm_port_backend.services.machine_tls import store
+from faden_backend.db.models.machine_tls import MachineCA, MachineTlsClient
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.machine_tls import authority as auth
+from faden_backend.services.machine_tls import store
 
 MASTER = "test-master-key"
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)

@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from llm_port_node_agent.ray.container import (
+from faden_agent.ray.container import (
     RayContainerRuntime,
     RuntimeBundleSpec,
 )
@@ -26,9 +26,9 @@ HEAD = "10.100.0.2:6379"
 
 def _spec() -> RuntimeBundleSpec:
     return RuntimeBundleSpec(
-        image="llm-port/ray-runtime:test",
+        image="fadenstack/ray-runtime:test",
         digest="sha256:" + "0" * 64,
-        name="llm-port-ray-runtime",
+        name="faden-ray-runtime",
     )
 
 

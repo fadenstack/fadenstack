@@ -292,7 +292,7 @@ def upgrade() -> None:
                 IF current_count >= max_count THEN
                     RAISE EXCEPTION
                         'Project limit reached. '
-                        'Upgrade to LLM.port Enterprise for unlimited projects.';
+                        'Upgrade to Fadenstack Enterprise for unlimited projects.';
                 END IF;
             END IF;
 

@@ -22,7 +22,7 @@ from typing import Any
 
 from cryptography import x509
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 CA_BASENAME = "ca.crt"
 EDGE_INFO_BASENAME = "edge.json"

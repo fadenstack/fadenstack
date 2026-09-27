@@ -577,11 +577,11 @@
       },
       "tls_certificate_expiring": {
         "title": "El certificado HTTPS caduca en {{days}} días",
-        "detail": "El {{until}}. llmport tls status indica cómo se renueva."
+        "detail": "El {{until}}. faden tls status indica cómo se renueva."
       },
       "tls_certificate_expired": {
         "title": "El certificado HTTPS caducó el {{until}}",
-        "detail": "Los navegadores y las máquinas rechazan la consola. Renuévelo: llmport tls renew o llmport tls use CERT KEY."
+        "detail": "Los navegadores y las máquinas rechazan la consola. Renuévelo: faden tls renew o faden tls use CERT KEY."
       },
       "model_traffic_unencrypted": {
         "title": "El tráfico de modelos hacia {{cluster}} no está cifrado",
@@ -735,8 +735,8 @@
     "confirm_title": "¿Reemplazar {{name}}?",
     "confirm_body": "Docker no puede cambiar estos ajustes en un contenedor existente, así que se crea uno nuevo con ellos y el anterior se elimina cuando el nuevo está en marcha. El contenedor recibe un ID nuevo y se pierden los archivos que escribió fuera de sus volúmenes. Si el nuevo no se puede crear o iniciar, el anterior se restaura tal como estaba.",
     "confirm_replace": "Reemplazar",
-    "compose_note": "Fadenstack ejecuta este contenedor desde su archivo compose: el próximo llmport deploy o upgrade lo vuelve a crear a partir del archivo compose y de .env, sin estos cambios.",
-    "backend_note": "El backend se ejecuta en este contenedor y no puede reemplazarlo. Cambie sus ajustes en .env y ejecute llmport upgrade.",
+    "compose_note": "Fadenstack ejecuta este contenedor desde su archivo compose: el próximo faden deploy o upgrade lo vuelve a crear a partir del archivo compose y de .env, sin estos cambios.",
+    "backend_note": "El backend se ejecuta en este contenedor y no puede reemplazarlo. Cambie sus ajustes en .env y ejecute faden upgrade.",
     "load_failed": "No se pudieron cargar los ajustes del contenedor."
   },
   "images": {
@@ -1407,7 +1407,7 @@
   "pii_policy": {
     "system_section": "Politica PII (Predeterminada del Sistema)",
     "pii_service_url": "URL del Servicio PII",
-    "pii_service_url_help": "URL interna de llm_port_pii (por ejemplo http://llm-port-pii:8000/api).",
+    "pii_service_url_help": "URL interna de faden_pii (por ejemplo http://faden-pii:8000/api).",
     "hidden_when_disabled": "La configuracion PII esta oculta porque el modulo PII esta deshabilitado.",
     "tenants_title": "Politicas PII por Inquilino",
     "tenants_description": "Sobrescribe la politica PII predeterminada para un inquilino especifico.",
@@ -2204,7 +2204,7 @@
   },
   "rag_runtime": {
     "title": "Configuración del runtime RAG",
-    "description": "La configuración de embeddings y fragmentación se envía desde Fadenstack core a llm_port_rag.",
+    "description": "La configuración de embeddings y fragmentación se envía desde Fadenstack core a faden_rag.",
     "failed_load": "No se pudo cargar la configuración del runtime.",
     "failed_save": "No se pudo guardar la configuración del runtime.",
     "saved": "Configuración del runtime actualizada.",
@@ -2868,8 +2868,8 @@
     "signed_in_as": "Conectado a Hugging Face como {{username}}",
     "token_named": "token «{{name}}»",
     "role_write": "Este token también puede escribir en Hugging Face. Este servidor solo necesita acceso de lectura: conviene sustituirlo por un token de solo lectura.",
-    "from_environment": "Este token proviene de LLM_PORT_BACKEND_HF_TOKEN en el entorno del servidor. Un token guardado aquí lo sustituye.",
-    "storage_unsafe": "Este servidor aún usa la clave maestra de configuración predeterminada, así que un token guardado no estaría protegido. Asigne un valor aleatorio a LLM_PORT_BACKEND_SETTINGS_MASTER_KEY y reinicie antes de guardar uno.",
+    "from_environment": "Este token proviene de FADEN_BACKEND_HF_TOKEN en el entorno del servidor. Un token guardado aquí lo sustituye.",
+    "storage_unsafe": "Este servidor aún usa la clave maestra de configuración predeterminada, así que un token guardado no estaría protegido. Asigne un valor aleatorio a FADEN_BACKEND_SETTINGS_MASTER_KEY y reinicie antes de guardar uno.",
     "token_label": "Token de acceso",
     "replace_label": "Sustituir por un token nuevo",
     "create_hint": "Cree un token de lectura en",

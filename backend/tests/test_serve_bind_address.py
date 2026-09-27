@@ -23,8 +23,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from llm_port_backend.services.inference.drivers.ray import deployment as dep
-from llm_port_backend.services.inference.drivers.ray.deployment import (
+from faden_backend.services.inference.drivers.ray import deployment as dep
+from faden_backend.services.inference.drivers.ray.deployment import (
     _WILDCARD_BIND,
     _WILDCARD_BINDS,
 )

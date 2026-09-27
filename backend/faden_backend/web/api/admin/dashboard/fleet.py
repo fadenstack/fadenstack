@@ -11,11 +11,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.dashboard import attention as attention_rules
-from llm_port_backend.services.dashboard import capacity as capacity_service
-from llm_port_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
-from llm_port_backend.web.api.admin.dashboard.schema import (
+from faden_backend.db.models.users import User
+from faden_backend.services.dashboard import attention as attention_rules
+from faden_backend.services.dashboard import capacity as capacity_service
+from faden_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
+from faden_backend.web.api.admin.dashboard.schema import (
     AttentionDTO,
     AttentionItemDTO,
     CapacityDTO,
@@ -30,7 +30,7 @@ from llm_port_backend.web.api.admin.dashboard.schema import (
     ProvidersSummaryDTO,
     SkillsSummaryDTO,
 )
-from llm_port_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.dependencies import require_superuser
 
 router = APIRouter()
 

@@ -21,14 +21,14 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceComputePool,
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.pools import (
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.pools import (
     ComputePoolCoordinator,
     accelerator_family,
     accelerator_vendor,

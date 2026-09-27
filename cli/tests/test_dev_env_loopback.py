@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from llmport.commands.dev import dev_up
-from llmport.core.registry import (
+from faden_cli.commands.dev import dev_up
+from faden_cli.core.registry import (
     BACKEND_DEV_ENV,
     GATEWAY_DEV_ENV,
     INFRA_HOST_KEYS,
@@ -36,7 +36,7 @@ def _env(path: Path) -> dict[str, str]:
 
 
 def _workspace(tmp_path: Path) -> Path:
-    shared = tmp_path / "llm_port_shared"
+    shared = tmp_path / "shared"
     shared.mkdir()
     (shared / ".env").write_text("RABBITMQ_BACKEND_PASS=pw\nRABBITMQ_API_PASS=pw\n", encoding="utf-8")
     return tmp_path
@@ -44,50 +44,50 @@ def _workspace(tmp_path: Path) -> Path:
 
 def test_an_existing_backend_env_is_moved_off_localhost(tmp_path: Path) -> None:
     ws = _workspace(tmp_path)
-    backend = ws / "llm_port_backend"
+    backend = ws / "backend"
     backend.mkdir()
     (backend / ".env").write_text(
-        "LLM_PORT_BACKEND_DB_HOST=localhost\n"
-        "LLM_PORT_BACKEND_RABBIT_HOST=localhost\n"
-        "LLM_PORT_BACKEND_DB_PASS=kept\n",
+        "FADEN_BACKEND_DB_HOST=localhost\n"
+        "FADEN_BACKEND_RABBIT_HOST=localhost\n"
+        "FADEN_BACKEND_DB_PASS=kept\n",
         encoding="utf-8",
     )
 
     dev_up._ensure_backend_env(backend, ws)
 
     env = _env(backend / ".env")
-    assert env["LLM_PORT_BACKEND_DB_HOST"] == "127.0.0.1"
-    assert env["LLM_PORT_BACKEND_RABBIT_HOST"] == "127.0.0.1"
-    assert env["LLM_PORT_BACKEND_DB_PASS"] == "kept"
+    assert env["FADEN_BACKEND_DB_HOST"] == "127.0.0.1"
+    assert env["FADEN_BACKEND_RABBIT_HOST"] == "127.0.0.1"
+    assert env["FADEN_BACKEND_DB_PASS"] == "kept"
     text = (backend / ".env").read_text(encoding="utf-8")
-    assert text.count("LLM_PORT_BACKEND_DB_HOST=") == 1, "rewritten in place, not appended"
+    assert text.count("FADEN_BACKEND_DB_HOST=") == 1, "rewritten in place, not appended"
 
 
 def test_an_existing_gateway_env_is_moved_off_localhost(tmp_path: Path) -> None:
     ws = _workspace(tmp_path)
-    api = ws / "llm_port_api"
+    api = ws / "gateway"
     api.mkdir()
     (api / ".env").write_text(
-        "LLM_PORT_API_DB_HOST=localhost\n"
-        "LLM_PORT_API_REDIS_HOST=LOCALHOST\n"
-        "LLM_PORT_API_RABBIT_HOST=localhost\n",
+        "FADEN_GATEWAY_DB_HOST=localhost\n"
+        "FADEN_GATEWAY_REDIS_HOST=LOCALHOST\n"
+        "FADEN_GATEWAY_RABBIT_HOST=localhost\n",
         encoding="utf-8",
     )
 
     dev_up._ensure_gateway_env(api, ws)
 
     env = _env(api / ".env")
-    for key in ("LLM_PORT_API_DB_HOST", "LLM_PORT_API_REDIS_HOST", "LLM_PORT_API_RABBIT_HOST"):
+    for key in ("FADEN_GATEWAY_DB_HOST", "FADEN_GATEWAY_REDIS_HOST", "FADEN_GATEWAY_RABBIT_HOST"):
         assert env[key] == "127.0.0.1", key
-    assert (api / ".env").read_text(encoding="utf-8").count("LLM_PORT_API_DB_HOST=") == 1
+    assert (api / ".env").read_text(encoding="utf-8").count("FADEN_GATEWAY_DB_HOST=") == 1
 
 
 def test_a_host_pointed_elsewhere_is_left_alone(tmp_path: Path) -> None:
     ws = _workspace(tmp_path)
-    api = ws / "llm_port_api"
+    api = ws / "gateway"
     api.mkdir()
-    (api / ".env").write_text("LLM_PORT_API_DB_HOST=db.internal\n", encoding="utf-8")
+    (api / ".env").write_text("FADEN_GATEWAY_DB_HOST=db.internal\n", encoding="utf-8")
 
     dev_up._ensure_gateway_env(api, ws)
 
-    assert _env(api / ".env")["LLM_PORT_API_DB_HOST"] == "db.internal"
+    assert _env(api / ".env")["FADEN_GATEWAY_DB_HOST"] == "db.internal"

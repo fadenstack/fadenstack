@@ -1,10 +1,10 @@
 # Build and publish the Ray runtime images: the containers models run in on
 # every machine of a cluster.
 #
-#   gb10     llm_port_runtime_image/Dockerfile          -> ghcr.io/llm-port/ray-runtime-gb10:<version>
-#   x86_64   llm_port_runtime_image/Dockerfile.x86_64   -> ghcr.io/llm-port/ray-runtime-x86_64:<version>
+#   gb10     runtime-image/Dockerfile          -> ghcr.io/fadenstack/ray-runtime-gb10:<version>
+#   x86_64   runtime-image/Dockerfile.x86_64   -> ghcr.io/fadenstack/ray-runtime-x86_64:<version>
 #
-# Release: llm-port-dev/scripts/release-runtime.ps1 -Version 2.58.0-1, which
+# Release: fadenstack-dev/scripts/release-runtime.ps1 -Version 2.58.0-1, which
 # tags runtime-v2.58.0-1 and pushes the tag. Or run this by hand
 # (workflow_dispatch) with push off, to check the images still build.
 #
@@ -15,7 +15,7 @@
 # use (rebuild_runtime_image.py). The manifests are attached to a pre-release.
 #
 # They say "uncertified": CI has no GB10 pair and no NVIDIA card. Certify each
-# image on its hardware, commit its manifest to llm_port_runtime_image/, and the
+# image on its hardware, commit its manifest to runtime-image/, and the
 # next core release builds the backend with it. Until then the backend keeps
 # pointing at the previous, certified build.
 #
@@ -57,8 +57,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REGISTRY: ghcr.io/llm-port
-  IMAGE_DIR: llm_port_runtime_image
+  REGISTRY: ghcr.io/fadenstack
+  IMAGE_DIR: runtime-image
 
 jobs:
   plan:
@@ -115,7 +115,7 @@ jobs:
     timeout-minutes: 240
     env:
       FLAVOR: ${{ matrix.flavor }}
-      TAG: ghcr.io/llm-port/ray-runtime-${{ matrix.flavor }}:${{ needs.plan.outputs.version }}
+      TAG: ghcr.io/fadenstack/ray-runtime-${{ matrix.flavor }}:${{ needs.plan.outputs.version }}
       # Secrets cannot appear in a step's `if`; an env value can.
       NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
     steps:
@@ -165,7 +165,7 @@ jobs:
         run: python3 rebuild_runtime_image.py --flavor "$FLAVOR" --tag "$TAG" --build --manifest "$RUNNER_TEMP/local-manifest.json"
 
       - name: Validate inside the image
-        # Imports, pip check, and Ray's LLMConfig against LLM.Port's own
+        # Imports, pip check, and Ray's LLMConfig against Fadenstack's own
         # deployment shapes. No GPU needed; a failure here publishes nothing.
         run: docker run --rm --entrypoint python3 "$TAG" /opt/llm-port/runtime/test_local_validation.py
 
@@ -213,12 +213,12 @@ jobs:
           body: |
             The Ray runtime images models run in, for this version:
 
-            - `ghcr.io/llm-port/ray-runtime-gb10:${{ needs.plan.outputs.version }}` (aarch64, NVIDIA DGX Spark / GB10)
-            - `ghcr.io/llm-port/ray-runtime-x86_64:${{ needs.plan.outputs.version }}` (x86_64, NVIDIA Turing to Blackwell)
+            - `ghcr.io/fadenstack/ray-runtime-gb10:${{ needs.plan.outputs.version }}` (aarch64, NVIDIA DGX Spark / GB10)
+            - `ghcr.io/fadenstack/ray-runtime-x86_64:${{ needs.plan.outputs.version }}` (x86_64, NVIDIA Turing to Blackwell)
 
             The manifests attached were minted from the pushed images and say
             **uncertified**: CI has no GPU. Certify each image on its hardware,
-            then commit its manifest to `llm_port_runtime_image/`. The next core
+            then commit its manifest to `runtime-image/`. The next core
             release builds the backend with it; until then the backend keeps its
             current, certified build.
           files: manifests/*.json

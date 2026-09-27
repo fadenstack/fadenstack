@@ -12,7 +12,7 @@ Abstracts over two backends:
 
 Usage::
 
-    from llm_port_backend.services.docling.processor import DocumentProcessor
+    from faden_backend.services.docling.processor import DocumentProcessor
 
     processor = DocumentProcessor()
     result = await processor.process(
@@ -30,7 +30,7 @@ import time
 from asyncio import to_thread
 from typing import Any
 
-from llm_port_backend.settings import settings
+from faden_backend.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class DocumentProcessor:
         filename: str,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        from llm_port_backend.services.docling.client import DoclingClient  # noqa: PLC0415
+        from faden_backend.services.docling.client import DoclingClient  # noqa: PLC0415
 
         async with DoclingClient() as client:
             result = await client.convert(file_bytes, filename, **kwargs)
@@ -99,7 +99,7 @@ class DocumentProcessor:
         file_bytes: bytes,
         filename: str,
     ) -> dict[str, Any]:
-        from llm_port_backend.services.docling.fallback import extract_text  # noqa: PLC0415
+        from faden_backend.services.docling.fallback import extract_text  # noqa: PLC0415
 
         t0 = time.perf_counter()
         result = await to_thread(extract_text, file_bytes, filename)
@@ -118,7 +118,7 @@ class DocumentProcessor:
             "active_backend": "docling" if settings.docling_enabled else "fallback",
         }
         if settings.docling_enabled:
-            from llm_port_backend.services.docling.client import DoclingClient  # noqa: PLC0415
+            from faden_backend.services.docling.client import DoclingClient  # noqa: PLC0415
 
             async with DoclingClient() as client:
                 info["docling_healthy"] = await client.healthy()

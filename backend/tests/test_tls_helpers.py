@@ -6,7 +6,7 @@ import ssl
 
 import pytest
 
-from llm_port_backend.services.tls import (
+from faden_backend.services.tls import (
     SSLMode,
     build_asyncpg_ssl,
     build_httpx_verify,

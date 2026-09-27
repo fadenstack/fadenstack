@@ -1,7 +1,7 @@
 """Status normalization functions for Ray cluster state."""
 
-from llm_port_backend.db.models.inference import EnvironmentStatus
-from llm_port_backend.services.inference.drivers.ray.schemas import RayClusterStatus
+from faden_backend.db.models.inference import EnvironmentStatus
+from faden_backend.services.inference.drivers.ray.schemas import RayClusterStatus
 
 
 def map_cluster_to_environment_status(

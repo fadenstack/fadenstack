@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-    image: llm-port-backend:${LLM_PORT_BACKEND_VERSION:-latest}
+    image: faden-backend:${FADEN_BACKEND_VERSION:-latest}
     restart: always
     env_file:
       - path: .env
@@ -16,13 +16,13 @@ services:
       migrator:
         condition: service_completed_successfully
     environment:
-      LLM_PORT_BACKEND_HOST: 0.0.0.0
-      LLM_PORT_BACKEND_DB_HOST: llm-port-backend-db
-      LLM_PORT_BACKEND_DB_PORT: 5432
-      LLM_PORT_BACKEND_DB_USER: llm_port_backend
-      LLM_PORT_BACKEND_DB_PASS: llm_port_backend
-      LLM_PORT_BACKEND_DB_BASE: llm_port_backend
-      LLM_PORT_BACKEND_RABBIT_HOST: llm-port-backend-rmq
+      FADEN_BACKEND_HOST: 0.0.0.0
+      FADEN_BACKEND_DB_HOST: faden-backend-db
+      FADEN_BACKEND_DB_PORT: 5432
+      FADEN_BACKEND_DB_USER: faden_backend
+      FADEN_BACKEND_DB_PASS: faden_backend
+      FADEN_BACKEND_DB_BASE: faden_backend
+      FADEN_BACKEND_RABBIT_HOST: faden-backend-rmq
 
   taskiq-worker:
     <<: *main_app
@@ -30,20 +30,20 @@ services:
     command:
       - taskiq
       - worker
-      - llm_port_backend.tkq:broker
+      - faden_backend.tkq:broker
 
   db:
     image: postgres:18.1-bookworm
-    hostname: llm-port-backend-db
+    hostname: faden-backend-db
     environment:
-      POSTGRES_PASSWORD: "llm_port_backend"
-      POSTGRES_USER: "llm_port_backend"
-      POSTGRES_DB: "llm_port_backend"
+      POSTGRES_PASSWORD: "faden_backend"
+      POSTGRES_USER: "faden_backend"
+      POSTGRES_DB: "faden_backend"
     volumes:
-      - llm-port-backend-db-data:/var/lib/postgresql
+      - faden-backend-db-data:/var/lib/postgresql
     restart: always
     healthcheck:
-      test: pg_isready -U llm_port_backend
+      test: pg_isready -U faden_backend
       interval: 2s
       timeout: 3s
       retries: 40
@@ -58,7 +58,7 @@ services:
 
   rmq:
     image: rabbitmq:4.2.1-management-alpine
-    hostname: "llm-port-backend-rmq"
+    hostname: "faden-backend-rmq"
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
@@ -73,5 +73,5 @@ services:
 
 
 volumes:
-  llm-port-backend-db-data:
-    name: llm-port-backend-db-data
+  faden-backend-db-data:
+    name: faden-backend-db-data

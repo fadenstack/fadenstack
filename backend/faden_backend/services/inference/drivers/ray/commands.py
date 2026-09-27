@@ -17,11 +17,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import (
+from faden_backend.db.models.node_control import (
     InfraNodeCommand,
     NodeCommandStatus,
 )
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.services.nodes.service import NodeControlService
 
 log = logging.getLogger(__name__)
 
@@ -56,8 +56,8 @@ class NodeCommandGateway:
             self._direct_service = None
 
     def _get_service(self, session: AsyncSession) -> NodeControlService:
-        from llm_port_backend.db.dao.node_control_dao import NodeControlDAO
-        from llm_port_backend.settings import settings
+        from faden_backend.db.dao.node_control_dao import NodeControlDAO
+        from faden_backend.settings import settings
 
         return NodeControlService(
             dao=NodeControlDAO(session),

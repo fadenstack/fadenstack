@@ -1,4 +1,4 @@
-"""``llmport down`` — stop llm.port services."""
+"""``faden down`` — stop fadenstack services."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ import sys
 
 import click
 
-from llmport.core.compose import build_context_from_config, down as compose_down
-from llmport.core.console import console, success, error, info
-from llmport.core.settings import load_config
+from faden_cli.core.compose import build_context_from_config, down as compose_down
+from faden_cli.core.console import console, success, error, info
+from faden_cli.core.settings import load_config
 
 # Image prefixes that belong to the project (built from source).
-_PROJECT_IMAGE_PREFIX = "ghcr.io/llm-port/"
+_PROJECT_IMAGE_PREFIX = "ghcr.io/fadenstack/"
 
 
 def _remove_project_images() -> int:
-    """Remove only locally-built llmport/* images. Return count removed."""
+    """Remove only locally-built faden/* images. Return count removed."""
     docker = shutil.which("docker")
     if not docker:
         return 0
@@ -39,14 +39,14 @@ def _remove_project_images() -> int:
 @click.option("--remove-orphans/--no-remove-orphans", default=True, help="Remove containers for services not defined in the compose file.")
 @click.option("--all", "nuke", is_flag=True, help="Remove everything: containers, networks, volumes, and built images (keeps third-party images).")
 def down_cmd(*, volumes: bool, remove_orphans: bool, nuke: bool) -> None:
-    """Stop and remove llm.port containers and networks."""
+    """Stop and remove fadenstack containers and networks."""
     cfg = load_config()
     ctx = build_context_from_config(cfg)
 
     if nuke:
         volumes = True
 
-    console.print("[bold cyan]Stopping llm.port services…[/bold cyan]")
+    console.print("[bold cyan]Stopping fadenstack services…[/bold cyan]")
 
     with console.status("[bold cyan]docker compose down[/bold cyan]"):
         returncode = compose_down(
@@ -64,12 +64,12 @@ def down_cmd(*, volumes: bool, remove_orphans: bool, nuke: bool) -> None:
     if nuke:
         removed = _remove_project_images()
         if removed:
-            info(f"Removed {removed} llmport image(s).")
+            info(f"Removed {removed} faden image(s).")
         else:
-            info("No llmport images to remove.")
+            info("No faden images to remove.")
 
         # Stop and remove the local node agent if present.
-        from llmport.core.local_node import remove_local_node_agent  # noqa: PLC0415
+        from faden_cli.core.local_node import remove_local_node_agent  # noqa: PLC0415
 
         workspace = cfg.install_path.parent
         remove_local_node_agent(workspace=workspace)

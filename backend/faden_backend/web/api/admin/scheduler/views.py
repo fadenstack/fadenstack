@@ -10,16 +10,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from starlette import status
 
-from llm_port_backend.db.dao.audit_dao import AuditDAO
-from llm_port_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO
-from llm_port_backend.db.dao.rag_lite_dao import RagLiteIngestJobDAO
-from llm_port_backend.db.models.containers import AuditResult
-from llm_port_backend.db.models.llm import DownloadJobStatus, ModelStatus
-from llm_port_backend.db.models.rag_lite import RagLiteJobStatus
-from llm_port_backend.db.models.users import User
-from llm_port_backend.settings import settings
-from llm_port_backend.web.api.admin.dependencies import audit_action
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO
+from faden_backend.db.dao.rag_lite_dao import RagLiteIngestJobDAO
+from faden_backend.db.models.containers import AuditResult
+from faden_backend.db.models.llm import DownloadJobStatus, ModelStatus
+from faden_backend.db.models.rag_lite import RagLiteJobStatus
+from faden_backend.db.models.users import User
+from faden_backend.settings import settings
+from faden_backend.web.api.admin.dependencies import audit_action
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 
@@ -114,7 +114,7 @@ async def list_all_jobs(
         )
 
         # Resolve document names in bulk
-        from llm_port_backend.db.dao.rag_lite_dao import RagLiteDocumentDAO  # noqa: PLC0415
+        from faden_backend.db.dao.rag_lite_dao import RagLiteDocumentDAO  # noqa: PLC0415
 
         doc_dao = RagLiteDocumentDAO(rag_job_dao.session)
         doc_ids = {j.document_id for j in rag_jobs}
@@ -219,7 +219,7 @@ async def retry_job(
 
     await dl_job_dao.session.flush()
 
-    from llm_port_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
+    from faden_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
 
     hf_repo_id = model.hf_repo_id if model else ""
     hf_revision = model.hf_revision if model else None

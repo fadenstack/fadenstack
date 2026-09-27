@@ -20,11 +20,11 @@ from typing import Any
 import httpx
 import litellm
 
-from llm_port_api.db.crypto import decrypt_value
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway import upstream_tls
-from llm_port_api.services.gateway.ssl_helpers import build_ssl_kwargs
-from llm_port_api.settings import settings
+from faden_gateway.db.crypto import decrypt_value
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway import upstream_tls
+from faden_gateway.services.gateway.ssl_helpers import build_ssl_kwargs
+from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 

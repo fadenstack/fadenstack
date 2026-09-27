@@ -10,8 +10,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from llm_port_api.services.gateway.auth import AuthContext, get_auth_context
-from llm_port_api.services.gateway.stream_buffer import StreamBuffer
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 
 pytestmark = pytest.mark.anyio
 

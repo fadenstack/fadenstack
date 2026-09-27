@@ -21,15 +21,15 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from llm_port_node_agent.ray import ray_tls
-from llm_port_node_agent.ray.container import RayContainerRuntime, RuntimeBundleSpec
-from llm_port_node_agent.ray.manager import RayManager
-from llm_port_node_agent.runtimes import ContainerRuntimeError
+from faden_agent.ray import ray_tls
+from faden_agent.ray.container import RayContainerRuntime, RuntimeBundleSpec
+from faden_agent.ray.manager import RayManager
+from faden_agent.runtimes import ContainerRuntimeError
 from tests.test_ray_container import _FakeRuntime, _payload
 
 
 class _Material:
-    def __init__(self, host_dir: str = "/var/lib/llmport/ray-tls/env-1") -> None:
+    def __init__(self, host_dir: str = "/var/lib/faden/ray-tls/env-1") -> None:
         self.host_dir = host_dir
         self.prepared = 0
 
@@ -38,19 +38,19 @@ class _Material:
 
 
 def _existing(runtime: _FakeRuntime, spec: RuntimeBundleSpec, *, tls: bool) -> None:
-    env = ["RAY_AUTH_TOKEN_PATH=/var/run/llm-port/ray/cluster.token"]
+    env = ["RAY_AUTH_TOKEN_PATH=/var/run/fadenstack/ray/cluster.token"]
     if tls:
         env += [f"{k}={v}" for k, v in ray_tls.container_env().items()]
     runtime.containers[spec.name] = {
         "Image": spec.digest,
         "State": {"Running": True},
         "Config": {"Env": env},
-        "Mounts": [{"Destination": "/models"}, {"Destination": "/var/run/llm-port/ray"}],
+        "Mounts": [{"Destination": "/models"}, {"Destination": "/var/run/fadenstack/ray"}],
     }
 
 
 def _container(runtime: _FakeRuntime) -> RayContainerRuntime:
-    return RayContainerRuntime(runtime=runtime, token_path="/var/run/llm-port/ray/cluster.token")
+    return RayContainerRuntime(runtime=runtime, token_path="/var/run/fadenstack/ray/cluster.token")
 
 
 # ── the container ────────────────────────────────────────────────────────
@@ -68,10 +68,10 @@ async def test_a_new_container_runs_ray_with_tls_and_its_certificate_made_for_it
     assert material.prepared == 1
     run = runtime.runs[-1]
     assert run["env"]["RAY_USE_TLS"] == "1"
-    assert run["env"]["RAY_TLS_CA_CERT"] == "/etc/llmport-ray-tls/ca.pem"
-    assert run["env"]["RAY_TLS_SERVER_CERT"] == "/etc/llmport-ray-tls/node.crt"
-    assert run["env"]["RAY_TLS_SERVER_KEY"] == "/etc/llmport-ray-tls/node.key"
-    assert "/var/lib/llmport/ray-tls/env-1:/etc/llmport-ray-tls:ro" in run["volumes"]
+    assert run["env"]["RAY_TLS_CA_CERT"] == "/etc/faden-ray-tls/ca.pem"
+    assert run["env"]["RAY_TLS_SERVER_CERT"] == "/etc/faden-ray-tls/node.crt"
+    assert run["env"]["RAY_TLS_SERVER_KEY"] == "/etc/faden-ray-tls/node.key"
+    assert "/var/lib/faden/ray-tls/env-1:/etc/faden-ray-tls:ro" in run["volumes"]
 
 
 @pytest.mark.anyio()
@@ -113,7 +113,7 @@ async def test_switching_tls_off_recreates_the_container_without_it() -> None:
     assert result["created"] is True and result["ray_tls"] is False
     run = runtime.runs[-1]
     assert "RAY_USE_TLS" not in run["env"]
-    assert not any(v.endswith(":/etc/llmport-ray-tls:ro") for v in run["volumes"])
+    assert not any(v.endswith(":/etc/faden-ray-tls:ro") for v in run["volumes"])
 
 
 @pytest.mark.anyio()

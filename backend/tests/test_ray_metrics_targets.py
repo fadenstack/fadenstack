@@ -27,8 +27,8 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.services.inference.drivers.ray.driver import RayDriver
 
 
 class _Env:
@@ -132,7 +132,7 @@ async def test_no_metrics_means_no_targets(dbsession: AsyncSession) -> None:
 
 @pytest.mark.anyio()
 async def test_sync_writes_entries_the_dashboard_can_select(tmp_path: Path) -> None:
-    from llm_port_backend.services.llm.monitoring import MonitoringProvisioner
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
 
     targets_file = tmp_path / "targets.json"
     targets_file.write_text("[]", encoding="utf-8")
@@ -160,7 +160,7 @@ async def test_sync_writes_entries_the_dashboard_can_select(tmp_path: Path) -> N
 async def test_syncing_replaces_this_cluster_and_leaves_others_alone(
     tmp_path: Path,
 ) -> None:
-    from llm_port_backend.services.llm.monitoring import MonitoringProvisioner
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
 
     targets_file = tmp_path / "targets.json"
     # A legacy per-runtime entry, keyed differently on purpose.
@@ -197,7 +197,7 @@ async def test_syncing_replaces_this_cluster_and_leaves_others_alone(
 
 _DASHBOARD = (
     Path(__file__).resolve().parents[2]
-    / "llm_port_shared/grafana/dashboards/templates/vllm-runtime.json"
+    / "shared/grafana/dashboards/templates/vllm-runtime.json"
 )
 
 
@@ -277,7 +277,7 @@ def test_the_serve_panels_select_labels_that_exist() -> None:
         status      does not exist; Serve's label is ``status_code`` and it
                     carries the code itself (200, 404), not a family ("2xx").
         route       is prefixed with the application's name, so the real one
-                    is "/llmport-<deployment-id>/v1/chat/completions".
+                    is "/faden-<deployment-id>/v1/chat/completions".
 
     The result parsed and ran and matched nothing, which is worse than an
     error: three panels showed a confident flat zero for a cluster that was
@@ -327,11 +327,11 @@ async def test_a_backend_restart_does_not_wipe_a_clusters_targets(
     stack: the cluster's two targets were present, the backend reloaded, and
     they were gone.
     """
-    from llm_port_backend.db.models.inference import (
+    from faden_backend.db.models.inference import (
         InferenceControlPlane,
         InferenceEnvironment,
     )
-    from llm_port_backend.services.llm.monitoring import MonitoringProvisioner
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
 
     targets_file = tmp_path / "targets.json"
     targets_file.write_text("[]", encoding="utf-8")
@@ -376,11 +376,11 @@ async def test_a_backend_restart_does_not_delete_a_clusters_dashboard(
     are ``vllm-rt-<hash>.json`` -- so the cluster's was simply swept, and the
     link in the product led to a Grafana 404.
     """
-    from llm_port_backend.db.models.inference import (
+    from faden_backend.db.models.inference import (
         InferenceControlPlane,
         InferenceEnvironment,
     )
-    from llm_port_backend.services.llm.monitoring import (
+    from faden_backend.services.llm.monitoring import (
         MonitoringProvisioner,
         dashboard_uid_for,
     )
@@ -423,7 +423,7 @@ async def test_a_clusters_dashboard_is_this_cluster(
     The scrape targets carry the same value under the same label, so the
     cluster reads as "the runtime" and the template works unchanged.
     """
-    from llm_port_backend.services.llm.monitoring import (
+    from faden_backend.services.llm.monitoring import (
         MonitoringProvisioner,
         dashboard_uid_for,
     )
@@ -464,7 +464,7 @@ def test_stat_cards_ask_for_both_metric_families() -> None:
     blank card is indistinguishable from an idle engine -- so the break would
     have read as "this runtime is quiet", not "this query is wrong".
     """
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     rendered = {
         key: template.format(rt='runtime_name="x"')
@@ -480,7 +480,7 @@ def test_stat_cards_ask_for_both_metric_families() -> None:
 
 def test_stat_card_gauges_survive_an_idle_engine() -> None:
     """Same lazy-registration trap as the dashboard's gauges."""
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     for key in ("running_requests", "waiting_requests", "kv_cache_usage"):
         assert "last_over_time(" in STAT_QUERIES[key], key
@@ -496,7 +496,7 @@ def test_every_stat_query_is_valid_promql_shape() -> None:
     request time rather than at import, where nobody would see it until a card
     was opened.
     """
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     for key, template in STAT_QUERIES.items():
         expr = template.format(rt='runtime_name="x"')
@@ -519,7 +519,7 @@ def test_a_counter_that_has_never_fired_reads_as_zero() -> None:
     So a healthy cluster that has never preempted a request showed "No data"
     for preemptions, which claims we cannot see something we can.
     """
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     expr = STAT_QUERIES["preemption_rate"].format(rt='runtime_name="x"')
     assert " or (" in expr, "an absent preemption counter still reads as no data"
@@ -534,7 +534,7 @@ def test_the_zero_is_conditioned_on_the_engine_being_alive() -> None:
     from the same engine instead, so zero is only claimed when something else
     from that engine is being published.
     """
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     for key in (
         "preemption_rate",
@@ -557,7 +557,7 @@ def test_config_gated_families_are_left_absent() -> None:
     about a feature that is not running. Absence is the honest answer, and
     the panel says "No data" for it.
     """
-    from llm_port_backend.services.llm.monitoring import STAT_QUERIES
+    from faden_backend.services.llm.monitoring import STAT_QUERIES
 
     expr = STAT_QUERIES["mtp_acceptance"].format(rt='runtime_name="x"')
     assert " or (" not in expr
@@ -618,7 +618,7 @@ def test_kv_cache_block_metrics_are_asked_for() -> None:
     vLLM samples them at 1% by default, so the cardinality cost is bounded
     without us having to bound it.
     """
-    from llm_port_backend.services.inference.drivers.ray.compiler import (
+    from faden_backend.services.inference.drivers.ray.compiler import (
         _engine_kwargs,
     )
 
@@ -630,7 +630,7 @@ def test_kv_cache_block_metrics_are_asked_for() -> None:
 
 def test_an_operator_can_still_turn_them_off() -> None:
     """Every default in the compiler is a default, not a policy."""
-    from llm_port_backend.services.inference.drivers.ray.compiler import (
+    from faden_backend.services.inference.drivers.ray.compiler import (
         _engine_kwargs,
     )
 

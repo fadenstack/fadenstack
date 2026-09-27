@@ -29,9 +29,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from llm_port_api.db.models.gateway import ProviderType
-from llm_port_api.services.gateway import upstream_tls
-from llm_port_api.services.gateway.llm_adapter import LLMAdapter
+from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway import upstream_tls
+from faden_gateway.services.gateway.llm_adapter import LLMAdapter
 
 NOW = datetime.now(UTC)
 

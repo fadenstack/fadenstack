@@ -1,1 +1,1 @@
-"""Custom Textual widgets for the llmport TUI."""
+"""Custom Textual widgets for the faden TUI."""

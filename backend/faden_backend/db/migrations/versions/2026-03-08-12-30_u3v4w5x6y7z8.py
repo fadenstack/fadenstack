@@ -50,7 +50,7 @@ def upgrade() -> None:
                 IF current_count >= max_count THEN
                     RAISE EXCEPTION
                         'Remote provider limit reached. '
-                        'Upgrade to LLM.port Enterprise for unlimited providers.';
+                        'Upgrade to Fadenstack Enterprise for unlimited providers.';
                 END IF;
             END IF;
 

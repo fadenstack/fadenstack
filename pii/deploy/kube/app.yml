@@ -2,21 +2,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: llm-port-pii
-  name: llm-port-pii-app
+  namespace: faden-pii
+  name: faden-pii-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: llm-port-pii-app
+      app: faden-pii-app
   template:
     metadata:
       labels:
-        app: llm-port-pii-app
+        app: faden-pii-app
     spec:
       containers:
         - name: app
-          image: llm_port_pii:latest
+          image: faden_pii:latest
           readinessProbe:
             httpGet:
               path: /api/health
@@ -24,14 +24,14 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           env:
-            - name: LLM_PORT_PII_HOST
+            - name: FADEN_PII_HOST
               value: "0.0.0.0"
-            - name: LLM_PORT_PII_WORKERS_COUNT
+            - name: FADEN_PII_WORKERS_COUNT
               value: "10"
-            - name: LLM_PORT_PII_DB_HOST
-              value: "llm-port-pii-db-service"
-            - name: LLM_PORT_PII_REDIS_HOST
-              value: "llm-port-pii-redis-service"
+            - name: FADEN_PII_DB_HOST
+              value: "faden-pii-db-service"
+            - name: FADEN_PII_REDIS_HOST
+              value: "faden-pii-redis-service"
           resources:
             limits:
               memory: "200Mi"
@@ -43,11 +43,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: llm-port-pii
-  name: llm-port-pii-app-service
+  namespace: faden-pii
+  name: faden-pii-app-service
 spec:
   selector:
-    app: llm-port-pii-app
+    app: faden-pii-app
   ports:
     - protocol: TCP
       port: 80
@@ -58,20 +58,20 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: llm-port-pii-app
-  namespace: llm-port-pii
+  name: faden-pii-app
+  namespace: faden-pii
   labels:
-    name: llm-port-pii-app
+    name: faden-pii-app
 spec:
   rules:
-    - host: llm-port-pii.local
+    - host: faden-pii.local
       http:
         paths:
           - pathType: Prefix
             path: "/"
             backend:
               service:
-                name: llm-port-pii-app-service
+                name: faden-pii-app-service
                 port:
                   name: api-port
 

@@ -1,7 +1,7 @@
 [project]
-name = "llm_port_mcp"
-version = "0.3.0"
-description = "MCP Tool Registry — governed MCP broker for llm.port"
+name = "faden_mcp"
+version = "0.4.0"
+description = "MCP Tool Registry — governed MCP broker for fadenstack"
 readme = "README.md"
 requires-python = ">=3.11,<4"
 authors = [
@@ -66,7 +66,7 @@ build-backend = "hatchling.build"
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-src_paths = ["llm_port_mcp",]
+src_paths = ["faden_mcp",]
 
 [tool.mypy]
 strict = true
@@ -88,9 +88,9 @@ filterwarnings = [
     "ignore:.*unclosed.*:ResourceWarning",
 ]
 env = [
-    "LLM_PORT_MCP_ENVIRONMENT=pytest",
-    "LLM_PORT_MCP_DB_BASE=llm_mcp_test",
-    "LLM_PORT_MCP_SENTRY_DSN=",
+    "FADEN_MCP_ENVIRONMENT=pytest",
+    "FADEN_MCP_DB_BASE=llm_mcp_test",
+    "FADEN_MCP_SENTRY_DSN=",
 ]
 
 [tool.ruff]

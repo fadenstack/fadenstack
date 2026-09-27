@@ -1,26 +1,26 @@
 # MCP servers
 
 An MCP server gives chats tools: search a repository, read a file, add two
-numbers. LLM.Port's MCP module connects to the servers you register, lists
+numbers. Fadenstack's MCP module connects to the servers you register, lists
 their tools, and runs a tool when a model asks for it; the gateway offers each
-chat the tools switched on for it. The module needs `llmport module enable mcp`.
+chat the tools switched on for it. The module needs `faden module enable mcp`.
 
 Everything below was taken on the test install (Ubuntu VM, 2026-09-25/26) with
 two servers: GitHub's hosted one, and `server-everything`, a test server run as
-a container next to LLM.Port.
+a container next to Fadenstack.
 
 ---
 
 ## Running a server as a container
 
-A server that speaks MCP over HTTP can run on the LLM.Port server itself, from
+A server that speaks MCP over HTTP can run on the Fadenstack server itself, from
 the Containers pages ([Containers](containers.md) has the whole flow). For
 `server-everything`:
 
 - image `node:22-alpine` (pull it under Images first);
 - command `npx -y @modelcontextprotocol/server-everything streamableHttp`
   (it listens on port 3001);
-- network **`llm_port_shared_default`**, and no port binding: the MCP service
+- network **`fadenstack_default`**, and no port binding: the MCP service
   reaches it by name, as `http://mcp-everything:3001/mcp`. Publishing 3001 on
   the host would clash with Grafana on the shared install.
 
@@ -103,7 +103,7 @@ about 14.7k). Narrow it with headers: `X-MCP-Toolsets: repos` (or `issues`,
 
 A new chat has every MCP tool switched off: each tool offered costs prompt
 tokens on every message (the 13 of `server-everything` about 1,500, GitHub's
-48 about 14,700). The model always gets LLM.Port's own tools:
+48 about 14,700). The model always gets Fadenstack's own tools:
 
 | Tool | What it does |
 |---|---|

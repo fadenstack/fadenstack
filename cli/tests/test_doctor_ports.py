@@ -1,6 +1,6 @@
-"""`llmport doctor` checks the ports the install publishes, not a developer's.
+"""`faden doctor` checks the ports the install publishes, not a developer's.
 
-It listed the dev servers' ports (8000, 5173, 5432, ...) and, once LLM.Port
+It listed the dev servers' ports (8000, 5173, 5432, ...) and, once Fadenstack
 was running, reported every port it had itself taken as "in use". A port
 held by something else is what stops a deploy ("port is already
 allocated": Prometheus and MinIO both wanted 9090 on the release VM).
@@ -13,19 +13,19 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from llmport.core import detect
+from faden_cli.core import detect
 
-SHARED = Path(__file__).resolve().parents[2] / "llm_port_shared"
+SHARED = Path(__file__).resolve().parents[2] / "shared"
 
 
 def test_ports_come_from_the_compose_file_and_our_own_are_not_conflicts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(detect, "_published_ports", lambda f, e: [(80, "nginx"), (3001, "grafana"), (9099, "prometheus")])
-    monkeypatch.setattr(detect, "_ports_held_by_llm_port", lambda: {80})
+    monkeypatch.setattr(detect, "_ports_held_by_faden", lambda: {80})
     monkeypatch.setattr(detect, "check_port", lambda port, label="": detect.PortCheck(port, label, port in {80, 9099}))
 
     checks = {c.port: c for c in detect.check_install_ports(SHARED / "docker-compose.yaml")}
 
-    assert checks[80].in_use and checks[80].ours, "LLM.Port's own nginx"
+    assert checks[80].in_use and checks[80].ours, "Fadenstack's own nginx"
     assert not checks[3001].in_use
     assert checks[9099].in_use and not checks[9099].ours, "something else holds it: a deploy would fail"
 
@@ -46,7 +46,7 @@ def test_the_real_compose_file_publishes_the_console_on_80() -> None:
 
 
 def test_doctor_fails_on_a_port_held_by_something_else(monkeypatch: pytest.MonkeyPatch) -> None:
-    from llmport.commands import doctor
+    from faden_cli.commands import doctor
 
     report = detect.SystemReport(
         os=detect.OSInfo(system="Linux", release="6", version="", machine="x86_64"),

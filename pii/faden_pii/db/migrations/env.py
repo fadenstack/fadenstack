@@ -4,9 +4,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlalchemy.future import Connection
-from llm_port_pii.db.meta import meta
-from llm_port_pii.db.models import load_all_models
-from llm_port_pii.settings import settings
+from faden_pii.db.meta import meta
+from faden_pii.db.models import load_all_models
+from faden_pii.settings import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

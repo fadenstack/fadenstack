@@ -9,9 +9,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from llm_port_backend.db.models.notifications import NotificationOutbox
-from llm_port_backend.services.notifications.mailer_client import MailerClient
-from llm_port_backend.settings import settings
+from faden_backend.db.models.notifications import NotificationOutbox
+from faden_backend.services.notifications.mailer_client import MailerClient
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 

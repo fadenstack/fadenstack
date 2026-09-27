@@ -12,9 +12,9 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from starlette import status
 
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.web.api.llm.dependencies import get_llm_graph_service
-from llm_port_backend.web.api.llm.schema import (
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.web.api.llm.dependencies import get_llm_graph_service
+from faden_backend.web.api.llm.schema import (
     GraphEdgeDTO,
     GraphNodeDTO,
     TopologyResponseDTO,
@@ -154,7 +154,7 @@ def test_usage_is_attributed_to_the_provider_each_instance_serves() -> None:
     """
     from types import SimpleNamespace  # noqa: PLC0415
 
-    from llm_port_backend.services.llm.graph_service import ProviderOwners  # noqa: PLC0415
+    from faden_backend.services.llm.graph_service import ProviderOwners  # noqa: PLC0415
 
     docker, remote, cluster, found = (str(uuid.uuid4()) for _ in range(4))
     runtime_id, deployment_id, adoption_id = (str(uuid.uuid4()) for _ in range(3))

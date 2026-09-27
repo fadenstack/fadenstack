@@ -1,4 +1,4 @@
-"""``llmport ports`` — the host ports the console, the API and /v1 are served on."""
+"""``faden ports`` — the host ports the console, the API and /v1 are served on."""
 
 from __future__ import annotations
 
@@ -7,17 +7,17 @@ from pathlib import Path
 
 import click
 
-from llmport.core.console import console, error, success, warning
-from llmport.core.edge import HTTP_PORT_KEY, HTTPS_PORT_KEY, check_ports, ports
-from llmport.core.env_gen import read_env_file, write_env_file
-from llmport.core.settings import load_config
+from faden_cli.core.console import console, error, success, warning
+from faden_cli.core.edge import HTTP_PORT_KEY, HTTPS_PORT_KEY, check_ports, ports
+from faden_cli.core.env_gen import read_env_file, write_env_file
+from faden_cli.core.settings import load_config
 
 
 def port_conflicts(http: int, https: int, *, current: tuple[int, int]) -> list[str]:
     """Which of the wanted ports something other than this install holds."""
-    from llmport.core.detect import _ports_held_by_llm_port, check_port  # noqa: PLC0415
+    from faden_cli.core.detect import _ports_held_by_faden, check_port  # noqa: PLC0415
 
-    ours = _ports_held_by_llm_port()
+    ours = _ports_held_by_faden()
     problems = []
     for label, port in (("HTTP", http), ("HTTPS", https)):
         if port in current or port in ours:
@@ -53,14 +53,14 @@ def ports_cmd(*, http: int | None, https: int | None, no_restart: bool) -> None:
     """Show or change the ports the console, the API and /v1 are served on.
 
     \b
-    llmport ports                        show them
-    llmport ports --http 8080 --https 8443
+    faden ports                        show them
+    faden ports --http 8080 --https 8443
     """
-    from llmport.commands.tls import addresses, apply_to_proxy  # noqa: PLC0415
+    from faden_cli.commands.tls import addresses, apply_to_proxy  # noqa: PLC0415
 
     cfg = load_config()
     if not cfg.install_dir:
-        error("No install found. Run llmport deploy first.")
+        error("No install found. Run faden deploy first.")
         sys.exit(1)
     install_dir = Path(cfg.install_dir)
     env_path = install_dir / ".env"
@@ -85,7 +85,7 @@ def ports_cmd(*, http: int | None, https: int | None, no_restart: bool) -> None:
     success(f"HTTP on port {wanted[0]}, HTTPS on port {wanted[1]} (written to {env_path}).")
     if not no_restart and not apply_to_proxy(install_dir, recreate=True):
         sys.exit(1)
-    from llmport.commands.tls import refresh_edge_info  # noqa: PLC0415
+    from faden_cli.commands.tls import refresh_edge_info  # noqa: PLC0415
 
     refresh_edge_info(install_dir)
     console.print("  " + "  ".join(addresses(install_dir)))

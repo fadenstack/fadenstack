@@ -28,7 +28,7 @@ import pytest
 
 UNIT = (
     Path(__file__).resolve().parents[1]
-    / "deploy/systemd/llmport-agent.service"
+    / "deploy/systemd/faden-agent.service"
 )
 
 
@@ -91,7 +91,7 @@ def test_the_generated_unit_matches_the_shipped_one() -> None:
     It drifted from the shipped file before; a node installed by the fallback
     would keep the old looping behaviour with nothing to show for it.
     """
-    import llm_port_node_agent.__main__ as cli
+    import faden_agent.__main__ as cli
 
     source = Path(cli.__file__).read_text(encoding="utf-8")
     # The fallback is a literal in `_build_service_content`.

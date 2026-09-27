@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
-from llm_port_skills.settings import settings
+from faden_skills.settings import settings
 from tests.conftest import ADMIN, SERVICE_TOKEN, as_user
 
 ALICE = as_user("alice", groups=("g-eng",))
@@ -500,7 +500,7 @@ async def test_a_skill_folder_round_trips_through_export_and_import(
             "license: MIT\n---\n# PDF\nSteps",
         )
         z.writestr(
-            "pdf-tools/llmport.yaml",
+            "pdf-tools/faden.yaml",
             "title: PDF Tools\nforbidden_tools: [web.fetch]\n",
         )
         z.writestr("pdf-tools/references/forms.md", "Forms")
@@ -527,7 +527,7 @@ async def test_a_skill_folder_round_trips_through_export_and_import(
         skill_md = z.read("pdf-tools/SKILL.md").decode()
     assert names == {
         "pdf-tools/SKILL.md",
-        "pdf-tools/llmport.yaml",
+        "pdf-tools/faden.yaml",
         "pdf-tools/references/forms.md",
         "pdf-tools/scripts/fill.py",
     }
@@ -688,7 +688,7 @@ async def _with_files(client: AsyncClient) -> dict[str, Any]:
             "Read references/formulas.md when a formula is involved.",
         )
         z.writestr(
-            "sheets/llmport.yaml",
+            "sheets/faden.yaml",
             "activation: auto\ntrigger_rules:\n  file_types: [xlsx]\n",
         )
         z.writestr("sheets/references/formulas.md", "SUMIF sums what matches.")

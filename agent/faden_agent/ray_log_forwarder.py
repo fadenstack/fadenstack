@@ -35,17 +35,17 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from llm_port_node_agent.loki_client import LokiClient
+from faden_agent.loki_client import LokiClient
 
 log = logging.getLogger(__name__)
 
 #: Where Ray keeps a session's Serve logs, inside the runtime container and --
 #: once the bundle's mount is in place -- on the host.
-DEFAULT_SESSION_DIR = "/var/lib/llm-port/ray"
+DEFAULT_SESSION_DIR = "/var/lib/fadenstack/ray"
 
 #: ``replica_<app>_<deployment>_<replica id>.log``.
 #:
-#: The app name is ours (``llmport-<deployment uuid>``) and contains hyphens,
+#: The app name is ours (``faden-<deployment uuid>``) and contains hyphens,
 #: the deployment name is Ray's and may contain underscores, so the split is
 #: anchored on the known app prefix rather than on counting underscores.
 _REPLICA_FILE = re.compile(r"^replica_(?P<rest>.+)\.log$")

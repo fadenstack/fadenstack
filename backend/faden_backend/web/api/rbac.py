@@ -8,9 +8,9 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, Request
 from starlette import status
 
-from llm_port_backend.db.dao.rag_grants_dao import RagGrantDAO
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.users import User, current_active_user
+from faden_backend.db.dao.rag_grants_dao import RagGrantDAO
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.users import User, current_active_user
 
 
 def require_permission(

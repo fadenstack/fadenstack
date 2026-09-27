@@ -18,9 +18,9 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.llm import (
+from faden_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.llm import (
     LLMProvider,
     LLMRuntime,
     ModelSource,
@@ -29,10 +29,10 @@ from llm_port_backend.db.models.llm import (
     ProviderType,
     RuntimeStatus,
 )
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.llm import remote_health
-from llm_port_backend.services.llm.service import LLMService
-from llm_port_backend.web.api.llm.dependencies import get_llm_service
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.llm import remote_health
+from faden_backend.services.llm.service import LLMService
+from faden_backend.web.api.llm.dependencies import get_llm_service
 
 pytestmark = pytest.mark.anyio
 
@@ -219,8 +219,8 @@ async def test_found_containers_are_followed_when_no_cluster_has_work(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The pass returned before following them when nothing else was pending."""
-    from llm_port_backend.db.dao import inference_dao
-    from llm_port_backend.web import lifespan
+    from faden_backend.db.dao import inference_dao
+    from faden_backend.web import lifespan
 
     class _Session:
         async def __aenter__(self) -> Self:

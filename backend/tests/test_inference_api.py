@@ -22,12 +22,12 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.users import User, current_active_user
 
 API = "/api/inference"
-API_VERSION = "inference.llmport.ai/v1alpha1"
+API_VERSION = "inference.fadenstack.com/v1alpha1"
 
 
 # ---------------------------------------------------------------------------
@@ -517,14 +517,14 @@ async def test_deleting_a_serving_deployment_takes_its_model_off_the_machines_fi
     """Deleting the row used to be all a delete did; the model went on running.
 
     Found on the DGX pair: the application kept its share of a GB10 with
-    nothing in LLM.Port left to stop it. A deployment that was applied is now
+    nothing in Fadenstack left to stop it. A deployment that was applied is now
     marked deleted -- gone from the lists at once -- and the reconciler takes
     the application down, then removes the row.
     """
     from sqlalchemy import select
 
-    from llm_port_backend.db.models.inference import InferenceDeployment
-    from llm_port_backend.services.inference.reconciliation import ReconciliationContext, reconcile_deployment
+    from faden_backend.db.models.inference import InferenceDeployment
+    from faden_backend.services.inference.reconciliation import ReconciliationContext, reconcile_deployment
 
     env, model_id = await _seed_env_and_model(client, dbsession, "cp-del-run", "env-del-run")
     dep = await _create_deploy(client, env, model_id, "del-running")
@@ -545,7 +545,7 @@ async def test_deleting_a_serving_deployment_takes_its_model_off_the_machines_fi
 
     # The driver takes the application down (its own tests cover how); then
     # the row goes, and the name is free again.
-    from llm_port_backend.services.inference import reconciliation as reconciliation_mod
+    from faden_backend.services.inference import reconciliation as reconciliation_mod
 
     class _Manager:
         async def reconcile_deployment(self, session: AsyncSession, deployment: InferenceDeployment) -> None:

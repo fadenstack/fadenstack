@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from llm_port_backend.tkq import broker
+from faden_backend.tkq import broker
 
 log = logging.getLogger(__name__)
 
@@ -17,16 +17,16 @@ async def rag_lite_ingest_task(document_id: str, job_id: str) -> dict:
     Credentials and service references are resolved at runtime from the
     application state — nothing sensitive is transmitted over RabbitMQ.
     """
-    from llm_port_backend.db.dao.rag_lite_dao import (  # noqa: PLC0415
+    from faden_backend.db.dao.rag_lite_dao import (  # noqa: PLC0415
         RagLiteChunkDAO,
         RagLiteDocumentDAO,
         RagLiteIngestJobDAO,
     )
-    from llm_port_backend.db.models.rag_lite import (  # noqa: PLC0415
+    from faden_backend.db.models.rag_lite import (  # noqa: PLC0415
         RagLiteDocumentStatus,
         RagLiteJobStatus,
     )
-    from llm_port_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
+    from faden_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
 
     _doc_id = uuid.UUID(document_id)
     _job_id = uuid.UUID(job_id)
@@ -89,11 +89,11 @@ async def rag_lite_ingest_task(document_id: str, job_id: str) -> dict:
 
 async def _resolve_embedding_client(app, session) -> "EmbeddingClient":
     """Build an EmbeddingClient from the configured or auto-detected provider."""
-    from llm_port_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings  # noqa: PLC0415
+    from faden_backend.services.rag_lite.embedding import EmbeddingClient  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
 
-    from llm_port_backend.services.system_settings.runtime_mapping import (  # noqa: PLC0415
+    from faden_backend.services.system_settings.runtime_mapping import (  # noqa: PLC0415
         refresh_runtime_values,
     )
 

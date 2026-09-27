@@ -1,6 +1,6 @@
 [project]
-name = "llm_port_pii"
-version = "0.3.0"
+name = "faden_pii"
+version = "0.4.0"
 description = ""
 readme = "README.md"
 requires-python = ">=3.11,<4"
@@ -73,7 +73,7 @@ build-backend = "hatchling.build"
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-src_paths = ["llm_port_pii",]
+src_paths = ["faden_pii",]
 
 [tool.mypy]
 strict = true
@@ -103,9 +103,9 @@ filterwarnings = [
     "ignore:.*unclosed.*:ResourceWarning",
 ]
 env = [
-    "LLM_PORT_PII_ENVIRONMENT=pytest",
-    "LLM_PORT_PII_DB_BASE=llm_port_pii_test",
-    "LLM_PORT_PII_SENTRY_DSN=",
+    "FADEN_PII_ENVIRONMENT=pytest",
+    "FADEN_PII_DB_BASE=faden_pii_test",
+    "FADEN_PII_SENTRY_DSN=",
 ]
 
 [tool.ruff]
@@ -155,7 +155,7 @@ lint.ignore = [
     "D106",    # Missing docstring in public nested class
 ]
 exclude = [
-    "llm_port_pii/db/migrations",
+    "faden_pii/db/migrations",
     ".venv/"
 ]
 lint.mccabe = { max-complexity = 10 }
@@ -175,7 +175,7 @@ allow-magic-value-types = ["int", "str", "float", "bytes"]
 
 
 [fastapi-template.options]
-project_name = "llm_port_pii"
+project_name = "faden_pii"
 api_type = "rest"
 enable_redis = "True"
 enable_rmq = "None"
@@ -183,7 +183,7 @@ ci_type = "none"
 enable_migrations = "True"
 enable_taskiq = "None"
 enable_kube = "True"
-kube_name = "llm-port-pii"
+kube_name = "faden-pii"
 enable_routers = "True"
 enable_kafka = "None"
 enable_loguru = "True"

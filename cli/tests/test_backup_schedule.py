@@ -1,4 +1,4 @@
-"""Nightly backups: one crontab line, owned and replaced by `llmport backup schedule`.
+"""Nightly backups: one crontab line, owned and replaced by `faden backup schedule`.
 
 There were backups with retention, but nothing ran them: an install was
 only as safe as the operator's memory.
@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from llmport.commands.backup import backup_cmd
-from llmport.core import schedule
+from faden_cli.commands.backup import backup_cmd
+from faden_cli.core import schedule
 
 
 @pytest.fixture()
@@ -26,16 +26,16 @@ def crontab(monkeypatch: pytest.MonkeyPatch) -> list[str]:
         lines[:] = new
 
     monkeypatch.setattr(schedule, "_write", write)
-    monkeypatch.setattr(schedule.shutil, "which", lambda name: "/home/ops/.local/bin/llmport")
+    monkeypatch.setattr(schedule.shutil, "which", lambda name: "/home/ops/.local/bin/faden")
     return lines
 
 
 def _configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    install = tmp_path / "llm-port"
+    install = tmp_path / "fadenstack"
     install.mkdir()
-    config = tmp_path / "llmport.yaml"
+    config = tmp_path / "faden.yaml"
     config.write_text(f"version: 1\ninstall_dir: {install.as_posix()}\n", encoding="utf-8")
-    monkeypatch.setenv("LLMPORT_CONFIG", str(config))
+    monkeypatch.setenv("FADEN_CONFIG", str(config))
     return install
 
 
@@ -50,7 +50,7 @@ def test_scheduling_adds_one_line_and_keeps_the_rest(
     line = crontab[2]
     assert line.startswith("30 2 * * * PATH=")
     assert "backup -y --retain 10" in line
-    assert "LLMPORT_CONFIG=" in line, "cron must find the same install"
+    assert "FADEN_CONFIG=" in line, "cron must find the same install"
     assert str(install / "backups" / "backup.log").replace("\\", "/") in line.replace("\\", "/")
     assert line.endswith(schedule.MARK)
 
@@ -71,7 +71,7 @@ def test_a_bad_time_is_refused(crontab: list[str], tmp_path: Path, monkeypatch: 
 
 
 def test_backup_without_a_subcommand_still_backs_up(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from llmport.commands import backup as backup_module
+    from faden_cli.commands import backup as backup_module
 
     _configure(tmp_path, monkeypatch)
     ran: list[Path] = []
@@ -80,7 +80,7 @@ def test_backup_without_a_subcommand_still_backs_up(tmp_path: Path, monkeypatch:
         ok = True
         errors: list[str] = []  # noqa: RUF012
         backup_dir = tmp_path / "b"
-        databases = ["llm_port_backend"]
+        databases = ["faden_backend"]
         env_snapshot = None
         volumes: list[str] = []  # noqa: RUF012
         tls_material: list[str] = []  # noqa: RUF012
@@ -102,7 +102,7 @@ def test_with_systemd_a_user_timer_is_installed_and_lingering_switched_on(
     monkeypatch.setenv("USER", "ops")
     monkeypatch.setattr(schedule, "_systemd_user", lambda: True)
     monkeypatch.setattr(schedule, "_cron", lambda: False)
-    monkeypatch.setattr(schedule, "_cli", lambda: ["/home/ops/.local/bin/llmport"])
+    monkeypatch.setattr(schedule, "_cli", lambda: ["/home/ops/.local/bin/faden"])
     ran: list[list[str]] = []
     linger = {"on": False}
 
@@ -123,12 +123,12 @@ def test_with_systemd_a_user_timer_is_installed_and_lingering_switched_on(
     assert result.exit_code == 0, result.output
 
     units = tmp_path / "xdg" / "systemd" / "user"
-    timer = (units / "llmport-backup.timer").read_text()
-    service = (units / "llmport-backup.service").read_text()
+    timer = (units / "faden-backup.timer").read_text()
+    service = (units / "faden-backup.service").read_text()
     assert "OnCalendar=*-*-* 01:15:00" in timer and "Persistent=true" in timer
-    assert "ExecStart=/home/ops/.local/bin/llmport backup -y --retain 4" in service
-    assert "LLMPORT_CONFIG=" in service
+    assert "ExecStart=/home/ops/.local/bin/faden backup -y --retain 4" in service
+    assert "FADEN_CONFIG=" in service
     assert f"append:{install / 'backups' / 'backup.log'}" in service
-    assert ["systemctl", "--user", "enable", "--now", "llmport-backup.timer"] in ran
+    assert ["systemctl", "--user", "enable", "--now", "faden-backup.timer"] in ran
     assert ["loginctl", "enable-linger", "ops"] in ran, "or it only runs while someone is logged in"
     assert "Lingering is off" not in result.output

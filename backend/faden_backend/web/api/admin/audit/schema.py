@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from llm_port_backend.db.models.containers import AuditResult
+from faden_backend.db.models.containers import AuditResult
 
 
 class AuditEventDTO(BaseModel):

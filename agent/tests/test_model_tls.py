@@ -23,8 +23,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from llm_port_node_agent import model_tls
-from llm_port_node_agent.model_tls import ModelTls, ModelTlsError, render_conf
+from faden_agent import model_tls
+from faden_agent.model_tls import ModelTls, ModelTlsError, render_conf
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
 
@@ -160,7 +160,7 @@ def test_the_configuration_puts_tls_and_the_gateway_check_in_front_of_loopback()
     assert "proxy_pass http://127.0.0.1:28010;" in conf and "proxy_pass http://127.0.0.1:28000;" in conf
     assert "ssl_verify_client on;" in conf
     assert '"~(^|,)CN=fadenstack-gateway(,|$)" 1;' in conf
-    assert conf.count("if ($llmport_client_ok = 0) { return 403; }") == 2
+    assert conf.count("if ($faden_client_ok = 0) { return 403; }") == 2
     assert "proxy_buffering off;" in conf, "streamed tokens must not wait in a buffer"
     assert "listen 8010;" not in conf, "no plain listener"
     assert "[::]" not in render_conf({8010: 28010}, client_name="g", ipv6=False)
@@ -238,7 +238,7 @@ async def test_the_proxy_starts_reloads_and_goes(tmp_path: Path, pinned: list[st
         assert await tls.ensure_route(8010, 28010) == {"protected": True, "public_port": 8010, "internal_port": 28010}
     run = next(c[1] for c in runtime.calls if c[0] == "run")
     assert run["image"] == model_tls.server_image_tag()
-    assert run["volumes"] == ["/host/model-tls:/etc/llmport-model-tls:ro"]
+    assert run["volumes"] == ["/host/model-tls:/etc/faden-model-tls:ro"]
     assert run["extra_args"] == ["--network", "host"]
     assert run["entrypoint"] == "nginx"
     assert json.loads((tmp_path / "model-tls" / model_tls.ROUTES_FILE).read_text()) == {"8010": 28010}

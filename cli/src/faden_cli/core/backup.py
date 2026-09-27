@@ -1,8 +1,8 @@
-"""Backup and restore helpers for llm.port databases and volumes.
+"""Backup and restore helpers for fadenstack databases and volumes.
 
-Shared by ``llmport backup``, ``llmport restore``, and
-``llmport upgrade``.  All database operations run via
-``docker exec`` against the running ``llm-port-postgres`` container —
+Shared by ``faden backup``, ``faden restore``, and
+``faden upgrade``.  All database operations run via
+``docker exec`` against the running ``faden-postgres`` container —
 no direct network connection is needed.
 """
 
@@ -16,10 +16,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from llmport import __version__
-from llmport.core.compose import ComposeContext, up as compose_up
-from llmport.core.console import console, error, info, success, warning
-from llmport.core.registry import DATABASES, POSTGRES_CONTAINER
+from faden_cli import __version__
+from faden_cli.core.compose import ComposeContext, up as compose_up
+from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
 
 # Named Docker volumes that can be included in a backup.
 BACKUP_VOLUMES: list[str] = [
@@ -29,16 +29,16 @@ BACKUP_VOLUMES: list[str] = [
     "ch_logs",
     "loki_data",
     "grafana_data",
-    "llm_port_models",
+    "faden_models",
 ]
 
 # Alembic migrator containers (service name → database).
 _MIGRATOR_SERVICES: dict[str, str] = {
-    "llm-port-backend-migrator": "llm_port_backend",
-    "llm-port-api-migrator": "llm_api",
-    "llm-port-mcp-migrator": "llm_mcp",
-    "llm-port-skills-migrator": "llm_skills",
-    "llm-port-pii-migrator": "pii",
+    "faden-backend-migrator": "faden_backend",
+    "faden-gateway-migrator": "faden_gateway",
+    "faden-mcp-migrator": "faden_mcp",
+    "faden-skills-migrator": "faden_skills",
+    "faden-pii-migrator": "pii",
 }
 
 
@@ -425,7 +425,7 @@ def write_manifest(
     manifest = {
         "version": 1,
         "created_at": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
-        "llmport_version": __version__,
+        "faden_version": __version__,
         "databases": db_entries,
         "env_snapshot": env_snapshot,
         "volumes": volumes,

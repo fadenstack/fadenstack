@@ -14,8 +14,8 @@ import sys
 
 import pytest
 
-from llm_port_backend.services.gpu.passthrough import build_gpu_host_config
-from llm_port_backend.services.gpu.types import GpuVendor
+from faden_backend.services.gpu.passthrough import build_gpu_host_config
+from faden_backend.services.gpu.types import GpuVendor
 
 
 # ──────────────────────────────────────────────────────────────────────────────

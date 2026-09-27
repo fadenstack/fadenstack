@@ -10,18 +10,18 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dao.groups_dao import GroupDAO
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.groups import Group
-from llm_port_backend.db.models.rbac import Permission, Role
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.skills.client import forget_principal
-from llm_port_backend.web.api.admin.dependencies import require_superuser
-from llm_port_backend.web.api.admin.users.preferences import (
+from faden_backend.db.dao.groups_dao import GroupDAO
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.groups import Group
+from faden_backend.db.models.rbac import Permission, Role
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.skills.client import forget_principal
+from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.users.preferences import (
     router as preferences_router,
 )
-from llm_port_backend.web.api.admin.users.schema import (
+from faden_backend.web.api.admin.users.schema import (
     AdminUserDTO,
     ApiTokenResponse,
     ChangePasswordRequest,
@@ -83,8 +83,8 @@ async def _build_admin_user_dto(user: User, rbac_dao: RbacDAO) -> AdminUserDTO:
 
 async def _resolve_users_secret(session: AsyncSession) -> str:
     """Resolve backend JWT signing secret with DB fallback."""
-    from llm_port_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-    from llm_port_backend.settings import settings as backend_settings  # noqa: PLC0415
+    from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
+    from faden_backend.settings import settings as backend_settings  # noqa: PLC0415
 
     secret = backend_settings.users_secret.strip()
     if secret:
@@ -94,7 +94,7 @@ async def _resolve_users_secret(session: AsyncSession) -> str:
 
     row = await session.execute(
         text("SELECT ciphertext FROM system_setting_secret WHERE key = :k"),
-        {"k": "llm_port_backend.users_secret"},
+        {"k": "faden_backend.users_secret"},
     )
     ciphertext = row.scalar_one_or_none()
     if not ciphertext:
@@ -396,8 +396,8 @@ async def generate_api_token(
     """Generate a JWT token for the LLM API gateway.
 
     Uses ``settings.users_secret`` which is loaded from the
-    ``llm_port_backend.users_secret`` system setting at startup.
-    Both backend and llm_port_api share the same DB-stored secret.
+    ``faden_backend.users_secret`` system setting at startup.
+    Both backend and faden_gateway share the same DB-stored secret.
     """
     import time  # noqa: PLC0415
 

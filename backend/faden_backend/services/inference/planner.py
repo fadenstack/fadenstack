@@ -33,12 +33,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.models.inference import (
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.node_control import InfraNode, NodeCommandType
-from llm_port_backend.services.inference.service import ConflictError, NotFoundError
+from faden_backend.db.models.node_control import InfraNode, NodeCommandType
+from faden_backend.services.inference.service import ConflictError, NotFoundError
 
 log = logging.getLogger(__name__)
 
@@ -620,7 +620,7 @@ class MultiNodeFabricPlanner:
         A node whose platform no bundle covers makes the set incompatible.
         That is a refusal: there is nothing to start it with.
         """
-        from llm_port_backend.services.inference.bundles import (  # noqa: PLC0415
+        from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             default_bundle_registry,
         )
 
@@ -715,7 +715,7 @@ class MultiNodeFabricPlanner:
 
     async def _probe_candidate(self, candidate: FabricCandidate) -> FabricValidation:
         """Run one ephemeral listener and probe it from every other binding."""
-        from llm_port_backend.services.inference.drivers.ray.commands import (
+        from faden_backend.services.inference.drivers.ray.commands import (
             NodeCommandGateway,
         )
 

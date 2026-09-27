@@ -1,20 +1,20 @@
-"""``llmport module`` — enable / disable optional platform modules."""
+"""``faden module`` — enable / disable optional platform modules."""
 
 from __future__ import annotations
 
 import click
 from rich.table import Table
 
-from llmport.core.console import console, info, success, warning
-from llmport.core.env_gen import set_module_env
-from llmport.core.registry import MODULES_COMPAT as MODULES
-from llmport.core.settings import LlmportConfig, load_config, save_config
+from faden_cli.core.console import console, info, success, warning
+from faden_cli.core.env_gen import set_module_env
+from faden_cli.core.registry import MODULES_COMPAT as MODULES
+from faden_cli.core.settings import FadenConfig, load_config, save_config
 
 
-def _write_env(cfg: LlmportConfig, *, enable: list[str], disable: list[str]) -> None:
+def _write_env(cfg: FadenConfig, *, enable: list[str], disable: list[str]) -> None:
     """Carry the change into the install's ``.env``, where the services read it.
 
-    Recording a module in llmport.yaml only starts its containers; the
+    Recording a module in faden.yaml only starts its containers; the
     gateway and the backend switch it on from ``.env``.
     """
     env_path = cfg.install_path / ".env"
@@ -27,7 +27,7 @@ def _write_env(cfg: LlmportConfig, *, enable: list[str], disable: list[str]) -> 
 
 @click.group("module")
 def module_group() -> None:
-    """Manage optional llm.port modules (pii, mcp, skills)."""
+    """Manage optional fadenstack modules (pii, mcp, skills)."""
 
 
 @module_group.command("list")
@@ -37,7 +37,7 @@ def module_list() -> None:
     active_profiles = set(cfg.profiles or [])
 
     table = Table(
-        title="llm.port Modules",
+        title="fadenstack Modules",
         show_header=True,
         header_style="bold cyan",
     )
@@ -58,7 +58,7 @@ def module_list() -> None:
 def module_enable(modules: tuple[str, ...]) -> None:
     """Enable one or more modules.
 
-    Example: llmport module enable pii auth
+    Example: faden module enable pii auth
     """
     cfg = load_config()
     profiles = set(cfg.profiles or [])
@@ -78,8 +78,8 @@ def module_enable(modules: tuple[str, ...]) -> None:
     save_config(cfg)
     _write_env(cfg, enable=enabled, disable=[])
     console.print(
-        "\n[dim]Run [bold]llmport up[/bold] to apply changes "
-        "(or [bold]llmport dev up[/bold] in a dev workspace).[/dim]",
+        "\n[dim]Run [bold]faden up[/bold] to apply changes "
+        "(or [bold]faden dev up[/bold] in a dev workspace).[/dim]",
     )
 
 
@@ -88,7 +88,7 @@ def module_enable(modules: tuple[str, ...]) -> None:
 def module_disable(modules: tuple[str, ...]) -> None:
     """Disable one or more modules.
 
-    Example: llmport module disable pii
+    Example: faden module disable pii
     """
     cfg = load_config()
     profiles = set(cfg.profiles or [])
@@ -108,6 +108,6 @@ def module_disable(modules: tuple[str, ...]) -> None:
     save_config(cfg)
     _write_env(cfg, enable=[], disable=disabled)
     console.print(
-        "\n[dim]Run [bold]llmport down && llmport up[/bold] to apply changes "
-        "(or [bold]llmport dev up[/bold] in a dev workspace).[/dim]",
+        "\n[dim]Run [bold]faden down && faden up[/bold] to apply changes "
+        "(or [bold]faden dev up[/bold] in a dev workspace).[/dim]",
     )

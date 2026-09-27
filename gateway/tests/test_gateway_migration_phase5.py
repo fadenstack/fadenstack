@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_api.db.dao.gateway_dao import GatewayDAO
-from llm_port_api.db.models.gateway import (
+from faden_gateway.db.dao.gateway_dao import GatewayDAO
+from faden_gateway.db.models.gateway import (
     LLMModelAlias,
     LLMPoolMembership,
     LLMProviderInstance,
@@ -25,7 +25,7 @@ async def test_provider_instance_source_metadata_and_uniqueness(db_session: Asyn
     inst1 = LLMProviderInstance(
         id=uuid.uuid4(),
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/llmport-app1",
+        base_url="http://10.250.10.49:8000/faden-app1",
         enabled=True,
         health_status=ProviderHealthStatus.HEALTHY,
         source_kind="inference_deployment",
@@ -44,7 +44,7 @@ async def test_provider_instance_source_metadata_and_uniqueness(db_session: Asyn
             inst_duplicate = LLMProviderInstance(
                 id=uuid.uuid4(),
                 type=ProviderType.VLLM,
-                base_url="http://10.250.10.71:8000/llmport-app1-dup",
+                base_url="http://10.250.10.71:8000/faden-app1-dup",
                 enabled=True,
                 health_status=ProviderHealthStatus.HEALTHY,
                 source_kind="inference_deployment",

@@ -8,11 +8,11 @@ pure; no platform probing happens.  The real ``GpuDevice``/``GpuVendor``/
 
 from __future__ import annotations
 
-from llm_port_backend.services.gpu.detector import (
+from faden_backend.services.gpu.detector import (
     _build_inventory,
     _merge_device_lists,
 )
-from llm_port_backend.services.gpu.types import (
+from faden_backend.services.gpu.types import (
     GpuComputeApi,
     GpuDevice,
     GpuVendor,

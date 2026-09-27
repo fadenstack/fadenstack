@@ -10,14 +10,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_skills.db.models.skill import SkillModel, SkillVisibility
-from llm_port_skills.db.session import get_db_session
-from llm_port_skills.services import bundle as fmt
-from llm_port_skills.services.access import Principal
-from llm_port_skills.services.dao import SkillDao
-from llm_port_skills.services.errors import NotFoundError
-from llm_port_skills.services.resolve import RequestContext
-from llm_port_skills.web.api.auth import verify_service_token
+from faden_skills.db.models.skill import SkillModel, SkillVisibility
+from faden_skills.db.session import get_db_session
+from faden_skills.services import bundle as fmt
+from faden_skills.services.access import Principal
+from faden_skills.services.dao import SkillDao
+from faden_skills.services.errors import NotFoundError
+from faden_skills.services.resolve import RequestContext
+from faden_skills.web.api.auth import verify_service_token
 
 logger = logging.getLogger(__name__)
 

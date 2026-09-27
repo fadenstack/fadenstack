@@ -8,7 +8,7 @@ from __future__ import annotations
 import base64
 import re
 
-from llm_port_backend.services.nodes.auth import (
+from faden_backend.services.nodes.auth import (
     constant_time_equal,
     hash_with_pepper,
     random_secret,

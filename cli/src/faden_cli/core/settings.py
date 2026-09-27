@@ -1,10 +1,10 @@
-"""Configuration file (llmport.yaml) read/write utilities.
+"""Configuration file (faden.yaml) read/write utilities.
 
 The CLI persists its state in a YAML file located at:
-  - ``$LLMPORT_CONFIG`` env var (if set)
-  - ``<install_dir>/llmport.yaml``
-  - ``%LOCALAPPDATA%/llmport/llmport.yaml`` (Windows)
-  - ``~/.config/llmport/llmport.yaml`` (Linux/macOS)
+  - ``$FADEN_CONFIG`` env var (if set)
+  - ``<install_dir>/faden.yaml``
+  - ``%LOCALAPPDATA%/faden/faden.yaml`` (Windows)
+  - ``~/.config/faden/faden.yaml`` (Linux/macOS)
 
 The schema is intentionally flat:  top-level scalars for the common
 case, with a ``dev:`` section for dev-mode specifics.
@@ -19,7 +19,7 @@ from typing import Any
 
 import yaml
 
-from llmport.core.registry import (
+from faden_cli.core.registry import (
     REPO_DIR_MAP,
     REPO_NAMES,
     repo_clone_url,
@@ -37,12 +37,12 @@ def _default_config_dir() -> Path:
     if os.name == "nt":
         base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
         if base:
-            return Path(base) / "llmport"
-    return Path.home() / ".config" / "llmport"
+            return Path(base) / "faden"
+    return Path.home() / ".config" / "faden"
 
 
 _DEFAULT_CONFIG_DIR = _default_config_dir()
-_DEFAULT_CONFIG_FILE = _DEFAULT_CONFIG_DIR / "llmport.yaml"
+_DEFAULT_CONFIG_FILE = _DEFAULT_CONFIG_DIR / "faden.yaml"
 
 
 @dataclass
@@ -57,7 +57,7 @@ class DevConfig:
 
 
 @dataclass
-class LlmportConfig:
+class FadenConfig:
     """Top-level CLI configuration."""
 
     version: int = 1
@@ -109,22 +109,22 @@ class LlmportConfig:
 
 def config_path() -> Path:
     """Return the active config file path."""
-    env = os.environ.get("LLMPORT_CONFIG")
+    env = os.environ.get("FADEN_CONFIG")
     if env:
         return Path(env).expanduser().resolve()
     return _DEFAULT_CONFIG_FILE
 
 
-def load_config() -> LlmportConfig:
+def load_config() -> FadenConfig:
     """Load the config from disk, or return defaults if missing."""
     path = config_path()
     if not path.exists():
-        return LlmportConfig()
+        return FadenConfig()
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return _from_dict(data)
 
 
-def save_config(cfg: LlmportConfig) -> Path:
+def save_config(cfg: FadenConfig) -> Path:
     """Write the config to disk.  Creates parent dirs as needed."""
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -135,19 +135,19 @@ def save_config(cfg: LlmportConfig) -> Path:
 # ── Serialisation helpers ─────────────────────────────────────────
 
 
-def _from_dict(data: dict[str, Any]) -> LlmportConfig:
-    """Build a ``LlmportConfig`` from a raw dict."""
+def _from_dict(data: dict[str, Any]) -> FadenConfig:
+    """Build a ``FadenConfig`` from a raw dict."""
     dev_data = data.pop("dev", {}) or {}
     dev = DevConfig(**{k: v for k, v in dev_data.items() if k in DevConfig.__dataclass_fields__})
-    cfg = LlmportConfig(
-        **{k: v for k, v in data.items() if k in LlmportConfig.__dataclass_fields__ and k != "dev"},
+    cfg = FadenConfig(
+        **{k: v for k, v in data.items() if k in FadenConfig.__dataclass_fields__ and k != "dev"},
         dev=dev,
     )
     return cfg
 
 
-def _to_dict(cfg: LlmportConfig) -> dict[str, Any]:
-    """Serialise a ``LlmportConfig`` to a plain dict for YAML."""
+def _to_dict(cfg: FadenConfig) -> dict[str, Any]:
+    """Serialise a ``FadenConfig`` to a plain dict for YAML."""
     from dataclasses import asdict
 
     return asdict(cfg)

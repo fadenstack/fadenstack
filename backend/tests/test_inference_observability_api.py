@@ -19,19 +19,19 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.rbac_dao import RbacDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.rbac_dao import RbacDAO
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceDeployment,
     InferenceEnvironment,
     InferenceEnvironmentNode,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode
-from llm_port_backend.db.models.users import User, current_active_user
-from llm_port_backend.services.inference.contracts import InferenceDriver
-from llm_port_backend.services.inference.drivers.ray.driver import RayDriver
-from llm_port_backend.services.inference.observability import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode
+from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.inference.contracts import InferenceDriver
+from faden_backend.services.inference.drivers.ray.driver import RayDriver
+from faden_backend.services.inference.observability import (
     DeploymentMetrics,
     EnvironmentMetrics,
     LogLine,
@@ -40,12 +40,12 @@ from llm_port_backend.services.inference.observability import (
     MetricsPartial,
     ReplicaMetrics,
 )
-from llm_port_backend.services.inference.registry import registry
+from faden_backend.services.inference.registry import registry
 
 API = "/api/inference"
 
 _SPEC: dict[str, Any] = {
-    "api_version": "inference.llmport.ai/v1alpha1",
+    "api_version": "inference.fadenstack.com/v1alpha1",
     "engine": {"name": "vllm", "config": {}},
     "scale": {"replicas": 1},
 }
@@ -352,7 +352,7 @@ async def test_deployment_metrics_reports_all_three_tiers(
     async def fake_metrics(self, session, dep, **kwargs) -> DeploymentMetrics:  # noqa: ANN001
         return DeploymentMetrics(
             deployment_id=str(dep.id),
-            app_name="llm-port-dep",
+            app_name="faden-dep",
             app_status="RUNNING",
             replicas_ready=1,
             replicas_total=2,

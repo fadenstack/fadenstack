@@ -1,4 +1,4 @@
-"""``llmport runtime-images``: the runtime images this server holds for its machines.
+"""``faden runtime-images``: the runtime images this server holds for its machines.
 
 The same step runs at the end of ``deploy`` and ``upgrade``; this command runs
 it on its own -- to retry a pull that failed, to fetch an architecture chosen
@@ -12,14 +12,14 @@ import sys
 import click
 from rich.table import Table
 
-from llmport.core import runtime_images as rt
-from llmport.core.console import console, info, success, warning
-from llmport.core.settings import LlmportConfig, load_config, save_config
+from faden_cli.core import runtime_images as rt
+from faden_cli.core.console import console, info, success, warning
+from faden_cli.core.settings import FadenConfig, load_config, save_config
 
-_HOW_TO_RETRY = "llmport runtime-images"
+_HOW_TO_RETRY = "faden runtime-images"
 
 
-def choose(cfg: LlmportConfig, value: str | None) -> set[str] | None:
+def choose(cfg: FadenConfig, value: str | None) -> set[str] | None:
     """The architectures to fetch: *value* when given (and remembered), else the saved choice.
 
     Returns None, after saying why, when *value* is not a valid choice.
@@ -35,7 +35,7 @@ def choose(cfg: LlmportConfig, value: str | None) -> set[str] | None:
     return chosen
 
 
-def run_step(cfg: LlmportConfig, *, value: str | None = None) -> bool:
+def run_step(cfg: FadenConfig, *, value: str | None = None) -> bool:
     """Fetch this release's runtime images onto the server and say what happened.
 
     Never stops the caller: every service is already running without them,
@@ -122,7 +122,7 @@ def _say(outcome: rt.Outcome) -> None:
         )
 
 
-def _check(cfg: LlmportConfig) -> bool:
+def _check(cfg: FadenConfig) -> bool:
     image = rt.backend_image(cfg.env_path)
     try:
         pinned = rt.pinned(image)
@@ -162,13 +162,13 @@ def runtime_images_cmd(*, arch: str | None, check: bool) -> None:
 
     \b
     Examples:
-        llmport runtime-images                 # fetch what this release pins
-        llmport runtime-images --arch x86_64   # only for x86_64 machines, from now on
-        llmport runtime-images --check         # what is here, what is missing
+        faden runtime-images                 # fetch what this release pins
+        faden runtime-images --arch x86_64   # only for x86_64 machines, from now on
+        faden runtime-images --check         # what is here, what is missing
     """
     cfg = load_config()
     if not cfg.install_dir:
-        warning("No install directory configured. Run 'llmport deploy' first.")
+        warning("No install directory configured. Run 'faden deploy' first.")
         sys.exit(1)
     ok = _check(cfg) if check else run_step(cfg, value=arch)
     sys.exit(0 if ok else 1)

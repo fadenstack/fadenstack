@@ -25,11 +25,11 @@ from pathlib import Path
 
 import pytest
 
-from llm_port_node_agent.ray_log_forwarder import RayServeLogForwarder
+from faden_agent.ray_log_forwarder import RayServeLogForwarder
 
 pytestmark = pytest.mark.anyio()
 
-APP = "llmport-b64e389b-58ae-4b1d-a754-1f9f48e22220"
+APP = "faden-b64e389b-58ae-4b1d-a754-1f9f48e22220"
 REPLICA_FILE = f"replica_{APP}_LLMServer_Qwen2_5-0_5B-Instruct_wib8cvxx.log"
 
 

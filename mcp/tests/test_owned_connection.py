@@ -17,7 +17,7 @@ from contextlib import AsyncExitStack
 import anyio
 import pytest
 
-from llm_port_mcp.services.transport.base import MCPConnectError, OwnedConnection
+from faden_mcp.services.transport.base import MCPConnectError, OwnedConnection
 
 
 def _transport(fail_after: float | None, events: list[str]):

@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from llm_port_backend.db.base import Base
+from faden_backend.db.base import Base
 
 
 class NodeHealthStatus(enum.StrEnum):

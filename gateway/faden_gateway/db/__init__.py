@@ -1,1 +1,1 @@
-"""Database package for llm_port_api."""
+"""Database package for faden_gateway."""

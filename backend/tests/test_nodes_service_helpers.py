@@ -16,8 +16,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from llm_port_backend.db.models.node_control import NodeHealthStatus
-from llm_port_backend.services.nodes.service import NodeControlService
+from faden_backend.db.models.node_control import NodeHealthStatus
+from faden_backend.services.nodes.service import NodeControlService
 
 
 def _make_service(dao: object) -> NodeControlService:

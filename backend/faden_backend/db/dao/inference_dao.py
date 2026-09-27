@@ -17,8 +17,8 @@ from fastapi import Depends
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
@@ -446,7 +446,7 @@ class DeploymentDAO:
 
         The stored ``spec_json`` is the serialized versioned spec; callers
         are expected to validate it with
-        ``llm_port_backend.services.inference.schemas`` first so the
+        ``faden_backend.services.inference.schemas`` first so the
         database only ever holds well-formed documents.
         """
         deployment = InferenceDeployment(

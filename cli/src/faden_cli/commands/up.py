@@ -1,4 +1,4 @@
-"""``llmport up`` — start llm.port services."""
+"""``faden up`` — start fadenstack services."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import sys
 
 import click
 
-from llmport.core.compose import build_context_from_config, up as compose_up
-from llmport.core.console import console, success, error
-from llmport.core.env_gen import write_env_file, default_env_vars
-from llmport.core.settings import load_config
+from faden_cli.core.compose import build_context_from_config, up as compose_up
+from faden_cli.core.console import console, success, error
+from faden_cli.core.env_gen import write_env_file, default_env_vars
+from faden_cli.core.settings import load_config
 
 
 @click.command("up")
@@ -26,7 +26,7 @@ def up_cmd(
     gen_env: bool,
     services: tuple[str, ...],
 ) -> None:
-    """Start llm.port infrastructure and services.
+    """Start fadenstack infrastructure and services.
 
     Optionally pass SERVICE names to start only specific containers.
     """
@@ -41,13 +41,13 @@ def up_cmd(
         env_vars = default_env_vars(profiles=cfg.profiles)
         write_env_file(env_path, env_vars, preserve_secrets=True)
         success(f"Environment file written to {env_path}")
-        from llmport.core.tune import tune_env  # noqa: PLC0415
+        from faden_cli.core.tune import tune_env  # noqa: PLC0415
 
         tune_env(env_path)
 
     ctx = build_context_from_config(cfg)
 
-    console.print("[bold cyan]Starting llm.port services…[/bold cyan]")
+    console.print("[bold cyan]Starting fadenstack services…[/bold cyan]")
 
     returncode = compose_up(
         ctx,

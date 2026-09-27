@@ -1,6 +1,6 @@
 """Runtime images: the containers models run in, fetched onto the server.
 
-A machine never pulls its runtime image from the internet. The LLM.Port
+A machine never pulls its runtime image from the internet. The Fadenstack
 server exports the pinned image from its own Docker and the machine downloads
 it from the server, or from a cluster peer that already has it. So the server
 has to hold every runtime image a machine may ask for -- and nothing put it
@@ -8,7 +8,7 @@ there: a fresh install could take over a cluster that already had its image,
 and could not give a new machine one.
 
 ``deploy`` and ``upgrade`` now fetch them from the registry the release
-publishes to (``ghcr.io/llm-port/ray-runtime-*``). Which images is not decided
+publishes to (``ghcr.io/fadenstack/ray-runtime-*``). Which images is not decided
 here: they are read out of this release's backend image, from the same
 runtime manifests the backend builds its catalogue from, so the CLI can never
 fetch a build the backend would then refuse.
@@ -22,7 +22,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from llmport.core.env_gen import read_env_file
+from faden_cli.core.env_gen import read_env_file
 
 #: Architectures as machines report them (``uname -m``), with the names
 #: registries and Docker use for the same thing.
@@ -34,10 +34,10 @@ _PLATFORMS = {"x86_64": "linux/amd64", "aarch64": "linux/arm64"}
 _READ_MANIFESTS = (
     "import glob, json\n"
     "print(json.dumps({p.rsplit('/', 1)[-1]: json.load(open(p))"
-    " for p in sorted(glob.glob('llm_port_runtime_image/runtime-manifest*.json'))}))\n"
+    " for p in sorted(glob.glob('runtime-image/runtime-manifest*.json'))}))\n"
 )
 
-DEFAULT_REGISTRY = "ghcr.io/llm-port"
+DEFAULT_REGISTRY = "ghcr.io/fadenstack"
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ class RuntimeImage:
 
         Until a runtime release is certified, a manifest can still name a
         build that only ever existed on the machines it was made on
-        (``llmport/ray-vllm-gb10:…``); pulling that would ask Docker Hub for
+        (``faden/ray-vllm-gb10:…``); pulling that would ask Docker Hub for
         an image nobody published.
         """
         return is_registry_ref(self.ref)
@@ -268,7 +268,7 @@ MODEL_TLS_NGINX = {
         "sha256:2f89fd28b672e74bd0d11deb485485881ca606ccc04a6a14b05cca1272f0459a",
     ),
 }
-MODEL_TLS_TAG = "llmport/model-tls-nginx:1.31.6-alpine-{arch}"
+MODEL_TLS_TAG = "faden/model-tls-nginx:1.31.6-alpine-{arch}"
 
 
 def rootfs_digest(layers: tuple[str, ...] | list[str]) -> str:

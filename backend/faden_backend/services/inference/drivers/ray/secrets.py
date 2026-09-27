@@ -3,12 +3,12 @@
 A Ray cluster auth token is never stored in plain columns or node-command
 payloads.  It is encrypted with the system-settings master key (Fernet) and
 persisted in the ``system_setting_secret`` table.  What *is* stored on the
-:class:`~llm_port_backend.db.models.inference.InferenceControlPlane` row and
+:class:`~faden_backend.db.models.inference.InferenceControlPlane` row and
 shipped in node-command payloads is an opaque, non-secret ``credential_ref``
 derived from the owning control plane id (``cp-<uuid>``).
 
 The matching delivery endpoint
-(:func:`llm_port_backend.web.api.admin.system.views.system_node_secret_delivery`)
+(:func:`faden_backend.web.api.admin.system.views.system_node_secret_delivery`)
 resolves the ref to a control plane, verifies the *requesting* node actually
 belongs to that control plane's membership, and only then decrypts and serves
 the token.
@@ -21,9 +21,9 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.system_settings_dao import SystemSettingsDAO
-from llm_port_backend.services.system_settings.crypto import SettingsCrypto
-from llm_port_backend.settings import settings
+from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
+from faden_backend.services.system_settings.crypto import SettingsCrypto
+from faden_backend.settings import settings
 
 __all__ = [
     "credential_ref_for_control_plane",

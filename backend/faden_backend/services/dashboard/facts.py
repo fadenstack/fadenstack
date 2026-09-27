@@ -15,12 +15,12 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.services.dashboard import attention as attention_rules
-from llm_port_backend.services.dashboard import capacity as capacity_service
-from llm_port_backend.services.dashboard import integrations as integrations_service
-from llm_port_backend.services.dashboard import platform, traffic
-from llm_port_backend.services.dashboard.cache import FactCache
-from llm_port_backend.services.dashboard.timewindows import Window
+from faden_backend.services.dashboard import attention as attention_rules
+from faden_backend.services.dashboard import capacity as capacity_service
+from faden_backend.services.dashboard import integrations as integrations_service
+from faden_backend.services.dashboard import platform, traffic
+from faden_backend.services.dashboard.cache import FactCache
+from faden_backend.services.dashboard.timewindows import Window
 
 #: How long each kind of figure is reused.
 TTL_ATTRIBUTION = 30.0

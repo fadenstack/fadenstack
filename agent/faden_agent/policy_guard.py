@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from llm_port_node_agent.models import NodeCommandType
-from llm_port_node_agent.state_store import AgentState
+from faden_agent.models import NodeCommandType
+from faden_agent.state_store import AgentState
 
 
 class PolicyViolationError(RuntimeError):

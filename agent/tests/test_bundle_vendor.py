@@ -7,10 +7,10 @@ silently fall back to NVIDIA flags and the genericity would be cosmetic.
 
 from __future__ import annotations
 
-from llm_port_node_agent.ray.container import RuntimeBundleSpec
+from faden_agent.ray.container import RuntimeBundleSpec
 
 _BASE = {
-    "image": "llm-port/ray-runtime:2.58.0-cu130",
+    "image": "fadenstack/ray-runtime:2.58.0-cu130",
     "digest": "sha256:" + "0" * 64,
     "requirements": {"gpus": "all"},
 }

@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_user: str = "llm_user"
     db_pass: str = "llm_user"
-    db_base: str = "llm_api"
+    db_base: str = "faden_gateway"
     db_echo: bool = False
     # Per process, not per CPU. Every uvicorn worker of every service holds
     # its own pool, and all of them share one Postgres (max_connections 100
@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     redis_ssl_ca_bundle: Optional[str] = None
 
     # Variables for RabbitMQ
-    rabbit_host: str = "llm_port_api-rmq"
+    rabbit_host: str = "faden_gateway-rmq"
     rabbit_port: int = 5672
     rabbit_user: str = "guest"
     rabbit_pass: str = "guest"
@@ -135,7 +135,7 @@ class Settings(BaseSettings):
     # If set, jwt_secret is loaded from backend's system_setting_secret table at startup
     # (same PostgreSQL host/user/pass, different database).
     # Defaults match local dev bootstrap values; override in production.
-    backend_db_base: str = "llm_port_backend"
+    backend_db_base: str = "faden_backend"
     settings_master_key: str = "dev-settings-master-key-change-me"
 
     # Column-level encryption for chat data (empty = disabled / plaintext)
@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     session_max_output_tokens: int | None = 4096
 
     # Chat file attachments
-    chat_file_store_root: str = "/data/llm-port/chat-files"
+    chat_file_store_root: str = "/data/fadenstack/chat-files"
     chat_upload_max_file_mb: int = 10
     chat_upload_allowed_extensions: str = (
         ".pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.html,.json,"
@@ -321,14 +321,14 @@ class Settings(BaseSettings):
             user=self.rabbit_user,
             password=self.rabbit_pass,
             # The vhost is the URL's path: "/" stays "/", a name gets its slash.
-            # A bare name ("llmport") used to crash start-up: yarl refuses a
+            # A bare name ("faden") used to crash start-up: yarl refuses a
             # path without one next to a host.
             path="/" + self.rabbit_vhost.lstrip("/"),
         )
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "llm_port_api/.env"),
-        env_prefix="LLM_PORT_API_",
+        env_file=(".env", "gateway/.env"),
+        env_prefix="FADEN_GATEWAY_",
         env_file_encoding="utf-8",
         extra="ignore",
     )

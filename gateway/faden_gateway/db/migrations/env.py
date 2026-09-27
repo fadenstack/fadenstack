@@ -5,10 +5,10 @@ from alembic import context
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlalchemy.future import Connection
 
-from llm_port_api.db.meta import meta
-from llm_port_api.db.models import load_all_models
-from llm_port_api.services.tls import build_asyncpg_ssl
-from llm_port_api.settings import settings
+from faden_gateway.db.meta import meta
+from faden_gateway.db.models import load_all_models
+from faden_gateway.services.tls import build_asyncpg_ssl
+from faden_gateway.settings import settings
 
 config = context.config
 

@@ -1,7 +1,7 @@
 """Installing without a source checkout: the deployment files the CLI carries.
 
-``pip install llmport-cli`` then ``llmport deploy`` used to stop at "Cannot
-find llm_port_shared": the compose file and what it mounts lived only in the
+``pip install fadenstack`` then ``faden deploy`` used to stop at "Cannot
+find shared": the compose file and what it mounts lived only in the
 repository. The CLI now carries them (``hatch_build.py``), unpacks them into
 an install, and runs the published images of its own version; ``upgrade``
 with a newer CLI moves the install to the newer release.
@@ -17,17 +17,17 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from llmport import __version__
-from llmport.commands import deploy as deploy_module
-from llmport.commands import upgrade as upgrade_module
-from llmport.core import bootstrap, bundle, clickhouse, compose
+from faden_cli import __version__
+from faden_cli.commands import deploy as deploy_module
+from faden_cli.commands import upgrade as upgrade_module
+from faden_cli.core import bootstrap, bundle, clickhouse, compose
 
 REPO = Path(__file__).resolve().parents[2]
-SHARED = REPO / "llm_port_shared"
+SHARED = REPO / "shared"
 
 
 def _hook():  # noqa: ANN202 - the build hook module, loaded from its file
-    spec = importlib.util.spec_from_file_location("hatch_build", REPO / "llm_port_cli" / "hatch_build.py")
+    spec = importlib.util.spec_from_file_location("hatch_build", REPO / "cli" / "hatch_build.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -66,7 +66,7 @@ def test_a_release_carries_the_deployment_and_nothing_an_install_made() -> None:
 
 
 def test_unpacking_keeps_what_the_install_made(carried: Path, tmp_path: Path) -> None:
-    install = tmp_path / "llm-port"
+    install = tmp_path / "fadenstack"
     written = bundle.unpack(install)
     assert "docker-compose.yaml" in written
     assert (install / "prometheus" / "targets.json").read_text() == "[]\n", "mounted: must exist as a file"
@@ -95,21 +95,21 @@ def _no_docker(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
 
 
 def _configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, install: Path) -> None:
-    config = tmp_path / "llmport.yaml"
+    config = tmp_path / "faden.yaml"
     config.write_text(f"version: 1\ninstall_dir: {install.as_posix()}\ncompose_file: docker-compose.yaml\n",
                       encoding="utf-8")
-    monkeypatch.setenv("LLMPORT_CONFIG", str(config))
+    monkeypatch.setenv("FADEN_CONFIG", str(config))
 
 
 def test_an_upgrade_moves_a_release_install_to_this_release(
     carried: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    install = tmp_path / "llm-port"
+    install = tmp_path / "fadenstack"
     bundle.unpack(install)
     (install / bundle.MARKER).write_text(json.dumps({"version": "0.0.1"}), encoding="utf-8")
     (install / ".env").write_text(
         "VERSION=0.0.1\nPOSTGRES_PASSWORD=pgpw\nHF_CACHE_DIR=/models/hf\nGRAFANA_ADMIN_USER=ops@example.com\n"
-        "LLM_PORT_HTTP_PORT=8080\n",
+        "FADEN_HTTP_PORT=8080\n",
         encoding="utf-8",
     )
     _configure(tmp_path, monkeypatch, install)
@@ -125,7 +125,7 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
     # What deploy and the operator set survives -- it used to be dropped.
     assert env["HF_CACHE_DIR"] == "/models/hf"
     assert env["GRAFANA_ADMIN_USER"] == "ops@example.com"
-    assert env["LLM_PORT_HTTP_PORT"] == "8080"
+    assert env["FADEN_HTTP_PORT"] == "8080"
     assert "REDIS_AUTH" in env, "keys a release introduces are added"
     assert calls == ["pull", "up"], "published images are pulled, not built"
     assert bundle.installed_release(install) == __version__
@@ -134,7 +134,7 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
 def test_a_cli_older_than_the_install_does_not_touch_it(
     carried: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    install = tmp_path / "llm-port"
+    install = tmp_path / "fadenstack"
     bundle.unpack(install)
     (install / bundle.MARKER).write_text(json.dumps({"version": "999.0.0"}), encoding="utf-8")
     (install / ".env").write_text("VERSION=999.0.0\n", encoding="utf-8")
@@ -158,4 +158,4 @@ def test_deploy_pins_a_release_install_to_the_cli_version(tmp_path: Path) -> Non
 
 def test_the_compose_project_is_named_so_volumes_do_not_follow_the_directory() -> None:
     text = (SHARED / "docker-compose.yaml").read_text(encoding="utf-8")
-    assert "\nname: llm_port_shared\n" in text, "an install unpacked into ~/llm-port keeps the checkout's volumes"
+    assert "\nname: shared\n" in text, "an install unpacked into ~/fadenstack keeps the checkout's volumes"

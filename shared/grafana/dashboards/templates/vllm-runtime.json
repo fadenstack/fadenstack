@@ -39,7 +39,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "Auto-provisioned by llm-port for **__RUNTIME_NAME__**. This is generated from a template, so edits made here are lost the next time it is provisioned — change `llm_port_shared/grafana/dashboards/templates/vllm-runtime.json` instead. It is removed when its runtime or cluster is.",
+        "content": "Auto-provisioned by fadenstack for **__RUNTIME_NAME__**. This is generated from a template, so edits made here are lost the next time it is provisioned — change `shared/grafana/dashboards/templates/vllm-runtime.json` instead. It is removed when its runtime or cluster is.",
         "mode": "markdown"
       }
     },
@@ -2028,8 +2028,8 @@
   "tags": [
     "dgx-spark",
     "generated",
-    "llm-port",
-    "llm-port-runtime",
+    "fadenstack",
+    "faden-runtime",
     "mtp",
     "prometheus",
     "vllm"

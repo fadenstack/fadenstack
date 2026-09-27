@@ -1,4 +1,4 @@
-"""``llmport tune`` — auto-detect system resources and generate scalability settings."""
+"""``faden tune`` — auto-detect system resources and generate scalability settings."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import click
 
-from llmport.core.settings import load_config
-from llmport.core.tune import tune_env
+from faden_cli.core.settings import load_config
+from faden_cli.core.tune import tune_env
 
 
 @click.command("tune")

@@ -7,24 +7,24 @@ reconciliation is performed; see :mod:`reconciliation` for the seams Phase 2
 fills in.
 """
 
-from llm_port_backend.services.inference.capabilities import (
+from faden_backend.services.inference.capabilities import (
     CAPABILITY_SECTIONS,
     DEFAULT_CAPABILITY_SECTIONS,
     CapabilityDocument,
 )
-from llm_port_backend.services.inference.contracts import (
+from faden_backend.services.inference.contracts import (
     DeploymentOrchestrator,
     EnvironmentManager,
     InferenceDriver,
 )
-from llm_port_backend.services.inference.registry import DriverRegistry, registry
-from llm_port_backend.services.inference.schemas import (
+from faden_backend.services.inference.registry import DriverRegistry, registry
+from faden_backend.services.inference.schemas import (
     API_VERSION_V1ALPHA1,
     InferenceDeploymentSpecV1Alpha1,
     KnownSpecVersions,
     parse_inference_deployment_spec,
 )
-from llm_port_backend.services.inference.service import (
+from faden_backend.services.inference.service import (
     ConflictError,
     ControlPlaneService,
     DeploymentService,

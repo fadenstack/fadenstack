@@ -17,10 +17,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from llm_port_backend.db.dependencies import get_db_session
-from llm_port_backend.db.models.users import User
-from llm_port_backend.services.inference import takeover
-from llm_port_backend.web.api.rbac import require_permission
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.users import User
+from faden_backend.services.inference import takeover
+from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
 _ENV = "inference.environments"
@@ -38,7 +38,7 @@ class TakeOverRequest(BaseModel):
 
 def _gateway(request: Request) -> Any:
     """Commands to agents are polled across sessions, so the factory, not this request's session."""
-    from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway  # noqa: PLC0415
+    from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway  # noqa: PLC0415
 
     factory = getattr(request.app.state, "db_session_factory", None)
     if factory is None:
@@ -54,7 +54,7 @@ async def list_found_clusters(
 ) -> dict[str, list[dict[str, Any]]]:
     """Clusters the machines run that this server does not manage, and what each serves.
 
-    Asks every machine that runs LLM.Port's Ray runtime outside a cluster
+    Asks every machine that runs Fadenstack's Ray runtime outside a cluster
     here -- a few seconds, all at once.
     """
     return await takeover.find(session, _gateway(request))

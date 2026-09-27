@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from llm_port_backend.db.models.containers import ContainerClass, ContainerPolicy
+from faden_backend.db.models.containers import ContainerClass, ContainerPolicy
 
 
 class ContainerSummaryDTO(BaseModel):
@@ -91,7 +91,7 @@ class ContainerSettingsDTO(BaseModel):
     container_class: ContainerClass
     owner_scope: str
     policy: ContainerPolicy
-    #: Made by Compose (LLM.Port's own services): the next deploy or upgrade
+    #: Made by Compose (Fadenstack's own services): the next deploy or upgrade
     #: makes it again from the compose file and .env.
     managed_by_compose: bool = False
     #: The backend runs in it, and cannot replace the container it runs in.

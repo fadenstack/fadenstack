@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from llm_port_backend.db.models.llm import ProviderType
-from llm_port_backend.services.llm.base import ProviderAdapter
+from faden_backend.db.models.llm import ProviderType
+from faden_backend.services.llm.base import ProviderAdapter
 
 _registry: dict[ProviderType, type[ProviderAdapter]] = {}
 
@@ -32,7 +32,7 @@ def get_adapter(provider_type: ProviderType | str) -> ProviderAdapter:
 
 def _auto_register() -> None:
     """Import adapters so they self-register on module load."""
-    from llm_port_backend.services.llm.adapters import cloud, llamacpp, ollama, tgi, vllm  # noqa: F401, PLC0415
+    from faden_backend.services.llm.adapters import cloud, llamacpp, ollama, tgi, vllm  # noqa: F401, PLC0415
 
 
 _auto_register()

@@ -15,20 +15,20 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from llm_port_backend.db.dao.inference_dao import ModelAvailabilityDAO
-from llm_port_backend.db.models.inference import (
+from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.models.inference import (
     InferenceControlPlane,
     InferenceEnvironment,
     InferenceEnvironmentNode,
     ModelAvailabilityStatus,
 )
-from llm_port_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
-from llm_port_backend.db.models.node_control import InfraNode, InfraNodeCommand
-from llm_port_backend.services.inference.artifacts import (
+from faden_backend.db.models.llm import LLMModel, ModelSource, ModelStatus
+from faden_backend.db.models.node_control import InfraNode, InfraNodeCommand
+from faden_backend.services.inference.artifacts import (
     ModelArtifactCoordinator,
     _default_revision,
 )
-from llm_port_backend.services.inference.drivers.ray.commands import NodeCommandGateway
+from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 
 
 async def _environment(dbsession: AsyncSession, *, nodes: int = 1):
@@ -105,8 +105,8 @@ async def test_a_model_still_downloading_here_is_not_sent(
     in the folder and sent it; both machines refused "Invalid blob hash",
     attempt after attempt, until the download finished.
     """
-    from llm_port_backend.db.models.llm import DownloadJob, DownloadJobStatus
-    from llm_port_backend.settings import settings
+    from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus
+    from faden_backend.settings import settings
 
     monkeypatch.setattr(settings, "model_store_root", str(tmp_path))
     env, model, nodes = await _environment(dbsession, nodes=2)
@@ -138,7 +138,7 @@ async def test_failed_sync_is_retried_after_backoff(
     without files there is nothing to re-send, and dispatching a fileless
     payload only records a second node failure for a server-side gap.
     """
-    import llm_port_backend.services.llm.artifacts as artifacts_mod
+    import faden_backend.services.llm.artifacts as artifacts_mod
 
     monkeypatch.setattr(artifacts_mod, "model_cache_dir", lambda _repo: Path("/srv/models/x"))
     monkeypatch.setattr(
@@ -222,7 +222,7 @@ async def test_an_abandoned_sync_is_eventually_retried(
     skipped on every future pass, and the artifact never becomes ready. The
     deployment waiting on it waits for good, with nothing reported anywhere.
     """
-    import llm_port_backend.services.llm.artifacts as artifacts_mod
+    import faden_backend.services.llm.artifacts as artifacts_mod
 
     monkeypatch.setattr(artifacts_mod, "model_cache_dir", lambda _repo: Path("/srv/models/x"))
     monkeypatch.setattr(
@@ -263,6 +263,6 @@ async def test_an_abandoned_sync_is_eventually_retried(
 
 
 def artifacts_mod_stale_sec() -> float:
-    from llm_port_backend.services.inference.artifacts import _IN_FLIGHT_STALE_SEC
+    from faden_backend.services.inference.artifacts import _IN_FLIGHT_STALE_SEC
 
     return _IN_FLIGHT_STALE_SEC

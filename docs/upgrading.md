@@ -1,4 +1,4 @@
-# Upgrading LLM.Port
+# Upgrading Fadenstack
 
 How to move an installation to a newer version, keeping its data. Written
 from upgrading a real installation twice -- a 13 September build on an
@@ -6,10 +6,10 @@ Ubuntu VM to the `ray` branch, then that VM to release 0.3.0 while it ran a
 model on two DGX Spark machines -- and every problem those upgrades hit is in
 [If the upgrade stops](#if-the-upgrade-stops).
 
-## What `llmport upgrade` does
+## What `faden upgrade` does
 
 It upgrades the installation the CLI is configured for
-(`install_dir` in `~/.config/llmport/llmport.yaml`), in this order:
+(`install_dir` in `~/.config/faden/faden.yaml`), in this order:
 
 1. **Checks** Docker, and that no container it is about to replace was
    created by something else (see below).
@@ -31,7 +31,7 @@ It upgrades the installation the CLI is configured for
    machines run models in, which they download from this server. Read out
    of the new backend image, so they are exactly the builds it will hand
    out; only what changed is downloaded. A failed pull stops nothing:
-   services are already up, and `llmport runtime-images` retries it.
+   services are already up, and `faden runtime-images` retries it.
    `--runtime-images x86_64` (or `aarch64`, `none`) limits it, and is
    remembered. A release whose runtime images are not published yet says so
    here (see [Runtime images "on no registry"](#runtime-images-on-no-registry)).
@@ -40,10 +40,10 @@ The new version comes from the CLI (published images) or from the
 checkout (source), so put that in place first.
 
 Which of the two an install is depends on how it was made, not on where the
-CLI came from: `llmport deploy` from the published CLI marks the install
-(`.llmport-release`), and only a marked install pulls published images. An
+CLI came from: `faden deploy` from the published CLI marks the install
+(`.faden-release`), and only a marked install pulls published images. An
 install made from a checkout keeps building from it, even with the published
-CLI -- so its checkout has to be at the new release too. `llmport upgrade
+CLI -- so its checkout has to be at the new release too. `faden upgrade
 --dry-run` says which it is: `Release: 0.3.0 -> 0.3.1 (pull published
 images)`, or `Build images: yes`.
 
@@ -62,15 +62,15 @@ first. Nothing else will work until there is space.
 **Know where the installation is.**
 
 ```bash
-llmport config show        # install_dir is the llm_port_shared directory
+faden config show        # install_dir is the shared directory
 ```
 
-## Installed with `pipx install llmport-cli`
+## Installed with `pipx install fadenstack`
 
 ```bash
-pipx upgrade llmport-cli        # or: uv tool upgrade llmport-cli
-llmport upgrade --dry-run       # shows the release it moves to
-llmport upgrade -y
+pipx upgrade fadenstack        # or: uv tool upgrade fadenstack
+faden upgrade --dry-run       # shows the release it moves to
+faden upgrade -y
 ```
 
 Then [check it](#check-it). The CLI refuses to move an install to an
@@ -81,10 +81,10 @@ Going back is a [restore](#going-back).
 
 ### 1. Put the new version in place
 
-For an installation made with `llmport dev init` or `git clone`:
+For an installation made with `faden dev init` or `git clone`:
 
 ```bash
-cd ~/llm-port-core
+cd ~/fadenstack
 git stash push -m "local edits before upgrade"   # only if `git status` shows changes
 git fetch
 git checkout <release tag or branch>
@@ -99,9 +99,9 @@ The upgrade logic is in the CLI, so update it before running it -- either
 the published CLI of the release you checked out, or the one in the checkout:
 
 ```bash
-uv tool install --force llmport-cli==0.3.0            # the published CLI
-uv tool install --force ~/llm-port-core/llm_port_cli  # or: from the checkout
-llmport --version
+uv tool install --force fadenstack==0.3.0            # the published CLI
+uv tool install --force ~/fadenstack/cli  # or: from the checkout
+faden --version
 ```
 
 Either way the install builds its images from the checkout; the dry run
@@ -109,17 +109,17 @@ says `Build images: yes`.
 
 ![Updating the CLI to 0.3.0 and the dry run](images/upgrading/01-update-the-cli.png)
 
-(`LLMPORT_CONFIG` points the CLI at this VM's install; one with a single
+(`FADEN_CONFIG` points the CLI at this VM's install; one with a single
 install doesn't need it.)
 
 ### 3. Upgrade
 
 ```bash
-llmport upgrade --dry-run   # what it would do
-llmport upgrade -y
+faden upgrade --dry-run   # what it would do
+faden upgrade -y
 ```
 
-![llmport upgrade from backup to the runtime images](images/upgrading/02-llmport-upgrade.png)
+![faden upgrade from backup to the runtime images](images/upgrading/02-faden-upgrade.png)
 
 On an 8-core VM the first upgrade from a 13 September build took about 15
 minutes for the image builds and a few minutes for the rest. The next one, to
@@ -130,11 +130,11 @@ expected for 0.3.0 (see [Runtime images "on no registry"](#runtime-images-on-no-
 ## Check it
 
 ```bash
-llmport status                          # every service running; healthy where it has a check
+faden status                          # every service running; healthy where it has a check
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost/api/health   # 200
 ```
 
-![llmport status after the upgrade](images/upgrading/03-llmport-status.png)
+![faden status after the upgrade](images/upgrading/03-faden-status.png)
 
 Then sign in to the console. What the VM showed after the upgrade to 0.3.0
 (25 September):
@@ -156,7 +156,7 @@ Then sign in to the console. What the VM showed after the upgrade to 0.3.0
 
 Some pages show what the new version changed. The data residency map, for
 example, placed providers by how they were added: the model served by the
-DGX pair on the LAN counted as **Cloud**, and the one LLM.Port runs on its
+DGX pair on the LAN counted as **Cloud**, and the one Fadenstack runs on its
 own cluster counted nowhere. After the upgrade it places them by where they
 are -- both on your machines, and the setup is air-gapped:
 
@@ -176,7 +176,7 @@ expects agent 0.1.13. The server doesn't update its machines; each one is
 updated by running its install line again, on the machine:
 
 ```bash
-curl -fsSLO http://<server>/api/install/llmport-agent.sh && sh llmport-agent.sh --join http://<server> --user
+curl -fsSLO http://<server>/api/install/faden-agent.sh && sh faden-agent.sh --join http://<server> --user
 ```
 
 Use the line from **Machines → Add a machine**, as you ran it the first time
@@ -196,7 +196,7 @@ answered throughout. The machine's page shows the version it runs:
 
 **If the server keeps its own agent builds** -- `agent-binaries/` in the
 install, for machines without internet -- replace them with the new release's
-builds after the upgrade (`llmport-agent-linux-x86_64` and
+builds after the upgrade (`faden-agent-linux-x86_64` and
 `-linux-aarch64` from the release, with their `.sha256` files to check them).
 Nothing replaces them for you, and the server's copy is what the install line
 checks the download against. On the VM, 0.3.0 kept a 0.1.12 copy from an
@@ -211,7 +211,7 @@ version's build, sets it aside for the release, and says so in its log.
 ### Runtime images "on no registry"
 
 ```
-⚠ llmport-ray-runtime-x86_64:2.58.0 (x86_64): this release names a build that is on no registry.
+⚠ faden-ray-runtime-x86_64:2.58.0 (x86_64): this release names a build that is on no registry.
 ```
 
 The release names runtime images that were never published, so there is
@@ -226,9 +226,9 @@ published images, and this step pulls them.
 
 ### Settings missing after an earlier upgrade
 
-Before this release, `llmport upgrade` rewrote `.env` from the defaults and
+Before this release, `faden upgrade` rewrote `.env` from the defaults and
 kept only the passwords. Everything else was lost, including `HF_CACHE_DIR`
-(the host's model cache, set by `llmport deploy`), the admin name synced to
+(the host's model cache, set by `faden deploy`), the admin name synced to
 Grafana, and any port you had changed. Upgrades now keep every value.
 
 To get the lost values back, compare `.env` with the copy the upgrade saved
@@ -238,19 +238,19 @@ in its backup, and copy the missing lines back:
 diff <(grep -o '^[A-Z_]*=' .env.bak) <(grep -o '^[A-Z_]*=' .env)   # in backups/<time>/ and the install dir
 ```
 
-Then run `llmport up` to apply them.
+Then run `faden up` to apply them.
 
 ### "These containers have names this installation uses, but it did not create them"
 
-A container with one of LLM.Port's names (`llm-port-prometheus`, ...) was
+A container with one of Fadenstack's names (`faden-prometheus`, ...) was
 created some other way -- by hand with `docker run`, or by another compose
 project. Compose cannot replace it, and before this check the upgrade
 stopped on it only after building every image. The message lists the
 containers and the command to remove them:
 
 ```bash
-docker rm -f llm-port-prometheus
-llmport upgrade -y --no-build     # the images are already built
+docker rm -f faden-prometheus
+faden upgrade -y --no-build     # the images are already built
 ```
 
 Removing a container keeps its data volumes.
@@ -266,7 +266,7 @@ If you had set `PROM_PORT` yourself, that still wins.
 
 RabbitMQ creates its users from `rabbitmq/definitions.json` every time it
 starts, and the services log in with the passwords in `.env`. Before this
-release only `llmport deploy` wrote that file, so an installation upgraded
+release only `faden deploy` wrote that file, so an installation upgraded
 with an older CLI kept a file with other passwords: RabbitMQ was healthy,
 and refused the gateway and the backend. The upgrade now writes the file
 from `.env`. Update the CLI first (step 2) and run the upgrade again.
@@ -274,7 +274,7 @@ from `.env`. Update the CLI first (step 2) and run the upgrade again.
 To check by hand (the password is `RABBITMQ_API_PASS` in `.env`):
 
 ```bash
-docker exec llm-port-rmq rabbitmqctl authenticate_user llmport-api '<password>'
+docker exec faden-rmq rabbitmqctl authenticate_user faden-gateway '<password>'
 ```
 
 ### The disk is full
@@ -285,7 +285,7 @@ diagnostic logs forever. On the upgraded VM `system.trace_log` alone held
 busy workstation it grew about 3 GB a day.
 
 This release turns those logs off
-(`llm_port_shared/clickhouse/config.d/system-logs.xml`) and the upgrade
+(`shared/clickhouse/config.d/system-logs.xml`) and the upgrade
 drops what they hold. But an installation whose disk is already full cannot
 get that far. Free space by hand first:
 
@@ -300,7 +300,7 @@ get that far. Free space by hand first:
    ClickHouse's own, not your data):
 
    ```bash
-   docker exec llm-port-clickhouse sh -c \
+   docker exec faden-clickhouse sh -c \
      'for t in trace_log text_log metric_log asynchronous_metric_log; do
         clickhouse-client -u "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" \
           -q "TRUNCATE TABLE IF EXISTS system.$t"; done'
@@ -314,7 +314,7 @@ Every upgrade leaves a backup in `<install_dir>/backups/<time>/`: a dump of
 each database, the `.env`, and the migration versions it was taken at.
 
 ```bash
-llmport restore <install_dir>/backups/<time>
+faden restore <install_dir>/backups/<time>
 ```
 
 It puts back every database and the `.env`, and restarts the services.
@@ -322,7 +322,7 @@ Checked on the upgraded VM: a chat deleted and a setting changed after the
 backup were both back as they had been, and chat still answered.
 
 To go back to the version you came from as well, check it out and run
-`llmport upgrade --no-backup` to rebuild it.
+`faden upgrade --no-backup` to rebuild it.
 
 A backup older than a cluster doesn't have that cluster in it, but the
 machines are still running it. Take it over from **Clusters** instead of
