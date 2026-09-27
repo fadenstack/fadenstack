@@ -127,3 +127,31 @@ async def test_an_older_agent_reports_nothing_and_is_published_as_before(monkeyp
     assert update["address"] == "http://10.250.10.49:8010/llmport-dep1"
     assert update["published"]["machine_tls"] is False
     assert update["published"]["model_tls_pending"] is False
+
+
+@pytest.mark.anyio
+async def test_the_agents_report_survives_the_passes_that_wait_for_the_copies(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Found on the DGX pair: a waiting pass replaced ``observation`` and the report went with it.
+
+    The model ran behind the proxy and was published http:// on every pass.
+    The report is kept on ``last_run`` when an apply returns.
+    """
+    _Endpoints.rows, _Endpoints.updates = [], []
+    monkeypatch.setattr(dep, "EndpointDAO", _Endpoints)
+    last_run = {
+        "route_prefix": "/llmport-dep1",
+        "model_tls": {"protected": True, "public_port": 8010, "internal_port": 28010},
+    }
+    deployment = SimpleNamespace(
+        id=uuid.uuid4(),
+        observed_status_json={
+            "last_run": last_run,
+            # What a later pass left: no run at all, or the placeholder.
+            "observation": {"action": "run", "run": {"app": "llmport-dep1", "deployed": True, "cached": True}},
+        },
+    )
+    await _manager()._publish_endpoint(  # noqa: SLF001
+        None, deployment, _facts(model_tls=True), "llmport-dep1", ready_replicas=2,
+    )
+    assert _Endpoints.updates[-1]["address"] == "https://10.250.10.49:8010/llmport-dep1"
+    assert _Endpoints.updates[-1]["published"]["machine_tls"] is True

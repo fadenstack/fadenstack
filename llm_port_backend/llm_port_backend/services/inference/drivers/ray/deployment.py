@@ -173,8 +173,17 @@ def _no_serve_instance(detail: str | None) -> bool:
 
 
 def _reported_run(deployment: Any) -> dict[str, Any]:
+    """What the agent said the last apply did (``last_run``), or the observation's copy.
+
+    ``observation`` is replaced by every pass -- a pass waiting for the copies
+    to start records no ``run`` -- so the agent's report is kept on its own
+    key when an apply returns. Read from ``observation.run`` only for rows
+    written before that.
+    """
     observed = getattr(deployment, "observed_status_json", None) or {}
-    run = (observed.get("observation") or {}).get("run") or {}
+    run = observed.get("last_run")
+    if not isinstance(run, dict) or not run:
+        run = (observed.get("observation") or {}).get("run") or {}
     return run if isinstance(run, dict) else {}
 
 
@@ -185,8 +194,7 @@ def _reported_route_prefix(deployment: Any) -> str | None:
     older agent that reports none leaves this ``None`` and the caller falls
     back to the documented convention.
     """
-    observed = getattr(deployment, "observed_status_json", None) or {}
-    run = ((observed.get("observation") or {}).get("run") or {})
+    run = _reported_run(deployment)
     prefix = run.get("route_prefix")
     if not isinstance(prefix, str) or not prefix.startswith("/"):
         return None
@@ -909,10 +917,13 @@ class RayDeploymentManager:
                     observed={"reconciled": False, "reason": "apply", "error_code": exc.error_code},
                 )
                 return
+            # Kept apart from ``observation``, which the passes that wait for
+            # the copies replace: publishing reads it (route prefix, model TLS).
+            observed_now = dict(deployment.observed_status_json or {})
+            observed_now["last_run"] = run_result
+            deployment.observed_status_json = observed_now
         else:
-            run_result = (deployment.observed_status_json or {}).get("observation", {}).get(
-                "run", {"app": app_name, "deployed": True, "cached": True}
-            )
+            run_result = _reported_run(deployment) or {"app": app_name, "deployed": True, "cached": True}
             log.info(
                 "Deployment %s config_hash %s already applied; observing only",
                 deployment.id, config_hash[:8],
