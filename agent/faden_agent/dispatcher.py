@@ -287,6 +287,10 @@ class CommandDispatcher:
             return await self._runtime.collect_diagnostics()
         if command_type == NodeCommandType.SYNC_MODEL.value:
             return await self._runtime.sync_model(payload, emit_progress=emit_progress)
+        if command_type == NodeCommandType.CHECK_INTERNET.value:
+            from faden_agent.hf_download import check_internet  # noqa: PLC0415
+
+            return await check_internet(payload)
         if command_type == NodeCommandType.FETCH_CONTAINER_LOGS.value:
             return await self._runtime.fetch_container_logs(payload)
         if command_type == NodeCommandType.SET_MAINTENANCE_MODE.value:

@@ -111,6 +111,22 @@ def is_ready_for(row: ModelAvailability | None, desired_digest: str | None) -> b
     return True
 
 
+def _machines_downloading(model: LLMModel, readiness: ArtifactReadiness, rows: dict[Any, Any]) -> str:
+    """What a deployment waits on while its machines download the model from the Hub."""
+    nodes = len(readiness.ready_node_ids) + len(readiness.pending_node_ids)
+    progress = [
+        float(getattr(row, "progress", 0) or 0)
+        for row in rows.values()
+        if getattr(row, "status", None) == ModelAvailabilityStatus.SYNCING.value
+    ]
+    done = (sum(progress) + 100.0 * len(readiness.ready_node_ids)) / nodes if nodes else 0.0
+    share = f" ({done:.0f}%)" if done else ""
+    return (
+        f"The machines are downloading {model.hf_repo_id} from Hugging Face themselves{share}; "
+        f"{len(readiness.ready_node_ids)} of {nodes} have it."
+    )
+
+
 class ModelArtifactCoordinator:
     """Coordinates model artifact synchronization and readiness for inference environments."""
 
@@ -161,10 +177,15 @@ class ModelArtifactCoordinator:
         ``persist=False`` reports the same readiness without writing any row, so
         a read-only caller does not mutate state just by looking at it.
         """
+        from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+
         desired_revision = model.hf_revision
         manifest_sha256: str | None = None
 
-        if model.hf_repo_id:
+        # A cluster whose machines download the model themselves holds what
+        # the Hub has, not the server's copy: that copy -- if the server has
+        # one, or half of one -- says nothing about theirs.
+        if model.hf_repo_id and not machine_downloads.enabled(environment):
             m_dir = model_cache_dir(model.hf_repo_id)
             if m_dir is not None:
                 manifest = build_cache_manifest(m_dir)
@@ -385,13 +406,26 @@ class ModelArtifactCoordinator:
 
         Idempotent: does not re-issue commands already in flight for the desired digest.
         """
+        from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+
         readiness = await self.evaluate(model=model, environment=environment)
         if readiness.all_ready:
             return readiness
 
-        sync_payload = await self._payload_to_send(model, readiness, fetch_to_server=fetch_to_server)
-        if sync_payload is None:
-            return readiness
+        on_machines = machine_downloads.enabled(environment)
+        if on_machines:
+            # Each machine downloads the model from the Hub itself; the server
+            # neither downloads it nor sends it.
+            sync_payload = machine_downloads.sync_payload(model)
+            if sync_payload is None:
+                readiness.blockers.append(
+                    f"{model.display_name} has no Hugging Face repository for the machines to download."
+                )
+                return readiness
+        else:
+            sync_payload = await self._payload_to_send(model, readiness, fetch_to_server=fetch_to_server)
+            if sync_payload is None:
+                return readiness
 
         gw = (
             gateway
@@ -403,7 +437,9 @@ class ModelArtifactCoordinator:
             return readiness
 
         target_nodes = set(readiness.pending_node_ids) | set(readiness.failed_node_ids)
-        digest_tag = readiness.manifest_sha256 or "latest"
+        digest_tag = (
+            f"hf:{sync_payload['revision']}" if on_machines else readiness.manifest_sha256 or "latest"
+        )
 
         # Rows are re-read here so an in-flight sync can be recognised.  The
         # readiness report only carries node ids, and re-marking a node that is
@@ -453,4 +489,6 @@ class ModelArtifactCoordinator:
                 log.warning("Failed issuing SYNC_MODEL to node %s: %s", node_id_str, exc)
                 readiness.blockers.append(f"Failed issuing SYNC_MODEL to node {node_id_str}: {exc}")
 
+        if on_machines and not readiness.failed_node_ids and not readiness.blockers:
+            readiness.waiting_on = _machines_downloading(model, readiness, rows_now)
         return readiness

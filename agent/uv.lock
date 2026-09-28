@@ -1037,11 +1037,12 @@ wheels = [
 
 [[package]]
 name = "faden-agent"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "httpx" },
+    { name = "huggingface-hub" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "websockets" },
@@ -1071,7 +1072,8 @@ ray-host = [
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "httpx", specifier = ">=0.27,<1.0" },
-    { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.27,<2" },
+    { name = "huggingface-hub", specifier = ">=0.32,<2" },
+    { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.32,<2" },
     { name = "jinja2", marker = "extra == 'llm'", specifier = ">=3.1,<4" },
     { name = "jinja2", marker = "extra == 'ray-host'", specifier = ">=3.1,<4" },
     { name = "psutil", specifier = ">=5.9,<8.0" },

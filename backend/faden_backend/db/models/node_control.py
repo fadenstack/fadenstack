@@ -92,6 +92,9 @@ class NodeCommandType(enum.StrEnum):
     #: Serve this node's runtime image to cluster peers over the fabric.
     SERVE_RUNTIME_IMAGE = "serve_runtime_image"
 
+    # --- Can this machine download models itself? (agent 0.2.2) ---
+    CHECK_INTERNET = "check_internet"
+
 
 class InfraNodeProfile(Base):
     """Reusable profile with platform-specific sub-configs for nodes."""

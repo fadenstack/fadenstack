@@ -2602,6 +2602,25 @@
       "restart_warning": "The cluster restarts on every machine: its models stop, load again and answer again when loaded — minutes for a large model.",
       "restart_confirm": "Restart the cluster",
       "update_agents": "Encryption between the machines needs agent 0.1.18 or later on every machine. Update {{hosts}} by re-running the install line there."
+    },
+    "model_downloads": {
+      "title": "Where the machines get models",
+      "switch_label": "Machines download models themselves",
+      "on_chip": "From Hugging Face",
+      "off_chip": "From this server",
+      "on_detail": "Each machine downloads a model from Hugging Face into its own model store, with this server's Hugging Face token for a gated model. The server neither downloads it nor copies it.",
+      "off_detail": "This server downloads a model and each machine copies it from the server. That works with no internet on the machines; over a slow server link a large model takes that long twice.",
+      "checking": "Asking the machines whether they reach Hugging Face…",
+      "check_again": "Check again",
+      "reaches": "Reaches Hugging Face",
+      "cannot_switch_on": "Every machine must reach Hugging Face to switch this on:",
+      "problem": {
+        "no_internet": "{{host}}: cannot reach Hugging Face",
+        "old_agent": "{{host}}: agent too old, update it to 0.2.2 or later",
+        "offline": "{{host}}: offline",
+        "no_answer": "{{host}}: did not answer"
+      },
+      "applies_next": "Applies to the next model placed on the cluster; models already on the machines stay."
     }
   },
   "inference": {

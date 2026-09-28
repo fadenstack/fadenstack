@@ -238,6 +238,32 @@ async def node_server_trust(_node: InfraNode = Depends(_authenticate_node)) -> d
     }
 
 
+@router.get("/hf-token", name="node_hf_token")
+async def node_hf_token(
+    request: Request,
+    node: InfraNode = Depends(_authenticate_node),
+) -> dict[str, Any]:
+    """This server's Hugging Face token, for a machine downloading a model itself.
+
+    Only for a machine of a cluster whose machines download models themselves
+    (``services/inference/machine_downloads.py``); any other machine gets its
+    models from this server and has no use for the token. The agent asks for
+    each download and keeps it only for that download.
+    """
+    from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+    from faden_backend.services.llm import hf_token  # noqa: PLC0415
+
+    async with request.app.state.db_session_factory() as session:
+        if not await machine_downloads.node_may_download(session, node.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This machine's cluster does not download models itself: it copies them from the server.",
+            )
+        token, source = await hf_token.resolve(session)
+    log.info("Handed the Hugging Face token (%s) to %s for a download", source or "none", node.host)
+    return {"token": token}
+
+
 @router.get("/machine-tls", name="node_machine_tls")
 async def node_machine_tls(
     request: Request,

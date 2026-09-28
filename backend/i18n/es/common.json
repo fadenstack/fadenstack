@@ -2604,6 +2604,25 @@
       "restart_warning": "El clúster se reinicia en todas las máquinas: sus modelos se detienen, vuelven a cargarse y responden de nuevo al terminar — minutos para un modelo grande.",
       "restart_confirm": "Reiniciar el clúster",
       "update_agents": "El cifrado entre máquinas necesita el agente 0.1.18 o posterior en cada máquina. Actualice {{hosts}} ejecutando de nuevo allí la línea de instalación."
+    },
+    "model_downloads": {
+      "title": "De dónde obtienen los modelos las máquinas",
+      "switch_label": "Las máquinas descargan los modelos por sí mismas",
+      "on_chip": "Desde Hugging Face",
+      "off_chip": "Desde este servidor",
+      "on_detail": "Cada máquina descarga un modelo de Hugging Face en su propio almacén de modelos, con el token de Hugging Face de este servidor para un modelo restringido. El servidor ni lo descarga ni lo copia.",
+      "off_detail": "Este servidor descarga un modelo y cada máquina lo copia desde el servidor. Funciona sin internet en las máquinas; con un enlace lento del servidor, un modelo grande tarda ese tiempo dos veces.",
+      "checking": "Preguntando a las máquinas si llegan a Hugging Face…",
+      "check_again": "Comprobar de nuevo",
+      "reaches": "Llega a Hugging Face",
+      "cannot_switch_on": "Para activarlo, todas las máquinas deben llegar a Hugging Face:",
+      "problem": {
+        "no_internet": "{{host}}: no llega a Hugging Face",
+        "old_agent": "{{host}}: agente demasiado antiguo, actualícelo a 0.2.2 o posterior",
+        "offline": "{{host}}: sin conexión",
+        "no_answer": "{{host}}: no respondió"
+      },
+      "applies_next": "Se aplica al próximo modelo que se coloque en el clúster; los modelos que ya están en las máquinas se quedan."
     }
   },
   "inference": {

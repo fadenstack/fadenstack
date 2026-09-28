@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import logging
 from pathlib import Path
 
@@ -81,6 +82,9 @@ class NodeAgentService:
         # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
         # (1 was a lab build that did not).
         static_capabilities["ray_tls"] = 2
+        # ... and download a model from the Hub itself, and say whether it can
+        # reach it (hf_download.py): a cluster's "machines download models".
+        static_capabilities["model_download"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -105,6 +109,47 @@ class NodeAgentService:
                 model_sync=model_sync,
                 model_store_root=self._config.model_store_root,
                 emit_progress=emit_progress,
+            )
+
+        async def _download_model(
+            *,
+            model_sync: dict,
+            emit_progress: Callable[[dict[str, Any]], Any] | None = None,
+        ) -> dict[str, Any]:
+            """Download a model from the Hub, with the server's token for a gated one."""
+            from faden_agent import hf_download  # noqa: PLC0415
+
+            credential = self._state_store.state.credential
+            if not credential:
+                raise RuntimeError("No credential available to ask the server for its Hugging Face token.")
+            token = await hf_download.fetch_token(self._client.http, credential)
+            repo = str(model_sync.get("hf_repo_id") or "")
+            loop = asyncio.get_running_loop()
+            last = [0.0]
+
+            def _progress(done: int, total: int, _file: str) -> None:
+                # Every ten seconds is plenty: each report is a row on the server.
+                now = time.monotonic()
+                if emit_progress is None or (now - last[0] < 10.0 and done < total):
+                    return
+                last[0] = now
+                pct = round(done / total * 100, 1) if total else 0.0
+                message = (
+                    f"Downloading {repo} from Hugging Face: "
+                    f"{done / 1e9:.1f} of {total / 1e9:.1f} GB ({pct}%)"
+                )
+                asyncio.run_coroutine_threadsafe(
+                    emit_progress({"message": message, "progress_pct": pct, "bytes_done": done, "bytes_total": total}),
+                    loop,
+                )
+
+            return await asyncio.to_thread(
+                hf_download.download_model,
+                hf_repo_id=repo,
+                revision=model_sync.get("revision"),
+                cache_dir=self._config.model_store_root,
+                token=token,
+                progress=_progress,
             )
 
         async def _load_image(
@@ -186,6 +231,7 @@ class NodeAgentService:
             model_puller=_pull_model,
             image_loader=_load_image,
             model_tls=self._model_tls,
+            model_downloader=_download_model,
         )
         stream = StreamClient(
             config=self._config,

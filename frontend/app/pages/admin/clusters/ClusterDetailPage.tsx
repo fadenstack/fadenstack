@@ -32,6 +32,7 @@ import { HostModelDialog } from "~/components/hosting/HostModelDialog";
 import { useAsyncData } from "~/lib/useAsyncData";
 import StrayModelsCard from "./StrayModelsCard";
 import ModelTrafficCard from "./ModelTrafficCard";
+import ModelDownloadsCard from "./ModelDownloadsCard";
 import RayTlsCard from "./RayTlsCard";
 
 import Accordion from "@mui/material/Accordion";
@@ -618,6 +619,9 @@ export default function ClusterDetailPage() {
 
       {/* --- how its machines talk to each other ---------------------------- */}
       <RayTlsCard environmentId={id!} onSwitched={() => void deployments.refresh()} />
+
+      {/* --- where its machines get models ----------------------------------- */}
+      <ModelDownloadsCard environmentId={id!} />
 
       {/* --- models it runs that no deployment here owns ------------------- */}
       {/* Both: taking over can add the model to the catalogue, and without

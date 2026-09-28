@@ -750,14 +750,24 @@ class RayDeploymentManager:
                         f"No local manifest or cache directory found on server for model {facts.hf_repo_id or (facts.model.id if facts.model else 'unknown')}"
                     )
                 blocker_msg = "; ".join(blockers) if blockers else f"Model sync failed on nodes: {', '.join(readiness.failed_node_ids)}"
+                from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+
+                on_machines = machine_downloads.enabled(facts.environment)
                 self._observe(
                     deployment,
                     DeploymentPhase.FAILED,
                     # Say what is wrong in the operator's terms and name the
                     # node, rather than making them read a Ray traceback.
-                    f"The model is not on every machine yet, and this runtime "
-                    f"cannot download it: {blocker_msg}"
-                    + (" The copy is tried again in a few minutes." if retry_later else ""),
+                    (
+                        f"The machines could not download the model from Hugging Face: {blocker_msg}"
+                        if on_machines
+                        else f"The model is not on every machine yet, and this runtime cannot download it: {blocker_msg}"
+                    )
+                    + (
+                        (" The download is tried again in a few minutes." if on_machines
+                         else " The copy is tried again in a few minutes.")
+                        if retry_later else ""
+                    ),
                     False,
                     observed={
                         "reconciled": False,

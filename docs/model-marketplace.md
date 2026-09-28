@@ -71,6 +71,41 @@ engine settings step shows the numbers before anything starts.
 
 The server downloads the model, copies it to the machines and starts the
 copies. The deployment page shows each step. Nothing waits in the dialog.
+A cluster can have its machines download models from Hugging Face
+themselves instead. See [Where the machines get models](#where-the-machines-get-models).
+
+A deployment never sends the machines a model whose download has not
+finished. If the server's download stops (its worker restarts, or runs out of
+memory), the download is marked **interrupted**. It resumes by itself when a
+deployment waits for the model, and from where it stopped: the files already
+on disk are kept.
+
+## Where the machines get models
+
+By default the server downloads a model and each machine of the cluster
+copies it from the server. This works when the machines have no internet
+access. But a server on a slow link makes every model pay twice: once to the
+server, then again to each machine over the same link.
+
+A cluster's page has a switch, **Machines download models themselves**. It is
+off by default. When it is on, each machine downloads the model from Hugging
+Face into its own model store, and the server neither downloads nor copies
+it. The engine still runs offline and loads the model from the store.
+
+- The switch can be turned on only when every machine of the cluster
+  reaches Hugging Face. The card asks each machine and shows the answer.
+  While a machine cannot reach it, the switch stays off, and its tooltip names
+  the machine and the reason: no internet access, an agent older than 0.2.2,
+  offline, or no answer. **Check again** asks the machines again. The server
+  checks too, so the API refuses it as well.
+- A machine uses a proxy set in its environment (`HTTPS_PROXY`) and a mirror
+  set in `HF_ENDPOINT`, for the check and the download alike.
+- For a gated model, a machine asks the server for its Hugging Face token at
+  the start of each download. Only machines of a cluster with the switch on
+  get it, and they do not store it.
+- It applies to the next model placed on the cluster. Models already on the
+  machines stay where they are. Turning it off goes back to copying from the
+  server.
 
 ## Engine settings
 
@@ -122,10 +157,12 @@ or in **Settings → LLM → Hugging Face**.
 - It is stored encrypted with the settings master key, and no screen or API
   returns it. You see only the account it belongs to. If the token can also
   write, a note says so: a read token is all the server needs.
-- It is used only by the server itself: to search, to read model details and
+- It is used by the server itself: to search, to read model details and
   to download. Cluster machines get their models from the server and never
-  receive the token. A legacy container gets it only when it is allowed
-  onto the network to fetch model code (`trust-remote-code`).
+  receive the token, unless their cluster lets them download models
+  themselves (see [Where the machines get models](#where-the-machines-get-models)).
+  A legacy container gets it only when it is allowed onto the network to
+  fetch model code (`trust-remote-code`).
 - The server will not save a token while it still uses the default settings
   master key. `faden deploy` generates a random one for each installation.
 - Setting and removing the token are recorded in the audit log, without the

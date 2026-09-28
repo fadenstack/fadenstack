@@ -611,6 +611,26 @@ export interface RayTlsStatus {
   can_switch_on: boolean;
 }
 
+/** One machine's answer: can it download a model from Hugging Face itself? */
+export interface MachineInternet {
+  node_id: string;
+  host: string;
+  /** null: it could not be asked (offline, an old agent, no answer). */
+  internet: boolean | null;
+  detail: string | null;
+  checked_at: string;
+  problem: "no_internet" | "old_agent" | "offline" | "no_answer" | null;
+}
+
+/** Whether a cluster's machines download models from Hugging Face themselves. */
+export interface ModelDownloadsStatus {
+  on: boolean;
+  machines: MachineInternet[];
+  /** Every machine reaches Hugging Face and runs an agent that can. */
+  can_switch_on: boolean;
+  reason: string | null;
+}
+
 export interface StrayModels {
   models: FoundClusterApp[];
   /** Why the cluster could not be asked, when it could not. */
@@ -915,6 +935,19 @@ export const inferenceApi = {
   /** Restarts the cluster: every machine's Ray starts again with TLS, or without. */
   switchRayTls(environmentId: string, on: boolean) {
     return request<RayTlsStatus>(`/environments/${enc(environmentId)}/ray-tls`, {
+      method: "POST",
+      body: JSON.stringify({ on }),
+    });
+  },
+  /** Asks each machine whether it reaches Hugging Face (answers are kept a few minutes unless `fresh`). */
+  modelDownloads(environmentId: string, fresh = false) {
+    return request<ModelDownloadsStatus>(
+      `/environments/${enc(environmentId)}/model-downloads${fresh ? "?fresh=true" : ""}`,
+    );
+  },
+  /** On: every machine downloads models itself. Refused (409) while one cannot reach Hugging Face. */
+  switchModelDownloads(environmentId: string, on: boolean) {
+    return request<ModelDownloadsStatus>(`/environments/${enc(environmentId)}/model-downloads`, {
       method: "POST",
       body: JSON.stringify({ on }),
     });

@@ -2604,6 +2604,25 @@
       "restart_warning": "Der Cluster startet auf jeder Maschine neu: Seine Modelle halten an, laden neu und antworten wieder, sobald sie geladen sind — Minuten bei einem großen Modell.",
       "restart_confirm": "Cluster neu starten",
       "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.18 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
+    },
+    "model_downloads": {
+      "title": "Woher die Maschinen Modelle bekommen",
+      "switch_label": "Maschinen laden Modelle selbst herunter",
+      "on_chip": "Von Hugging Face",
+      "off_chip": "Von diesem Server",
+      "on_detail": "Jede Maschine lädt ein Modell von Hugging Face in ihren eigenen Modellspeicher, für ein zugangsbeschränktes Modell mit dem Hugging-Face-Token dieses Servers. Der Server lädt es weder herunter noch kopiert er es.",
+      "off_detail": "Dieser Server lädt ein Modell herunter, und jede Maschine kopiert es vom Server. Das funktioniert ohne Internet auf den Maschinen; über eine langsame Leitung des Servers dauert ein großes Modell dann zweimal so lange.",
+      "checking": "Die Maschinen werden gefragt, ob sie Hugging Face erreichen…",
+      "check_again": "Erneut prüfen",
+      "reaches": "Erreicht Hugging Face",
+      "cannot_switch_on": "Zum Einschalten muss jede Maschine Hugging Face erreichen:",
+      "problem": {
+        "no_internet": "{{host}}: erreicht Hugging Face nicht",
+        "old_agent": "{{host}}: Agent zu alt, auf 0.2.2 oder neuer aktualisieren",
+        "offline": "{{host}}: offline",
+        "no_answer": "{{host}}: hat nicht geantwortet"
+      },
+      "applies_next": "Gilt für das nächste Modell, das auf den Cluster kommt; Modelle, die schon auf den Maschinen liegen, bleiben."
     }
   },
   "inference": {

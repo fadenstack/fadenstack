@@ -2604,6 +2604,25 @@
       "restart_warning": "集群将在每台机器上重启：其模型会停止、重新加载，加载完成后再次响应——大型模型需要几分钟。",
       "restart_confirm": "重启集群",
       "update_agents": "机器之间的加密需要每台机器上的代理为 0.1.18 或更高版本。请在 {{hosts}} 上重新运行安装命令以更新。"
+    },
+    "model_downloads": {
+      "title": "机器从哪里获取模型",
+      "switch_label": "机器自行下载模型",
+      "on_chip": "来自 Hugging Face",
+      "off_chip": "来自本服务器",
+      "on_detail": "每台机器从 Hugging Face 将模型下载到自己的模型存储；受限模型使用本服务器的 Hugging Face 令牌。服务器既不下载也不复制该模型。",
+      "off_detail": "本服务器下载模型，每台机器再从服务器复制。机器无需联网即可工作；若服务器链路较慢，大模型需要花两倍的时间。",
+      "checking": "正在询问各机器能否访问 Hugging Face…",
+      "check_again": "重新检查",
+      "reaches": "可访问 Hugging Face",
+      "cannot_switch_on": "要开启此项，每台机器都必须能访问 Hugging Face：",
+      "problem": {
+        "no_internet": "{{host}}：无法访问 Hugging Face",
+        "old_agent": "{{host}}：代理版本过旧，请升级到 0.2.2 或更高版本",
+        "offline": "{{host}}：离线",
+        "no_answer": "{{host}}：未响应"
+      },
+      "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。"
     }
   },
   "inference": {
