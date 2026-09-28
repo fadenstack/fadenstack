@@ -164,7 +164,7 @@ def provision_local_node_agent(
         repo_url = core_repo_clone_url(method=method, token=github_token)
     else:
         repo_url = repo_clone_url(_NODE_AGENT_REPO, method=method, token=github_token)
-    branch = branch.strip() or "master"
+    branch = branch.strip() or "main"
     backend_url = backend_url.strip() or "http://127.0.0.1:8000"
     advertise_host = advertise_host.strip()
     enrollment_token = enrollment_token.strip()

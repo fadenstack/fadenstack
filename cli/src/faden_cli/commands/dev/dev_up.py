@@ -1262,7 +1262,7 @@ def dev_up(
                     " --local-node-enrollment-token."
                 )
 
-        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "main")
         remote_host = local_node_host.strip() or None
         method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
         github_token = cfg.dev.github_token if cfg.dev else ""

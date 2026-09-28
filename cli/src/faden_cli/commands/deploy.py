@@ -728,7 +728,7 @@ def deploy_cmd(
                 " --local-node-enrollment-token or re-run after bootstrap."
             )
 
-        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "master")
+        branch = local_node_branch.strip() or (cfg.dev.branch if cfg.dev and cfg.dev.branch else "main")
         method = cfg.dev.clone_method if cfg.dev and cfg.dev.clone_method else "https"
         github_token = cfg.dev.github_token if cfg.dev else ""
         remote_host = local_node_host.strip() or None

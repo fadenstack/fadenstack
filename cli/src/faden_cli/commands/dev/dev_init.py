@@ -447,7 +447,7 @@ def _resolve_init_workspace(workspace: str, *, explicit: bool) -> Path:
 @dev_group.command("init")
 @click.argument("workspace", type=click.Path(), default=".")
 @click.option("--ssh", is_flag=True, help="Clone using SSH instead of HTTPS.")
-@click.option("--branch", "-b", default="master", show_default=True, help="Branch to checkout after cloning.")
+@click.option("--branch", "-b", default="main", show_default=True, help="Branch to checkout after cloning.")
 @click.option("--overwrite", is_flag=True, help="Remove and re-clone existing repos.")
 @click.option("--skip-infra", is_flag=True, help="Skip starting shared infrastructure.")
 @click.option("--skip-deps", is_flag=True, help="Skip installing dependencies.")

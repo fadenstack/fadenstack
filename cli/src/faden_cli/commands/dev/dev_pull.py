@@ -2,7 +2,7 @@
 
 Fetches and fast-forwards every repository checked out in the dev
 workspace to the latest commit of the target branch (default:
-``master``).  This is the counterpart of ``dev init --overwrite`` for an already
+``main``).  This is the counterpart of ``dev init --overwrite`` for an already
 bootstrapped workspace: no cloning and no dependency installation — it
 just brings the checkouts up to date.
 
@@ -191,7 +191,7 @@ def _pull_repo(
 @click.option(
     "--branch",
     "-b",
-    default="master",
+    default="main",
     show_default=True,
     help="Branch to pull from the remote.",
 )
@@ -217,7 +217,7 @@ def dev_pull(*, branch: str, force: bool, hard: bool) -> None:
 
     Fetches and fast-forwards every repository checked out in the dev
     workspace to the latest commit of the target branch (default
-    ``master``).  Working trees that cannot be fast-forwarded are
+    ``main``).  Working trees that cannot be fast-forwarded are
     reported and left untouched; ``--hard`` cleans untracked files,
     discards all local changes and resets every checkout to the remote
     branch (destructive).
@@ -226,7 +226,7 @@ def dev_pull(*, branch: str, force: bool, hard: bool) -> None:
     Examples:
         faden dev pull
         faden dev pull --branch feature-x
-        faden dev pull -b master --force
+        faden dev pull -b main --force
         faden dev pull --hard   # destructive
     """
     cfg = load_config()

@@ -51,7 +51,7 @@ class DevConfig:
 
     workspace_dir: str = ""
     clone_method: str = "https"  # "https" or "ssh"
-    branch: str = "master"
+    branch: str = "main"
     repos: list[str] = field(default_factory=lambda: list(REPO_NAMES))
     github_token: str = ""  # GitHub PAT or OAuth token for private repos
 

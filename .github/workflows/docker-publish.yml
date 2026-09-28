@@ -1,7 +1,7 @@
 # Build and push all Fadenstack core Docker images to GHCR.
 #
 # Trigger options:
-#   - Push to master (builds changed services only)
+#   - Push to main (builds changed services only)
 #   - A release tag v<version> (e.g. v0.3.0): every image, tagged 0.3.0, 0.3 and
 #     latest. `faden deploy` from the CLI of that version pulls exactly
 #     <version>, so the images must be published before the CLI is.
@@ -33,7 +33,7 @@ on:
         type: string
 
   push:
-    branches: [master]
+    branches: [main]
     tags:
       - "v*"
       - "core-v*"

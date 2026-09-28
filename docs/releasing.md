@@ -21,7 +21,7 @@ install a CLI whose images are missing.
 
 - **Core images.** The backend image carries the runtime manifests from
   `runtime-image/` (a named build context), because its catalogue of
-  runtime images is built from them. Pushes to `master` rebuild only the
+  runtime images is built from them. Pushes to `main` rebuild only the
   services that changed.
 - **Node agent.** The agent's `pyproject.toml`, its `__version__` and the
   backend's `AGENT_VERSION` must agree -- the backend is what tells machines
