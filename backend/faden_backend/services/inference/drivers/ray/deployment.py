@@ -702,6 +702,25 @@ class RayDeploymentManager:
                 retry = await ModelArtifactCoordinator(session, gateway=_gateway(node_control)).ensure(
                     model=facts.model, environment=facts.environment, fetch_to_server=False,
                 )
+                if retry.waiting_on:
+                    # The server's copy is still arriving (or its interrupted
+                    # download was just resumed): the copies that failed were
+                    # of a model that was not all there. Nothing is wrong
+                    # now -- say what is being waited on, not "failed".
+                    facts.artifact_readiness = retry
+                    self._observe(
+                        deployment,
+                        DeploymentPhase.PREPARING,
+                        retry.waiting_on,
+                        False,
+                        observed={
+                            "reconciled": False,
+                            "reason": "model_downloading_to_server",
+                            "failed_node_ids": retry.failed_node_ids,
+                        },
+                        mark_observed=False,
+                    )
+                    return
                 still_failed = [n for n in retry.failed_node_ids if not await self._retry_issued(session, facts, n)]
                 # The failed nodes' own blockers were already there; anything
                 # ``ensure`` added (no copy to send, the re-issue failing) is new.

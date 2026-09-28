@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus, LLMModel, ModelStatus
+from faden_backend.services.llm.artifacts import model_cache_dir
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
@@ -67,7 +68,69 @@ async def download_under_way(session: AsyncSession, model: LLMModel) -> str | No
     return None
 
 
-async def ensure_server_copy(session: AsyncSession, model: LLMModel) -> ServerCopy:
+async def incomplete_server_copy(session: AsyncSession, model: LLMModel) -> str | None:
+    """Why this server's copy of *model* must not be sent to the machines yet, else None.
+
+    A download that stopped leaves the files that arrived, and a folder that
+    looks like a copy. Sending it had both machines of the release VM's
+    cluster fail on the missing shards, twice, and the deployment with them.
+    Complete means: the model's last download finished (or the model was put
+    here some other way and is available), and no file is still partial.
+    """
+    if not model.hf_repo_id:
+        return None
+    job = await _latest_job(session, model.id)
+    if job is not None and job.status != DownloadJobStatus.SUCCESS and model.status != ModelStatus.AVAILABLE:
+        how = {
+            DownloadJobStatus.CANCELED: "was canceled",
+            DownloadJobStatus.FAILED: "stopped" if job.error_code else "failed",
+        }.get(job.status, "has not finished")
+        reason = f": {job.error_message}" if job.error_message else ""
+        return (
+            f"The server's copy of {model.hf_repo_id} is incomplete: its download {how}{reason}. "
+            f"Start the download again from Models; it resumes where it stopped."
+        )
+    folder = model_cache_dir(model.hf_repo_id)
+    blobs = folder / "blobs" if folder is not None else None
+    partial = sorted(blobs.glob("*.incomplete")) if blobs is not None and blobs.is_dir() else []
+    if partial:
+        return (
+            f"The server's copy of {model.hf_repo_id} is incomplete: {len(partial)} file(s) "
+            f"did not finish downloading. Start the download again from Models."
+        )
+    return None
+
+
+async def _resume(session: AsyncSession, model: LLMModel, job: DownloadJob) -> ServerCopy:
+    """Start an interrupted download again; it picks up the files already on disk."""
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO  # noqa: PLC0415
+    from faden_backend.services.llm.tasks import download_model_task  # noqa: PLC0415
+
+    await DownloadJobDAO(session).requeue(job.id)
+    model.status = ModelStatus.DOWNLOADING
+    await session.flush()
+    try:
+        await download_model_task.kiq(
+            model_id=str(model.id),
+            job_id=str(job.id),
+            hf_repo_id=model.hf_repo_id,
+            hf_revision=model.hf_revision,
+            target_dir=settings.model_store_root,
+        )
+    except Exception as exc:  # noqa: BLE001 - reported, not raised
+        log.warning("Could not resume the download of %s: %s", model.hf_repo_id, exc)
+        return ServerCopy(blocker=f"Could not resume downloading {model.hf_repo_id}: {exc}")
+    log.info("Resumed the interrupted server-side download of %s for a deployment", model.hf_repo_id)
+    done = f" ({job.progress}%)" if job.progress else ""
+    return ServerCopy(
+        waiting=(
+            f"Resuming the download of {model.hf_repo_id} to the Fadenstack server{done}. "
+            f"It is copied to the cluster as soon as it is there."
+        )
+    )
+
+
+async def ensure_server_copy(session: AsyncSession, model: LLMModel, *, resume_only: bool = False) -> ServerCopy:
     """Start or follow the server-side download of *model*.
 
     Never starts a second download of the same model, and never restarts one
@@ -75,6 +138,10 @@ async def ensure_server_copy(session: AsyncSession, model: LLMModel) -> ServerCo
     name, and retrying it on every reconcile pass would be the same storm of
     identical attempts the cluster reconciler used to produce. The operator
     retries from Models once it is fixed, and the deployment picks it up.
+
+    An *interrupted* download is another matter: nothing was wrong with it,
+    its worker went away (``services/llm/downloads.py``). It is resumed.
+    *resume_only* does only that, and otherwise returns an empty answer.
     """
     if not model.hf_repo_id:
         return ServerCopy(
@@ -87,6 +154,13 @@ async def ensure_server_copy(session: AsyncSession, model: LLMModel) -> ServerCo
     job = await _latest_job(session, model.id)
     if job is not None and job.status in _ACTIVE:
         return ServerCopy(waiting=_waiting_message(model, job.progress))
+
+    from faden_backend.db.dao.llm_dao import INTERRUPTED  # noqa: PLC0415
+
+    if job is not None and job.status == DownloadJobStatus.FAILED and job.error_code == INTERRUPTED:
+        return await _resume(session, model, job)
+    if resume_only:
+        return ServerCopy()
 
     if job is not None and job.status == DownloadJobStatus.FAILED:
         reason = job.error_message or "no reason recorded"

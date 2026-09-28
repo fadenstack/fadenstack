@@ -302,6 +302,7 @@ class ModelArtifactCoordinator:
         from faden_backend.services.inference.server_copy import (  # noqa: PLC0415
             download_under_way,
             ensure_server_copy,
+            incomplete_server_copy,
         )
 
         # Halfway through a download the folder already holds files, and
@@ -311,6 +312,20 @@ class ModelArtifactCoordinator:
         downloading = await download_under_way(self.session, model)
         if downloading is not None:
             readiness.waiting_on = downloading
+            return None
+
+        # A download that stopped is no copy either, whatever arrived before
+        # it did: send it and every machine fails on the files that are not
+        # there. One that was interrupted is resumed -- something is waiting
+        # for the model -- while a new download is started only by a caller
+        # that may fetch to the server.
+        incomplete = await incomplete_server_copy(self.session, model)
+        if incomplete is not None:
+            copy = await ensure_server_copy(self.session, model, resume_only=not fetch_to_server)
+            if copy.waiting is not None:
+                readiness.waiting_on = copy.waiting
+            else:
+                readiness.blockers.append(copy.blocker or incomplete)
             return None
 
         sync_payload = build_model_sync_payload(model, source="sync_from_server")

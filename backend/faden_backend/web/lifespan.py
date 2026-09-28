@@ -391,7 +391,15 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
                 # like it has more agents attached than it does, which is
                 # precisely what hides a duplicate agent.
                 closed = await service.close_stale_sessions()
-                if reaped or closed:
+                # Downloads whose worker went away, found the same way: by
+                # a heartbeat that stopped. A deployment waiting for one
+                # starts it again, and it resumes.
+                from faden_backend.services.llm.downloads import (  # noqa: PLC0415
+                    interrupt_stale_downloads,
+                )
+
+                interrupted = await interrupt_stale_downloads(session)
+                if reaped or closed or interrupted:
                     await session.commit()
                 if time.monotonic() - last_prune >= prune_every_sec:
                     last_prune = time.monotonic()
@@ -819,51 +827,18 @@ async def _reconcile_monitoring_on_startup(app: FastAPI) -> None:
 
 
 async def _recover_orphaned_downloads(app: FastAPI) -> None:
-    """Mark downloads that were interrupted by a prior crash as FAILED.
+    """Mark downloads no process is doing any more as interrupted.
 
-    On startup, any ``download_jobs`` still in QUEUED/RUNNING and any
-    ``llm_models`` still in DOWNLOADING are orphans from a previous
-    process that died mid-download.  Mark them FAILED so the UI shows
-    the correct state and the user can retry.
+    Told apart by their heartbeat, not by this process starting: the
+    download runs in the task worker, which a restart of the web backend
+    leaves running (``services/llm/downloads.py``).
     """
-    from sqlalchemy import update  # noqa: PLC0415
-
-    from faden_backend.db.models.llm import (  # noqa: PLC0415
-        DownloadJob,
-        DownloadJobStatus,
-        LLMModel,
-        ModelStatus,
-    )
+    from faden_backend.services.llm.downloads import interrupt_stale_downloads  # noqa: PLC0415
 
     async with app.state.db_session_factory() as session:
         try:
-            result_jobs = await session.execute(
-                update(DownloadJob)
-                .where(
-                    DownloadJob.status.in_([
-                        DownloadJobStatus.QUEUED,
-                        DownloadJobStatus.RUNNING,
-                    ]),
-                )
-                .values(
-                    status=DownloadJobStatus.FAILED,
-                    error_message="Interrupted by server restart. Use retry to resume.",
-                ),
-            )
-            result_models = await session.execute(
-                update(LLMModel)
-                .where(LLMModel.status == ModelStatus.DOWNLOADING)
-                .values(status=ModelStatus.FAILED),
-            )
+            await interrupt_stale_downloads(session, orphaned_models=True)
             await session.commit()
-            jobs_fixed = result_jobs.rowcount
-            models_fixed = result_models.rowcount
-            if jobs_fixed or models_fixed:
-                log.warning(
-                    "Recovered %d orphaned download job(s) and %d model(s) from prior crash.",
-                    jobs_fixed,
-                    models_fixed,
-                )
         except Exception:
             await session.rollback()
             log.exception("Failed to recover orphaned downloads.")

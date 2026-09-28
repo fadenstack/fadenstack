@@ -1,9 +1,10 @@
 """DAOs for the LLM server subsystem."""
 
 import uuid
+from datetime import timedelta
 
 from fastapi import Depends
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
@@ -485,6 +486,14 @@ class RuntimeDAO:
 # -----------------------------------------------------------------------
 
 
+#: ``error_code`` of a download whose worker went away. Starting it again resumes it.
+INTERRUPTED = "interrupted"
+INTERRUPTED_MESSAGE = (
+    "The download stopped: the process doing it went away (a restart, or out of memory). "
+    "Starting it again resumes it from what is already on disk."
+)
+
+
 class DownloadJobDAO:
     """CRUD operations for model download jobs."""
 
@@ -574,6 +583,126 @@ class DownloadJobDAO:
             return None
         job.status = DownloadJobStatus.CANCELED
         return job
+
+    async def claim(self, job_id: uuid.UUID, runner_id: str, *, stale_after_sec: float) -> bool:
+        """Take the job for the run *runner_id*, if no other run is doing it.
+
+        Free to take: queued (new or retried), interrupted, or running with no
+        heartbeat for *stale_after_sec* -- or none at all, as a job from before
+        heartbeats has. A second delivery of the same task message finds the
+        first run's heartbeat fresh and gets False.
+        """
+        stale = func.now() - timedelta(seconds=stale_after_sec)
+        stmt = (
+            update(DownloadJob)
+            .where(
+                DownloadJob.id == job_id,
+                or_(
+                    DownloadJob.status == DownloadJobStatus.QUEUED,
+                    and_(
+                        DownloadJob.status == DownloadJobStatus.FAILED,
+                        DownloadJob.error_code == INTERRUPTED,
+                    ),
+                    and_(
+                        DownloadJob.status == DownloadJobStatus.RUNNING,
+                        or_(DownloadJob.heartbeat_at.is_(None), DownloadJob.heartbeat_at < stale),
+                    ),
+                ),
+            )
+            .values(
+                status=DownloadJobStatus.RUNNING,
+                runner_id=runner_id,
+                heartbeat_at=func.now(),
+                error_code=None,
+                error_message=None,
+            )
+            .returning(DownloadJob.id)
+            .execution_options(synchronize_session=False)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def heartbeat(self, job_id: uuid.UUID, runner_id: str) -> str:
+        """Say the run *runner_id* is still downloading, and hear whether it should go on.
+
+        ``running``: go on. ``resumed``: go on -- the job had been taken for
+        interrupted during a long silence, and is running again. Anything else
+        means stop: ``canceled``, ``taken`` (another run holds it now),
+        ``gone`` or the status it ended in.
+        """
+        row = (await self.session.execute(
+            select(DownloadJob.status, DownloadJob.runner_id, DownloadJob.error_code)
+            .where(DownloadJob.id == job_id)
+            .with_for_update(),
+        )).one_or_none()
+        if row is None:
+            return "gone"
+        status, runner, code = row
+        if runner != runner_id:
+            return "taken"
+        if status == DownloadJobStatus.CANCELED:
+            return "canceled"
+        interrupted = status == DownloadJobStatus.FAILED and code == INTERRUPTED
+        if status != DownloadJobStatus.RUNNING and not interrupted:
+            return str(status.value if hasattr(status, "value") else status)
+        await self.session.execute(
+            update(DownloadJob)
+            .where(DownloadJob.id == job_id)
+            .values(
+                status=DownloadJobStatus.RUNNING,
+                heartbeat_at=func.now(),
+                error_code=None,
+                error_message=None,
+            )
+            .execution_options(synchronize_session=False),
+        )
+        return "resumed" if interrupted else "running"
+
+    async def interrupt_stale(self, *, stale_after_sec: float, queued_after_sec: float) -> list[uuid.UUID]:
+        """Mark downloads no process is doing any more as interrupted; the models they were for.
+
+        Running with no heartbeat for *stale_after_sec* (its worker died or was
+        stopped), or queued for *queued_after_sec* without a worker ever taking
+        it (its message was lost). A live download is never touched: it says it
+        is alive every few seconds, whichever process restarts.
+        """
+        running_stale = func.now() - timedelta(seconds=stale_after_sec)
+        queued_stale = func.now() - timedelta(seconds=queued_after_sec)
+        stmt = (
+            update(DownloadJob)
+            .where(
+                or_(
+                    and_(
+                        DownloadJob.status == DownloadJobStatus.RUNNING,
+                        func.coalesce(DownloadJob.heartbeat_at, DownloadJob.updated_at) < running_stale,
+                    ),
+                    and_(
+                        DownloadJob.status == DownloadJobStatus.QUEUED,
+                        DownloadJob.updated_at < queued_stale,
+                    ),
+                ),
+            )
+            .values(
+                status=DownloadJobStatus.FAILED,
+                error_code=INTERRUPTED,
+                error_message=INTERRUPTED_MESSAGE,
+            )
+            .returning(DownloadJob.model_id)
+            .execution_options(synchronize_session=False)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def requeue(self, job_id: uuid.UUID) -> None:
+        """Queue the job again, to resume it: what is on disk already is kept."""
+        await self.session.execute(
+            update(DownloadJob)
+            .where(DownloadJob.id == job_id)
+            .values(
+                status=DownloadJobStatus.QUEUED,
+                error_code=None,
+                error_message=None,
+            )
+            .execution_options(synchronize_session=False),
+        )
 
     async def active_for_model(self, model_id: uuid.UUID) -> DownloadJob | None:
         """The queued or running job for a model, if one is under way."""

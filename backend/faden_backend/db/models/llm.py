@@ -395,6 +395,15 @@ class DownloadJob(Base):
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     log_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Why it stopped, for a caller to act on: ``interrupted`` is a download
+    #: whose worker went away, and it resumes when started again.
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    #: The run of the download task that holds the job. A second delivery of
+    #: the same task message finds it here and leaves the download to it.
+    runner_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: When that run last said it was alive. A running job that stopped
+    #: saying so is a download no process is doing any more.
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

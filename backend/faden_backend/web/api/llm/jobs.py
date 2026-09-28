@@ -109,6 +109,7 @@ async def retry_job(
     job.status = DownloadJobStatus.QUEUED
     job.progress = 0
     job.error_message = None
+    job.error_code = None
 
     # Ensure model is in downloading state
     model = await model_dao.get(job.model_id)

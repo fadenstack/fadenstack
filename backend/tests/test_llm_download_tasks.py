@@ -143,13 +143,23 @@ async def test_do_download_no_artifacts_skips_batch(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _install_fake_broker_app(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Install a fake FastAPI-style app on broker.state for the task to read."""
+def _install_fake_broker_app(monkeypatch: pytest.MonkeyPatch, *, claim: str | None = None) -> None:
+    """Install a fake FastAPI-style app on broker.state for the task to read.
+
+    The job is this run's to take unless *claim* says why not; the heartbeat
+    is left out (``test_download_heartbeat.py`` runs both against Postgres).
+    """
     session = _fake_session()
     app = SimpleNamespace(state=SimpleNamespace(db_session_factory=lambda: session))
     # Reinstall in case a previous test left state behind
     broker.state.fastapi_app = app  # type: ignore[attr-defined]
     monkeypatch.setattr(broker.state, "fastapi_app", app, raising=False)
+    monkeypatch.setattr(tasks_mod, "_claim", AsyncMock(return_value=claim))
+
+    async def _no_heartbeat(*_a: object) -> None:
+        return None
+
+    monkeypatch.setattr(tasks_mod, "_heartbeat", _no_heartbeat)
 
 
 async def test_download_model_task_crash_marks_model_failed(
@@ -371,3 +381,135 @@ async def test_a_canceled_job_leaves_the_model_failed_not_available(monkeypatch:
     model_dao.set_status.assert_awaited_once_with(_MODEL_ID, ModelStatus.FAILED)
     assert all(call.args[2] is not DownloadJobStatus.SUCCESS for call in job_dao.update_progress.await_args_list)
 
+
+
+# -- delivered twice, taken over, broken off by the network -----------------
+
+
+async def test_a_second_delivery_leaves_the_download_to_the_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    """RabbitMQ hands the message out again after 30 minutes: it must not start a second download."""
+    started: list[object] = []
+
+    async def fake_do_download(**kw: object) -> dict:
+        started.append(kw)
+        return {"status": "success"}
+
+    monkeypatch.setattr(tasks_mod, "_do_download", fake_do_download)
+    monkeypatch.setattr(tasks_mod, "_resolve_hf_token", AsyncMock(return_value=None))
+    _install_fake_broker_app(monkeypatch, claim="busy")
+
+    result = await tasks_mod.download_model_task.original_func(str(_MODEL_ID), str(_JOB_ID), _HF_REPO, None, _TARGET)
+
+    assert result == {"status": "skipped", "reason": "busy"}
+    assert started == []
+
+
+async def test_a_run_that_lost_the_job_leaves_it_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Another run took the job over: whatever this one hits, the job is not this one's to fail."""
+    model_dao = MagicMock()
+    model_dao.set_status = AsyncMock()
+    job_dao = MagicMock()
+    job_dao.set_failed = AsyncMock()
+    monkeypatch.setattr(llm_dao_mod, "ModelDAO", lambda session: model_dao)
+    monkeypatch.setattr(llm_dao_mod, "DownloadJobDAO", lambda session: job_dao)
+
+    async def lose_then_crash(**kw: object) -> dict:
+        kw["run"].lost = True  # type: ignore[attr-defined]
+        raise OSError("the other run removed the lock")
+
+    monkeypatch.setattr(tasks_mod, "_do_download", lose_then_crash)
+    monkeypatch.setattr(tasks_mod, "_resolve_hf_token", AsyncMock(return_value=None))
+    _install_fake_broker_app(monkeypatch)
+
+    result = await tasks_mod.download_model_task.original_func(str(_MODEL_ID), str(_JOB_ID), _HF_REPO, None, _TARGET)
+
+    assert result == {"status": "superseded"}
+    job_dao.set_failed.assert_not_awaited()
+    model_dao.set_status.assert_not_awaited()
+
+
+async def test_a_download_the_network_broke_off_is_tried_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    model_dao = MagicMock()
+    model_dao.set_status = AsyncMock()
+    job_dao = MagicMock()
+    job_dao.update_progress = AsyncMock()
+    job_dao.status_of = AsyncMock(return_value=DownloadJobStatus.RUNNING)
+    monkeypatch.setattr(llm_dao_mod, "ModelDAO", lambda session: model_dao)
+    monkeypatch.setattr(llm_dao_mod, "DownloadJobDAO", lambda session: job_dao)
+    monkeypatch.setattr(llm_dao_mod, "ArtifactDAO", lambda session: MagicMock(create_batch=AsyncMock()))
+    monkeypatch.setattr(scanner_mod, "scan_model_directory", lambda path: [])
+    monkeypatch.setattr(tasks_mod, "_NETWORK_BACKOFF_SEC", 0.0)
+    attempts: list[int] = []
+
+    def flaky(*_a: object, **_k: object) -> str:
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise ConnectionError("peer closed connection without sending complete message body")
+        return "/tmp/snap"
+
+    monkeypatch.setattr(tasks_mod, "_run_download_sync", flaky)
+    result = await tasks_mod._do_download(
+        session=_fake_session(), model_id=_MODEL_ID, job_id=_JOB_ID, hf_repo_id=_HF_REPO,
+        hf_revision=None, target_dir=_TARGET, hf_token=None,
+    )
+    assert result["status"] == "success"
+    assert len(attempts) == 2
+
+
+async def test_a_refused_download_is_not_tried_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    job_dao = MagicMock()
+    job_dao.update_progress = AsyncMock()
+    monkeypatch.setattr(llm_dao_mod, "ModelDAO", lambda session: MagicMock())
+    monkeypatch.setattr(llm_dao_mod, "DownloadJobDAO", lambda session: job_dao)
+    monkeypatch.setattr(llm_dao_mod, "ArtifactDAO", lambda session: MagicMock())
+    monkeypatch.setattr(tasks_mod, "_NETWORK_BACKOFF_SEC", 0.0)
+    attempts: list[int] = []
+
+    def refused(*_a: object, **_k: object) -> str:
+        attempts.append(1)
+        raise PermissionError("401 Client Error: Unauthorized")
+
+    monkeypatch.setattr(tasks_mod, "_run_download_sync", refused)
+    with pytest.raises(PermissionError):
+        await tasks_mod._do_download(
+            session=_fake_session(), model_id=_MODEL_ID, job_id=_JOB_ID, hf_repo_id=_HF_REPO,
+            hf_revision=None, target_dir=_TARGET, hf_token=None,
+        )
+    assert len(attempts) == 1
+
+
+async def test_a_run_that_lost_the_job_mid_download_does_not_fail_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    model_dao = MagicMock()
+    model_dao.set_status = AsyncMock()
+    job_dao = MagicMock()
+    job_dao.update_progress = AsyncMock()
+    monkeypatch.setattr(llm_dao_mod, "ModelDAO", lambda session: model_dao)
+    monkeypatch.setattr(llm_dao_mod, "DownloadJobDAO", lambda session: job_dao)
+    monkeypatch.setattr(llm_dao_mod, "ArtifactDAO", lambda session: MagicMock())
+    run = tasks_mod._Run()
+
+    def stopped(*_a: object, **_k: object) -> str:
+        run.lost = True
+        raise tasks_mod.DownloadCanceled(_HF_REPO)
+
+    monkeypatch.setattr(tasks_mod, "_run_download_sync", stopped)
+    result = await tasks_mod._do_download(
+        session=_fake_session(), model_id=_MODEL_ID, job_id=_JOB_ID, hf_repo_id=_HF_REPO,
+        hf_revision=None, target_dir=_TARGET, hf_token=None, run=run,
+    )
+    assert result == {"status": "superseded"}
+    model_dao.set_status.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("exc", "network"),
+    [
+        (ConnectionError("reset"), True),
+        (TimeoutError(), True),
+        (RuntimeError("Data processing error: connection reset by peer"), False),  # not from hf_xet
+        (ValueError("401 Client Error"), False),
+        (OSError(28, "No space left on device"), False),
+    ],
+)
+def test_what_counts_as_the_network_breaking_off(exc: BaseException, network: bool) -> None:
+    assert tasks_mod._network_error(exc) is network
