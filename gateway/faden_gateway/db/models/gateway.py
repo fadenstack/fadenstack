@@ -399,6 +399,13 @@ class LLMGatewayRequestLog(Base):
     # backend stores on the user, and the chat project the session is in.
     group_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     project_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # A request of an agent (``/v1/agents/{agent}/...``): the agent, the device
+    # signed in to it, and the conversation and turn the SDK names -- the
+    # conversation itself stays on the device.
+    agent_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    turn_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     finish_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     retry_count: Mapped[int | None] = mapped_column(
         Integer, nullable=True, server_default="0",
@@ -909,4 +916,31 @@ class SessionClientCapability(Base):
     available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
+    )
+
+
+class AgentClientEvent(Base):
+    """What an SDK reports about its agent's work on a device -- never content.
+
+    Tool executions, approval decisions, attached local MCP servers, session
+    statistics: names, counts, durations and outcomes, for usage and audit.
+    Arguments, results and messages are refused when the event arrives.
+    """
+
+    __tablename__ = "agent_client_event"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    type: Mapped[str] = mapped_column(String(64), nullable=False)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    #: When it happened on the device.
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )

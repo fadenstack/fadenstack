@@ -30,6 +30,8 @@ from faden_gateway.services.gateway.pricing import PricingService
 from faden_gateway.services.gateway.proxy import create_shared_http_client
 from faden_gateway.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
 from faden_gateway.services.gateway.settings_loader import load_system_settings_from_backend_db
+from faden_gateway.services.extensions import load_plugin
+from faden_gateway.services.gateway.agents import build_agent_directory
 from faden_gateway.services.gateway.usage_group import build_user_resolvers
 from faden_gateway.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
 from faden_gateway.services.cache import NoOpCache, RedisCache
@@ -257,6 +259,11 @@ async def lifespan_setup(
     app.state.usage_group_resolver, app.state.group_membership_resolver = (
         build_user_resolvers(settings)
     )
+    # Agents, their versions, grants and maintainers: read from the backend
+    # database for the agent routes, cached per agent for a minute.
+    app.state.agent_directory = build_agent_directory(settings)
+    # Enterprise extensions to core (agent access rules, features, ...), once.
+    load_plugin(gateway_plugin)
     # Connect to RabbitMQ with retries — RMQ may still be starting.
     if not broker.is_worker_process:
         import asyncio
@@ -344,6 +351,8 @@ async def lifespan_setup(
         await broker.shutdown()
     if getattr(app.state, "usage_group_resolver", None) is not None:
         await app.state.usage_group_resolver.close()
+    if getattr(app.state, "agent_directory", None) is not None:
+        await app.state.agent_directory.close()
     await app.state.http_client.aclose()
     await app.state.db_engine.dispose()
     app.state.gateway_observability.shutdown()

@@ -225,6 +225,10 @@ class GatewayDAO:
         mcp_tool_loop_iterations: int | None = None,
         group_id: str | None = None,
         project_id: str | None = None,
+        agent_id: str | None = None,
+        device_id: str | None = None,
+        conversation_id: str | None = None,
+        turn_id: str | None = None,
     ) -> LLMGatewayRequestLog:
         """Insert request audit log row."""
         row = LLMGatewayRequestLog(
@@ -259,6 +263,10 @@ class GatewayDAO:
             mcp_tool_loop_iterations=mcp_tool_loop_iterations,
             group_id=group_id,
             project_id=project_id,
+            agent_id=agent_id,
+            device_id=device_id,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
         )
         self.session.add(row)
         await self.session.flush()

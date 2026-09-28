@@ -54,8 +54,17 @@ async def _refresh_jwt_secret_if_needed() -> None:
         await load_jwt_secret_from_backend_db()
 
 
-def verify_token(token: str) -> dict[str, Any]:
-    """Verify JWT token and return claims."""
+#: The ``typ`` claim of agent tokens: bound to one agent (``aud`` is
+#: ``agent:<id>``), accepted on that agent's routes only.
+AGENT_TOKEN_TYPE = "agent"  # noqa: S105 - a claim value, not a secret
+
+
+def verify_token(token: str, *, check_audience: bool = True) -> dict[str, Any]:
+    """Verify JWT token and return claims.
+
+    Without *check_audience* the caller checks ``aud`` itself: the agent
+    routes accept agent tokens, whose audience is their agent.
+    """
     if not settings.jwt_secret:
         raise GatewayError(
             status_code=500,
@@ -67,7 +76,7 @@ def verify_token(token: str) -> dict[str, Any]:
         decode_opts: dict[str, Any] = {
             "algorithms": [settings.jwt_algorithm],
         }
-        if settings.jwt_audience:
+        if settings.jwt_audience and check_audience:
             decode_opts["audience"] = settings.jwt_audience
         else:
             # When no audience is configured, skip audience verification so
@@ -123,4 +132,38 @@ async def get_auth_context(
         )
     await _refresh_jwt_secret_if_needed()
     claims = verify_token(token)
+    if claims.get("typ") == AGENT_TOKEN_TYPE:
+        # An agent token carries the agent's rules only on the agent's routes;
+        # anywhere else it would be a way around them.
+        raise GatewayError(
+            status_code=403,
+            message="Agent tokens are accepted only on their agent's routes (/v1/agents/{agent}/...).",
+            error_type="permission_error",
+            code="agent_token_not_allowed",
+        )
     return get_auth_context_from_claims(claims, token)
+
+
+async def get_agent_route_claims(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> tuple[dict[str, Any], str]:
+    """Verified claims and token for an agent route; the route checks ``aud``.
+
+    Agent tokens name their agent in ``aud``; any other token keeps the
+    configured audience check.
+    """
+    token = credentials.credentials if credentials else None
+    if not token:
+        raise GatewayError(
+            status_code=401,
+            message="Missing Authorization header.",
+            code="missing_authorization",
+        )
+    await _refresh_jwt_secret_if_needed()
+    claims = verify_token(token, check_audience=False)
+    if claims.get("typ") != AGENT_TOKEN_TYPE and settings.jwt_audience:
+        audience = claims.get("aud")
+        audiences = audience if isinstance(audience, list) else [audience]
+        if settings.jwt_audience not in audiences:
+            raise GatewayError(status_code=401, message="Invalid JWT token.", code="invalid_token")
+    return claims, token

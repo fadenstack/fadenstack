@@ -50,6 +50,10 @@ class AuditService:
         group_id: str | None = None,
         project_id: str | None = None,
         tool_calls: list[dict] | None = None,
+        agent_id: str | None = None,
+        device_id: str | None = None,
+        conversation_id: str | None = None,
+        turn_id: str | None = None,
     ) -> None:
         """Persist one request log row with optional cost estimation."""
         parsed_provider_id: uuid.UUID | None = None
@@ -111,6 +115,10 @@ class AuditService:
             mcp_tool_loop_iterations=mcp_tool_loop_iterations,
             group_id=group_id,
             project_id=project_id,
+            agent_id=agent_id,
+            device_id=device_id,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
         )
 
         # Persist per-tool-call telemetry

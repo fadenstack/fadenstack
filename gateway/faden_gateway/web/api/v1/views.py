@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response, WebSocket
@@ -11,6 +12,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError, error_response
@@ -686,8 +688,26 @@ async def create_chat_completions(
     service: GatewayService = Depends(get_gateway_service),
 ) -> Response:
     """Proxy chat completions with stream and non-stream support."""
+    return await serve_chat_completions(request, auth=auth, service=service)
+
+
+async def serve_chat_completions(
+    request: Request,
+    *,
+    auth: AuthContext,
+    service: GatewayService,
+    agent: AgentRequest | None = None,
+    prepare: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+) -> Response:
+    """One chat completion, whole or streamed: the plain route and an agent's.
+
+    *prepare* applies an agent to the request body before it is routed; the
+    rest -- routing, PII, tools, streaming, the request log -- is one path.
+    """
     try:
         payload = await _get_json_payload(request)
+        if prepare is not None:
+            payload = prepare(payload)
         parsed = ChatCompletionRequest.model_validate(payload)
         request_id = _request_id(request)
 
@@ -704,6 +724,7 @@ async def create_chat_completions(
                 request_id=request_id,
                 session_id=session_id,
                 skills=skills,
+                agent=agent,
             )
             stream_response = StreamingResponse(
                 streamed.stream,
@@ -725,6 +746,7 @@ async def create_chat_completions(
             request_id=request_id,
             session_id=session_id,
             skills=skills,
+            agent=agent,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,

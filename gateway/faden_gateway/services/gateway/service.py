@@ -11,16 +11,17 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, TypedDict
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.db.models.gateway import PrivacyMode, ProviderType
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import attachment_search, knowledge, skill_files, system_tools
 from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
 from faden_gateway.services.gateway.observability import (
     GatewayObservability,
@@ -675,6 +676,63 @@ def _file_types(names: list[tuple[str, str]]) -> list[str]:
     return sorted(types)
 
 
+def _stream_error_event(exc: BaseException) -> bytes:
+    """An SSE error event, in the shape the OpenAI APIs send mid-stream."""
+    if isinstance(exc, GatewayError):
+        error = {"message": exc.message, "type": exc.error_type, "code": exc.code, "param": exc.param}
+    else:
+        error = {
+            "message": "The answer was cut off: the model's stream failed.",
+            "type": "server_error",
+            "code": "upstream_stream_failed",
+            "param": None,
+        }
+    return f"data: {json.dumps({'error': error})}\n\n".encode()
+
+
+def _privacy_mode(policy: Any | None, req: _Prepared) -> Any:
+    """What the trace may keep: for an agent, metadata only -- its sessions stay on the device."""
+    if req.agent is not None:
+        return PrivacyMode.METADATA_ONLY
+    return policy.privacy_mode if policy else None
+
+
+class _AgentLogFields(TypedDict, total=False):
+    agent_id: str | None
+    device_id: str | None
+    conversation_id: str | None
+    turn_id: str | None
+
+
+def _agent_log_fields(req: _Prepared) -> _AgentLogFields:
+    """The agent columns of the request log: which agent, device and conversation."""
+    agent = req.agent
+    if agent is None:
+        return {}
+    return {
+        "agent_id": agent.id,
+        "device_id": agent.device_id,
+        "conversation_id": agent.conversation_id,
+        "turn_id": agent.turn_id,
+    }
+
+
+def _agent_tools(payload: dict[str, Any], req: _Prepared) -> dict[str, Any]:
+    """Only the gateway tools the agent allows; the caller's own tools stay."""
+    tools = payload.get("tools")
+    if not tools or req.agent is None or req.agent.agent.server_tools is None:
+        return payload
+    kept = [
+        tool for tool in tools
+        if (name := _tool_definition_name(tool)) in req.client_tools or req.agent.allows_server_tool(name)
+    ]
+    if len(kept) == len(tools):
+        return payload
+    if not kept:
+        return {k: v for k, v in payload.items() if k not in ("tools", "tool_choice")}
+    return {**payload, "tools": kept}
+
+
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
     """The skills a request used, for the audit log.
 
@@ -751,6 +809,8 @@ class _Prepared:
     tool_exchange: list[dict[str, Any]] = field(default_factory=list)
     #: How a streamed answer ended.
     finish_reason: str | None = None
+    #: The agent the request runs under (``/v1/agents/{agent}/...``).
+    agent: AgentRequest | None = None
 
     @property
     def instance_id(self) -> str | None:
@@ -843,6 +903,7 @@ class GatewayService:
         request_id: str,
         session_id: str | None = None,
         skills: list[str] | None = None,
+        agent: AgentRequest | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -866,7 +927,7 @@ class GatewayService:
         if rerank is not None:
             candidates = _rerank_routes(model_alias, candidates)
 
-        req = _Prepared(payload=payload, requested_skills=list(skills or []))
+        req = _Prepared(payload=payload, requested_skills=list(skills or []), agent=agent)
         result: UpstreamResult | None = None
         error_code: str | None = None
         status_code = 500
@@ -1016,7 +1077,7 @@ class GatewayService:
                     endpoint=endpoint,
                     model_alias=model_alias,
                     payload={"model": payload.get("model"), "_pii_mode": "pre_upstream_error"},
-                    privacy_mode=policy.privacy_mode if policy else None,
+                    privacy_mode=_privacy_mode(policy, req),
                     stream=False,
                     routing_metadata={"pii_fallback_outcome": req.fallback_outcome},
                 )
@@ -1061,6 +1122,7 @@ class GatewayService:
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
                 tool_calls=req.tool_calls,
+                **_agent_log_fields(req),
             )
 
     async def route_stream_chat(
@@ -1071,6 +1133,7 @@ class GatewayService:
         request_id: str,
         session_id: str | None = None,
         skills: list[str] | None = None,
+        agent: AgentRequest | None = None,
     ) -> StreamingGatewayResponse:
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
@@ -1089,7 +1152,7 @@ class GatewayService:
         )
         _check_kind("/v1/chat/completions", model_alias, candidates)
 
-        req = _Prepared(payload=payload, requested_skills=list(skills or []))
+        req = _Prepared(payload=payload, requested_skills=list(skills or []), agent=agent)
         stream_started = False
         stats: StreamStats | None = None
         pre_stream_status_code = 500
@@ -1152,6 +1215,7 @@ class GatewayService:
                 stream_error_code: str | None = None
                 accumulated_content: list[str] = []
                 closing = False
+                failure: bytes | None = None
                 try:
                     async for chunk in wrapped_stream:
                         # The closing [DONE] is held back until the answer is
@@ -1172,8 +1236,13 @@ class GatewayService:
                 except Exception as exc:
                     stream_status_code = 502
                     stream_error_code = "upstream_stream_failed"
+                    # The response has started, so no HTTP error can say it
+                    # any more: an error event does, before [DONE]. Without it
+                    # a cut-off answer looked like a whole one.
+                    failure = _stream_error_event(exc)
+                    if isinstance(exc, GatewayError) and exc.code:
+                        stream_error_code = exc.code
                     del exc
-                    # Response has already started; terminate stream gracefully.
                     closing = True
                 finally:
                     stream_status_code, stream_error_code = _stream_outcome(
@@ -1201,6 +1270,8 @@ class GatewayService:
                         buffer_session_id=_sbuf_sid,
                         saved=saved,
                     ), until=saved)
+                if failure is not None:
+                    yield failure
                 if closing:
                     yield _DONE_EVENT
 
@@ -1222,7 +1293,7 @@ class GatewayService:
                     endpoint=endpoint,
                     model_alias=model_alias,
                     payload={"model": payload.get("model"), "_pii_mode": "pre_upstream_error"},
-                    privacy_mode=policy.privacy_mode if policy else None,
+                    privacy_mode=_privacy_mode(policy, req),
                     stream=True,
                     routing_metadata={"pii_fallback_outcome": req.fallback_outcome},
                 )
@@ -1268,6 +1339,7 @@ class GatewayService:
                     mcp_tool_call_count=0,
                     mcp_tool_loop_iterations=0,
                     tool_calls=[],
+                    **_agent_log_fields(req),
                 )
 
     # ------------------------------------------------------------------
@@ -1393,7 +1465,7 @@ class GatewayService:
             endpoint=endpoint,
             model_alias=_require_model(payload),
             payload=telemetry_payload if telemetry_payload is not None else egress,
-            privacy_mode=policy.privacy_mode if policy else None,
+            privacy_mode=_privacy_mode(policy, req),
             stream=stream,
             routing_metadata={"pii_fallback_outcome": req.fallback_outcome},
         )
@@ -1418,6 +1490,8 @@ class GatewayService:
         # Apply skill-based tool constraints (after all tools are merged)
         if req.skills:
             egress = self._apply_skill_tool_constraints(egress, req.skills)
+        if req.agent is not None:
+            egress = _agent_tools(egress, req)
         # A skill's own files are always readable: offered after the
         # constraints, which would otherwise take the tool away again.
         if chat and searchable and skill_files.has_files(req.skills):
@@ -2508,6 +2582,7 @@ class GatewayService:
                 mcp_tool_call_count=len(req.tool_calls),
                 mcp_tool_loop_iterations=req.tool_iterations,
                 tool_calls=req.tool_calls,
+                **_agent_log_fields(req),
             )
         except Exception:
             logger.warning("Failed to write the request log", exc_info=True)
