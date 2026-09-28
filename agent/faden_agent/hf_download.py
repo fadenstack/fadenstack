@@ -74,15 +74,52 @@ def files_to_fetch(names: list[str]) -> list[str]:
     return keep
 
 
-async def check_internet(payload: dict[str, Any]) -> dict[str, Any]:
-    """``CHECK_INTERNET``: can this machine reach the Hub to download a model?
+def _owner(path: Path) -> str:
+    try:
+        import pwd  # noqa: PLC0415 - POSIX only
+
+        return pwd.getpwuid(path.stat().st_uid).pw_name
+    except (ImportError, KeyError, OSError):
+        return "another user"
+
+
+def store_problem(cache_dir: str, hf_repo_id: str | None = None) -> str | None:
+    """Why this agent cannot write a model into *cache_dir*, with the fix; None when it can.
+
+    The Hub's client takes a lock under ``<store>/.locks/<model>`` for every
+    file. On a DGX Spark a container once run as root had left ``.locks``
+    owned by root, and the download failed on its first file with
+    "Permission denied" -- the machine reached the Hub fine. Checked before a
+    download starts, and when the server asks whether the machine can
+    download at all, so the answer names the directory and the command.
+    """
+    root = Path(cache_dir)
+    candidates = [root, root / ".locks"]
+    if hf_repo_id:
+        folder = f"models--{hf_repo_id.replace('/', '--')}"
+        candidates += [root / folder, root / ".locks" / folder]
+        candidates += [root / folder / part for part in ("blobs", "refs", "snapshots")]
+    for path in candidates:
+        if path.exists() and not os.access(path, os.W_OK | os.X_OK):
+            user = os.environ.get("USER") or "the agent's user"
+            return (
+                f"{path} belongs to {_owner(path)} and the agent (running as {user}) cannot write to it. "
+                f"Fix it on the machine with: sudo chown -R {user}: {path}"
+            )
+    return None
+
+
+async def check_internet(payload: dict[str, Any], *, model_store_root: str | None = None) -> dict[str, Any]:
+    """``CHECK_INTERNET``: can this machine download a model from the Hub itself?
 
     Asks the Hub's API for one model, through the proxy the environment names
     if any, as a download would. Any answer from the Hub -- 429 included --
-    means it is reachable; no answer, or a proxy's error page, means not.
+    means it is reachable; no answer, or a proxy's error page, means not. And
+    the model store must be the agent's to write (``store_problem``).
     """
     timeout = min(30.0, max(1.0, float(payload.get("timeout_sec") or 8.0)))
     url = f"{hub_endpoint()}/api/models?limit=1"
+    problem = store_problem(model_store_root) if model_store_root else None
     started = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -92,6 +129,7 @@ async def check_internet(payload: dict[str, Any]) -> dict[str, Any]:
             "reachable": False,
             "url": url,
             "error": f"{type(exc).__name__}: {exc}"[:300] or type(exc).__name__,
+            "store_problem": problem,
         }
     latency_ms = int((time.monotonic() - started) * 1000)
     reachable = response.status_code < 500 and response.status_code not in (407,)
@@ -100,6 +138,7 @@ async def check_internet(payload: dict[str, Any]) -> dict[str, Any]:
         "url": url,
         "status_code": response.status_code,
         "latency_ms": latency_ms,
+        "store_problem": problem,
     }
     if not reachable:
         result["error"] = f"The Hub answered {response.status_code}"
@@ -128,6 +167,9 @@ def download_model(
 
     wanted_revision = revision or "main"
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    problem = store_problem(cache_dir, hf_repo_id)
+    if problem is not None:
+        raise PermissionError(problem)
     info = HfApi(endpoint=hub_endpoint(), token=token).model_info(
         hf_repo_id, revision=wanted_revision, files_metadata=True,
     )

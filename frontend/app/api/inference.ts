@@ -619,7 +619,7 @@ export interface MachineInternet {
   internet: boolean | null;
   detail: string | null;
   checked_at: string;
-  problem: "no_internet" | "old_agent" | "offline" | "no_answer" | null;
+  problem: "no_internet" | "store_not_writable" | "old_agent" | "offline" | "no_answer" | null;
 }
 
 /** Whether a cluster's machines download models from Hugging Face themselves. */

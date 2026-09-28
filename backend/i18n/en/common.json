@@ -2616,6 +2616,7 @@
       "cannot_switch_on": "Every machine must reach Hugging Face to switch this on:",
       "problem": {
         "no_internet": "{{host}}: cannot reach Hugging Face",
+        "store_not_writable": "{{host}}: its model store is not writable by the agent",
         "old_agent": "{{host}}: agent too old, update it to 0.2.2 or later",
         "offline": "{{host}}: offline",
         "no_answer": "{{host}}: did not answer"

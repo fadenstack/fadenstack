@@ -2618,6 +2618,7 @@
       "cannot_switch_on": "要开启此项，每台机器都必须能访问 Hugging Face：",
       "problem": {
         "no_internet": "{{host}}：无法访问 Hugging Face",
+        "store_not_writable": "{{host}}：代理无法写入其模型存储",
         "old_agent": "{{host}}：代理版本过旧，请升级到 0.2.2 或更高版本",
         "offline": "{{host}}：离线",
         "no_answer": "{{host}}：未响应"

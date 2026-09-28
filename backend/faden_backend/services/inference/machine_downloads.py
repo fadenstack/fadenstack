@@ -61,7 +61,7 @@ class MachineCheck:
     detail: str | None
     checked_at: datetime
     #: Why not, for the console to say in its language: ``no_internet``,
-    #: ``old_agent``, ``offline``, ``no_answer``; None when it can.
+    #: ``store_not_writable``, ``old_agent``, ``offline``, ``no_answer``; None when it can.
     problem: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -141,6 +141,9 @@ async def _ask(gateway: Any, node: InfraNode) -> MachineCheck:
     result = done.result_json or {}
     if done.status != "succeeded":
         return _answer(node, None, done.error_message or "The machine could not check.")
+    if result.get("store_problem"):
+        # It reaches the Hub, but could not write the model where it keeps models.
+        return _answer(node, False, str(result["store_problem"]), "store_not_writable")
     if result.get("reachable"):
         latency = result.get("latency_ms")
         return _answer(node, True, f"Reached {result.get('url')} in {latency} ms" if latency is not None else None)
@@ -190,7 +193,8 @@ def _blocker(checks: list[MachineCheck]) -> str | None:
         return None
     parts = [
         f"{check.host}: " + (
-            f"cannot reach Hugging Face ({check.detail})" if check.internet is False
+            (check.detail or "its model store is not writable") if check.problem == "store_not_writable"
+            else f"cannot reach Hugging Face ({check.detail})" if check.internet is False
             else (check.detail or "could not be checked")
         )
         for check in lacking

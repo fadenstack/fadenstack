@@ -217,3 +217,39 @@ async def test_a_server_that_says_no_stops_the_download() -> None:
 def test_the_same_files_as_the_server_chooses() -> None:
     names = ["model.safetensors", "pytorch_model.bin", "config.json", "onnx/model.onnx", "checkpoint-500/x.safetensors"]
     assert hf_download.files_to_fetch(names) == ["model.safetensors", "config.json"]
+
+
+# -- a store the agent cannot write to -------------------------------------------
+
+
+def test_a_store_the_agent_cannot_write_is_named_with_the_fix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """gpu-01: a container run as root had left ~/.cache/huggingface/.locks owned by root."""
+    locks = tmp_path / ".locks"
+    locks.mkdir()
+    real_access = hf_download.os.access
+    monkeypatch.setattr(hf_download.os, "access", lambda p, mode: False if Path(p) == locks else real_access(p, mode))
+    monkeypatch.setenv("USER", "sachi")
+
+    problem = hf_download.store_problem(str(tmp_path), REPO)
+
+    assert problem is not None and str(locks) in problem
+    assert "sudo chown -R sachi:" in problem
+    assert hf_download.store_problem(str(tmp_path / "elsewhere")) is None
+
+
+def test_the_download_stops_before_it_starts_on_such_a_store(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fetched: list[dict[str, Any]] = []
+    _fake_hub(monkeypatch, {"model.safetensors": 10}, fetched)
+    monkeypatch.setattr(hf_download, "store_problem", lambda cache_dir, repo=None: f"{cache_dir}/.locks belongs to root")
+    with pytest.raises(PermissionError, match="belongs to root"):
+        hf_download.download_model(hf_repo_id=REPO, revision=None, cache_dir=str(tmp_path), token=None)
+    assert fetched == []
+
+
+@pytest.mark.asyncio()
+async def test_the_check_says_when_the_store_is_not_writable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _patch_client(monkeypatch, lambda request: httpx.Response(200, json=[]))
+    monkeypatch.setattr(hf_download, "store_problem", lambda cache_dir, repo=None: "/store/.locks belongs to root")
+    result = await hf_download.check_internet({}, model_store_root=str(tmp_path))
+    assert result["reachable"] is True
+    assert result["store_problem"] == "/store/.locks belongs to root"

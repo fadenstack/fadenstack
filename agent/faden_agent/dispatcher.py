@@ -290,7 +290,7 @@ class CommandDispatcher:
         if command_type == NodeCommandType.CHECK_INTERNET.value:
             from faden_agent.hf_download import check_internet  # noqa: PLC0415
 
-            return await check_internet(payload)
+            return await check_internet(payload, model_store_root=getattr(self._runtime, "_model_store_root", None))
         if command_type == NodeCommandType.FETCH_CONTAINER_LOGS.value:
             return await self._runtime.fetch_container_logs(payload)
         if command_type == NodeCommandType.SET_MAINTENANCE_MODE.value:

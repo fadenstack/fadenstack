@@ -220,3 +220,18 @@ async def test_the_machines_are_told_to_download_it_themselves(
         assert command["idempotency_key"].startswith(f"artifact:{model.id}:hf:main:")
     started.assert_not_awaited()
     assert readiness.waiting_on is not None and "from Hugging Face themselves" in readiness.waiting_on
+
+
+async def test_a_machine_that_reaches_the_hub_but_cannot_write_its_store_keeps_it_off(dbsession: AsyncSession) -> None:
+    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1})
+    machines = _Machines({"10.250.10.71": REACHES | {
+        "store_problem": "/home/sachi/.cache/huggingface/.locks belongs to root and the agent (running as sachi) "
+                         "cannot write to it. Fix it on the machine with: sudo chown -R sachi: /home/sachi/.cache/huggingface/.locks",
+    }})
+    machines.know(nodes[0])
+
+    status = await machine_downloads.environment_status(dbsession, machines, env.id)
+
+    assert status["can_switch_on"] is False
+    assert status["machines"][0]["problem"] == "store_not_writable"
+    assert "sudo chown" in status["reason"] and "10.250.10.71" in status["reason"]

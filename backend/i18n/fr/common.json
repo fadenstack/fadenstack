@@ -2618,6 +2618,7 @@
       "cannot_switch_on": "Pour l'activer, chaque machine doit atteindre Hugging Face :",
       "problem": {
         "no_internet": "{{host}} : n'atteint pas Hugging Face",
+        "store_not_writable": "{{host}} : l'agent ne peut pas écrire dans son stockage de modèles",
         "old_agent": "{{host}} : agent trop ancien, mettez-le à jour en 0.2.2 ou plus récent",
         "offline": "{{host}} : hors ligne",
         "no_answer": "{{host}} : n'a pas répondu"
