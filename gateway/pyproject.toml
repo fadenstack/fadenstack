@@ -45,6 +45,12 @@ dependencies = [
   "taskiq-redis>=1.0.2",
   "taskiq-aio-pika>=0.4.1",
   "aiofiles>=24.1.0",
+  # Local text extraction for chat attachments when Docling is absent or fails
+  # (services/gateway/extraction.py); the same libraries as the backend's fallback.
+  "pdfplumber>=0.11.0,<1",
+  "python-docx>=1.1.0,<2",
+  "python-pptx>=1.0.0,<2",
+  "openpyxl>=3.1.0,<4",
   "python-multipart>=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   "litellm>=1.84.0,<2",  # >=1.84.0: fixes CVE-2026-35030 / CVE-2026-42208 / CVE-2026-49468 (proxy-side); 1.82.7 & 1.82.8 were malware releases
   # Transitive floors — no direct cap exists in pyproject; uv lock is conservative

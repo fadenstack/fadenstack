@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -9,13 +10,14 @@ from typing import Any
 
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import AttachmentScope, ExtractionStatus
+from faden_gateway.services.gateway import extraction
 from faden_gateway.services.gateway.docling_client import ChatDoclingClient
 from faden_gateway.services.gateway.file_store import FileStore
 from faden_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Extensions that can be read as plain UTF-8 text without Docling.
+# Extensions that can be read as plain UTF-8 text, without any extractor.
 _PLAINTEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".html"}
 
 # Extensions treated as images (no text extraction).
@@ -108,6 +110,9 @@ class ChatAttachmentService:
                 status_code=413,
             )
 
+        # Refuse what nothing here can read before storing anything.
+        self._check_readable(ext)
+
         # Store file
         scope_id = str(session_id or project_id or "unscoped")
         file_id = uuid.uuid4().hex
@@ -128,13 +133,11 @@ class ChatAttachmentService:
                 extraction_status = ExtractionStatus.COMPLETED
             except UnicodeDecodeError:
                 extraction_status = ExtractionStatus.FAILED
-        elif self.docling is not None:
-            try:
-                result = await self.docling.convert(
-                    file_bytes,
-                    filename,
-                    max_pages=settings.chat_attachment_max_pages,
-                )
+        else:
+            result = await self._extract(file_bytes, filename, ext)
+            if result is None:
+                extraction_status = ExtractionStatus.FAILED
+            else:
                 extracted_text = result.get("content", "")
                 metadata = result.get("metadata", {})
                 page_count = metadata.get("page_count")
@@ -146,18 +149,6 @@ class ChatAttachmentService:
                         "search, upload to a Knowledge Base.]"
                     )
                 extraction_status = ExtractionStatus.COMPLETED
-            except Exception:
-                logger.warning(
-                    "Docling extraction failed for %s", filename, exc_info=True,
-                )
-                extraction_status = ExtractionStatus.FAILED
-        else:
-            raise AttachmentError(
-                f"Cannot extract text from '{ext}' files. "
-                "The document conversion service (Docling) is not configured. "
-                "Please upload a plaintext file (.txt, .md, .csv, .json, .html) "
-                "or enable the Docling service.",
-            )
 
         attachment = await self.dao.create_attachment(
             tenant_id=tenant_id,
@@ -183,6 +174,65 @@ class ChatAttachmentService:
             "extracted_text_length": text_len,
             "token_estimate": token_est,
         }
+
+    def _check_readable(self, ext: str) -> None:
+        """Refuse a file type that neither Docling nor the local extractor reads."""
+        readable = (
+            ext in _IMAGE_EXTENSIONS
+            or ext in _PLAINTEXT_EXTENSIONS
+            or ext in extraction.SUPPORTED_EXTENSIONS
+            or self.docling is not None
+        )
+        if not readable:
+            raise AttachmentError(
+                f"Cannot extract text from '{ext}' files. "
+                "The document conversion service (Docling) is not configured.",
+            )
+
+    async def _extract(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        ext: str,
+    ) -> dict[str, Any] | None:
+        """The text of a document, from Docling or else the local extractor.
+
+        Docling when it is configured and answers; the local extractor when
+        Docling is not configured, fails or cannot be reached. ``None`` when
+        neither produced any text -- a scanned PDF without Docling's OCR, a
+        broken file -- so the attachment is marked failed instead of being
+        stored as an empty document.
+        """
+        max_pages = settings.chat_attachment_max_pages
+        if self.docling is not None:
+            try:
+                return await self.docling.convert(
+                    file_bytes,
+                    filename,
+                    max_pages=max_pages,
+                )
+            except Exception:
+                logger.warning(
+                    "Docling extraction failed for %s; trying the local extractor",
+                    filename,
+                    exc_info=True,
+                )
+        if ext not in extraction.SUPPORTED_EXTENSIONS:
+            return None
+        try:
+            local = await asyncio.to_thread(
+                extraction.extract_text,
+                file_bytes,
+                filename,
+                max_pages=max_pages,
+            )
+        except Exception:
+            logger.warning("Local extraction failed for %s", filename, exc_info=True)
+            return None
+        if not local.content.strip():
+            logger.info("The local extractor found no text in %s", filename)
+            return None
+        return local.to_dict()
 
     # ------------------------------------------------------------------
     # Read / List / Delete
