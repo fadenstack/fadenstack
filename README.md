@@ -41,6 +41,10 @@ This repository is the Fadenstack server and everything that installs and runs i
 
 Fadenstack was called LLM.Port up to release 0.3.
 
+<p align="center">
+  <img src="docs/images/readme/dashboard.png" width="100%" alt="The admin dashboard: all requests served in-house on the dgx-pair cluster, nothing needing attention, and the key metrics for today.">
+</p>
+
 ## What it does
 
 ### For everyone: a chat on your own models
@@ -50,6 +54,10 @@ Fadenstack was called LLM.Port up to release 0.3.
 - **Knowledge**: the model searches your documents itself and names the source.
 - **Tools** from the MCP servers your administrators connect.
 - Works on phones, in English, Deutsch, Español and 中文.
+
+<p align="center">
+  <img src="docs/images/readme/chat.png" width="100%" alt="The chat with its sidebar folded away: a Python question answered by qwen-chat, the model served on your own cluster.">
+</p>
 
 ### For developers: one endpoint for apps and agents
 
