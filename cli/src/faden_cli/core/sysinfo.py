@@ -60,23 +60,26 @@ CONNECTION_HEADROOM = 100
 MIN_MAX_CONNECTIONS = 250
 
 # ── Memory: what each part takes (docker stats, release VM, 2026-09-28) ──
-# Sized by CPU alone, a 7 GB server got two of everything: at rest it used
-# 4.6 GB, a model download took the task worker to 2.3 GB, swap filled, the
-# kernel killed the worker and the web backend's supervisor replaced a child
-# that had stopped answering. So the workers are cut to what the memory holds.
+# Sized by CPU alone, a 7 GB server got two of everything: a model download
+# took the task worker to 2.3 GB, swap filled, the kernel killed the worker,
+# the web backend's supervisor replaced a child that had stopped answering,
+# and at last the VM stopped answering at all. So the workers are cut to
+# what the memory holds. Measured after start-up with every module on; PII
+# loads its language models in each web worker and in its task worker.
 #: The operating system and Docker, and some page cache to breathe: 1 GB plus 5 %.
 OS_RESERVE_MB = 1024
 OS_RESERVE_PCT = 0.05
-#: The services that run once whatever the sizing: Postgres ~290, the gateway's
-#: task worker ~360, the web app, Loki, Alloy, MinIO, Grafana, the console,
-#: ClickHouse, RabbitMQ (capped at 512), nginx, Prometheus, Redis.
-FIXED_MB = 1500
+#: The services that run once whatever the sizing: the gateway's task worker
+#: ~440, ClickHouse ~290, Postgres ~250, Alloy ~210, the web app ~190,
+#: Grafana ~180, the console ~150, Loki, RabbitMQ (capped at 512), MinIO,
+#: Prometheus, Redis, nginx.
+FIXED_MB = 2100
 #: One worker process of each service ``faden tune`` sizes.
-PER_WORKER_MB = {"backend": 160, "gateway": 200, "pii": 320}
-#: The optional modules' own processes (PII's includes its task worker).
-MODULE_MB = {"mcp": 80, "skills": 60, "pii": 80}
+PER_WORKER_MB = {"backend": 200, "gateway": 290, "pii": 780}
+#: The optional modules' own processes (PII's task worker holds its models too).
+MODULE_MB = {"mcp": 110, "skills": 90, "pii": 1550}
 #: One process of the backend's task worker (taskiq), before any download.
-TASK_WORKER_MB = 250
+TASK_WORKER_MB = 160
 #: A model download holds up to one xet range (64 MB) per range it fetches at once.
 XET_RANGE_MB = 64
 #: Ranges fetched at once: fewer on a small server, never so few a download crawls.

@@ -181,10 +181,11 @@ with the prefixes `FADEN_GATEWAY_`, `FADEN_BACKEND_`, `FADEN_MCP_` and
 `FADEN_SKILLS_`; the backend worker takes the backend's.
 
 `faden tune` also sizes by memory. It estimates what each part takes, from
-measurements on a production install: about 1.5 GB for the services that run
-once, per worker process 160 MB for the backend, 200 MB for the gateway and
-320 MB for PII, 250 MB per process of the backend's task worker, and the
-optional modules' own processes. The operating system keeps 1 GB plus 5 % of
+measurements on a production install: about 2.1 GB for the services that run
+once, per worker process 200 MB for the backend, 290 MB for the gateway and
+780 MB for PII, 160 MB per process of the backend's task worker, and the
+optional modules' own processes: PII's task worker holds its language
+models too, 1.5 GB. The operating system keeps 1 GB plus 5 % of
 the memory. When the workers the CPU allows do not fit, `tune` uses fewer:
 
 - It first reduces the workers of every service, down to one each.
