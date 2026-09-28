@@ -25,7 +25,7 @@
   <img alt="Licence: AGPL-3.0 for the server and agent, Apache-2.0 for the CLI" src="https://img.shields.io/badge/licence-AGPL--3.0%20%C2%B7%20Apache--2.0-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="API: OpenAI-compatible" src="https://img.shields.io/badge/API-OpenAI--compatible-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="Runs on your hardware" src="https://img.shields.io/badge/runs%20on-your%20hardware-486A91?style=flat-square&labelColor=0A0E1A">
-  <img alt="Console in English, German, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="Console in English, German, Français, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
 </p>
 
 ---
@@ -53,7 +53,7 @@ Fadenstack was called LLM.Port up to release 0.3.
 - **Skills**: your team's checklists and formats as shared, versioned instructions. Pick one with `$`, or turn a chat into one with `/skill`.
 - **Knowledge**: the model searches your documents itself and names the source.
 - **Tools** from the MCP servers your administrators connect.
-- Works on phones, in English, Deutsch, Español and 中文.
+- Works on phones, in English, Français, Deutsch, Español and 中文.
 
 <p align="center">
   <img src="docs/images/readme/chat.png" width="100%" alt="The chat with its sidebar folded away: a Python question answered by qwen-chat, the model served on your own cluster.">
