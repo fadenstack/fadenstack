@@ -538,6 +538,9 @@ services:
       - worker
       - faden_backend.tkq:broker
       - --fs-discover
+      # Processes: two, or one on a server short of memory (set via faden tune).
+      - --workers
+      - ${FADEN_BACKEND_TASK_WORKERS:-2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -586,6 +589,9 @@ services:
       FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
       FADEN_BACKEND_MODEL_STORE_ROOT: /srv/faden/models
       FADEN_BACKEND_HOST_HF_CACHE_DIR: ${FADEN_BACKEND_HOST_HF_CACHE_DIR:-}
+      # Ranges a model download fetches at once, up to 64 MB each in memory
+      # (set via faden tune: fewer on a server short of memory).
+      HF_XET_NUM_CONCURRENT_RANGE_GETS: ${FADEN_BACKEND_DOWNLOAD_RANGES:-16}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - faden_models:/srv/faden/models
