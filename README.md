@@ -1,65 +1,175 @@
-# Fadenstack
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/banner-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/readme/banner-light.png">
+    <img src="docs/images/readme/banner-dark.png" width="100%" alt="fadenstack: one AI system for your whole organization. Three stacked layers: chat, agents and apps on top, Fadenstack in the middle, your GPU machines below, with one thread running through them.">
+  </picture>
+</p>
 
-> Self-hosted all-in-one LLM platform — gateway, chat console, control plane, and optional modules in a single release.
+<h3 align="center">One AI system for your whole organization.</h3>
 
-This monorepo contains the **core** components of [Fadenstack](https://fadenstack.github.io).
-Fadenstack was called LLM.Port up to release 0.3; see [Moving from LLM.Port](#moving-from-llmport).
+<p align="center">
+  Chat for everyone, an OpenAI-compatible API for your apps and agents,<br>
+  and the models on your own GPUs. Your IT department runs it all as one system.
+</p>
 
-## Components
+<p align="center">
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="docs/installing.md">Install guide</a> ·
+  <a href="#documentation">Documentation</a> ·
+  <a href="#moving-from-llmport">Moving from LLM.Port</a> ·
+  <a href="https://github.com/fadenstack">All repositories</a>
+</p>
 
-| Directory        | Description                              | Runtime                    |
-| ---------------- | ---------------------------------------- | -------------------------- |
-| `backend`        | Control plane API (FastAPI)              | Docker                     |
-| `frontend`       | React admin console                      | Docker                     |
-| `gateway`        | OpenAI-compatible gateway                | Docker                     |
-| `pii`            | PII detection & redaction (Presidio)     | Docker (profile: `pii`)    |
-| `mcp`            | MCP tool registry                        | Docker (profile: `mcp`)    |
-| `skills`         | Skills registry                          | Docker (profile: `skills`) |
-| `shared`         | Compose files, nginx, base image, initdb | Docker                     |
-| `cli`            | CLI installer & management tool (`faden`) | PyPI / pipx               |
-| `agent`          | Machine agent (`faden-agent`)            | Standalone binary          |
-| `runtime-image`  | The certified Ray + vLLM runtime image   | Docker                     |
+<p align="center">
+  <img alt="Licence: AGPL-3.0 for the server and agent, Apache-2.0 for the CLI" src="https://img.shields.io/badge/licence-AGPL--3.0%20%C2%B7%20Apache--2.0-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="API: OpenAI-compatible" src="https://img.shields.io/badge/API-OpenAI--compatible-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="Runs on your hardware" src="https://img.shields.io/badge/runs%20on-your%20hardware-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="Console in English, German, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
+</p>
 
-## Quick Start
+---
 
-On a Linux (x86_64) server with Docker:
+This repository is the Fadenstack server and everything that installs and runs it:
+
+- the **gateway**, an OpenAI-compatible `/v1` with limits, routing, PII redaction, skills, tools and an audit log;
+- the **console and chat**, one web app for administrators and for everyone else;
+- the **backend**, the control plane for users, models, machines, clusters, containers and policies;
+- the **PII, MCP and skills services**;
+- the **machine agent**, `faden-agent`, which makes a Linux GPU machine a member of a cluster;
+- the **CLI**, `faden`, which installs, upgrades and backs up the server.
+
+Fadenstack was called LLM.Port up to release 0.3.
+
+## What it does
+
+### For everyone: a chat on your own models
+
+- A chat with projects, sessions and file attachments, on the models you run or allow. Reasoning models show their thinking.
+- **Skills**: your team's checklists and formats as shared, versioned instructions. Pick one with `$`, or turn a chat into one with `/skill`.
+- **Knowledge**: the model searches your documents itself and names the source.
+- **Tools** from the MCP servers your administrators connect.
+- Works on phones, in English, Deutsch, Español and 中文.
+
+### For developers: one endpoint for apps and agents
+
+- An OpenAI-compatible `/v1` for chat completions (streamed or whole), embeddings and the model list. Any OpenAI SDK works: change the base URL and the key.
+- Every request goes through the same steps as the chat: limits, routing, skills, PII, tools and the audit log. See [what the gateway does with a request](docs/gateway-pipeline.md).
+- **Tools on the server and on the user's side.** MCP servers are registered once on the server. Agents can also connect over a WebSocket and offer local tools, such as the open document or files on the user's machine. Each session's policy decides where its tools run: on the server, locally or both.
+- SDKs for Python (`faden`) and .NET (`Faden.Client`) add sessions, memory, tools and attachments to the OpenAI SDKs. They live in their own repositories.
+
+### For IT: one console for all of it
+
+- **GPU machines.** Add a Linux machine with an NVIDIA GPU, x86_64 or aarch64 (DGX Spark included), with one install line and an approval code. The agent dials out to the server, so it needs no inbound port, and nobody hands over SSH keys. Model traffic reaches a cluster through one port that only accepts the gateway's client certificate.
+- **Clusters and models.** Machines form Ray clusters that serve models with vLLM. The model marketplace searches Hugging Face, says whether a model fits your cluster and fills in vLLM's settings.
+- **What you already run.** Fadenstack finds the vLLM containers already on your machines and routes to them without restarting them. A server rebuilt from a backup takes over the clusters its machines still run.
+- **When something fails.** A cluster re-forms when a machine drops out, and the console says what happened.
+- **Personal data.** Presidio-based detection on messages, history and tool results, redacted or tokenised before a model sees them.
+- **Security.** HTTPS by default, with nginx as the only public port. Model traffic between the gateway and the machines uses mutual TLS, and Ray runs over TLS between machines. The data stores listen on localhost only.
+- **Oversight.** A dashboard with where each request was served (your machines, your private network, or an outside provider), usage per user and group, cost per request from model prices, traces, and logs from the server and the machines in one place. Prometheus, Grafana and Loki come with it.
+- **Operations.** Containers, modules, backups, restores and upgrades, from the console or with `faden`.
+
+## How it fits together
+
+```mermaid
+flowchart TB
+  subgraph clients ["People and apps"]
+    br["Browser<br/>console and chat"]
+    api["Apps and agents<br/>OpenAI or Fadenstack SDKs"]
+  end
+  subgraph server ["Fadenstack server · one Linux host"]
+    ng["nginx<br/>HTTPS, the only public port"]
+    fe["frontend<br/>console and chat"]
+    gw["gateway<br/>/v1"]
+    be["backend<br/>control plane"]
+    mods["PII · MCP · skills"]
+    data[("Postgres · Redis<br/>RabbitMQ · MinIO")]
+    obs["Prometheus · Loki<br/>Grafana · Langfuse"]
+  end
+  subgraph machines ["Your GPU machines"]
+    ag["faden-agent<br/>dials out, no inbound port"]
+    mtls["model-TLS proxy<br/>client certificate required"]
+    ray["Ray cluster<br/>vLLM"]
+  end
+  prov["Outside providers<br/>only where policy allows"]
+  br --> ng
+  api --> ng
+  ng --> fe
+  ng --> gw
+  ng --> be
+  gw --> mods
+  gw --> data
+  be --> data
+  be -.-> obs
+  be ---|"signed commands over WSS<br/>the agent dials out"| ag
+  gw -->|"mutual TLS"| mtls
+  mtls --> ray
+  ag --> ray
+  gw -.-> prov
+  style gw stroke:#FF4D6D,stroke-width:3px
+```
+
+Every connection, and whether it is encrypted, is in [Connections and TLS](docs/connections-and-tls.md).
+
+## Quick start
+
+**The server** is one Linux machine (x86_64) with Docker Engine 24 or later and Compose v2, Python 3.12 or later, and ports 80 and 443 free. It needs no GPU: at least 4 cores, 6 GB of memory and 60 GB of disk ([system requirements](docs/system-requirements.md)).
 
 ```bash
 pipx install fadenstack        # or: uv tool install fadenstack
 faden deploy
 ```
 
-Then open `http://<server>`, sign in, and add the machines with GPUs from
-**Machines → Add a machine**. See [Installing Fadenstack](docs/installing.md),
-and [Upgrading Fadenstack](docs/upgrading.md) for upgrades.
+`faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator. Then open `https://<server>` and sign in.
+
+**The GPU machines** run Linux (x86_64 or aarch64) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is [Adding a machine and serving a model on it](docs/onboarding-a-node.md).
+
+**Your apps** use any OpenAI client:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="https://<server>/v1", api_key="<your key>")
+reply = client.chat.completions.create(
+    model="qwen-chat",
+    messages=[{"role": "user", "content": "Hello from Fadenstack"}],
+)
+print(reply.choices[0].message.content)
+```
 
 ## Documentation
 
 | | |
 | --- | --- |
-| Setting up | [Installing](docs/installing.md) · [Upgrading](docs/upgrading.md) · [System requirements](docs/system-requirements.md) |
+| Setting up | [Installing](docs/installing.md) · [Upgrading](docs/upgrading.md) · [System requirements](docs/system-requirements.md) · [HTTPS and trust](docs/https-and-trust.md) |
 | Using it | [The chat](docs/chat.md) · [Skills](docs/skills.md) · [The admin dashboard](docs/dashboard.md) |
 | GPU machines and models | [Adding a machine](docs/onboarding-a-node.md) · [Hosting a model from the marketplace](docs/model-marketplace.md) · [vLLM you already run](docs/found-vllm.md) · [Taking over clusters](docs/taking-over-clusters.md) · [When something fails](docs/resilience.md) · [FAQ](docs/faq.md) |
-| The server | [Containers](docs/containers.md) · [MCP servers](docs/mcp-servers.md) · [HTTPS and trust](docs/https-and-trust.md) |
-| How it works | [The gateway's chat pipeline](docs/gateway-pipeline.md) · [RAG Lite search](docs/rag-lite-search.md) |
+| The server | [Containers](docs/containers.md) · [MCP servers](docs/mcp-servers.md) |
+| How it works | [The gateway's chat pipeline](docs/gateway-pipeline.md) · [RAG Lite search](docs/rag-lite-search.md) · [Connections and TLS](docs/connections-and-tls.md) |
 | Maintainers | [Releasing](docs/releasing.md) · [Onboarding friction](docs/onboarding-friction.md) |
 
-## Docker Images
+## Repository layout
 
-The images are published to the GitHub Container Registry:
+| Directory | What it is | Runs as | Licence |
+| --- | --- | --- | --- |
+| `gateway` | OpenAI-compatible gateway (`/v1`) | Docker | AGPL-3.0 |
+| `backend` | Control plane API (`/api`) and its worker | Docker | AGPL-3.0 |
+| `frontend` | Console and chat (React) | Docker | AGPL-3.0 |
+| `pii` | PII detection and redaction (Presidio) | Docker, module `pii` | AGPL-3.0 |
+| `mcp` | MCP server registry and tool runner | Docker, module `mcp` | AGPL-3.0 |
+| `skills` | Skills registry | Docker, module `skills` | AGPL-3.0 |
+| `shared` | Compose files, nginx, base image, database setup | Docker | AGPL-3.0 |
+| `agent` | Machine agent (`faden-agent`) | Standalone binary | AGPL-3.0 |
+| `runtime-image` | The Ray and vLLM image the machines run models in | Docker | AGPL-3.0 |
+| `cli` | Installer and management tool (`faden`) | PyPI (`fadenstack`) | Apache-2.0 |
+| `docs` | The guides linked above | | |
+| `dev` | Scripts for working on Fadenstack | | |
 
-- `ghcr.io/fadenstack/backend`
-- `ghcr.io/fadenstack/gateway`
-- `ghcr.io/fadenstack/frontend`
-- `ghcr.io/fadenstack/pii`
-- `ghcr.io/fadenstack/mcp`
-- `ghcr.io/fadenstack/skills`
+A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.4.0`, `0.4`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
 
-A release `v0.4.0` publishes them as `0.4.0`, `0.4` and `latest`. The CLI of a
-release runs the images of its own version, so `fadenstack 0.4.0` deploys
-`0.4.0`.
+## Building and developing
 
-## Building from source
+Run a server built from this checkout:
 
 ```bash
 git clone https://github.com/fadenstack/fadenstack.git
@@ -68,46 +178,28 @@ pipx install ./cli
 faden deploy --build
 ```
 
-## Releasing
+For working on Fadenstack itself, `faden dev init` and `faden dev up` run the services from source against a local stack, and `faden dev doctor` checks the tools they need. How a release is made is in [Releasing](docs/releasing.md).
 
-1. Set the version in `cli/pyproject.toml` and
-   `cli/src/faden_cli/__init__.py`.
-2. Tag and push `v<version>`. That builds the images of that version, then
-   publishes the CLI to PyPI once they exist.
-3. For a new machine agent: set its version in `agent/faden_agent/__init__.py`,
-   `agent/pyproject.toml` and `AGENT_VERSION` in the backend, then tag and push
-   `node-agent-v<version>`. That publishes the Linux x86_64 and aarch64 binaries
-   the install line fetches.
+The agent is published as standalone binaries for Linux x86_64 and aarch64 (no Python needed on the machine); see [agent/README.md](agent/README.md).
 
-## Machine agent
+## Contributing
 
-The agent is distributed as standalone binaries (no Python required).
-Machines get it through the install line on the console's **Machines → Add a
-machine** page. See [agent/README.md](agent/README.md)
-and the [Releases](https://github.com/fadenstack/fadenstack/releases) page.
+Issues and ideas are welcome. Before we can accept pull requests, we are setting up a contributor licence agreement, so please open an issue first and describe what you would like to change.
 
 ## Moving from LLM.Port
 
-Release 0.4.0 renamed everything an install carries: the compose project and
-its volumes, the containers, the databases, the environment variables
-(`LLM_PORT_*` became `FADEN_*`, the gateway's `LLM_PORT_API_*` became
-`FADEN_GATEWAY_*`), the CLI (`llmport` became `faden`) and the agent
-(`llmport-agent` became `faden-agent`). An install of LLM.Port 0.3 moves
-across with the migration tool, which keeps every row, file and setting:
-[llm-port/migrate-to-fadenstack](https://github.com/llm-port/migrate-to-fadenstack).
+Release 0.4.0 renamed everything an install carries: the compose project and its volumes, the containers, the databases, the environment variables (`LLM_PORT_*` became `FADEN_*`, the gateway's `LLM_PORT_API_*` became `FADEN_GATEWAY_*`), the CLI (`llmport` became `faden`) and the agent (`llmport-agent` became `faden-agent`). An install of LLM.Port 0.3 moves across with the migration tool, which keeps every row, file and setting: [llm-port/migrate-to-fadenstack](https://github.com/llm-port/migrate-to-fadenstack).
 
 ## Licence
 
-What runs as part of Fadenstack is licensed under the
-[GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`): the
-backend, the gateway, the console, the PII, MCP and skills services, the
-compose files, the machine agent and the runtime image. The licence carries an
-additional permission for combining Fadenstack with NVIDIA's CUDA libraries;
-see [NOTICE](NOTICE).
+What runs as part of Fadenstack is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`): the backend, the gateway, the console, the PII, MCP and skills services, the compose files, the machine agent and the runtime image. The licence carries an additional permission for combining Fadenstack with NVIDIA's CUDA libraries; see [NOTICE](NOTICE).
 
-What you build on or wrap in your own tooling is licensed under the
-[Apache License 2.0](cli/LICENSE): the CLI (`cli/`), the SDKs and the MCP
-servers.
+What you build on or wrap in your own tooling is licensed under the [Apache License 2.0](cli/LICENSE): the CLI (`cli/`), the SDKs and the MCP servers.
 
-Releases up to and including 0.3 were published as LLM.Port under the Apache
-License 2.0, and remain available under it.
+Your own apps, agents and tools that use Fadenstack through its API or the SDKs are not affected by the AGPL. If your organization can't use AGPL software, a commercial licence is available from [Emagin8](https://emagin8.de/contact?subject=Fadenstack).
+
+Releases up to and including 0.3 were published as LLM.Port under the Apache License 2.0, and remain available under it.
+
+---
+
+<p align="center"><sub>Built in Germany by <a href="https://emagin8.de">Emagin8</a> · English · Deutsch · Español · 中文</sub></p>
