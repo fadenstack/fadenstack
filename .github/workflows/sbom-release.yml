@@ -113,9 +113,9 @@ jobs:
                   "$SYFT" "dir:unpacked/$name" -o "spdx-json=sbom/$name.spdx.json"
                   ;;
                 *.tar.gz)
-                  mkdir -p "unpacked/$name"
-                  tar -xzf "$asset" -C "unpacked/$name"
-                  "$SYFT" "dir:unpacked/$name" -o "spdx-json=sbom/$name.spdx.json"
+                  # Source archives have no installed package metadata. Record
+                  # the exact artifact and its digest; the wheel is unpacked.
+                  "$SYFT" "file:$asset" -o "spdx-json=sbom/$name.spdx.json"
                   ;;
                 *)
                   # An opaque single-file executable is inventoried as an
@@ -146,8 +146,8 @@ jobs:
               document = json.loads(Path(name).read_text(encoding='utf-8'))
               if document.get('spdxVersion') != 'SPDX-2.3':
                   raise SystemExit(f'{name}: expected SPDX-2.3')
-              if not document.get('name') or 'packages' not in document:
-                  raise SystemExit(f'{name}: missing document name or packages')
+              if not document.get('name') or not document.get('packages'):
+                  raise SystemExit(f'{name}: missing document name or package inventory')
               print(f'{name}: {len(document["packages"])} packages')
           PY
 

@@ -20,11 +20,13 @@ images with Syft. The resulting SPDX 2.3 JSON files are attached to the
 matching GitHub release and retained as workflow artifacts. Core images also
 carry BuildKit SBOM attestations. A manual run of `Release SBOMs` can regenerate
 the documents for an existing release tag. Review the actual release assets
-and SBOMs before calling the release complete. Archive scans unpack the CLI
-wheel and source archive. The single-file agent executables are opaque to Syft,
-so the workflow also publishes a separate inventory of the agent lockfile;
-that inventory includes build inputs and is not a claim that every locked
-package is embedded in each executable.
+and SBOMs before calling the release complete. The CLI wheel is unpacked so
+Syft can read its installed package metadata. Source archives and standalone
+executables are recorded as exact artifacts with digests; Syft cannot inspect
+the dependencies embedded in those single-file executables. The agent workflow
+also publishes a separate inventory of its lockfile. That inventory includes
+build inputs and is not a claim that every locked package is embedded in each
+executable.
 
 | Script | Tag | Workflow | Produces |
 |---|---|---|---|
