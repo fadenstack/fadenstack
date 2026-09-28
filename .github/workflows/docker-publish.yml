@@ -81,10 +81,10 @@ jobs:
         id: manual
         run: |
           SERVICES="${{ github.event.inputs.services }}"
-          # Build all on tag push, workflow_dispatch with 'all', or no services specified
+          # Build all on release tags or a manual run with all services selected.
           if [[ "$GITHUB_REF" == refs/tags/core-v* || "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "build_all=true" >> "$GITHUB_OUTPUT"
-          elif [[ "$SERVICES" == "all" || -z "$SERVICES" ]]; then
+          elif [[ "${{ github.event_name }}" == workflow_dispatch && ( "$SERVICES" == "all" || -z "$SERVICES" ) ]]; then
             echo "build_all=true" >> "$GITHUB_OUTPUT"
           else
             echo "build_all=false" >> "$GITHUB_OUTPUT"
