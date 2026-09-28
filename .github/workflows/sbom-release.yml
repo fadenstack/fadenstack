@@ -78,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p downloads
-          gh release download "$TAG" --dir downloads
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloads
 
       - name: Scan published images and files
         shell: bash
@@ -162,4 +162,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$TAG" sbom/*.spdx.json --clobber
+        run: gh release upload "$TAG" sbom/*.spdx.json --repo "$GITHUB_REPOSITORY" --clobber
