@@ -11,6 +11,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from faden_backend.db.dependencies import commit_before_responding
 from faden_backend.log import configure_logging
+from faden_backend.services.extensions import load_plugin
 from faden_backend.settings import settings
 from faden_backend.web.api.router import api_router
 from faden_backend.web.lifespan import lifespan_setup
@@ -67,6 +68,8 @@ def get_app() -> FastAPI:
     # endpoints with enterprise implementations.
     if backend_plugin is not None:
         app.include_router(router=backend_plugin.router())
+    # Its extensions to core (agent access rules, token lifetimes, ...), once.
+    load_plugin(backend_plugin)
 
     # Main router for the API.
     app.include_router(router=api_router, prefix="/api")

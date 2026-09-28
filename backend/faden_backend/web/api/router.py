@@ -2,6 +2,8 @@ from fastapi.routing import APIRouter
 
 from faden_backend.web.api import docs, i18n, logs, monitoring, users
 from faden_backend.web.api.admin import admin_router
+from faden_backend.web.api.agents.views import router as agents_router
+from faden_backend.web.api.agents.views import tokens_router as agent_tokens_router
 from faden_backend.web.api.bootstrap.views import router as bootstrap_router
 from faden_backend.web.api.chat.views import router as chat_router
 from faden_backend.web.api.inference import inference_router
@@ -21,6 +23,8 @@ api_router.include_router(chat_router, tags=["chat"])
 # Skills for everyone: what each user may do is RBAC plus the skill's owner
 # and grants (the admin pages use it too; there is no separate admin API).
 api_router.include_router(skills_router, tags=["skills"])
+api_router.include_router(agents_router)
+api_router.include_router(agent_tokens_router)
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(i18n.router, prefix="/i18n", tags=["i18n"])
 api_router.include_router(node_files_router)

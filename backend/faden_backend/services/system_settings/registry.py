@@ -491,6 +491,45 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),
+    SettingDefinition(
+        key="agents.access_token_ttl_s",
+        type="int",
+        category="auth",
+        group="agents",
+        label="Agent access token lifetime (s)",
+        description=(
+            "How long an agent access token is valid. The SDK refreshes it; removing a user's "
+            "access takes effect within this time."
+        ),
+        is_secret=False,
+        default=600,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="agents.refresh_token_ttl_s",
+        type="int",
+        category="auth",
+        group="agents",
+        label="Agent sign-in lifetime (s)",
+        description="How long an agent sign-in on a device lasts before the user signs in again.",
+        is_secret=False,
+        default=2592000,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="agents.refresh_idle_s",
+        type="int",
+        category="auth",
+        group="agents",
+        label="Agent sign-in idle timeout (s)",
+        description="An agent sign-in not used for this long ends.",
+        is_secret=False,
+        default=604800,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
 ]
 
 

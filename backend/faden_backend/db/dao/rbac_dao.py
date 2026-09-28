@@ -66,6 +66,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "chat.tool_policy": ["read", "update"],
         "pii.session": ["read", "strengthen", "weaken"],
         "skills": ["read", "create", "share", "publish", "manage"],
+        "agents": ["read", "create", "manage"],
     },
     "operator": {
         "llm.providers": ["read"],
@@ -106,6 +107,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "modules": ["read"],
         "pii.session": ["read", "strengthen"],
         "skills": ["read", "create", "share"],
+        "agents": ["read"],
     },
     "viewer": {
         "llm.providers": ["read"],

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Annotated
 
@@ -10,9 +11,11 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
 from faden_backend.db.models.users import User, current_active_user
@@ -35,6 +38,7 @@ from faden_backend.web.api.admin.users.schema import (
     UpdateUserRolesRequest,
     UpdateUserUsageGroupRequest,
 )
+from faden_backend.web.api.agents.schema import DeveloperModeDTO, DeveloperModeRequest
 
 router = APIRouter()
 router.include_router(preferences_router)
@@ -303,6 +307,40 @@ async def set_user_usage_group(
     await session.flush()
 
     return await _build_admin_user_dto(target_user, RbacDAO(session))
+
+
+@router.put("/{user_id}/developer-mode", response_model=DeveloperModeDTO, name="set_user_developer_mode")
+async def set_user_developer_mode(
+    user_id: uuid.UUID,
+    payload: DeveloperModeRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    session: AsyncSession = Depends(get_db_session),
+) -> DeveloperModeDTO:
+    """Switch a user's developer mode on or off -- by an admin, never by the user.
+
+    It lets agents attach any local MCP server on that user's machine; it
+    never widens what the server allows. It reaches the user's agent tokens
+    at their next refresh.
+    """
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    target.developer_mode = payload.enabled
+    target.developer_mode_until = payload.until if payload.enabled else None
+    await AuditDAO(session).log(
+        action="user.developer_mode",
+        target_type="user",
+        target_id=str(user_id),
+        result=AuditResult.ALLOW,
+        actor_id=admin.id,
+        metadata_json=json.dumps({"enabled": payload.enabled, "until": payload.until}, default=str),
+    )
+    await session.flush()
+    return DeveloperModeDTO(
+        user_id=target.id,
+        developer_mode=target.developer_mode,
+        developer_mode_until=target.developer_mode_until,
+    )
 
 
 @router.post("/", response_model=AdminUserDTO, status_code=status.HTTP_201_CREATED, name="create_user")

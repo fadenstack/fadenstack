@@ -1,6 +1,7 @@
 # type: ignore
 import logging
 import uuid
+from datetime import datetime
 from urllib.parse import urlencode
 
 from fastapi import Depends, Request
@@ -13,7 +14,7 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from pydantic import ConfigDict
-from sqlalchemy import ForeignKey
+from sqlalchemy import Boolean, DateTime, ForeignKey, false
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -36,6 +37,19 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         ForeignKey("groups.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    # Developer mode: set by an admin, never by the user. Agents let such a
+    # user attach any local MCP server on their own machine; it never widens
+    # what the server allows. Until ``developer_mode_until`` when set.
+    developer_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    developer_mode_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
 

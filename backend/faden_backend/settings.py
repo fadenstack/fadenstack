@@ -278,6 +278,12 @@ class Settings(BaseSettings):
     skills_service_url: str = "http://127.0.0.1:8008"
     skills_service_token: str = "dev-skills-service-token"
 
+    # Agent tokens, tenant-wide (system settings "agents.*"). Enterprise can
+    # set them per agent, under a ceiling.
+    agent_access_token_ttl_s: int = 600
+    agent_refresh_token_ttl_s: int = 30 * 24 * 3600
+    agent_refresh_idle_s: int = 7 * 24 * 3600
+
     # RAG Lite module settings (embedded pgvector-based RAG)
     rag_lite_enabled: bool = False
     rag_lite_file_store_root: str = "/data/faden/rag-lite"
