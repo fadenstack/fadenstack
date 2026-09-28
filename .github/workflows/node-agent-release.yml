@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: write
+  packages: read
 
 env:
   AGENT_DIR: agent
@@ -114,6 +115,9 @@ jobs:
           name: "Node Agent v${{ needs.version.outputs.version }}"
           generate_release_notes: true
           body: |
+            Fadenstack-authored agent code is licensed under Apache-2.0.
+            Bundled dependencies retain their own licenses.
+
             Standalone agent binaries for Linux, no Python needed. Machines normally
             get them through the install line on the Fadenstack **Machines → Add a
             machine** page, which checks the SHA-256 against the server's own copy.
@@ -154,3 +158,12 @@ jobs:
             echo "::error title=PyPI refused faden-agent::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
             exit 1
           fi
+
+  sbom:
+    needs: [version, release]
+    if: startsWith(github.ref, 'refs/tags/node-agent-v')
+    uses: ./.github/workflows/sbom-release.yml
+    with:
+      kind: agent
+      version: ${{ needs.version.outputs.version }}
+      release_tag: ${{ github.ref_name }}

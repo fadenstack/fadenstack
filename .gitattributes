@@ -1,0 +1,4 @@
+# Preserve vendored npm distributions byte for byte, including line endings.
+backend/faden_backend/static/docs/* -text whitespace=-blank-at-eol,-blank-at-eof
+gateway/faden_gateway/static/docs/* -text whitespace=-blank-at-eol,-blank-at-eof
+pii/faden_pii/static/docs/* -text whitespace=-blank-at-eol,-blank-at-eof

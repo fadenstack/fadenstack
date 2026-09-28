@@ -58,6 +58,25 @@ jobs:
       skills: ${{ steps.filter.outputs.skills }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check notices required by vendored API docs
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/core-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in backend gateway pii; do
+            case "$service" in
+              backend) package=faden_backend ;;
+              gateway) package=faden_gateway ;;
+              pii) package=faden_pii ;;
+            esac
+            docs="$service/$package/static/docs"
+            for asset in swagger-ui-bundle.js redoc.standalone.js; do
+              test -s "$docs/$asset.LICENSE.txt" || {
+                echo "::error::Missing license notices for $docs/$asset"
+                exit 1
+              }
+            done
+          done
       - name: Check if building all
         id: manual
         run: |

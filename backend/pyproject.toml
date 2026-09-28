@@ -1,6 +1,6 @@
 [project]
 name = "faden-backend"
-version = "0.4.0"
+version = "0.4.1"
 requires-python = ">=3.12,<4.0"
 description = ""
 authors = [
@@ -10,7 +10,7 @@ maintainers = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },
 ]
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 dependencies = [
   "fastapi >=0.122.0,<1",

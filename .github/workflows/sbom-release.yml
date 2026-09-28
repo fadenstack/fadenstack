@@ -1,0 +1,165 @@
+# Generate SPDX 2.3 JSON SBOMs from published release artifacts, not from
+# source manifests. The calling release workflow invokes this after publishing.
+name: Release SBOMs
+
+on:
+  workflow_call:
+    inputs:
+      kind:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Release family to scan"
+        required: true
+        type: choice
+        options: [cli, agent, runtime]
+      version:
+        description: "Published artifact version"
+        required: true
+        type: string
+      release_tag:
+        description: "Existing GitHub release tag"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release identity
+        shell: bash
+        env:
+          KIND: ${{ inputs.kind }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$KIND" =~ ^(cli|agent|runtime)$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]
+          case "$KIND:$TAG" in
+            cli:v"$VERSION"|cli:cli-v"$VERSION"|agent:node-agent-v"$VERSION"|runtime:runtime-v"$VERSION") ;;
+            *) echo "::error::Tag $TAG does not match $KIND version $VERSION"; exit 1 ;;
+          esac
+
+      - uses: anchore/sbom-action/download-syft@v0
+        id: syft
+
+      - uses: actions/checkout@v4
+        if: inputs.kind == 'agent'
+        with:
+          sparse-checkout: agent
+
+      - name: Log in to GHCR
+        if: inputs.kind == 'cli' || inputs.kind == 'runtime'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Download the release assets
+        if: inputs.kind == 'cli' || inputs.kind == 'agent'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          gh release download "$TAG" --dir downloads
+
+      - name: Scan published images and files
+        shell: bash
+        env:
+          KIND: ${{ inputs.kind }}
+          VERSION: ${{ inputs.version }}
+          SYFT: ${{ steps.syft.outputs.cmd }}
+        run: |
+          set -euo pipefail
+          mkdir -p sbom
+          if [ "$KIND" = cli ]; then
+            for svc in base gateway backend frontend pii mcp skills; do
+              "$SYFT" "registry:ghcr.io/fadenstack/$svc:$VERSION" \
+                -o "spdx-json=sbom/fadenstack-$svc-$VERSION.spdx.json"
+            done
+          elif [ "$KIND" = runtime ]; then
+            for flavor in gb10 x86_64; do
+              "$SYFT" "registry:ghcr.io/fadenstack/ray-runtime-$flavor:$VERSION" \
+                -o "spdx-json=sbom/ray-runtime-$flavor-$VERSION.spdx.json"
+            done
+          fi
+          if [ "$KIND" = cli ] || [ "$KIND" = agent ]; then
+            shopt -s nullglob
+            count=0
+            for asset in downloads/*; do
+              case "$asset" in *.sha256|*.spdx.json) continue ;; esac
+              name=$(basename "$asset")
+              case "$asset" in
+                *.whl|*.zip)
+                  mkdir -p "unpacked/$name"
+                  unzip -q "$asset" -d "unpacked/$name"
+                  "$SYFT" "dir:unpacked/$name" -o "spdx-json=sbom/$name.spdx.json"
+                  ;;
+                *.tar.gz)
+                  mkdir -p "unpacked/$name"
+                  tar -xzf "$asset" -C "unpacked/$name"
+                  "$SYFT" "dir:unpacked/$name" -o "spdx-json=sbom/$name.spdx.json"
+                  ;;
+                *)
+                  # An opaque single-file executable is inventoried as an
+                  # artifact; the agent's lockfile is scanned separately.
+                  "$SYFT" "file:$asset" -o "spdx-json=sbom/$name.spdx.json"
+                  ;;
+              esac
+              count=$((count + 1))
+            done
+            [ "$count" -gt 0 ] || { echo "::error::No release assets to scan"; exit 1; }
+          fi
+          if [ "$KIND" = agent ]; then
+            "$SYFT" dir:agent -o "spdx-json=sbom/agent-lock-$VERSION.spdx.json"
+          fi
+
+      - name: Validate SPDX documents
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob
+          import json
+          from pathlib import Path
+
+          files = glob.glob('sbom/*.spdx.json')
+          if not files:
+              raise SystemExit('No SBOMs generated')
+          for name in files:
+              document = json.loads(Path(name).read_text(encoding='utf-8'))
+              if document.get('spdxVersion') != 'SPDX-2.3':
+                  raise SystemExit(f'{name}: expected SPDX-2.3')
+              if not document.get('name') or 'packages' not in document:
+                  raise SystemExit(f'{name}: missing document name or packages')
+              print(f'{name}: {len(document["packages"])} packages')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ inputs.kind }}-${{ inputs.version }}
+          path: sbom/*.spdx.json
+          retention-days: 90
+
+      - name: Attach SBOMs to the GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$TAG" sbom/*.spdx.json --clobber

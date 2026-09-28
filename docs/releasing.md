@@ -4,6 +4,28 @@ A release is a tag. The scripts in `fadenstack-dev/scripts/` bump what needs
 bumping, tag, and push; GitHub Actions does all the building. Nothing is built
 or uploaded from a developer's machine.
 
+## Licensing and SBOM gate
+
+Fadenstack-authored files in the core repository are Apache-2.0. Each release
+must say so explicitly. Preserve the root and service `LICENSE` and `NOTICE`
+files in source archives, the CLI's bundled `shared/` directory, and images.
+Third-party components keep their own terms; see
+[Third-party components](third-party-components.md). The image workflow checks
+that the license notices referenced by vendored Swagger UI and ReDoc bundles
+are present before a release tag can build images.
+
+The release workflows call `sbom-release.yml` after uploading their artifacts.
+It scans the published CLI assets and core images, agent binaries, and runtime
+images with Syft. The resulting SPDX 2.3 JSON files are attached to the
+matching GitHub release and retained as workflow artifacts. Core images also
+carry BuildKit SBOM attestations. A manual run of `Release SBOMs` can regenerate
+the documents for an existing release tag. Review the actual release assets
+and SBOMs before calling the release complete. Archive scans unpack the CLI
+wheel and source archive. The single-file agent executables are opaque to Syft,
+so the workflow also publishes a separate inventory of the agent lockfile;
+that inventory includes build inputs and is not a claim that every locked
+package is embedded in each executable.
+
 | Script | Tag | Workflow | Produces |
 |---|---|---|---|
 | `release-core.ps1 -Version 0.3.0` | `core-v0.3.0` | `docker-publish.yml` | `ghcr.io/fadenstack/{base,gateway,backend,frontend,pii,mcp,skills}:0.3.0` (and `0.3`, `latest`) |

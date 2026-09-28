@@ -211,6 +211,9 @@ jobs:
           name: "Runtime images ${{ needs.plan.outputs.version }}"
           prerelease: true
           body: |
+            The Fadenstack runtime helper is Apache-2.0. NVIDIA base images,
+            Ray, vLLM, and other dependencies retain their own terms.
+
             The Ray runtime images models run in, for this version:
 
             - `ghcr.io/fadenstack/ray-runtime-gb10:${{ needs.plan.outputs.version }}` (aarch64, NVIDIA DGX Spark / GB10)
@@ -222,3 +225,12 @@ jobs:
             release builds the backend with it; until then the backend keeps its
             current, certified build.
           files: manifests/*.json
+
+  sbom:
+    needs: [plan, release]
+    if: startsWith(github.ref, 'refs/tags/runtime-v')
+    uses: ./.github/workflows/sbom-release.yml
+    with:
+      kind: runtime
+      version: ${{ needs.plan.outputs.version }}
+      release_tag: ${{ github.ref_name }}

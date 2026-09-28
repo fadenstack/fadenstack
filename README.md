@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img alt="Licence: AGPL-3.0 for the server and agent, Apache-2.0 for the CLI" src="https://img.shields.io/badge/licence-AGPL--3.0%20%C2%B7%20Apache--2.0-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="API: OpenAI-compatible" src="https://img.shields.io/badge/API-OpenAI--compatible-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="Runs on your hardware" src="https://img.shields.io/badge/runs%20on-your%20hardware-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="Console in English, German, Français, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
@@ -160,15 +160,15 @@ print(reply.choices[0].message.content)
 
 | Directory | What it is | Runs as | Licence |
 | --- | --- | --- | --- |
-| `gateway` | OpenAI-compatible gateway (`/v1`) | Docker | AGPL-3.0 |
-| `backend` | Control plane API (`/api`) and its worker | Docker | AGPL-3.0 |
-| `frontend` | Console and chat (React) | Docker | AGPL-3.0 |
-| `pii` | PII detection and redaction (Presidio) | Docker, module `pii` | AGPL-3.0 |
-| `mcp` | MCP server registry and tool runner | Docker, module `mcp` | AGPL-3.0 |
-| `skills` | Skills registry | Docker, module `skills` | AGPL-3.0 |
-| `shared` | Compose files, nginx, base image, database setup | Docker | AGPL-3.0 |
-| `agent` | Machine agent (`faden-agent`) | Standalone binary | AGPL-3.0 |
-| `runtime-image` | The Ray and vLLM image the machines run models in | Docker | AGPL-3.0 |
+| `gateway` | OpenAI-compatible gateway (`/v1`) | Docker | Apache-2.0 |
+| `backend` | Control plane API (`/api`) and its worker | Docker | Apache-2.0 |
+| `frontend` | Console and chat (React) | Docker | Apache-2.0 |
+| `pii` | PII detection and redaction (Presidio) | Docker, module `pii` | Apache-2.0 |
+| `mcp` | MCP server registry and tool runner | Docker, module `mcp` | Apache-2.0 |
+| `skills` | Skills registry | Docker, module `skills` | Apache-2.0 |
+| `shared` | Compose files, nginx, base image, database setup | Docker | Apache-2.0 |
+| `agent` | Machine agent (`faden-agent`) | Standalone binary | Apache-2.0 |
+| `runtime-image` | Fadenstack's Ray and vLLM runtime helper and image recipes | Docker | Apache-2.0 for Fadenstack-authored files; third-party components keep their own terms |
 | `cli` | Installer and management tool (`faden`) | PyPI (`fadenstack`) | Apache-2.0 |
 | `docs` | The guides linked above | | |
 | `dev` | Scripts for working on Fadenstack | | |
@@ -200,13 +200,11 @@ Release 0.4.0 renamed everything an install carries: the compose project and its
 
 ## Licence
 
-What runs as part of Fadenstack is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`): the backend, the gateway, the console, the PII, MCP and skills services, the compose files, the machine agent and the runtime image. The licence carries an additional permission for combining Fadenstack with NVIDIA's CUDA libraries; see [NOTICE](NOTICE).
+Fadenstack-authored code and deployment files in this repository are licensed under the [Apache License 2.0](LICENSE), including the server, optional services, machine agent, runtime helper and CLI. The CLI's installed package includes deployment files from `shared/`.
 
-What you build on or wrap in your own tooling is licensed under the [Apache License 2.0](cli/LICENSE): the CLI (`cli/`), the SDKs and the MCP servers.
+Container images also contain third-party software, including NVIDIA's runtime base image, Ray and vLLM. Those components retain their own licence terms. Release SBOMs identify the components present in each published artifact; see [Releasing](docs/releasing.md).
 
-Your own apps, agents and tools that use Fadenstack through its API or the SDKs are not affected by the AGPL. If your organization can't use AGPL software, a commercial licence is available from [Emagin8](https://emagin8.de/contact?subject=Fadenstack).
-
-Releases up to and including 0.3 were published as LLM.Port under the Apache License 2.0, and remain available under it.
+Apache-2.0 grants no general right to use the Fadenstack name or logo for a modified product. See [Brand and Official Releases](backend/OFFICIAL.md) for the current branding guidance.
 
 ---
 

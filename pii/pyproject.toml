@@ -1,9 +1,9 @@
 [project]
 name = "faden_pii"
-version = "0.4.0"
+version = "0.4.1"
 description = ""
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<4"
 authors = [

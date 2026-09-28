@@ -59,6 +59,7 @@ print('metrics stack OK:', opencensus.__name__, aiohttp_cors.__name__, pe.__name
 
 WORKDIR /opt/llm-port/runtime
 COPY setup.py /opt/llm-port/runtime/
+COPY LICENSE NOTICE /opt/llm-port/runtime/
 COPY llm_port_ray_runtime /opt/llm-port/runtime/llm_port_ray_runtime/
 COPY fixtures.json test_local_validation.py /opt/llm-port/runtime/
 
