@@ -87,7 +87,9 @@ jobs:
           chmod +x "$BIN"
           # It must start, parse its arguments and print its licence -- in the
           # oldest environment it claims to support, not only on this runner.
-          docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/faden-agent-${{ matrix.platform }}" license | head -5
+          docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/faden-agent-${{ matrix.platform }}" license > "$RUNNER_TEMP/agent-license.txt"
+          sed -n '1,5p' "$RUNNER_TEMP/agent-license.txt"
+          grep -q 'Apache License' "$RUNNER_TEMP/agent-license.txt"
           sha256sum "$BIN" | awk '{print $1}' > "$BIN.sha256"
 
       - uses: actions/upload-artifact@v4
