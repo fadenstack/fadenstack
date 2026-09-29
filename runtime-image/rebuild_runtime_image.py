@@ -87,8 +87,8 @@ FLAVORS: dict[str, Flavor] = {
     "gb10": Flavor(
         dockerfile="Dockerfile",
         manifest="runtime-manifest.json",
-        default_tag="faden/ray-vllm-gb10:ray2.58-nv26.08",
-        runtime_id="faden-ray-vllm-gb10-ray2.58-nv26.08",
+        default_tag="faden/ray-vllm-gb10:ray2.58-nv26.09",
+        runtime_id="faden-ray-vllm-gb10-ray2.58-nv26.09",
         hardware_target="NVIDIA DGX Spark (GB10) pair",
         bundle="bundle-dgx-spark-gb10-v1",
     ),
@@ -367,11 +367,13 @@ def write_manifest(
         "image_id": identity["image_id"],
         "rootfs_layers": identity["rootfs_layers"],
         "repo_digest": identity.get("repo_digest"),
-        # What the image is built on and for carries over; it is not read
-        # from the image (the base's digest is not recorded in it). With no
-        # earlier record -- the x86_64 manifest never had one -- the base is
-        # read from the Dockerfile and the base image the build pulled.
-        "base_image": previous.get("base_image") or base_image_of(flavor),
+        # What the image is built on: the Dockerfile's FROM and the base image
+        # the build pulled (its digest is not recorded in the image itself).
+        # This used to carry the previous manifest's base over, so moving the
+        # Dockerfile to a newer NVIDIA base would have written a new build
+        # down as built on the old one. The earlier record is only a fallback
+        # for a Dockerfile that names no base. What it is *for* carries over.
+        "base_image": base_image_of(flavor) or previous.get("base_image"),
         "target_hardware": previous.get("target_hardware") or dict(flavor.target_hardware),
         "stack_components": stack,
         "machine": arch.get("machine") or identity.get("architecture"),

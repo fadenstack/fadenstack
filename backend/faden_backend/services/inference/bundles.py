@@ -408,14 +408,20 @@ def _load_runtime_manifest(name: str) -> dict[str, Any]:
 # One record makes that impossible. ``rebuild_runtime_image.py`` builds the
 # image and writes ``runtime-manifest.json`` from ``docker image inspect`` and
 # the in-image helper; this reads that file. Rebuild, and the catalogue follows.
+def _described(manifest: dict[str, Any], what: str) -> str:
+    """What the image carries, in words, from its own manifest: typed beside it, it went stale."""
+    stack = manifest.get("stack_components") or {}
+    base = manifest.get("base_image") or {}
+    base_tag = f" ({base.get('repository')}:{base.get('tag')})" if base.get("tag") else ""
+    return f"Ray {stack.get('ray', '?')} + vLLM {stack.get('vllm', '?')}{base_tag} image {what}"
+
+
+_GB10_MANIFEST = _load_runtime_manifest("runtime-manifest.json")
 CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
-    _load_runtime_manifest("runtime-manifest.json"),
+    _GB10_MANIFEST,
     bundle_id="bundle-dgx-spark-gb10-v1",
     display_name="NVIDIA DGX Spark Blackwell GB10 Runtime",
-    description=(
-        "Ray 2.58 + vLLM 0.27.1 (NVIDIA nv26.08 build) image with "
-        "Blackwell GB10 support over 200 Gb/s RoCE"
-    ),
+    description=_described(_GB10_MANIFEST, "with Blackwell GB10 support over 200 Gb/s RoCE"),
     report_ref="runtime-image/runtime-manifest.json",
     target_architecture=TargetArchitecture(
         cpu="aarch64",

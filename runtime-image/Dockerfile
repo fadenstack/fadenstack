@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/vllm:26.08-py3
+FROM nvcr.io/nvidia/vllm:26.09-py3
 
 # Air-gapped runtime defaults and telemetry suppression
 ENV HF_HUB_OFFLINE=1 \
