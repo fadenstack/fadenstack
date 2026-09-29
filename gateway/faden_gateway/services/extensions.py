@@ -15,6 +15,9 @@ it.
   ``extensions`` (EE: ``pii.local`` for device-only PII). The SDK refuses to
   run an agent it lacks a module for.
 - ``features`` and ``edition``: what ``GET /v1/features`` reports.
+- ``governance_checks``: checks on prompts, answers and tool calls
+  (``services/gateway/governance.py``; EE: content policies). Core's own
+  check, the tenant's tool rules, is added per request.
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ class ExtensionRegistry:
     required_client_modules: list[RequiredModules] = field(default_factory=list)
     features: set[str] = field(default_factory=lambda: set(CORE_FEATURES))
     edition: str = "community"
+    governance_checks: list[Any] = field(default_factory=list)
 
     def client_modules(self, extensions: dict[str, Any]) -> list[str]:
         """Every SDK module an agent with *extensions* needs, sorted."""
@@ -68,5 +72,9 @@ def load_plugin(plugin: object | None) -> None:
     _loaded.add(id(plugin))
     try:
         register(registry)
+        # The plugin may also hand over its governance checks this way.
+        checks = getattr(plugin, "governance_checks", None)
+        if callable(checks):
+            registry.governance_checks.extend(checks())
     except Exception:
         log.exception("The Enterprise plugin failed to register its extensions")

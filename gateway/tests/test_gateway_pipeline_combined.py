@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -246,8 +247,9 @@ async def test_the_model_sees_the_newest_turns_when_history_is_over_budget(
     await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
         "model": ALIAS, "session_id": str(sid), "messages": [{"role": "user", "content": "and now?"}],
     })
-    turns = [m["content"].split()[1] for m in sent[0]["messages"] if m["content"].startswith("turn ")]
-    assert turns == ["4", "5"]
+    # Consecutive user messages reach the model as one (strict chat templates).
+    said = "\n".join(m["content"] for m in sent[0]["messages"] if m["role"] == "user")
+    assert re.findall(r"turn (\d)", said) == ["4", "5"]
 
 
 # ── What a slot is held for ───────────────────────────────────────

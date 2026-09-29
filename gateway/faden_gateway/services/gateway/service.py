@@ -26,6 +26,8 @@ from faden_gateway.services.gateway import (
     skill_files,
     system_tools,
 )
+from faden_gateway.services.extensions import registry as extension_registry
+from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
@@ -603,11 +605,17 @@ def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
 
 
 def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
-    """The PII notice of a request, when the client asked for events and something was found."""
-    if not req.faden_events or req.pii_policy is None:
+    """What goes before the answer, when the client asked for events.
+
+    The PII notice (when something was found), and the client's tools a rule
+    refused.
+    """
+    if not req.faden_events:
         return []
-    notice = faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode)
-    return [notice] if notice is not None else []
+    notice = (
+        faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode) if req.pii_policy is not None else None
+    )
+    return [*([notice] if notice is not None else []), *req.faden_leading]
 
 
 async def _leading(events: list[dict[str, Any]], stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
@@ -860,6 +868,14 @@ class _Prepared:
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
     faden_whole: list[dict[str, Any]] = field(default_factory=list)
+    #: Faden events sent before the answer (tools the client offered and a rule refuses).
+    faden_leading: list[dict[str, Any]] = field(default_factory=list)
+    #: The governance checks this request runs: EE's, and the tenant's tool rules.
+    checks: list[Any] = field(default_factory=list)
+    #: The user's messages this request stored in its session.
+    user_message_ids: list[uuid.UUID] = field(default_factory=list)
+    #: An output check refused the answer: the decision and the answer's HMAC.
+    blocked_output: tuple[uuid.UUID | None, str | None] | None = None
 
     @property
     def instance_id(self) -> str | None:
@@ -962,21 +978,6 @@ class GatewayService:
         model_alias = _require_model(payload)
         policy = await self.dao.get_tenant_policy(auth.tenant_id)
 
-        await _check_limits(
-            limiter=self.limiter,
-            tenant_id=auth.tenant_id,
-            payload=payload,
-            rpm_limit=policy.rpm_limit if policy else None,
-            tpm_limit=policy.tpm_limit if policy else None,
-        )
-
-        candidates = await self.router.resolve_alias(
-            alias=model_alias, tenant_id=auth.tenant_id,
-        )
-        _check_kind(endpoint, model_alias, candidates)
-        if rerank is not None:
-            candidates = _rerank_routes(model_alias, candidates)
-
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
         )
@@ -990,6 +991,13 @@ class GatewayService:
         retry_count = 0
         finish_reason: str | None = None
         try:
+            # Inside the try: a request refused here (rate limit, unknown
+            # model) gets its audit row like any other; it got none.
+            candidates = await self._admit(
+                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+            )
+            if rerank is not None:
+                candidates = _rerank_routes(model_alias, candidates)
             await self._prepare(
                 req,
                 auth=auth,
@@ -1089,6 +1097,11 @@ class GatewayService:
                 # Beside the OpenAI fields, which an OpenAI client reads as ever.
                 events = [*_pii_events(req), *req.faden_whole]
                 response_payload = {**response_payload, "faden": {"events": events}}
+            if endpoint == "/v1/chat/completions" and gov.output_window(req.checks):
+                response_payload = await self._check_whole_answer(
+                    req, response_payload, auth=auth, request_id=request_id,
+                )
+                finish_reason = "content_filter" if req.blocked_output else finish_reason
 
             if req.trace_context is not None:
                 self.observability.record_success(
@@ -1110,6 +1123,7 @@ class GatewayService:
                 provider_instance_id=req.instance_id,
                 trace_id=req.trace_id,
                 tool_exchange=req.tool_exchange,
+                blocked=req.blocked_output,
             )
 
             # Best effort, and the client need not wait for it.
@@ -1123,6 +1137,7 @@ class GatewayService:
                 trace_id=req.trace_id,
             )
         except GatewayError as exc:
+            exc.logged = True  # the finally below writes its row
             error_code = exc.code
             status_code = exc.status_code
             if req.trace_context is None:
@@ -1148,6 +1163,8 @@ class GatewayService:
             raise
         finally:
             await self._release(req)
+            if status_code >= 400:
+                await self._mark_turn(req, "error")
             await self.audit.log(
                 request_id=request_id,
                 trace_id=req.trace_id,
@@ -1196,18 +1213,6 @@ class GatewayService:
         endpoint = "/v1/chat/completions"
         model_alias = _require_model(payload)
         policy = await self.dao.get_tenant_policy(auth.tenant_id)
-        await _check_limits(
-            limiter=self.limiter,
-            tenant_id=auth.tenant_id,
-            payload=payload,
-            rpm_limit=policy.rpm_limit if policy else None,
-            tpm_limit=policy.tpm_limit if policy else None,
-        )
-
-        candidates = await self.router.resolve_alias(
-            alias=model_alias, tenant_id=auth.tenant_id,
-        )
-        _check_kind("/v1/chat/completions", model_alias, candidates)
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
@@ -1217,6 +1222,9 @@ class GatewayService:
         pre_stream_status_code = 500
         pre_stream_error_code: str | None = None
         try:
+            candidates = await self._admit(
+                auth=auth, payload=payload, policy=policy, endpoint=endpoint, model_alias=model_alias,
+            )
             await self._prepare(
                 req,
                 auth=auth,
@@ -1244,9 +1252,10 @@ class GatewayService:
                 # answered whole and then replayed: nothing reached the client
                 # until every tool had run and the answer was complete.
                 wrapped_stream, stats = await wrap_sse_stream(
-                    _leading(
-                        _pii_events(req), self._stream_tool_rounds(req, auth=auth, request_id=request_id),
-                    ),
+                    _leading(_pii_events(req), self._govern_output(
+                        req, self._stream_tool_rounds(req, auth=auth, request_id=request_id),
+                        auth=auth, request_id=request_id, model_alias=model_alias,
+                    )),
                 )
             else:
                 raw_stream = self.adapter.completion(
@@ -1261,7 +1270,10 @@ class GatewayService:
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
                 wrapped_stream, stats = await wrap_sse_stream(
-                    _leading(_pii_events(req), restore_sse(raw_stream, req.token_mapping, req.client_tools)),
+                    _leading(_pii_events(req), self._govern_output(
+                        req, restore_sse(raw_stream, req.token_mapping, req.client_tools),
+                        auth=auth, request_id=request_id, model_alias=model_alias,
+                    )),
                 )
             stream_started = True
 
@@ -1344,6 +1356,7 @@ class GatewayService:
                 trace_id=req.trace_id,
             )
         except GatewayError as exc:
+            exc.logged = True  # the finally below writes its row
             pre_stream_status_code = exc.status_code
             pre_stream_error_code = exc.code
             if req.trace_context is None:
@@ -1370,6 +1383,7 @@ class GatewayService:
         finally:
             if not stream_started:
                 await self._release(req)
+                await self._mark_turn(req, "error")
                 await self.audit.log(
                     request_id=request_id,
                     trace_id=req.trace_id,
@@ -1406,6 +1420,243 @@ class GatewayService:
     # ------------------------------------------------------------------
     # On the way to the model
     # ------------------------------------------------------------------
+
+    async def _admit(
+        self, *, auth: AuthContext, payload: dict[str, Any], policy: Any | None, endpoint: str, model_alias: str,
+    ) -> list[Any]:
+        """Rate limits, then the routes for the model; raises when the request cannot go on."""
+        await _check_limits(
+            limiter=self.limiter,
+            tenant_id=auth.tenant_id,
+            payload=payload,
+            rpm_limit=policy.rpm_limit if policy else None,
+            tpm_limit=policy.tpm_limit if policy else None,
+        )
+        candidates = await self.router.resolve_alias(alias=model_alias, tenant_id=auth.tenant_id)
+        _check_kind(endpoint, model_alias, candidates)
+        return candidates
+
+    # ------------------------------------------------------------------
+    # Governance (services/gateway/governance.py)
+    # ------------------------------------------------------------------
+
+    def _context(
+        self, req: _Prepared, auth: AuthContext, request_id: str, stage: gov.GovernanceStage,
+        session_id: str | None = None, **fields: Any,
+    ) -> gov.GovernanceContext:
+        return gov.GovernanceContext(
+            stage=stage,
+            tenant_id=auth.tenant_id,
+            user_id=auth.user_id,
+            agent_id=req.agent.agent.id if req.agent is not None else None,
+            session_id=session_id or req.session_id,
+            request_id=request_id,
+            **fields,
+        )
+
+    async def _governance_checks(self, auth: AuthContext) -> list[Any]:
+        """EE's checks and the tenant's tool rules; empty in a plain core install without rules."""
+        checks: list[Any] = list(extension_registry.governance_checks)
+        rules = await gov.tool_rules.for_tenant(self.dao.session, auth.tenant_id)
+        if rules:
+            checks.append(gov.ToolRuleCheck(rules))
+        return checks
+
+    async def _check_input(
+        self, req: _Prepared, *, auth: AuthContext, session_id: str | None, request_id: str,
+    ) -> None:
+        """Refuse the prompt before anything is stored; the turn stays as a notice, not text."""
+        messages = req.payload.get("messages") or []
+        ctx = self._context(req, auth, request_id, gov.GovernanceStage.INPUT, session_id, messages=messages)
+        verdict = await gov.decide(req.checks, ctx)
+        if verdict is None:
+            return
+        decision_id, digest = await gov.record(
+            self.dao.session, ctx, verdict, text=gov.text_of(messages), outcome="block",
+        )
+        stored_session: str | None = None
+        message_id: uuid.UUID | None = None
+        sid = _uuid_or_none(session_id)
+        if sid is not None and self.session_dao is not None:
+            owned = await self.session_dao.get_session(session_id=sid, tenant_id=auth.tenant_id, user_id=auth.user_id)
+            if owned is not None:
+                stored = await self.session_dao.append_message(
+                    session_id=sid, role="user", content="", status="blocked_input",
+                    decision_id=decision_id, content_hmac=digest,
+                )
+                stored_session, message_id = str(sid), stored.id
+        await self.dao.session.commit()
+        raise gov.prompt_blocked(gov.governance_object(
+            verdict, outcome="prompt_blocked", stage=gov.GovernanceStage.INPUT, decision_id=decision_id,
+            request_id=request_id, session_id=stored_session, message_id=message_id,
+        ))
+
+    async def _screen_client_tools(self, req: _Prepared, *, auth: AuthContext, request_id: str) -> None:
+        """The client's tools a rule refuses are not offered to the model.
+
+        The client runs its own tools, so refusing a call would come too late:
+        the model never sees the tool. One that needs approval stays: the
+        client asks its user.
+        """
+        if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
+            return
+        tools = req.payload.get("tools") or []
+        kept = []
+        for tool in tools:
+            name = _tool_definition_name(tool)
+            ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
+            verdict = await gov.decide(req.checks, ctx)
+            if verdict is None or not verdict.blocked:
+                kept.append(tool)
+                continue
+            decision_id, _ = await gov.record(self.dao.session, ctx, verdict, text=None)
+            req.client_tools.discard(name)
+            req.faden_leading.append(gov.tool_denied_event({}, name, verdict.decision.message, decision_id))
+        if len(kept) == len(tools):
+            return
+        payload = {k: v for k, v in req.payload.items() if k != "tools"}
+        if kept:
+            payload["tools"] = kept
+        choice = payload.get("tool_choice")
+        if not kept or (isinstance(choice, dict) and (choice.get("function") or {}).get("name") not in req.client_tools):
+            payload.pop("tool_choice", None)
+        req.payload = payload
+
+    async def _screen_calls(
+        self, req: _Prepared, calls: list[dict[str, Any]], *, auth: AuthContext, request_id: str,
+    ) -> dict[str, tuple[str, gov.Verdict]]:
+        """The gateway's calls a check objects to: call id -> (tool, verdict)."""
+        if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
+            return {}
+        found: dict[str, tuple[str, gov.Verdict]] = {}
+        for call in calls:
+            name = _mcp_name(req, _tool_name(call))
+            ctx = self._context(
+                req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name, arguments=_tool_arguments(call),
+            )
+            verdict = await gov.decide(req.checks, ctx)
+            if verdict is not None:
+                found[call.get("id", "")] = (name, verdict)
+        return found
+
+    async def _ask_approvals(
+        self, req: _Prepared, calls: list[dict[str, Any]], screened: dict[str, tuple[str, gov.Verdict]],
+        answered: dict[str, bool], *, auth: AuthContext, request_id: str,
+    ) -> AsyncIterator[bytes]:
+        """Ask the user about each call that needs approval, one at a time; answers go in *answered*.
+
+        Only a stream to a client that reads events can ask; anywhere else the
+        call is refused, saying it needs approval.
+        """
+        if not req.faden_events:
+            return
+        timeout = float(settings.governance_approval_timeout_s)
+        for call in calls:
+            call_id = call.get("id", "")
+            name, verdict = screened.get(call_id, ("", None))  # type: ignore[assignment]
+            if verdict is None or verdict.blocked:
+                continue
+            approval_id = uuid.uuid4().hex
+            yield faden_events.sse_event(gov.approval_event(approval_id, call, name, verdict.decision.message, timeout))
+            approved = await gov.approvals.wait(
+                tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
+            )
+            answered[call_id] = bool(approved)
+            ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
+            outcome = "approved" if approved else ("rejected" if approved is False else "expired")
+            await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None, outcome=outcome)
+
+    async def _refused(
+        self, req: _Prepared, call: dict[str, Any], name: str, verdict: gov.Verdict, answer: bool | None,
+        *, auth: AuthContext, request_id: str,
+    ) -> str:
+        """Record a refused call and tell the client; what the model is told."""
+        message = verdict.decision.message
+        if not verdict.blocked:
+            message = (
+                f"{message} The user declined." if answer is False
+                else f"{message} It needs the user's approval, which could not be asked for here."
+            )
+        ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
+        decision_id = None
+        if verdict.blocked or answer is None:
+            decision_id, _ = await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None)
+        event = gov.tool_denied_event(call, name, message, decision_id)
+        if req.faden_events:
+            req.faden_pending.append(event)
+        return gov.denied_result(name, message)
+
+    def _govern_output(
+        self, req: _Prepared, stream: AsyncIterator[bytes], *, auth: AuthContext, request_id: str, model_alias: str,
+    ) -> AsyncIterator[bytes]:
+        """*stream*, checked before it is forwarded -- unchanged without a check that reads answers."""
+        window = gov.output_window(req.checks)
+        if not window:
+            return stream
+
+        async def check(text: str) -> gov.Verdict | None:
+            ctx = self._context(req, auth, request_id, gov.GovernanceStage.OUTPUT, text=text)
+            return await gov.decide(req.checks, ctx)
+
+        async def on_block(verdict: gov.Verdict, text: str) -> AsyncIterator[bytes]:
+            ctx = self._context(req, auth, request_id, gov.GovernanceStage.OUTPUT)
+            decision_id, digest = await gov.record_on_own_session(
+                self.dao.session.bind, ctx, verdict, text=text, outcome="block",
+            )
+            req.blocked_output = (decision_id, digest)
+            req.finish_reason = "content_filter"
+            found = gov.governance_object(
+                verdict, outcome="response_blocked", stage=gov.GovernanceStage.OUTPUT, decision_id=decision_id,
+                request_id=request_id, session_id=req.session_id,
+            )
+            if req.faden_events:
+                yield faden_events.sse_event(gov.governance_event(found))
+            yield gov.content_filter_chunk({"id": f"chatcmpl-{request_id}", "model": model_alias})
+            yield _DONE_EVENT
+
+        return gov.govern_sse(stream, window=window, check=check, on_block=on_block)
+
+    async def _check_whole_answer(
+        self, req: _Prepared, payload: Any, *, auth: AuthContext, request_id: str,
+    ) -> Any:
+        """A whole answer an output check refuses: empty, ``content_filter``, ``faden.governance``."""
+        choices = (payload or {}).get("choices") or [] if isinstance(payload, dict) else []
+        message = choices[0].get("message") or {} if choices else {}
+        text = message.get("content")
+        if not isinstance(text, str) or not text:
+            return payload
+        ctx = self._context(req, auth, request_id, gov.GovernanceStage.OUTPUT, text=text)
+        verdict = await gov.decide(req.checks, ctx)
+        if verdict is None or not verdict.blocked:
+            return payload
+        decision_id, digest = await gov.record_on_own_session(
+            self.dao.session.bind, ctx, verdict, text=text, outcome="block",
+        )
+        req.blocked_output = (decision_id, digest)
+        found = gov.governance_object(
+            verdict, outcome="response_blocked", stage=gov.GovernanceStage.OUTPUT, decision_id=decision_id,
+            request_id=request_id, session_id=req.session_id,
+        )
+        blocked = {**choices[0], "message": {"role": "assistant", "content": ""}, "finish_reason": "content_filter"}
+        return {**payload, "choices": [blocked, *choices[1:]], "faden": {**(payload.get("faden") or {}), "governance": found}}
+
+    async def _mark_turn(self, req: _Prepared, status: str) -> None:
+        """Set the status of the user's messages this request stored (``error``: left out of context)."""
+        if not req.user_message_ids or self.session_dao is None:
+            return
+        from sqlalchemy import update  # noqa: PLC0415
+        from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+        from faden_gateway.db.models.gateway import ChatMessage  # noqa: PLC0415
+
+        try:
+            async with AsyncSession(self.dao.session.bind) as own:
+                await own.execute(
+                    update(ChatMessage).where(ChatMessage.id.in_(req.user_message_ids)).values(status=status),
+                )
+                await own.commit()
+        except Exception:
+            logger.warning("Could not mark the turn %s", status, exc_info=True)
 
     async def _prepare(
         self,
@@ -1450,6 +1701,13 @@ class GatewayService:
             )
         # Read before anything runs: the session step rewrites the messages.
         question = _last_user_text(payload)
+        if chat:
+            # Before anything is stored or sent: a refused prompt leaves no text.
+            req.checks = await self._governance_checks(auth)
+            if req.checks:
+                await self._check_input(req, auth=auth, session_id=session_id, request_id=request_id)
+                await self._screen_client_tools(req, auth=auth, request_id=request_id)
+                payload = req.payload
 
         # A file too long to include is searched by the model, if every route
         # the request may take calls tools; told apart before the slot.
@@ -1461,7 +1719,9 @@ class GatewayService:
         # session, which cannot run two queries at once.
         file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
         (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
-            self._inject_session_context(payload, auth, session_id, req=req if searchable else None)
+            self._inject_session_context(
+                payload, auth, session_id, req=req if searchable else None, saved=req.user_message_ids,
+            )
             if chat else _value((payload, None, None)),
             self._resolve_skills(
                 question,
@@ -1818,6 +2078,7 @@ class GatewayService:
         auth: AuthContext,
         session_id_str: str | None,
         req: _Prepared | None = None,
+        saved: list[uuid.UUID] | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         """Inject session history and memory into the payload.
 
@@ -1885,9 +2146,12 @@ class GatewayService:
                         p.get("text", "") for p in cur_content
                         if isinstance(p, dict) and p.get("type") == "text"
                     ) or ""
+                # A turn that was blocked or failed is not in the history the
+                # model gets: sending it again is a new turn, not a retry.
                 if (
                     last_db.role == first_cur.get("role")
                     and last_db.content == cur_content
+                    and last_db.status == "ok"
                 ):
                     current_messages = current_messages[1:]
 
@@ -1920,12 +2184,14 @@ class GatewayService:
                         p.get("text", "") for p in content
                         if isinstance(p, dict) and p.get("type") == "text"
                     ) or ""
-                await self.session_dao.append_message(
+                stored = await self.session_dao.append_message(
                     session_id=sid,
                     role=msg["role"],
                     content=content,
                     content_parts_json=content_parts_json,
                 )
+                if saved is not None and msg["role"] == "user":
+                    saved.append(stored.id)
                 if msg["role"] == "user" and first_user_text is None:
                     first_user_text = content
 
@@ -2319,8 +2585,17 @@ class GatewayService:
                     for call in calls.calls():
                         start = faden_events.tool_start(call, _tool_definition_name(call))
                         yield faden_events.sse_event(start)
+                screened: dict[str, tuple[str, gov.Verdict]] = {}
+                answered: dict[str, bool] = {}
+                if not any(_tool_name(c) in req.client_tools for c in calls.calls()):
+                    screened = await self._screen_calls(req, calls.calls(), auth=auth, request_id=request_id)
+                    async for asking in self._ask_approvals(
+                        req, calls.calls(), screened, answered, auth=auth, request_id=request_id,
+                    ):
+                        yield asking
                 answers = await self._run_tool_calls(
                     req, calls.calls(), iteration=iteration, auth=auth, request_id=request_id,
+                    screened=screened, answered=answered,
                 )
                 # The tool router reads the session's policy; the next round is
                 # another model call.
@@ -2392,8 +2667,14 @@ class GatewayService:
         iteration: int,
         auth: AuthContext,
         request_id: str,
+        screened: dict[str, tuple[str, gov.Verdict]] | None = None,
+        answered: dict[str, bool] | None = None,
     ) -> list[dict[str, Any]] | None:
         """Run *calls*; the tool messages that answer them, PII-scanned.
+
+        A call a check refuses is not run: the model is told why (*screened*,
+        from :meth:`_screen_calls`; *answered*, what the user said about calls
+        that needed approval).
 
         ``None`` when any of them is not the gateway's to run (a tool the
         client defined): the model's message then goes to the client as it
@@ -2409,13 +2690,23 @@ class GatewayService:
         if any(name in req.client_tools for name in names):
             return None
         names = [_mcp_name(req, name) for name in names]
+        if screened is None:
+            screened = await self._screen_calls(req, calls, auth=auth, request_id=request_id)
+        answered = answered or {}
 
         async def run(call: dict[str, Any], name: str) -> tuple[dict[str, Any], dict[str, Any]]:
             arguments = _mcp_arguments(req, name, _tool_arguments(call))
             started = time.perf_counter()
             row: dict[str, Any] = {"iteration": iteration, "tool_name": name, "mcp_server": None}
-            own = self._run_system_tool(req, name, arguments, routed=router_session is not None)
-            if own is not None:
+            objection = screened.get(call.get("id", ""))
+            answer = answered.get(call.get("id", ""))
+            if objection is not None and (objection[1].blocked or answer is not True):
+                content = await self._refused(
+                    req, call, name, objection[1], answer, auth=auth, request_id=request_id,
+                )
+                is_error = True
+                row["denied"] = True
+            elif (own := self._run_system_tool(req, name, arguments, routed=router_session is not None)) is not None:
                 content, is_error = own
             elif name in knowledge.NAMES:
                 # Searched inside Fadenstack, like the session store: with the
@@ -2552,9 +2843,20 @@ class GatewayService:
         provider_instance_id: str | None = None,
         trace_id: str | None = None,
         tool_exchange: list[dict[str, Any]] | None = None,
+        blocked: tuple[uuid.UUID | None, str | None] | None = None,
     ) -> None:
-        """Store the assistant's response message in the session."""
+        """Store the assistant's response message in the session.
+
+        A refused answer is stored as a notice: no text, its decision and HMAC.
+        """
         if not session_id_str or not self.session_dao:
+            return
+        if blocked is not None:
+            await self.session_dao.append_message(
+                session_id=uuid.UUID(session_id_str), role="assistant", content="",
+                model_alias=model_alias, status="blocked_output",
+                decision_id=blocked[0], content_hmac=blocked[1],
+            )
             return
 
         import uuid as _uuid  # noqa: PLC0415
@@ -2629,19 +2931,25 @@ class GatewayService:
             await self._release(req)
         except Exception:
             logger.warning("Failed to release the model slot", exc_info=True)
-        if req.session_id and content:
+        failed = status_code >= 400 and req.blocked_output is None
+        if req.session_id and (content or req.blocked_output):
             try:
                 await self._persist_stream_assistant_response(
                     session_id_str=req.session_id,
-                    content=content,
+                    # A refused answer is not stored, not even the part already sent.
+                    content="" if req.blocked_output else content,
                     model_alias=model_alias,
                     provider_instance_id=req.instance_id,
                     trace_id=req.trace_id,
                     token_estimate=stats.usage.completion_tokens if stats is not None else None,
-                    tool_exchange=req.tool_exchange,
+                    tool_exchange=None if req.blocked_output else req.tool_exchange,
+                    status="blocked_output" if req.blocked_output else ("error" if failed else "ok"),
+                    blocked=req.blocked_output,
                 )
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
+        if failed:
+            await self._mark_turn(req, "error")
         saved.set()
         # Best effort, and nothing need wait for it.
         _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
@@ -2729,6 +3037,8 @@ class GatewayService:
         trace_id: str | None = None,
         token_estimate: int | None = None,
         tool_exchange: list[dict[str, Any]] | None = None,
+        status: str = "ok",
+        blocked: tuple[uuid.UUID | None, str | None] | None = None,
     ) -> None:
         """Store the accumulated streaming assistant response in the session.
 
@@ -2736,7 +3046,7 @@ class GatewayService:
         to the request-scoped session (which may already be closed or
         rolled back if the client disconnected mid-stream).
         """
-        if not self.session_dao or not content:
+        if not self.session_dao or not (content or blocked):
             return
 
         import uuid as _uuid  # noqa: PLC0415
@@ -2765,6 +3075,9 @@ class GatewayService:
                 token_estimate=token_estimate,
                 trace_id=trace_id,
                 tool_call_json=_exchange_record(tool_exchange),
+                status=status,
+                decision_id=blocked[0] if blocked else None,
+                content_hmac=blocked[1] if blocked else None,
             )
             fresh_session.add(msg)
             await fresh_session.commit()
@@ -2858,11 +3171,7 @@ async def _check_limits(
 ) -> None:
     rpm = await limiter.check_rpm(tenant_id=tenant_id, limit=rpm_limit)
     if rpm and not rpm.allowed:
-        raise GatewayError(
-            status_code=429,
-            message="Rate limit exceeded (RPM).",
-            code="rate_limit_rpm",
-        )
+        raise _rate_limited("Rate limit exceeded (RPM).", "rate_limit_rpm", rpm.retry_after_sec)
     estimated_tokens = estimate_input_tokens(
         payload.get("input") or payload.get("messages"),
     )
@@ -2870,8 +3179,20 @@ async def _check_limits(
         tenant_id=tenant_id, tokens=estimated_tokens, limit=tpm_limit,
     )
     if tpm and not tpm.allowed:
-        raise GatewayError(
-            status_code=429,
-            message="Rate limit exceeded (TPM).",
-            code="rate_limit_tpm",
-        )
+        raise _rate_limited("Rate limit exceeded (TPM).", "rate_limit_tpm", tpm.retry_after_sec)
+
+
+def _rate_limited(message: str, code: str, retry_after_sec: int) -> GatewayError:
+    """A 429 as OpenAI clients read it: ``rate_limit_error``, and when to retry.
+
+    It said ``invalid_request_error`` with no ``Retry-After``, so clients that
+    back off on 429 guessed; the window's remaining seconds were computed and
+    dropped.
+    """
+    return GatewayError(
+        status_code=429,
+        message=message,
+        error_type="rate_limit_error",
+        code=code,
+        headers={"Retry-After": str(max(int(retry_after_sec), 1))},
+    )

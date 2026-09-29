@@ -129,6 +129,8 @@ class InFlight:
     tool_id: str
     arguments: dict[str, Any]
     reply_to: str | None = None
+    #: Why the user must approve the call first; the device asks them.
+    approval: str | None = None
 
 
 @dataclass
@@ -259,9 +261,13 @@ class DeviceHub:
         arguments: dict[str, Any],
         call_id: str,
         agent_id: str | None = None,
+        approval: str | None = None,
         timeout: float = TOOL_CALL_TIMEOUT_SEC,
     ) -> ToolCallResult:
         """Run *tool_id* on the user's device and wait for its answer.
+
+        With *approval*, the device asks its user first (``approval_required``
+        in the request) and says ``tool_call_approval_pending`` to wait for them.
 
         Without a session bound to a device, any of the user's devices signed
         in for the same agent (*agent_id*; ``None``: signed in as the user)
@@ -277,7 +283,7 @@ class DeviceHub:
             local = self._local_device(tenant_id, user_id, session_id, tool_id, agent_id)
             if local is not None:
                 waiting.device = local.key
-                call = InFlight(call_id=call_id, tool_id=tool_id, arguments=arguments)
+                call = InFlight(call_id=call_id, tool_id=tool_id, arguments=arguments, approval=approval)
                 local.inflight[call_id] = call
                 await self._request(local, call)
             else:
@@ -288,7 +294,7 @@ class DeviceHub:
                 waiting.worker, waiting.device = worker, device
                 await self._publish(worker, {
                     "op": "call", "call_id": call_id, "tool_id": tool_id, "arguments": arguments,
-                    "device": _key_str(device), "reply_to": self.worker_id,
+                    "device": _key_str(device), "reply_to": self.worker_id, "approval": approval,
                 })
             return await self._wait(waiting)
         finally:
@@ -375,13 +381,16 @@ class DeviceHub:
         return None
 
     async def _request(self, conn: DeviceConnection, call: InFlight) -> None:
-        await conn.send({
+        request = {
             "type": "tool_call_request",
             "call_id": call.call_id,
             "session_id": str(conn.session_id) if conn.session_id else None,
             "tool_id": call.tool_id,
             "arguments": call.arguments,
-        })
+        }
+        if call.approval:
+            request["approval_required"] = {"reason": call.approval}
+        await conn.send(request)
 
     # -- what devices say ---------------------------------------------------------------------
 
@@ -452,7 +461,7 @@ class DeviceHub:
         if op == "call":
             key = _key_of(msg["device"])
             call = InFlight(call_id=call_id, tool_id=msg["tool_id"], arguments=msg.get("arguments") or {},
-                            reply_to=msg["reply_to"])
+                            reply_to=msg["reply_to"], approval=msg.get("approval"))
             conn = self._devices.get(key)
             if conn is not None:
                 conn.inflight[call_id] = call
@@ -717,11 +726,13 @@ async def broker_tool_call(
     tenant_id: str = "default",
     user_id: str | None = None,
     agent_id: str | None = None,
+    approval: str | None = None,
     timeout: float = TOOL_CALL_TIMEOUT_SEC,
     hub: DeviceHub | None = None,
 ) -> ToolCallResult:
     """Run *tool_id* on the device serving *session_id* (or another of the user's devices)."""
     return await (hub or device_hub).call(
         tenant_id=tenant_id, user_id=user_id, session_id=session_id,
-        tool_id=tool_id, arguments=arguments, call_id=call_id, agent_id=agent_id, timeout=timeout,
+        tool_id=tool_id, arguments=arguments, call_id=call_id, agent_id=agent_id,
+        approval=approval, timeout=timeout,
     )

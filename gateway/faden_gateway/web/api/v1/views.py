@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -16,7 +17,7 @@ from faden_gateway.services.gateway import faden_events
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
-from faden_gateway.services.gateway.errors import GatewayError, error_response
+from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.lease import LeaseManager
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
 from faden_gateway.services.gateway.observability import GatewayObservability
@@ -43,6 +44,7 @@ from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/health")
@@ -191,13 +193,7 @@ async def list_models(
         payload = await service.list_models(auth)
         return JSONResponse(status_code=200, content=payload)
     except GatewayError as exc:
-        return error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_type=exc.error_type,
-            param=exc.param,
-            code=exc.code,
-        )
+        return error_from(exc)
 
 
 # ── Tool Availability ────────────────────────────────────────────
@@ -612,13 +608,7 @@ async def create_embeddings(
             response.headers["x-langfuse-trace-id"] = routed.trace_id
         return response
     except GatewayError as exc:
-        return error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_type=exc.error_type,
-            param=exc.param,
-            code=exc.code,
-        )
+        return error_from(exc)
 
 
 @router.post("/v1/rerank")
@@ -652,13 +642,7 @@ async def create_rerank(
             code="validation_error",
         )
     except GatewayError as exc:
-        return error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_type=exc.error_type,
-            param=exc.param,
-            code=exc.code,
-        )
+        return error_from(exc)
 
 
 def _requested_skills(value: Any) -> list[str]:
@@ -691,6 +675,7 @@ async def serve_chat_completions(
     *prepare* applies an agent to the request body before it is routed; the
     rest -- routing, PII, tools, streaming, the request log -- is one path.
     """
+    payload: dict[str, Any] = {}
     try:
         payload = await _get_json_payload(request)
         if prepare is not None:
@@ -750,6 +735,7 @@ async def serve_chat_completions(
             json_response.headers["x-langfuse-trace-id"] = non_stream.trace_id
         return json_response
     except ValidationError as exc:
+        await _log_refusal(request, service, auth, agent, payload, 400, "validation_error")
         return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=str(exc),
@@ -757,13 +743,42 @@ async def serve_chat_completions(
             code="validation_error",
         )
     except GatewayError as exc:
-        return error_response(
-            status_code=exc.status_code,
-            message=exc.message,
-            error_type=exc.error_type,
-            param=exc.param,
-            code=exc.code,
+        if not exc.logged:
+            await _log_refusal(request, service, auth, agent, payload, exc.status_code, exc.code)
+        return error_from(exc)
+
+
+async def _log_refusal(
+    request: Request,
+    service: GatewayService,
+    auth: AuthContext,
+    agent: AgentRequest | None,
+    payload: dict[str, Any],
+    status_code: int,
+    code: str | None,
+) -> None:
+    """A request refused before the pipeline logs it still gets its row.
+
+    A bad body, no model, an agent's rules.
+
+    They were missing from the request log, so a client failing on every call
+    left no trace an admin could find.
+    """
+    fields: dict[str, Any] = {}
+    if agent is not None:
+        fields = {"agent_id": agent.id, "device_id": agent.device_id,
+                  "conversation_id": agent.conversation_id, "turn_id": agent.turn_id}
+    try:
+        await service.audit.log(
+            request_id=_request_id(request), trace_id=None, tenant_id=auth.tenant_id, user_id=auth.user_id,
+            model_alias=str(payload.get("model") or "") or None, provider_instance_id=None,
+            endpoint="/v1/chat/completions", status_code=status_code, latency_ms=0, ttft_ms=None,
+            prompt_tokens=None, completion_tokens=None, total_tokens=None, error_code=code,
+            stream=bool(payload.get("stream")),
+            session_id=str(payload["session_id"]) if payload.get("session_id") else None, **fields,
         )
+    except Exception:
+        logger.warning("Could not log the refused request", exc_info=True)
 
 
 # ── Stream reconnection ──────────────────────────────────────────

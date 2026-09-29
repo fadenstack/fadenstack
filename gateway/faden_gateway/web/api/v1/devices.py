@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, WebSocket
+from fastapi import APIRouter, WebSocket
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -75,21 +75,47 @@ async def authenticate_device(app: Any, token: str) -> DeviceIdentity:
     return DeviceIdentity(tenant_id=auth.tenant_id, user_id=auth.user_id, device_id=device, agent_id=agent_id)
 
 
+class _Briefly:
+    """The DAO calls the channel makes, each on a session of its own.
+
+    A device stays connected for hours: a request-scoped session would hold a
+    pooled connection all that time. (The route took one through
+    ``get_db_session``, which needs a ``Request`` a WebSocket route does not
+    get: every connection failed with a 500.)
+    """
+
+    def __init__(self, factory: Any) -> None:
+        self._factory = factory
+
+    async def register_client_capabilities(
+        self, session_id: uuid.UUID, client_id: str, tools: list[Any],
+    ) -> None:
+        async with self._factory() as db:
+            await GatewayDAO(db).register_client_capabilities(session_id, client_id, tools)
+            await db.commit()
+
+    async def mark_client_tools_unavailable(self, session_id: uuid.UUID, client_id: str) -> None:
+        async with self._factory() as db:
+            await GatewayDAO(db).mark_client_tools_unavailable(session_id, client_id)
+            await db.commit()
+
+    async def owns_session(self, identity: DeviceIdentity, session_id: uuid.UUID) -> bool:
+        async with self._factory() as db:
+            found = await SessionDAO(db).get_session(
+                session_id=session_id, tenant_id=identity.tenant_id, user_id=identity.user_id,
+            )
+            return found is not None
+
+
 @router.websocket("/v1/client/ws")
-async def client_websocket(
-    ws: WebSocket,
-    dao: GatewayDAO = Depends(),
-    sessions: SessionDAO = Depends(),
-) -> None:
+async def client_websocket(ws: WebSocket) -> None:
     """A device's connection: authenticated first, then its tools, then calls."""
+    dao = _Briefly(ws.app.state.db_session_factory)
 
     async def authenticate(token: str) -> DeviceIdentity:
         return await authenticate_device(ws.app, token)
 
-    async def owns_session(identity: DeviceIdentity, session_id: uuid.UUID) -> bool:
-        found = await sessions.get_session(
-            session_id=session_id, tenant_id=identity.tenant_id, user_id=identity.user_id,
-        )
-        return found is not None
-
-    await handle_client_websocket(ws, dao, authenticate=authenticate, owns_session=owns_session)
+    await handle_client_websocket(
+        ws, dao,  # type: ignore[arg-type]
+        authenticate=authenticate, owns_session=dao.owns_session,
+    )

@@ -52,6 +52,42 @@ class AssembledContext:
     total_token_estimate: int = 0
 
 
+def in_context(msg: Any) -> bool:
+    """Whether a stored message goes to the model (04-skills-and-governance §8).
+
+    A refused prompt (``blocked_input``) and a failed turn (``error``) are
+    left out whole; of a refused answer (``blocked_output``) the question
+    stays and the answer goes.
+    """
+    return getattr(msg, "status", "ok") in ("ok", None)
+
+
+def merge_consecutive_users(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Adjacent user messages as one: strict chat templates refuse roles that do not alternate.
+
+    They follow each other once a blocked or failed turn's answer is left out.
+    """
+    merged: list[dict[str, Any]] = []
+    for message in messages:
+        last = merged[-1] if merged else None
+        if last is None or last.get("role") != "user" or message.get("role") != "user":
+            merged.append(message)
+            continue
+        before, after = last.get("content"), message.get("content")
+        if isinstance(before, str) and isinstance(after, str):
+            content: Any = f"{before}\n\n{after}"
+        else:
+            content = [*_parts(before), *_parts(after)]
+        merged[-1] = {**last, **message, "content": content}
+    return merged
+
+
+def _parts(content: Any) -> list[Any]:
+    if isinstance(content, list):
+        return content
+    return [{"type": "text", "text": content or ""}]
+
+
 def _replayed_exchange(msg: Any) -> list[dict[str, Any]]:
     """The tool calls and results that led to a saved reply, to put before it.
 
@@ -209,6 +245,7 @@ class ContextAssembler:
         # If we have a summary, only include messages after the summary cutoff
         if after_id and recent:
             recent = [m for m in recent if m.created_at > summary.created_at]
+        recent = [m for m in recent if in_context(m)]
 
         # The newest turns that fit, kept in order. Filled from the oldest,
         # the budget ran out on the old turns and the latest ones -- the ones
@@ -238,6 +275,7 @@ class ContextAssembler:
             result.messages.append(msg)
             total_tokens += msg_tokens
 
+        result.messages = merge_consecutive_users(result.messages)
         result.total_token_estimate = total_tokens
         return result
 

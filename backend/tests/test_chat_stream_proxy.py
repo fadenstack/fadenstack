@@ -57,6 +57,22 @@ async def test_a_gateway_error_is_an_sse_error_event() -> None:
     assert events[1] == "data: [DONE]"
 
 
+async def test_a_refused_prompt_keeps_its_governance_notice() -> None:
+    notice = {"governance": {"outcome": "prompt_blocked", "stage": "input", "message": "Not here.",
+                             "decision_id": "d-1", "message_id": "m-1"}}
+
+    def gateway(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(422, json={
+            "error": {"message": "Not here.", "type": "governance_error", "code": "policy_blocked"},
+            "faden": notice,
+        })
+
+    stream = await _client(httpx.MockTransport(gateway)).open_stream_chat({}, "jwt")
+    event = json.loads((await _read(stream)).decode().split("\n\n")[0].removeprefix("data: "))
+    assert (event["error"]["code"], event["error"]["status"]) == ("policy_blocked", 422)
+    assert event["faden"] == notice
+
+
 async def test_an_unreachable_gateway_is_an_sse_error_event() -> None:
     def gateway(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)

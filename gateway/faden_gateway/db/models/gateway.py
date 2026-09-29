@@ -640,6 +640,12 @@ class ChatMessage(Base):
     )
     token_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: ``ok``, ``blocked_input``, ``blocked_output`` or ``error``. A blocked
+    #: message keeps an empty ``content``: the text is never stored, only
+    #: ``content_hmac`` (keyed per tenant) and the decision.
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ok", server_default="ok")
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    content_hmac: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         server_default=func.now(), index=True,
@@ -943,4 +949,85 @@ class AgentClientEvent(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Governance
+# ---------------------------------------------------------------------------
+
+
+class PolicyDecisionRecord(Base):
+    """A governance check objected: what, where and why -- never the text.
+
+    ``content_hmac`` is HMAC-SHA256 of the refused text with the tenant's key:
+    the same prompt refused twice shows as the same value, and nobody can read
+    it or test guesses against it without the key.
+    """
+
+    __tablename__ = "llm_gateway_policy_decision"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    agent_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    #: ``input``, ``output`` or ``tool``.
+    stage: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: ``block``, ``approval_required``, ``approved`` or ``rejected``.
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    policy_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    #: The policy's name: for auditors, never shown to the user.
+    policy_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: What the user was told (the admin's message for the policy).
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    check: Mapped[str] = mapped_column(String(128), nullable=False)
+    content_hmac: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tool_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    #: Every objection, the one that won first: ``[{check, outcome, policy_id, category}]``.
+    reasons: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True,
+    )
+
+
+class GovernanceKey(Base):
+    """A tenant's key for ``content_hmac``, made on first use."""
+
+    __tablename__ = "llm_gateway_governance_key"
+
+    tenant_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    key: Mapped[str] = mapped_column(EncryptedText("governance-key"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+class ToolRule(Base):
+    """A tenant's rule for tools the gateway runs or a client offers.
+
+    ``message`` is what the user is told; ``name`` is for admins and
+    auditors. The lowest ``priority`` that matches decides.
+    """
+
+    __tablename__ = "llm_gateway_tool_rule"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: A glob over tool names: ``mcp_github__*``, ``knowledge_search``, ``*``.
+    tool_pattern: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: ``deny``, ``approval_required`` or ``allow``.
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="tool_rule")
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )

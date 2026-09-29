@@ -99,6 +99,12 @@ class MessageDTO(BaseModel):
     created_at: datetime
     #: A reply's request usage (set by the messages list; null when unknown).
     usage: TokenUsageDTO | None = None
+    #: ``ok``, ``blocked_input``, ``blocked_output`` or ``error``. A blocked
+    #: message has no content: show ``notice`` in its place.
+    status: str = "ok"
+    decision_id: uuid.UUID | None = None
+    #: What the user was told about a blocked message (the admin's message).
+    notice: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

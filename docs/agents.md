@@ -146,6 +146,14 @@ With Redis configured, a call reaches the device wherever its socket is:
 each worker announces its devices and the call travels to the worker that
 holds the socket, and the answer back.
 
+### Refusals
+
+A prompt, an answer or a tool call can be refused (tool rules in core,
+content policies with Enterprise); the outcomes -- 422 `policy_blocked`,
+`finish_reason: content_filter`, `faden.tool_denied`, approvals -- are in
+[governance.md](governance.md). Agent routes answer approvals at
+`POST /v1/agents/{agent}/approvals/{approvalId}`.
+
 What the server keeps: one request-log row per request (agent, user, device,
 conversation id, model, tokens, latency, status), the events, and nothing of
 the conversation. Traces of agent requests hold metadata only.

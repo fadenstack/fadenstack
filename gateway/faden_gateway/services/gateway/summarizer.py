@@ -12,7 +12,7 @@ import uuid
 
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import ChatMessage, SessionSummary
-from faden_gateway.services.gateway.context_assembler import _estimate_tokens
+from faden_gateway.services.gateway.context_assembler import _estimate_tokens, in_context
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,10 @@ class Summarizer:
         if previous_summary:
             parts.append(f"[Previous Summary]\n{previous_summary.summary_text}")
         for msg in new_messages:
-            parts.append(f"{msg.role}: {msg.content}")
+            # Blocked and failed turns are not summarised, as they are not sent
+            # to the model (context_assembler.in_context).
+            if in_context(msg):
+                parts.append(f"{msg.role}: {msg.content}")
 
         conversation_text = "\n\n".join(parts)
 

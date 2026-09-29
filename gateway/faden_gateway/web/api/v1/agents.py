@@ -42,7 +42,7 @@ from faden_gateway.services.gateway.auth import (
     get_agent_route_claims,
     get_auth_context_from_claims,
 )
-from faden_gateway.services.gateway.errors import GatewayError, error_response
+from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions
 
@@ -54,13 +54,7 @@ TURN_HEADER = "x-faden-turn-id"
 
 
 def _error(exc: GatewayError) -> JSONResponse:
-    return error_response(
-        status_code=exc.status_code,
-        message=exc.message,
-        error_type=exc.error_type,
-        param=exc.param,
-        code=exc.code,
-    )
+    return error_from(exc)
 
 
 def _header_id(request: Request, name: str) -> str | None:

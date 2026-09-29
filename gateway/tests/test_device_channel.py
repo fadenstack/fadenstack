@@ -180,7 +180,9 @@ async def test_another_users_session_is_refused() -> None:
 
 
 def test_the_route_refuses_an_unauthenticated_socket(fastapi_app: FastAPI) -> None:
-    http = TestClient(fastapi_app)  # no lifespan: the refusal needs none
+    # No lifespan: refusing needs no database (the real route is run end to end).
+    fastapi_app.state.db_session_factory = lambda: pytest.fail("a refused socket touched the database")
+    http = TestClient(fastapi_app)
     with (
         pytest.raises(WebSocketDisconnect) as refused,
         http.websocket_connect("/v1/client/ws", headers={"Authorization": "Bearer nonsense"}),
@@ -365,4 +367,24 @@ async def test_the_broker_entry_point_reaches_the_users_device() -> None:
     await ws.heard()
     ws.say(type="tool_call_result", call_id="c", status="ok", result="ok")
     assert (await call).content == "ok"
+    await _drop(ws, task)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("across", [False, True], ids=["same worker", "across workers"])
+async def test_a_call_that_needs_approval_asks_the_device_to_ask_its_user(
+    across: bool, hubs: tuple[DeviceHub, DeviceHub],
+) -> None:
+    a, b = hubs
+    ws, task = await _connect(b)
+    call = asyncio.create_task((a if across else b).call(
+        tenant_id="tenant-a", user_id=USER, session_id=SESSION, tool_id="read_page", arguments={},
+        call_id="call_1", approval="Reading pages needs your approval.", timeout=0.3,
+    ))
+    request = await ws.heard()
+    assert request["approval_required"] == {"reason": "Reading pages needs your approval."}
+    ws.say(type="tool_call_approval_pending", call_id="call_1", timeout_s=5)
+    await asyncio.sleep(0.5)
+    ws.say(type="tool_call_result", call_id="call_1", status="ok", result="read")
+    assert (await call).content == "read"
     await _drop(ws, task)

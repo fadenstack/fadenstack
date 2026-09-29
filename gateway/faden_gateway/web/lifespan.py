@@ -348,6 +348,10 @@ async def lifespan_setup(
 
     cache = app.state.cache_backend
     await device_hub.start(cache.client() if isinstance(cache, RedisCache) else None)
+    # Tool calls waiting for approval are answered on any worker the same way.
+    from faden_gateway.services.gateway.governance import approvals  # noqa: PLC0415
+
+    approvals.use(cache.client() if isinstance(cache, RedisCache) else None)
 
     yield
     await device_hub.stop()

@@ -247,6 +247,9 @@ class SessionDAO:
         token_estimate: int | None = None,
         trace_id: str | None = None,
         tool_call_json: dict | None = None,
+        status: str = "ok",
+        decision_id: uuid.UUID | None = None,
+        content_hmac: str | None = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             session_id=session_id,
@@ -258,10 +261,25 @@ class SessionDAO:
             token_estimate=token_estimate,
             trace_id=trace_id,
             tool_call_json=tool_call_json,
+            status=status,
+            decision_id=decision_id,
+            content_hmac=content_hmac,
         )
         self.session.add(msg)
         await self.session.flush()
         return msg
+
+    async def decision_notices(self, decision_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """What the user was told about each of *decision_ids* (blocked messages)."""
+        if not decision_ids:
+            return {}
+        from faden_gateway.db.models.gateway import PolicyDecisionRecord  # noqa: PLC0415
+
+        rows = await self.session.execute(
+            select(PolicyDecisionRecord.id, PolicyDecisionRecord.message)
+            .where(PolicyDecisionRecord.id.in_(decision_ids)),
+        )
+        return {row.id: row.message or "" for row in rows}
 
     async def list_messages(
         self,

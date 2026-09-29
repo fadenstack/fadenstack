@@ -37,6 +37,9 @@ class ToolCallResult:
     executor: str = ""
 
 
+#: Realms whose executor can ask the user for approval (the device does).
+_ASKS_ITS_USER = frozenset({"client_local", "client_proxied"})
+
 class ToolExecutor(Protocol):
     """Interface every executor must satisfy."""
 
@@ -50,6 +53,7 @@ class ToolExecutor(Protocol):
         tenant_id: str,
         request_id: str,
         user_id: str | None = None,
+        approval: str | None = None,
     ) -> ToolCallResult: ...
 
 
@@ -75,7 +79,9 @@ class ServerToolExecutor:
         tenant_id: str,
         request_id: str,
         user_id: str | None = None,
+        approval: str | None = None,
     ) -> ToolCallResult:
+        del user_id, approval  # a server tool asks nobody; the tool rules decide first
         t0 = time.perf_counter()
         is_error = False
         content = ""
@@ -253,6 +259,7 @@ class ToolRouter:
             )
 
         # Policy engine check
+        approval: str | None = None
         if self._cfg.policy_engine is not None:
             decision = await self._cfg.policy_engine.evaluate(
                 tool_id=tool_id,
@@ -270,7 +277,11 @@ class ToolRouter:
                     realm=realm,
                     executor="PolicyEngine",
                 )
-            if decision.action == PolicyAction.APPROVAL_REQUIRED:
+            if decision.action == PolicyAction.APPROVAL_REQUIRED and realm in _ASKS_ITS_USER:
+                # The device asks its user, and keeps the call waiting for them
+                # (tool_call_approval_pending); it used to be refused outright.
+                approval = decision.reason or f"'{tool_id}' needs your approval."
+            elif decision.action == PolicyAction.APPROVAL_REQUIRED:
                 return ToolCallResult(
                     call_id=call_id,
                     tool_id=tool_id,
@@ -312,6 +323,7 @@ class ToolRouter:
             tenant_id=tenant_id,
             request_id=request_id,
             user_id=user_id,
+            **({"approval": approval} if approval else {}),
         )
 
         # Fallback on executor failure in hybrid mode

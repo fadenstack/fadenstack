@@ -50,14 +50,32 @@ class GatewayStream:
     aclose: Callable[[], Awaitable[None]] = _nothing
 
 
-def _sse_error(error: dict[str, Any]) -> bytes:
-    return f"data: {json.dumps({'error': error}, ensure_ascii=False)}\n\n".encode()
+def _sse_error(error: dict[str, Any], faden: dict[str, Any] | None = None) -> bytes:
+    body: dict[str, Any] = {"error": error}
+    if faden:
+        body["faden"] = faden
+    return f"data: {json.dumps(body, ensure_ascii=False)}\n\n".encode()
 
 
-async def _sse_events(error: dict[str, Any]) -> AsyncIterator[bytes]:
-    """An error event and the end of the stream, as the chat client reads them."""
-    yield _sse_error(error)
+async def _sse_events(error: dict[str, Any], faden: dict[str, Any] | None = None) -> AsyncIterator[bytes]:
+    """An error event and the end of the stream, as the chat client reads them.
+
+    *faden* is the gateway's ``faden`` object (a refused prompt's
+    ``governance`` notice): it goes along, so the chat can show the notice on
+    the turn and offer "edit and resend".
+    """
+    yield _sse_error(error, faden)
     yield b"data: [DONE]\n\n"
+
+
+def _faden_of(body_bytes: bytes) -> dict[str, Any] | None:
+    """The ``faden`` object of a gateway error body, if it has one."""
+    try:
+        detail = json.loads(body_bytes) if body_bytes else None
+    except Exception:
+        return None
+    faden = detail.get("faden") if isinstance(detail, dict) else None
+    return faden if isinstance(faden, dict) else None
 
 
 def _unavailable_error() -> dict[str, Any]:
@@ -211,7 +229,7 @@ class GatewayChatClient:
                 body_bytes = b""
             finally:
                 await resp.aclose()
-            return GatewayStream({}, _sse_events(_http_error(resp, body_bytes)))
+            return GatewayStream({}, _sse_events(_http_error(resp, body_bytes), _faden_of(body_bytes)))
 
         headers = {
             name: resp.headers[name]

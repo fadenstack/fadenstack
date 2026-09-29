@@ -61,6 +61,11 @@ from faden_backend.web.api.admin.pii.views import router as pii_router  # noqa: 
 
 admin_router.include_router(pii_router, prefix="/pii", tags=["admin-pii"])
 
+# --- Governance: tool rules and the decision log (the gateway's database) --
+from faden_backend.web.api.admin.governance.views import router as governance_router  # noqa: E402
+
+admin_router.include_router(governance_router, prefix="/governance", tags=["admin-governance"])
+
 # --- Optional module: RAG ------------------------------------------------
 # RAG Lite routes are always mounted (like PII) so settings toggled at
 # runtime take effect without restart.  The full RAG Engine takes

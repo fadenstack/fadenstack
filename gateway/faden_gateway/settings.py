@@ -178,6 +178,9 @@ class Settings(BaseSettings):
     mcp_enabled: bool = False
     mcp_service_token: str = ""
     mcp_tool_loop_max_iterations: int = 5
+    #: How long a tool call that needs approval waits for the user (streamed
+    #: answers to clients that asked for events); then it is refused.
+    governance_approval_timeout_s: int = 300
 
     # Optional module: Skills registry
     skills_service_url: str | None = None

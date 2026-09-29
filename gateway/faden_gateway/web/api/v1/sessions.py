@@ -329,11 +329,15 @@ async def list_messages(
         session_id=session_id,
         trace_ids=[m.trace_id for m in messages if m.role == "assistant" and m.trace_id],
     )
+    # A blocked message shows what the user was told, in place of its text.
+    notices = await dao.decision_notices([m.decision_id for m in messages if m.decision_id])
     data = []
     for m in messages:
         dto = MessageDTO.model_validate(m)
         if m.role == "assistant" and m.trace_id in usage:
             dto.usage = TokenUsageDTO(**usage[m.trace_id])
+        if m.decision_id:
+            dto.notice = notices.get(m.decision_id)
         data.append(dto.model_dump(mode="json"))
     return JSONResponse(status_code=200, content={"data": data})
 
