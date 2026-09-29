@@ -12,6 +12,12 @@ export type ToolRealm =
   | "client_local"
   | "client_proxied";
 export type ToolSource = "core" | "skills" | "mcp" | "local_agent" | "plugin";
+/** What a tool does. ``unknown``: nobody vouched for it -- it always asks. */
+export type ToolClass = "read" | "write" | "destructive" | "unknown";
+/** What the user lets tools do in a chat. Every chat starts in ``ask``. */
+export type ToolMode = "off" | "read_only" | "ask" | "auto";
+/** What the chat's mode does with a tool. */
+export type ToolModeDecision = "run" | "ask" | "hidden";
 
 export interface ToolAvailabilityEntry {
   tool_id: string;
@@ -24,6 +30,19 @@ export interface ToolAvailabilityEntry {
   user_enabled: boolean;
   available: boolean;
   availability_reason: string | null;
+  tool_class?: ToolClass;
+  class_source?: string;
+  /** Reaches outside the organisation (shown; no mode acts on it yet). */
+  open_world?: boolean | null;
+  mode_decision?: ToolModeDecision;
+  mode_reason?: string | null;
+}
+
+/** A chat's tool mode: the user's pick, and what applies after any ceiling. */
+export interface ToolModeState {
+  tool_mode: ToolMode;
+  effective_tool_mode: ToolMode;
+  tool_mode_ceiling: ToolMode | null;
 }
 
 export interface ToolAvailabilityResponse {
@@ -31,6 +50,9 @@ export interface ToolAvailabilityResponse {
   execution_mode: ExecutionMode;
   effective_catalog_version: number;
   tools: ToolAvailabilityEntry[];
+  tool_mode?: ToolMode;
+  effective_tool_mode?: ToolMode;
+  tool_mode_ceiling?: ToolMode | null;
 }
 
 export interface SessionToolPolicy {
@@ -38,6 +60,9 @@ export interface SessionToolPolicy {
   execution_mode: ExecutionMode;
   hybrid_preference: string | null;
   effective_catalog_version: number;
+  tool_mode?: ToolMode;
+  effective_tool_mode?: ToolMode;
+  tool_mode_ceiling?: ToolMode | null;
 }
 
 export interface SessionToolOverride {
@@ -49,6 +74,7 @@ export interface SessionToolPolicyPatch {
   execution_mode?: ExecutionMode;
   hybrid_preference?: string | null;
   tool_overrides?: SessionToolOverride[];
+  tool_mode?: ToolMode;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

@@ -76,5 +76,10 @@
   "turn_failed": "Pas de réponse : la requête a échoué.",
   "edit_and_resend": "Modifier et renvoyer",
   "rate_limited_label": "Limite de requêtes atteinte",
-  "retry_after": "Réessayez dans {{seconds}} s."
+  "retry_after": "Réessayez dans {{seconds}} s.",
+  "tool_refused": "Non exécuté",
+  "approval_title": "{{tool}} veut s'exécuter",
+  "approval_a_tool": "Un outil",
+  "approval_decline": "Refuser",
+  "approval_approve": "Approuver"
 }

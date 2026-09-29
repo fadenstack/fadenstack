@@ -119,4 +119,14 @@ export interface StreamDelta {
   finish_reason?: string | null;
   usage?: TokenUsage;
   trace_id?: string;
+  /** One of the gateway's events (AG-UI): a tool waiting for approval, one refused, ... */
+  faden?: FadenEvent;
+}
+
+/** An AG-UI event the gateway sends beside the answer (``event: faden``). */
+export interface FadenEvent {
+  type: string;
+  name?: string;
+  value?: Record<string, unknown>;
+  [key: string]: unknown;
 }

@@ -193,6 +193,9 @@ class GatewayChatClient:
         """
         return await self._open_stream(
             "POST", "/v1/chat/completions", jwt, json=payload,
+            # The chat page reads the gateway's events: a tool that waits for
+            # the user's approval, one the chat's tool mode refused.
+            extra_headers={"X-Faden-Events": "ag-ui"},
         )
 
     async def open_stream_resume(self, session_id: str, jwt: str) -> GatewayStream:
@@ -210,12 +213,13 @@ class GatewayChatClient:
         method: str,
         url: str,
         jwt: str,
+        extra_headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> GatewayStream:
         client = self._ensure_client()
         try:
             request = client.build_request(
-                method, url, headers=self._headers(jwt), **kwargs,
+                method, url, headers={**self._headers(jwt), **(extra_headers or {})}, **kwargs,
             )
             resp = await client.send(request, stream=True)
         except Exception:
@@ -499,6 +503,15 @@ class GatewayChatClient:
             f"/v1/sessions/{session_id}/tool-policy",
             json=body,
             headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def answer_approval(self, approval_id: str, approved: bool, jwt: str) -> Any:
+        """Approve or decline a tool call waiting in one of the user's chats."""
+        client = self._ensure_client()
+        resp = await client.post(
+            f"/v1/approvals/{approval_id}", json={"approved": approved}, headers=self._headers(jwt),
         )
         resp.raise_for_status()
         return resp.json()

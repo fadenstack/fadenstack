@@ -76,5 +76,10 @@
   "turn_failed": "No answer: the request failed.",
   "edit_and_resend": "Edit and resend",
   "rate_limited_label": "Rate limit reached",
-  "retry_after": "Try again in {{seconds}} s."
+  "retry_after": "Try again in {{seconds}} s.",
+  "tool_refused": "Not run",
+  "approval_title": "{{tool}} wants to run",
+  "approval_a_tool": "A tool",
+  "approval_decline": "Decline",
+  "approval_approve": "Approve"
 }

@@ -2188,6 +2188,26 @@
       "hint": "Las herramientas activadas se ofrecen con cada mensaje. El modelo puede encontrar y activar las demás cuando las necesite.",
       "refresh": "Actualizar",
       "title": "Herramientas"
+    },
+    "mode": {
+      "label": "Modo de herramientas",
+      "off": "Desactivado",
+      "read_only": "Solo lectura",
+      "ask": "Preguntar",
+      "auto": "Automático",
+      "hint_off": "En este chat no se usan herramientas.",
+      "hint_read_only": "Solo se usan herramientas de lectura; las demás no se ofrecen.",
+      "hint_ask": "Las herramientas de lectura se ejecutan; cualquier otra espera su aprobación.",
+      "hint_auto": "Las herramientas de lectura y escritura se ejecutan; las destructivas y sin clasificar esperan su aprobación.",
+      "capped": "Su organización permite como máximo este modo.",
+      "new_chat": "Cada chat empieza en «Preguntar»; cámbielo cuando el chat haya empezado.",
+      "asks": "pregunta antes"
+    },
+    "class": {
+      "read": "lectura",
+      "write": "escritura",
+      "destructive": "destructiva",
+      "unknown": "sin clasificar"
     }
   },
   "vllm": {

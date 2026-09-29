@@ -76,5 +76,10 @@
   "turn_failed": "Keine Antwort: Die Anfrage ist fehlgeschlagen.",
   "edit_and_resend": "Bearbeiten und erneut senden",
   "rate_limited_label": "Anfragelimit erreicht",
-  "retry_after": "Erneut versuchen in {{seconds}} s."
+  "retry_after": "Erneut versuchen in {{seconds}} s.",
+  "tool_refused": "Nicht ausgeführt",
+  "approval_title": "{{tool}} möchte ausgeführt werden",
+  "approval_a_tool": "Ein Werkzeug",
+  "approval_decline": "Ablehnen",
+  "approval_approve": "Zulassen"
 }

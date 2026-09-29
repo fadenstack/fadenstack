@@ -2188,6 +2188,26 @@
       "hint": "Eingeschaltete Werkzeuge werden bei jeder Nachricht angeboten. Die anderen kann das Modell selbst finden und einschalten, wenn es sie braucht.",
       "refresh": "Aktualisieren",
       "title": "Tools"
+    },
+    "mode": {
+      "label": "Werkzeugmodus",
+      "off": "Aus",
+      "read_only": "Nur lesen",
+      "ask": "Fragen",
+      "auto": "Automatisch",
+      "hint_off": "In diesem Chat werden keine Werkzeuge verwendet.",
+      "hint_read_only": "Nur lesende Werkzeuge werden verwendet; die anderen werden nicht angeboten.",
+      "hint_ask": "Lesende Werkzeuge laufen; jedes andere wartet auf Ihre Zustimmung.",
+      "hint_auto": "Lesende und schreibende Werkzeuge laufen; zerstörende und nicht eingestufte warten auf Ihre Zustimmung.",
+      "capped": "Ihre Organisation erlaubt höchstens diesen Modus.",
+      "new_chat": "Jeder Chat beginnt mit „Fragen“; ändern Sie es, sobald der Chat begonnen hat.",
+      "asks": "fragt zuerst"
+    },
+    "class": {
+      "read": "lesen",
+      "write": "schreiben",
+      "destructive": "zerstörend",
+      "unknown": "nicht eingestuft"
     }
   },
   "vllm": {

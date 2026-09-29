@@ -2311,6 +2311,26 @@
       "hint": "Switched-on tools are offered with every message. The model can find and switch on the others when it needs them.",
       "refresh": "Refresh",
       "title": "Tools"
+    },
+    "mode": {
+      "label": "Tool mode",
+      "off": "Off",
+      "read_only": "Read only",
+      "ask": "Ask",
+      "auto": "Auto",
+      "hint_off": "No tools are used in this chat.",
+      "hint_read_only": "Only tools that read are used; the others are not offered.",
+      "hint_ask": "Tools that read run; any other tool waits for your approval.",
+      "hint_auto": "Tools that read or write run; destructive and unclassified tools wait for your approval.",
+      "capped": "Your organisation allows at most this mode.",
+      "new_chat": "Every chat starts in Ask; change it once the chat has started.",
+      "asks": "asks first"
+    },
+    "class": {
+      "read": "read",
+      "write": "write",
+      "destructive": "destructive",
+      "unknown": "unclassified"
     }
   },
   "clusters": {

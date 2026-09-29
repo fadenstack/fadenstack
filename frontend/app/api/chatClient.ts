@@ -15,6 +15,7 @@ import type {
   Capacity,
   TokenUsage,
   StreamDelta,
+  FadenEvent,
 } from "./chatTypes";
 
 export type {
@@ -245,6 +246,9 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    // The name of the SSE event the next data line belongs to (``faden``: the
+    // gateway's own events, beside the OpenAI chunks).
+    let eventName: string | null = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -256,9 +260,26 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data:")) continue;
+        if (!trimmed) {
+          eventName = null;
+          continue;
+        }
+        if (trimmed.startsWith("event:")) {
+          eventName = trimmed.slice(6).trim();
+          continue;
+        }
+        if (!trimmed.startsWith("data:")) continue;
 
         const data = trimmed.slice(5).trim();
+        if (eventName === "faden") {
+          eventName = null;
+          try {
+            yield { faden: JSON.parse(data) as FadenEvent };
+          } catch {
+            // A malformed event is skipped, as a malformed chunk is.
+          }
+          continue;
+        }
         if (data === "[DONE]") return;
 
         try {
@@ -358,6 +379,9 @@ export function resumeStream(sessionId: string): StreamHandle {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    // The name of the SSE event the next data line belongs to (``faden``: the
+    // gateway's own events, beside the OpenAI chunks).
+    let eventName: string | null = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -369,9 +393,26 @@ export function resumeStream(sessionId: string): StreamHandle {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data:")) continue;
+        if (!trimmed) {
+          eventName = null;
+          continue;
+        }
+        if (trimmed.startsWith("event:")) {
+          eventName = trimmed.slice(6).trim();
+          continue;
+        }
+        if (!trimmed.startsWith("data:")) continue;
 
         const data = trimmed.slice(5).trim();
+        if (eventName === "faden") {
+          eventName = null;
+          try {
+            yield { faden: JSON.parse(data) as FadenEvent };
+          } catch {
+            // A malformed event is skipped, as a malformed chunk is.
+          }
+          continue;
+        }
         if (data === "[DONE]") return;
 
         try {
@@ -429,6 +470,13 @@ export function resumeStream(sessionId: string): StreamHandle {
 // ── REST API ─────────────────────────────────────────────────────
 
 export const chatApi = {
+  /** Approve or decline a tool call waiting in this chat (``faden.approval_required``). */
+  answerApproval: (approvalId: string, approved: boolean) =>
+    request<{ approval_id: string; approved: boolean }>(
+      `/approvals/${encodeURIComponent(approvalId)}`,
+      { method: "POST", body: JSON.stringify({ approved }) },
+    ),
+
   // Models
   listModels: async () => {
     const payload = await request<

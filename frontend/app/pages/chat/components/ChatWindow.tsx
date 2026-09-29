@@ -80,6 +80,9 @@ export default function ChatWindow({
     isLoading,
     error,
     errorInfo,
+    pendingApproval,
+    answerApproval,
+    toolNotices,
     getResponseMs,
     send,
     retry,
@@ -213,6 +216,52 @@ export default function ChatWindow({
               streaming
               reasoning={streamingReasoning || null}
             />
+          )}
+
+          {/* Tools refused while this answer streams (tool mode, a rule) */}
+          {isStreaming && toolNotices.length > 0 && (
+            <Box sx={{ px: 1, mb: 1 }} data-testid="tool-notices">
+              {toolNotices.map((notice, i) => (
+                <Typography key={i} variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                  {t("tool_refused", { ns: "chat", defaultValue: "Not run" })}: {notice}
+                </Typography>
+              ))}
+            </Box>
+          )}
+
+          {/* A tool waits for the user: the answer goes on once they decide */}
+          {pendingApproval && (
+            <Box
+              data-testid="tool-approval"
+              sx={{
+                mx: 1,
+                mb: 1.5,
+                px: 2,
+                py: 1.5,
+                borderRadius: 2,
+                border: `1px solid ${theme.palette.warning.main}`,
+                bgcolor: theme.palette.background.paper,
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 600, display: "block", color: "warning.main" }}>
+                {t("approval_title", {
+                  ns: "chat",
+                  defaultValue: "{{tool}} wants to run",
+                  tool: pendingApproval.toolName || t("approval_a_tool", { ns: "chat", defaultValue: "A tool" }),
+                })}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {pendingApproval.message}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                <Button size="small" variant="outlined" onClick={() => void answerApproval(false)} sx={{ textTransform: "none" }}>
+                  {t("approval_decline", { ns: "chat", defaultValue: "Decline" })}
+                </Button>
+                <Button size="small" variant="contained" onClick={() => void answerApproval(true)} sx={{ textTransform: "none" }}>
+                  {t("approval_approve", { ns: "chat", defaultValue: "Approve" })}
+                </Button>
+              </Box>
+            </Box>
           )}
 
           {/* A refused prompt: its notice is in the history; offer to edit it. */}

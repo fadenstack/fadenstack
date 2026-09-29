@@ -8,7 +8,7 @@ import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ChatApiError, chatApi, resumeStream, streamChat } from "~/api/chatClient";
-import type { ChatMessage, ChatSession, TokenUsage } from "~/api/chatTypes";
+import type { ChatMessage, ChatSession, FadenEvent, TokenUsage } from "~/api/chatTypes";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
 function useStreamThrottle(setter: (v: string) => void) {
@@ -71,6 +71,39 @@ export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
   return { kind: "error", message };
 }
 
+/** A tool call that waits for the user in the answer that streams. */
+export interface PendingApproval {
+  approvalId: string;
+  toolName: string;
+  message: string;
+  timeoutS: number | null;
+}
+
+/** What a gateway event means for the page; ``null`` for the ones it does not show. */
+export function readFadenEvent(event: FadenEvent):
+  | { kind: "approval"; approval: PendingApproval }
+  | { kind: "denied"; notice: string }
+  | null {
+  const value = (event.value ?? {}) as Record<string, unknown>;
+  const text = (key: string) => (typeof value[key] === "string" ? (value[key] as string) : "");
+  if (event.name === "faden.approval_required" && text("approvalId")) {
+    return {
+      kind: "approval",
+      approval: {
+        approvalId: text("approvalId"),
+        toolName: text("toolCallName"),
+        message: text("message"),
+        timeoutS: typeof value.timeoutS === "number" ? value.timeoutS : null,
+      },
+    };
+  }
+  if (event.name === "faden.tool_denied") {
+    const name = text("toolCallName");
+    return { kind: "denied", notice: name ? `${name}: ${text("message")}` : text("message") };
+  }
+  return null;
+}
+
 export interface UseChatStreamOptions {
   sessionId?: string;
   selectedModel?: string;
@@ -89,6 +122,12 @@ export interface UseChatStreamReturn {
   error: string | null;
   /** The same error, with how to show it (refused, rate limited, failed). */
   errorInfo: ChatErrorDetail | null;
+  /** A tool call in the streaming answer that waits for the user. */
+  pendingApproval: PendingApproval | null;
+  /** Approve or decline it; the answer goes on. */
+  answerApproval: (approved: boolean) => Promise<void>;
+  /** Tools refused during the answer that streams (by the tool mode or a rule). */
+  toolNotices: string[];
   /** Response time in ms for the last completed assistant message. */
   lastResponseMs: number | null;
   /** Get response time for a specific message id, if tracked. */
@@ -123,6 +162,26 @@ export function useChatStream({
   const setError = useCallback((message: string | null) => {
     setErrorInfo(message === null ? null : { kind: "error", message });
   }, []);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const [toolNotices, setToolNotices] = useState<string[]>([]);
+  const onFaden = useCallback((event: FadenEvent) => {
+    const read = readFadenEvent(event);
+    if (read?.kind === "approval") setPendingApproval(read.approval);
+    if (read?.kind === "denied") setToolNotices((prev) => [...prev, read.notice]);
+  }, []);
+  const answerApproval = useCallback(
+    async (approved: boolean) => {
+      const waiting = pendingApproval;
+      if (!waiting) return;
+      setPendingApproval(null);
+      try {
+        await chatApi.answerApproval(waiting.approvalId, approved);
+      } catch (err) {
+        setErrorInfo(errorDetail(err));
+      }
+    },
+    [pendingApproval],
+  );
   const [lastResponseMs, setLastResponseMs] = useState<number | null>(null);
   /** Per-message response times (keyed by message id). */
   const responseMsMapRef = useRef<Map<string, number>>(new Map());
@@ -169,6 +228,10 @@ export function useChatStream({
           let traceId: string | null = null;
 
           for await (const delta of reader) {
+            if (delta.faden) {
+              onFaden(delta.faden);
+              continue;
+            }
             if (delta.reasoning) {
               thought += delta.reasoning;
               reasoningThrottle.push(thought);
@@ -248,6 +311,7 @@ export function useChatStream({
     abortRef.current?.();
     abortRef.current = null;
     setIsStreaming(false);
+    setPendingApproval(null);
   }, []);
 
   const send = useCallback(
@@ -332,7 +396,12 @@ export function useChatStream({
         let traceId: string | null = null;
         let finish: string | null = null;
 
+        setToolNotices([]);
         for await (const delta of reader) {
+          if (delta.faden) {
+            onFaden(delta.faden);
+            continue;
+          }
           if (delta.reasoning) {
             thoughtFrom ??= performance.now();
             thought += delta.reasoning;
@@ -423,6 +492,7 @@ export function useChatStream({
           }
         }
       } catch (err) {
+        setPendingApproval(null);
         if ((err as Error).name !== "AbortError") {
           const detail = errorDetail(err, text);
           if (detail.kind === "blocked" && sid) {
@@ -466,6 +536,9 @@ export function useChatStream({
   }, [send]);
 
   return {
+    pendingApproval,
+    answerApproval,
+    toolNotices,
     messages,
     streamingContent,
     streamingReasoning,

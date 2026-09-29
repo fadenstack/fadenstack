@@ -44,6 +44,23 @@ async def test_the_trace_id_comes_back_before_the_body() -> None:
     await stream.aclose()  # after the body closed it: harmless
 
 
+async def test_the_chat_asks_for_the_gateways_events_and_answers_approvals() -> None:
+    seen: list[httpx.Request] = []
+
+    def gateway(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path.startswith("/v1/approvals/"):
+            return httpx.Response(200, json={"approval_id": "a1", "approved": json.loads(request.content)["approved"]})
+        return httpx.Response(200, content=SSE)
+
+    client = _client(httpx.MockTransport(gateway))
+    stream = await client.open_stream_chat({"stream": True}, "jwt")
+    await _read(stream)
+    assert seen[0].headers["x-faden-events"] == "ag-ui"
+    assert await client.answer_approval("a1", True, "jwt") == {"approval_id": "a1", "approved": True}
+    assert seen[1].url.path == "/v1/approvals/a1" and seen[1].headers["authorization"] == "Bearer jwt"
+
+
 async def test_a_gateway_error_is_an_sse_error_event() -> None:
     def gateway(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, json={"error": {"message": "slow down", "type": "rate_limit"}})

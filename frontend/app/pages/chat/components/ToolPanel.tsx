@@ -10,7 +10,10 @@ import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
 import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
+import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import CloudIcon from "@mui/icons-material/Cloud";
@@ -26,6 +29,7 @@ import type {
   ExecutionMode,
   ToolAvailabilityEntry,
   ToolAvailabilityResponse,
+  ToolMode,
   ToolRealm,
   ToolSource,
 } from "~/api/tools";
@@ -59,6 +63,11 @@ const SOURCE_ICON: Record<ToolSource, React.ReactElement> = {
   local_agent: <ComputerIcon fontSize="small" />,
   plugin: <ExtensionIcon fontSize="small" />,
 };
+
+// ── Tool modes ─────────────────────────────────────────────────
+
+const MODES: ToolMode[] = ["off", "read_only", "ask", "auto"];
+const MODE_ORDER: Record<ToolMode, number> = { off: 0, read_only: 1, ask: 2, auto: 3 };
 
 // ── Grouping helpers ───────────────────────────────────────────
 
@@ -127,6 +136,7 @@ export default function ToolPanel({
   const [catalog, setCatalog] = useState<ToolAvailabilityResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [savingMode, setSavingMode] = useState(false);
 
   // ── Fetch ──
 
@@ -261,6 +271,28 @@ export default function ToolPanel({
     [sessionId, refresh, onLocalOverride],
   );
 
+  // Every chat starts in "ask": read-only tools run, everything else waits
+  // for the user. The pick is the chat's own; a ceiling (Enterprise) caps it.
+  const chosenMode: ToolMode = catalog?.tool_mode ?? "ask";
+  const effectiveMode: ToolMode = catalog?.effective_tool_mode ?? chosenMode;
+  const ceiling = catalog?.tool_mode_ceiling ?? null;
+
+  const changeMode = useCallback(
+    async (mode: ToolMode | null) => {
+      if (!mode || !sessionId || mode === chosenMode) return;
+      setSavingMode(true);
+      try {
+        await patchSessionToolPolicy(sessionId, { tool_mode: mode });
+        await refresh();
+      } catch {
+        await refresh();
+      } finally {
+        setSavingMode(false);
+      }
+    },
+    [sessionId, chosenMode, refresh],
+  );
+
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -308,6 +340,44 @@ export default function ToolPanel({
         >
           <RefreshIcon fontSize="small" />
         </IconButton>
+      </Box>
+
+      {/* Tool mode: what tools may do in this chat */}
+      <Box sx={{ px: 1.5, pt: 1 }} data-testid="tool-mode">
+        <Typography variant="caption" sx={{ fontWeight: 600, display: "block", mb: 0.5 }}>
+          {t("tools.mode.label", "Tool mode")}
+        </Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          fullWidth
+          value={chosenMode}
+          disabled={!sessionId || savingMode}
+          onChange={(_, mode: ToolMode | null) => void changeMode(mode)}
+        >
+          {MODES.map((mode) => (
+            <ToggleButton
+              key={mode}
+              value={mode}
+              disabled={ceiling !== null && MODE_ORDER[mode] > MODE_ORDER[ceiling]}
+              sx={{ textTransform: "none", py: 0.25 }}
+            >
+              {t(`tools.mode.${mode}`, { off: "Off", read_only: "Read only", ask: "Ask", auto: "Auto" }[mode])}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, lineHeight: 1.4 }}>
+          {t(`tools.mode.hint_${effectiveMode}`, {
+            off: "No tools are used in this chat.",
+            read_only: "Only tools that read are used; the others are not offered.",
+            ask: "Tools that read run; any other tool waits for your approval.",
+            auto: "Tools that read or write run; destructive and unclassified tools wait for your approval.",
+          }[effectiveMode])}
+          {ceiling && effectiveMode !== chosenMode
+            ? ` ${t("tools.mode.capped", "Your organisation allows at most this mode.")}`
+            : ""}
+          {!sessionId ? ` ${t("tools.mode.new_chat", "Every chat starts in Ask; change it once the chat has started.")}` : ""}
+        </Typography>
       </Box>
 
       {tools.length > 0 && (
@@ -451,9 +521,19 @@ interface ToolRowProps {
   onToggle: (toolId: string, enabled: boolean) => void;
 }
 
+const CLASS_COLOR: Record<string, "success" | "info" | "error" | "default"> = {
+  read: "success",
+  write: "info",
+  destructive: "error",
+  unknown: "default",
+};
+
 function ToolRow({ tool, onToggle }: ToolRowProps) {
-  const disabled = !tool.policy_allowed;
+  const { t } = useTranslation();
+  const hidden = tool.mode_decision === "hidden";
+  const disabled = !tool.policy_allowed || hidden;
   const dimmed = !tool.effective_enabled;
+  const toolClass = tool.tool_class ?? "unknown";
 
   return (
     <Box
@@ -486,6 +566,21 @@ function ToolRow({ tool, onToggle }: ToolRowProps) {
           }}
         >
           {toolShortName(tool)}
+          <Chip
+            size="small"
+            variant="outlined"
+            color={CLASS_COLOR[toolClass] ?? "default"}
+            label={t(`tools.class.${toolClass}`, {
+              read: "read", write: "write", destructive: "destructive", unknown: "unclassified",
+            }[toolClass] ?? toolClass)}
+            data-tool-class={toolClass}
+            sx={{ ml: 0.75, height: 18, fontSize: "0.68rem", verticalAlign: "middle" }}
+          />
+          {tool.mode_decision === "ask" && (
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+              {t("tools.mode.asks", "asks first")}
+            </Typography>
+          )}
         </Typography>
 
         {tool.description && (
@@ -503,7 +598,13 @@ function ToolRow({ tool, onToggle }: ToolRowProps) {
           </Typography>
         )}
 
-        {tool.availability_reason && (
+        {hidden && tool.mode_reason && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.35, mt: 0.125 }}>
+            {tool.mode_reason}
+          </Typography>
+        )}
+
+        {tool.availability_reason && !hidden && (
           <Tooltip title={tool.availability_reason} placement="bottom-start">
             <Typography
               variant="caption"

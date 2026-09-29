@@ -433,6 +433,18 @@ async def patch_session_tool_policy(
         return await _proxy_error(exc)
 
 
+@router.post("/approvals/{approval_id}")
+async def answer_approval(approval_id: str, request: Request) -> JSONResponse:
+    """Proxy ``POST /v1/approvals/{approval_id}``: the user answers a tool call that waits for them."""
+    jwt = _jwt_from_cookie(request)
+    body = await request.json()
+    try:
+        data = await _client().answer_approval(approval_id, bool(body.get("approved")), jwt)
+        return JSONResponse(content=data)
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
 @router.get("/pii-defaults")
 async def get_pii_defaults(
     request: Request,

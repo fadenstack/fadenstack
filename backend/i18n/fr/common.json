@@ -2283,6 +2283,26 @@
       "hint": "Les outils activés sont proposés à chaque message. Le modèle peut trouver et activer les autres quand il en a besoin.",
       "refresh": "Actualiser",
       "title": "Outils"
+    },
+    "mode": {
+      "label": "Mode des outils",
+      "off": "Désactivé",
+      "read_only": "Lecture seule",
+      "ask": "Demander",
+      "auto": "Automatique",
+      "hint_off": "Aucun outil n'est utilisé dans ce chat.",
+      "hint_read_only": "Seuls les outils de lecture sont utilisés ; les autres ne sont pas proposés.",
+      "hint_ask": "Les outils de lecture s'exécutent ; tout autre outil attend votre accord.",
+      "hint_auto": "Les outils de lecture et d'écriture s'exécutent ; les outils destructifs ou non classés attendent votre accord.",
+      "capped": "Votre organisation autorise au plus ce mode.",
+      "new_chat": "Chaque chat commence en « Demander » ; changez-le une fois le chat commencé.",
+      "asks": "demande d'abord"
+    },
+    "class": {
+      "read": "lecture",
+      "write": "écriture",
+      "destructive": "destructif",
+      "unknown": "non classé"
     }
   },
   "system_updates": {

@@ -76,5 +76,10 @@
   "turn_failed": "没有回答：请求失败。",
   "edit_and_resend": "编辑并重新发送",
   "rate_limited_label": "已达到请求限制",
-  "retry_after": "请在 {{seconds}} 秒后重试。"
+  "retry_after": "请在 {{seconds}} 秒后重试。",
+  "tool_refused": "未运行",
+  "approval_title": "{{tool}} 请求运行",
+  "approval_a_tool": "一个工具",
+  "approval_decline": "拒绝",
+  "approval_approve": "批准"
 }
