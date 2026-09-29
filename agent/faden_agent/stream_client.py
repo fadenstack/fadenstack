@@ -32,6 +32,10 @@ from faden_agent.tls import websockets_ssl
 
 log = logging.getLogger(__name__)
 
+#: Header the agent connects with: the commands it is still executing (backend
+#: ``NodeControlService.RUNNING_COMMANDS_HEADER``).
+RUNNING_COMMANDS_HEADER = "X-Faden-Running-Commands"
+
 #: How often the control channel checks the backend is still there.
 _PING_INTERVAL_SEC = 20
 
@@ -89,7 +93,11 @@ class StreamClient:
         # the stream was opened with, for as long as it stays open.
         self._signing_key = derive_signing_key(credential)
         ws_url = self._ws_url()
-        headers = {"Authorization": f"Bearer {credential}", SIGNING_HEADER: SIGNING_SCHEME}
+        headers = {
+            "Authorization": f"Bearer {credential}",
+            SIGNING_HEADER: SIGNING_SCHEME,
+            RUNNING_COMMANDS_HEADER: self._running_commands_header(),
+        }
         log.info("Connecting node stream to %s", ws_url)
         async with websockets.connect(
             ws_url,
@@ -117,6 +125,17 @@ class StreamClient:
                 exc = task.exception()
                 if exc is not None:
                     raise exc
+
+    def _running_commands_header(self) -> str:
+        """``v1:`` and the ids of the commands still executing here, for the backend to keep.
+
+        Everything else it had sent to this agent died with the last
+        connection -- which the backend may not have seen close, when it is
+        itself the one that restarted.
+        """
+        listing = getattr(self._dispatcher, "running_command_ids", None)
+        running = listing() if callable(listing) else []
+        return "v1:" + ",".join(running[:100])
 
     async def _receive_loop(self, ws: websockets.WebSocketClientProtocol) -> None:
         while True:

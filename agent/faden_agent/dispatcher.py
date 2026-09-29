@@ -144,6 +144,14 @@ class CommandDispatcher:
         )
         return normalized
 
+    def running_command_ids(self) -> list[str]:
+        """The commands this agent is executing right now.
+
+        Said to the backend on every connect, which fails the rest of what it
+        had sent here as lost (``StreamClient`` ``RUNNING_COMMANDS_HEADER``).
+        """
+        return [command_id for command_id, task in self._inflight.items() if not task.done()]
+
     async def _guarded_execute(
         self,
         *,
