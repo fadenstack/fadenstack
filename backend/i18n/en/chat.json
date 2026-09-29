@@ -69,5 +69,12 @@
   },
   "thinking": "Thinking…",
   "thought_for": "Thought for {{seconds}} s",
-  "thought": "Thought"
+  "thought": "Thought",
+  "blocked_prompt": "Not sent",
+  "blocked_answer": "Answer withheld",
+  "blocked_default": "This was stopped by your organisation's policy.",
+  "turn_failed": "No answer: the request failed.",
+  "edit_and_resend": "Edit and resend",
+  "rate_limited_label": "Rate limit reached",
+  "retry_after": "Try again in {{seconds}} s."
 }

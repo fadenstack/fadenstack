@@ -14,6 +14,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +63,8 @@ interface Props {
   autoFocus?: boolean;
   onToolsToggle?: () => void;
   toolsOpen?: boolean;
+  /** Text to put back in the box ("edit and resend"); a new ``nonce`` puts it again. */
+  draft?: { text: string; nonce: number } | null;
 }
 
 /** ``/skill`` or ``/skills``, alone or followed by what the skill should do. */
@@ -79,6 +82,7 @@ export default function ChatInput({
   autoFocus = true,
   onToolsToggle,
   toolsOpen = false,
+  draft = null,
 }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -87,6 +91,9 @@ export default function ChatInput({
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const phoneNav = useChatShell()?.phoneNav ?? null;
   const [text, setText] = useState("");
+  useEffect(() => {
+    if (draft) setText(draft.text);
+  }, [draft]);
   const [files, setFiles] = useState<File[]>([]);
   const [focused, setFocused] = useState(false);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);

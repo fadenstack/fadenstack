@@ -69,5 +69,12 @@
   },
   "thinking": "Denkt nach…",
   "thought_for": "{{seconds}} s nachgedacht",
-  "thought": "Gedanken"
+  "thought": "Gedanken",
+  "blocked_prompt": "Nicht gesendet",
+  "blocked_answer": "Antwort zurückgehalten",
+  "blocked_default": "Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.",
+  "turn_failed": "Keine Antwort: Die Anfrage ist fehlgeschlagen.",
+  "edit_and_resend": "Bearbeiten und erneut senden",
+  "rate_limited_label": "Anfragelimit erreicht",
+  "retry_after": "Erneut versuchen in {{seconds}} s."
 }

@@ -65,6 +65,7 @@ export default function ChatWindow({
   const { t } = useTranslation();
   const theme = useTheme();
   const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const initialSentRef = useRef(false);
@@ -78,6 +79,7 @@ export default function ChatWindow({
     isStreaming,
     isLoading,
     error,
+    errorInfo,
     getResponseMs,
     send,
     retry,
@@ -196,6 +198,8 @@ export default function ChatWindow({
               onDebugClick={setDebugTraceId}
               reasoning={msg.role === "assistant" ? msg.reasoning : null}
               reasoningMs={msg.role === "assistant" ? msg.reasoning_ms : null}
+              status={msg.status}
+              notice={msg.notice}
             />
           ))}
 
@@ -211,8 +215,23 @@ export default function ChatWindow({
             />
           )}
 
-          {/* Error bubble — shown after messages so it appears at the bottom */}
-          {error && (
+          {/* A refused prompt: its notice is in the history; offer to edit it. */}
+          {errorInfo?.kind === "blocked" && (
+            <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1, mb: 1.5 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="info"
+                onClick={() => setDraft({ text: errorInfo.text ?? "", nonce: Date.now() })}
+                sx={{ textTransform: "none" }}
+              >
+                {t("edit_and_resend", { ns: "chat", defaultValue: "Edit and resend" })}
+              </Button>
+            </Box>
+          )}
+
+          {/* Error bubble — on the turn that failed, the last one */}
+          {error && errorInfo?.kind !== "blocked" && (
             <Box
               sx={{
                 display: "flex",
@@ -258,13 +277,22 @@ export default function ChatWindow({
                     display: "block",
                   }}
                 >
-                  {t("error_label", { ns: "chat", defaultValue: "Error" })}
+                  {errorInfo?.kind === "rate_limit"
+                    ? t("rate_limited_label", { ns: "chat", defaultValue: "Rate limit reached" })
+                    : t("error_label", { ns: "chat", defaultValue: "Error" })}
                 </Typography>
                 <Typography
                   variant="body2"
                   sx={{ mb: 1, wordBreak: "break-word" }}
                 >
                   {error}
+                  {errorInfo?.kind === "rate_limit" && errorInfo.retryAfter
+                    ? ` ${t("retry_after", {
+                        ns: "chat",
+                        defaultValue: "Try again in {{seconds}} s.",
+                        seconds: errorInfo.retryAfter,
+                      })}`
+                    : ""}
                 </Typography>
                 <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                   <Button
@@ -328,6 +356,7 @@ export default function ChatWindow({
         streaming={isStreaming}
         onToolsToggle={onToolsToggle}
         toolsOpen={toolsOpen}
+        draft={draft}
       />
 
       {/* Debug panel — only rendered when RBAC allows */}

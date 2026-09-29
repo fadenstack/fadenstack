@@ -7,7 +7,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { chatApi, resumeStream, streamChat } from "~/api/chatClient";
+import { ChatApiError, chatApi, resumeStream, streamChat } from "~/api/chatClient";
 import type { ChatMessage, ChatSession, TokenUsage } from "~/api/chatTypes";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
@@ -47,6 +47,30 @@ function useStreamThrottle(setter: (v: string) => void) {
   return { push, flush, reset };
 }
 
+/** How the last error shows on its turn. */
+export interface ChatErrorDetail {
+  /** ``blocked``: a governance check refused the prompt (not an error: info,
+   * with "edit and resend"); ``rate_limit``: try again later; ``error``: retry. */
+  kind: "blocked" | "rate_limit" | "error";
+  message: string;
+  /** The text that was refused, for "edit and resend". */
+  text?: string;
+  retryAfter?: number | null;
+}
+
+export function errorDetail(err: unknown, text?: string): ChatErrorDetail {
+  const message = err instanceof Error ? err.message : String(err);
+  if (err instanceof ChatApiError) {
+    if (err.code === "policy_blocked" || err.type === "governance_error") {
+      return { kind: "blocked", message: err.governance?.message ?? message, text };
+    }
+    if (err.status === 429 || err.type === "rate_limit_error" || err.code?.startsWith("rate_limit")) {
+      return { kind: "rate_limit", message, retryAfter: err.retryAfter };
+    }
+  }
+  return { kind: "error", message };
+}
+
 export interface UseChatStreamOptions {
   sessionId?: string;
   selectedModel?: string;
@@ -63,6 +87,8 @@ export interface UseChatStreamReturn {
   isStreaming: boolean;
   isLoading: boolean;
   error: string | null;
+  /** The same error, with how to show it (refused, rate limited, failed). */
+  errorInfo: ChatErrorDetail | null;
   /** Response time in ms for the last completed assistant message. */
   lastResponseMs: number | null;
   /** Get response time for a specific message id, if tracked. */
@@ -92,7 +118,11 @@ export function useChatStream({
   const [streamingUsage, setStreamingUsage] = useState<TokenUsage | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ChatErrorDetail | null>(null);
+  const error = errorInfo?.message ?? null;
+  const setError = useCallback((message: string | null) => {
+    setErrorInfo(message === null ? null : { kind: "error", message });
+  }, []);
   const [lastResponseMs, setLastResponseMs] = useState<number | null>(null);
   /** Per-message response times (keyed by message id). */
   const responseMsMapRef = useRef<Map<string, number>>(new Map());
@@ -191,7 +221,12 @@ export function useChatStream({
 
       // If the last message is from the user with no assistant reply,
       // the previous request likely failed — surface a retry prompt.
-      if (msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
+      // A refused prompt got its answer: the notice (status blocked_input).
+      if (
+        msgs.length > 0 &&
+        msgs[msgs.length - 1].role === "user" &&
+        msgs[msgs.length - 1].status !== "blocked_input"
+      ) {
         const lastUser = msgs[msgs.length - 1];
         lastSendRef.current = { text: lastUser.content, model: "" };
         setError(
@@ -295,6 +330,7 @@ export function useChatStream({
         let thoughtMs: number | null = null;
         let finalUsage: TokenUsage | null = null;
         let traceId: string | null = null;
+        let finish: string | null = null;
 
         for await (const delta of reader) {
           if (delta.reasoning) {
@@ -316,6 +352,27 @@ export function useChatStream({
           if (delta.trace_id) {
             traceId = delta.trace_id;
           }
+          if (delta.finish_reason) {
+            finish = delta.finish_reason;
+          }
+        }
+
+        // A refused answer: the part already shown is not kept -- the session
+        // holds the notice in its place.
+        if (finish === "content_filter") {
+          try {
+            setMessages(await chatApi.listMessages(sid));
+          } catch {
+            // The notice shows on the next load.
+          }
+          streamThrottle.reset();
+          setStreamingContent("");
+          reasoningThrottle.reset();
+          setStreamingReasoning("");
+          setStreamingUsage(null);
+          setIsStreaming(false);
+          abortRef.current = null;
+          return;
         }
 
         // 5. Streaming complete — materialise assistant message
@@ -367,7 +424,16 @@ export function useChatStream({
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          setError(err instanceof Error ? err.message : String(err));
+          const detail = errorDetail(err, text);
+          if (detail.kind === "blocked" && sid) {
+            // The session keeps the refused turn as a notice, without its text.
+            try {
+              setMessages(await chatApi.listMessages(sid));
+            } catch {
+              // Keep the optimistic message.
+            }
+          }
+          setErrorInfo(detail);
         }
         setIsStreaming(false);
         abortRef.current = null;
@@ -407,6 +473,7 @@ export function useChatStream({
     isStreaming,
     isLoading,
     error,
+    errorInfo,
     lastResponseMs,
     /** Get response time for a specific message id, if tracked. */
     getResponseMs: (msgId: string) =>

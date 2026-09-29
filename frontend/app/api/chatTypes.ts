@@ -51,6 +51,11 @@ export interface ChatMessage {
   reasoning?: string | null;
   /** How long it thought, in ms. */
   reasoning_ms?: number | null;
+  /** A turn the gateway refused or that failed: its text is not stored
+   * (``blocked_*``), and it is not sent to the model again. */
+  status?: "ok" | "blocked_input" | "blocked_output" | "error";
+  /** What the user was told about a refused message. */
+  notice?: string | null;
 }
 
 export interface ChatAttachment {

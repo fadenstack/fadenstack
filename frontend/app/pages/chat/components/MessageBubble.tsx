@@ -37,6 +37,10 @@ interface Props {
   /** What a reasoning model thought before this reply, folded above it. */
   reasoning?: string | null;
   reasoningMs?: number | null;
+  /** A refused or failed turn (see ChatMessage.status). */
+  status?: "ok" | "blocked_input" | "blocked_output" | "error";
+  /** What the user was told about a refused message; shown in its place. */
+  notice?: string | null;
 }
 
 export default function MessageBubble({
@@ -52,10 +56,15 @@ export default function MessageBubble({
   onDebugClick,
   reasoning = null,
   reasoningMs = null,
+  status = "ok",
+  notice = null,
 }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
   const isUser = role === "user";
+  // A refused message has no text: its notice shows, as information, not as an error.
+  const blocked = status === "blocked_input" || status === "blocked_output";
+  const tinted = isUser && !blocked;
 
   return (
     <Box
@@ -100,13 +109,15 @@ export default function MessageBubble({
           py: 1.5,
           // Chat-style radius: flat on the side closest to the avatar
           borderRadius: isUser ? "12px 4px 12px 12px" : "4px 12px 12px 12px",
-          bgcolor: isUser
+          bgcolor: tinted
             ? theme.palette.primary.main
             : theme.palette.mode === "dark"
               ? theme.palette.grey[900]
               : theme.palette.grey[100],
-          border: isUser ? "none" : `1px solid ${theme.palette.divider}`,
-          color: isUser
+          border: tinted
+            ? "none"
+            : `1px ${blocked ? "dashed" : "solid"} ${blocked ? theme.palette.info.main : theme.palette.divider}`,
+          color: tinted
             ? theme.palette.primary.contrastText
             : theme.palette.text.primary,
           position: "relative",
@@ -164,12 +175,41 @@ export default function MessageBubble({
           }}
         >
           {reasoning && !isUser && <ThinkingBlock text={reasoning} ms={reasoningMs} />}
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-          >
-            {content}
-          </ReactMarkdown>
+          {blocked ? (
+            <Box data-message-status={status} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+              <InfoOutlinedIcon sx={{ fontSize: 18, mt: 0.25, color: "info.main" }} />
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 600, display: "block", color: "info.main" }}>
+                  {status === "blocked_input"
+                    ? t("blocked_prompt", { ns: "chat", defaultValue: "Not sent" })
+                    : t("blocked_answer", { ns: "chat", defaultValue: "Answer withheld" })}
+                </Typography>
+                <Typography variant="body2">
+                  {notice ||
+                    t("blocked_default", {
+                      ns: "chat",
+                      defaultValue: "This was stopped by your organisation's policy.",
+                    })}
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {content}
+            </ReactMarkdown>
+          )}
+          {status === "error" && (
+            <Typography
+              variant="caption"
+              data-message-status="error"
+              sx={{ display: "block", mt: 0.5, opacity: 0.8 }}
+            >
+              {t("turn_failed", { ns: "chat", defaultValue: "No answer: the request failed." })}
+            </Typography>
+          )}
 
           {/* Blinking cursor for streaming */}
           {streaming && (
@@ -191,7 +231,7 @@ export default function MessageBubble({
         </Box>
 
         {/* Footer: info tooltip + response time + token usage */}
-        {!isUser && !streaming && (
+        {!isUser && !streaming && !blocked && (
           <Box
             sx={{
               display: "flex",

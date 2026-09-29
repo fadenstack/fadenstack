@@ -69,5 +69,12 @@
   },
   "thinking": "Pensando…",
   "thought_for": "Pensó durante {{seconds}} s",
-  "thought": "Razonamiento"
+  "thought": "Razonamiento",
+  "blocked_prompt": "No enviado",
+  "blocked_answer": "Respuesta retenida",
+  "blocked_default": "Una política de su organización lo ha detenido.",
+  "turn_failed": "Sin respuesta: la solicitud falló.",
+  "edit_and_resend": "Editar y reenviar",
+  "rate_limited_label": "Límite de solicitudes alcanzado",
+  "retry_after": "Inténtelo de nuevo en {{seconds}} s."
 }

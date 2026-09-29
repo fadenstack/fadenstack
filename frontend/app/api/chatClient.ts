@@ -41,6 +41,73 @@ const BASE =
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/** What the gateway said about a refused prompt (``faden.governance``). */
+export interface GovernanceNotice {
+  outcome: string;
+  stage: string;
+  category?: string;
+  message: string;
+  decision_id?: string | null;
+  message_id?: string | null;
+}
+
+/** An error from the chat API, with what the page needs to show it on its turn. */
+export class ChatApiError extends Error {
+  code: string | null;
+  type: string | null;
+  status: number | null;
+  /** Set when a governance check refused the prompt. */
+  governance: GovernanceNotice | null;
+  /** Seconds to wait, for a rate limit. */
+  retryAfter: number | null;
+
+  constructor(
+    message: string,
+    init: {
+      code?: string | null;
+      type?: string | null;
+      status?: number | null;
+      governance?: GovernanceNotice | null;
+      retryAfter?: number | null;
+    } = {},
+  ) {
+    super(message);
+    this.name = "ChatApiError";
+    this.code = init.code ?? null;
+    this.type = init.type ?? null;
+    this.status = init.status ?? null;
+    this.governance = init.governance ?? null;
+    this.retryAfter = init.retryAfter ?? null;
+  }
+}
+
+function errorFields(payload: unknown): {
+  code: string | null;
+  type: string | null;
+  status: number | null;
+  governance: GovernanceNotice | null;
+} {
+  const record = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const error = (record.error && typeof record.error === "object" ? record.error : {}) as Record<
+    string,
+    unknown
+  >;
+  const faden = (record.faden && typeof record.faden === "object" ? record.faden : {}) as Record<
+    string,
+    unknown
+  >;
+  const governance =
+    faden.governance && typeof faden.governance === "object"
+      ? (faden.governance as GovernanceNotice)
+      : null;
+  return {
+    code: typeof error.code === "string" ? error.code : null,
+    type: typeof error.type === "string" ? error.type : null,
+    status: typeof error.status === "number" ? error.status : null,
+    governance,
+  };
+}
+
 function parseApiErrorMessage(payload: unknown, status: number): string | null {
   if (!payload || typeof payload !== "object") return null;
 
@@ -101,7 +168,12 @@ async function buildApiError(res: Response): Promise<Error> {
       const parsed = JSON.parse(raw) as unknown;
       const parsedMessage = parseApiErrorMessage(parsed, res.status);
       if (parsedMessage) {
-        return new Error(parsedMessage);
+        const retry = Number(res.headers.get("retry-after"));
+        return new ChatApiError(parsedMessage, {
+          ...errorFields(parsed),
+          status: res.status,
+          retryAfter: Number.isFinite(retry) && retry > 0 ? retry : null,
+        });
       }
     } catch {
       // keep raw text fallback
@@ -200,7 +272,7 @@ export function streamChat(payload: Record<string, unknown>): StreamHandle {
               parsed.error.message ||
               parsed.error.type ||
               "Unknown streaming error";
-            throw new Error(msg);
+            throw new ChatApiError(msg, errorFields(parsed));
           }
 
           const choice = parsed.choices?.[0];

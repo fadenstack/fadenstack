@@ -69,5 +69,12 @@
   },
   "thinking": "Réflexion…",
   "thought_for": "A réfléchi {{seconds}} s",
-  "thought": "Réflexion"
+  "thought": "Réflexion",
+  "blocked_prompt": "Non envoyé",
+  "blocked_answer": "Réponse retenue",
+  "blocked_default": "Une règle de votre organisation l'a arrêté.",
+  "turn_failed": "Pas de réponse : la requête a échoué.",
+  "edit_and_resend": "Modifier et renvoyer",
+  "rate_limited_label": "Limite de requêtes atteinte",
+  "retry_after": "Réessayez dans {{seconds}} s."
 }
