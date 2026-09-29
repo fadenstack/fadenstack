@@ -362,6 +362,14 @@ class AgentRequest:
     def id(self) -> str:
         return self.agent.id
 
+    @property
+    def local_mcp_allowed(self) -> bool:
+        """Whether the device may offer its local MCP servers' tools.
+
+        The agent allows local MCP, or the user has developer mode.
+        """
+        return self.agent.local_mcp_mode == "allow" or self.developer_mode
+
     def allows_server_tool(self, name: str) -> bool:
         """Whether the agent lets the model be offered the gateway tool *name*."""
         allowed = self.agent.server_tools

@@ -143,8 +143,13 @@ async def agent_request(
     )
 
 
-def apply_agent(profile: AgentProfile, payload: dict[str, Any]) -> dict[str, Any]:
-    """The request body as the agent's version shapes it."""
+def apply_agent(profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False) -> dict[str, Any]:
+    """The request body as the agent's version shapes it.
+
+    Tools outside the host tool contract are refused, unless the device may
+    attach local MCP servers (*local_mcp*): their tools are not in any
+    contract, and the tool mode treats them as unclassified.
+    """
     if "session_id" in payload:
         raise GatewayError(
             status_code=400,
@@ -152,7 +157,7 @@ def apply_agent(profile: AgentProfile, payload: dict[str, Any]) -> dict[str, Any
             code="session_not_supported",
             param="session_id",
         )
-    if profile.host_tool_contract:
+    if profile.host_tool_contract and not local_mcp:
         allowed = profile.host_tools
         declared = [
             (tool.get("function") or {}).get("name") or ""
@@ -190,7 +195,7 @@ async def agent_chat_completions(
         auth=auth,
         service=service,
         agent=agent,
-        prepare=lambda payload: apply_agent(agent.agent, payload),
+        prepare=lambda payload: apply_agent(agent.agent, payload, local_mcp=agent.local_mcp_allowed),
     )
 
 

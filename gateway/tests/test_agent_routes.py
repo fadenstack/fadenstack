@@ -435,6 +435,29 @@ async def test_the_callers_tools_must_be_in_the_host_tool_contract(
     assert "read_page" in names and "delete_page" not in names
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize(("mode", "dev", "allowed"), [
+    ("disable", False, False), ("disable", True, True), ("allow", False, True),
+])
+async def test_local_mcp_tools_pass_the_contract_only_where_local_mcp_is_allowed(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    mode: str, dev: bool, allowed: bool,
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(local_mcp_mode=mode))
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    tools = [{"type": "function", "function": {"name": n, "parameters": {"type": "object"}}}
+             for n in ("read_page", "count_terminals")]
+    r = await client.post(URL, headers=_headers(_agent_token(dev=dev)), json=_chat(tools=tools))
+    if not allowed:
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "tool_not_in_contract"
+        return
+    assert r.status_code == 200, r.text
+    assert {t["function"]["name"] for t in sent[-1]["tools"]} >= {"read_page", "count_terminals"}
+
+
 def test_only_the_gateway_tools_the_agent_allows_are_offered() -> None:
     def tool(name: str) -> dict[str, Any]:
         return {"type": "function", "function": {"name": name}}

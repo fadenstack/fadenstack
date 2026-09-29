@@ -34,7 +34,10 @@ A version holds:
 - `model_alias`: the model every request uses, whatever the client asks for.
 - `host_tool_contract`: the tools the host application may offer (`name`,
   optionally `schema_sha256`, `risk`, `approval`). A request declaring any
-  other tool is refused. Empty means no restriction.
+  other tool is refused -- unless the device may attach local MCP servers
+  (`local_mcp_mode: allow`, or the user's developer mode): their tools are in
+  no contract, and tool modes treat them as unclassified. Empty means no
+  restriction.
 - `server_tools`: the gateway's own tools (knowledge search, MCP tools, ...)
   the model may be offered, as names or patterns (`knowledge_*`). Leave it out
   for what a chat would get; `[]` for none.
