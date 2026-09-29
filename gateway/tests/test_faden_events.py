@@ -35,12 +35,12 @@ EVENTS = {"X-Faden-Events": "ag-ui"}
 
 
 def _faden(raw: str) -> list[dict[str, Any]]:
-    """The named ``faden`` events of an SSE body, in order."""
+    """The named ``faden`` events of an SSE body, in order (the tool mode notice aside: test_tool_modes)."""
     out = []
     for block in raw.split("\n\n"):
         if block.startswith("event: faden\n"):
             out.append(json.loads(block.split("data: ", 1)[1]))
-    return out
+    return [e for e in out if e.get("name") != "faden.tool_mode"]
 
 
 def _text(raw: str) -> str:
@@ -99,7 +99,7 @@ async def test_a_whole_answer_carries_them_beside_the_openai_fields(
     })
     body = r.json()
     assert body["choices"][0]["message"]["content"] == "On 5 May."
-    types = [(e["type"], e.get("name")) for e in body["faden"]["events"]]
+    types = [(e["type"], e.get("name")) for e in body["faden"]["events"] if e.get("name") != "faden.tool_mode"]
     assert types == [
         ("TOOL_CALL_START", None), ("TOOL_CALL_END", None),
         ("CUSTOM", "faden.citations"), ("CUSTOM", "faden.gateway_round"),

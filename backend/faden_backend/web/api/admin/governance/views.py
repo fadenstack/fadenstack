@@ -1,4 +1,4 @@
-"""Governance for admins: the tenant's tool rules, and the decisions checks made.
+"""Governance for admins: tool rules, tool classes, and the decisions checks made.
 
 Both live in the gateway's database (``llm_gateway_tool_rule``,
 ``llm_gateway_policy_decision``). The gateway reads a tenant's rules at most
@@ -127,6 +127,94 @@ async def delete_tool_rule(rule_id: uuid.UUID, request: Request, _admin: Admin) 
     """Remove a rule."""
     async with _gateway(request)() as db:
         gone = await db.execute(text("DELETE FROM llm_gateway_tool_rule WHERE id = :id"), {"id": rule_id})
+        if not gone.rowcount:  # type: ignore[attr-defined]
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such rule.")
+        await db.commit()
+
+
+class ToolClassIn(BaseModel):
+    """What a tool does, as an admin says it (fadenstack-dev sdk/07-tool-classes.md)."""
+
+    tenant_id: str = Field(default="default", max_length=128)
+    #: A glob over tool names: ``mcp.github.*``, ``read_page``.
+    tool_pattern: str = Field(min_length=1, max_length=256)
+    #: ``annotations``: trust what these tools' MCP server says about them.
+    tool_class: Literal["read", "write", "destructive", "annotations"]
+    #: Reaches outside the organisation. Recorded and shown; no mode acts on it yet.
+    open_world: bool | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    priority: int = Field(default=100, ge=0, le=100_000)
+
+
+_CLASS_COLUMNS = "id, tenant_id, tool_pattern, tool_class, open_world, note, priority, created_at, updated_at"
+
+
+@router.get("/tool-classes", name="governance_tool_classes")
+async def list_tool_classes(request: Request, _admin: Admin, tenant_id: str = "default") -> dict[str, Any]:
+    """The tenant's classification rules, in the order they are tried.
+
+    A tool no rule classifies (and that is not one of the gateway's own) is
+    ``unknown``: it always waits for the user.
+    """
+    async with _gateway(request)() as db:
+        rows = await db.execute(
+            text(
+                f"SELECT {_CLASS_COLUMNS} FROM llm_gateway_tool_classification "  # noqa: S608 - fixed columns
+                "WHERE tenant_id = :tenant_id ORDER BY priority, created_at",
+            ),
+            {"tenant_id": tenant_id},
+        )
+        return {"data": [_rule(r) for r in rows]}
+
+
+@router.post("/tool-classes", name="governance_tool_class_create", status_code=status.HTTP_201_CREATED)
+async def create_tool_class(body: ToolClassIn, request: Request, _admin: Admin) -> dict[str, Any]:
+    """Classify tools."""
+    async with _gateway(request)() as db:
+        row = (await db.execute(
+            text(
+                "INSERT INTO llm_gateway_tool_classification "  # noqa: S608 - a fixed column list
+                "(id, tenant_id, tool_pattern, tool_class, open_world, note, priority, "
+                "created_at, updated_at) VALUES (:id, :tenant_id, :tool_pattern, :tool_class, "
+                ":open_world, :note, :priority, NOW(), NOW()) "
+                f"RETURNING {_CLASS_COLUMNS}",
+            ),
+            {"id": uuid.uuid4(), **body.model_dump()},
+        )).one()
+        await db.commit()
+        return _rule(row)
+
+
+@router.put("/tool-classes/{rule_id}", name="governance_tool_class_update")
+async def update_tool_class(
+    rule_id: uuid.UUID, body: ToolClassIn, request: Request, _admin: Admin,
+) -> dict[str, Any]:
+    """Change a classification rule."""
+    async with _gateway(request)() as db:
+        row = (await db.execute(
+            text(
+                "UPDATE llm_gateway_tool_classification SET tenant_id = :tenant_id, "  # noqa: S608
+                "tool_pattern = :tool_pattern, tool_class = :tool_class, open_world = :open_world, "
+                "note = :note, "
+                f"priority = :priority, updated_at = NOW() WHERE id = :id RETURNING {_CLASS_COLUMNS}",
+            ),
+            {"id": rule_id, **body.model_dump()},
+        )).one_or_none()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such rule.")
+        await db.commit()
+        return _rule(row)
+
+
+@router.delete(
+    "/tool-classes/{rule_id}", name="governance_tool_class_delete", status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_tool_class(rule_id: uuid.UUID, request: Request, _admin: Admin) -> None:
+    """Remove a classification rule."""
+    async with _gateway(request)() as db:
+        gone = await db.execute(
+            text("DELETE FROM llm_gateway_tool_classification WHERE id = :id"), {"id": rule_id},
+        )
         if not gone.rowcount:  # type: ignore[attr-defined]
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such rule.")
         await db.commit()

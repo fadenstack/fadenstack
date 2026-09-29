@@ -27,6 +27,17 @@ from tests.test_gateway_pipeline_combined import _session, _token
 from tests.test_session_tool_switches import CREATE, SEARCH, SYSTEM, _MCP, _ready, _switch_on
 
 
+
+@pytest.fixture(autouse=True)
+def _tools_are_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests are about running tools, not about tool modes (test_tool_modes.py): all tools are read."""
+    from faden_gateway.services.gateway import tool_classes  # noqa: PLC0415
+
+    async def rules(self: object, session: object, tenant_id: str) -> tuple[tool_classes.ClassRule, ...]:
+        return (tool_classes.ClassRule("*", "read"),)
+
+    monkeypatch.setattr(tool_classes.ClassRules, "for_tenant", rules)
+
 def _entry(name: str, description: str) -> dict[str, Any]:
     return {
         "qualified_name": name,

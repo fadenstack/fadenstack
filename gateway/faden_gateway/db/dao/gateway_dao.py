@@ -362,6 +362,7 @@ class GatewayDAO:
         *,
         execution_mode: ExecutionMode | None = None,
         hybrid_preference: str | None = ...,  # type: ignore[assignment]
+        tool_mode: str | None = None,
     ) -> SessionExecutionPolicy:
         """Create or update the execution policy for a session.
 
@@ -374,6 +375,7 @@ class GatewayDAO:
                 session_id=session_id,
                 execution_mode=mode,
                 hybrid_preference=hybrid_preference if hybrid_preference is not ... else None,
+                tool_mode=tool_mode,
             )
             self.session.add(policy)
         else:
@@ -381,6 +383,8 @@ class GatewayDAO:
                 policy.execution_mode = execution_mode
             if hybrid_preference is not ...:
                 policy.hybrid_preference = hybrid_preference
+            if tool_mode is not None:
+                policy.tool_mode = tool_mode
 
         # Keep ChatSession.execution_mode in sync
         effective_mode = execution_mode or policy.execution_mode

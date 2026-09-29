@@ -146,6 +146,17 @@ With Redis configured, a call reaches the device wherever its socket is:
 each worker announces its devices and the call travels to the worker that
 holds the socket, and the answer back.
 
+### Tool modes
+
+The conversation is on the device, so the SDK sends its session's tool mode
+with each request: `X-Faden-Tool-Mode: off | read_only | ask | auto` (Ask
+when missing). The gateway hides what the mode hides -- the agent's host
+tools by their `risk` in the contract, a tool without one as unclassified --
+and the SDK asks its user before running a host tool the mode asks about. The
+profile tells the SDK the default and any ceiling:
+`tool_modes: {default: "ask", ceiling: null, open_world_enforced: false}`.
+See [governance.md](governance.md).
+
 ### Refusals
 
 A prompt, an answer or a tool call can be refused (tool rules in core,

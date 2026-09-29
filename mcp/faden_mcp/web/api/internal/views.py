@@ -30,6 +30,10 @@ class ToolCatalogEntry(BaseModel):
     pii_mode: str
     realm: str = "mcp_remote"
     source: str = "mcp"
+    #: What the server says the tool does (MCP ToolAnnotations: readOnlyHint,
+    #: destructiveHint, openWorldHint, ...). Hints: the gateway trusts them
+    #: only where a tenant's classification rule says so.
+    annotations: dict[str, Any] | None = None
 
 
 class ToolCatalogResponse(BaseModel):
@@ -117,6 +121,7 @@ async def get_tool_catalog(
                 pii_mode=pii_mode,
                 realm=getattr(tool, "realm", "mcp_remote"),
                 source=getattr(tool, "source", "mcp"),
+                annotations=getattr(tool, "annotations_json", None) or None,
             ),
         )
 

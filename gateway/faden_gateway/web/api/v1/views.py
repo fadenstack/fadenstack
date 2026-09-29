@@ -13,7 +13,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.services.gateway import faden_events
+from faden_gateway.services.gateway import faden_events, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
@@ -236,6 +236,8 @@ async def get_tool_catalog(
     result = await service.get_global_catalog(
         tenant_id=auth.tenant_id,
         execution_mode=execution_mode,
+        tool_mode=await _effective_tool_mode(request, auth, None, None),
+        class_rules=await tool_classes.class_rules.for_tenant(dao.session, auth.tenant_id),
     )
     return JSONResponse(
         status_code=200,
@@ -292,11 +294,16 @@ async def get_available_tools(
             code="invalid_session_id",
         )
 
+    # The chat's tools are the user's own business.
+    await _require_session_owner(sid, auth, dao)
+    policy = await dao.get_session_execution_policy(sid)
     result = await service.get_available_tools(
         session_id=sid,
         tenant_id=auth.tenant_id,
         include_disabled=include_disabled,
         include_unavailable=include_unavailable,
+        tool_mode=await _effective_tool_mode(request, auth, session_id, policy.tool_mode if policy else None),
+        class_rules=await tool_classes.class_rules.for_tenant(dao.session, auth.tenant_id),
     )
     return JSONResponse(
         status_code=200,
@@ -305,6 +312,24 @@ async def get_available_tools(
 
 
 # ── Session Tool Policy ─────────────────────────────────────────
+
+
+async def _effective_tool_mode(
+    request: Request, auth: AuthContext, session_id: str | None, stored: str | None,
+) -> tool_classes.EffectiveMode:
+    """A chat's tool mode as the user picked it (Ask until they do), and after any ceiling (EE)."""
+    from faden_gateway.services.extensions import registry  # noqa: PLC0415
+
+    groups: tuple[str, ...] = ()
+    resolver = getattr(request.app.state, "group_membership_resolver", None)
+    if registry.tool_mode_ceilings and resolver is not None:
+        groups = tuple(await resolver.resolve(auth.user_id) or ())
+    return await tool_classes.effective(
+        tool_classes.parse_mode(stored), registry.tool_mode_ceilings,
+        tool_classes.CeilingContext(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, session_id=session_id, groups=groups,
+        ),
+    )
 
 
 def _parse_session_id(session_id: str) -> uuid.UUID:
@@ -340,6 +365,7 @@ async def _require_session_owner(
 )
 async def get_session_tool_policy(
     session_id: str,
+    request: Request,
     auth: AuthContext = Depends(get_auth_context),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
@@ -348,11 +374,13 @@ async def get_session_tool_policy(
     await _require_session_owner(sid, auth, dao)
     policy = await dao.get_session_execution_policy(sid)
     mode = await dao.get_session_execution_mode(sid)
+    tool_mode = await _effective_tool_mode(request, auth, session_id, policy.tool_mode if policy else None)
     dto = SessionToolPolicyDTO(
         session_id=session_id,
         execution_mode=mode.value,
         hybrid_preference=policy.hybrid_preference if policy else None,
         effective_catalog_version=policy.catalog_version if policy else 0,
+        **tool_mode.as_dict(),
     )
     return JSONResponse(status_code=200, content=dto.model_dump(mode="json"))
 
@@ -371,7 +399,11 @@ async def patch_session_tool_policy(
     sid = _parse_session_id(session_id)
     await _require_session_owner(sid, auth, dao)
     body = await _get_json_payload(request)
-    patch = SessionToolPolicyPatchDTO.model_validate(body)
+    try:
+        patch = SessionToolPolicyPatchDTO.model_validate(body)
+    except ValidationError as exc:
+        # It was a 500.
+        raise GatewayError(status_code=400, message=str(exc), code="validation_error") from exc
 
     from faden_gateway.db.models.gateway import ExecutionMode  # noqa: PLC0415
 
@@ -381,6 +413,7 @@ async def patch_session_tool_policy(
         sid,
         execution_mode=mode_arg,
         hybrid_preference=patch.hybrid_preference if patch.hybrid_preference is not None else ...,
+        tool_mode=patch.tool_mode,
     )
 
     # Apply tool overrides
@@ -390,11 +423,13 @@ async def patch_session_tool_policy(
             [(o.tool_id, o.enabled) for o in patch.tool_overrides],
         )
 
+    tool_mode = await _effective_tool_mode(request, auth, session_id, policy.tool_mode)
     dto = SessionToolPolicyDTO(
         session_id=session_id,
         execution_mode=policy.execution_mode.value,
         hybrid_preference=policy.hybrid_preference,
         effective_catalog_version=policy.catalog_version,
+        **tool_mode.as_dict(),
     )
     return JSONResponse(status_code=200, content=dto.model_dump(mode="json"))
 
@@ -689,6 +724,7 @@ async def serve_chat_completions(
         # model never sees the field, only the skills.
         skills = _requested_skills(payload.pop("skills", None))
         events = faden_events.wanted(request.headers.get(faden_events.HEADER))
+        tool_mode = request.headers.get(tool_classes.MODE_HEADER)
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -699,6 +735,7 @@ async def serve_chat_completions(
                 skills=skills,
                 agent=agent,
                 faden_events=events,
+                tool_mode=tool_mode,
             )
             stream_response = StreamingResponse(
                 streamed.stream,
@@ -722,6 +759,7 @@ async def serve_chat_completions(
             skills=skills,
             agent=agent,
             faden_events=events,
+            tool_mode=tool_mode,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,

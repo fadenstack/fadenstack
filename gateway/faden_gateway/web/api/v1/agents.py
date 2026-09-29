@@ -30,6 +30,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import registry
+from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
     AgentProfile,
@@ -195,11 +196,19 @@ async def agent_chat_completions(
 
 @router.get("/v1/agents/{agent}/profile")
 async def agent_profile(
+    request: Request,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
 ) -> dict[str, Any]:
     """What the SDK caches about the agent: never its instructions, only their hash."""
-    _, agent = caller
+    auth, agent = caller
     profile = agent.agent
+    groups: tuple[str, ...] = ()
+    resolver = getattr(request.app.state, "group_membership_resolver", None)
+    if registry.tool_mode_ceilings and resolver is not None:
+        groups = tuple(await resolver.resolve(auth.user_id) or ())
+    top = await tool_classes.ceiling(registry.tool_mode_ceilings, tool_classes.CeilingContext(
+        tenant_id=auth.tenant_id, user_id=auth.user_id, agent_id=profile.id, groups=groups,
+    ))
     return {
         "object": "agent.profile",
         "id": profile.id,
@@ -217,6 +226,13 @@ async def agent_profile(
             # The user's developer mode lets them attach any local server,
             # unless an Enterprise lock says otherwise (in ``extensions``).
             "developer_mode": agent.developer_mode,
+        },
+        # Sessions start in "ask"; the SDK sends its session's mode
+        # (X-Faden-Tool-Mode), never wider than the ceiling (EE).
+        "tool_modes": {
+            "default": tool_classes.DEFAULT_MODE,
+            "ceiling": top.value if top else None,
+            "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
         },
         "ui": profile.ui,
         "extensions": profile.extensions,

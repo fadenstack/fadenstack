@@ -219,8 +219,13 @@ class ToolRouter:
         tenant_id: str,
         request_id: str,
         user_id: str | None = None,
+        approved: bool = False,
     ) -> ToolCallResult:
-        """Route a single tool call to the correct executor."""
+        """Route a single tool call to the correct executor.
+
+        *approved*: the user already approved this call (the gateway asked);
+        a policy that wants approval does not ask again.
+        """
         realm = self._resolve_realm(tool_id)
         mode = await self._dao.get_session_execution_mode(session_id)
         allowed_realms = _MODE_REALMS.get(mode.value, set())
@@ -277,7 +282,9 @@ class ToolRouter:
                     realm=realm,
                     executor="PolicyEngine",
                 )
-            if decision.action == PolicyAction.APPROVAL_REQUIRED and realm in _ASKS_ITS_USER:
+            if decision.action == PolicyAction.APPROVAL_REQUIRED and approved:
+                pass
+            elif decision.action == PolicyAction.APPROVAL_REQUIRED and realm in _ASKS_ITS_USER:
                 # The device asks its user, and keeps the call waiting for them
                 # (tool_call_approval_pending); it used to be refused outright.
                 approval = decision.reason or f"'{tool_id}' needs your approval."

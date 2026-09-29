@@ -18,6 +18,10 @@ it.
 - ``governance_checks``: checks on prompts, answers and tool calls
   (``services/gateway/governance.py``; EE: content policies). Core's own
   check, the tenant's tool rules, is added per request.
+- ``tool_mode_ceilings``: the most a user may pick as a chat's tool mode
+  (``services/gateway/tool_classes.py``; EE: per tenant, team, agent,
+  user). Each is ``async (CeilingContext) -> ToolMode | None``; the narrowest
+  applies, and one that fails counts as ``read_only``.
 """
 
 from __future__ import annotations
@@ -47,6 +51,7 @@ class ExtensionRegistry:
     features: set[str] = field(default_factory=lambda: set(CORE_FEATURES))
     edition: str = "community"
     governance_checks: list[Any] = field(default_factory=list)
+    tool_mode_ceilings: list[Any] = field(default_factory=list)
 
     def client_modules(self, extensions: dict[str, Any]) -> list[str]:
         """Every SDK module an agent with *extensions* needs, sorted."""

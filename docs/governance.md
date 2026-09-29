@@ -100,6 +100,53 @@ An agent's conversation stays on the device: the SDK applies the same rule.
 
 ---
 
+## Tool classes and tool modes (core)
+
+Every tool is classified by what it does, and each chat has a **tool mode**
+the user picks in the tool panel:
+
+| Mode | read | write | destructive | unclassified |
+|---|---|---|---|---|
+| Off | hidden | hidden | hidden | hidden |
+| Read only | runs | hidden | hidden | hidden |
+| **Ask** (every chat starts here) | runs | asks | asks | asks |
+| Auto | runs | runs | asks | asks |
+
+- *hidden*: not offered to the model (nor found by its tool search), and
+  refused if called anyway. *asks*: waits for the user's approval (above).
+- No mode runs an unclassified or destructive tool unasked; an admin who wants
+  that classifies the tool.
+- The mode is the chat's: `PATCH /v1/sessions/{id}/tool-policy {"tool_mode": ...}`
+  (the chat page's tool panel). Requests without a server session -- agents,
+  the API -- send `X-Faden-Tool-Mode`; without either, Ask.
+- Clients that asked for events get `faden.tool_mode` first (the mode, and
+  which tools it hid).
+
+**Where a class comes from**, first that applies:
+
+1. The admin's classification rules:
+   ```
+   GET/POST/PUT/DELETE /api/admin/governance/tool-classes
+   {tool_pattern: "mcp.github.*", tool_class: "read" | "write" | "destructive" | "annotations", priority}
+   ```
+   `annotations` trusts what these tools' MCP server says (`readOnlyHint`,
+   `destructiveHint`): MCP servers describe themselves, so their word counts
+   only where an admin says so.
+2. The gateway's own tools (knowledge search, attachments, skill files, time,
+   tool search): read.
+3. An agent's host tool contract: each tool's `risk`.
+4. Otherwise: unclassified.
+
+`open_world` (a tool that reaches outside the organisation) is recorded from
+rules and annotations and shown, but no mode acts on it yet.
+
+**Ceilings** are Enterprise: `registry.tool_mode_ceilings` narrows the mode a
+user may pick (per tenant, team, agent, user). Core applies whatever is
+registered; a ceiling that fails counts as Read only. The tool panel and
+`tool-policy` show the pick, the effective mode and the ceiling.
+
+---
+
 ## Tool rules (core)
 
 Admins manage them in the backend (they live in the gateway's database):

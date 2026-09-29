@@ -7,6 +7,7 @@ These run them in the same request, where the order between them matters.
 from __future__ import annotations
 
 import asyncio
+import gc
 import json
 import re
 import time
@@ -498,12 +499,20 @@ async def test_the_answer_does_not_wait_for_skills_usage(
     monkeypatch.setattr(SkillsClient, "record_usage", slow_record)
     _model_answers(monkeypatch, "ok", [])
 
-    started = time.perf_counter()
-    r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
-        "model": ALIAS, "messages": [{"role": "user", "content": "hi"}],
-    })
+    # A full garbage collection late in the suite takes 0.3-0.5 s: it is not
+    # what this measures (whether the answer waits for the usage call).
+    gc.collect()
+    gc.disable()
+    try:
+        started = time.perf_counter()
+        r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+            "model": ALIAS, "messages": [{"role": "user", "content": "hi"}],
+        })
+        elapsed = time.perf_counter() - started
+    finally:
+        gc.enable()
     assert r.status_code == 200
-    assert time.perf_counter() - started < 0.4
+    assert elapsed < 0.4
     await asyncio.wait_for(recorded.wait(), timeout=2)  # and it is still recorded
 
 

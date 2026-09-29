@@ -28,6 +28,7 @@ from faden_gateway.services.gateway import (
 )
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
+from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
@@ -746,6 +747,35 @@ def _privacy_mode(policy: Any | None, req: _Prepared) -> Any:
     return policy.privacy_mode if policy else None
 
 
+class ToolModeCheck:
+    """The chat's tool mode, as a governance check on each tool call.
+
+    Hidden tools are not offered (``_offer_by_mode``); one called anyway is
+    refused here. A tool the mode asks about waits for the user.
+    """
+
+    name = "tool_mode"
+    stages = frozenset({gov.GovernanceStage.TOOL})
+    output_window_chars = 0
+
+    def __init__(self, classifier: tool_classes.Classifier, mode: tool_classes.ToolMode) -> None:
+        self.classifier = classifier
+        self.mode = mode
+
+    async def check(self, ctx: gov.GovernanceContext) -> gov.GovernanceDecision | None:
+        tool = self.classifier.classify(ctx.tool_id or "")
+        decision = tool_classes.decide(self.mode, tool)
+        if decision is tool_classes.Decision.RUN:
+            return None
+        return gov.GovernanceDecision(
+            outcome="block" if decision is tool_classes.Decision.HIDDEN else "approval_required",
+            policy_id=f"tool_mode:{self.mode.value}:{tool.tool_class.value}",
+            category="tool_mode",
+            message=tool_classes.reason(self.mode, decision),
+            policy_name=f"Tool mode {self.mode.value}",
+        )
+
+
 class _AgentLogFields(TypedDict, total=False):
     agent_id: str | None
     device_id: str | None
@@ -876,6 +906,11 @@ class _Prepared:
     user_message_ids: list[uuid.UUID] = field(default_factory=list)
     #: An output check refused the answer: the decision and the answer's HMAC.
     blocked_output: tuple[uuid.UUID | None, str | None] | None = None
+    #: The ``X-Faden-Tool-Mode`` header, for a request without a session setting.
+    tool_mode_header: str | None = None
+    #: The tool mode this request runs under, and what classifies its tools.
+    tool_mode: tool_classes.EffectiveMode | None = None
+    classifier: tool_classes.Classifier | None = None
 
     @property
     def instance_id(self) -> str | None:
@@ -970,6 +1005,7 @@ class GatewayService:
         skills: list[str] | None = None,
         agent: AgentRequest | None = None,
         faden_events: bool = False,
+        tool_mode: str | None = None,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -980,6 +1016,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
+            tool_mode_header=tool_mode,
         )
         result: UpstreamResult | None = None
         error_code: str | None = None
@@ -1208,6 +1245,7 @@ class GatewayService:
         skills: list[str] | None = None,
         agent: AgentRequest | None = None,
         faden_events: bool = False,
+        tool_mode: str | None = None,
     ) -> StreamingGatewayResponse:
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
@@ -1216,6 +1254,7 @@ class GatewayService:
 
         req = _Prepared(
             payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
+            tool_mode_header=tool_mode,
         )
         stream_started = False
         stats: StreamStats | None = None
@@ -1453,6 +1492,75 @@ class GatewayService:
             request_id=request_id,
             **fields,
         )
+
+    async def _resolve_tool_mode(
+        self, req: _Prepared, auth: AuthContext, mcp_tools: list[dict[str, Any]] | None,
+    ) -> None:
+        """The chat's tool mode (narrowed by any ceiling), what classifies its tools, and its check.
+
+        The session's setting when it has one, else the ``X-Faden-Tool-Mode``
+        header, else Ask; both given, the narrower. EE ceilings narrow it
+        further (``registry.tool_mode_ceilings``).
+        """
+        header = tool_classes.parse_mode(req.tool_mode_header)
+        chosen = header
+        sid = _uuid_or_none(req.session_id)
+        if sid is not None:
+            policy = await self.dao.get_session_execution_policy(sid)
+            stored = tool_classes.parse_mode(policy.tool_mode if policy else None)
+            if stored is not None:
+                chosen = tool_classes.narrowest(stored, header) if header else stored
+        groups: tuple[str, ...] = ()
+        if extension_registry.tool_mode_ceilings and self.group_memberships is not None:
+            groups = await self.group_memberships.resolve(auth.user_id) or ()
+        req.tool_mode = await tool_classes.effective(
+            chosen, extension_registry.tool_mode_ceilings,
+            tool_classes.CeilingContext(
+                tenant_id=auth.tenant_id, user_id=auth.user_id,
+                agent_id=req.agent.agent.id if req.agent is not None else None,
+                session_id=req.session_id, groups=tuple(groups),
+            ),
+        )
+        contract = (
+            {str(t.get("name", "")): str(t.get("risk") or "") for t in req.agent.agent.host_tool_contract}
+            if req.agent is not None else None
+        )
+        req.classifier = tool_classes.Classifier(
+            rules=await tool_classes.class_rules.for_tenant(self.dao.session, auth.tenant_id),
+            gateway_tools=frozenset(_GATEWAY_TOOLS),
+            contract=contract,
+            annotations={
+                t.get("qualified_name", ""): t["annotations"] for t in mcp_tools or [] if t.get("annotations")
+            },
+        )
+        req.checks.append(ToolModeCheck(req.classifier, req.tool_mode.mode))
+
+    def _hidden(self, req: _Prepared, name: str) -> bool:
+        if req.tool_mode is None or req.classifier is None:
+            return False
+        decision = tool_classes.decide(req.tool_mode.mode, req.classifier.classify(name))
+        return decision is tool_classes.Decision.HIDDEN
+
+    def _offer_by_mode(self, req: _Prepared, egress: dict[str, Any]) -> dict[str, Any]:
+        """The tools the mode lets the model see; the others are not offered at all."""
+        tools = egress.get("tools") or []
+        kept = [t for t in tools if not self._hidden(req, _tool_definition_name(t))]
+        hidden = [_tool_definition_name(t) for t in tools if t not in kept]
+        if req.faden_events and req.tool_mode is not None:
+            req.faden_leading.append({"type": "CUSTOM", "name": "faden.tool_mode", "value": {
+                **req.tool_mode.as_dict(), "hidden": hidden,
+            }})
+        if not hidden:
+            return egress
+        for name in hidden:
+            req.client_tools.discard(name)
+        out = {k: v for k, v in egress.items() if k != "tools"}
+        if kept:
+            out["tools"] = kept
+        choice = out.get("tool_choice")
+        if not kept or (isinstance(choice, dict) and (choice.get("function") or {}).get("name") in hidden):
+            out.pop("tool_choice", None)
+        return out
 
     async def _governance_checks(self, auth: AuthContext) -> list[Any]:
         """EE's checks and the tenant's tool rules; empty in a plain core install without rules."""
@@ -1746,8 +1854,16 @@ class GatewayService:
                 "content": skill_files.skill_block(skill, as_tool=searchable),
             })
         req.payload = payload
+        if chat:
+            # The session is resolved (and the user's): its tool mode applies.
+            await self._resolve_tool_mode(req, auth, mcp_tools)
         if mcp_tools:
             req.mcp_findable, req.mcp_on = await self._chat_tools(mcp_tools, auth, req.session_id, req.skills)
+            # A tool the mode hides is not found by the tool search either.
+            req.mcp_findable = [
+                t for t in req.mcp_findable if not self._hidden(req, t.get("qualified_name", ""))
+            ]
+            req.mcp_on = {n for n in req.mcp_on if not self._hidden(req, n)}
             picked = {t.get("qualified_name", "") for t in system_tools.picked_for(req.mcp_findable, question)}
             req.mcp_picked = picked - req.mcp_on
             req.mcp_on |= req.mcp_picked
@@ -1819,6 +1935,8 @@ class GatewayService:
             egress = _with_tools(egress, skill_files.TOOLS)
             req.skill_files = True
         egress = _without_replayed_tools(egress)
+        if chat:
+            egress = self._offer_by_mode(req, egress)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
@@ -2736,6 +2854,8 @@ class GatewayService:
                     tool_id=name, arguments=arguments, call_id=call.get("id", ""),
                     session_id=router_session, tenant_id=auth.tenant_id, request_id=request_id,
                     user_id=auth.user_id,
+                    # The user approved it here: the device does not ask again.
+                    approved=answer is True,
                 )
                 content, is_error = routed.content, routed.is_error
                 row.update(mcp_server=_mcp_server(name), realm=routed.realm, executor=routed.executor)

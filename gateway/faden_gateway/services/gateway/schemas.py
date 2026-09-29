@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -80,6 +80,15 @@ class ToolAvailabilityDTO(BaseModel):
     user_enabled: bool
     available: bool
     availability_reason: str | None = None
+    #: What the tool does: read, write, destructive or unknown (tool_classes.py).
+    tool_class: str = "unknown"
+    #: Where the class came from: rule, annotations, gateway, agent or none.
+    class_source: str = "none"
+    #: Reaches outside the organisation (recorded; no mode acts on it yet).
+    open_world: bool | None = None
+    #: What the chat's tool mode does with it: run, ask or hidden.
+    mode_decision: str = "ask"
+    mode_reason: str | None = None
 
 
 class SessionToolOverrideDTO(BaseModel):
@@ -96,6 +105,11 @@ class SessionToolPolicyDTO(BaseModel):
     execution_mode: ExecutionModeEnum = ExecutionModeEnum.SERVER_ONLY
     hybrid_preference: str | None = None
     effective_catalog_version: int = 0
+    #: What the user picked for the chat (``ask`` until they pick).
+    tool_mode: str = "ask"
+    #: The mode that applies: the pick, narrowed by any ceiling (EE).
+    effective_tool_mode: str = "ask"
+    tool_mode_ceiling: str | None = None
 
 
 class SessionToolPolicyPatchDTO(BaseModel):
@@ -104,6 +118,7 @@ class SessionToolPolicyPatchDTO(BaseModel):
     execution_mode: ExecutionModeEnum | None = None
     hybrid_preference: str | None = None
     tool_overrides: list[SessionToolOverrideDTO] | None = None
+    tool_mode: Literal["off", "read_only", "ask", "auto"] | None = None
 
 
 class ToolAvailabilityResponse(BaseModel):
@@ -113,6 +128,10 @@ class ToolAvailabilityResponse(BaseModel):
     execution_mode: ExecutionModeEnum
     effective_catalog_version: int = 0
     tools: list[ToolAvailabilityDTO] = Field(default_factory=list)
+    #: The chat's tool mode, as SessionToolPolicyDTO reports it.
+    tool_mode: str = "ask"
+    effective_tool_mode: str = "ask"
+    tool_mode_ceiling: str | None = None
 
 
 # ---------------------------------------------------------------------------

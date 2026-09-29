@@ -863,6 +863,9 @@ class SessionExecutionPolicy(Base):
     hybrid_preference: Mapped[str | None] = mapped_column(
         String(32), nullable=True,
     )
+    #: What the user lets tools do in this chat (``off``, ``read_only``,
+    #: ``ask``, ``auto``); ``None`` is the default, ``ask``.
+    tool_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
     catalog_version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0,
     )
@@ -1025,6 +1028,32 @@ class ToolRule(Base):
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="tool_rule")
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+
+class ToolClassification(Base):
+    """An admin's word on what tools do: their class, or "trust the server's annotations".
+
+    ``tool_class`` is ``read``, ``write``, ``destructive`` or ``annotations``;
+    the lowest ``priority`` that matches decides. ``open_world`` is recorded
+    and shown; no mode acts on it yet.
+    """
+
+    __tablename__ = "llm_gateway_tool_classification"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    #: A glob over tool names: ``mcp.github.*``, ``read_page``.
+    tool_pattern: Mapped[str] = mapped_column(String(256), nullable=False)
+    tool_class: Mapped[str] = mapped_column(String(16), nullable=False)
+    open_world: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

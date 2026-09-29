@@ -64,3 +64,14 @@ async def test_the_catalog_reads_the_servers_once_and_skips_disabled_ones(
         ("mcp.a.one", "allow"),
         ("mcp.a.three", "allow"),
     ]
+
+
+def test_the_catalog_entry_carries_the_servers_annotations() -> None:
+    """The gateway classifies tools; it gets the server's hints (and trusts them only where told)."""
+    from faden_mcp.web.api.internal.views import ToolCatalogEntry  # noqa: PLC0415
+
+    entry = ToolCatalogEntry(
+        qualified_name="mcp.github.get_issue", openai_tool={}, server_id="s", pii_mode="redact",
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+    )
+    assert entry.model_dump()["annotations"] == {"readOnlyHint": True, "openWorldHint": True}

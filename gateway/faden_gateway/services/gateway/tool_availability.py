@@ -16,6 +16,7 @@ from typing import Any
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import ExecutionMode, ToolRealm
+from faden_gateway.services.gateway import tool_classes
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from faden_gateway.services.gateway.policy_engine import PolicyAction, PolicyEngine
@@ -46,6 +47,32 @@ _MODE_ALLOWED_REALMS: dict[str, set[str]] = {
 }
 
 
+def _classify(
+    raw_tools: list[dict[str, Any]],
+    tool_mode: tool_classes.EffectiveMode | None,
+    rules: tuple[tool_classes.ClassRule, ...],
+) -> Any:
+    """``tool_id -> the class fields of its entry`` (and what the mode does with it)."""
+    classifier = tool_classes.Classifier(
+        rules=rules,
+        annotations={t["tool_id"]: t["annotations"] for t in raw_tools if t.get("annotations")},
+    )
+
+    def fields(tool_id: str) -> dict[str, Any]:
+        tool = classifier.classify(tool_id)
+        out = tool.as_dict()
+        if tool_mode is not None:
+            decision = tool_classes.decide(tool_mode.mode, tool)
+            out["mode_decision"] = decision.value
+            out["mode_reason"] = (
+                None if decision is tool_classes.Decision.RUN
+                else tool_classes.reason(tool_mode.mode, decision)
+            )
+        return out
+
+    return fields
+
+
 def _on_by_default(tool_id: str) -> bool:
     """MCP tools start off; a connected client's own tools start on."""
     return not tool_id.startswith(MCP_TOOL_PREFIX)
@@ -72,6 +99,8 @@ class ToolAvailabilityService:
         *,
         tenant_id: str,
         execution_mode: str = ExecutionMode.SERVER_ONLY,
+        tool_mode: tool_classes.EffectiveMode | None = None,
+        class_rules: tuple[tool_classes.ClassRule, ...] = (),
     ) -> ToolAvailabilityResponse:
         """Return the global tool catalog without requiring a session.
 
@@ -83,6 +112,7 @@ class ToolAvailabilityService:
         allowed_realms = _MODE_ALLOWED_REALMS.get(mode_str, set())
 
         raw_tools = await self._gather_tools(tenant_id, session_id=None)
+        classify = _classify(raw_tools, tool_mode, class_rules)
 
         entries: list[ToolAvailabilityDTO] = []
         for tool in raw_tools:
@@ -98,6 +128,10 @@ class ToolAvailabilityService:
                 reason = f"realm_not_allowed_in_{mode_str}_mode"
             elif not available:
                 reason = "tool_unavailable"
+            classes = classify(tool_id)
+            if classes.get("mode_decision") == "hidden":
+                effective_enabled = False
+                reason = reason or f"tool_mode_{tool_mode.mode.value}" if tool_mode else reason
 
             entries.append(
                 ToolAvailabilityDTO(
@@ -111,6 +145,7 @@ class ToolAvailabilityService:
                     user_enabled=user_enabled,
                     available=available,
                     availability_reason=reason,
+                    **classes,
                 ),
             )
 
@@ -119,6 +154,7 @@ class ToolAvailabilityService:
             execution_mode=ExecutionModeEnum(mode_str),
             effective_catalog_version=0,
             tools=entries,
+            **(tool_mode.as_dict() if tool_mode else {}),
         )
 
     async def get_available_tools(
@@ -129,6 +165,8 @@ class ToolAvailabilityService:
         include_disabled: bool = True,
         include_unavailable: bool = True,
         mcp_catalog: list[dict[str, Any]] | None = None,
+        tool_mode: tool_classes.EffectiveMode | None = None,
+        class_rules: tuple[tool_classes.ClassRule, ...] = (),
     ) -> ToolAvailabilityResponse:
         """Return the merged effective tool catalog for a session.
 
@@ -155,6 +193,7 @@ class ToolAvailabilityService:
 
         # 5. Compute effective state for each tool
         allowed_realms = _MODE_ALLOWED_REALMS.get(mode_str, set())
+        classify = _classify(raw_tools, tool_mode, class_rules)
         entries: list[ToolAvailabilityDTO] = []
 
         for tool in raw_tools:
@@ -194,6 +233,11 @@ class ToolAvailabilityService:
                 reason = f"realm_not_allowed_in_{mode_str}_mode"
             elif not available:
                 reason = "tool_unavailable"
+            # The chat's tool mode hides it: not offered, and the switch cannot bring it back.
+            classes = classify(tool_id)
+            if classes.get("mode_decision") == "hidden" and tool_mode is not None:
+                effective_enabled = False
+                reason = reason or f"tool_mode_{tool_mode.mode.value}"
 
             # Apply inclusion filters
             if not include_disabled and not effective_enabled:
@@ -213,6 +257,7 @@ class ToolAvailabilityService:
                     user_enabled=user_enabled,
                     available=available,
                     availability_reason=reason,
+                    **classes,
                 ),
             )
 
@@ -221,6 +266,7 @@ class ToolAvailabilityService:
             execution_mode=ExecutionModeEnum(mode_str),
             effective_catalog_version=catalog_version,
             tools=entries,
+            **(tool_mode.as_dict() if tool_mode else {}),
         )
 
     async def chat_mcp_tools(
@@ -272,6 +318,7 @@ class ToolAvailabilityService:
                         "realm": entry.get("realm", "mcp_remote"),
                         "source": entry.get("source", "mcp"),
                         "available": True,
+                        "annotations": entry.get("annotations"),
                     })
             except Exception:
                 logger.debug("Failed to load MCP tools for catalog", exc_info=True)
