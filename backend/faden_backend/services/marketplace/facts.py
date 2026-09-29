@@ -195,6 +195,8 @@ class Architecture:
     needs_remote_code: bool = False
     #: True for mixture-of-experts models.
     moe: bool = False
+    #: The Transformers the config was saved with: a hint at how new the model type is.
+    transformers_version: str | None = None
 
     def kv_bytes_per_token(self, dtype_bytes: int = 2) -> int | None:
         """KV cache bytes one token of context occupies (keys and values, every layer)."""
@@ -240,6 +242,7 @@ def architecture_from_config(config: dict[str, Any] | None) -> Architecture:
         max_context=_int(pick("max_position_embeddings", "n_positions", "max_sequence_length", "seq_length")),
         needs_remote_code=bool(config.get("auto_map")),
         moe=bool(pick("num_experts", "num_local_experts", "n_routed_experts")),
+        transformers_version=str(config["transformers_version"]) if config.get("transformers_version") else None,
     )
 
 

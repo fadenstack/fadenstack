@@ -114,6 +114,59 @@ function renderDialog(props: Partial<React.ComponentProps<typeof HostModelDialog
 afterEach(() => vi.restoreAllMocks());
 
 describe("HostModelDialog", () => {
+  it("does not host a model the cluster's runtime cannot load, and says why before any download", async () => {
+    // nvidia/Qwen3.8-Flash-Next-NVFP4: 132.7 GB downloaded to both DGX Sparks, then vLLM did not know its model type.
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    vi.spyOn(marketplaceApi, "detail").mockResolvedValue({
+      ...DETAIL,
+      clusters: [PAIR],
+      compatibility: {
+        [PAIR.environment_id]: {
+          status: "cannot_run",
+          code: "model_type_unknown",
+          message: "This cluster's runtime cannot load this model.",
+          model_type: "qwen4_exp",
+          architectures: ["Qwen4ExpForConditionalGeneration"],
+          model_transformers_version: "5.16.0.dev0",
+          vllm_version: "0.27.1",
+          transformers_version: "5.14.1",
+        },
+      },
+    });
+    const host = vi.spyOn(marketplaceApi, "host");
+    renderDialog({ repoId: "nvidia/Qwen3.8-Flash-Next-NVFP4" });
+
+    expect(await screen.findByTestId("host-cannot-run")).toHaveTextContent("Cannot run here");
+    const reason = screen.getByTestId(`host-compat-${PAIR.environment_id}`);
+    expect(reason).toHaveTextContent('model type "qwen4_exp"');
+    expect(reason).toHaveTextContent("Transformers 5.14.1");
+    expect(reason).toHaveTextContent("saved with Transformers 5.16.0.dev0");
+    await waitFor(() => expect(screen.getByTestId("host-next")).toBeDisabled());
+    expect(host).not.toHaveBeenCalled();
+  });
+
+  it("warns, and still lets it be hosted, when vLLM has no implementation of the architecture", async () => {
+    vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR]);
+    vi.spyOn(marketplaceApi, "detail").mockResolvedValue({
+      ...DETAIL,
+      clusters: [PAIR],
+      compatibility: {
+        [PAIR.environment_id]: {
+          status: "may_not_run", code: "architecture_not_native", message: null, model_type: "qwen4_exp",
+          architectures: ["Qwen4ExpForConditionalGeneration"], model_transformers_version: "5.16.0.dev0",
+          vllm_version: "0.26.0", transformers_version: "5.17.0",
+        },
+      },
+    });
+    renderDialog({ repoId: "nvidia/Qwen3.8-Flash-Next-NVFP4" });
+
+    expect(await screen.findByTestId("host-may-not-run")).toHaveTextContent("May not run");
+    expect(screen.getByTestId(`host-compat-${PAIR.environment_id}`)).toHaveTextContent(
+      "vLLM 0.26.0 in this cluster's runtime has no implementation of Qwen4ExpForConditionalGeneration",
+    );
+    await waitFor(() => expect(screen.getByTestId("host-next")).toBeEnabled());
+  });
+
   it("hosts a Hugging Face model at the size the fit planned, with the suggested settings", async () => {
     vi.spyOn(marketplaceApi, "clusters").mockResolvedValue([PAIR, SMALL]);
     vi.spyOn(marketplaceApi, "detail").mockResolvedValue(DETAIL);

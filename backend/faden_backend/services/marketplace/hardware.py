@@ -68,10 +68,13 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
     nodes = {n.id: n for n in (await session.execute(select(InfraNode))).scalars() if n.id in node_ids}
     snapshots = await NodeControlDAO(session).latest_inventory_snapshots(node_ids=list(node_ids)) if node_ids else {}
 
+    from faden_backend.services.marketplace.compat import RuntimeSupport  # noqa: PLC0415
+
     clusters: list[ClusterHardware] = []
     for env in environments:
         machines: list[Machine] = []
         version: str | None = None
+        support: RuntimeSupport | None = None
         for member in (m for m in members if m.environment_id == env.id):
             node = nodes.get(member.node_id)
             if node is None:
@@ -86,6 +89,14 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
                 try:
                     bundle = default_bundle_registry.resolve_for_node(node, driver="ray")
                     version = bundle.compatibility_matrix.vllm_version if bundle is not None else None
+                    if bundle is not None:
+                        matrix = bundle.compatibility_matrix
+                        support = RuntimeSupport(
+                            vllm_version=matrix.vllm_version or None,
+                            transformers_version=matrix.transformers_version,
+                            model_types=frozenset(matrix.supported_model_types),
+                            architectures=frozenset(matrix.supported_architectures),
+                        )
                 except Exception:  # noqa: BLE001 - the version is a nicety, never a blocker
                     version = None
         clusters.append(ClusterHardware(
@@ -94,5 +105,6 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
             status=env.status,
             machines=machines,
             vllm_version=version or None,
+            runtime=support,
         ))
     return clusters

@@ -75,6 +75,8 @@ class ClusterHardware:
     machines: list[Machine] = field(default_factory=list)
     #: vLLM version the cluster's runtime carries, when known.
     vllm_version: str | None = None
+    #: What the runtime can load (``compat.RuntimeSupport``); not sent to the console.
+    runtime: Any = field(default=None, repr=False)
 
     @property
     def gpus(self) -> list[Gpu]:
@@ -88,6 +90,7 @@ class ClusterHardware:
     def to_dict(self) -> dict[str, Any]:
         gpus = self.gpus
         data = asdict(self)
+        data.pop("runtime", None)
         data["gpu_count"] = len(gpus)
         data["gpu_bytes"] = min((g.total_bytes for g in gpus), default=None)
         data["accelerator"] = self.accelerator_name

@@ -2963,7 +2963,11 @@
     "creating": "正在创建部署…",
     "host": "托管",
     "revision_label": "修订版本（可选）",
-    "revision_help": "Hugging Face 上的分支、标签或提交。留空则使用最新版本。"
+    "revision_help": "Hugging Face 上的分支、标签或提交。留空则使用最新版本。",
+    "cannot_run": "无法在此运行",
+    "may_not_run": "可能无法运行",
+    "compat_model_type": "此集群的运行时无法加载它：其中的 Transformers {{transformers}} 和 vLLM {{vllm}} 都不认识模型类型“{{type}}”（该模型使用 Transformers {{saved}} 保存）。需要更新的运行时镜像；不会下载任何内容。",
+    "compat_architecture": "此集群运行时中的 vLLM {{vllm}} 没有 {{architecture}} 的实现。它只能尝试其通用的 Transformers 后端，而并非所有模型都受支持。"
   },
   "marketplace": {
     "title": "模型市场",

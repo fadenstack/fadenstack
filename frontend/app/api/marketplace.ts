@@ -125,12 +125,26 @@ export interface VllmRecipe {
   runtime_too_old: boolean;
 }
 
+/** Whether a cluster's runtime can load the model at all (``services/marketplace/compat.py``). */
+export interface Compatibility {
+  status: "runs" | "may_not_run" | "cannot_run" | "unknown";
+  code: "model_type_unknown" | "architecture_not_native" | "newer_transformers" | "remote_code" | "no_config" | null;
+  message: string | null;
+  model_type: string | null;
+  architectures: string[];
+  model_transformers_version: string | null;
+  vllm_version: string | null;
+  transformers_version: string | null;
+}
+
 export interface MarketDetail {
   hub: HubState;
   model: MarketModelDetail;
   clusters: MarketCluster[];
   cluster_id: string | null;
   fits: Record<string, Fit>;
+  /** Per cluster; absent from an older backend. */
+  compatibility?: Record<string, Compatibility>;
   suggested: { config: EngineConfig; reasons: Record<string, string> };
   recipe?: VllmRecipe | null;
   local: LocalCopy | null;

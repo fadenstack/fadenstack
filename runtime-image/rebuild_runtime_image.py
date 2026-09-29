@@ -251,6 +251,42 @@ def read_stack_versions(tag: str, *, platform: str | None = None) -> dict:
     return {key: value for key, value in report.items() if value is not None}
 
 
+#: What the image can load, for the marketplace to say before a download
+#: whether a model can run here at all: the model types its Transformers and
+#: vLLM can parse a config.json of, and the architectures vLLM runs natively.
+_SUPPORT_PROBE = (
+    "import json\n"
+    "from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES\n"
+    "types = set(CONFIG_MAPPING_NAMES)\n"
+    "try:\n"
+    "    from vllm.transformers_utils.config import _CONFIG_REGISTRY\n"
+    "    types |= set(_CONFIG_REGISTRY)\n"
+    "except Exception:\n"
+    "    pass\n"
+    "from vllm import ModelRegistry\n"
+    "print(json.dumps({'supported_model_types': sorted(types),"
+    " 'supported_architectures': sorted(ModelRegistry.get_supported_archs())}))\n"
+)
+
+
+def read_support(tag: str, *, platform: str | None = None) -> dict:
+    """The model types and architectures the image can load (``_SUPPORT_PROBE``).
+
+    A 132 GB model was downloaded to two DGX Sparks before vLLM said its
+    ``model_type`` was one its Transformers did not know. Read off the image
+    here, the marketplace says so before the download.
+    """
+    cmd = ["docker", "run", "--rm"]
+    if platform:
+        cmd += ["--platform", platform]
+    cmd += ["--entrypoint", "python3", tag, "-c", _SUPPORT_PROBE]
+    facts = _json_from(_run(cmd), "support probe")
+    return {
+        "supported_model_types": list(facts.get("supported_model_types") or []),
+        "supported_architectures": list(facts.get("supported_architectures") or []),
+    }
+
+
 def read_arch(tag: str, *, platform: str | None = None) -> dict:
     """The SM architectures the image's torch was compiled for, as capabilities too."""
     cmd = ["docker", "run", "--rm"]
@@ -316,6 +352,7 @@ def verify_peer(tag: str, target: str, local_layers: list[str]) -> None:
 
 def write_manifest(
     path: Path, tag: str, flavor: Flavor, identity: dict, stack: dict, arch: dict, previous: dict,
+    support: dict | None = None,
 ) -> dict:
     """Write the manifest with generated identity.
 
@@ -340,6 +377,10 @@ def write_manifest(
         "machine": arch.get("machine") or identity.get("architecture"),
         "arch_list": arch.get("arch_list", []),
         "compute_capabilities": arch.get("compute_capabilities", []),
+        # What it can load: model types (Transformers + vLLM configs) and the
+        # architectures vLLM runs natively (``read_support``).
+        "supported_model_types": (support or {}).get("supported_model_types", []),
+        "supported_architectures": (support or {}).get("supported_architectures", []),
         # Certification is evidence from a run, not from a build, so none of
         # it survives a rebuild. Only what the image is *for* carries over.
         #
@@ -425,6 +466,7 @@ def main(argv: list[str] | None = None) -> int:
         identity = inspect_image(tag)
         stack = read_stack_versions(tag, platform=args.platform)
         arch = read_arch(tag, platform=args.platform)
+        support = read_support(tag, platform=args.platform)
         previous = {}
         committed = HERE / flavor.manifest
         if committed.exists():
@@ -433,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError:
                 previous = {}
 
-        manifest = write_manifest(manifest_path, tag, flavor, identity, stack, arch, previous)
+        manifest = write_manifest(manifest_path, tag, flavor, identity, stack, arch, previous, support)
 
         if args.distribute:
             distribute(tag, args.distribute)

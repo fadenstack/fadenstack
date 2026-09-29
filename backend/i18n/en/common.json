@@ -2961,7 +2961,11 @@
     "creating": "Creating the deployment…",
     "host": "Host",
     "revision_label": "Revision (optional)",
-    "revision_help": "A branch, tag or commit on Hugging Face. Leave empty for the latest."
+    "revision_help": "A branch, tag or commit on Hugging Face. Leave empty for the latest.",
+    "cannot_run": "Cannot run here",
+    "may_not_run": "May not run",
+    "compat_model_type": "This cluster's runtime cannot load it: neither Transformers {{transformers}} nor vLLM {{vllm}} in it knows the model type \"{{type}}\" (the model was saved with Transformers {{saved}}). It needs a newer runtime image; nothing is downloaded.",
+    "compat_architecture": "vLLM {{vllm}} in this cluster's runtime has no implementation of {{architecture}}. It can only try its generic Transformers backend, which not every model supports."
   },
   "marketplace": {
     "title": "Model marketplace",

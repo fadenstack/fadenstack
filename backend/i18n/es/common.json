@@ -2963,7 +2963,11 @@
     "creating": "Creando el despliegue…",
     "host": "Alojar",
     "revision_label": "Revisión (opcional)",
-    "revision_help": "Una rama, etiqueta o commit en Hugging Face. Déjelo vacío para la más reciente."
+    "revision_help": "Una rama, etiqueta o commit en Hugging Face. Déjelo vacío para la más reciente.",
+    "cannot_run": "No se ejecuta aquí",
+    "may_not_run": "Puede que no se ejecute",
+    "compat_model_type": "El entorno de ejecución de este clúster no puede cargarlo: ni Transformers {{transformers}} ni vLLM {{vllm}} conocen el tipo de modelo \"{{type}}\" (el modelo se guardó con Transformers {{saved}}). Necesita una imagen de ejecución más reciente; no se descarga nada.",
+    "compat_architecture": "vLLM {{vllm}} en el entorno de ejecución de este clúster no tiene implementación de {{architecture}}. Solo puede intentar su backend genérico de Transformers, que no admite todos los modelos."
   },
   "marketplace": {
     "title": "Mercado de modelos",

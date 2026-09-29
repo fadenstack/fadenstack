@@ -2963,7 +2963,11 @@
     "creating": "Bereitstellung wird erstellt…",
     "host": "Bereitstellen",
     "revision_label": "Revision (optional)",
-    "revision_help": "Ein Branch, Tag oder Commit auf Hugging Face. Leer lassen für den neuesten Stand."
+    "revision_help": "Ein Branch, Tag oder Commit auf Hugging Face. Leer lassen für den neuesten Stand.",
+    "cannot_run": "Läuft hier nicht",
+    "may_not_run": "Läuft vielleicht nicht",
+    "compat_model_type": "Die Laufzeit dieses Clusters kann es nicht laden: Weder Transformers {{transformers}} noch vLLM {{vllm}} darin kennt den Modelltyp „{{type}}“ (das Modell wurde mit Transformers {{saved}} gespeichert). Es braucht ein neueres Laufzeit-Image; es wird nichts heruntergeladen.",
+    "compat_architecture": "vLLM {{vllm}} in der Laufzeit dieses Clusters hat keine Implementierung von {{architecture}}. Es kann nur sein allgemeines Transformers-Backend versuchen, das nicht jedes Modell unterstützt."
   },
   "marketplace": {
     "title": "Modell-Marktplatz",

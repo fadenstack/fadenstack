@@ -231,6 +231,11 @@ class CompatibilityMatrix(BaseModel):
     triton_version: str | None = None
     transformers_version: str | None = None
     supported_fabrics: list[str] = Field(default_factory=lambda: ["roce", "infiniband", "ethernet"])
+    #: Model types the image's Transformers and vLLM can read a config.json of,
+    #: and the architectures its vLLM runs natively (``runtime-image``
+    #: ``rebuild_runtime_image.py`` reads them off the image). Empty: not known.
+    supported_model_types: list[str] = Field(default_factory=list)
+    supported_architectures: list[str] = Field(default_factory=list)
 
 
 class CertificationEvidence(BaseModel):
@@ -337,6 +342,8 @@ class RuntimeBundleManifest(BaseModel):
                 nccl_version=_opt(stack.get("nccl")),
                 triton_version=_opt(stack.get("triton")),
                 transformers_version=_opt(stack.get("transformers")),
+                supported_model_types=[str(t) for t in manifest.get("supported_model_types") or []],
+                supported_architectures=[str(a) for a in manifest.get("supported_architectures") or []],
             ),
             certification=CertificationEvidence(
                 status=status,

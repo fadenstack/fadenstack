@@ -80,6 +80,31 @@ memory), the download is marked **interrupted**. It resumes by itself when a
 deployment waits for the model, and from where it stopped: the files already
 on disk are kept.
 
+## Can the cluster run it?
+
+Before anything is downloaded, the host dialog checks each cluster's runtime
+against the model's `config.json`. Each runtime image lists what it can load.
+The image build reads the lists off the image into the runtime manifest:
+
+- the model types its Transformers and vLLM can read a configuration of
+- the architectures its vLLM runs natively
+
+The check gives one of these verdicts:
+
+- **Cannot run here.** No part of the runtime knows the model type. vLLM
+  would stop at the model's configuration, whatever the hardware. The
+  cluster cannot be chosen, and the API refuses to host it (409). The reason
+  names the model type, the runtime's Transformers and vLLM versions, and the
+  Transformers version the model was saved with. It needs a newer runtime
+  image. `ignore_compatibility: true` in the host request overrides the
+  check.
+- **May not run.** The runtime can read the configuration, but its vLLM has
+  no implementation of the architecture. It can only try its generic
+  Transformers backend, which not every model supports.
+
+A model that brings its own code (`auto_map`, `trust-remote-code`) is not
+judged by the lists. If Hugging Face cannot be reached, nothing is refused.
+
 ## Where the machines get models
 
 By default the server downloads a model and each machine of the cluster

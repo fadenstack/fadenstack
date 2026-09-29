@@ -2963,7 +2963,11 @@
     "creating": "Création du déploiement…",
     "host": "Héberger",
     "revision_label": "Révision (facultatif)",
-    "revision_help": "Une branche, un tag ou un commit sur Hugging Face. Laissez vide pour la plus récente."
+    "revision_help": "Une branche, un tag ou un commit sur Hugging Face. Laissez vide pour la plus récente.",
+    "cannot_run": "Ne peut pas tourner ici",
+    "may_not_run": "Pourrait ne pas tourner",
+    "compat_model_type": "L'environnement d'exécution de ce cluster ne peut pas le charger : ni Transformers {{transformers}} ni vLLM {{vllm}} ne connaissent le type de modèle « {{type}} » (le modèle a été enregistré avec Transformers {{saved}}). Il faut une image d'exécution plus récente ; rien n'est téléchargé.",
+    "compat_architecture": "vLLM {{vllm}} dans l'environnement d'exécution de ce cluster n'a pas d'implémentation de {{architecture}}. Il ne peut qu'essayer son backend Transformers générique, qui ne prend pas en charge tous les modèles."
   },
   "marketplace": {
     "title": "Catalogue de modèles",
