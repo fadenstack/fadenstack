@@ -37,6 +37,15 @@ from faden_backend.services.nodes.wakeup import get_command_notifier
 from faden_backend.services.nodes.auth import constant_time_equal, hash_with_pepper, random_secret
 
 
+#: A command in one of these is over, whatever its agent says next.
+_OVER = frozenset({
+    NodeCommandStatus.SUCCEEDED.value,
+    NodeCommandStatus.FAILED.value,
+    NodeCommandStatus.TIMED_OUT.value,
+    NodeCommandStatus.CANCELED.value,
+})
+
+
 class NodeControlService:
     """Implements onboarding, command lifecycle, and scheduler selection."""
 
@@ -422,7 +431,12 @@ class NodeControlService:
         """
         node.status = NodeHealthStatus.OFFLINE
         await self._demote_node_runtimes(node_id=node.id)
-        await self._fail_commands_lost_with_the_stream(node_id=node.id)
+        if not self.keeps_commands_across_connections(node):
+            await self._fail_commands_lost_with_the_stream(node_id=node.id)
+        # An agent that keeps them (agent 0.2.3) carries on, and says as it
+        # connects again what still runs and what finished
+        # (``settle_commands_on_connect``). One that never comes back is
+        # reaped as offline past its commands' timeouts.
         await self._recheck_member_clusters(node_id=node.id)
 
     async def _recheck_member_clusters(self, *, node_id: uuid.UUID) -> int:
@@ -468,43 +482,79 @@ class NodeControlService:
             wake_reconciler_after_commit(self._dao.session)
         return len(clusters)
 
-    #: Header an agent connects with to say which commands it is still
-    #: executing: ``v1:`` and their ids, comma-separated -- ``v1:`` alone for
-    #: none (agent 0.2.3). Without it, nothing is known and nothing is failed.
-    RUNNING_COMMANDS_HEADER = "x-faden-running-commands"
+    #: Header an agent connects with (agent 0.2.3): ``v1; running=<ids>;
+    #: finished=<ids>`` -- what it is still executing, and its latest results.
+    COMMANDS_HEADER = "x-faden-commands"
+    #: What an agent says it can do: keep a command running when its
+    #: connection drops, and send its result on the next one.
+    CONTINUITY_CAPABILITY = "command_continuity"
 
     @classmethod
-    def running_commands_reported(cls, headers: Any) -> set[str] | None:
-        """The command ids an agent says it is still executing, or None when it does not say."""
-        raw = headers.get(cls.RUNNING_COMMANDS_HEADER) if headers is not None else None
-        if raw is None or not str(raw).startswith("v1:"):
+    def commands_reported(cls, headers: Any) -> tuple[set[str], set[str]] | None:
+        """The (running, finished) command ids an agent connected with; None when it does not say."""
+        raw = headers.get(cls.COMMANDS_HEADER) if headers is not None else None
+        if raw is None:
             return None
-        return {part.strip() for part in str(raw)[3:].split(",") if part.strip()}
+        parts = [part.strip() for part in str(raw).split(";")]
+        if not parts or parts[0] != "v1":
+            return None
+        found: dict[str, set[str]] = {"running": set(), "finished": set()}
+        for part in parts[1:]:
+            name, _, ids = part.partition("=")
+            if name.strip() in found:
+                found[name.strip()] = {i.strip() for i in ids.split(",") if i.strip()}
+        return found["running"], found["finished"]
 
-    async def fail_commands_the_agent_dropped(self, *, node_id: uuid.UUID, still_running: set[str]) -> int:
-        """On a node's connect: fail what the backend has as accepted or running there that the agent is not running.
+    @classmethod
+    def keeps_commands_across_connections(cls, node: InfraNode | None) -> bool:
+        """Whether *node*'s agent carries on with a command when its connection drops."""
+        try:
+            return int(((node.capabilities_json if node else None) or {}).get(cls.CONTINUITY_CAPABILITY) or 0) >= 1
+        except (TypeError, ValueError):
+            return False
 
-        A command runs in the agent that received it, and the agent drops it
-        when that connection goes. The backend learns of a closed connection
-        only if it is still there to see it close: after a restart of the
-        backend (an upgrade), the commands the machines were running stayed
-        "running" for the hour it takes to call one overdue, and everything
-        waiting on them waited -- a model copy on both DGX Sparks among them.
-        The agent now says, as it connects, what it is still running; the
-        rest is lost, as surely as with a connection seen to close. A command
-        sent but never accepted is left to be sent again.
+    async def settle_commands_on_connect(
+        self, *, node_id: uuid.UUID, running: set[str], finished: set[str],
+    ) -> list[InfraNodeCommand]:
+        """What the backend had accepted or running on a machine, set straight as its agent connects.
+
+        Still running there: left alone, its result comes on this connection.
+        Finished there: returned, to be sent again -- the agent answers from
+        its result store, which is how a result sent as the last connection
+        closed (or never sent) reaches the backend. Neither: lost, failed now.
+        That last one is what a restart of the backend used to leave behind:
+        the model copies both DGX Sparks had been running read "running" for
+        the hour it takes to call a command overdue. A command sent but never
+        accepted is sent again as before.
         """
-        return await self._fail_commands_lost_with_the_stream(
+        try:
+            commands = await self._dao.list_inflight_commands(node_id=node_id)
+        except Exception:  # pragma: no cover - defensive
+            log.exception("Could not list in-flight commands for node %s", node_id)
+            return []
+        accepted = [c for c in commands if c.status != NodeCommandStatus.DISPATCHED.value]
+        replay = [c for c in accepted if str(c.id) in finished and str(c.id) not in running]
+        await self._fail_commands_lost_with_the_stream(
             node_id=node_id,
             keep=lambda command: (
-                command.status == NodeCommandStatus.DISPATCHED.value or str(command.id) in still_running
+                command.status == NodeCommandStatus.DISPATCHED.value
+                or str(command.id) in running
+                or str(command.id) in finished
             ),
             reason=(
                 "The node's agent was no longer running this command when it connected again "
-                "(its connection had closed, or this server restarted), so it did not finish. "
+                "(it had restarted, or the command ended with no result), so it did not finish. "
                 "It is safe to try again."
             ),
         )
+        for command in replay:
+            await self._dao.append_command_event(
+                command_id=command.id,
+                phase="re-dispatched",
+                message="The agent finished it while disconnected; sent again for its stored result.",
+                payload_json=None,
+            )
+        return replay
 
     async def _fail_commands_lost_with_the_stream(
         self,
@@ -1120,6 +1170,18 @@ class NodeControlService:
     ) -> None:
         command = await self._dao.get_command(command_id)
         if command is None or command.node_id != node_id:
+            return
+        if command.status in _OVER:
+            # Its agent carried on after the backend had given it up (timed
+            # out while the machine was away). Noted, but it stays over: what
+            # was retried in its place is what counts now. Its result, when
+            # it comes, is still recorded -- the truth about the machine.
+            await self._dao.append_command_event(
+                command_id=command.id,
+                phase="late-progress",
+                message=str(payload.get("message") or "Progress after the command was over."),
+                payload_json=None,
+            )
             return
         await self._dao.set_command_status(command, status=NodeCommandStatus.RUNNING)
         await self._dao.append_command_event(

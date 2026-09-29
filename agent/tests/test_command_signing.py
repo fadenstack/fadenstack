@@ -186,4 +186,4 @@ async def test_the_stream_is_opened_announcing_the_check(tmp_path: Path, monkeyp
     assert seen["X-Command-Signing"] == "hmac-sha256"
     assert seen["Authorization"] == f"Bearer {CREDENTIAL}"
     # ... and what it is still running, so the backend fails the rest (test_running_commands.py).
-    assert seen["X-Faden-Running-Commands"] == "v1:"
+    assert seen["X-Faden-Commands"] == "v1; running=; finished="

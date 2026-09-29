@@ -1,13 +1,15 @@
-"""What an agent was running when this server restarted is not left "running" for an hour.
+"""What a machine was running when its connection went is settled when it connects again.
 
-A command runs in the agent that received it and dies with its connection.
-The backend fails it when it sees the connection close -- but after its own
-restart (an upgrade on the release VM) there was no one left to see that, and
-the model copies both DGX Sparks had been running stayed "running" until they
-were an hour overdue. The deployment waited on them the whole time.
+A command used to run inside the agent's reading of its connection, and died
+with it. The backend failed it when it saw the connection close -- but after
+a restart of its own (an upgrade on the release VM) no one saw that, and the
+model copies both DGX Sparks had been running stayed "running" for an hour.
 
-The agent now says, as it connects, which commands it is still executing
-(agent 0.2.3); the backend fails the rest of what it had accepted.
+An agent of 0.2.3 keeps a command running when its connection drops, and
+says as it connects what still runs and what finished (X-Faden-Commands).
+The backend leaves the running ones alone, asks again for the finished ones
+it has no result for, and fails the rest. A connection seen to close fails
+nothing for such an agent any more; for an older one it still does.
 """
 
 from __future__ import annotations
@@ -29,8 +31,9 @@ def _service(session: AsyncSession) -> NodeControlService:
     return NodeControlService(NodeControlDAO(session), pepper="p", enrollment_ttl_minutes=60, default_command_timeout_sec=60)
 
 
-async def _node(session: AsyncSession) -> InfraNode:
-    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="10.250.10.71", status="healthy", capabilities_json={})
+async def _node(session: AsyncSession, *, continuity: bool = True) -> InfraNode:
+    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="10.250.10.71", status="healthy",
+                     capabilities_json={"command_continuity": 1} if continuity else {})
     session.add(node)
     await session.flush()
     return node
@@ -47,31 +50,37 @@ async def _command(session: AsyncSession, node: InfraNode, status: str, *, comma
     return command
 
 
-async def test_what_the_agent_no_longer_runs_is_failed_and_the_rest_kept(dbsession: AsyncSession) -> None:
-    node = await _node(dbsession)
-    dropped_running = await _command(dbsession, node, NodeCommandStatus.RUNNING.value)
-    dropped_acked = await _command(dbsession, node, NodeCommandStatus.ACKED.value)
-    still_running = await _command(dbsession, node, NodeCommandStatus.RUNNING.value)
-    never_accepted = await _command(dbsession, node, NodeCommandStatus.DISPATCHED.value)
-    queued = await _command(dbsession, node, NodeCommandStatus.QUEUED.value)
+async def _statuses(session: AsyncSession, *commands) -> list[str]:
+    for command in commands:
+        await session.refresh(command)
+    return [command.status for command in commands]
 
-    failed = await _service(dbsession).fail_commands_the_agent_dropped(
-        node_id=node.id, still_running={str(still_running.id)},
+
+# -- on connect ---------------------------------------------------------------
+
+
+async def test_running_is_left_finished_is_asked_again_and_the_rest_is_failed(dbsession: AsyncSession) -> None:
+    node = await _node(dbsession)
+    running = await _command(dbsession, node, NodeCommandStatus.RUNNING.value)
+    finished = await _command(dbsession, node, NodeCommandStatus.RUNNING.value)
+    lost_running = await _command(dbsession, node, NodeCommandStatus.RUNNING.value)
+    lost_acked = await _command(dbsession, node, NodeCommandStatus.ACKED.value)
+    never_accepted = await _command(dbsession, node, NodeCommandStatus.DISPATCHED.value)
+
+    replay = await _service(dbsession).settle_commands_on_connect(
+        node_id=node.id, running={str(running.id)}, finished={str(finished.id)},
     )
 
-    assert failed == 2
-    for command in (dropped_running, dropped_acked, still_running, never_accepted, queued):
-        await dbsession.refresh(command)
-    assert dropped_running.status == dropped_acked.status == NodeCommandStatus.FAILED.value
-    assert dropped_running.error_code == "node_stream_lost"
-    assert "no longer running" in (dropped_running.error_message or "")
-    assert still_running.status == NodeCommandStatus.RUNNING.value
-    assert never_accepted.status == NodeCommandStatus.DISPATCHED.value, "sent again on connect, not failed"
-    assert queued.status == NodeCommandStatus.QUEUED.value
+    assert [c.id for c in replay] == [finished.id]
+    assert await _statuses(dbsession, running, finished, lost_running, lost_acked, never_accepted) == [
+        "running", "running", "failed", "failed", "dispatched",
+    ]
+    assert lost_running.error_code == "node_stream_lost"
+    assert "no longer running" in (lost_running.error_message or "")
 
 
 async def test_a_model_copy_that_died_frees_its_node_for_a_retry(dbsession: AsyncSession) -> None:
-    """The DGX pair after the upgrade: the copy row said "syncing" and blocked a retry for an hour."""
+    """The DGX pair after the upgrade: the copy's row said "syncing" and blocked a retry for an hour."""
     node = await _node(dbsession)
     model = LLMModel(display_name="Qwen3.8-Flash-Next-NVFP4", source=ModelSource.HUGGINGFACE,
                      status=ModelStatus.AVAILABLE, hf_repo_id=f"nvidia/q-{uuid.uuid4().hex[:6]}")
@@ -82,21 +91,58 @@ async def test_a_model_copy_that_died_frees_its_node_for_a_retry(dbsession: Asyn
     await _command(dbsession, node, NodeCommandStatus.RUNNING.value, command_type=NodeCommandType.SYNC_MODEL.value,
                    payload={"model_sync": {"model_id": str(model.id), "hf_repo_id": model.hf_repo_id}})
 
-    await _service(dbsession).fail_commands_the_agent_dropped(node_id=node.id, still_running=set())
+    await _service(dbsession).settle_commands_on_connect(node_id=node.id, running=set(), finished=set())
 
     row = await availability.get(model.id, node.id)
     assert row is not None and row.status == ModelAvailabilityStatus.FAILED.value
 
 
-async def test_an_agent_that_does_not_say_changes_nothing(dbsession: AsyncSession) -> None:
-    """An agent older than 0.2.3 connects without the header: its commands are left as they were."""
-    assert NodeControlService.running_commands_reported({"authorization": "Bearer x"}) is None
+# -- a connection closing ----------------------------------------------------------
+
+
+async def test_a_closing_connection_fails_nothing_for_an_agent_that_carries_on(dbsession: AsyncSession) -> None:
+    node = await _node(dbsession, continuity=True)
+    copy = await _command(dbsession, node, NodeCommandStatus.RUNNING.value, command_type="sync_model")
+    await _service(dbsession)._node_lost_its_last_stream(node)
+    assert await _statuses(dbsession, copy) == ["running"]
+    assert node.status == "offline"
+
+
+async def test_a_closing_connection_still_fails_what_an_older_agent_was_running(dbsession: AsyncSession) -> None:
+    node = await _node(dbsession, continuity=False)
+    copy = await _command(dbsession, node, NodeCommandStatus.RUNNING.value, command_type="sync_model")
+    await _service(dbsession)._node_lost_its_last_stream(node)
+    assert await _statuses(dbsession, copy) == ["failed"]
+
+
+async def test_progress_does_not_bring_a_command_that_is_over_back(dbsession: AsyncSession) -> None:
+    """Timed out while its machine was away, the agent carried on: what was retried instead counts."""
+    node = await _node(dbsession)
+    copy = await _command(dbsession, node, NodeCommandStatus.TIMED_OUT.value, command_type="sync_model")
+    await _service(dbsession).record_command_progress(
+        node_id=node.id, command_id=copy.id, payload={"message": "Downloading 40%", "progress_pct": 40},
+    )
+    assert await _statuses(dbsession, copy) == ["timed_out"]
+
+
+# -- the header ----------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("header", "ids"),
-    [("v1:", set()), ("v1:a1", {"a1"}), ("v1:a1, b2,,", {"a1", "b2"}), ("v2:a1", None), ("a1,b2", None)],
-    ids=["none running", "one", "several, untidy", "a later format", "no version"],
+    ("header", "report"),
+    [
+        ("v1; running=; finished=", (set(), set())),
+        ("v1; running=a1; finished=b2,c3", ({"a1"}, {"b2", "c3"})),
+        ("v1;running=a1 , ;finished=", ({"a1"}, set())),
+        ("v2; running=a1", None),
+        ("running=a1", None),
+    ],
+    ids=["nothing", "both", "untidy", "a later format", "no version"],
 )
-def test_reading_the_header(header: str, ids: set[str] | None) -> None:
-    assert NodeControlService.running_commands_reported({"x-faden-running-commands": header}) == ids
+def test_reading_the_header(header: str, report: tuple[set[str], set[str]] | None) -> None:
+    assert NodeControlService.commands_reported({"x-faden-commands": header}) == report
+
+
+def test_an_agent_that_does_not_say_is_left_as_before() -> None:
+    assert NodeControlService.commands_reported({"authorization": "Bearer x"}) is None
+    assert NodeControlService.keeps_commands_across_connections(None) is False

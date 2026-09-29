@@ -133,6 +133,37 @@ Two changes stop this:
    says "Waiting for gpu-01 to reconnect before applying" and goes ahead
    once it has.
 
+## A dropped connection no longer stops what a machine is doing
+
+A machine's agent (0.2.3 and later) runs each command beside its connection
+to the server, not inside it. Until 0.2.3 it read nothing else while a
+command ran. During a 36-minute model copy on gpu-01, the server's
+status requests piled up unread. The connection's buffer filled, and the
+agent stopped reading altogether, including the replies to its keepalive
+pings. The connection was then dropped as dead, and the copy died with it.
+
+Now:
+
+- **Commands keep running** while the connection drops and comes back.
+  Their progress and result go out on the connection that is open when they
+  come.
+- **Which commands run together:**
+  - Changes (starting, joining, deploying, loading the runtime image,
+    system updates) run one at a time, in the order they came.
+  - Status requests run together, but never during a change. A status taken
+    halfway through starting a cluster would read "down".
+  - Model copies run beside everything else, at most two at a time, and one
+    per model.
+  - A command waiting for its turn says so every minute.
+- **Each reconnect settles the commands.** The agent says which commands
+  still run and which it finished. The server leaves the running ones alone,
+  asks again for any finished result it has not recorded, and fails the
+  rest. Before this, a restart of the server left what the machines had
+  been running marked "running" for an hour.
+- **A closed connection alone fails nothing** for such an agent. A machine
+  that never comes back is timed out as offline. For an older agent, the
+  server still fails its commands when it sees the connection close.
+
 ## Settings
 
 | Setting | Default | What it does |

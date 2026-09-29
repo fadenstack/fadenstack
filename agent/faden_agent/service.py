@@ -85,6 +85,11 @@ class NodeAgentService:
         # ... and download a model from the Hub itself, and say whether it can
         # reach it (hf_download.py): a cluster's "machines download models".
         static_capabilities["model_download"] = 1
+        # ... and keep a command running when its connection drops, deliver its
+        # result on the next, and say on connecting what runs and what finished
+        # (stream_client.py): the server then leaves them alone when it sees a
+        # connection close, instead of failing them as lost.
+        static_capabilities["command_continuity"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")

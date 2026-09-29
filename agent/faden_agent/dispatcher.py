@@ -7,6 +7,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from faden_agent.command_order import CommandOrder
 from faden_agent.event_buffer import EventBuffer
 from faden_agent.models import NodeCommandType
 from faden_agent.policy_guard import PolicyGuard, PolicyViolationError
@@ -55,6 +56,9 @@ class CommandDispatcher:
         # the same deploy twice concurrently (two ``docker run`` = two
         # containers, or a second restart mid-flight).
         self._inflight: dict[str, asyncio.Task[dict[str, Any]]] = {}
+        #: Which commands may run beside which (command_order.py): they run
+        #: beside the connection's reading now, not inside it.
+        self._order = CommandOrder()
 
     async def handle(self, command: dict[str, Any], emit_progress: ProgressEmitter) -> dict[str, Any]:
         """Execute command and return normalized result payload."""
@@ -176,7 +180,7 @@ class CommandDispatcher:
         prev = self._inflight.get(command_id)
         if prev is None or prev.done():
             task = asyncio.create_task(
-                self._execute(command_type=command_type, payload=payload, emit_progress=emit_progress),
+                self._in_turn(command_type=command_type, payload=payload, emit_progress=emit_progress),
                 name=f"command:{command_id}",
             )
             self._inflight[command_id] = task
@@ -191,6 +195,13 @@ class CommandDispatcher:
         finally:
             if self._inflight.get(command_id) is task:
                 self._inflight.pop(command_id, None)
+
+    async def _in_turn(
+        self, *, command_type: str, payload: dict[str, Any], emit_progress: ProgressEmitter,
+    ) -> dict[str, Any]:
+        """Run the command when its kind may (``command_order``), saying meanwhile that it waits."""
+        async with self._order.turn(command_type, notify=emit_progress):
+            return await self._execute(command_type=command_type, payload=payload, emit_progress=emit_progress)
 
     async def _execute(
         self, *, command_type: str, payload: dict[str, Any], emit_progress: ProgressEmitter,

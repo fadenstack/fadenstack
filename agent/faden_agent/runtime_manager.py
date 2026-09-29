@@ -467,8 +467,15 @@ class RuntimeManager:
             if emit_progress is not None:
                 await emit_progress(p)
 
+        from faden_agent.model_puller import _lock_for_model_dir  # noqa: PLC0415
+
+        model_folder = Path(self._model_store_root) / f"models--{hf_repo_id.replace('/', '--')}"
         try:
-            fetched = await self._model_downloader(model_sync=model_sync, emit_progress=_progress)
+            # One copy of a model at a time, from the Hub or from the server
+            # (``model_puller`` takes the same lock): transfers run beside each
+            # other now (command_order.py).
+            async with _lock_for_model_dir(model_folder):
+                fetched = await self._model_downloader(model_sync=model_sync, emit_progress=_progress)
         except PermissionError as exc:
             raise RuntimeManagerError(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - the Hub's own words are the useful part
