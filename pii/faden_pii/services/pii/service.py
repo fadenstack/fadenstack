@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
@@ -22,6 +23,10 @@ from typing import Any
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerResult
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import EngineResult
+
+#: A value the SDK masked on the device before it left (``[[fs:PERSON_1]]``).
+#: Already a token: detecting it again would mask the mask.
+_LOCAL_TOKEN = re.compile(r"\[\[fs:[A-Z][A-Z0-9_]*_\d+\]\]")
 
 log = logging.getLogger(__name__)
 
@@ -448,9 +453,12 @@ class PIIService:
                 entities=entities,
                 score_threshold=score_threshold,
             )
-            for key, results in zip(missing, batch, strict=True):
+            for (key, text), results in zip(missing.items(), batch, strict=True):
+                local = [m.span() for m in _LOCAL_TOKEN.finditer(text)]
                 found[key] = tuple(
-                    (r.entity_type, r.start, r.end, r.score) for r in results
+                    (r.entity_type, r.start, r.end, r.score)
+                    for r in results
+                    if not any(r.start < end and start < r.end for start, end in local)
                 )
                 self._analyses.put(key, found[key])
         analyses: list[list[RecognizerResult]] = []

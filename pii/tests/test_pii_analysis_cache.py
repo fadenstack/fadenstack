@@ -125,3 +125,29 @@ async def test_a_later_call_continues_the_conversations_tokens(service: PIIServi
     carol = next(t for t, v in later.token_mapping.items() if v == "Carol Danvers")
     assert carol not in first.token_mapping, "a new person gets a new number"
     assert set(first.token_mapping) <= set(later.token_mapping), "the whole mapping comes back"
+
+
+@pytest.mark.anyio
+async def test_a_value_the_sdk_masked_on_the_device_is_left_alone(
+    service: PIIService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``[[fs:PERSON_1]]`` is already a token: masking it again would lose it."""
+    text = "Ask [[fs:PERSON_1]] and Alice Meyer about the plan."
+    real = service._batch.analyze_iterator
+
+    def with_the_token_found(*, texts: list[str], **kwargs: Any) -> Any:
+        # Whatever the model makes of the token, a hit on it is dropped.
+        from presidio_analyzer import RecognizerResult  # noqa: PLC0415
+
+        results = list(real(texts=texts, **kwargs))
+        start = texts[0].index("[[fs:")
+        end = start + len("[[fs:PERSON_1]]")
+        results[0] = [*results[0], RecognizerResult("PERSON", start, end, 0.9)]
+        return results
+
+    monkeypatch.setattr(service._batch, "analyze_iterator", with_the_token_found)
+    result = await service.sanitize_payload(_chat(text), mode="tokenize")
+    content = result.payload["messages"][0]["content"]
+    assert "[[fs:PERSON_1]]" in content
+    assert "Alice Meyer" not in content

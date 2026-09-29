@@ -103,3 +103,90 @@ def test_a_tokenized_request_becomes_the_redacted_one() -> None:
     assert out["messages"][1]["content"][1] == {"type": "image_url", "image_url": {}}
     assert out["input"] == ["Mail <EMAIL_ADDRESS>"]
     assert request["messages"][0]["content"] == "I am [PERSON_1]", "the original is not changed"
+
+
+# -- the client's tool calls ------------------------------------------------------------
+
+QUOTED = {"[PERSON_2]": 'Sean "Jack" O\'Brien'}
+
+
+def _call_event(fragment: dict[str, Any], finish: str | None = None) -> bytes:
+    body = {"id": "c", "object": "chat.completion.chunk", "model": "m",
+            "choices": [{"index": 0, "delta": {"tool_calls": [fragment]}, "finish_reason": finish}]}
+    return f"data: {json.dumps(body)}\n\n".encode()
+
+
+def _arguments(out: list[bytes]) -> dict[int, str]:
+    """The arguments each streamed call carried, joined."""
+    args: dict[int, str] = {}
+    for raw in b"".join(out).decode().split("\n\n"):
+        if raw.startswith("data: ") and raw != "data: [DONE]":
+            for choice in json.loads(raw[6:]).get("choices", []):
+                for call in (choice.get("delta") or {}).get("tool_calls") or []:
+                    piece = (call.get("function") or {}).get("arguments") or ""
+                    args[call["index"]] = args.get(call["index"], "") + piece
+    return args
+
+
+@pytest.mark.anyio
+async def test_a_client_tools_arguments_are_restored_across_fragments() -> None:
+    chunks = (
+        _call_event({"index": 0, "id": "call_1", "type": "function",
+                     "function": {"name": "open_file", "arguments": '{"owner": "[PER'}}),
+        _call_event({"index": 0, "function": {"arguments": 'SON_1]", "mail": "[EMAIL_ADDRESS_1]"}'}}),
+        _event(finish="tool_calls"),
+        b"data: [DONE]\n\n",
+    )
+    out = [c async for c in restore_sse(_stream(*chunks), MAPPING, {"open_file"})]
+    assert b"PER" not in b"".join(out)
+    assert json.loads(_arguments(out)[0]) == {"owner": "Alice Meyer", "mail": "alice@example.com"}
+
+
+@pytest.mark.anyio
+async def test_held_arguments_go_out_when_the_call_ends() -> None:
+    chunks = (
+        _call_event({"index": 0, "id": "call_1", "type": "function",
+                     "function": {"name": "open_file", "arguments": '{"owner": "[PERSON_1'}}),
+        _call_event({"index": 0, "function": {"arguments": ""}}, finish="tool_calls"),
+    )
+    out = [c async for c in restore_sse(_stream(*chunks), MAPPING, {"open_file"})]
+    assert _arguments(out)[0] == '{"owner": "[PERSON_1', "an unfinished token is not a token: kept as sent"
+
+
+@pytest.mark.anyio
+async def test_a_value_is_escaped_inside_the_arguments() -> None:
+    chunks = (
+        _call_event({"index": 0, "id": "call_1", "type": "function",
+                     "function": {"name": "greet", "arguments": '{"name": "[PERSON_2]"}'}}),
+        b"data: [DONE]\n\n",
+    )
+    out = [c async for c in restore_sse(_stream(*chunks), QUOTED, {"greet"})]
+    assert json.loads(_arguments(out)[0]) == {"name": 'Sean "Jack" O\'Brien'}
+
+
+@pytest.mark.anyio
+async def test_only_the_clients_tools_and_not_the_sdks_own_tokens() -> None:
+    chunks = (
+        _call_event({"index": 0, "id": "a", "type": "function",
+                     "function": {"name": "gateway_tool", "arguments": '{"who": "[PERSON_1]"}'}}),
+        _call_event({"index": 1, "id": "b", "type": "function",
+                     "function": {"name": "open_file", "arguments": '{"who": "[[fs:PERSON_1]]"}'}}),
+        b"data: [DONE]\n\n",
+    )
+    out = [c async for c in restore_sse(_stream(*chunks), MAPPING, {"open_file"})]
+    args = _arguments(out)
+    assert json.loads(args[0]) == {"who": "[PERSON_1]"}, "not the client's: left for the gateway"
+    assert json.loads(args[1]) == {"who": "[[fs:PERSON_1]]"}, "masked on the device: left alone"
+
+
+def test_a_whole_answers_tool_calls_are_restored() -> None:
+    payload = {"choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
+        "role": "assistant", "content": None,
+        "tool_calls": [
+            {"id": "a", "type": "function", "function": {"name": "greet", "arguments": '{"name": "[PERSON_2]"}'}},
+            {"id": "b", "type": "function", "function": {"name": "other", "arguments": '{"name": "[PERSON_2]"}'}},
+        ],
+    }}]}
+    calls = restore_payload(payload, QUOTED, {"greet"})["choices"][0]["message"]["tool_calls"]
+    assert json.loads(calls[0]["function"]["arguments"]) == {"name": 'Sean "Jack" O\'Brien'}
+    assert json.loads(calls[1]["function"]["arguments"]) == {"name": "[PERSON_2]"}

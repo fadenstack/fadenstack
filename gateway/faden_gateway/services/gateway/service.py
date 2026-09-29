@@ -35,6 +35,7 @@ from faden_gateway.services.gateway.pii_restore import (
     redact_tokens,
     restore_payload,
     restore_sse,
+    restore_tool_calls,
     restore_text,
 )
 from faden_gateway.services.gateway.proxy import UpstreamProxy, UpstreamResult
@@ -1032,7 +1033,7 @@ class GatewayService:
 
             # The client gets the values tokenize mode took out; the trace
             # keeps the answer as the model gave it, with the tokens.
-            response_payload = restore_payload(result.payload, req.token_mapping)
+            response_payload = restore_payload(result.payload, req.token_mapping, req.client_tools)
 
             if req.trace_context is not None:
                 self.observability.record_success(
@@ -1200,7 +1201,7 @@ class GatewayService:
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
                 wrapped_stream, stats = await wrap_sse_stream(
-                    restore_sse(raw_stream, req.token_mapping),
+                    restore_sse(raw_stream, req.token_mapping, req.client_tools),
                 )
             stream_started = True
 
@@ -2261,7 +2262,9 @@ class GatewayService:
             if calls:
                 # Tools the client defined: its to run, as in any streamed answer.
                 yield sse({**head, "choices": [{
-                    "index": 0, "delta": {"tool_calls": calls.as_deltas()}, "finish_reason": None,
+                    "index": 0,
+                    "delta": {"tool_calls": restore_tool_calls(calls.as_deltas(), req.token_mapping, req.client_tools)},
+                    "finish_reason": None,
                 }]})
             req.finish_reason = ended["finish"] or ("tool_calls" if calls else "stop")
             last: dict[str, Any] = {
