@@ -164,6 +164,19 @@ class AgentTokensDTO(BaseModel):
     agent: str
 
 
+class ClientEventDTO(BaseModel):
+    """One event an agent's SDK reported: names, counts, durations -- never content."""
+
+    id: uuid.UUID
+    type: str
+    user_id: str
+    device_id: str | None
+    conversation_id: str | None
+    data: dict[str, Any]
+    occurred_at: datetime | None
+    created_at: datetime
+
+
 class SignInDTO(BaseModel):
     """One sign-in (device) to an agent."""
 

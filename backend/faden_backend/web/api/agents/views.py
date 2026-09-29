@@ -43,6 +43,7 @@ from faden_backend.web.api.agents.schema import (
     AgentTokensDTO,
     AgentVersionDTO,
     AgentVersionFields,
+    ClientEventDTO,
     CreateAgentRequest,
     GrantDTO,
     IssueTokenRequest,
@@ -541,6 +542,39 @@ async def agent_usage(
             for row in days_rows
         ],
     )
+
+
+@router.get("/{agent_ref}/events", response_model=list[ClientEventDTO], name="agent_client_events")
+async def agent_client_events(
+    agent_ref: str,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    type: str | None = None,
+    since: datetime | None = None,
+    limit: int = 100,
+) -> list[ClientEventDTO]:
+    """What the agent's SDKs reported (02 §9), newest first, for its maintainers."""
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
+    if factory is None:
+        raise HTTPException(status_code=503, detail="Gateway database not available")
+    async with factory() as gw:
+        rows = (
+            await gw.execute(
+                text("""
+                SELECT id, type, user_id, device_id, conversation_id, data, occurred_at, created_at
+                FROM agent_client_event
+                WHERE agent_id = :agent
+                  AND (CAST(:type AS TEXT) IS NULL OR type = :type)
+                  AND (CAST(:since AS TIMESTAMPTZ) IS NULL OR created_at >= :since)
+                ORDER BY created_at DESC LIMIT :limit
+                """),
+                {"agent": str(agent.id), "type": type, "since": since, "limit": max(1, min(limit, 500))},
+            )
+        ).mappings().all()
+    return [ClientEventDTO(**row) for row in rows]
 
 
 def _sign_in(row: Any) -> SignInDTO:
