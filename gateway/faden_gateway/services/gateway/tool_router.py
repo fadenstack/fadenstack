@@ -49,6 +49,7 @@ class ToolExecutor(Protocol):
         session_id: uuid.UUID,
         tenant_id: str,
         request_id: str,
+        user_id: str | None = None,
     ) -> ToolCallResult: ...
 
 
@@ -73,6 +74,7 @@ class ServerToolExecutor:
         session_id: uuid.UUID,
         tenant_id: str,
         request_id: str,
+        user_id: str | None = None,
     ) -> ToolCallResult:
         t0 = time.perf_counter()
         is_error = False
@@ -210,6 +212,7 @@ class ToolRouter:
         session_id: uuid.UUID,
         tenant_id: str,
         request_id: str,
+        user_id: str | None = None,
     ) -> ToolCallResult:
         """Route a single tool call to the correct executor."""
         realm = self._resolve_realm(tool_id)
@@ -308,6 +311,7 @@ class ToolRouter:
             session_id=session_id,
             tenant_id=tenant_id,
             request_id=request_id,
+            user_id=user_id,
         )
 
         # Fallback on executor failure in hybrid mode
@@ -328,6 +332,7 @@ class ToolRouter:
                         session_id=session_id,
                         tenant_id=tenant_id,
                         request_id=request_id,
+                        user_id=user_id,
                     )
                     if not result.is_error:
                         break
@@ -341,6 +346,7 @@ class ToolRouter:
         session_id: uuid.UUID,
         tenant_id: str,
         request_id: str,
+        user_id: str | None = None,
     ) -> list[ToolCallResult]:
         """Route multiple tool calls sequentially."""
         results: list[ToolCallResult] = []
@@ -360,6 +366,7 @@ class ToolRouter:
                 session_id=session_id,
                 tenant_id=tenant_id,
                 request_id=request_id,
+                user_id=user_id,
             )
             results.append(result)
         return results

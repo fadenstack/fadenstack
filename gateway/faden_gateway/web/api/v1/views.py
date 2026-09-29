@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response, WebSocket
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette import status
@@ -586,20 +586,6 @@ async def delete_session_pii_policy(
     await _require_session_owner(sid, auth, dao)
     await dao.delete_session_pii_override(sid, auth.tenant_id, auth.user_id)
     return Response(status_code=204)
-
-
-# ── Client WebSocket ─────────────────────────────────────────────
-
-
-@router.websocket("/v1/client/ws")
-async def client_websocket(
-    ws: WebSocket,
-    dao: GatewayDAO = Depends(),
-) -> None:
-    """WebSocket channel for local agentic client connections."""
-    from faden_gateway.services.gateway.client_ws import handle_client_websocket  # noqa: PLC0415
-
-    await handle_client_websocket(ws, dao)
 
 
 @router.post("/v1/embeddings")

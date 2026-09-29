@@ -343,8 +343,14 @@ async def lifespan_setup(
 
     await upstream_tls.machine_identity.refresh()
     machine_tls_task = asyncio.create_task(upstream_tls.refresh_loop(), name="machine_tls")
+    # The device channel: devices on another worker are reached through Redis.
+    from faden_gateway.services.gateway.client_ws import device_hub  # noqa: PLC0415
+
+    cache = app.state.cache_backend
+    await device_hub.start(cache.client() if isinstance(cache, RedisCache) else None)
 
     yield
+    await device_hub.stop()
     pricing_task.cancel()
     machine_tls_task.cancel()
     if not broker.is_worker_process:

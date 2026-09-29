@@ -116,6 +116,36 @@ An agent's SDK keeps `faden.gateway_round` messages in its local session and
 sends them back as history with the next request, so the model still knows
 what it searched after the client answered one of its own tools.
 
+### Tools on the device, called by the gateway
+
+Most of an agent's tools run in the SDK's own loop. When the gateway itself
+has to call a tool on the user's machine -- a server session using the
+desktop's tools -- the device keeps a WebSocket open to `/v1/client/ws`:
+
+1. **Authenticate first.** An agent token (the agent must still let the user
+   in; its `did` is the device) or the user's login token, sent as
+   `Authorization: Bearer ...`, as the subprotocol `faden.bearer.<token>`
+   (offer `faden.v1` beside it -- browsers cannot set headers), or as `token`
+   in `session_init`. Without one the socket is closed (4401) before anything
+   is registered.
+2. `session_init` `{client_id, tools, session_id?}`. The device registers once
+   and serves all of the user's sessions; a named session must be the user's
+   own, and gets this device first. A device signed in for an agent serves
+   only that agent's calls.
+3. The gateway sends `tool_call_request` `{call_id, tool_id, arguments}`; the
+   device answers `tool_call_result` or `tool_call_error` with the same
+   `call_id`. Only the device that was sent a call can answer it.
+4. Calls wait 30 s. `tool_call_progress` buys another 30 s;
+   `tool_call_approval_pending` `{timeout_s}` waits for a person (up to
+   10 minutes). A call that runs out is failed and the device gets
+   `tool_call_cancel`.
+5. A device that drops and reconnects as the same device within 15 s gets
+   its pending calls again; after that they fail with a clear error.
+
+With Redis configured, a call reaches the device wherever its socket is:
+each worker announces its devices and the call travels to the worker that
+holds the socket, and the answer back.
+
 What the server keeps: one request-log row per request (agent, user, device,
 conversation id, model, tokens, latency, status), the events, and nothing of
 the conversation. Traces of agent requests hold metadata only.

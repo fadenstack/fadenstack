@@ -28,6 +28,7 @@ class ClientToolBroker:
         session_id: uuid.UUID,
         tenant_id: str,
         request_id: str,
+        user_id: str | None = None,
     ) -> ToolCallResult:
         """Broker the tool call to the connected client agent."""
         return await broker_tool_call(
@@ -35,5 +36,7 @@ class ClientToolBroker:
             tool_id=tool_id,
             arguments=arguments,
             call_id=call_id,
+            tenant_id=tenant_id,
+            user_id=user_id,
             timeout=self._timeout,
         )

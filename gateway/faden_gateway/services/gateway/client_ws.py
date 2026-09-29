@@ -1,25 +1,48 @@
-"""WebSocket protocol for local agentic client connections.
+"""The device channel: tools that run on a user's machine, called from the gateway.
 
-Provides a persistent channel between Fadenstack and connected local agents
-so that client-local tools can be brokered in real time.
+A device -- an SDK integration, the desktop agent, a local client -- keeps a
+WebSocket open to ``/v1/client/ws`` and offers its tools; the gateway calls
+them for that user's requests.
 
-Protocol messages (JSON over WS):
-  Client -> Server:
-    session_init          – authenticate and declare capabilities
-    tool_call_result      – return result for a brokered call
-    tool_call_error       – report tool execution failure
-    tool_registry_update  – hot-update advertised tools
-  Server -> Client:
-    session_ack           – confirm session initialisation
-    tool_call_request     – request the client to execute a tool
-    tool_call_cancel      – cancel a pending tool call
-    session_close         – server-initiated close
-    error                 – protocol-level error
+What changed from the first version, and why:
+
+- **Authentication first.** The channel took anyone: a ``session_init`` naming
+  any session and tenant registered tools there and received that session's
+  tool calls. Now nothing is registered until a token is verified -- an agent
+  token (its agent's access rules apply, its ``did`` is the device) or a
+  user's token -- sent in the upgrade's ``Authorization`` header, as the
+  WebSocket subprotocol ``faden.bearer.<token>`` (browsers cannot set
+  headers), or in ``session_init``. A session named in ``session_init`` must be
+  the user's own.
+- **Per device, not per session.** A device registers once, keyed by tenant,
+  user and device; any session of that user can use it. Naming a session
+  still binds the device to it, first choice for that session's calls.
+- **Across workers.** The registry was in memory, so a call handled by another
+  worker or replica found no device. With Redis, each worker announces its
+  devices and listens on a channel of its own; a call for a device elsewhere
+  goes to the worker holding the socket and the answer comes back the same
+  way.
+- **Time for people.** 30 s was too short for a human approval. The device
+  says ``tool_call_progress`` (another stretch) or
+  ``tool_call_approval_pending`` (up to the approval timeout) and the wait
+  grows; a call that times out is cancelled on the device.
+- **Reconnects.** A device that drops keeps its pending calls for a grace
+  period; reconnecting as the same device gets them again. After it, they
+  fail with a clear error.
+
+Protocol (JSON text frames):
+
+  device -> gateway: session_init, tool_call_result, tool_call_error,
+                     tool_call_progress, tool_call_approval_pending,
+                     tool_registry_update, ping
+  gateway -> device: session_ack, tool_call_request, tool_call_cancel,
+                     tool_registry_update_ack, pong, error
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time
@@ -32,196 +55,480 @@ from faden_gateway.services.gateway.tool_router import ToolCallResult
 
 logger = logging.getLogger(__name__)
 
-# Default timeout for tool call responses from the client
-_TOOL_CALL_TIMEOUT_SEC = 30.0
+#: How long a call waits for a device, unless the device asks for more.
+TOOL_CALL_TIMEOUT_SEC = 30.0
+#: The longest a call waits once the device says a person has to approve it.
+APPROVAL_TIMEOUT_SEC = 600.0
+#: How long a dropped device's pending calls wait for it to come back.
+RECONNECT_GRACE_SEC = 15.0
+#: How long a connection has to authenticate.
+AUTH_TIMEOUT_SEC = 10.0
+#: Presence in Redis lives this long and is renewed a third of the way.
+PRESENCE_TTL_SEC = 90
+SUBPROTOCOL = "faden.v1"
+BEARER_PREFIX = "faden.bearer."
+
+DeviceKey = tuple[str, str, str]  # (tenant_id, user_id, device_id)
+
+
+def _key_str(key: DeviceKey) -> str:
+    return ":".join(key)
+
+
+def _key_of(value: str) -> DeviceKey:
+    tenant, user, device = value.split(":", 2)
+    return tenant, user, device
+
+
+def _text(value: str | bytes) -> str:
+    return value.decode() if isinstance(value, bytes) else value
+
+
+def _presence(value: str | bytes) -> tuple[str, str | None]:
+    """``(worker, agent)`` of a device's presence in Redis."""
+    body = json.loads(_text(value))
+    return str(body["worker"]), body.get("agent")
+
+
+def _failed(call_id: str, tool_id: str, message: str, started: float | None = None) -> ToolCallResult:
+    return ToolCallResult(
+        call_id=call_id,
+        tool_id=tool_id,
+        content=message,
+        is_error=True,
+        latency_ms=int((time.monotonic() - started) * 1000) if started else 0,
+        realm="client_local",
+        executor="ClientToolBroker",
+    )
 
 
 # ---------------------------------------------------------------------------
-# Pending call tracking
-# ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True)
-class PendingToolCall:
-    """Tracks an in-flight tool call brokered to a client."""
-
-    call_id: str
-    tool_id: str
-    future: asyncio.Future[ToolCallResult]
-    created_at: float = field(default_factory=time.time)
-
-
-# ---------------------------------------------------------------------------
-# Client session state
+# State
 # ---------------------------------------------------------------------------
 
 
 @dataclass
-class ClientSession:
-    """State for one connected local agent."""
+class Waiting:
+    """A call this worker waits on, for the request that made it."""
 
-    session_id: uuid.UUID
-    client_id: str
-    tenant_id: str
-    websocket: Any  # starlette.websockets.WebSocket
-    pending_calls: dict[str, PendingToolCall] = field(default_factory=dict)
+    call_id: str
+    tool_id: str
+    future: asyncio.Future[ToolCallResult]
+    deadline: float
+    started: float = field(default_factory=time.monotonic)
+    #: Where the call went: a local device, or another worker's.
+    device: DeviceKey | None = None
+    worker: str | None = None
+
+
+@dataclass
+class InFlight:
+    """A call sent to a device on this worker; answered to *reply_to* (a worker) or here."""
+
+    call_id: str
+    tool_id: str
+    arguments: dict[str, Any]
+    reply_to: str | None = None
+
+
+@dataclass
+class DeviceConnection:
+    """One authenticated device, connected to this worker."""
+
+    key: DeviceKey
+    websocket: Any
     tools: list[dict[str, Any]] = field(default_factory=list)
+    session_id: uuid.UUID | None = None
+    agent_id: str | None = None
+    inflight: dict[str, InFlight] = field(default_factory=dict)
     connected: bool = True
 
+    def offers(self, tool_id: str) -> bool:
+        return not self.tools or any(t.get("tool_id") == tool_id for t in self.tools)
+
+    async def send(self, message: dict[str, Any]) -> None:
+        await self.websocket.send_json(message)
+
 
 # ---------------------------------------------------------------------------
-# Client connection registry (singleton)
+# The hub
 # ---------------------------------------------------------------------------
 
 
-class ClientConnectionRegistry:
-    """In-memory registry of connected local agents.
+class DeviceHub:
+    """The devices connected to this worker, and the way to the others'."""
 
-    Keyed by (session_id, client_id) so multiple agents can connect to
-    different sessions.
-    """
+    def __init__(self, *, worker_id: str | None = None) -> None:
+        self.worker_id = worker_id or uuid.uuid4().hex
+        self._devices: dict[DeviceKey, DeviceConnection] = {}
+        self._sessions: dict[uuid.UUID, DeviceKey] = {}
+        self._waiting: dict[str, Waiting] = {}
+        self._orphans: dict[DeviceKey, dict[str, InFlight]] = {}
+        self._orphan_timers: dict[DeviceKey, asyncio.Task[None]] = {}
+        self._redis: Any = None
+        self._tasks: list[asyncio.Task[None]] = []
+        self.grace_sec = RECONNECT_GRACE_SEC
 
-    def __init__(self) -> None:
-        self._connections: dict[tuple[uuid.UUID, str], ClientSession] = {}
-        self._lock = asyncio.Lock()
+    # -- lifecycle ----------------------------------------------------------------
 
-    async def register(self, cs: ClientSession) -> None:
-        async with self._lock:
-            self._connections[(cs.session_id, cs.client_id)] = cs
+    async def start(self, redis: Any | None) -> None:
+        """Listen on this worker's channel and keep its devices announced (with Redis)."""
+        self._redis = redis
+        if redis is None:
+            return
+        ready = asyncio.Event()
+        self._tasks = [
+            asyncio.create_task(self._listen(ready)),
+            asyncio.create_task(self._announce()),
+        ]
+        await asyncio.wait_for(ready.wait(), timeout=5)
 
-    async def unregister(self, session_id: uuid.UUID, client_id: str) -> ClientSession | None:
-        async with self._lock:
-            return self._connections.pop((session_id, client_id), None)
+    async def stop(self) -> None:
+        for task in [*self._tasks, *self._orphan_timers.values()]:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        self._tasks = []
+        self._orphan_timers = {}
+        self._redis = None
 
-    def get(self, session_id: uuid.UUID, client_id: str) -> ClientSession | None:
-        return self._connections.get((session_id, client_id))
+    # -- devices ------------------------------------------------------------------------
 
-    def get_any_for_session(self, session_id: uuid.UUID) -> ClientSession | None:
-        """Return the first connected client for a session."""
-        for (sid, _), cs in self._connections.items():
-            if sid == session_id and cs.connected:
-                return cs
+    def get(self, key: DeviceKey) -> DeviceConnection | None:
+        return self._devices.get(key)
+
+    def device_for_session(self, session_id: uuid.UUID) -> DeviceConnection | None:
+        key = self._sessions.get(session_id)
+        return self._devices.get(key) if key else None
+
+    async def connect(self, conn: DeviceConnection) -> None:
+        """Register a device; it takes over the calls it left pending, if it comes back in time."""
+        old = self._devices.get(conn.key)
+        if old is not None and old is not conn:
+            old.connected = False
+            conn.inflight.update(old.inflight)
+            old.inflight = {}
+            with contextlib.suppress(Exception):
+                await old.websocket.close(code=4409)  # replaced by a newer connection
+        self._devices[conn.key] = conn
+        if conn.session_id is not None:
+            self._sessions[conn.session_id] = conn.key
+        timer = self._orphan_timers.pop(conn.key, None)
+        if timer is not None:
+            timer.cancel()
+        adopted = self._orphans.pop(conn.key, {})
+        conn.inflight.update(adopted)
+        for call in adopted.values():
+            await self._request(conn, call)
+        await self._announce_one(conn)
+
+    async def disconnect(self, conn: DeviceConnection) -> None:
+        """Forget a device; its pending calls wait out the grace period."""
+        conn.connected = False
+        if self._devices.get(conn.key) is not conn:
+            return  # replaced already
+        del self._devices[conn.key]
+        if conn.session_id is not None and self._sessions.get(conn.session_id) == conn.key:
+            del self._sessions[conn.session_id]
+        if self._redis is not None:
+            with contextlib.suppress(Exception):
+                await self._redis.delete(f"faden:device:{_key_str(conn.key)}")
+                if conn.session_id is not None:
+                    await self._redis.delete(f"faden:device-session:{conn.session_id}")
+        if conn.inflight:
+            self._orphans[conn.key] = dict(conn.inflight)
+            conn.inflight = {}
+            self._orphan_timers[conn.key] = asyncio.create_task(self._expire_orphans(conn.key))
+
+    async def _expire_orphans(self, key: DeviceKey) -> None:
+        await asyncio.sleep(self.grace_sec)
+        self._orphan_timers.pop(key, None)
+        for call in self._orphans.pop(key, {}).values():
+            gone = _failed(call.call_id, call.tool_id, "The device disconnected and did not come back.")
+            await self._answer(call, gone)
+
+    # -- calls ------------------------------------------------------------------------------
+
+    async def call(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str | None,
+        session_id: uuid.UUID | None,
+        tool_id: str,
+        arguments: dict[str, Any],
+        call_id: str,
+        agent_id: str | None = None,
+        timeout: float = TOOL_CALL_TIMEOUT_SEC,
+    ) -> ToolCallResult:
+        """Run *tool_id* on the user's device and wait for its answer.
+
+        Without a session bound to a device, any of the user's devices signed
+        in for the same agent (*agent_id*; ``None``: signed in as the user)
+        will do -- a device signed in for one agent never serves another's
+        calls, nor a chat's.
+        """
+        started = time.monotonic()
+        loop = asyncio.get_running_loop()
+        waiting = Waiting(call_id=call_id, tool_id=tool_id, future=loop.create_future(),
+                          deadline=started + timeout, started=started)
+        self._waiting[call_id] = waiting
+        try:
+            local = self._local_device(tenant_id, user_id, session_id, tool_id, agent_id)
+            if local is not None:
+                waiting.device = local.key
+                call = InFlight(call_id=call_id, tool_id=tool_id, arguments=arguments)
+                local.inflight[call_id] = call
+                await self._request(local, call)
+            else:
+                target = await self._remote_device(tenant_id, user_id, session_id, agent_id)
+                if target is None:
+                    return _failed(call_id, tool_id, "No device is connected for this user.", started)
+                device, worker = target
+                waiting.worker, waiting.device = worker, device
+                await self._publish(worker, {
+                    "op": "call", "call_id": call_id, "tool_id": tool_id, "arguments": arguments,
+                    "device": _key_str(device), "reply_to": self.worker_id,
+                })
+            return await self._wait(waiting)
+        finally:
+            self._waiting.pop(call_id, None)
+
+    async def _wait(self, waiting: Waiting) -> ToolCallResult:
+        while True:
+            remaining = waiting.deadline - time.monotonic()
+            if remaining <= 0:
+                await self._cancel(waiting)
+                return _failed(
+                    waiting.call_id, waiting.tool_id,
+                    f"The device did not answer in time ({int(time.monotonic() - waiting.started)} s).",
+                    waiting.started,
+                )
+            try:
+                result = await asyncio.wait_for(asyncio.shield(waiting.future), timeout=remaining)
+            except TimeoutError:
+                continue  # the deadline may have moved; the loop decides
+            return ToolCallResult(
+                call_id=result.call_id, tool_id=result.tool_id, content=result.content,
+                is_error=result.is_error, latency_ms=int((time.monotonic() - waiting.started) * 1000),
+                realm=result.realm, executor=result.executor,
+            )
+
+    async def _cancel(self, waiting: Waiting) -> None:
+        if waiting.worker is not None and waiting.worker != self.worker_id:
+            with contextlib.suppress(Exception):
+                await self._publish(waiting.worker, {"op": "cancel", "call_id": waiting.call_id,
+                                                     "device": _key_str(waiting.device or ("", "", ""))})
+            return
+        await self._cancel_local(waiting.device, waiting.call_id)
+
+    async def _cancel_local(self, device: DeviceKey | None, call_id: str) -> None:
+        conn = self._devices.get(device) if device else None
+        if conn is not None and conn.inflight.pop(call_id, None) is not None:
+            with contextlib.suppress(Exception):
+                await conn.send({"type": "tool_call_cancel", "call_id": call_id})
+        if device is not None:
+            self._orphans.get(device, {}).pop(call_id, None)
+
+    def _local_device(
+        self, tenant_id: str, user_id: str | None, session_id: uuid.UUID | None, tool_id: str,
+        agent_id: str | None,
+    ) -> DeviceConnection | None:
+        if session_id is not None:
+            bound = self.device_for_session(session_id)
+            if bound is not None and bound.key[0] == tenant_id:
+                return bound
+        if user_id is None:
+            return None
+        mine = [
+            c for k, c in self._devices.items()
+            if k[0] == tenant_id and k[1] == user_id and c.connected and c.agent_id == agent_id
+        ]
+        return next((c for c in mine if c.offers(tool_id)), None)
+
+    async def _remote_device(
+        self, tenant_id: str, user_id: str | None, session_id: uuid.UUID | None, agent_id: str | None,
+    ) -> tuple[DeviceKey, str] | None:
+        if self._redis is None:
+            return None
+        try:
+            if session_id is not None:
+                bound = await self._redis.get(f"faden:device-session:{session_id}")
+                if bound:
+                    key = _key_of(_text(bound))
+                    presence = await self._redis.get(f"faden:device:{_key_str(key)}")
+                    if presence and key[0] == tenant_id:
+                        return key, _presence(presence)[0]
+            if user_id is None:
+                return None
+            pattern = f"faden:device:{tenant_id}:{user_id}:*"
+            async for found in self._redis.scan_iter(match=pattern, count=100):
+                name = _text(found)
+                presence = await self._redis.get(name)
+                if not presence:
+                    continue
+                worker, device_agent = _presence(presence)
+                if device_agent == agent_id:
+                    return _key_of(name[len("faden:device:"):]), worker
+        except Exception:
+            logger.warning("Device lookup in Redis failed", exc_info=True)
         return None
 
+    async def _request(self, conn: DeviceConnection, call: InFlight) -> None:
+        await conn.send({
+            "type": "tool_call_request",
+            "call_id": call.call_id,
+            "session_id": str(conn.session_id) if conn.session_id else None,
+            "tool_id": call.tool_id,
+            "arguments": call.arguments,
+        })
 
-# Global singleton – will be attached to app.state during startup
-client_registry = ClientConnectionRegistry()
+    # -- what devices say ---------------------------------------------------------------------
+
+    async def on_result(self, conn: DeviceConnection, call_id: str, result: ToolCallResult) -> None:
+        call = conn.inflight.pop(call_id, None)
+        if call is None:
+            logger.warning("Device %s answered a call it does not hold: %s", conn.key[2], call_id)
+            return
+        await self._answer(call, result)
+
+    async def on_more_time(self, conn: DeviceConnection, call_id: str, seconds: float) -> bool:
+        """The device needs *seconds* more for *call_id*; ``False`` when it holds no such call."""
+        call = conn.inflight.get(call_id)
+        if call is None:
+            return False
+        until = time.time() + seconds
+        if call.reply_to is None:
+            self._extend(call_id, until)
+        else:
+            await self._publish(call.reply_to, {"op": "extend", "call_id": call_id, "until": until})
+        return True
+
+    def _extend(self, call_id: str, until_wall: float) -> None:
+        waiting = self._waiting.get(call_id)
+        if waiting is not None:
+            deadline = time.monotonic() + max(0.0, until_wall - time.time())
+            waiting.deadline = max(waiting.deadline, deadline)
+
+    async def _answer(self, call: InFlight, result: ToolCallResult) -> None:
+        if call.reply_to is None:
+            waiting = self._waiting.get(call.call_id)
+            if waiting is not None and not waiting.future.done():
+                waiting.future.set_result(result)
+            return
+        await self._publish(call.reply_to, {
+            "op": "result", "call_id": call.call_id, "tool_id": result.tool_id,
+            "content": result.content, "is_error": result.is_error,
+        })
+
+    # -- between workers -----------------------------------------------------------------------
+
+    async def _publish(self, worker: str, message: dict[str, Any]) -> None:
+        if self._redis is None:
+            raise RuntimeError("No Redis: devices on other workers cannot be reached.")
+        await self._redis.publish(f"faden:worker:{worker}", json.dumps(message))
+
+    async def _listen(self, ready: asyncio.Event) -> None:
+        pubsub = self._redis.pubsub()
+        await pubsub.subscribe(f"faden:worker:{self.worker_id}")
+        ready.set()
+        try:
+            while True:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message is None or message.get("type") != "message":
+                    continue
+                try:
+                    await self._on_worker_message(json.loads(message["data"]))
+                except Exception:
+                    logger.warning("A message from another worker failed", exc_info=True)
+        finally:
+            with contextlib.suppress(Exception):
+                await pubsub.unsubscribe()
+                await pubsub.aclose()
+
+    async def _on_worker_message(self, msg: dict[str, Any]) -> None:
+        op = msg.get("op")
+        call_id = str(msg.get("call_id", ""))
+        if op == "call":
+            key = _key_of(msg["device"])
+            call = InFlight(call_id=call_id, tool_id=msg["tool_id"], arguments=msg.get("arguments") or {},
+                            reply_to=msg["reply_to"])
+            conn = self._devices.get(key)
+            if conn is not None:
+                conn.inflight[call_id] = call
+                await self._request(conn, call)
+            elif key in self._orphans:
+                self._orphans[key][call_id] = call  # sent when it reconnects
+            else:
+                await self._answer(call, _failed(call_id, call.tool_id, "The device is no longer connected."))
+        elif op == "result":
+            waiting = self._waiting.get(call_id)
+            if waiting is not None and not waiting.future.done():
+                waiting.future.set_result(ToolCallResult(
+                    call_id=call_id, tool_id=msg.get("tool_id", waiting.tool_id),
+                    content=msg.get("content", ""), is_error=bool(msg.get("is_error")),
+                    realm="client_local", executor="ClientToolBroker",
+                ))
+        elif op == "extend":
+            self._extend(call_id, float(msg.get("until", 0)))
+        elif op == "cancel":
+            await self._cancel_local(_key_of(msg["device"]) if msg.get("device") else None, call_id)
+
+    async def _announce(self) -> None:
+        while True:
+            await asyncio.sleep(PRESENCE_TTL_SEC / 3)
+            for conn in list(self._devices.values()):
+                await self._announce_one(conn)
+
+    async def _announce_one(self, conn: DeviceConnection) -> None:
+        if self._redis is None:
+            return
+        try:
+            presence = json.dumps({"worker": self.worker_id, "agent": conn.agent_id})
+            await self._redis.set(f"faden:device:{_key_str(conn.key)}", presence, ex=PRESENCE_TTL_SEC)
+            if conn.session_id is not None:
+                await self._redis.set(
+                    f"faden:device-session:{conn.session_id}", _key_str(conn.key), ex=PRESENCE_TTL_SEC,
+                )
+        except Exception:
+            logger.warning("Could not announce device %s", conn.key[2], exc_info=True)
+
+
+#: This worker's hub; the lifespan starts it with Redis when there is one.
+device_hub = DeviceHub()
 
 
 # ---------------------------------------------------------------------------
-# WebSocket message handlers
+# The WebSocket
 # ---------------------------------------------------------------------------
 
 
-async def _handle_session_init(
-    ws: Any,
-    msg: dict[str, Any],
-    dao: GatewayDAO,
-) -> ClientSession | None:
-    """Process 'session_init' from a client and register capabilities."""
-    session_id_str = msg.get("session_id")
-    client_id = msg.get("client_id", "")
-    tools = msg.get("tools", [])
-    tenant_id = msg.get("tenant_id", "default")
+@dataclass(frozen=True)
+class DeviceIdentity:
+    """Who a connection authenticated as."""
 
-    if not session_id_str or not client_id:
-        await ws.send_json({
-            "type": "error",
-            "code": "invalid_session_init",
-            "message": "session_id and client_id are required.",
-        })
-        return None
-
-    try:
-        session_id = uuid.UUID(session_id_str)
-    except ValueError:
-        await ws.send_json({
-            "type": "error",
-            "code": "invalid_session_id",
-            "message": "Invalid session_id format.",
-        })
-        return None
-
-    # Register capabilities in DB
-    tool_records = []
-    for t in tools:
-        tool_records.append({
-            "tool_id": t.get("tool_id", ""),
-            "realm": t.get("realm", "client_local"),
-            "schema": t.get("schema"),
-            "available": True,
-        })
-    await dao.register_client_capabilities(session_id, client_id, tool_records)
-
-    cs = ClientSession(
-        session_id=session_id,
-        client_id=client_id,
-        tenant_id=tenant_id,
-        websocket=ws,
-        tools=tools,
-    )
-    await client_registry.register(cs)
-    logger.info("Client %s connected to session %s with %d tools", client_id, session_id, len(tools))
-
-    await ws.send_json({
-        "type": "session_ack",
-        "session_id": str(session_id),
-        "client_id": client_id,
-        "tools_registered": len(tool_records),
-    })
-    return cs
+    tenant_id: str
+    user_id: str
+    device_id: str | None  # from an agent token's ``did``
+    agent_id: str | None
 
 
-async def _handle_tool_call_result(cs: ClientSession, msg: dict[str, Any]) -> None:
-    """Process the result of a brokered tool call from the client."""
-    call_id = msg.get("call_id", "")
-    pending = cs.pending_calls.pop(call_id, None)
-    if pending is None:
-        logger.warning("Received result for unknown call_id=%s", call_id)
-        return
-
-    result = ToolCallResult(
-        call_id=call_id,
-        tool_id=pending.tool_id,
-        content=msg.get("result", {}).get("content", str(msg.get("result", ""))),
-        is_error=msg.get("status", "ok") != "ok",
-        latency_ms=int((time.time() - pending.created_at) * 1000),
-        realm="client_local",
-        executor="ClientToolBroker",
-    )
-    if not pending.future.done():
-        pending.future.set_result(result)
+#: ``(token, message) -> identity``; raises ``PermissionError`` with a code when refused.
+Authenticator = Any
 
 
-async def _handle_tool_call_error(cs: ClientSession, msg: dict[str, Any]) -> None:
-    """Process a tool execution error from the client."""
-    call_id = msg.get("call_id", "")
-    pending = cs.pending_calls.pop(call_id, None)
-    if pending is None:
-        logger.warning("Received error for unknown call_id=%s", call_id)
-        return
-
-    result = ToolCallResult(
-        call_id=call_id,
-        tool_id=pending.tool_id,
-        content=msg.get("error", "Client tool execution failed."),
-        is_error=True,
-        latency_ms=int((time.time() - pending.created_at) * 1000),
-        realm="client_local",
-        executor="ClientToolBroker",
-    )
-    if not pending.future.done():
-        pending.future.set_result(result)
+def _token_from_handshake(ws: Any) -> str | None:
+    auth = ws.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip() or None
+    for proto in ws.scope.get("subprotocols") or []:
+        if proto.startswith(BEARER_PREFIX):
+            return proto[len(BEARER_PREFIX):] or None
+    return None
 
 
-async def _handle_tool_registry_update(
-    cs: ClientSession,
-    msg: dict[str, Any],
-    dao: GatewayDAO,
-) -> None:
-    """Hot-update the tool list for a connected client."""
-    tools = msg.get("tools", [])
-    tool_records = [
+def _tool_records(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
         {
             "tool_id": t.get("tool_id", ""),
             "realm": t.get("realm", "client_local"),
@@ -229,88 +536,175 @@ async def _handle_tool_registry_update(
             "available": t.get("available", True),
         }
         for t in tools
+        if isinstance(t, dict)
     ]
-    await dao.register_client_capabilities(cs.session_id, cs.client_id, tool_records)
-    cs.tools = tools
-    await cs.websocket.send_json({
-        "type": "tool_registry_update_ack",
-        "tools_registered": len(tool_records),
-    })
 
 
-# ---------------------------------------------------------------------------
-# WebSocket endpoint handler
-# ---------------------------------------------------------------------------
+async def _error(ws: Any, code: str, message: str) -> None:
+    await ws.send_json({"type": "error", "code": code, "message": message})
 
 
-async def handle_client_websocket(ws: Any, dao: GatewayDAO) -> None:
-    """Main WS handler loop for a local agent connection.
+async def handle_client_websocket(
+    ws: Any,
+    dao: GatewayDAO,
+    *,
+    authenticate: Authenticator,
+    owns_session: Any,
+    hub: DeviceHub | None = None,
+) -> None:
+    """A device's connection, from authentication to goodbye.
 
-    Expected to be called from a FastAPI/Starlette WebSocket route.
+    *authenticate* ``(token) -> DeviceIdentity`` verifies a token (raising
+    ``PermissionError(code, message)``); *owns_session* ``(identity, session_id)
+    -> bool`` tells whether a session is the user's.
     """
-    await ws.accept()
-    cs: ClientSession | None = None
+    hub = hub or device_hub
+    handshake_token = _token_from_handshake(ws)
+    identity: DeviceIdentity | None = None
+    if handshake_token is not None:
+        try:
+            identity = await authenticate(handshake_token)
+        except PermissionError as exc:
+            await ws.close(code=4401 if exc.args[0] in ("invalid_token", "missing_authorization") else 4403)
+            return
+    offered = ws.scope.get("subprotocols") or []
+    await ws.accept(subprotocol=SUBPROTOCOL if SUBPROTOCOL in offered else None)
+
+    conn: DeviceConnection | None = None
     try:
+        first = await asyncio.wait_for(ws.receive_text(), timeout=AUTH_TIMEOUT_SEC)
+        conn = await _init(ws, first, dao, identity, authenticate, owns_session, hub)
+        if conn is None:
+            await ws.close(code=4401)
+            return
         while True:
             raw = await ws.receive_text()
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await ws.send_json({"type": "error", "code": "invalid_json", "message": "Expected JSON."})
+                await _error(ws, "invalid_json", "Expected JSON.")
                 continue
-
-            msg_type = msg.get("type", "")
-
-            if msg_type == "session_init":
-                cs = await _handle_session_init(ws, msg, dao)
-
-            elif cs is None:
-                await ws.send_json({
-                    "type": "error",
-                    "code": "not_initialised",
-                    "message": "Send session_init first.",
-                })
-
-            elif msg_type == "tool_call_result":
-                await _handle_tool_call_result(cs, msg)
-
-            elif msg_type == "tool_call_error":
-                await _handle_tool_call_error(cs, msg)
-
-            elif msg_type == "tool_registry_update":
-                await _handle_tool_registry_update(cs, msg, dao)
-
-            else:
-                await ws.send_json({
-                    "type": "error",
-                    "code": "unknown_message_type",
-                    "message": f"Unknown message type: {msg_type}",
-                })
-
+            await _dispatch(conn, msg, dao, hub)
+    except TimeoutError:
+        with contextlib.suppress(Exception):
+            await ws.close(code=4401)
     except Exception:
-        logger.debug("Client WS disconnected", exc_info=True)
+        logger.debug("Device channel closed", exc_info=True)
     finally:
-        if cs is not None:
-            cs.connected = False
-            # Cancel pending calls
-            for pending in cs.pending_calls.values():
-                if not pending.future.done():
-                    pending.future.set_result(ToolCallResult(
-                        call_id=pending.call_id,
-                        tool_id=pending.tool_id,
-                        content="Client disconnected before tool call completed.",
-                        is_error=True,
-                        realm="client_local",
-                        executor="ClientToolBroker",
-                    ))
-            # Mark tools as unavailable
-            await dao.mark_client_tools_unavailable(cs.session_id, cs.client_id)
-            await client_registry.unregister(cs.session_id, cs.client_id)
-            logger.info("Client %s disconnected from session %s", cs.client_id, cs.session_id)
+        if conn is not None:
+            await hub.disconnect(conn)
+            if conn.session_id is not None:
+                with contextlib.suppress(Exception):
+                    await dao.mark_client_tools_unavailable(conn.session_id, conn.key[2])
+            logger.info("Device %s of user %s disconnected", conn.key[2], conn.key[1])
+
+
+async def _init(
+    ws: Any,
+    raw: str,
+    dao: GatewayDAO,
+    identity: DeviceIdentity | None,
+    authenticate: Authenticator,
+    owns_session: Any,
+    hub: DeviceHub,
+) -> DeviceConnection | None:
+    """``session_init``: who the device is, what it offers, which session it serves."""
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        msg = {}
+    if not isinstance(msg, dict) or msg.get("type") != "session_init":
+        await _error(ws, "not_initialised", "Send session_init first.")
+        return None
+    identity = identity or await _authenticate_init(ws, msg, authenticate)
+    if identity is None:
+        return None
+    device_id = identity.device_id or str(msg.get("client_id") or "").strip()
+    if not device_id or len(device_id) > 128:
+        await _error(ws, "invalid_session_init", "A client_id (1-128 characters) is required.")
+        return None
+    session_id: uuid.UUID | None = None
+    if msg.get("session_id"):
+        try:
+            session_id = uuid.UUID(str(msg["session_id"]))
+        except ValueError:
+            await _error(ws, "invalid_session_id", "Invalid session_id format.")
+            return None
+        if not await owns_session(identity, session_id):
+            await _error(ws, "session_not_found", "No such session of yours.")
+            return None
+    tools = [t for t in msg.get("tools") or [] if isinstance(t, dict)]
+    conn = DeviceConnection(
+        key=(identity.tenant_id, identity.user_id, device_id),
+        websocket=ws, tools=tools, session_id=session_id, agent_id=identity.agent_id,
+    )
+    if session_id is not None:
+        await dao.register_client_capabilities(session_id, device_id, _tool_records(tools))
+    await ws.send_json({
+        "type": "session_ack",
+        "session_id": str(session_id) if session_id else None,
+        "client_id": device_id,
+        "device_id": device_id,
+        "tools_registered": len(tools),
+    })
+    await hub.connect(conn)
+    logger.info("Device %s of user %s connected with %d tools", device_id, identity.user_id, len(tools))
+    return conn
+
+
+async def _authenticate_init(
+    ws: Any, msg: dict[str, Any], authenticate: Authenticator,
+) -> DeviceIdentity | None:
+    """The identity of the token in ``session_init``; ``None`` when refused (the device is told why)."""
+    token = msg.get("token")
+    if not isinstance(token, str) or not token:
+        await _error(ws, "missing_authorization", "Send a token: in the header, subprotocol or session_init.")
+        return None
+    try:
+        identity: DeviceIdentity = await authenticate(token)
+    except PermissionError as exc:
+        await _error(ws, str(exc.args[0]), str(exc.args[1] if len(exc.args) > 1 else "Refused."))
+        return None
+    return identity
+
+
+async def _dispatch(conn: DeviceConnection, msg: dict[str, Any], dao: GatewayDAO, hub: DeviceHub) -> None:
+    kind = msg.get("type", "")
+    call_id = str(msg.get("call_id", ""))
+    if kind == "tool_call_result":
+        result = msg.get("result")
+        content = result.get("content") if isinstance(result, dict) else result
+        await hub.on_result(conn, call_id, ToolCallResult(
+            call_id=call_id, tool_id=str(msg.get("tool_id", "")),
+            content=content if isinstance(content, str) else json.dumps(content),
+            is_error=msg.get("status", "ok") != "ok", realm="client_local", executor="ClientToolBroker",
+        ))
+    elif kind == "tool_call_error":
+        error = str(msg.get("error") or "The tool failed on the device.")
+        await hub.on_result(conn, call_id, _failed(call_id, str(msg.get("tool_id", "")), error))
+    elif kind in ("tool_call_progress", "tool_call_approval_pending"):
+        asked = msg.get("timeout_s")
+        if kind == "tool_call_progress":
+            seconds = TOOL_CALL_TIMEOUT_SEC
+        elif isinstance(asked, int | float):
+            seconds = min(float(asked), APPROVAL_TIMEOUT_SEC)
+        else:
+            seconds = APPROVAL_TIMEOUT_SEC
+        if not await hub.on_more_time(conn, call_id, seconds):
+            await _error(conn.websocket, "unknown_call", f"No pending call {call_id}.")
+    elif kind == "tool_registry_update":
+        conn.tools = [t for t in msg.get("tools") or [] if isinstance(t, dict)]
+        if conn.session_id is not None:
+            await dao.register_client_capabilities(conn.session_id, conn.key[2], _tool_records(conn.tools))
+        await conn.send({"type": "tool_registry_update_ack", "tools_registered": len(conn.tools)})
+    elif kind == "ping":
+        await conn.send({"type": "pong"})
+    else:
+        await _error(conn.websocket, "unknown_message_type", f"Unknown message type: {kind}")
 
 
 # ---------------------------------------------------------------------------
-# Broker function (used by ClientToolBroker executor)
+# The broker's entry point
 # ---------------------------------------------------------------------------
 
 
@@ -320,44 +714,14 @@ async def broker_tool_call(
     tool_id: str,
     arguments: dict[str, Any],
     call_id: str,
-    timeout: float = _TOOL_CALL_TIMEOUT_SEC,
+    tenant_id: str = "default",
+    user_id: str | None = None,
+    agent_id: str | None = None,
+    timeout: float = TOOL_CALL_TIMEOUT_SEC,
+    hub: DeviceHub | None = None,
 ) -> ToolCallResult:
-    """Send a tool_call_request to the connected client and await the result."""
-    cs = client_registry.get_any_for_session(session_id)
-    if cs is None or not cs.connected:
-        return ToolCallResult(
-            call_id=call_id,
-            tool_id=tool_id,
-            content="No client connected for this session.",
-            is_error=True,
-            realm="client_local",
-            executor="ClientToolBroker",
-        )
-
-    loop = asyncio.get_running_loop()
-    future: asyncio.Future[ToolCallResult] = loop.create_future()
-    pending = PendingToolCall(call_id=call_id, tool_id=tool_id, future=future)
-    cs.pending_calls[call_id] = pending
-
-    # Send request to client
-    await cs.websocket.send_json({
-        "type": "tool_call_request",
-        "call_id": call_id,
-        "session_id": str(session_id),
-        "tool_id": tool_id,
-        "arguments": arguments,
-    })
-
-    try:
-        return await asyncio.wait_for(future, timeout=timeout)
-    except asyncio.TimeoutError:
-        cs.pending_calls.pop(call_id, None)
-        return ToolCallResult(
-            call_id=call_id,
-            tool_id=tool_id,
-            content=f"Tool call timed out after {timeout}s.",
-            is_error=True,
-            latency_ms=int(timeout * 1000),
-            realm="client_local",
-            executor="ClientToolBroker",
-        )
+    """Run *tool_id* on the device serving *session_id* (or another of the user's devices)."""
+    return await (hub or device_hub).call(
+        tenant_id=tenant_id, user_id=user_id, session_id=session_id,
+        tool_id=tool_id, arguments=arguments, call_id=call_id, agent_id=agent_id, timeout=timeout,
+    )

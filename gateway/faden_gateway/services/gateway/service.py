@@ -2444,6 +2444,7 @@ class GatewayService:
                 routed = await self.tool_router.route(
                     tool_id=name, arguments=arguments, call_id=call.get("id", ""),
                     session_id=router_session, tenant_id=auth.tenant_id, request_id=request_id,
+                    user_id=auth.user_id,
                 )
                 content, is_error = routed.content, routed.is_error
                 row.update(mcp_server=_mcp_server(name), realm=routed.realm, executor=routed.executor)

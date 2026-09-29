@@ -17,6 +17,10 @@ class RedisCache:
         self._pool = pool
         log.info("CacheBackend initialised as RedisCache.")
 
+    def client(self) -> Redis:
+        """A client on the pool, for what the cache ops do not cover (pub/sub)."""
+        return Redis(connection_pool=self._pool)
+
     # ── simple ops ────────────────────────────────────────────
 
     async def get(self, key: str) -> bytes | None:
