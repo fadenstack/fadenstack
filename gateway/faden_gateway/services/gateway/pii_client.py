@@ -25,7 +25,19 @@ class SanitizeResult:
     entities_found: list[dict[str, Any]] = field(default_factory=list)
     pii_detected: bool = False
     token_mapping: dict[str, str] | None = None
+    #: What was found, by entity type -- counts only, never the values.
+    entity_types: dict[str, int] = field(default_factory=dict)
 
+
+
+def _entity_types(report: Any) -> dict[str, int]:
+    """Entity type -> count from a PII report; the matched text is not kept."""
+    counts: dict[str, int] = {}
+    for entity in report or []:
+        if isinstance(entity, dict) and entity.get("entity_type"):
+            kind = str(entity["entity_type"])
+            counts[kind] = counts.get(kind, 0) + 1
+    return counts
 
 class PIIClient:
     """Async client wrapping PII service HTTP endpoints."""
@@ -87,6 +99,7 @@ class PIIClient:
                 entities_found=data.get("entities_found", []),
                 pii_detected=bool(data.get("entities_found")),
                 token_mapping=data.get("token_mapping"),
+                entity_types=_entity_types(data.get("pii_report")),
             )
         except Exception:
             logger.exception("PII sanitize call failed")

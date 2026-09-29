@@ -12,6 +12,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.services.gateway import faden_events
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
@@ -716,6 +717,7 @@ async def serve_chat_completions(
         # The skills the user picked for this message, by slug or id: the
         # model never sees the field, only the skills.
         skills = _requested_skills(payload.pop("skills", None))
+        events = faden_events.wanted(request.headers.get(faden_events.HEADER))
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -725,6 +727,7 @@ async def serve_chat_completions(
                 session_id=session_id,
                 skills=skills,
                 agent=agent,
+                faden_events=events,
             )
             stream_response = StreamingResponse(
                 streamed.stream,
@@ -747,6 +750,7 @@ async def serve_chat_completions(
             session_id=session_id,
             skills=skills,
             agent=agent,
+            faden_events=events,
         )
         json_response = JSONResponse(
             status_code=non_stream.status_code,

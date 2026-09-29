@@ -97,6 +97,25 @@ client.chat.completions.create(model="any", messages=[...], stream=True,
 - A maintainer can call the routes with their normal login token, to try a
   draft.
 
+### What the gateway did on its own
+
+Send `X-Faden-Events: ag-ui` (any chat route) to hear about the gateway's own
+work during the answer, in AG-UI's vocabulary. In a stream they arrive as
+named events (`event: faden`) between the OpenAI chunks; a whole answer
+carries them in a `faden` object beside the OpenAI fields. Without the header
+nothing changes, so plain OpenAI clients never see them.
+
+| Event | Says |
+|---|---|
+| `TOOL_CALL_START`, `TOOL_CALL_END` | A gateway tool ran: name, kind (`knowledge`, `mcp`, `skill_file`, ...), duration, whether it failed |
+| `CUSTOM` `faden.citations` | The sources a knowledge search returned (document, chunk, score), not their text |
+| `CUSTOM` `faden.pii` | What the PII scan found: types and counts only |
+| `CUSTOM` `faden.gateway_round` | The round as the model saw it -- its tool-calling turn and the tools' answers, with PII values put back |
+
+An agent's SDK keeps `faden.gateway_round` messages in its local session and
+sends them back as history with the next request, so the model still knows
+what it searched after the client answered one of its own tools.
+
 What the server keeps: one request-log row per request (agent, user, device,
 conversation id, model, tokens, latency, status), the events, and nothing of
 the conversation. Traces of agent requests hold metadata only.

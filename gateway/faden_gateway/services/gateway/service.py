@@ -19,7 +19,13 @@ from faden_gateway.db.models.gateway import PrivacyMode, ProviderType
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.gateway.auth import AuthContext
-from faden_gateway.services.gateway import attachment_search, knowledge, skill_files, system_tools
+from faden_gateway.services.gateway import (
+    attachment_search,
+    faden_events,
+    knowledge,
+    skill_files,
+    system_tools,
+)
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter, reasoning_of
@@ -596,6 +602,40 @@ def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
     return {t.get("qualified_name") for t in mcp_tools or [] if t.get("pii_mode") == "allow"}
 
 
+def _pii_events(req: _Prepared) -> list[dict[str, Any]]:
+    """The PII notice of a request, when the client asked for events and something was found."""
+    if not req.faden_events or req.pii_policy is None:
+        return []
+    notice = faden_events.pii_notice(req.pii_types, req.pii_policy.egress.mode)
+    return [notice] if notice is not None else []
+
+
+async def _leading(events: list[dict[str, Any]], stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+    """*stream*, after *events* as named SSE events."""
+    for event in events:
+        yield faden_events.sse_event(event)
+    async for chunk in stream:
+        yield chunk
+
+
+def _replayable(messages: list[dict[str, Any]], mapping: dict[str, str] | None) -> list[dict[str, Any]]:
+    """A gateway round as the client keeps it: PII values put back, arguments as valid JSON.
+
+    The client sends it back as history; the next request scans it again.
+    """
+    if not mapping:
+        return messages
+    out = []
+    for message in messages:
+        restored = dict(message)
+        if isinstance(restored.get("content"), str):
+            restored["content"] = restore_text(restored["content"], mapping)
+        if isinstance(restored.get("tool_calls"), list):
+            restored["tool_calls"] = restore_tool_calls(restored["tool_calls"], mapping)
+        out.append(restored)
+    return out
+
+
 def _mcp_arguments(req: _Prepared, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """A tool's arguments, with the values tokenize mode took out when its server allows them.
 
@@ -812,6 +852,14 @@ class _Prepared:
     finish_reason: str | None = None
     #: The agent the request runs under (``/v1/agents/{agent}/...``).
     agent: AgentRequest | None = None
+    #: Whether the client asked for Faden's events (``X-Faden-Events``).
+    faden_events: bool = False
+    #: What the egress PII scan found: entity type -> count.
+    pii_types: dict[str, int] = field(default_factory=dict)
+    #: Faden events not yet sent (tool ends, citations, gateway rounds).
+    faden_pending: list[dict[str, Any]] = field(default_factory=list)
+    #: Faden events of a whole answer, sent in its ``faden`` object.
+    faden_whole: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def instance_id(self) -> str | None:
@@ -905,6 +953,7 @@ class GatewayService:
         session_id: str | None = None,
         skills: list[str] | None = None,
         agent: AgentRequest | None = None,
+        faden_events: bool = False,
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
@@ -928,7 +977,9 @@ class GatewayService:
         if rerank is not None:
             candidates = _rerank_routes(model_alias, candidates)
 
-        req = _Prepared(payload=payload, requested_skills=list(skills or []), agent=agent)
+        req = _Prepared(
+            payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
+        )
         result: UpstreamResult | None = None
         error_code: str | None = None
         status_code = 500
@@ -1034,6 +1085,10 @@ class GatewayService:
             # The client gets the values tokenize mode took out; the trace
             # keeps the answer as the model gave it, with the tokens.
             response_payload = restore_payload(result.payload, req.token_mapping, req.client_tools)
+            if req.faden_events and isinstance(response_payload, dict):
+                # Beside the OpenAI fields, which an OpenAI client reads as ever.
+                events = [*_pii_events(req), *req.faden_whole]
+                response_payload = {**response_payload, "faden": {"events": events}}
 
             if req.trace_context is not None:
                 self.observability.record_success(
@@ -1135,6 +1190,7 @@ class GatewayService:
         session_id: str | None = None,
         skills: list[str] | None = None,
         agent: AgentRequest | None = None,
+        faden_events: bool = False,
     ) -> StreamingGatewayResponse:
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
@@ -1153,7 +1209,9 @@ class GatewayService:
         )
         _check_kind("/v1/chat/completions", model_alias, candidates)
 
-        req = _Prepared(payload=payload, requested_skills=list(skills or []), agent=agent)
+        req = _Prepared(
+            payload=payload, requested_skills=list(skills or []), agent=agent, faden_events=faden_events,
+        )
         stream_started = False
         stats: StreamStats | None = None
         pre_stream_status_code = 500
@@ -1186,7 +1244,9 @@ class GatewayService:
                 # answered whole and then replayed: nothing reached the client
                 # until every tool had run and the answer was complete.
                 wrapped_stream, stats = await wrap_sse_stream(
-                    self._stream_tool_rounds(req, auth=auth, request_id=request_id),
+                    _leading(
+                        _pii_events(req), self._stream_tool_rounds(req, auth=auth, request_id=request_id),
+                    ),
                 )
             else:
                 raw_stream = self.adapter.completion(
@@ -1201,7 +1261,7 @@ class GatewayService:
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
                 wrapped_stream, stats = await wrap_sse_stream(
-                    restore_sse(raw_stream, req.token_mapping, req.client_tools),
+                    _leading(_pii_events(req), restore_sse(raw_stream, req.token_mapping, req.client_tools)),
                 )
             stream_started = True
 
@@ -1556,7 +1616,7 @@ class GatewayService:
         ):
             return None, candidates
         try:
-            return await self._sanitize(req.payload, pii_policy), candidates
+            return await self._sanitize(req.payload, pii_policy, req), candidates
         except Exception:
             fail_action = pii_policy.egress.fail_action
             if fail_action == "block":
@@ -1579,7 +1639,7 @@ class GatewayService:
                     ) from None
                 if any(_needs_scan(pii_policy, c) for c in local):
                     try:
-                        return await self._sanitize(req.payload, pii_policy), local
+                        return await self._sanitize(req.payload, pii_policy, req), local
                     except Exception:
                         # Local is let through, as it was before.
                         logger.warning(
@@ -1594,7 +1654,7 @@ class GatewayService:
             return None, candidates
 
     async def _sanitize(
-        self, payload: dict[str, Any], pii_policy: PIIPolicy,
+        self, payload: dict[str, Any], pii_policy: PIIPolicy, req: _Prepared | None = None,
     ) -> tuple[dict[str, Any], dict[str, str] | None]:
         assert self.pii_client is not None  # noqa: S101
         result = await self.pii_client.sanitize(
@@ -1602,6 +1662,10 @@ class GatewayService:
             policy=pii_policy,
             mode=pii_policy.egress.mode,
         )
+        if req is not None:
+            # Types and counts only, for a notice in the UI -- never the values.
+            for kind, count in result.entity_types.items():
+                req.pii_types[kind] = req.pii_types.get(kind, 0) + count
         return result.sanitized_payload, result.token_mapping
 
     async def _lease(
@@ -2174,6 +2238,9 @@ class GatewayService:
             req.tool_iterations = iteration + 1
             turn = _assistant_turn(message.get("content"), message["tool_calls"])
             req.tool_exchange.extend([turn, *answers])
+            if req.faden_events:
+                starts = [faden_events.tool_start(c, _tool_definition_name(c)) for c in message["tool_calls"]]
+                req.faden_whole.extend([*starts, *self._take_faden_events(req, [turn, *answers])])
             payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
             payload = await self._offering_found(req, payload)
             result = await self._complete(req, payload)
@@ -2246,6 +2313,12 @@ class GatewayService:
                 return
 
             if calls and iteration < settings.mcp_tool_loop_max_iterations:
+                if req.faden_events and not any(
+                    _tool_definition_name(c) in req.client_tools for c in calls.calls()
+                ):
+                    for call in calls.calls():
+                        start = faden_events.tool_start(call, _tool_definition_name(call))
+                        yield faden_events.sse_event(start)
                 answers = await self._run_tool_calls(
                     req, calls.calls(), iteration=iteration, auth=auth, request_id=request_id,
                 )
@@ -2256,6 +2329,8 @@ class GatewayService:
                     req.tool_iterations = iteration + 1
                     turn = _assistant_turn("".join(said) or None, calls.calls())
                     req.tool_exchange.extend([turn, *answers])
+                    for event in self._take_faden_events(req, [turn, *answers]):
+                        yield faden_events.sse_event(event)
                     payload = {**payload, "messages": [*payload["messages"], turn, *answers]}
                     payload = await self._offering_found(req, payload)
                     continue
@@ -2263,7 +2338,9 @@ class GatewayService:
                 # Tools the client defined: its to run, as in any streamed answer.
                 yield sse({**head, "choices": [{
                     "index": 0,
-                    "delta": {"tool_calls": restore_tool_calls(calls.as_deltas(), req.token_mapping, req.client_tools)},
+                    "delta": {"tool_calls": restore_tool_calls(
+                        calls.as_deltas(), req.token_mapping, req.client_tools,
+                    )},
                     "finish_reason": None,
                 }]})
             req.finish_reason = ended["finish"] or ("tool_calls" if calls else "stop")
@@ -2275,6 +2352,16 @@ class GatewayService:
             yield sse(last)
             yield sse(DONE)
             return
+
+    def _take_faden_events(
+        self, req: _Prepared, round_messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """The events of a finished gateway round: tool ends, citations, the round itself."""
+        if not req.faden_events:
+            return []
+        events, req.faden_pending = req.faden_pending, []
+        events.append(faden_events.gateway_round(_replayable(round_messages, req.token_mapping)))
+        return events
 
     async def _complete(self, req: _Prepared, payload: dict[str, Any]) -> UpstreamResult:
         """One whole model call; an error from upstream is raised, not answered."""
@@ -2377,6 +2464,11 @@ class GatewayService:
                 is_error=is_error,
                 error_message=content[:500] if is_error else None,
             )
+            if req.faden_events:
+                req.faden_pending.append(faden_events.tool_end(call, row))
+                cited = None if is_error else faden_events.citations(name, content)
+                if cited is not None:
+                    req.faden_pending.append(cited)
             return row, {"role": "tool", "tool_call_id": call.get("id", ""), "content": content}
 
         # Calls the model makes together are independent -- it asked for them

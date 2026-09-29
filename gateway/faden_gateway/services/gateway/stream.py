@@ -50,6 +50,8 @@ async def wrap_sse_stream(
 
 def _contains_data_event(chunk: bytes) -> bool:
     text = chunk.decode("utf-8", errors="ignore")
+    if text.startswith("event: faden"):
+        return False  # the gateway's own events are not the model's first token
     return "data:" in text and "[DONE]" not in text
 
 
