@@ -28,6 +28,33 @@ completion and total. The ⓘ beside it names the model that answered.
 
 ---
 
+## Leaving a reply that is being written
+
+A reply keeps being written when you leave it: when you open another chat or
+another page, reload, or close the tab. Come back to the chat and it shows
+the reply from its start and follows it to the end. A chat whose reply is
+still being written has a small spinner in the sidebar.
+
+- **One reply per chat, three at once.** A chat takes a new message once its
+  reply is done. You can have replies written in up to three chats at the
+  same time; a fourth is refused until one finishes, and what you typed stays
+  in the box. An administrator sets the number
+  (`FADEN_GATEWAY_CHAT_TURNS_PER_USER`).
+- **Stop.** The square button stops the reply, whichever chat you started it
+  in. What was written stays, marked **Stopped**.
+- **Failed replies stay.** A reply that failed stays in the chat with the
+  reason, for example a model refusing the request. **Retry** under the
+  chat's last reply asks again with the model now selected, and the new reply
+  takes its place. Sending the same message again does the same. A failed
+  reply is not sent to the model with later messages; a stopped one is.
+- **A server restart** ends the replies being written; they are marked as
+  cut off and can be tried again.
+
+This is the chat's own behaviour. A request to the gateway's OpenAI-style API
+still ends when its client disconnects.
+
+---
+
 ## Titles
 
 A chat is named from its first message: its first line, cut at a word, at
