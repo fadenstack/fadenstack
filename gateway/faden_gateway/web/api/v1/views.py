@@ -37,6 +37,7 @@ from faden_gateway.services.gateway.schemas import (
     ToolAvailabilityResponse,
 )
 from faden_gateway.services.gateway.service import GatewayService, StreamingGatewayResponse
+from faden_gateway.services.gateway.stream_buffer import StreamBuffer
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 
@@ -163,8 +164,16 @@ def get_gateway_service(
         usage_groups=getattr(request.app.state, "usage_group_resolver", None),
         group_memberships=getattr(request.app.state, "group_membership_resolver", None),
     )
-    service.stream_buffer = getattr(request.app.state, "stream_buffer", None)
+    service.stream_buffer = _stream_buffer(request)
     return service
+
+
+def _stream_buffer(request: Request) -> StreamBuffer:
+    """The app's one stream buffer: what a chat page's reply is read from."""
+    buffer = getattr(request.app.state, "stream_buffer", None)
+    if buffer is None:
+        buffer = request.app.state.stream_buffer = StreamBuffer()
+    return buffer
 
 
 def _shared_tool_cache(request: Request, mcp_client: MCPClient) -> MCPToolCache:
@@ -697,6 +706,9 @@ async def create_chat_completions(
         # The skills the user picked for this message, by slug or id: the
         # model never sees the field, only the skills.
         skills = _requested_skills(payload.pop("skills", None))
+        # The chat page's replies run on their own: the page may leave and
+        # come back. Not the model's field either.
+        background = payload.pop("background", None) is True
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -705,6 +717,7 @@ async def create_chat_completions(
                 request_id=request_id,
                 session_id=session_id,
                 skills=skills,
+                background=background,
             )
             return _streamed_response(streamed, request_id)
 
@@ -820,6 +833,7 @@ async def retry_turn(
             request_id=request_id,
             session_id=str(session_id),
             skills=_requested_skills(body.get("skills")),
+            background=True,
         )
         return _streamed_response(streamed, request_id)
     except GatewayError as exc:
@@ -832,6 +846,26 @@ async def retry_turn(
         )
 
 
+@router.post("/v1/sessions/{session_id}/turns/{turn_id}/stop")
+async def stop_turn(
+    request: Request,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+) -> JSONResponse:
+    """Stop a reply being written in the chat; what was written is kept.
+
+    ``stopping`` says whether the reply was found running here.
+    """
+    try:
+        await _require_session_owner(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    stopping = _stream_buffer(request).request_stop(str(session_id), str(turn_id))
+    return JSONResponse({"stopping": stopping})
+
+
 # ── Stream reconnection ──────────────────────────────────────────
 
 @router.get("/v1/sessions/{session_id}/stream/status")
@@ -841,7 +875,6 @@ async def stream_status(
     auth: AuthContext = Depends(get_auth_context),
 ) -> JSONResponse:
     """Check whether a streaming response is still in progress for a session."""
-    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
     buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
     if buf and buf.has_buffer(session_id):
         return JSONResponse({"active": buf.is_active(session_id)})
@@ -859,7 +892,6 @@ async def stream_resume(
     Replays all buffered chunks, then tails live chunks until the
     stream completes.  Returns 204 if no buffer exists.
     """
-    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
     buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
     if not buf or not buf.has_buffer(session_id):
         return Response(status_code=status.HTTP_204_NO_CONTENT)

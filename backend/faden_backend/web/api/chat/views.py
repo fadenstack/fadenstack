@@ -291,6 +291,16 @@ async def retry_turn(session_id: str, turn_id: str, request: Request) -> Streami
         return await _proxy_error(exc)
 
 
+@router.post("/sessions/{session_id}/turns/{turn_id}/stop")
+async def stop_turn(session_id: str, turn_id: str, request: Request) -> JSONResponse:
+    """Proxy stopping a reply being written; what was written is kept."""
+    jwt = _jwt_from_cookie(request)
+    try:
+        return JSONResponse(content=await _client().stop_turn(session_id, turn_id, jwt))
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
 # ── Stream reconnection ──────────────────────────────────────────
 
 

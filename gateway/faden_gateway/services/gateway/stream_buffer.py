@@ -34,6 +34,12 @@ class _StreamEntry:
     finished_at: float | None = None
     #: The request's trace id, for a reconnecting client's debug panel.
     trace_id: str | None = None
+    #: The reply's row in the chat (its turn), when there is one.
+    turn_id: str | None = None
+    #: Whether the user asked for the reply to stop.
+    stop_requested: bool = False
+    #: The reading of the model's stream: what a stop cancels.
+    reading: asyncio.Future[None] | None = None
 
 
 class StreamBuffer:
@@ -52,14 +58,35 @@ class StreamBuffer:
 
     # ── producer API ──────────────────────────────────────────
 
-    def start(self, session_id: str, trace_id: str | None = None) -> None:
-        """Register a new active stream for *session_id*."""
+    def start(self, session_id: str, trace_id: str | None = None, turn_id: str | None = None) -> None:
+        """Register a new active stream for *session_id* (the reply *turn_id*, when it has a row)."""
         old = self._buffers.get(session_id)
         if old and not old.done:
             logger.warning("Overwriting active stream buffer for session %s", session_id)
-        self._buffers[session_id] = _StreamEntry(trace_id=trace_id)
+        self._buffers[session_id] = _StreamEntry(trace_id=trace_id, turn_id=turn_id)
         self._ensure_cleanup()
         logger.debug("Stream buffer started for session %s", session_id)
+
+    def reading(self, session_id: str, reading: asyncio.Future[None]) -> None:
+        """Note the task reading *session_id*'s reply from the model: a stop cancels it."""
+        entry = self._buffers.get(session_id)
+        if entry is not None:
+            entry.reading = reading
+
+    def request_stop(self, session_id: str, turn_id: str) -> bool:
+        """Stop the reply *turn_id* of *session_id*, if this process writes it; whether it did."""
+        entry = self._buffers.get(session_id)
+        if entry is None or entry.done or entry.turn_id != turn_id:
+            return False
+        entry.stop_requested = True
+        if entry.reading is not None:
+            entry.reading.cancel()
+        return True
+
+    def stop_requested(self, session_id: str) -> bool:
+        """Whether the user asked for *session_id*'s reply to stop."""
+        entry = self._buffers.get(session_id)
+        return entry is not None and entry.stop_requested
 
     def push(self, session_id: str, chunk: bytes) -> None:
         """Append an SSE chunk to the buffer and notify subscribers."""

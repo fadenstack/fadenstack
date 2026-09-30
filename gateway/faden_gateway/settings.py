@@ -198,6 +198,15 @@ class Settings(BaseSettings):
 
     # Optional module: Sessions & Memory
     sessions_enabled: bool = True
+    # A chat page's reply runs on its own (a background turn): leaving the
+    # page does not stop it. Replies one user may have written at once,
+    # across their chats (one per chat).
+    chat_turns_per_user: int = 3
+    # How often a running reply's text so far is saved: its heartbeat.
+    chat_turn_checkpoint_sec: float = 3.0
+    # A running reply whose heartbeat is older than this was left by a
+    # gateway that went away.
+    chat_turn_stale_sec: float = 30.0
     session_max_recent_messages: int = 20
     session_token_budget: int = 4096
     session_summary_threshold: int = 10

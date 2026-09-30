@@ -12,13 +12,16 @@ const api = vi.hoisted(() => ({
   listMessages: vi.fn(),
   streamStatus: vi.fn(),
   getSession: vi.fn(),
+  stopTurn: vi.fn(),
   streamChat: vi.fn(),
   retryTurn: vi.fn(),
   resumeStream: vi.fn(),
 }));
 
 vi.mock("~/api/chatClient", () => ({
-  chatApi: { listMessages: api.listMessages, streamStatus: api.streamStatus, getSession: api.getSession },
+  chatApi: {
+    listMessages: api.listMessages, streamStatus: api.streamStatus, getSession: api.getSession, stopTurn: api.stopTurn,
+  },
   streamChat: api.streamChat,
   retryTurn: api.retryTurn,
   resumeStream: api.resumeStream,
@@ -86,6 +89,31 @@ describe("useChatStream", () => {
 
     expect(result.current.error).toBeNull();
     expect(result.current.messages.at(-1)).toMatchObject({ id: "turn-1", content: "Half an", status: "stopped" });
+  });
+
+  it("stops the reply at the gateway, not only the stream: it runs on its own", async () => {
+    let abort!: () => void;
+    const aborted = new Promise<never>((_, reject) => {
+      abort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    });
+    async function* reader() {
+      yield { turn_id: "turn-1", content: "Half" };
+      await aborted;
+    }
+    api.streamChat.mockReturnValue({ reader: reader(), abort: () => abort() });
+    api.stopTurn.mockResolvedValue({ stopping: true });
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    let sending!: Promise<void>;
+    act(() => {
+      sending = result.current.send("hi", "m");
+    });
+    await waitFor(() => expect(result.current.streamingContent).toBe("Half"));
+    act(() => result.current.stop());
+    await act(() => sending);
+
+    expect(api.stopTurn).toHaveBeenCalledWith(SID, "turn-1");
+    expect(result.current.messages.at(-1)).toMatchObject({ id: "turn-1", content: "Half", status: "stopped" });
   });
 
   it("shows a reply still being written as it streams, then as stored", async () => {

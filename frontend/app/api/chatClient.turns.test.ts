@@ -75,6 +75,14 @@ describe("a streamed reply", () => {
     expect(error?.message).toBe("System message must be at the beginning.");
   });
 
+  it("asks for a reply that runs on its own", async () => {
+    const fetch = vi.fn(async () => sse(chunk("hi"), "[DONE]"));
+    vi.stubGlobal("fetch", fetch);
+    await read(streamChat({ model: "m", session_id: "s1" }).reader);
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ stream: true, background: true, session_id: "s1" });
+  });
+
   it("tries a reply again at its turn", async () => {
     const fetch = vi.fn(async () => sse(chunk("again"), "[DONE]"));
     vi.stubGlobal("fetch", fetch);

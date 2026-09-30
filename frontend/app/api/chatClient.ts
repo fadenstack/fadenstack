@@ -276,9 +276,12 @@ function postStream(path: string, payload: Record<string, unknown>): StreamHandl
  * Returns an async generator of `StreamDelta` objects and an `abort()`
  * function to cancel. Usage from the final `[DONE]` chunk is extracted
  * automatically.
+ *
+ * The reply runs on its own (``background``): closing the stream does not
+ * stop it -- the page may leave and come back. ``chatApi.stopTurn`` stops it.
  */
 export function streamChat(payload: Record<string, unknown>): StreamHandle {
-  return postStream("/completions", { ...payload, stream: true });
+  return postStream("/completions", { ...payload, stream: true, background: true });
 }
 
 /**
@@ -407,6 +410,10 @@ export const chatApi = {
   // Stream reconnection
   streamStatus: (sessionId: string) =>
     request<{ active: boolean }>(`/sessions/${sessionId}/stream/status`),
+
+  /** Stop a reply being written; what was written is kept. */
+  stopTurn: (sessionId: string, turnId: string) =>
+    request<{ stopping: boolean }>(`/sessions/${sessionId}/turns/${turnId}/stop`, { method: "POST" }),
 
   // Attachments
   uploadAttachment: async (sessionId: string, file: File) => {

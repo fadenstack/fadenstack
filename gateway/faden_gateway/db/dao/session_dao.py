@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import Depends
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -340,6 +341,22 @@ class SessionDAO:
             ),
         )
         return list(result.scalars().all())
+
+    async def running_turn_sessions(
+        self, *, tenant_id: str, user_id: str, alive_since: datetime,
+    ) -> list[uuid.UUID]:
+        """The user's chats with a reply being written: one per reply alive since *alive_since*."""
+        result = await self.session.execute(
+            select(ChatMessage.session_id)
+            .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+            .where(
+                ChatSession.tenant_id == tenant_id,
+                ChatSession.user_id == user_id,
+                ChatMessage.status == "running",
+                ChatMessage.updated_at > alive_since,
+            ),
+        )
+        return [row[0] for row in result.all()]
 
     async def delete_message(self, *, message_id: uuid.UUID) -> bool:
         """Delete one message: a reply that is replaced by trying again."""

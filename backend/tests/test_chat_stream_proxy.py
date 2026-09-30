@@ -124,3 +124,19 @@ async def test_a_retried_reply_streams_with_its_new_turn_id(
     assert resp.status_code == 200 and resp.content == SSE
     assert resp.headers["x-faden-turn-id"] == "turn-2"
     assert asked == [("/v1/sessions/s1/turns/turn-1/retry", {"model": "other"})]
+
+
+async def test_a_reply_is_stopped_through_the_proxy(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def gateway(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/sessions/s1/turns/turn-1/stop"
+        return httpx.Response(200, json={"stopping": True})
+
+    fake = _client(httpx.MockTransport(gateway))
+    monkeypatch.setattr(chat_views, "_client", lambda: fake)
+    client.cookies.set("fapiauth", "jwt")
+
+    resp = await client.post(fastapi_app.url_path_for("stop_turn", session_id="s1", turn_id="turn-1"))
+
+    assert (resp.status_code, resp.json()) == (200, {"stopping": True})

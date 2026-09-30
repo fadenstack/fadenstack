@@ -186,6 +186,15 @@ class GatewayChatClient:
             "POST", f"/v1/sessions/{session_id}/turns/{turn_id}/retry", jwt, json=body,
         )
 
+    async def stop_turn(self, session_id: str, turn_id: str, jwt: str) -> Any:
+        """Stop a reply being written in a chat; what was written is kept."""
+        client = self._ensure_client()
+        resp = await client.post(
+            f"/v1/sessions/{session_id}/turns/{turn_id}/stop", headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     async def open_stream_resume(self, session_id: str, jwt: str) -> GatewayStream:
         """Reconnect to a session's in-progress (or just finished) stream.
 

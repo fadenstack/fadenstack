@@ -9,7 +9,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -621,8 +621,11 @@ def _json_arguments(call: dict[str, Any]) -> str:
 
 def _turn_outcome(
     *, content: str, error: str | None, status_code: int, closing: bool, finish_reason: str | None,
+    interrupted: bool = False,
 ) -> tuple[str, str | None]:
     """How a streamed reply ended, for its row in the chat: (status, error)."""
+    if interrupted:  # the gateway went away while writing it
+        return TurnStatus.INTERRUPTED.value, "The server stopped while this reply was being written."
     if error:  # the model's server refused, or failed part way
         return TurnStatus.FAILED.value, error
     if status_code >= 500:
@@ -1098,7 +1101,14 @@ class GatewayService:
         request_id: str,
         session_id: str | None = None,
         skills: list[str] | None = None,
+        background: bool = False,
     ) -> StreamingGatewayResponse:
+        """A streamed chat completion.
+
+        *background* (the chat page): a reply in a chat runs on its own, so
+        the page may leave and come back to it; the response only reads it.
+        Otherwise the client leaving ends the reply, as it always did.
+        """
         started = time.perf_counter()
         endpoint = "/v1/chat/completions"
         model_alias = _require_model(payload)
@@ -1115,6 +1125,9 @@ class GatewayService:
             alias=model_alias, tenant_id=auth.tenant_id,
         )
         _check_kind("/v1/chat/completions", model_alias, candidates)
+        background = background and bool(session_id) and self.session_dao is not None
+        if background:
+            await self._check_turn_limits(auth, str(session_id))
 
         req = _Prepared(payload=payload, requested_skills=list(skills or []))
         stream_started = False
@@ -1176,7 +1189,48 @@ class GatewayService:
             _sbuf = self.stream_buffer
             _sbuf_sid = req.session_id
             if _sbuf and _sbuf_sid:
-                _sbuf.start(_sbuf_sid, trace_id=req.trace_id)
+                _sbuf.start(_sbuf_sid, trace_id=req.trace_id, turn_id=req.turn_id)
+
+            def _finish(
+                content: str, status_code: int, error_code: str | None, closing: bool, saved: asyncio.Event,
+                *, interrupted: bool = False,
+            ) -> Awaitable[None]:
+                return self._finish_stream(
+                    req,
+                    auth=auth,
+                    request_id=request_id,
+                    endpoint=endpoint,
+                    model_alias=model_alias,
+                    session_id=session_id,
+                    started=started,
+                    stats=stats,
+                    content=content,
+                    status_code=status_code,
+                    error_code=error_code,
+                    closing=closing,
+                    stream_buffer=_sbuf,
+                    buffer_session_id=_sbuf_sid,
+                    saved=saved,
+                    interrupted=interrupted,
+                )
+
+            if background and req.turn_id and _sbuf and _sbuf_sid:
+                self._own_session()
+                _kept(self._run_turn(req, wrapped_stream, stats, buffer=_sbuf, finish=_finish))
+
+                async def _follow() -> AsyncIterator[bytes]:
+                    # The reply as any page that comes back reads it.
+                    async for chunk in await _sbuf.subscribe(_sbuf_sid):
+                        yield chunk
+
+                return StreamingGatewayResponse(
+                    stream=_follow(),
+                    provider_instance_id=str(decision.candidate.instance_id),
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    stats=stats,
+                    trace_id=req.trace_id,
+                    turn_id=req.turn_id,
+                )
 
             async def _stream_with_finalize() -> AsyncIterator[bytes]:
                 stream_status_code = 200
@@ -1215,22 +1269,8 @@ class GatewayService:
                     # client can see (the chat page reloads the session there);
                     # the audit row and the trace follow on their own.
                     saved = asyncio.Event()
-                    await _to_the_end(self._finish_stream(
-                        req,
-                        auth=auth,
-                        request_id=request_id,
-                        endpoint=endpoint,
-                        model_alias=model_alias,
-                        session_id=session_id,
-                        started=started,
-                        stats=stats,
-                        content="".join(accumulated_content),
-                        status_code=stream_status_code,
-                        error_code=stream_error_code,
-                        closing=closing,
-                        stream_buffer=_sbuf,
-                        buffer_session_id=_sbuf_sid,
-                        saved=saved,
+                    await _to_the_end(_finish(
+                        "".join(accumulated_content), stream_status_code, stream_error_code, closing, saved,
                     ), until=saved)
                 if closing:
                     yield _DONE_EVENT
@@ -2506,6 +2546,7 @@ class GatewayService:
         stream_buffer: Any,
         buffer_session_id: str | None,
         saved: asyncio.Event,
+        interrupted: bool = False,
     ) -> None:
         """What a streamed answer owes once it has ended: the slot, the reply, the audit row, the trace.
 
@@ -2525,6 +2566,7 @@ class GatewayService:
                 status_code=status_code,
                 closing=closing,
                 finish_reason=req.finish_reason,
+                interrupted=interrupted,
             )
             try:
                 await self._persist_stream_assistant_response(
@@ -2542,6 +2584,12 @@ class GatewayService:
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
         saved.set()
+        # Whoever reads the reply from the buffer -- the chat page, or one that
+        # came back -- is done once it is saved, as the live stream is.
+        if stream_buffer and buffer_session_id:
+            if closing:
+                stream_buffer.push(buffer_session_id, _DONE_EVENT)
+            stream_buffer.finish(buffer_session_id)
         # Best effort, and nothing need wait for it.
         _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
         final_error_code = error_code or req.fallback_error_code
@@ -2595,12 +2643,6 @@ class GatewayService:
                 )
             except Exception:
                 logger.warning("Failed to finalize the stream's trace", exc_info=True)
-        # Mark stream buffer as finished for reconnection; a replay ends as
-        # the live stream does.
-        if stream_buffer and buffer_session_id:
-            if closing:
-                stream_buffer.push(buffer_session_id, _DONE_EVENT)
-            stream_buffer.finish(buffer_session_id)
 
     async def _audit_on_own_session(self, **fields: Any) -> None:
         """Write the request log row on a session of its own, and commit it.
@@ -2615,6 +2657,136 @@ class GatewayService:
         async with AsyncSession(self.dao.session.bind, expire_on_commit=False) as own:
             audit = AuditService(GatewayDAO(own), pricing_service=self.audit.pricing_service)
             await audit.log(**fields)
+            await own.commit()
+
+    async def _check_turn_limits(self, auth: AuthContext, session_id: str) -> None:
+        """One reply at a time in a chat, and a few at once per user (``chat_turns_per_user``).
+
+        Replies whose heartbeat stopped (a gateway that went away) do not count.
+        """
+        assert self.session_dao is not None  # noqa: S101
+        alive_since = datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+        running = await self.session_dao.running_turn_sessions(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, alive_since=alive_since,
+        )
+        if any(str(sid) == session_id for sid in running):
+            raise GatewayError(
+                status_code=409,
+                message="A reply is still being written in this chat. Wait for it, or stop it.",
+                code="turn_running",
+            )
+        if len(running) >= settings.chat_turns_per_user:
+            raise GatewayError(
+                status_code=429,
+                message=f"Replies are being written in {len(running)} of your chats. Wait for one to finish.",
+                code="too_many_turns",
+            )
+
+    async def _run_turn(
+        self,
+        req: _Prepared,
+        stream: AsyncIterator[bytes],
+        stats: StreamStats,
+        *,
+        buffer: StreamBuffer,
+        finish: Callable[..., Awaitable[None]],
+    ) -> None:
+        """A chat page's reply, written to its end whoever reads it.
+
+        Its events go to the buffer, which the page -- and a page that comes
+        back -- reads. Leaving does not stop it. A stop (``request_stop``)
+        cancels the reading, which closes the call to the model; what was
+        written is kept. The reply's own session (``_own_session``) is
+        committed and closed at the end.
+        """
+        sid = req.session_id
+        assert sid is not None  # noqa: S101
+        written: list[str] = []
+        closing = False
+
+        async def read() -> None:
+            nonlocal closing
+            async for chunk in stream:
+                piece, seen = _split_done(chunk)
+                closing = closing or seen
+                if piece:
+                    _accumulate_stream_content(piece, written)
+                    buffer.push(sid, piece)
+
+        reading = asyncio.ensure_future(read())
+        buffer.reading(sid, reading)
+        beating = asyncio.ensure_future(self._keep_turn_alive(req, written))
+        status_code, error_code, interrupted = 200, None, False
+        try:
+            await reading
+        except asyncio.CancelledError:
+            # A stop cancels the reading; a gateway going away cancels this.
+            interrupted = not buffer.stop_requested(sid)
+        except Exception:
+            logger.warning("A chat reply's stream failed", exc_info=True)
+            status_code, error_code, closing = 502, "upstream_stream_failed", True
+        finally:
+            beating.cancel()
+            await asyncio.gather(beating, return_exceptions=True)
+            status_code, error_code = _stream_outcome(stats, status_code, error_code)
+            session = self.dao.session
+            try:
+                await finish(
+                    "".join(written), status_code, error_code, closing, asyncio.Event(), interrupted=interrupted,
+                )
+            finally:
+                try:
+                    await session.commit()
+                finally:
+                    await session.close()
+        if interrupted:
+            raise asyncio.CancelledError
+
+    def _own_session(self) -> None:
+        """Give the rest of this reply a database session of its own.
+
+        The reply goes on after its request, whose session is committed and
+        closed when the request ends (``get_db_session``): a tool round after
+        the page left would have used a session being closed under it. The
+        data-access objects -- which the router, the tool router and the audit
+        hold -- are pointed at the new one.
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+        own = AsyncSession(self.dao.session.bind, expire_on_commit=False)
+        self.dao.session = own
+        if self.session_dao is not None:
+            self.session_dao.session = own
+
+    async def _keep_turn_alive(self, req: _Prepared, written: list[str]) -> None:
+        """Save a running reply's text every few seconds: its heartbeat, and what a reload shows."""
+        if req.turn_written is not None:
+            # Shielded: a short reply cancels this while its row is still
+            # being written, and cancelling the write lost the row.
+            await asyncio.shield(req.turn_written)
+        while True:
+            await asyncio.sleep(settings.chat_turn_checkpoint_sec)
+            try:
+                await self._checkpoint_turn(req, "".join(written))
+            except Exception:
+                logger.debug("A running reply was not checkpointed", exc_info=True)
+
+    async def _checkpoint_turn(self, req: _Prepared, content: str) -> None:
+        """Save a running reply's text so far; a reply that has ended is left alone."""
+        if not req.turn_id or self.session_dao is None:
+            return
+        from sqlalchemy import update  # noqa: PLC0415
+        from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+        async with AsyncSession(self.session_dao.session.bind) as own:
+            await own.execute(
+                update(ChatMessage)
+                .where(
+                    ChatMessage.id == uuid.UUID(req.turn_id),
+                    ChatMessage.status == TurnStatus.RUNNING.value,
+                )
+                .values(content=content, updated_at=datetime.now(timezone.utc)),
+            )
             await own.commit()
 
     def _start_turn(self, req: _Prepared, *, model_alias: str) -> None:
@@ -2685,7 +2857,7 @@ class GatewayService:
         written = False
         if turn is not None and turn.turn_written is not None:
             try:
-                await turn.turn_written
+                await asyncio.shield(turn.turn_written)
                 written = True
             except Exception:
                 logger.warning("The reply's row was not written as it started", exc_info=True)

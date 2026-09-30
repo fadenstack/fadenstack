@@ -107,6 +107,8 @@ export function useChatStream({
   const responseMsMapRef = useRef<Map<string, number>>(new Map());
 
   const abortRef = useRef<(() => void) | null>(null);
+  /** The reply being written, which Stop stops. */
+  const turnRef = useRef<string | null>(null);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -198,6 +200,10 @@ export function useChatStream({
   }, []);
 
   const stop = useCallback(() => {
+    // The reply runs on its own: closing the stream alone would not stop it.
+    const sid = sessionIdRef.current;
+    const turn = turnRef.current;
+    if (sid && turn) void chatApi.stopTurn(sid, turn).catch(() => undefined);
     abortRef.current?.();
     abortRef.current = null;
     setIsStreaming(false);
@@ -228,6 +234,7 @@ export function useChatStream({
       let turnId: string | null = null;
 
       const settle = () => {
+        turnRef.current = null;
         streamThrottle.flush();
         setStreamingContent("");
         reasoningThrottle.reset();
@@ -256,7 +263,7 @@ export function useChatStream({
 
       try {
         for await (const delta of handle.reader) {
-          if (delta.turn_id) turnId = delta.turn_id;
+          if (delta.turn_id) turnId = turnRef.current = delta.turn_id;
           if (delta.trace_id) traceId = delta.trace_id;
           if (delta.reasoning) {
             thoughtFrom ??= performance.now();
