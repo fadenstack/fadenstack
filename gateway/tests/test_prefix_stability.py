@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import llm_adapter
 from faden_gateway.services.gateway.context_assembler import ContextAssembler
-from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
+from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter, _system_first
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.services.gateway.skills_client import ResolvedSkill, SkillResolveResult, SkillsClient
 from faden_gateway.services.registry import service_registry
@@ -147,7 +147,7 @@ async def test_a_skill_goes_after_the_history_unless_set_to_the_prefix(
     assert roles == expected
 
 
-# ── A template that refuses a system message after the start ─────
+# ── A template that takes one system message, first ─────────────
 
 
 LATE_SYSTEM = [
@@ -157,7 +157,13 @@ LATE_SYSTEM = [
     {"role": "system", "content": "skill"},
     {"role": "user", "content": "q2"},
 ]
-UP_FRONT = ["date", "skill", "q1", "a1", "q2"]
+UP_FRONT = ["date\n\nskill", "q1", "a1", "q2"]
+#: The date and the PII note, both before the history: nothing is "late".
+TWO_LEADING = [
+    {"role": "system", "content": "date"},
+    {"role": "system", "content": "pii"},
+    {"role": "user", "content": "q1"},
+]
 
 
 def _contents(request: httpx.Request) -> list[str]:
@@ -165,7 +171,7 @@ def _contents(request: httpx.Request) -> list[str]:
 
 
 def _refusing_engine(seen: list[httpx.Request], *, refusal: str = REFUSED) -> httpx.AsyncClient:
-    """A vLLM whose template takes system messages only at the start."""
+    """A vLLM whose template takes one system message, first (Qwen 3.5 and later)."""
 
     async def body() -> AsyncIterator[bytes]:
         yield _event({"content": "ok"})
@@ -174,8 +180,7 @@ def _refusing_engine(seen: list[httpx.Request], *, refusal: str = REFUSED) -> ht
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         roles = [m["role"] for m in json.loads(request.content)["messages"]]
-        first_other = next(i for i, role in enumerate(roles) if role != "system")
-        if "system" in roles[first_other:]:
+        if "system" in roles[1:]:
             return httpx.Response(400, json={"object": "error", "message": refusal})
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body())
 
@@ -204,6 +209,32 @@ async def test_a_refused_stream_goes_again_with_system_messages_up_front() -> No
         await _stream(LLMAdapter(http_client=http), payload=payload)
     assert len(seen) == 3
     assert _contents(seen[2]) == UP_FRONT
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("fresh_memory")
+async def test_two_system_messages_before_the_history_go_again_as_one() -> None:
+    """Qwen3.8, 2026-09-30: "System message must be at the beginning." with none after the history."""
+    seen: list[httpx.Request] = []
+    refusal = "System message must be at the beginning."
+    async with _refusing_engine(seen, refusal=refusal) as http:
+        out = await _stream(LLMAdapter(http_client=http), payload={"model": "qwen3.8", "messages": TWO_LEADING})
+    assert b"ok" in b"".join(out)
+    assert [_contents(request) for request in seen] == [["date", "pii", "q1"], ["date\n\npii", "q1"]]
+
+
+def test_one_system_message_first_is_left_as_it_is() -> None:
+    assert _system_first([{"role": "system", "content": "date"}, {"role": "user", "content": "q"}]) is None
+    assert _system_first([{"role": "user", "content": "q"}]) is None
+
+
+def test_a_system_message_in_parts_is_merged_by_its_text() -> None:
+    merged = _system_first([
+        {"role": "system", "content": "date"},
+        {"role": "system", "content": [{"type": "text", "text": "skill"}]},
+        {"role": "user", "content": "q"},
+    ])
+    assert merged == [{"role": "system", "content": "date\n\nskill"}, {"role": "user", "content": "q"}]
 
 
 @pytest.mark.anyio

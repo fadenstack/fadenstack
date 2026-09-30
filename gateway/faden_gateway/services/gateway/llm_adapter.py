@@ -49,38 +49,47 @@ _DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", *_OPENAI_
 _DONE = b"data: [DONE]\n\n"
 
 
-# Models whose chat template refused a system message after the conversation
-# had begun: theirs go up front from then on (see _late_system_refused).
+# Models whose chat template refused the gateway's system messages: theirs go
+# as one, first, from then on (see _late_system_refused).
 _SYSTEM_FIRST: set[str] = set()
 _TEMPLATE_REFUSAL = re.compile(r"template|roles? must alternate|system (role|message)", re.IGNORECASE)
 
 
-def _system_first(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-    """*messages* with each system message after the leading ones moved up to them.
+def _text_of(content: Any) -> str:
+    """A message's text, whether it is a string or OpenAI's list of parts."""
+    if isinstance(content, list):
+        parts = (part for part in content if isinstance(part, dict) and part.get("type") == "text")
+        return "\n".join(str(part.get("text") or "") for part in parts)
+    return "" if content is None else str(content)
 
-    None when there is none to move. The order among the moved messages, and
-    among the others, is kept.
+
+def _system_first(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    """*messages* with all their system messages as one, first.
+
+    That is the one form every chat template takes: Qwen 3.5 and later
+    refuse any system message but the first -- two in a row as well as one
+    after the history -- and others refuse one after the conversation has
+    begun. The system texts keep their order, a blank line apart, and so do
+    the other messages. None when *messages* already have that form.
     """
-    lead = 0
-    while lead < len(messages) and messages[lead].get("role") == "system":
-        lead += 1
-    late = [m for m in messages[lead:] if m.get("role") == "system"]
-    if not late:
+    system = [m for m in messages if m.get("role") == "system"]
+    if not system or (len(system) == 1 and messages[0] is system[0]):
         return None
-    rest = [m for m in messages[lead:] if m.get("role") != "system"]
-    return [*messages[:lead], *late, *rest]
+    texts = (_text_of(m.get("content")).strip() for m in system)
+    merged = {"role": "system", "content": "\n\n".join(text for text in texts if text)}
+    return [merged, *(m for m in messages if m.get("role") != "system")]
 
 
 def _late_system_refused(
     status: int, detail: str, messages: list[dict[str, Any]],
 ) -> list[dict[str, Any]] | None:
-    """The messages to try again with, when a template refused a late system message.
+    """The messages to try again with, when a template refused the system messages.
 
-    The gateway puts a turn's skills after the history, so the prefix vLLM
-    caches stays the same (``session_skills_position``). Qwen's and Llama 3's
-    templates take a system message anywhere; one that does not answers 400
-    with the template's error. That request then goes again with its system
-    messages up front.
+    The gateway sends several: the date, the PII note, memory, a turn's
+    skills after the history, so the prefix vLLM caches stays the same
+    (``session_skills_position``). Llama 3's template takes them anywhere;
+    one that does not answers 400 with the template's error. That request
+    then goes again with its system messages as one, first.
     """
     if status != 400 or not _TEMPLATE_REFUSAL.search(detail):
         return None
@@ -88,12 +97,12 @@ def _late_system_refused(
 
 
 def _remember_system_first(model: str) -> None:
-    """Send *model*'s system messages up front from now on; say so once."""
+    """Send *model*'s system messages as one, first, from now on; say so once."""
     if model not in _SYSTEM_FIRST:
         _SYSTEM_FIRST.add(model)
         logger.warning(
-            "%s's chat template refuses a system message after the conversation has begun; "
-            "its skills go before the history from now on",
+            "%s's chat template refuses more than one system message, or one after the start; "
+            "its system messages go as one, before the history, from now on",
             model,
         )
 
