@@ -77,37 +77,19 @@ class LokiClient:
         if self._owns_http:
             await self._http.aclose()
 
-    def add(self, entry: LogEntry) -> None:
-        """Buffer a single log entry for the next flush."""
-        self._buffer.append(entry)
+    async def push(self, entries: list[LogEntry]) -> bool:
+        """Push *entries* under the client's labels; True when Loki took them.
 
-    def add_many(self, entries: list[LogEntry]) -> None:
-        """Buffer multiple log entries."""
-        self._buffer.extend(entries)
-
-    @property
-    def pending(self) -> int:
-        return len(self._buffer)
-
-    async def flush(self) -> bool:
-        """Push buffered entries to Loki and clear the buffer.
-
-        Returns ``True`` on success, ``False`` on failure (entries
-        are discarded to prevent unbounded growth).
+        Nothing is kept here: a caller whose push was refused reads the same
+        entries again from its source on the next pass (``log_cursors``).
         """
-        if not self._buffer:
+        if not entries:
             return True
-
-        entries = self._buffer
-        self._buffer = []
 
         # Group entries by level so Loki gets separate streams per level
         streams: dict[str, list[list[str]]] = {}
         for entry in entries:
-            level = entry.level
-            if level not in streams:
-                streams[level] = []
-            streams[level].append([str(entry.timestamp_ns), entry.line])
+            streams.setdefault(entry.level, []).append([str(entry.timestamp_ns), entry.line])
 
         payload: dict[str, Any] = {
             "streams": [

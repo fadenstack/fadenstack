@@ -9,10 +9,11 @@ thread executor so the event loop is never blocked.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -39,76 +40,83 @@ class LogCollector:
 
     def __init__(self, *, max_lines: int = 500) -> None:
         self._max_lines = max_lines
-        # journalctl cursor for resuming
-        self._journal_cursor: str | None = None
-        # Windows: last timestamp we saw (ISO string)
-        self._win_last_ts: str | None = None
 
-    async def collect(self) -> list[LogEntry]:
-        """Return new log entries since last call."""
+    async def collect(self, after: str | None = None) -> tuple[list[LogEntry], str | None]:
+        """Up to ``max_lines`` entries after the position *after*, oldest first, and the new position.
+
+        The position is only a proposal: the caller keeps it once the entries
+        are in Loki, and otherwise asks again from *after* -- the journal (or
+        the event log) is the queue. With no position yet, the newest entries.
+        """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._collect_sync)
+        return await loop.run_in_executor(None, self._collect_sync, after)
 
-    def _collect_sync(self) -> list[LogEntry]:
+    def _collect_sync(self, after: str | None) -> tuple[list[LogEntry], str | None]:
         if sys.platform == "win32":
-            return self._collect_windows()
-        return self._collect_journald()
+            return self._collect_windows(after)
+        return self._collect_journald(after)
 
     # ── Linux: journalctl ────────────────────────────────────
 
-    def _collect_journald(self) -> list[LogEntry]:
+    def _collect_journald(self, after: str | None) -> tuple[list[LogEntry], str | None]:
+        """Read forward from *after*, stopping at ``max_lines``.
+
+        ``--lines`` with ``--after-cursor`` gives the *last* N entries after
+        the cursor, which skipped the middle of anything longer than one
+        batch. So entries are read as JSON -- each carries its own cursor --
+        and the read stops at the budget.
+        """
         import subprocess
 
-        cmd = [
-            "journalctl",
-            "--no-pager",
-            "--output=short-iso",
-            f"--lines={self._max_lines}",
-        ]
-        if self._journal_cursor:
-            cmd.extend(["--after-cursor", self._journal_cursor])
-        else:
-            # First run: only grab last N lines
-            pass
-
-        # Ask journalctl to show the cursor for each entry
-        cmd.append("--show-cursor")
-
+        cmd = ["journalctl", "--no-pager", "--output=json"]
+        cmd += ["--after-cursor", after] if after else [f"--lines={self._max_lines}"]
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         except FileNotFoundError:
             log.debug("journalctl not found — system log collection disabled.")
-            return []
-        except subprocess.TimeoutExpired:
-            log.warning("journalctl timed out.")
-            return []
-
-        if result.returncode != 0:
-            log.debug("journalctl exited %d: %s", result.returncode, result.stderr[:200])
-            return []
+            return [], after
 
         entries: list[LogEntry] = []
-        last_cursor: str | None = None
+        position = after
+        deadline = time.monotonic() + 10
+        try:
+            assert proc.stdout is not None
+            for raw in proc.stdout:
+                try:
+                    doc = json.loads(raw)
+                except ValueError:
+                    continue
+                entries.append(self._journal_entry(doc))
+                position = doc.get("__CURSOR") or position
+                if len(entries) >= self._max_lines or time.monotonic() > deadline:
+                    break
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait()
+        return entries, position
 
-        for raw_line in result.stdout.splitlines():
-            # Cursor lines look like: "-- cursor: s=abc123..."
-            if raw_line.startswith("-- cursor: "):
-                last_cursor = raw_line[len("-- cursor: "):].strip()
-                continue
-            if not raw_line.strip():
-                continue
-            ts_ns, level = self._parse_journal_line_meta(raw_line)
-            entries.append(LogEntry(timestamp_ns=ts_ns, line=raw_line, level=level))
-
-        if last_cursor:
-            self._journal_cursor = last_cursor
-
-        return entries
+    @staticmethod
+    def _journal_entry(doc: dict[str, Any]) -> LogEntry:
+        """One journal entry as the short-iso line it used to be shipped as."""
+        try:
+            ts_ns = int(doc.get("__REALTIME_TIMESTAMP")) * 1000
+        except (TypeError, ValueError):
+            ts_ns = time.time_ns()
+        message = doc.get("MESSAGE")
+        if isinstance(message, list):  # binary: an array of bytes
+            message = bytes(message).decode("utf-8", errors="replace")
+        stamp = datetime.fromtimestamp(ts_ns / 1e9, tz=UTC).isoformat(timespec="seconds")
+        ident = doc.get("SYSLOG_IDENTIFIER") or doc.get("_COMM") or "-"
+        pid = doc.get("_PID")
+        source = f"{ident}[{pid}]" if pid else str(ident)
+        line = f"{stamp} {doc.get('_HOSTNAME', '-')} {source}: {message or ''}"
+        try:
+            priority = int(doc.get("PRIORITY", 6))
+        except (TypeError, ValueError):
+            priority = 6
+        level = "error" if priority <= 3 else "warning" if priority == 4 else "debug" if priority >= 7 else "info"
+        return LogEntry(timestamp_ns=ts_ns, line=line, level=level)
 
     @staticmethod
     def _parse_journal_line_meta(line: str) -> tuple[int, str]:
@@ -141,22 +149,24 @@ class LogCollector:
 
     # ── Windows: wevtutil ────────────────────────────────────
 
-    def _collect_windows(self) -> list[LogEntry]:
+    def _collect_windows(self, after: str | None) -> tuple[list[LogEntry], str | None]:
         import subprocess
         import xml.etree.ElementTree as ET
 
         # Build XPath query for System log
-        if self._win_last_ts:
-            # Only events after last seen timestamp
+        newest_first = not after
+        if after:
+            # Oldest first from the position: newest-first with a count gave
+            # the last N events after it, skipping the middle of a backlog.
             xpath = (
-                f"*[System[TimeCreated[@SystemTime>'{self._win_last_ts}']]]"
+                f"*[System[TimeCreated[@SystemTime>'{after}']]]"
             )
             cmd = [
                 "wevtutil", "qe", "System",
                 f"/q:{xpath}",
                 f"/c:{self._max_lines}",
                 "/f:xml",
-                "/rd:true",
+                "/rd:false",
             ]
         else:
             cmd = [
@@ -175,14 +185,14 @@ class LogCollector:
             )
         except FileNotFoundError:
             log.debug("wevtutil not found — system log collection disabled.")
-            return []
+            return [], after
         except subprocess.TimeoutExpired:
             log.warning("wevtutil timed out.")
-            return []
+            return [], after
 
         if result.returncode != 0:
             log.debug("wevtutil exited %d: %s", result.returncode, result.stderr[:200])
-            return []
+            return [], after
 
         entries: list[LogEntry] = []
         max_ts: str | None = None
@@ -193,7 +203,7 @@ class LogCollector:
             root = ET.fromstring(wrapped)
         except ET.ParseError:
             log.debug("Failed to parse wevtutil XML output.")
-            return []
+            return [], after
 
         ns = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
 
@@ -238,12 +248,10 @@ class LogCollector:
             line = f"{ts_str} {provider}[{eid}]: {message}"
             entries.append(LogEntry(timestamp_ns=ts_ns, line=line, level=level))
 
-        if max_ts:
-            self._win_last_ts = max_ts
-
-        # Reverse so entries are chronological (wevtutil /rd:true = newest first)
-        entries.reverse()
-        return entries
+        if newest_first:
+            # Chronological: /rd:true reads newest first.
+            entries.reverse()
+        return entries, max_ts or after
 
 
 def _win_level(level_id: int) -> str:

@@ -21,6 +21,7 @@ from faden_agent.dispatcher import CommandDispatcher
 from faden_agent.event_buffer import EventBuffer
 from faden_agent.gpu import detect_gpu
 from faden_agent.log_collector import LogCollector
+from faden_agent.log_cursors import LogCursors
 from faden_agent.loki_client import LokiClient
 from faden_agent.ray_log_forwarder import RayServeLogForwarder
 from faden_agent.image_loader import load_image_from_backend
@@ -381,7 +382,6 @@ class NodeAgentService:
                 log.debug("ray manager close failed", exc_info=True)
         await self._client.close()
         if self._loki:
-            await self._loki.flush()
             await self._loki.close()
 
     def _start_log_forwarding(self, loki_url: str, runtime: Any) -> None:
@@ -412,8 +412,10 @@ class NodeAgentService:
         )
         self._loki = loki_client
         collector = LogCollector(max_lines=self._config.log_batch_size)
+        # Where each shipper has got to, kept across restarts (log_cursors).
+        cursors = LogCursors(self._config.state_path.parent / "log-cursors.json")
         self._log_tasks.append(
-            asyncio.create_task(self._log_push_loop(collector, loki_client), name="log_push"),
+            asyncio.create_task(self._log_push_loop(collector, loki_client, cursors), name="log_push"),
         )
         # Container log forwarding — tails docker logs for tracked workloads
         self._log_tasks.append(
@@ -424,6 +426,7 @@ class NodeAgentService:
                     loki=loki_client,
                     host=self._config.advertise_host,
                     interval_sec=self._config.log_flush_interval_sec,
+                    cursors=cursors,
                 ).run_forever(),
                 name="container_log_forwarder",
             ),
@@ -439,6 +442,7 @@ class NodeAgentService:
                     host=self._config.advertise_host,
                     session_dir=self._config.ray_session_dir,
                     interval_sec=self._config.log_flush_interval_sec,
+                    cursors=cursors,
                 ).run_forever(),
                 name="ray_serve_log_forwarder",
             ),
@@ -473,15 +477,22 @@ class NodeAgentService:
         self,
         collector: LogCollector,
         loki: LokiClient,
+        cursors: LogCursors,
     ) -> None:
-        """Collect system logs and push to Loki on a timer."""
+        """Collect system logs and push to Loki on a timer.
+
+        The journal position moves only once Loki took the entries; a refused
+        push reads the same entries again next time.
+        """
         interval = max(self._config.log_flush_interval_sec, 2)
+        position = cursors.get("journal")
         while True:
             try:
-                entries = await collector.collect()
-                if entries:
-                    loki.add_many(entries)
-                await loki.flush()
+                entries, proposed = await collector.collect(after=position)
+                if await loki.push(entries) and proposed and proposed != position:
+                    position = proposed
+                    cursors.set("journal", position)
+                    cursors.save()
             except Exception:
                 log.warning("Log push cycle failed.", exc_info=True)
             await asyncio.sleep(interval)

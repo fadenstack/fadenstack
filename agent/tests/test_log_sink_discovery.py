@@ -158,8 +158,7 @@ async def test_pushes_through_the_backend_carry_the_credential_and_follow_its_ad
     creds = ["cred-1"]
     loki = LokiClient(loki_url="/api/node-files/logs", labels={"job": "node-agent", "host": "10.250.10.49"},
                       http=backend, credential=lambda: creds[0])
-    loki.add(LogEntry(timestamp_ns=1, line="hello", level="info"))
-    assert await loki.flush()
+    assert await loki.push([LogEntry(timestamp_ns=1, line="hello", level="info")])
     creds[0] = "cred-2"  # rotated: the next push carries the new one
     assert await loki.push_streams(labels={"container": "c"}, entries=[(2, "x")])
     await loki.close()  # the backend's client is not the Loki client's to close
