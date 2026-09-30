@@ -38,8 +38,9 @@ still being written has a small spinner in the sidebar.
 - **One reply per chat, three at once.** A chat takes a new message once its
   reply is done. You can have replies written in up to three chats at the
   same time; a fourth is refused until one finishes, and what you typed stays
-  in the box. An administrator sets the number
-  (`FADEN_GATEWAY_CHAT_TURNS_PER_USER`).
+  in the box. An administrator sets the number:
+  `FADEN_GATEWAY_CHAT_TURNS_PER_USER` in the install's `.env`, applied when
+  the gateway is next started (`faden upgrade` does).
 - **Stop.** The square button stops the reply, whichever chat you started it
   in. What was written stays, marked **Stopped**.
 - **Failed replies stay.** A reply that failed stays in the chat with the
