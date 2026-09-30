@@ -2627,6 +2627,7 @@
       },
       "applies_next": "Se aplica al próximo modelo que se coloque en el clúster; los modelos que ya están en las máquinas se quedan."
     },
+    "applies_on_start": "Se aplica cuando el clúster arranque",
     "runtime": {
       "title": "Entorno de ejecución",
       "detail": "La imagen que ejecutan las máquinas, con Ray y vLLM. Solo cambia cuando la cambia aquí.",
@@ -2641,7 +2642,6 @@
       "preview": "Vista previa",
       "recommended": "Recomendado",
       "applying": "Reiniciando con el nuevo entorno",
-      "applies_on_start": "Se aplica cuando el clúster arranque",
       "update": "Hay un entorno certificado más reciente (vLLM {{vllm}}). El clúster mantiene el suyo hasta que lo cambie.",
       "choose": "Cambiar a",
       "switch": "Cambiar",

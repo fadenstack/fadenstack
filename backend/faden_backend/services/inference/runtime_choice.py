@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO
-from faden_backend.db.models.inference import EnvironmentDesiredState, InferenceEnvironment
+from faden_backend.db.models.inference import InferenceEnvironment
 from faden_backend.services.inference.bundles import (
     RUNTIME_KEY,
     RuntimeBundleManifest,
@@ -90,7 +90,7 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         "runs": sorted(runs),
         "applied": applied,
         # Not there yet, and the cluster is to run: it is restarting.
-        "restarting": not applied and env.desired_state == EnvironmentDesiredState.RUNNING.value,
+        "restarting": env.restarting(applied=applied),
         "update": update,
         "runtimes": [
             _offered(bundle, default=bundle.bundle_id in defaults)

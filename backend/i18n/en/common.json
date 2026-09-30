@@ -2625,6 +2625,7 @@
       },
       "applies_next": "Applies to the next model placed on the cluster; models already on the machines stay."
     },
+    "applies_on_start": "Applies when the cluster starts",
     "runtime": {
       "title": "Runtime",
       "detail": "The image the machines run, with Ray and vLLM together. It changes only when you switch it here.",
@@ -2639,7 +2640,6 @@
       "preview": "Preview",
       "recommended": "Recommended",
       "applying": "Restarting on the new runtime",
-      "applies_on_start": "Applies when the cluster starts",
       "update": "A newer certified runtime is available (vLLM {{vllm}}). The cluster keeps its runtime until you switch.",
       "choose": "Switch to",
       "switch": "Switch",

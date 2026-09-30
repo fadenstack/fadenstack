@@ -49,9 +49,10 @@ export default function RayTlsCard({ environmentId, onSwitched }: RayTlsCardProp
     void load();
   }, [load]);
 
-  // While the cluster restarts on the new setting, look again now and then.
+  // While the cluster restarts on the new setting, look again now and then --
+  // and only then: a stopped cluster takes it when it starts.
   useEffect(() => {
-    if (!status || status.applied) return;
+    if (!status?.restarting) return;
     const timer = window.setInterval(() => void load(), 5000);
     return () => window.clearInterval(timer);
   }, [status, load]);
@@ -74,8 +75,10 @@ export default function RayTlsCard({ environmentId, onSwitched }: RayTlsCardProp
   // One machine: Ray's traffic never leaves it. Still shown when on, so it can be switched off.
   if (status === null || (status.machines < 2 && !status.on)) return null;
 
-  const chip = !status.applied ? (
+  const chip = status.restarting ? (
     <Chip size="small" color="info" icon={<CircularProgress size={12} />} label={t("clusters.ray_tls.applying")} />
+  ) : !status.applied ? (
+    <Chip size="small" variant="outlined" label={t("clusters.applies_on_start")} />
   ) : status.on ? (
     <Chip size="small" color="success" icon={<LockIcon />} label={t("clusters.ray_tls.encrypted")} />
   ) : (

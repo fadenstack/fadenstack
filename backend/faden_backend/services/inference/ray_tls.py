@@ -67,6 +67,9 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         "on": on,
         # Every machine runs Ray as the switch says.
         "applied": applied,
+        # Not yet, and the cluster is to run: it is restarting. A stopped
+        # cluster takes the switch when it starts.
+        "restarting": env.restarting(applied=applied),
         "running": running,
         "machines": len(nodes),
         "old_agents": old,

@@ -606,6 +606,8 @@ export interface RayTlsStatus {
   on: boolean;
   /** Every machine's agent says its container runs Ray as the switch says. */
   applied: boolean;
+  /** Not applied, and the cluster is to run: it is restarting. A stopped cluster waits for its start. */
+  restarting?: boolean;
   /** Per machine: what its agent last said (null: not yet). */
   running: Record<string, boolean | null>;
   machines: number;

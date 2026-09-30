@@ -2627,6 +2627,7 @@
       },
       "applies_next": "S'applique au prochain modèle placé sur le cluster ; les modèles déjà sur les machines restent."
     },
+    "applies_on_start": "S'applique au démarrage du cluster",
     "runtime": {
       "title": "Environnement d'exécution",
       "detail": "L'image qu'exécutent les machines, avec Ray et vLLM. Elle ne change que lorsque vous la changez ici.",
@@ -2641,7 +2642,6 @@
       "preview": "Aperçu",
       "recommended": "Recommandé",
       "applying": "Redémarrage sur le nouvel environnement",
-      "applies_on_start": "S'applique au démarrage du cluster",
       "update": "Un environnement certifié plus récent est disponible (vLLM {{vllm}}). Le cluster garde le sien jusqu'à ce que vous le changiez.",
       "choose": "Passer à",
       "switch": "Changer",

@@ -78,7 +78,7 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
             <Chip size="small" color="info" icon={<CircularProgress size={12} />} label={t("clusters.runtime.applying")} />
           )}
           {!status.applied && !status.restarting && (
-            <Chip size="small" variant="outlined" label={t("clusters.runtime.applies_on_start")} />
+            <Chip size="small" variant="outlined" label={t("clusters.applies_on_start")} />
           )}
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

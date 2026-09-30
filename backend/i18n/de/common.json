@@ -2627,6 +2627,7 @@
       },
       "applies_next": "Gilt für das nächste Modell, das auf den Cluster kommt; Modelle, die schon auf den Maschinen liegen, bleiben."
     },
+    "applies_on_start": "Gilt, sobald der Cluster startet",
     "runtime": {
       "title": "Laufzeit",
       "detail": "Das Image, das die Maschinen ausführen, mit Ray und vLLM. Es ändert sich nur, wenn Sie hier umschalten.",
@@ -2641,7 +2642,6 @@
       "preview": "Vorschau",
       "recommended": "Empfohlen",
       "applying": "Startet mit der neuen Laufzeit neu",
-      "applies_on_start": "Gilt, sobald der Cluster startet",
       "update": "Eine neuere zertifizierte Laufzeit ist verfügbar (vLLM {{vllm}}). Der Cluster behält seine Laufzeit, bis Sie umschalten.",
       "choose": "Umschalten auf",
       "switch": "Umschalten",

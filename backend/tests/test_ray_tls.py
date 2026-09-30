@@ -216,7 +216,7 @@ async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -
     before = env.generation
 
     state = await ray_tls.switch(dbsession, env.id, on=True)
-    assert state["on"] is True and state["applied"] is False
+    assert state["on"] is True and state["applied"] is False and state["restarting"] is True
     assert state["running"] == {"10.250.10.49": None}, "nothing reported yet"
     env.observed_status_json = {**(env.observed_status_json or {}), "ray_tls": {str(node.id): True}}
     await dbsession.flush()
@@ -229,6 +229,12 @@ async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -
     state = await ray_tls.switch(dbsession, env.id, on=False)
     assert env.config_json["ray_tls"] is False and env.generation == before + 2
     assert state["applied"] is False, "a machine still runs it"
+
+    # Stopped, it waits for its start rather than restarting: nothing to watch.
+    env.desired_state = "stopped"
+    await dbsession.flush()
+    state = await ray_tls.environment_status(dbsession, env.id)
+    assert state["applied"] is False and state["restarting"] is False
 
 
 @pytest.mark.anyio

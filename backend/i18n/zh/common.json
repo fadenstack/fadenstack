@@ -2627,6 +2627,7 @@
       },
       "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。"
     },
+    "applies_on_start": "集群启动时生效",
     "runtime": {
       "title": "运行时",
       "detail": "机器运行的镜像，包含 Ray 和 vLLM。只有在此处切换时才会改变。",
@@ -2641,7 +2642,6 @@
       "preview": "预览",
       "recommended": "推荐",
       "applying": "正在使用新运行时重启",
-      "applies_on_start": "集群启动时生效",
       "update": "有更新的已认证运行时可用（vLLM {{vllm}}）。在您切换之前，集群保持当前运行时。",
       "choose": "切换到",
       "switch": "切换",
