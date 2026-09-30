@@ -2018,6 +2018,8 @@
     "detail": {
       "token_tooltip": "Einmal-Registrierungstoken für diese Maschine erstellen",
       "token_title": "Registrierungstoken",
+      "deployments": "Bereitstellungen auf dieser Maschine",
+      "no_deployments": "Keine Bereitstellung läuft auf einem Cluster mit dieser Maschine.",
       "deployment_progress": "Bereitstellungsfortschritt",
       "container_logs": "Container-Protokolle"
     },

@@ -698,9 +698,10 @@ class DeploymentService:
         self,
         environment_id: uuid.UUID | None = None,
         model_id: uuid.UUID | None = None,
+        node_id: uuid.UUID | None = None,
     ) -> list[InferenceDeployment]:
-        """List deployments, optionally filtered by environment or model."""
-        return await self.dao.list_all(environment_id=environment_id, model_id=model_id)
+        """List deployments, optionally filtered by environment, model or machine."""
+        return await self.dao.list_all(environment_id=environment_id, model_id=model_id, node_id=node_id)
 
     async def update(
         self,

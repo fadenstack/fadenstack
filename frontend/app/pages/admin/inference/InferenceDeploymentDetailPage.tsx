@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 
 import { inferenceApi } from "~/api/inference";
 import type { RuntimeMonitoring, StatKey } from "~/api/llm";
@@ -47,6 +47,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
@@ -884,7 +885,9 @@ export default function InferenceDeploymentDetailPage() {
                   <TableRow key={member.node_id}>
                     <TableCell>
                       <Tooltip title={member.node_id}>
-                        <span>{nodeHost(member.node_id)}</span>
+                        <Link component={RouterLink} to={`/admin/nodes/${member.node_id}`} underline="hover">
+                          {nodeHost(member.node_id)}
+                        </Link>
                       </Tooltip>
                     </TableCell>
                     <TableCell>
@@ -970,7 +973,11 @@ export default function InferenceDeploymentDetailPage() {
                 <TableBody>
                   {artifactRows.map((row) => (
                     <TableRow key={row.nodeId}>
-                      <TableCell>{nodeHost(row.nodeId)}</TableCell>
+                      <TableCell>
+                        <Link component={RouterLink} to={`/admin/nodes/${row.nodeId}`} underline="hover">
+                          {nodeHost(row.nodeId)}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         <Chip
                           size="small"

@@ -2199,6 +2199,8 @@
     "detail": {
       "token_tooltip": "Créer un jeton d'inscription à usage unique pour cette machine",
       "token_title": "Jeton d'inscription",
+      "deployments": "Déploiements sur cette machine",
+      "no_deployments": "Aucun déploiement n'est sur un cluster qui comprend cette machine.",
       "deployment_progress": "Progression du déploiement",
       "container_logs": "Journaux du conteneur"
     },

@@ -856,8 +856,9 @@ export const inferenceApi = {
 
   // --- Deployments ---------------------------------------------------------
 
-  listDeployments() {
-    return request<InferenceDeployment[]>("/deployments");
+  /** All deployments, or those on a cluster the machine *nodeId* is a member of. */
+  listDeployments(nodeId?: string) {
+    return request<InferenceDeployment[]>(nodeId ? `/deployments?node_id=${enc(nodeId)}` : "/deployments");
   },
 
   getDeployment(id: string) {

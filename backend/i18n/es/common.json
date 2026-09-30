@@ -2018,6 +2018,8 @@
     "detail": {
       "token_tooltip": "Crear un token de registro de un solo uso para esta máquina",
       "token_title": "Token de registro",
+      "deployments": "Despliegues en esta máquina",
+      "no_deployments": "Ningún despliegue está en un clúster con esta máquina.",
       "deployment_progress": "Progreso del despliegue",
       "container_logs": "Registros del contenedor"
     },

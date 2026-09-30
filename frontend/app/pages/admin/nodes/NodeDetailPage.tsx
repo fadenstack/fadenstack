@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   nodesApi,
@@ -9,7 +9,10 @@ import {
   type NodeEnrollmentToken,
   type NodeProfile,
 } from "~/api/nodes";
+import { inferenceApi, type InferenceDeployment, type InferenceEnvironment } from "~/api/inference";
 import { logsApi, type LogStream } from "~/api/logs";
+import { phaseLabel } from "~/pages/admin/clusters/presentation";
+import { deploymentPhaseColor } from "~/pages/admin/inference/common";
 import { NodeDeploymentProgress } from "~/pages/admin/llm/RuntimeDetailPage";
 
 import Alert from "@mui/material/Alert";
@@ -22,6 +25,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
 import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
@@ -51,6 +55,9 @@ import GaugeCard from "~/components/GaugeCard";
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
 const REFRESH_INTERVAL_MS = 10_000;
+/** A deploy command is shown while it runs, and for this long after: then it is history (Commands). */
+const DEPLOY_SHOWN_AFTER_MS = 10 * 60_000;
+const DEPLOY_IN_FLIGHT = new Set(["queued", "dispatched", "acked", "running"]);
 
 function statusColor(
   status: string,
@@ -172,6 +179,8 @@ export default function NodeDetailPage() {
   const [containerLogsExpanded, setContainerLogsExpanded] = useState(true);
   const [deployTimeline, setDeployTimeline] =
     useState<NodeCommandTimeline | null>(null);
+  const [deployments, setDeployments] = useState<InferenceDeployment[] | null>(null);
+  const [clusters, setClusters] = useState<InferenceEnvironment[]>([]);
   const [enrollToken, setEnrollToken] = useState<NodeEnrollmentToken | null>(
     null,
   );
@@ -276,9 +285,17 @@ export default function NodeDetailPage() {
 
   const loadDeployTimeline = useCallback(
     async (nodeId: string, cmds: NodeCommand[]) => {
-      // Find the most recent DEPLOY_WORKLOAD command
+      // A container deploy running on this machine now, or just finished.
+      // The latest one ever read as the machine's current deployment: a
+      // test that failed three days before, beside a model serving fine.
+      const now = Date.now();
       const deployCmds = cmds
-        .filter((c) => c.command_type === "deploy_workload")
+        .filter(
+          (c) =>
+            c.command_type === "deploy_workload" &&
+            (DEPLOY_IN_FLIGHT.has(c.status) ||
+              now - Date.parse(c.completed_at ?? c.issued_at) < DEPLOY_SHOWN_AFTER_MS),
+        )
         .sort((a, b) => Date.parse(b.issued_at) - Date.parse(a.issued_at));
       if (deployCmds.length === 0) {
         setDeployTimeline(null);
@@ -293,6 +310,20 @@ export default function NodeDetailPage() {
     },
     [],
   );
+
+  // The deployments on a cluster this machine is a member of: what it serves.
+  const loadDeployments = useCallback(async (nodeId: string) => {
+    try {
+      const [onMachine, allClusters] = await Promise.all([
+        inferenceApi.listDeployments(nodeId),
+        inferenceApi.listEnvironments(),
+      ]);
+      setDeployments(onMachine);
+      setClusters(allClusters);
+    } catch {
+      /* best-effort: the rest of the page stands without it */
+    }
+  }, []);
 
   async function runAction(key: string, action: () => Promise<void>) {
     setBusyKey(key);
@@ -380,6 +411,10 @@ export default function NodeDetailPage() {
   }, [id, commands, loadDeployTimeline]);
 
   useEffect(() => {
+    if (id) void loadDeployments(id);
+  }, [id, loadDeployments]);
+
+  useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (autoRefresh && id) {
       intervalRef.current = setInterval(() => {
@@ -389,6 +424,7 @@ export default function NodeDetailPage() {
           void loadContainerLogs(node.host);
         }
         if (id && commands.length > 0) void loadDeployTimeline(id, commands);
+        if (id) void loadDeployments(id);
       }, REFRESH_INTERVAL_MS);
     }
     return () => {
@@ -979,7 +1015,48 @@ faden-agent run`}
         </CardContent>
       </Card>
 
-      {/* ── Latest Deployment Progress ──────────────────────────── */}
+      {/* ── Deployments on this machine ─────────────────────────── */}
+      {deployments !== null && (
+        <Card variant="outlined">
+          <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              {t("nodes.detail.deployments")}
+            </Typography>
+            {deployments.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                {t("nodes.detail.no_deployments")}
+              </Typography>
+            ) : (
+              <Stack spacing={0.75}>
+                {deployments.map((dep) => {
+                  const cluster = clusters.find((c) => c.id === dep.environment_id);
+                  return (
+                    <Stack key={dep.id} direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+                      <Link component={RouterLink} to={`/admin/deployments/${dep.id}`} underline="hover">
+                        {dep.name}
+                      </Link>
+                      <Chip size="small" label={phaseLabel(dep.phase)} color={deploymentPhaseColor(dep.phase)} />
+                      {cluster && (
+                        <Link
+                          component={RouterLink}
+                          to={`/admin/clusters/${cluster.id}`}
+                          underline="hover"
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          {cluster.name}
+                        </Link>
+                      )}
+                    </Stack>
+                  );
+                })}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── A container deploy in progress ──────────────────────── */}
       {deployTimeline && (
         <Card variant="outlined">
           <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>

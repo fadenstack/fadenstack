@@ -494,13 +494,18 @@ class DeploymentDAO:
         *,
         environment_id: uuid.UUID | None = None,
         model_id: uuid.UUID | None = None,
+        node_id: uuid.UUID | None = None,
         phase: DeploymentPhase | None = None,
         include_deleted: bool = False,
     ) -> list[InferenceDeployment]:
-        """Return deployments, optionally filtered."""
+        """Return deployments, optionally filtered; *node_id*: those on a cluster the machine is a member of."""
         stmt = select(InferenceDeployment)
         if environment_id is not None:
             stmt = stmt.where(InferenceDeployment.environment_id == environment_id)
+        if node_id is not None:
+            stmt = stmt.where(InferenceDeployment.environment_id.in_(
+                select(InferenceEnvironmentNode.environment_id).where(InferenceEnvironmentNode.node_id == node_id)
+            ))
         if model_id is not None:
             stmt = stmt.where(InferenceDeployment.model_id == model_id)
         if phase is not None:

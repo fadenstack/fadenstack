@@ -2197,6 +2197,8 @@
     "detail": {
       "token_tooltip": "Create a one-time enrollment token for this machine",
       "token_title": "Enrollment token",
+      "deployments": "Deployments on this machine",
+      "no_deployments": "No deployment's cluster includes this machine.",
       "deployment_progress": "Deployment progress",
       "container_logs": "Container logs"
     },

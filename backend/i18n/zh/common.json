@@ -2018,6 +2018,8 @@
     "detail": {
       "token_tooltip": "为此机器创建一次性注册令牌",
       "token_title": "注册令牌",
+      "deployments": "此机器上的部署",
+      "no_deployments": "没有部署所在的集群包含此机器。",
       "deployment_progress": "部署进度",
       "container_logs": "容器日志"
     },

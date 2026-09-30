@@ -55,11 +55,12 @@ _DEP = "inference.deployments"
 async def list_deployments(
     environment_id: uuid.UUID | None = None,
     model_id: uuid.UUID | None = None,
+    node_id: uuid.UUID | None = Query(None, description="Only deployments on a cluster this machine is a member of."),
     _user: User = Depends(require_permission(_DEP, "read")),
     service: DeploymentService = Depends(),
 ) -> list[DeploymentDTO]:
-    """List inference deployments, optionally filtered by environment or model."""
-    return [_dto_from_dep(d) for d in await service.list(environment_id, model_id)]
+    """List inference deployments, optionally filtered by environment, model or machine."""
+    return [_dto_from_dep(d) for d in await service.list(environment_id, model_id, node_id)]
 
 
 @router.post("", response_model=DeploymentDTO, status_code=status.HTTP_201_CREATED)
