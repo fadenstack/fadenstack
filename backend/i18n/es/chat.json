@@ -69,5 +69,8 @@
   },
   "thinking": "Pensando…",
   "thought_for": "Pensó durante {{seconds}} s",
-  "thought": "Razonamiento"
+  "thought": "Razonamiento",
+  "turn_failed": "La respuesta ha fallado.",
+  "turn_interrupted": "El servidor se reinició mientras se escribía esta respuesta.",
+  "turn_stopped": "Detenida"
 }

@@ -69,5 +69,8 @@
   },
   "thinking": "Réflexion…",
   "thought_for": "A réfléchi {{seconds}} s",
-  "thought": "Réflexion"
+  "thought": "Réflexion",
+  "turn_failed": "La réponse a échoué.",
+  "turn_interrupted": "Le serveur a redémarré pendant la rédaction de cette réponse.",
+  "turn_stopped": "Arrêtée"
 }

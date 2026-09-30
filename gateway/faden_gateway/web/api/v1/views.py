@@ -11,6 +11,7 @@ from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import TURNS_RETRYABLE
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError, error_response
@@ -35,7 +36,7 @@ from faden_gateway.services.gateway.schemas import (
     SessionToolPolicyPatchDTO,
     ToolAvailabilityResponse,
 )
-from faden_gateway.services.gateway.service import GatewayService
+from faden_gateway.services.gateway.service import GatewayService, StreamingGatewayResponse
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 
@@ -705,18 +706,7 @@ async def create_chat_completions(
                 session_id=session_id,
                 skills=skills,
             )
-            stream_response = StreamingResponse(
-                streamed.stream,
-                media_type="text/event-stream",
-            )
-            stream_response.headers["x-request-id"] = request_id
-            stream_response.headers["x-provider-instance-id"] = (
-                streamed.provider_instance_id
-            )
-            stream_response.headers["cache-control"] = "no-cache"
-            if streamed.trace_id:
-                stream_response.headers["x-langfuse-trace-id"] = streamed.trace_id
-            return stream_response
+            return _streamed_response(streamed, request_id)
 
         non_stream = await service.route_non_stream(
             auth=auth,
@@ -744,6 +734,94 @@ async def create_chat_completions(
             error_type="invalid_request_error",
             code="validation_error",
         )
+    except GatewayError as exc:
+        return error_response(
+            status_code=exc.status_code,
+            message=exc.message,
+            error_type=exc.error_type,
+            param=exc.param,
+            code=exc.code,
+        )
+
+
+def _streamed_response(streamed: StreamingGatewayResponse, request_id: str) -> StreamingResponse:
+    """A streamed chat completion, with the ids the client reads from its headers."""
+    response = StreamingResponse(streamed.stream, media_type="text/event-stream")
+    response.headers["x-request-id"] = request_id
+    response.headers["x-provider-instance-id"] = streamed.provider_instance_id
+    response.headers["cache-control"] = "no-cache"
+    if streamed.trace_id:
+        response.headers["x-langfuse-trace-id"] = streamed.trace_id
+    # The reply's row in the chat: what the chat page tries again or stops.
+    if streamed.turn_id:
+        response.headers["x-faden-turn-id"] = streamed.turn_id
+    return response
+
+
+# ── Turns ─────────────────────────────────────────────────────────
+
+
+@router.post("/v1/sessions/{session_id}/turns/{turn_id}/retry", response_model=None)
+async def retry_turn(
+    request: Request,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    service: GatewayService = Depends(get_gateway_service),
+) -> Response:
+    """Try the chat's last reply again, once it has failed or stopped.
+
+    The new reply replaces it and answers the same question. The body may
+    name another model (``model``; the failed reply's by default) and the
+    skills to use (``skills``). It streams as a chat completion does.
+    """
+    try:
+        dao = service.session_dao
+        sess = await dao.get_session(
+            session_id=session_id, tenant_id=auth.tenant_id, user_id=auth.user_id,
+        ) if dao is not None else None
+        if dao is None or sess is None:
+            raise GatewayError(status_code=404, message="Session not found.", code="session_not_found")
+        last = await dao.get_recent_messages(session_id=session_id, limit=2)
+        if (
+            len(last) < 2
+            or last[-1].id != turn_id
+            or last[-1].role != "assistant"
+            or last[-1].status not in TURNS_RETRYABLE
+            or last[-2].role != "user"
+        ):
+            raise GatewayError(
+                status_code=409,
+                message="Only the chat's last reply can be tried again, once it has failed or stopped.",
+                code="turn_not_retryable",
+            )
+        raw = await request.body()
+        try:
+            body = json.loads(raw) if raw else {}
+        except ValueError as exc:
+            raise GatewayError(status_code=400, message="The body is not JSON.", code="invalid_json") from exc
+        body = body if isinstance(body, dict) else {}
+        model = body.get("model") or last[-1].model_alias
+        if not model:
+            raise GatewayError(
+                status_code=400, message="Name the model to try again with.", code="model_required",
+            )
+        question = last[-2]
+        request_id = _request_id(request)
+        # The question as it was asked: the session sees it is already there,
+        # and the reply it replaces goes (``_inject_session_context``).
+        streamed = await service.route_stream_chat(
+            auth=auth,
+            payload={
+                "model": model,
+                "stream": True,
+                "messages": [{"role": "user", "content": question.content_parts_json or question.content}],
+            },
+            request_id=request_id,
+            session_id=str(session_id),
+            skills=_requested_skills(body.get("skills")),
+        )
+        return _streamed_response(streamed, request_id)
     except GatewayError as exc:
         return error_response(
             status_code=exc.status_code,

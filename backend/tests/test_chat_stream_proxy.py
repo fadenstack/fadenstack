@@ -101,3 +101,26 @@ async def test_a_resumed_stream_brings_its_trace_id_and_no_buffer_is_empty() -> 
     assert resumed.headers == {"x-langfuse-trace-id": "trace-3"}
     assert await _read(resumed) == SSE
     assert (nothing.headers, await _read(nothing)) == ({}, b"")
+
+
+async def test_a_retried_reply_streams_with_its_new_turn_id(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The page tries a failed reply again through the proxy, and learns the new reply's row."""
+    asked: list[tuple[str, dict[str, object]]] = []
+
+    def gateway(request: httpx.Request) -> httpx.Response:
+        asked.append((request.url.path, json.loads(request.content or b"{}")))
+        return httpx.Response(200, headers={"x-faden-turn-id": "turn-2", "x-langfuse-trace-id": "t"}, content=SSE)
+
+    fake = _client(httpx.MockTransport(gateway))
+    monkeypatch.setattr(chat_views, "_client", lambda: fake)
+    client.cookies.set("fapiauth", "jwt")
+
+    resp = await client.post(
+        fastapi_app.url_path_for("retry_turn", session_id="s1", turn_id="turn-1"), json={"model": "other"},
+    )
+
+    assert resp.status_code == 200 and resp.content == SSE
+    assert resp.headers["x-faden-turn-id"] == "turn-2"
+    assert asked == [("/v1/sessions/s1/turns/turn-1/retry", {"model": "other"})]

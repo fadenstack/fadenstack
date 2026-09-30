@@ -69,5 +69,8 @@
   },
   "thinking": "思考中…",
   "thought_for": "思考了 {{seconds}} 秒",
-  "thought": "思考过程"
+  "thought": "思考过程",
+  "turn_failed": "回复失败。",
+  "turn_interrupted": "编写此回复时服务器重新启动了。",
+  "turn_stopped": "已停止"
 }

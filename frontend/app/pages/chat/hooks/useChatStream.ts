@@ -7,8 +7,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { chatApi, resumeStream, streamChat } from "~/api/chatClient";
-import type { ChatMessage, ChatSession, TokenUsage } from "~/api/chatTypes";
+import { chatApi, resumeStream, retryTurn, streamChat, type StreamHandle } from "~/api/chatClient";
+import { RETRYABLE_TURNS, type ChatMessage, type ChatSession, type TokenUsage } from "~/api/chatTypes";
 
 /** Small helper: flush accumulated text to state at display frame rate. */
 function useStreamThrottle(setter: (v: string) => void) {
@@ -84,7 +84,16 @@ export function useChatStream({
   const { t } = useTranslation();
   const selectedModelRef = useRef(selectedModel);
   selectedModelRef.current = selectedModel;
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessagesState] = useState<ChatMessage[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  // The messages as the callbacks read them: set with the state.
+  const setMessages = useCallback((next: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    setMessagesState((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      messagesRef.current = value;
+      return value;
+    });
+  }, []);
   const [streamingContent, setStreamingContent] = useState("");
   const streamThrottle = useStreamThrottle(setStreamingContent);
   const [streamingReasoning, setStreamingReasoning] = useState("");
@@ -114,14 +123,17 @@ export function useChatStream({
     const sid = sessionIdRef.current;
     if (!sid) return;
     setIsLoading(true);
+    setError(null);
     try {
       const msgs = await chatApi.listMessages(sid);
-      setMessages(msgs);
+      // A reply still being written is shown as it streams, not as its row.
+      const writing = msgs[msgs.length - 1]?.status === "running";
+      setMessages(writing ? msgs.slice(0, -1) : msgs);
 
       // Check if there is an active stream we can reconnect to
       try {
         const { active } = await chatApi.streamStatus(sid);
-        if (active) {
+        if (active || writing) {
           // Reconnect to the in-progress stream
           setIsStreaming(true);
           streamThrottle.reset();
@@ -135,9 +147,6 @@ export function useChatStream({
 
           let accumulated = "";
           let thought = "";
-          let finalUsage: TokenUsage | null = null;
-          let traceId: string | null = null;
-
           for await (const delta of reader) {
             if (delta.reasoning) {
               thought += delta.reasoning;
@@ -148,34 +157,11 @@ export function useChatStream({
               streamThrottle.push(accumulated);
             }
             if (delta.usage) {
-              finalUsage = delta.usage;
               setStreamingUsage(delta.usage);
             }
-            if (delta.trace_id) {
-              traceId = delta.trace_id;
-            }
           }
 
-          // Stream complete — materialise assistant message
-          if (accumulated.trim()) {
-            const assistantMsg: ChatMessage = {
-              id: `tmp-${Date.now()}-a`,
-              session_id: sid,
-              role: "assistant",
-              content: accumulated,
-              content_parts: null,
-              tool_call_json: null,
-              model_alias: null,
-              provider_instance_id: null,
-              token_estimate: finalUsage?.completion_tokens ?? null,
-              trace_id: traceId,
-              usage: finalUsage,
-              reasoning: thought || null,
-              created_at: new Date().toISOString(),
-            };
-            setMessages((prev) => [...prev, assistantMsg]);
-          }
-
+          // Stream complete: the reply as the gateway stored it.
           streamThrottle.flush();
           setStreamingContent("");
           reasoningThrottle.reset();
@@ -183,6 +169,7 @@ export function useChatStream({
           setStreamingUsage(null);
           setIsStreaming(false);
           abortRef.current = null;
+          setMessages(await chatApi.listMessages(sid));
           return;
         }
       } catch {
@@ -191,6 +178,7 @@ export function useChatStream({
 
       // If the last message is from the user with no assistant reply,
       // the previous request likely failed — surface a retry prompt.
+      // (A failed reply the gateway stored shows itself, with its error.)
       if (msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
         const lastUser = msgs[msgs.length - 1];
         lastSendRef.current = { text: lastUser.content, model: "" };
@@ -214,6 +202,130 @@ export function useChatStream({
     abortRef.current = null;
     setIsStreaming(false);
   }, []);
+
+  /**
+   * Read a reply as it streams, then keep it. A reply that failed is shown
+   * as the gateway stored it (with its error, to be tried again); one the
+   * user stopped keeps what was written.
+   */
+  const runStream = useCallback(
+    async (handle: StreamHandle, sid: string, model: string) => {
+      setIsStreaming(true);
+      streamThrottle.reset();
+      setStreamingContent("");
+      reasoningThrottle.reset();
+      setStreamingReasoning("");
+      setStreamingUsage(null);
+      abortRef.current = handle.abort;
+
+      const streamStartedAt = performance.now();
+      let accumulated = "";
+      let thought = "";
+      let thoughtFrom: number | null = null;
+      let thoughtMs: number | null = null;
+      let finalUsage: TokenUsage | null = null;
+      let traceId: string | null = null;
+      let turnId: string | null = null;
+
+      const settle = () => {
+        streamThrottle.flush();
+        setStreamingContent("");
+        reasoningThrottle.reset();
+        setStreamingReasoning("");
+        setStreamingUsage(null);
+        setIsStreaming(false);
+        abortRef.current = null;
+      };
+      const reply = (status: ChatMessage["status"]): ChatMessage => ({
+        id: turnId ?? `tmp-${Date.now()}-a`,
+        session_id: sid,
+        role: "assistant",
+        content: accumulated,
+        content_parts: null,
+        tool_call_json: null,
+        model_alias: model || null,
+        provider_instance_id: null,
+        token_estimate: finalUsage?.completion_tokens ?? null,
+        trace_id: traceId,
+        usage: finalUsage,
+        reasoning: thought || null,
+        reasoning_ms: thoughtMs,
+        created_at: new Date().toISOString(),
+        status,
+      });
+
+      try {
+        for await (const delta of handle.reader) {
+          if (delta.turn_id) turnId = delta.turn_id;
+          if (delta.trace_id) traceId = delta.trace_id;
+          if (delta.reasoning) {
+            thoughtFrom ??= performance.now();
+            thought += delta.reasoning;
+            reasoningThrottle.push(thought);
+          }
+          if (delta.content) {
+            if (thoughtFrom !== null && thoughtMs === null) {
+              thoughtMs = Math.round(performance.now() - thoughtFrom);
+            }
+            accumulated += delta.content;
+            streamThrottle.push(accumulated);
+          }
+          if (delta.usage) {
+            finalUsage = delta.usage;
+            setStreamingUsage(delta.usage);
+          }
+        }
+        if (!accumulated.trim()) {
+          throw new Error(
+            t("error_no_response", {
+              ns: "chat",
+              defaultValue: "No response received from the model.",
+            }),
+          );
+        }
+      } catch (err) {
+        settle();
+        if ((err as Error).name === "AbortError") {
+          // Stopped: what was written stays, as the gateway keeps it.
+          if (accumulated.trim()) setMessages((prev) => [...prev, reply("stopped")]);
+          return;
+        }
+        // The gateway stored the failed reply before it closed the stream:
+        // show it as stored, with its error and a way to try it again.
+        try {
+          const stored = await chatApi.listMessages(sid);
+          setMessages(stored);
+          const last = stored[stored.length - 1];
+          if (last?.role === "assistant" && last.status && RETRYABLE_TURNS.has(last.status)) {
+            setError(null);
+            return;
+          }
+        } catch {
+          // Shown below instead.
+        }
+        setError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+
+      // Streaming complete — materialise assistant message
+      const elapsedMs = Math.round(performance.now() - streamStartedAt);
+      const assistantMsg = reply("complete");
+      setMessages((prev) => [...prev, assistantMsg]);
+      responseMsMapRef.current.set(assistantMsg.id, elapsedMs);
+      setLastResponseMs(elapsedMs);
+      settle();
+
+      // Update session title if it was auto-generated
+      if (onSessionUpdated) {
+        try {
+          onSessionUpdated(await chatApi.getSession(sid));
+        } catch {
+          // Non-critical
+        }
+      }
+    },
+    [onSessionUpdated],
+  );
 
   const send = useCallback(
     async (text: string, model: string, files?: File[], skills?: string[]) => {
@@ -261,16 +373,6 @@ export function useChatStream({
           return [...prev, userMsg];
         });
 
-        // 4. Start streaming
-        setIsStreaming(true);
-        streamThrottle.reset();
-        setStreamingContent("");
-        reasoningThrottle.reset();
-        setStreamingReasoning("");
-        setStreamingUsage(null);
-
-        const streamStartedAt = performance.now();
-
         if (!model) {
           throw new Error(
             t("error_select_model", {
@@ -279,114 +381,60 @@ export function useChatStream({
             }),
           );
         }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return;
+      }
 
-        const { reader, abort } = streamChat({
+      // 4. Stream the reply
+      await runStream(
+        streamChat({
           session_id: sid,
           model,
           messages: [{ role: "user", content: text }],
           // The gateway takes them off before the model sees the request.
           ...(skills && skills.length > 0 ? { skills } : {}),
-        });
-        abortRef.current = abort;
-
-        let accumulated = "";
-        let thought = "";
-        let thoughtFrom: number | null = null;
-        let thoughtMs: number | null = null;
-        let finalUsage: TokenUsage | null = null;
-        let traceId: string | null = null;
-
-        for await (const delta of reader) {
-          if (delta.reasoning) {
-            thoughtFrom ??= performance.now();
-            thought += delta.reasoning;
-            reasoningThrottle.push(thought);
-          }
-          if (delta.content) {
-            if (thoughtFrom !== null && thoughtMs === null) {
-              thoughtMs = Math.round(performance.now() - thoughtFrom);
-            }
-            accumulated += delta.content;
-            streamThrottle.push(accumulated);
-          }
-          if (delta.usage) {
-            finalUsage = delta.usage;
-            setStreamingUsage(delta.usage);
-          }
-          if (delta.trace_id) {
-            traceId = delta.trace_id;
-          }
-        }
-
-        // 5. Streaming complete — materialise assistant message
-        if (!accumulated.trim()) {
-          throw new Error(
-            t("error_no_response", {
-              ns: "chat",
-              defaultValue: "No response received from the model.",
-            }),
-          );
-        }
-        const elapsedMs = Math.round(performance.now() - streamStartedAt);
-        const assistantMsgId = `tmp-${Date.now()}-a`;
-        const assistantMsg: ChatMessage = {
-          id: assistantMsgId,
-          session_id: sid,
-          role: "assistant",
-          content: accumulated,
-          content_parts: null,
-          tool_call_json: null,
-          model_alias: model || null,
-          provider_instance_id: null,
-          token_estimate: finalUsage?.completion_tokens ?? null,
-          trace_id: traceId,
-          usage: finalUsage,
-          reasoning: thought || null,
-          reasoning_ms: thoughtMs,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        responseMsMapRef.current.set(assistantMsgId, elapsedMs);
-        setLastResponseMs(elapsedMs);
-        streamThrottle.flush();
-        setStreamingContent("");
-        reasoningThrottle.reset();
-        setStreamingReasoning("");
-        setStreamingUsage(null);
-        setIsStreaming(false);
-        abortRef.current = null;
-
-        // 6. Update session title if it was auto-generated
-        if (onSessionUpdated) {
-          try {
-            const updated = await chatApi.getSession(sid);
-            onSessionUpdated(updated);
-          } catch {
-            // Non-critical
-          }
-        }
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-        setIsStreaming(false);
-        abortRef.current = null;
-      }
+        }),
+        sid,
+        model,
+      );
     },
-    [onSessionCreated, onSessionUpdated],
+    [onSessionCreated, runStream],
   );
 
   const retry = useCallback(async () => {
-    const last = lastSendRef.current;
-    if (!last) return;
-    // Use the currently selected model, not the one from the failed attempt
-    const model = selectedModelRef.current || last.model;
+    const sid = sessionIdRef.current;
+    const model = selectedModelRef.current || lastSendRef.current?.model || "";
+    const last = messagesRef.current[messagesRef.current.length - 1];
     setError(null);
+
+    // The chat's last reply, stored as failed or stopped: a new one replaces it.
+    if (
+      sid &&
+      last?.role === "assistant" &&
+      last.status &&
+      RETRYABLE_TURNS.has(last.status) &&
+      !last.id.startsWith("tmp-")
+    ) {
+      setMessages((prev) => prev.filter((m) => m.id !== last.id));
+      const skills = lastSendRef.current?.skills;
+      await runStream(
+        retryTurn(sid, last.id, {
+          ...(model ? { model } : {}),
+          ...(skills && skills.length > 0 ? { skills } : {}),
+        }),
+        sid,
+        model || last.model_alias || "",
+      );
+      return;
+    }
+
+    const lastSend = lastSendRef.current;
+    if (!lastSend) return;
 
     // Reload messages from the server to get the authoritative state.
     // This removes any optimistic duplicates and picks up messages
     // that were persisted on the previous (failed) attempt.
-    const sid = sessionIdRef.current;
     if (sid) {
       try {
         const freshMsgs = await chatApi.listMessages(sid);
@@ -396,8 +444,8 @@ export function useChatStream({
       }
     }
 
-    await send(last.text, model, last.files, last.skills);
-  }, [send]);
+    await send(lastSend.text, model, lastSend.files, lastSend.skills);
+  }, [send, runStream]);
 
   return {
     messages,

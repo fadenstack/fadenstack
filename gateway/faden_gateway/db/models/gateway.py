@@ -633,10 +633,46 @@ class ChatMessage(Base):
     )
     token_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    #: A reply is a turn with a state of its own (``TurnStatus``): the row is
+    #: written when the reply starts, so a failure is kept, not lost with the
+    #: browser tab that saw it. Every other message is ``complete``.
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="complete", server_default="complete",
+    )
+    #: Why the reply failed, as the chat shows it.
+    error: Mapped[str | None] = mapped_column(EncryptedText("chat-content"), nullable=True)
+    #: When the reply last moved: a running turn's heartbeat.
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         server_default=func.now(), index=True,
     )
+
+    __table_args__ = (
+        # The turns still running, for the sweeper that ends the ones a
+        # restart left behind. Partial: every other row is complete.
+        Index("ix_chat_message_running", "updated_at", postgresql_where=text("status = 'running'")),
+    )
+
+
+class TurnStatus(str, enum.Enum):
+    """Where a reply is (``ChatMessage.status``)."""
+
+    RUNNING = "running"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    #: Stopped by the user; what was written is kept.
+    STOPPED = "stopped"
+    #: Ended by the gateway going away (a restart) while it was written.
+    INTERRUPTED = "interrupted"
+
+
+#: Replies that are not part of the conversation the model is sent.
+TURNS_LEFT_OUT = frozenset({TurnStatus.RUNNING.value, TurnStatus.FAILED.value, TurnStatus.INTERRUPTED.value})
+#: Replies that can be tried again.
+TURNS_RETRYABLE = frozenset({
+    TurnStatus.FAILED.value, TurnStatus.STOPPED.value, TurnStatus.INTERRUPTED.value,
+})
 
 
 # ---------------------------------------------------------------------------

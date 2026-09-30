@@ -15,7 +15,7 @@ from typing import Any
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, ProviderType, TurnStatus
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.gateway.auth import AuthContext
@@ -134,6 +134,8 @@ class StreamingGatewayResponse:
     latency_ms: int
     stats: StreamStats
     trace_id: str | None = None
+    #: The reply's row in the chat session, when there is one.
+    turn_id: str | None = None
 
 
 #: What each endpoint can be sent to: the kinds a route declares
@@ -285,6 +287,14 @@ def _in_background(step: Awaitable[Any]) -> None:
     task.add_done_callback(_BACKGROUND.discard)
 
 
+def _kept(step: Awaitable[Any]) -> asyncio.Future[Any]:
+    """Start *step* in a task of its own, kept referenced until it is done."""
+    task = asyncio.ensure_future(step)
+    _BACKGROUND.add(task)
+    task.add_done_callback(_BACKGROUND.discard)
+    return task
+
+
 async def _to_the_end(step: Awaitable[Any], *, until: asyncio.Event | None = None) -> None:
     """Start *step*, which goes on to its end even if this task is cancelled.
 
@@ -294,9 +304,7 @@ async def _to_the_end(step: Awaitable[Any], *, until: asyncio.Event | None = Non
     stops waiting for it but does not stop it. The caller waits for the whole
     step, or only until *until* is set.
     """
-    task = asyncio.ensure_future(step)
-    _BACKGROUND.add(task)
-    task.add_done_callback(_BACKGROUND.discard)
+    task = _kept(step)
     if until is None:
         await asyncio.shield(task)
         return
@@ -611,6 +619,21 @@ def _json_arguments(call: dict[str, Any]) -> str:
     return json.dumps(_tool_arguments(call))
 
 
+def _turn_outcome(
+    *, content: str, error: str | None, status_code: int, closing: bool, finish_reason: str | None,
+) -> tuple[str, str | None]:
+    """How a streamed reply ended, for its row in the chat: (status, error)."""
+    if error:  # the model's server refused, or failed part way
+        return TurnStatus.FAILED.value, error
+    if status_code >= 500:
+        return TurnStatus.FAILED.value, "The model's answer broke off."
+    if not closing:  # the client left, or stopped it: what was written is kept
+        return TurnStatus.STOPPED.value, None
+    if not content and finish_reason != "tool_calls":
+        return TurnStatus.FAILED.value, "The model sent no answer."
+    return TurnStatus.COMPLETE.value, None
+
+
 def _stream_outcome(stats: StreamStats, status_code: int, error_code: str | None) -> tuple[int, str | None]:
     """A stream's status and error code for the log, counting an error event.
 
@@ -751,6 +774,10 @@ class _Prepared:
     tool_exchange: list[dict[str, Any]] = field(default_factory=list)
     #: How a streamed answer ended.
     finish_reason: str | None = None
+    #: The reply's row in the chat session (a turn), written as it starts.
+    turn_id: str | None = None
+    #: Writing that row, which runs beside the model call.
+    turn_written: asyncio.Future[Any] | None = None
 
     @property
     def instance_id(self) -> str | None:
@@ -1094,6 +1121,7 @@ class GatewayService:
         stats: StreamStats | None = None
         pre_stream_status_code = 500
         pre_stream_error_code: str | None = None
+        pre_stream_error = "The request failed before the model answered."
         try:
             await self._prepare(
                 req,
@@ -1108,6 +1136,9 @@ class GatewayService:
             decision = req.decision
             egress_payload = req.egress_payload
             assert decision is not None and egress_payload is not None  # noqa: S101
+            # The reply's row, written beside the model call: whatever becomes
+            # of the stream, the chat keeps how the reply ended.
+            self._start_turn(req, model_alias=model_alias)
             mcp_tools_injected = any(
                 (t.get("function", {}).get("name") or "").startswith(MCP_TOOL_PREFIX)
                 for t in (egress_payload.get("tools") or [])
@@ -1210,10 +1241,12 @@ class GatewayService:
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 stats=stats,
                 trace_id=req.trace_id,
+                turn_id=req.turn_id,
             )
         except GatewayError as exc:
             pre_stream_status_code = exc.status_code
             pre_stream_error_code = exc.code
+            pre_stream_error = exc.message
             if req.trace_context is None:
                 req.trace_context = self.observability.start_request_trace(
                     request_id=request_id,
@@ -1238,6 +1271,21 @@ class GatewayService:
         finally:
             if not stream_started:
                 await self._release(req)
+                # The question was saved before this failed: the chat keeps the
+                # failure with it, to be seen and tried again after a reload.
+                if req.session_id:
+                    try:
+                        await self._persist_stream_assistant_response(
+                            session_id_str=req.session_id,
+                            content="",
+                            model_alias=model_alias,
+                            trace_id=req.trace_id,
+                            status=TurnStatus.FAILED.value,
+                            error=pre_stream_error,
+                            turn=req,
+                        )
+                    except Exception:
+                        logger.warning("Failed to keep the failed reply", exc_info=True)
                 await self.audit.log(
                     request_id=request_id,
                     trace_id=req.trace_id,
@@ -1733,24 +1781,35 @@ class GatewayService:
         # user message, this is a retry.  Skip persistence and drop
         # the duplicate from current_messages so the assembler
         # (which already loads it from history) doesn't double it.
+        # A reply that failed or was stopped after that message is
+        # replaced: asking again is trying again.
+        replaced = False
         if current_messages:
             last_msgs = await self.session_dao.get_recent_messages(
-                session_id=sid, limit=1,
+                session_id=sid, limit=2,
             )
-            if last_msgs:
-                last_db = last_msgs[-1]
-                first_cur = current_messages[0]
-                cur_content = first_cur.get("content", "")
-                if isinstance(cur_content, list):
-                    cur_content = " ".join(
-                        p.get("text", "") for p in cur_content
-                        if isinstance(p, dict) and p.get("type") == "text"
-                    ) or ""
-                if (
-                    last_db.role == first_cur.get("role")
-                    and last_db.content == cur_content
-                ):
-                    current_messages = current_messages[1:]
+            first_cur = current_messages[0]
+            cur_content = first_cur.get("content", "")
+            if isinstance(cur_content, list):
+                cur_content = " ".join(
+                    p.get("text", "") for p in cur_content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ) or ""
+
+            def same(message: Any) -> bool:
+                return message.role == first_cur.get("role") and message.content == cur_content
+
+            if (
+                len(last_msgs) == 2
+                and last_msgs[-1].role == "assistant"
+                and last_msgs[-1].status in TURNS_RETRYABLE
+                and same(last_msgs[-2])
+            ):
+                await self.session_dao.delete_message(message_id=last_msgs[-1].id)
+                last_msgs = last_msgs[:-1]
+                replaced = True
+            if last_msgs and same(last_msgs[-1]):
+                current_messages = current_messages[1:]
 
         assembled = await assembler.assemble(
             session_id=sid,
@@ -1798,7 +1857,7 @@ class GatewayService:
 
         # Commit user messages immediately so they survive if the
         # streaming response is interrupted (e.g. page reload).
-        if current_messages:
+        if current_messages or replaced:
             await self.session_dao.session.commit()
 
         return payload, str(sid), (str(sess.project_id) if sess.project_id else None)
@@ -2459,7 +2518,14 @@ class GatewayService:
             await self._release(req)
         except Exception:
             logger.warning("Failed to release the model slot", exc_info=True)
-        if req.session_id and content:
+        if req.session_id:
+            turn_status, turn_error = _turn_outcome(
+                content=content,
+                error=stats.error if stats is not None else None,
+                status_code=status_code,
+                closing=closing,
+                finish_reason=req.finish_reason,
+            )
             try:
                 await self._persist_stream_assistant_response(
                     session_id_str=req.session_id,
@@ -2469,6 +2535,9 @@ class GatewayService:
                     trace_id=req.trace_id,
                     token_estimate=stats.usage.completion_tokens if stats is not None else None,
                     tool_exchange=req.tool_exchange,
+                    status=turn_status,
+                    error=turn_error,
+                    turn=req,
                 )
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
@@ -2548,6 +2617,40 @@ class GatewayService:
             await audit.log(**fields)
             await own.commit()
 
+    def _start_turn(self, req: _Prepared, *, model_alias: str) -> None:
+        """Write the reply's row (``running``) as the reply starts, beside the model call.
+
+        Its id goes to the client with the stream (``x-faden-turn-id``); the
+        end of the stream fills the row in (``_persist_stream_assistant_response``).
+        """
+        if not req.session_id or not self.session_dao:
+            return
+        try:
+            sid = uuid.UUID(req.session_id)
+        except ValueError:
+            return
+        turn_id = uuid.uuid4()
+        req.turn_id = str(turn_id)
+        engine = self.session_dao.session.bind
+
+        async def write() -> None:
+            from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+            async with AsyncSession(engine, expire_on_commit=False) as own:
+                own.add(ChatMessage(
+                    id=turn_id,
+                    session_id=sid,
+                    role="assistant",
+                    content="",
+                    model_alias=model_alias,
+                    trace_id=req.trace_id,
+                    status=TurnStatus.RUNNING.value,
+                    updated_at=datetime.now(timezone.utc),
+                ))
+                await own.commit()
+
+        req.turn_written = _kept(write())
+
     async def _persist_stream_assistant_response(
         self,
         *,
@@ -2558,44 +2661,61 @@ class GatewayService:
         trace_id: str | None = None,
         token_estimate: int | None = None,
         tool_exchange: list[dict[str, Any]] | None = None,
+        status: str = TurnStatus.COMPLETE.value,
+        error: str | None = None,
+        turn: _Prepared | None = None,
     ) -> None:
-        """Store the accumulated streaming assistant response in the session.
+        """Store how a streamed reply ended in the session: on its row, or as a new one.
+
+        The row written as the reply started (*turn*) is filled in; without
+        one, the reply is added. A complete reply with no text (tool calls for
+        the client to run) is not kept, as before.
 
         Uses a fresh, independent DB session so the commit is not tied
         to the request-scoped session (which may already be closed or
         rolled back if the client disconnected mid-stream).
         """
-        if not self.session_dao or not content:
+        if not self.session_dao:
             return
-
-        import uuid as _uuid  # noqa: PLC0415
-
         try:
-            sid = _uuid.UUID(session_id_str)
+            sid = uuid.UUID(session_id_str)
         except ValueError:
             return
+        row_id = uuid.UUID(turn.turn_id) if turn is not None and turn.turn_id else None
+        written = False
+        if turn is not None and turn.turn_written is not None:
+            try:
+                await turn.turn_written
+                written = True
+            except Exception:
+                logger.warning("The reply's row was not written as it started", exc_info=True)
+        keep = bool(content) or status != TurnStatus.COMPLETE.value
 
         # Obtain a fresh DB session from the factory stored on session_dao.
         # The request-scoped session may be unusable at this point (client
         # disconnect can close/rollback it), so we create an independent one.
         engine = self.session_dao.session.bind  # AsyncEngine
         from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
-        from faden_gateway.db.models.gateway import ChatMessage  # noqa: PLC0415
 
         async with AsyncSession(engine, expire_on_commit=False) as fresh_session:
-            msg = ChatMessage(
-                session_id=sid,
-                role="assistant",
-                content=content,
-                model_alias=model_alias,
-                provider_instance_id=(
-                    _uuid.UUID(provider_instance_id) if provider_instance_id else None
-                ),
-                token_estimate=token_estimate,
-                trace_id=trace_id,
-                tool_call_json=_exchange_record(tool_exchange),
-            )
-            fresh_session.add(msg)
+            row = await fresh_session.get(ChatMessage, row_id) if written and row_id else None
+            if not keep:
+                if row is not None:
+                    await fresh_session.delete(row)
+                    await fresh_session.commit()
+                return
+            if row is None:
+                row = ChatMessage(id=row_id or uuid.uuid4(), session_id=sid, role="assistant")
+                fresh_session.add(row)
+            row.content = content
+            row.model_alias = model_alias
+            row.provider_instance_id = uuid.UUID(provider_instance_id) if provider_instance_id else None
+            row.token_estimate = token_estimate
+            row.trace_id = trace_id
+            row.tool_call_json = _exchange_record(tool_exchange)
+            row.status = status
+            row.error = error
+            row.updated_at = datetime.now(timezone.utc)
             await fresh_session.commit()
 
 

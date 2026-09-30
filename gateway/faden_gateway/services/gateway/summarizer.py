@@ -11,7 +11,7 @@ import logging
 import uuid
 
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import ChatMessage, SessionSummary
+from faden_gateway.db.models.gateway import TURNS_LEFT_OUT, ChatMessage, SessionSummary
 from faden_gateway.services.gateway.context_assembler import _estimate_tokens
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,9 @@ class Summarizer:
         if previous_summary:
             parts.append(f"[Previous Summary]\n{previous_summary.summary_text}")
         for msg in new_messages:
+            # A failed or unfinished reply is not what was said.
+            if getattr(msg, "status", None) in TURNS_LEFT_OUT:
+                continue
             parts.append(f"{msg.role}: {msg.content}")
 
         conversation_text = "\n\n".join(parts)

@@ -142,6 +142,135 @@ export interface StreamHandle {
 }
 
 /**
+ * A streamed reply's events as deltas. The ids the gateway sends as headers
+ * (the trace, the reply's turn) ride on the first delta.
+ *
+ * An error event is thrown -- once the stream has ended, not when it comes:
+ * the gateway stores the failed reply before it closes the stream, so a page
+ * that reloads the chat then finds it. With ``skipErrors`` it is dropped.
+ */
+async function* deltasOf(
+  res: Response,
+  { skipErrors = false }: { skipErrors?: boolean } = {},
+): AsyncGenerator<StreamDelta> {
+  const ids: StreamDelta = {};
+  const traceId = res.headers.get("x-langfuse-trace-id");
+  const turnId = res.headers.get("x-faden-turn-id");
+  if (traceId) ids.trace_id = traceId;
+  if (turnId) ids.turn_id = turnId;
+  let idsSent = false;
+  let failure: Error | null = null;
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") {
+        if (failure) throw failure;
+        return;
+      }
+
+      let parsed: Record<string, any>;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        continue; // malformed
+      }
+
+      // Detect error payloads from the gateway
+      if (parsed.error) {
+        if (!skipErrors && !failure) {
+          const apiMessage = parseApiErrorMessage(parsed, 500);
+          failure = new Error(
+            apiMessage ||
+              parsed.error.message ||
+              parsed.error.type ||
+              "Unknown streaming error",
+          );
+        }
+        continue;
+      }
+
+      const choice = parsed.choices?.[0];
+      const delta: StreamDelta = {};
+
+      if (choice?.delta?.content) {
+        delta.content = choice.delta.content;
+      }
+      // The gateway sends it as reasoning_content; a vLLM streamed
+      // straight through may call it reasoning.
+      const thinking = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+      if (typeof thinking === "string" && thinking) {
+        delta.reasoning = thinking;
+      }
+      if (choice?.finish_reason) {
+        delta.finish_reason = choice.finish_reason;
+      }
+      if (parsed.usage) {
+        delta.usage = {
+          prompt_tokens: parsed.usage.prompt_tokens ?? 0,
+          completion_tokens: parsed.usage.completion_tokens ?? 0,
+          total_tokens: parsed.usage.total_tokens ?? 0,
+        };
+      }
+      if (!idsSent) {
+        Object.assign(delta, ids);
+        idsSent = true;
+      }
+
+      if (
+        delta.content ||
+        delta.reasoning ||
+        delta.finish_reason ||
+        delta.usage ||
+        delta.trace_id ||
+        delta.turn_id
+      ) {
+        yield delta;
+      }
+    }
+  }
+  if (failure) throw failure;
+  // A stream that failed before any event still names its reply.
+  if (!idsSent && (ids.trace_id || ids.turn_id)) yield ids;
+}
+
+/** A streamed POST, as deltas; an error response is thrown. */
+function postStream(path: string, payload: Record<string, unknown>): StreamHandle {
+  const controller = new AbortController();
+
+  async function* read(): AsyncGenerator<StreamDelta> {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw await buildApiError(res);
+    }
+    yield* deltasOf(res);
+  }
+
+  return { reader: read(), abort: () => controller.abort() };
+}
+
+/**
  * Start a streaming chat completion request.
  *
  * Returns an async generator of `StreamDelta` objects and an `abort()`
@@ -149,119 +278,27 @@ export interface StreamHandle {
  * automatically.
  */
 export function streamChat(payload: Record<string, unknown>): StreamHandle {
-  const controller = new AbortController();
+  return postStream("/completions", { ...payload, stream: true });
+}
 
-  async function* read(): AsyncGenerator<StreamDelta> {
-    const res = await fetch(`${BASE}/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ ...payload, stream: true }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw await buildApiError(res);
-    }
-
-    // Capture trace_id from response header (set by the gateway)
-    const traceId = res.headers.get("x-langfuse-trace-id") ?? undefined;
-    let traceIdEmitted = false;
-
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error("No response body");
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-        const data = trimmed.slice(5).trim();
-        if (data === "[DONE]") return;
-
-        try {
-          const parsed = JSON.parse(data);
-
-          // Detect error payloads from the gateway
-          if (parsed.error) {
-            const apiMessage = parseApiErrorMessage(parsed, 500);
-            const msg =
-              apiMessage ||
-              parsed.error.message ||
-              parsed.error.type ||
-              "Unknown streaming error";
-            throw new Error(msg);
-          }
-
-          const choice = parsed.choices?.[0];
-          const delta: StreamDelta = {};
-
-          if (choice?.delta?.content) {
-            delta.content = choice.delta.content;
-          }
-          // The gateway sends it as reasoning_content; a vLLM streamed
-          // straight through may call it reasoning.
-          const thinking = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
-          if (typeof thinking === "string" && thinking) {
-            delta.reasoning = thinking;
-          }
-          if (choice?.finish_reason) {
-            delta.finish_reason = choice.finish_reason;
-          }
-          if (parsed.usage) {
-            delta.usage = {
-              prompt_tokens: parsed.usage.prompt_tokens ?? 0,
-              completion_tokens: parsed.usage.completion_tokens ?? 0,
-              total_tokens: parsed.usage.total_tokens ?? 0,
-            };
-          }
-
-          // Attach trace_id to the first yielded delta
-          if (traceId && !traceIdEmitted) {
-            delta.trace_id = traceId;
-            traceIdEmitted = true;
-          }
-
-          if (
-            delta.content ||
-            delta.reasoning ||
-            delta.finish_reason ||
-            delta.usage ||
-            delta.trace_id
-          ) {
-            yield delta;
-          }
-        } catch (e) {
-          // Re-throw gateway errors, skip malformed JSON
-          if (
-            e instanceof Error &&
-            e.message !== "Unexpected end of JSON input"
-          ) {
-            throw e;
-          }
-        }
-      }
-    }
-  }
-
-  return { reader: read(), abort: () => controller.abort() };
+/**
+ * Try the chat's last failed or stopped reply again: a new reply replaces it,
+ * streamed like a completion. ``model`` defaults to the failed reply's.
+ */
+export function retryTurn(
+  sessionId: string,
+  turnId: string,
+  body: { model?: string; skills?: string[] } = {},
+): StreamHandle {
+  return postStream(`/sessions/${sessionId}/turns/${turnId}/retry`, body);
 }
 
 /**
  * Reconnect to an in-progress SSE stream for a session.
  *
  * Returns the same `StreamHandle` interface as `streamChat` so callers
- * can use it interchangeably.  Returns `null` if no active stream.
+ * can use it interchangeably. No stream (204), or any failure, reads as
+ * an empty one.
  */
 export function resumeStream(sessionId: string): StreamHandle {
   const controller = new AbortController();
@@ -274,81 +311,8 @@ export function resumeStream(sessionId: string): StreamHandle {
     });
 
     // 204 = no buffer available
-    if (res.status === 204) return;
-    if (!res.ok) return;
-
-    // Capture trace_id from response header (set by the gateway)
-    const traceId = res.headers.get("x-langfuse-trace-id") ?? undefined;
-    let traceIdEmitted = false;
-
-    const reader = res.body?.getReader();
-    if (!reader) return;
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-        const data = trimmed.slice(5).trim();
-        if (data === "[DONE]") return;
-
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) continue;
-
-          const choice = parsed.choices?.[0];
-          const delta: StreamDelta = {};
-
-          if (choice?.delta?.content) {
-            delta.content = choice.delta.content;
-          }
-          // The gateway sends it as reasoning_content; a vLLM streamed
-          // straight through may call it reasoning.
-          const thinking = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
-          if (typeof thinking === "string" && thinking) {
-            delta.reasoning = thinking;
-          }
-          if (choice?.finish_reason) {
-            delta.finish_reason = choice.finish_reason;
-          }
-          if (parsed.usage) {
-            delta.usage = {
-              prompt_tokens: parsed.usage.prompt_tokens ?? 0,
-              completion_tokens: parsed.usage.completion_tokens ?? 0,
-              total_tokens: parsed.usage.total_tokens ?? 0,
-            };
-          }
-
-          // Attach trace_id to the first yielded delta
-          if (traceId && !traceIdEmitted) {
-            delta.trace_id = traceId;
-            traceIdEmitted = true;
-          }
-
-          if (
-            delta.content ||
-            delta.reasoning ||
-            delta.finish_reason ||
-            delta.usage ||
-            delta.trace_id
-          ) {
-            yield delta;
-          }
-        } catch {
-          // skip malformed
-        }
-      }
-    }
+    if (res.status === 204 || !res.ok) return;
+    yield* deltasOf(res, { skipErrors: true });
   }
 
   return { reader: read(), abort: () => controller.abort() };

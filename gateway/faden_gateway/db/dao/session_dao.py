@@ -341,6 +341,12 @@ class SessionDAO:
         )
         return list(result.scalars().all())
 
+    async def delete_message(self, *, message_id: uuid.UUID) -> bool:
+        """Delete one message: a reply that is replaced by trying again."""
+        result = await self.session.execute(delete(ChatMessage).where(ChatMessage.id == message_id))
+        await self.session.flush()
+        return (result.rowcount or 0) > 0
+
     async def count_messages(self, *, session_id: uuid.UUID) -> int:
         result = await self.session.execute(
             select(func.count(ChatMessage.id)).where(

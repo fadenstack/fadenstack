@@ -24,6 +24,7 @@ from typing import Any
 
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import (
+    TURNS_LEFT_OUT,
     ChatAttachment,
     ChatMessage,
     ChatProject,
@@ -209,6 +210,9 @@ class ContextAssembler:
         # If we have a summary, only include messages after the summary cutoff
         if after_id and recent:
             recent = [m for m in recent if m.created_at > summary.created_at]
+        # A reply that failed, was cut off by a restart or is still being
+        # written is the chat's record, not part of the conversation.
+        recent = [m for m in recent if getattr(m, "status", None) not in TURNS_LEFT_OUT]
 
         # The newest turns that fit, kept in order. Filled from the oldest,
         # the budget ran out on the old turns and the latest ones -- the ones

@@ -32,6 +32,12 @@ export interface ChatSession {
   updated_at: string;
 }
 
+/** Where a reply is: its row is written as it starts, and kept however it ends. */
+export type TurnStatus = "running" | "complete" | "failed" | "stopped" | "interrupted";
+
+/** Replies that can be tried again (the chat's last one). */
+export const RETRYABLE_TURNS: ReadonlySet<TurnStatus> = new Set(["failed", "stopped", "interrupted"]);
+
 export interface ChatMessage {
   id: string;
   session_id: string;
@@ -51,6 +57,10 @@ export interface ChatMessage {
   reasoning?: string | null;
   /** How long it thought, in ms. */
   reasoning_ms?: number | null;
+  /** A reply's state; every other message is complete. */
+  status?: TurnStatus;
+  /** Why a failed reply failed. */
+  error?: string | null;
 }
 
 export interface ChatAttachment {
@@ -114,4 +124,6 @@ export interface StreamDelta {
   finish_reason?: string | null;
   usage?: TokenUsage;
   trace_id?: string;
+  /** The reply's row in the chat (its turn), from the stream's headers. */
+  turn_id?: string;
 }

@@ -13,6 +13,7 @@ import { useTheme } from "@mui/material/styles";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonIcon from "@mui/icons-material/Person";
+import ReplayIcon from "@mui/icons-material/Replay";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -37,6 +38,10 @@ interface Props {
   /** What a reasoning model thought before this reply, folded above it. */
   reasoning?: string | null;
   reasoningMs?: number | null;
+  /** A reply the user stopped: it says so. */
+  stopped?: boolean;
+  /** Tries the reply again (the chat's last one, stopped). */
+  onRetry?: () => void;
 }
 
 export default function MessageBubble({
@@ -52,6 +57,8 @@ export default function MessageBubble({
   onDebugClick,
   reasoning = null,
   reasoningMs = null,
+  stopped = false,
+  onRetry,
 }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -201,6 +208,22 @@ export default function MessageBubble({
               alignItems: "center",
             }}
           >
+            {stopped && (
+              <Typography
+                variant="caption"
+                data-testid="reply-stopped"
+                sx={{ fontSize: "0.7rem", opacity: 0.7, mr: "auto" }}
+              >
+                {t("turn_stopped", { ns: "chat", defaultValue: "Stopped" })}
+              </Typography>
+            )}
+            {onRetry && (
+              <Tooltip title={t("retry", { ns: "chat", defaultValue: "Retry" })} arrow placement="top">
+                <IconButton size="small" onClick={onRetry} sx={{ opacity: 0.6, p: 0.25, "&:hover": { opacity: 1 } }}>
+                  <ReplayIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
             {responseMs != null && (
               <Typography
                 variant="caption"

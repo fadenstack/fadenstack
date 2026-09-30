@@ -69,5 +69,8 @@
   },
   "thinking": "Thinking…",
   "thought_for": "Thought for {{seconds}} s",
-  "thought": "Thought"
+  "thought": "Thought",
+  "turn_failed": "The reply failed.",
+  "turn_interrupted": "The server restarted while this reply was being written.",
+  "turn_stopped": "Stopped"
 }

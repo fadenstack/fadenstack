@@ -97,6 +97,10 @@ class MessageDTO(BaseModel):
     token_estimate: int | None
     trace_id: str | None
     created_at: datetime
+    #: A reply's state: running, complete, failed, stopped or interrupted.
+    status: str = "complete"
+    #: Why a failed reply failed.
+    error: str | None = None
     #: A reply's request usage (set by the messages list; null when unknown).
     usage: TokenUsageDTO | None = None
 
@@ -117,6 +121,8 @@ class MessageDTO(BaseModel):
             token_estimate=msg.token_estimate,
             trace_id=msg.trace_id,
             created_at=msg.created_at,
+            status=msg.status,
+            error=msg.error,
         )
 
 
