@@ -316,4 +316,39 @@ describe("InferenceDeploymentDetailPage", () => {
       }),
     );
   });
+
+  it("reads the whole deployment -- Serve and the engine -- as one log", async () => {
+    await renderDetail();
+    await waitFor(() =>
+      expect(inferenceApi.deploymentLogs).toHaveBeenCalledWith(DEPLOYMENT_ID, { source: "all", tail: 500 }),
+    );
+  });
+
+  it("says why a start failed at the top, and takes the reader to the errors", async () => {
+    const cause = "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)";
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      phase: "failed",
+      phase_message: `Start failed: ${cause}. Not tried again: this error comes back on every attempt.`,
+    });
+    vi.spyOn(inferenceApi, "deploymentLogs").mockResolvedValue({
+      ...logPage,
+      source: "all",
+      lines: [
+        { ts: "2026-09-30T06:44:00Z", level: "INFO", message: "Started LLMDeployment:qwen", source: "replica" },
+        { ts: "2026-09-30T06:44:12Z", level: null, message: `(EngineCore pid=1) ${cause}`, source: "engine" },
+      ],
+    });
+    // jsdom has no layout, so no scrollIntoView.
+    Element.prototype.scrollIntoView = vi.fn();
+    await renderDetail();
+
+    const banner = await screen.findByTestId("start-failure");
+    expect(banner).toHaveTextContent("Not tried again");
+    await screen.findByText("Started LLMDeployment:qwen");
+
+    await userEvent.click(within(banner).getByRole("button", { name: "Show the errors" }));
+    expect(screen.queryByText("Started LLMDeployment:qwen")).not.toBeInTheDocument();
+    expect(screen.getByText(/\(EngineCore pid=1\) ValueError/)).toBeInTheDocument();
+  });
 });

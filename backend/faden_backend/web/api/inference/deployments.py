@@ -172,8 +172,8 @@ def _dto_from_dep(dep) -> DeploymentDTO:
 async def get_deployment_logs(
     deployment_id: uuid.UUID,
     source: LogSource = Query(
-        LogSource.SERVE_REPLICA,
-        description="What to read: the Serve replicas, the inference engine, or the machines' agents.",
+        LogSource.ALL,
+        description="What to read: all of the deployment, its Serve replicas, its engine, or the agents.",
     ),
     node_id: uuid.UUID | None = Query(None, description="Only this member machine; all of them when omitted."),
     replica_id: str | None = Query(None, description="Narrow a serve_replica read to one replica."),

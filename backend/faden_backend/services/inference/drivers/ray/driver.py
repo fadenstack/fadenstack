@@ -248,7 +248,7 @@ class RayDriver(InferenceDriver):
         session: "AsyncSession",
         deployment: Any,
         *,
-        source: LogSource = LogSource.SERVE_REPLICA,
+        source: LogSource = LogSource.ALL,
         node_id: str | None = None,
         replica_id: str | None = None,
         tail: int = 200,

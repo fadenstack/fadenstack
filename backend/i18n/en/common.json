@@ -2718,12 +2718,6 @@
       "col_ready": "Ready",
       "col_pending": "Pending",
       "logs": "Logs",
-      "log_source": "Source",
-      "log_replicas": "Serving copies",
-      "log_engine": "Engine (vLLM)",
-      "log_agent": "Machine agent",
-      "log_all_machines": "All machines",
-      "log_machine": "Machine",
       "log_tail": "Lines",
       "fetch": "Fetch",
       "truncated_one": "Truncated to the last {{count}} line.",
@@ -2756,7 +2750,8 @@
       "traffic_window_one": "Measured at the gateway, last minute",
       "traffic_window_other": "Measured at the gateway, last {{count}} minutes",
       "engine_reported": "Reported by the engine",
-      "page_title": "Deployment"
+      "page_title": "Deployment",
+      "show_in_logs": "Show the errors"
     },
     "engine": {
       "title": "Engine settings",
@@ -3226,6 +3221,27 @@
       "action_fit": "Pick a cluster: every model says whether it fits, and how.",
       "action_host": "Host a model: choose the cluster, the size of each copy and vLLM's settings.",
       "action_manage": "On this server: follow downloads, add models from a path, delete what is no longer needed."
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Errors",
+      "warning": "Warnings",
+      "info": "Info",
+      "debug": "Debug",
+      "other": "Other"
+    },
+    "search": "Search the lines",
+    "follow": "Follow new lines",
+    "copy": "Copy the lines shown",
+    "download": "Download the lines shown",
+    "empty": "No log lines yet.",
+    "nothing_matches": "No line matches the filters.",
+    "source": {
+      "replica": "Model serving",
+      "engine": "Engine (vLLM)",
+      "agent": "System log",
+      "container": "Model containers"
     }
   }
 }

@@ -110,20 +110,55 @@ judged by the lists. If Hugging Face cannot be reached, nothing is refused.
 ## Reading a deployment's logs
 
 A deployment's page shows its logs from Loki, where the machines ship them
-as they are written. Choose what to read:
+as they are written. It is one log, from every machine of the cluster, with
+two streams in it:
 
-- **Serving copies**: Serve's log of the model's copies. Use it to see a
-  copy start, get ready, or be stopped.
+- **Model serving**: Serve's log of the model's copies. It shows a copy
+  start, get ready, or be stopped.
 - **Engine (vLLM)**: what the inference engine itself printed. When a model
   fails to start, Serve only says "Engine core initialization failed. See
-  root cause above". The root cause is here, for example
+  root cause above". The root cause is in this stream, for example
   `ValueError: There is no module or parameter named 'ngram_embedding.weight_scale'`.
-- **Machine agent**: the log of the agent on each machine.
 
-**Machine** narrows the page to one machine; **All machines** marks each line
-with the machine that wrote it. A deployment that fails to start puts the
-engine's error first in its **Last message**, so the reason is on the page
-without opening the logs.
+Each line shows its time, its level, its stream and the machine that wrote
+it. The level sets the line's colour: errors red, warnings yellow, debug
+grey. A traceback's frames take the level of the exception they belong to.
+Above the lines are filters:
+
+- the levels, each with a count: click **Errors** to hide it, or
+  click every other level to see only the errors;
+- the streams and the machines, when there is more than one;
+- a search box, which also marks the words it found.
+
+The log follows new lines while you are at the bottom and stops when you
+scroll up to read. Copy and download take the lines the filters show. While
+the deployment starts, the page reads its log again every five seconds.
+
+The machine agent's own log is on the machine's page, which shows
+everything that machine sent in the last 15 minutes: the agent, its
+containers, and Serve and the engine of every deployment on it. Container
+and runtime pages use the same log view.
+
+### When a model fails to start
+
+Serve tries to start a copy three times, and each attempt loads the whole
+model again. Serve only gives the reason after the third attempt, which
+can be fifteen minutes for a large model. Fadenstack doesn't wait for
+that. While no copy is up, it reads the engine's stream after each check:
+
+- **An error that will come back** (weights the engine cannot load, a
+  configuration it rejects): the deployment is stopped at once. Its phase
+  becomes **Failed**, and the page says
+  `Start failed: <the engine's error>. Not tried again: this error comes back on every attempt.`
+- **An error that can pass** (not enough free memory yet, a CUDA or NCCL
+  error, a timeout): Serve keeps trying. The page shows a warning,
+  `A start failed: <the error>. Ray is trying again.`
+
+Either message sits at the top of the page. **Show the errors** in the
+message filters the log to its errors and scrolls to it. Only this
+attempt's lines count: an error an earlier start printed is not taken for
+this one. A stopped deployment stays stopped. After fixing the cause,
+change the deployment or click **Check now**, and it starts over.
 
 The machines keep sending what the server has not taken yet: nothing is lost
 while the server restarts or Loki is down (agents 0.2.4). A page looks back

@@ -2720,12 +2720,6 @@
       "col_ready": "Listas",
       "col_pending": "Pendientes",
       "logs": "Registros",
-      "log_source": "Origen",
-      "log_replicas": "Copias en servicio",
-      "log_engine": "Motor (vLLM)",
-      "log_agent": "Agente de la máquina",
-      "log_all_machines": "Todas las máquinas",
-      "log_machine": "Máquina",
       "log_tail": "Líneas",
       "fetch": "Obtener",
       "truncated_one": "Recortado a la última {{count}} línea.",
@@ -2758,7 +2752,8 @@
       "traffic_window_one": "Medido en la pasarela, último minuto",
       "traffic_window_other": "Medido en la pasarela, últimos {{count}} minutos",
       "engine_reported": "Informado por el motor",
-      "page_title": "Despliegue"
+      "page_title": "Despliegue",
+      "show_in_logs": "Mostrar los errores"
     },
     "engine": {
       "title": "Ajustes del motor",
@@ -3228,6 +3223,27 @@
       "action_fit": "Elija un clúster: cada modelo indica si cabe y cómo.",
       "action_host": "Aloje un modelo: elija el clúster, el tamaño de cada copia y los ajustes de vLLM.",
       "action_manage": "En este servidor: siga las descargas, añada modelos desde una ruta y elimine lo que ya no necesite."
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Errores",
+      "warning": "Avisos",
+      "info": "Info",
+      "debug": "Depuración",
+      "other": "Otros"
+    },
+    "search": "Buscar en las líneas",
+    "follow": "Seguir las líneas nuevas",
+    "copy": "Copiar las líneas mostradas",
+    "download": "Descargar las líneas mostradas",
+    "empty": "Todavía no hay líneas de registro.",
+    "nothing_matches": "Ninguna línea coincide con los filtros.",
+    "source": {
+      "replica": "Servicio del modelo",
+      "engine": "Motor (vLLM)",
+      "agent": "Registro del sistema",
+      "container": "Contenedores de modelos"
     }
   }
 }

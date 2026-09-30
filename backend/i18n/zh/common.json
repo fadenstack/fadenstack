@@ -2720,12 +2720,6 @@
       "col_ready": "就绪",
       "col_pending": "等待中",
       "logs": "日志",
-      "log_source": "来源",
-      "log_replicas": "服务副本",
-      "log_engine": "推理引擎 (vLLM)",
-      "log_agent": "机器代理",
-      "log_all_machines": "所有机器",
-      "log_machine": "机器",
       "log_tail": "行数",
       "fetch": "获取",
       "truncated_one": "已截断为最后 {{count}} 行。",
@@ -2758,7 +2752,8 @@
       "traffic_window_one": "在网关测量，最近 1 分钟",
       "traffic_window_other": "在网关测量，最近 {{count}} 分钟",
       "engine_reported": "由引擎上报",
-      "page_title": "部署"
+      "page_title": "部署",
+      "show_in_logs": "显示错误"
     },
     "engine": {
       "title": "引擎设置",
@@ -3228,6 +3223,27 @@
       "action_fit": "选择一个集群：每个模型都会说明能否放下以及如何放下。",
       "action_host": "托管模型：选择集群、每个副本的规模和 vLLM 设置。",
       "action_manage": "本服务器上：跟踪下载、从路径添加模型、删除不再需要的模型。"
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "错误",
+      "warning": "警告",
+      "info": "信息",
+      "debug": "调试",
+      "other": "其他"
+    },
+    "search": "搜索日志行",
+    "follow": "跟随新行",
+    "copy": "复制显示的行",
+    "download": "下载显示的行",
+    "empty": "还没有日志行。",
+    "nothing_matches": "没有与筛选条件匹配的行。",
+    "source": {
+      "replica": "模型服务",
+      "engine": "推理引擎 (vLLM)",
+      "agent": "系统日志",
+      "container": "模型容器"
     }
   }
 }

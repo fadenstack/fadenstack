@@ -183,7 +183,7 @@ async def test_logs_happy_path_is_backend_neutral(
 
     async def fake_logs(self, session, dep, **kwargs) -> LogPage:  # noqa: ANN001
         assert kwargs["tail"] == 50
-        assert kwargs["source"] == LogSource.SERVE_REPLICA
+        assert kwargs["source"] == LogSource.ALL
         return LogPage(
             source=LogSource.RUNTIME_CONTAINER,
             node_id="node-1",

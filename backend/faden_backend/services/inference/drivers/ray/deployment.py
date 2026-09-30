@@ -52,6 +52,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
@@ -204,7 +205,18 @@ def _reported_route_prefix(deployment: Any) -> str | None:
     return "" if prefix == "/" else prefix.rstrip("/")
 
 
-async def _failure_with_cause(app: dict[str, Any] | None, app_name: str) -> str:
+def _applied_at(deployment: InferenceDeployment) -> datetime | None:
+    """When this deployment's application was last handed to Serve (``applied_at``)."""
+    raw = (deployment.observed_status_json or {}).get("applied_at")
+    try:
+        return datetime.fromisoformat(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
+
+
+async def _failure_with_cause(
+    app: dict[str, Any] | None, app_name: str, after: datetime | None = None,
+) -> str:
     """Serve's reason, after the engine's own when there is one.
 
     A replica whose engine failed to start reads, from Serve, "Engine core
@@ -214,8 +226,8 @@ async def _failure_with_cause(app: dict[str, Any] | None, app_name: str) -> str:
     0.29. Read from Loki (``logs.engine_root_cause``), it goes first.
     """
     detail = _failure_detail(app)
-    cause = await engine_root_cause(app_name)
-    return f"{cause}. Serve: {detail}" if cause else detail
+    failure = await engine_root_cause(app_name, after=after)
+    return f"{failure.cause}. Serve: {detail}" if failure else detail
 
 
 def _failure_detail(app: dict[str, Any] | None, *, limit: int = 600) -> str:
@@ -966,6 +978,9 @@ class RayDeploymentManager:
             # the copies replace: publishing reads it (route prefix, model TLS).
             observed_now = dict(deployment.observed_status_json or {})
             observed_now["last_run"] = run_result
+            # From here on the engine's output is this run's: an earlier
+            # run's failure is never taken for it (``engine_root_cause``).
+            observed_now["applied_at"] = datetime.now(tz=UTC).isoformat()
             deployment.observed_status_json = observed_now
         else:
             run_result = _reported_run(deployment) or {"app": app_name, "deployed": True, "cached": True}
@@ -1030,21 +1045,22 @@ class RayDeploymentManager:
         )
 
         app_status = ((observed or {}).get("status") or "").upper()
+        applied_at = _applied_at(deployment)
         if app_status == "DEPLOY_FAILED":
             # Terminal on Ray's side (replica startup exhausted its retries):
             # surface why.  Out of the queue until the spec changes or a
             # reconcile is requested (phase FAILED forces a re-apply).
+            cause = await _failure_with_cause(observed, app_name, applied_at)
             self._observe(
-                deployment, DeploymentPhase.FAILED,
-                f"application DEPLOY_FAILED: {await _failure_with_cause(observed, app_name)}".strip(), False,
+                deployment, DeploymentPhase.FAILED, f"application DEPLOY_FAILED: {cause}".strip(), False,
                 observed={"reconciled": False, "reason": "deploy-failed", "app": app_name},
                 config_hash=config_hash,
             )
             return
         if app_status == "UNHEALTHY":
+            cause = await _failure_with_cause(observed, app_name, applied_at)
             self._observe(
-                deployment, DeploymentPhase.DEGRADED,
-                f"application UNHEALTHY: {await _failure_with_cause(observed, app_name)}".strip(), False,
+                deployment, DeploymentPhase.DEGRADED, f"application UNHEALTHY: {cause}".strip(), False,
                 observed={"reconciled": False, "reason": "unhealthy", "app": app_name},
                 mark_observed=False,
                 ready_replicas=ready,
@@ -1119,18 +1135,30 @@ class RayDeploymentManager:
 
         converged, reason = _app_deployment_readiness(observed, want_active=True)
         if not converged:
-            self._observe(
-                deployment, DeploymentPhase.APPLYING,
-                reason, False,
-                observed={
-                    "reconciled": False,
-                    "action": "waiting",
-                    "app": app_name,
-                    "app_status": (observed or {}).get("status"),
-                },
-                mark_observed=False,
-                config_hash=config_hash,
-            )
+            # While no copy is up, the engine's own output says whether a
+            # start already failed -- Serve only says so after three, each
+            # loading the whole model again (fifteen minutes for Qwen3.8).
+            failure = await engine_root_cause(app_name, after=applied_at) if ready < 1 else None
+            if failure is not None and failure.recurs:
+                # It would fail the same way on every attempt: stop now.
+                await self._stop_failed_start(
+                    deployment, facts, client, failure.cause, config_hash=config_hash,
+                )
+            else:
+                retrying = failure is not None and failure.start_failed
+                self._observe(
+                    deployment, DeploymentPhase.APPLYING,
+                    f"A start failed: {failure.cause}. Ray is trying again." if retrying else reason, False,
+                    observed={
+                        "reconciled": False,
+                        "action": "waiting",
+                        "app": app_name,
+                        "app_status": (observed or {}).get("status"),
+                        **({"reason": "start-retrying"} if retrying else {}),
+                    },
+                    mark_observed=False,
+                    config_hash=config_hash,
+                )
             return
 
         # 6. Converged: mark RUNNING, observed, and publish the endpoint.
@@ -1684,6 +1712,37 @@ class RayDeploymentManager:
         except ValueError:
             return False
         return row is not None and row.status != ModelAvailabilityStatus.FAILED.value
+
+    async def _stop_failed_start(
+        self,
+        deployment: InferenceDeployment,
+        facts: "_DeploymentFacts",
+        client: RayClusterClient,
+        cause: str,
+        *,
+        config_hash: str,
+    ) -> None:
+        """Take the app off Serve before its next attempt and say why, as FAILED.
+
+        Out of the queue like any FAILED deployment: a spec change or a
+        requested reconcile applies it again.
+        """
+        try:
+            await client.delete_serve_app(
+                head_node_id=facts.head_node_id,
+                app_name=facts.app_name,
+                runtime_bundle=facts.runtime_bundle_payload,
+            )
+        except RayCommandError as exc:
+            log.warning("Stopping %s after a failed start: %s", facts.app_name, exc.detail)
+        self._observe(
+            deployment, DeploymentPhase.FAILED,
+            f"Start failed: {cause}. Not tried again: this error comes back on every attempt.", False,
+            observed={"reconciled": False, "reason": "start-failed", "app": facts.app_name},
+            config_hash=config_hash,
+            ready_replicas=0,
+            total_replicas=0,
+        )
 
     def _observe(
         self,

@@ -6,12 +6,15 @@ so a page is one query here. It used to be a command to a machine that
 tailed files on demand, with a Loki read in front that ignored which source
 and machine the page asked for. Now the choice is the query:
 
+* ``all`` -- everything the deployment wrote, its copies and its engine,
+  in one stream (the default: nothing is hidden behind a choice);
 * ``serve_replica`` -- Serve's log of the replicas;
 * ``engine`` -- what vLLM's engine printed, where a failed start's root cause
   is (``{source="engine"}``);
 * ``agent`` -- the machines' agents.
 
-and a machine narrows it by the ``host`` label the agents ship under.
+and a machine narrows it by the ``host`` label the agents ship under. Every
+line says which stream and machine it came from, so a page can filter them.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -39,6 +43,17 @@ _WINDOW = timedelta(hours=24)
 #: ``(EngineCore pid=13728) ValueError: There is no module ...``.
 _PREFIXES = re.compile(r"^(?:\([A-Za-z_][\w:.-]* pid=\d+(?:, ip=[\d.]+)?\)\s*)+")
 _EXCEPTION = re.compile(r"^(?P<cause>[A-Za-z_][\w.]*(?:Error|Exception)\b(?::\s.*)?)$")
+#: vLLM saying the engine did not come up (``core.py``), or Serve summing it up.
+_START_FAILED = re.compile(r"EngineCore failed to start|Engine core initialization failed")
+#: Failures that can pass on another attempt: memory a stopping copy still
+#: holds, a busy device or fabric, time running out. Anything else -- an
+#: unsupported model, weights the engine cannot load, a bad setting -- comes
+#: back on every attempt, each of which loads the whole model again.
+_TRANSIENT = re.compile(
+    r"out of memory|OutOfMemory|Free memory on device|CUDA error|NCCL|timed? ?out|Timeout|"
+    r"ConnectionError|Connection refused|temporarily",
+    re.IGNORECASE,
+)
 
 
 def _escape_label(value: str) -> str:
@@ -60,7 +75,10 @@ def log_selector(
     else:
         matchers = ['job="ray-serve"', f'app="{_escape_label(app_name)}"']
         # Streams shipped before the source label existed are the replica's.
-        matchers.append('source="engine"' if source == LogSource.ENGINE else 'source!="engine"')
+        if source == LogSource.ENGINE:
+            matchers.append('source="engine"')
+        elif source != LogSource.ALL:
+            matchers.append('source!="engine"')
         if replica_id:
             matchers.append(f'replica="{_escape_label(replica_id)}"')
     if len(hosts) == 1:
@@ -123,28 +141,60 @@ class RayLogReader:
         )
 
 
-async def engine_root_cause(app_name: str, *, since: timedelta = timedelta(hours=1)) -> str | None:
-    """The last exception vLLM's engine printed for *app_name*, and the machine it was on.
+@dataclass(frozen=True)
+class EngineFailure:
+    """The last exception vLLM's engine printed, and what it means for another attempt."""
+
+    #: ``ValueError: ... (on 10.250.10.71)``.
+    cause: str
+    #: The engine said it did not start (not an exception it lived through).
+    start_failed: bool
+
+    @property
+    def recurs(self) -> bool:
+        """Would another attempt fail the same way? Only a start failure that is not transient."""
+        return self.start_failed and not _TRANSIENT.search(self.cause)
+
+
+async def engine_root_cause(app_name: str, *, after: datetime | None = None) -> EngineFailure | None:
+    """The last exception vLLM's engine printed for *app_name* since *after* (the last hour when not given).
 
     When a replica fails to start, Serve only reports "Engine core
     initialization failed. See root cause above" -- the root cause is in the
     engine's own output, which the agents ship as ``source="engine"``.
     ``None`` when there is none to be found (or Loki cannot be asked): the
-    caller keeps what Serve said.
+    caller keeps what Serve said. Only lines after *after* count, so an
+    earlier run's failure is never taken for this one's.
     """
     selector = log_selector(LogSource.ENGINE, app_name=app_name, hosts=[])
+    start = after or datetime.now(tz=UTC) - timedelta(hours=1)
     try:
         payload = await _query(
-            selector + ' |~ "(Error|Exception)"', limit=200, start=datetime.now(tz=UTC) - since,
+            f'{selector} |~ "(?i)(error|exception|failed to start|initialization failed)"',
+            limit=400,
+            start=start,
         )
     except Exception:  # noqa: BLE001 - the cause is a nicety on top of Serve's message
         log.debug("Engine root cause for %s not read", app_name, exc_info=True)
         return None
-    for line in reversed(_lines_from_loki(payload)):
+    lines = [line for line in _lines_from_loki(payload) if line.ts is None or line.ts >= start]
+    start_failed = any(_START_FAILED.search(line.message) for line in lines)
+
+    def cause_of(line: LogLine) -> str | None:
         match = _EXCEPTION.match(_PREFIXES.sub("", line.message).strip())
         # Serve's own summary is not the cause it points at.
-        if match and "Engine core initialization failed" not in match.group("cause"):
-            return f"{match.group('cause')} (on {line.host})" if line.host else match.group("cause")
+        if not match or _START_FAILED.search(match.group("cause")):
+            return None
+        return f"{match.group('cause')} (on {line.host})" if line.host else match.group("cause")
+
+    # vLLM logs "EngineCore failed to start." and then its traceback: that
+    # start's cause is the first exception after the last such line, not one
+    # the engine printed earlier and lived through.
+    marks = [i for i, line in enumerate(lines) if "EngineCore failed to start" in line.message]
+    candidates = [*lines[marks[-1]:], *reversed(lines[:marks[-1]])] if marks else list(reversed(lines))
+    for line in candidates:
+        if cause := cause_of(line):
+            return EngineFailure(cause=cause, start_failed=start_failed)
     return None
 
 
@@ -184,6 +234,7 @@ def _lines_from_loki(payload: dict[str, Any]) -> list[LogLine]:
                 if isinstance(doc, dict):
                     message = str(doc.get("message") or message)
                     level = str(doc.get("levelname") or level or "").upper() or None
-            out.append(LogLine(ts=ts, level=level, message=message, host=labels.get("host")))
+            source = labels.get("source") or ("agent" if labels.get("job") == "node-agent" else "replica")
+            out.append(LogLine(ts=ts, level=level, message=message, host=labels.get("host"), source=source))
     out.sort(key=lambda line: line.ts)
     return out

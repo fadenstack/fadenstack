@@ -2,7 +2,7 @@
  * Admin → Container Detail page.
  * Shows inspect data, live logs, and exec terminal token.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useOutletContext } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,6 +12,7 @@ import {
   type ContainerDetail,
 } from "~/api/admin";
 import { ClassChip } from "~/components/Chips";
+import LogViewer, { fromText } from "~/components/logs/LogViewer";
 
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -43,10 +44,11 @@ export default function ContainerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
   const [logs, setLogs] = useState<string>("");
+  const [logError, setLogError] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
+  const logLines = useMemo(() => fromText(logs), [logs]);
   const [execId, setExecId] = useState<string | null>(null);
   const [execError, setExecError] = useState<string | null>(null);
-  const logRef = useRef<HTMLPreElement>(null);
 
   async function load() {
     if (!id) return;
@@ -68,13 +70,13 @@ export default function ContainerDetailPage() {
   async function fetchLogs() {
     if (!id) return;
     setLogLoading(true);
+    setLogError(null);
     try {
       const res = await containers.fetchLogs(id, 300);
-      const text = await res.text();
-      setLogs(text);
-      setTimeout(() => logRef.current?.scrollTo(0, logRef.current.scrollHeight), 50);
+      setLogs(await res.text());
     } catch (e: unknown) {
-      setLogs(`${t("container_detail.error_loading_logs")}: ${e instanceof Error ? e.message : String(e)}`);
+      setLogs("");
+      setLogError(`${t("container_detail.error_loading_logs")}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLogLoading(false);
     }
@@ -226,31 +228,18 @@ export default function ContainerDetailPage() {
                 {logLoading ? t("common.loading") : t("dashboard.refresh")}
               </Button>
             </Stack>
-            <Paper
-              variant="outlined"
-              sx={(theme) => ({
-                bgcolor: theme.palette.mode === "dark" ? "grey.900" : "grey.100",
-                p: 2,
-                height: 420,
-                overflow: "auto",
-                borderRadius: 1,
-              })}
-            >
-              <Box
-                component="pre"
-                ref={logRef}
-                sx={{
-                  m: 0,
-                  fontFamily: "monospace",
-                  fontSize: "0.75rem",
-                  color: "success.main",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-all",
-                }}
-              >
-                {logs || t("container_detail.no_logs")}
-              </Box>
-            </Paper>
+            {logError && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {logError}
+              </Alert>
+            )}
+            <LogViewer
+              lines={logLines}
+              loading={logLoading}
+              empty={t("container_detail.no_logs")}
+              maxHeight={420}
+              downloadName={`${detail.name}.log`}
+            />
           </Box>
         )}
 

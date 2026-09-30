@@ -2720,12 +2720,6 @@
       "col_ready": "Bereit",
       "col_pending": "Ausstehend",
       "logs": "Protokolle",
-      "log_source": "Quelle",
-      "log_replicas": "Bereitstellungskopien",
-      "log_engine": "Engine (vLLM)",
-      "log_agent": "Maschinen-Agent",
-      "log_all_machines": "Alle Maschinen",
-      "log_machine": "Maschine",
       "log_tail": "Zeilen",
       "fetch": "Abrufen",
       "truncated_one": "Auf die letzte {{count}} Zeile gekürzt.",
@@ -2758,7 +2752,8 @@
       "traffic_window_one": "Am Gateway gemessen, letzte Minute",
       "traffic_window_other": "Am Gateway gemessen, letzte {{count}} Minuten",
       "engine_reported": "Von der Engine gemeldet",
-      "page_title": "Bereitstellung"
+      "page_title": "Bereitstellung",
+      "show_in_logs": "Fehler anzeigen"
     },
     "engine": {
       "title": "Engine-Einstellungen",
@@ -3228,6 +3223,27 @@
       "action_fit": "Wählen Sie einen Cluster: Jedes Modell zeigt, ob und wie es passt.",
       "action_host": "Stellen Sie ein Modell bereit: Cluster, Größe jeder Kopie und vLLM-Einstellungen wählen.",
       "action_manage": "Auf diesem Server: Downloads verfolgen, Modelle aus einem Pfad hinzufügen, Nicht-mehr-Benötigtes löschen."
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Fehler",
+      "warning": "Warnungen",
+      "info": "Info",
+      "debug": "Debug",
+      "other": "Sonstige"
+    },
+    "search": "Zeilen durchsuchen",
+    "follow": "Neuen Zeilen folgen",
+    "copy": "Angezeigte Zeilen kopieren",
+    "download": "Angezeigte Zeilen herunterladen",
+    "empty": "Noch keine Logzeilen.",
+    "nothing_matches": "Keine Zeile passt zu den Filtern.",
+    "source": {
+      "replica": "Modellbereitstellung",
+      "engine": "Engine (vLLM)",
+      "agent": "Systemprotokoll",
+      "container": "Modell-Container"
     }
   }
 }

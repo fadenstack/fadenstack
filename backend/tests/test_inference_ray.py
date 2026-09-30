@@ -1287,6 +1287,60 @@ async def test_deployment_deploy_failed_surfaces_ray_message(
     assert "Engine core initialization failed" in dep.phase_message
 
 
+def _serve_starting(app_name: str) -> dict[str, Any]:
+    """Serve still starting the first copy: DEPLOYING, none ready."""
+    status = _serve_status(app_name, app_status="DEPLOYING")
+    for entry in status["serve"]["apps"][app_name]["deployments"].values():
+        entry.update(status="UPDATING", num_replicas_ready=0, num_replicas_pending=1)
+    return status
+
+
+@pytest.mark.parametrize(
+    ("cause", "stops"),
+    [
+        ("ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)", True),
+        ("ValueError: Free memory on device cuda:0 (1.6/121.69 GiB) on startup is less than desired (on 10.250.10.71)",
+         False),
+    ],
+    ids=["comes-back-every-time", "can-pass"],
+)
+async def test_a_failed_start_is_said_at_once_and_stopped_when_it_would_recur(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch, cause: str, stops: bool,
+) -> None:
+    """Serve tries three times, each loading the whole model, and says why only after the third."""
+    from faden_backend.services.inference.drivers.ray import deployment as deployment_mod
+    from faden_backend.services.inference.drivers.ray.logs import EngineFailure
+
+    _fast_readiness(monkeypatch)
+
+    async def failed(app_name: str, *, after: Any = None) -> EngineFailure:
+        assert after is not None, "only this run's output counts"
+        return EngineFailure(cause=cause, start_failed=True)
+
+    monkeypatch.setattr(deployment_mod, "engine_root_cause", failed)
+    dep, _node = deployment_env
+    app = f"faden-{dep.id}"
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: _serve_starting(app),
+            NodeCommandType.DELETE_SERVE_APP.value: {"deleted": True},
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    deleted = fake.by_type(NodeCommandType.DELETE_SERVE_APP.value)
+    if stops:
+        assert dep.phase == "failed" and len(deleted) == 1
+        assert dep.phase_message.startswith("Start failed: ValueError: There is no module")
+        assert "Not tried again" in dep.phase_message
+    else:
+        assert dep.phase == "applying" and deleted == []
+        assert dep.phase_message.startswith("A start failed: ValueError: Free memory")
+        assert "trying again" in dep.phase_message
+
+
 async def test_deployment_run_timeout_stays_applying(
     deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:

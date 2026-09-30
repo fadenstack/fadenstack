@@ -351,8 +351,8 @@ export interface InferenceEndpoint {
 // Observability (mirrors the WI-1 DTOs)
 // ---------------------------------------------------------------------------
 
-/** Serving copies (Serve's log), the inference engine's own output, or the machines' agents. */
-export type LogSource = "serve_replica" | "engine" | "agent" | "runtime_container";
+/** All of a deployment, its serving copies (Serve's log), the inference engine's own output, or the machines' agents. */
+export type LogSource = "all" | "serve_replica" | "engine" | "agent" | "runtime_container";
 
 export interface LogLine {
   ts: string | null;
@@ -360,6 +360,8 @@ export interface LogLine {
   message: string;
   /** The machine it was written on, when a page spans several. */
   host?: string | null;
+  /** Which stream: replica (Serve), engine (vLLM) or agent. */
+  source?: string | null;
 }
 
 export interface LogPage {

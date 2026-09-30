@@ -32,11 +32,11 @@ import type {
   InferenceEndpoint,
   InferenceEnvironment,
   LogPage,
-  LogSource,
 } from "~/api/inference";
 import { models as modelsApi, type Model } from "~/api/llm";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
 import { FormDialog } from "~/components/FormDialog";
+import LogViewer, { LOG_LEVELS, type LogLevel } from "~/components/logs/LogViewer";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -48,7 +48,6 @@ import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
 import Link from "@mui/material/Link";
-import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -490,9 +489,9 @@ export default function InferenceDeploymentDetailPage() {
   const [chatInput, setChatInput] = useState("");
 
   // --- Logs ---------------------------------------------------------------
-  const [logSource, setLogSource] = useState<LogSource>("serve_replica");
-  const [logNodeId, setLogNodeId] = useState("");
-  const [logTail, setLogTail] = useState(200);
+  const [logTail, setLogTail] = useState(500);
+  const [logLevels, setLogLevels] = useState<LogLevel[]>(LOG_LEVELS);
+  const logsCard = useRef<HTMLDivElement | null>(null);
   const [logPage, setLogPage] = useState<LogPage | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
@@ -515,17 +514,14 @@ export default function InferenceDeploymentDetailPage() {
     [data.nodes],
   );
 
+  // All of the deployment -- Serve and the engine, on every machine -- in
+  // one stream; which part to read is a filter in the viewer, not a query.
   const loadLogs = useCallback(async () => {
     if (!id) return;
     setLogLoading(true);
     setLogError(null);
     try {
-      const page = await inferenceApi.deploymentLogs(id, {
-        source: logSource,
-        node_id: logNodeId || undefined,
-        tail: logTail,
-      });
-      setLogPage(page);
+      setLogPage(await inferenceApi.deploymentLogs(id, { source: "all", tail: logTail }));
     } catch (err: unknown) {
       // A driver that cannot serve logs answers 501; say so rather than
       // showing an empty log view that reads as "nothing happened".
@@ -534,43 +530,28 @@ export default function InferenceDeploymentDetailPage() {
     } finally {
       setLogLoading(false);
     }
-  }, [id, logSource, logNodeId, logTail]);
+  }, [id, logTail]);
 
   useEffect(() => {
     void loadLogs();
   }, [loadLogs]);
 
-  /**
-   * Make "the next refresh should show it" true.
-   *
-   * A cold read has nothing cached, so the backend starts a fetch on the node
-   * and answers with whatever it has -- which on the first load is nothing,
-   * plus a note saying the fetch is still running. The page then never asked
-   * again, so that note was the final state: an operator opening a deployment
-   * saw "the node has not answered within 30s" and sat there.
-   *
-   * So when a page comes back empty *and* still in flight, try again a few
-   * times. Bounded, and only for that case: a genuinely empty log is not a
-   * reason to keep polling a node.
-   */
-  const emptyAndPending =
-    logPage !== null && logPage.lines.length === 0 && Boolean(logPage.detail);
-  const [logRetries, setLogRetries] = useState(0);
-
+  // A deployment that is starting is watched as it starts.
+  const starting = ["pending", "preparing", "applying"].includes(deployment?.phase ?? "");
   useEffect(() => {
-    // Reset the budget whenever the operator changes what they are asking for.
-    setLogRetries(0);
-  }, [id, logSource, logNodeId, logTail]);
+    if (!starting) return;
+    const timer = window.setInterval(() => void loadLogs(), 5_000);
+    return () => window.clearInterval(timer);
+  }, [starting, loadLogs]);
 
-  useEffect(() => {
-    if (!emptyAndPending || logLoading || logRetries >= 4) return;
-    const timer = setTimeout(() => {
-      setLogRetries((n) => n + 1);
-      void loadLogs();
-    }, 3_000);
-    return () => clearTimeout(timer);
-  }, [emptyAndPending, logLoading, logRetries, loadLogs]);
-
+  // A failed start, or one Ray is trying again: said at the top, with the way to its lines.
+  const failureReason = asText(observation.reason);
+  const startFailure =
+    deployment?.phase === "failed" || failureReason === "start-retrying" ? deployment?.phase_message : null;
+  function showErrorsInLogs() {
+    setLogLevels(["error"]);
+    logsCard.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function runAction(key: string, action: () => Promise<unknown>) {
     setBusy(key);
@@ -742,6 +723,21 @@ export default function InferenceDeploymentDetailPage() {
           </Button>
         )}
       </Stack>
+
+      {/* --- why it did not start --------------------------------------- */}
+      {startFailure && (
+        <Alert
+          severity={deployment.phase === "failed" ? "error" : "warning"}
+          data-testid="start-failure"
+          action={
+            <Button color="inherit" size="small" onClick={showErrorsInLogs}>
+              {t("inference.detail.show_in_logs")}
+            </Button>
+          }
+        >
+          {startFailure}
+        </Alert>
+      )}
 
       {/* --- 1, 2, 3, 9: health, replicas, environment, reconcile -------- */}
       <Card variant="outlined">
@@ -1154,118 +1150,44 @@ export default function InferenceDeploymentDetailPage() {
       </Card>
 
       {/* --- 7: logs ------------------------------------------------------ */}
-      <Card variant="outlined">
+      <Card variant="outlined" ref={logsCard}>
         <CardContent>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ mb: 1 }}
-          >
-            <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-              {t("inference.detail.logs")}
-            </Typography>
-            <TextField
-              select
-              size="small"
-              label={t("inference.detail.log_source")}
-              value={logSource}
-              sx={{ minWidth: 180 }}
-              onChange={(e) => setLogSource(e.target.value as LogSource)}
-            >
-              <MenuItem value="serve_replica">{t("inference.detail.log_replicas")}</MenuItem>
-              <MenuItem value="engine">{t("inference.detail.log_engine")}</MenuItem>
-              <MenuItem value="agent">{t("inference.detail.log_agent")}</MenuItem>
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label={t("inference.detail.log_machine")}
-              value={logNodeId}
-              sx={{ minWidth: 180 }}
-              onChange={(e) => setLogNodeId(e.target.value)}
-            >
-              <MenuItem value="">{t("inference.detail.log_all_machines")}</MenuItem>
-              {data.members.map((member) => (
-                <MenuItem key={member.node_id} value={member.node_id}>
-                  {nodeHost(member.node_id)} ({roleLabel(member.role)})
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              size="small"
-              type="number"
-              label={t("inference.detail.log_tail")}
-              value={logTail}
-              sx={{ width: 110 }}
-              slotProps={{ htmlInput: { min: 1, max: 5000 } }}
-              onChange={(e) =>
-                setLogTail(
-                  Math.max(1, Math.min(5000, Number(e.target.value) || 200)),
-                )
-              }
-            />
-            <Button
-              size="small"
-              startIcon={<RefreshIcon />}
-              disabled={logLoading}
-              onClick={() => void loadLogs()}
-            >
-              {t("inference.detail.fetch")}
-            </Button>
-          </Stack>
-
-          {logError && <Alert severity="warning">{logError}</Alert>}
-
-          {logLoading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : logPage && logPage.lines.length > 0 ? (
-            <>
-              {logPage.truncated && (
-                <Typography variant="caption" color="text.secondary">
-                  {t("inference.detail.truncated", { count: logTail })}
-                </Typography>
-              )}
-              <Box
-                component="pre"
-                sx={{
-                  mt: 1,
-                  p: 1.5,
-                  maxHeight: 420,
-                  overflow: "auto",
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                  fontFamily: "monospace",
-                  fontSize: 12,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {logPage.lines
-                  .map((line) =>
-                    [
-                      line.ts ? new Date(line.ts).toISOString() : "",
-                      // Which machine, when the page is all of them.
-                      !logNodeId && line.host
-                        ? `[${nodeLabel(data.nodes.find((n) => n.host === line.host), line.host)}]`
-                        : "",
-                      line.level ?? "",
-                      line.message,
-                    ]
-                      .filter(Boolean)
-                      .join("  "),
-                  )
-                  .join("\n")}
-              </Box>
-            </>
-          ) : (
-            // An empty page carries its own reason, so "nothing logged" and
-            // "the node never answered" never look the same.
-            <Typography variant="body2" color="text.secondary">
-              {logPage?.detail ?? t("inference.detail.no_log_lines")}
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            {t("inference.detail.logs")}
+          </Typography>
+          {logError && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              {logError}
+            </Alert>
+          )}
+          <LogViewer
+            lines={logPage?.lines ?? []}
+            loading={logLoading}
+            empty={logPage?.detail ?? t("inference.detail.no_log_lines")}
+            hostLabel={(host) => nodeLabel(data.nodes.find((n) => n.host === host), host)}
+            levels={logLevels}
+            onLevelsChange={setLogLevels}
+            downloadName={`${deployment.name}.log`}
+            toolbar={
+              <>
+                <TextField
+                  size="small"
+                  type="number"
+                  label={t("inference.detail.log_tail")}
+                  value={logTail}
+                  sx={{ width: 100 }}
+                  slotProps={{ htmlInput: { min: 1, max: 5000 } }}
+                  onChange={(e) => setLogTail(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
+                />
+                <Button size="small" startIcon={<RefreshIcon />} disabled={logLoading} onClick={() => void loadLogs()}>
+                  {t("inference.detail.fetch")}
+                </Button>
+              </>
+            }
+          />
+          {logPage?.truncated && (
+            <Typography variant="caption" color="text.secondary">
+              {t("inference.detail.truncated", { count: logTail })}
             </Typography>
           )}
         </CardContent>

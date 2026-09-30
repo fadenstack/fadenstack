@@ -2720,12 +2720,6 @@
       "col_ready": "Prêtes",
       "col_pending": "En attente",
       "logs": "Journaux",
-      "log_source": "Source",
-      "log_replicas": "Copies en service",
-      "log_engine": "Moteur (vLLM)",
-      "log_agent": "Agent de la machine",
-      "log_all_machines": "Toutes les machines",
-      "log_machine": "Machine",
       "log_tail": "Lignes",
       "fetch": "Récupérer",
       "truncated_one": "Tronqué à la dernière {{count}} ligne.",
@@ -2758,7 +2752,8 @@
       "traffic_window_one": "Mesuré à la passerelle, dernière minute",
       "traffic_window_other": "Mesuré à la passerelle, {{count}} dernières minutes",
       "engine_reported": "Remonté par le moteur",
-      "page_title": "Déploiement"
+      "page_title": "Déploiement",
+      "show_in_logs": "Afficher les erreurs"
     },
     "engine": {
       "title": "Réglages du moteur",
@@ -3228,6 +3223,27 @@
       "action_fit": "Choisissez un cluster : chaque modèle indique s'il tient, et comment.",
       "action_host": "Hébergez un modèle : choisissez le cluster, la taille de chaque copie et les réglages de vLLM.",
       "action_manage": "Sur ce serveur : suivez les téléchargements, ajoutez des modèles depuis un chemin, supprimez ce qui ne sert plus."
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Erreurs",
+      "warning": "Avertissements",
+      "info": "Info",
+      "debug": "Débogage",
+      "other": "Autres"
+    },
+    "search": "Rechercher dans les lignes",
+    "follow": "Suivre les nouvelles lignes",
+    "copy": "Copier les lignes affichées",
+    "download": "Télécharger les lignes affichées",
+    "empty": "Aucune ligne de journal pour l’instant.",
+    "nothing_matches": "Aucune ligne ne correspond aux filtres.",
+    "source": {
+      "replica": "Service du modèle",
+      "engine": "Moteur (vLLM)",
+      "agent": "Journal système",
+      "container": "Conteneurs de modèles"
     }
   }
 }
