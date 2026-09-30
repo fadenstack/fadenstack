@@ -350,7 +350,7 @@ export const environmentMetricsPartial: EnvironmentMetrics = {
 };
 
 export const logPage: LogPage = {
-  source: "runtime_container",
+  source: "serve_replica",
   node_id: HEAD_NODE_ID,
   replica_id: null,
   lines: [
@@ -372,7 +372,7 @@ export const logPage: LogPage = {
 
 /** An empty page that says why, so silence never reads as health. */
 export const logPageUnreachable: LogPage = {
-  source: "runtime_container",
+  source: "serve_replica",
   node_id: HEAD_NODE_ID,
   replica_id: null,
   lines: [],

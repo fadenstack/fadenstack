@@ -351,12 +351,15 @@ export interface InferenceEndpoint {
 // Observability (mirrors the WI-1 DTOs)
 // ---------------------------------------------------------------------------
 
-export type LogSource = "runtime_container" | "serve_replica" | "agent";
+/** Serving copies (Serve's log), the inference engine's own output, or the machines' agents. */
+export type LogSource = "serve_replica" | "engine" | "agent" | "runtime_container";
 
 export interface LogLine {
   ts: string | null;
   level: string | null;
   message: string;
+  /** The machine it was written on, when a page spans several. */
+  host?: string | null;
 }
 
 export interface LogPage {

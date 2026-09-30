@@ -39,7 +39,7 @@ TLS next, see [Connections and TLS](connections-and-tls.md).
 | **Commands** | Every command the server sends a machine is signed (HMAC-SHA256, keyed by the machine's credential); agents 0.1.15 and later refuse one without a valid signature. |
 | **Model traffic** | The gateway reaches the models on the machines over mutual TLS: each machine runs nginx in front of its models, which accepts only the gateway's certificate. Agents 0.1.16 and later (0.1.17 for a vLLM found running); its own certificate authority, kept by the backend, renewed and rotated automatically. On whether HTTPS is on or not. |
 | **Ray** | Between a cluster's machines: authenticated with the cluster's token, and mutual TLS with the cluster's own CA once its **Traffic between machines** switch is on (agents 0.1.18). |
-| **Logs** | The machines push their logs through nginx and the backend (agents 0.1.17), never straight to Loki. |
+| **Logs** | The machines push their logs through nginx and the backend (agents 0.1.17), never straight to Loki. A line the server did not take is sent again from the machine's own log files (agents 0.2.4). |
 | **New machines** | The install line pins the server's authority by its SHA-256 fingerprint; a mismatch stops it before anything is downloaded or run. |
 | **Renewal** | Daily and automatic. Certificates made on the server are issued again 30 days before they run out; yours are taken again from the files your tooling renews. Renewing does not interrupt the machines. |
 | **Warnings** | `faden tls status`, `faden doctor`, and the console's dashboard before a certificate runs out. |
@@ -62,7 +62,7 @@ With HTTPS on:
 | API clients to `/v1` (chat, embeddings, streaming) | Yes | A POST to the plain-HTTP port is redirected with `307`, which keeps the method and the body. |
 | Agents to the server: control stream (WebSocket), enrollment, credential rotation | Yes | Verified against the server's authority or the public roots; never falls back to plain HTTP. |
 | Agents downloading models and runtime images from the server | Yes | Same connection and verification as the stream. |
-| Grafana through the console (`/grafana/`) | Yes | The dashboard's embedded panel goes through nginx. |
+| Grafana through the console (`/grafana/`) | Yes, and signed in | Only for a console session allowed to read observability data: nginx asks the backend before every request. Grafana's anonymous viewer can query any data source, so before this anyone who reached the port could read every log and metric. |
 | Grafana's own port `3001`, Langfuse `3002` | Not on the network | Plain HTTP, published on `127.0.0.1` only by default; the console reaches Grafana at `/grafana/`. `GRAFANA_BIND` / `LANGFUSE_BIND` publish them. |
 | The gateway to the models on the machines (Ray Serve, and vLLM that Fadenstack starts) | Yes, mutual TLS | Agents 0.1.16 and later; a cluster from before is moved with one button (see [Model traffic](#model-traffic-the-gateway-and-the-machines)). Independent of HTTPS on the front door. |
 | The gateway to a vLLM Fadenstack found running and did not start | Yes, mutual TLS | Through the machine's proxy (agents 0.1.17). The server's own port stays open: Fadenstack did not start it and does not close it. |

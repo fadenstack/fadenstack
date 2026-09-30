@@ -80,6 +80,7 @@ from faden_backend.services.inference.bundles import (
     default_bundle_registry,
     translate_host_path_to_container,
 )
+from faden_backend.services.inference.drivers.ray.logs import engine_root_cause
 from faden_backend.services.inference.drivers.ray.client import (
     RayClusterClient,
     RayCommandError,
@@ -201,6 +202,20 @@ def _reported_route_prefix(deployment: Any) -> str | None:
         return None
     # "/" means the app is at the root; the endpoint path is appended as-is.
     return "" if prefix == "/" else prefix.rstrip("/")
+
+
+async def _failure_with_cause(app: dict[str, Any] | None, app_name: str) -> str:
+    """Serve's reason, after the engine's own when there is one.
+
+    A replica whose engine failed to start reads, from Serve, "Engine core
+    initialization failed. See root cause above" -- and the root cause is
+    only in the engine's output: ``ValueError: There is no module or
+    parameter named 'ngram_embedding.weight_scale'`` for Qwen3.8 on vLLM
+    0.29. Read from Loki (``logs.engine_root_cause``), it goes first.
+    """
+    detail = _failure_detail(app)
+    cause = await engine_root_cause(app_name)
+    return f"{cause}. Serve: {detail}" if cause else detail
 
 
 def _failure_detail(app: dict[str, Any] | None, *, limit: int = 600) -> str:
@@ -1017,11 +1032,11 @@ class RayDeploymentManager:
         app_status = ((observed or {}).get("status") or "").upper()
         if app_status == "DEPLOY_FAILED":
             # Terminal on Ray's side (replica startup exhausted its retries):
-            # surface Ray's message.  Out of the queue until the spec changes
-            # or a reconcile is requested (phase FAILED forces a re-apply).
+            # surface why.  Out of the queue until the spec changes or a
+            # reconcile is requested (phase FAILED forces a re-apply).
             self._observe(
                 deployment, DeploymentPhase.FAILED,
-                f"application DEPLOY_FAILED: {_failure_detail(observed)}".strip(), False,
+                f"application DEPLOY_FAILED: {await _failure_with_cause(observed, app_name)}".strip(), False,
                 observed={"reconciled": False, "reason": "deploy-failed", "app": app_name},
                 config_hash=config_hash,
             )
@@ -1029,7 +1044,7 @@ class RayDeploymentManager:
         if app_status == "UNHEALTHY":
             self._observe(
                 deployment, DeploymentPhase.DEGRADED,
-                f"application UNHEALTHY: {_failure_detail(observed)}".strip(), False,
+                f"application UNHEALTHY: {await _failure_with_cause(observed, app_name)}".strip(), False,
                 observed={"reconciled": False, "reason": "unhealthy", "app": app_name},
                 mark_observed=False,
                 ready_replicas=ready,

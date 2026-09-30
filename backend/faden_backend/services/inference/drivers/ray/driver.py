@@ -20,7 +20,6 @@ from faden_backend.services.inference.drivers.ray.client import (
     _INTERACTIVE_PROBE_BUDGET_SEC,
     RayClusterClient,
 )
-from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 from faden_backend.services.inference.drivers.ray.logs import RayLogReader
 from faden_backend.services.inference.observability import (
     DeploymentMetrics,
@@ -28,7 +27,6 @@ from faden_backend.services.inference.observability import (
     LogPage,
     LogSource,
     MetricsPartial,
-    ObservabilityUnsupported,
     ReplicaMetrics,
     ScrapeTarget,
 )
@@ -250,7 +248,7 @@ class RayDriver(InferenceDriver):
         session: "AsyncSession",
         deployment: Any,
         *,
-        source: LogSource = LogSource.RUNTIME_CONTAINER,
+        source: LogSource = LogSource.SERVE_REPLICA,
         node_id: str | None = None,
         replica_id: str | None = None,
         tail: int = 200,
@@ -258,35 +256,20 @@ class RayDriver(InferenceDriver):
         cursor: str | None = None,
         node_control: object | None = None,
     ) -> LogPage:
-        """Read normalized logs for *deployment* (Phase 6, "Logs")."""
-        if source == LogSource.AGENT:
-            raise ObservabilityUnsupported(self.key, "agent logs")
-        if node_control is None:
-            return LogPage(
-                source=source,
-                detail="no node control service available; cannot reach the node",
-            )
+        """Read normalized logs for *deployment* from Loki (Phase 6, "Logs").
 
-        environment, head_node_id, app_name = await self._deployment_context(session, deployment)
-        if head_node_id is None:
-            return LogPage(source=source, detail="environment has no head node bound")
+        The cluster's machines, or the one *node_id* names: a page is theirs
+        by the ``host`` label the agents ship under.
+        """
+        from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO  # noqa: PLC0415
 
-        reader = RayLogReader(NodeCommandGateway(node_control))
-        return await reader.read(
-            deployment,
-            source=source,
-            head_node_id=head_node_id,
-            app_name=app_name,
-            node_id=node_id,
-            replica_id=replica_id,
-            tail=tail,
-            since=since,
-            # The node the reader will actually address -- a replica log lives
-            # on the node hosting that replica, which need not be the head and
-            # need not run the same image.
-            runtime_bundle=await self._runtime_bundle_payload_for(
-                session, environment, node_id or head_node_id
-            ),
+        environment, _head_node_id, app_name = await self._deployment_context(session, deployment)
+        members = await EnvironmentNodeDAO(session).machines(environment.id) if environment is not None else []
+        hosts = [str(node.host) for node in members if node_id is None or str(node.id) == node_id]
+        if not hosts:
+            return LogPage(source=source, detail="no machine of this deployment's cluster to read")
+        return await RayLogReader().read(
+            deployment, source=source, app_name=app_name, hosts=hosts, replica_id=replica_id, tail=tail,
         )
 
     async def deployment_metrics(

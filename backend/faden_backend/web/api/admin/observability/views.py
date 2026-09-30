@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.users import User
@@ -68,6 +68,24 @@ def _parse_range(
             detail=f"Time range cannot exceed {MAX_RANGE_DAYS} days",
         )
     return start, end
+
+
+# ── Grafana access ────────────────────────────────────────────────
+
+
+@router.get("/grafana-access", status_code=204, include_in_schema=False, name="observability_grafana_access")
+async def grafana_access(
+    _user: Annotated[User, Depends(require_permission("observability", "read"))],
+) -> Response:
+    """204 for a console session allowed to read observability data.
+
+    nginx asks before every ``/grafana/`` request (``auth_request``).
+    Grafana's anonymous viewer may query any data source through
+    ``/grafana/api/ds/query``; with nothing in front of it, whoever reached
+    the console's port read every log in Loki and every metric in
+    Prometheus, past the console's permissions.
+    """
+    return Response(status_code=204)
 
 
 # ── Summary ───────────────────────────────────────────────────────

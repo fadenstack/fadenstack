@@ -489,7 +489,7 @@ export default function InferenceDeploymentDetailPage() {
   const [chatInput, setChatInput] = useState("");
 
   // --- Logs ---------------------------------------------------------------
-  const [logSource, setLogSource] = useState<LogSource>("runtime_container");
+  const [logSource, setLogSource] = useState<LogSource>("serve_replica");
   const [logNodeId, setLogNodeId] = useState("");
   const [logTail, setLogTail] = useState(200);
   const [logPage, setLogPage] = useState<LogPage | null>(null);
@@ -1167,8 +1167,9 @@ export default function InferenceDeploymentDetailPage() {
               sx={{ minWidth: 180 }}
               onChange={(e) => setLogSource(e.target.value as LogSource)}
             >
-              <MenuItem value="runtime_container">{t("inference.detail.log_runtime")}</MenuItem>
-              <MenuItem value="serve_replica">{t("inference.detail.log_replica")}</MenuItem>
+              <MenuItem value="serve_replica">{t("inference.detail.log_replicas")}</MenuItem>
+              <MenuItem value="engine">{t("inference.detail.log_engine")}</MenuItem>
+              <MenuItem value="agent">{t("inference.detail.log_agent")}</MenuItem>
             </TextField>
             <TextField
               select
@@ -1178,7 +1179,7 @@ export default function InferenceDeploymentDetailPage() {
               sx={{ minWidth: 180 }}
               onChange={(e) => setLogNodeId(e.target.value)}
             >
-              <MenuItem value="">{t("inference.detail.log_head")}</MenuItem>
+              <MenuItem value="">{t("inference.detail.log_all_machines")}</MenuItem>
               {data.members.map((member) => (
                 <MenuItem key={member.node_id} value={member.node_id}>
                   {nodeHost(member.node_id)} ({roleLabel(member.role)})
@@ -1240,6 +1241,10 @@ export default function InferenceDeploymentDetailPage() {
                   .map((line) =>
                     [
                       line.ts ? new Date(line.ts).toISOString() : "",
+                      // Which machine, when the page is all of them.
+                      !logNodeId && line.host
+                        ? `[${nodeLabel(data.nodes.find((n) => n.host === line.host), line.host)}]`
+                        : "",
                       line.level ?? "",
                       line.message,
                     ]

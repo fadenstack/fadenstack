@@ -9,9 +9,13 @@ use for their WebSocket stream, so no additional secrets are needed.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import logging
 import os
 import re
+import time
 import uuid
 from urllib.parse import urlsplit
 from pathlib import Path
@@ -196,26 +200,58 @@ def stamp_streams(payload: Any, host: str) -> dict[str, Any]:
     return {"streams": streams}
 
 
+#: A push's credential, once verified, is taken for this long without asking
+#: the database again: every machine pushes every few seconds, and each push
+#: opened a session to check the same credential. Only log pushes: a revoked
+#: credential can go on sending logs for at most this long, nothing else.
+_PUSH_AUTH_TTL_SEC = 60.0
+_push_auth: dict[str, tuple[str, float]] = {}
+#: Above this a push is parsed off the event loop, so a large backlog being
+#: sent cannot hold up the requests around it.
+_PARSE_INLINE_BYTES = 64 * 1024
+
+
+async def _push_sender(request: Request) -> str:
+    """The ``host`` of the machine a log push comes from (its verified credential)."""
+    key = hashlib.sha256((request.headers.get("authorization") or "").encode()).hexdigest()
+    cached = _push_auth.get(key)
+    if cached is not None and cached[1] > time.monotonic():
+        return cached[0]
+    node = await _authenticate_node(request)
+    host = str(node.host or node.agent_id)
+    if len(_push_auth) > 1024:  # a bound, not an eviction policy: machines are few
+        _push_auth.clear()
+    _push_auth[key] = (host, time.monotonic() + _PUSH_AUTH_TTL_SEC)
+    return host
+
+
+def _stamped_body(body: bytes, host: str) -> bytes:
+    return json.dumps(stamp_streams(json.loads(body or b"{}"), host)).encode()
+
+
 @router.post(LOG_PUSH_BASE.removeprefix("/api/node-files") + "/loki/api/v1/push", name="node_log_push")
 async def node_log_push(
     request: Request,
-    node: InfraNode = Depends(_authenticate_node),
+    host: str = Depends(_push_sender),
 ) -> Response:
     """A machine's log push, forwarded to Loki on the server."""
-    import json  # noqa: PLC0415
-
     body = await request.body()
     if len(body) > _MAX_LOG_PUSH:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Log push too large.")
     try:
-        payload = stamp_streams(json.loads(body or b"{}"), str(node.host or node.agent_id))
+        if len(body) > _PARSE_INLINE_BYTES:
+            stamped = await asyncio.to_thread(_stamped_body, body, host)
+        else:
+            stamped = _stamped_body(body, host)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     base = settings.loki_base_url.rstrip("/")
     try:
-        answer = await _loki_client().post(f"{base}/loki/api/v1/push", json=payload)
-    except Exception as exc:  # noqa: BLE001 - the agent retries on its next flush
-        log.warning("Forwarding logs from %s to Loki failed: %s", node.host, exc)
+        answer = await _loki_client().post(
+            f"{base}/loki/api/v1/push", content=stamped, headers={"Content-Type": "application/json"},
+        )
+    except Exception as exc:  # noqa: BLE001 - the agent sends them again on its next pass
+        log.warning("Forwarding logs from %s to Loki failed: %s", host, exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Loki is not reachable.") from exc
     if answer.status_code >= 300:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Loki answered {answer.status_code}.")

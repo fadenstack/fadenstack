@@ -107,6 +107,28 @@ The check gives one of these verdicts:
 A model that brings its own code (`auto_map`, `trust-remote-code`) is not
 judged by the lists. If Hugging Face cannot be reached, nothing is refused.
 
+## Reading a deployment's logs
+
+A deployment's page shows its logs from Loki, where the machines ship them
+as they are written. Choose what to read:
+
+- **Serving copies**: Serve's log of the model's copies. Use it to see a
+  copy start, get ready, or be stopped.
+- **Engine (vLLM)**: what the inference engine itself printed. When a model
+  fails to start, Serve only says "Engine core initialization failed. See
+  root cause above". The root cause is here, for example
+  `ValueError: There is no module or parameter named 'ngram_embedding.weight_scale'`.
+- **Machine agent**: the log of the agent on each machine.
+
+**Machine** narrows the page to one machine; **All machines** marks each line
+with the machine that wrote it. A deployment that fails to start puts the
+engine's error first in its **Last message**, so the reason is on the page
+without opening the logs.
+
+The machines keep sending what the server has not taken yet: nothing is lost
+while the server restarts or Loki is down (agents 0.2.4). A page looks back
+24 hours; older lines are in Grafana, under **Observability**.
+
 ## Where the machines get models
 
 By default the server downloads a model and each machine of the cluster
