@@ -26,6 +26,8 @@ interface Props {
   onModelChange: (alias: string) => void;
   onSessionCreated: (session: ChatSession) => void;
   onSessionUpdated: (session: ChatSession) => void;
+  /** Whether a reply is being written in this chat, for the sidebar. */
+  onWritingChange?: (sessionId: string, writing: boolean) => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   languages: UiLanguage[];
@@ -46,6 +48,7 @@ export default function ChatWindow({
   onModelChange,
   onSessionCreated,
   onSessionUpdated,
+  onWritingChange,
   onToggleSidebar,
   sidebarOpen,
   languages,
@@ -119,6 +122,28 @@ export default function ChatWindow({
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // The sidebar marks the chat while its reply is written; it goes on when
+  // the user moves to another chat.
+  useEffect(() => {
+    if (isStreaming && sessionId) onWritingChange?.(sessionId, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming, sessionId]);
+
+  // Back to the tab, or back online: a reply that was being written is read
+  // again (a phone suspends a page and its connection).
+  useEffect(() => {
+    const catchUp = () => {
+      if (document.visibilityState !== "visible" || isStreaming) return;
+      if (messages[messages.length - 1]?.status === "running") void loadHistory();
+    };
+    document.addEventListener("visibilitychange", catchUp);
+    window.addEventListener("online", catchUp);
+    return () => {
+      document.removeEventListener("visibilitychange", catchUp);
+      window.removeEventListener("online", catchUp);
+    };
+  }, [isStreaming, messages, loadHistory]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {

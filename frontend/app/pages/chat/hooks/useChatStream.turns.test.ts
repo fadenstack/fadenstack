@@ -116,6 +116,58 @@ describe("useChatStream", () => {
     expect(result.current.messages.at(-1)).toMatchObject({ id: "turn-1", content: "Half", status: "stopped" });
   });
 
+  it("reads the reply again when the connection went but the reply goes on", async () => {
+    api.streamChat.mockReturnValue(stream([{ turn_id: "turn-1", content: "Hel" }], new TypeError("network error")));
+    api.listMessages
+      .mockResolvedValueOnce([message("u1", "user", "hi"), message("turn-1", "assistant", "Hel", { status: "running" })])
+      .mockResolvedValueOnce([message("u1", "user", "hi"), message("turn-1", "assistant", "Hello")]);
+    api.resumeStream.mockReturnValue(stream([{ content: "Hello" }]));
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("hi", "m"));
+
+    expect(api.resumeStream).toHaveBeenCalledWith(SID);
+    expect(result.current.error).toBeNull();
+    expect(result.current.messages.map((m) => [m.id, m.content])).toEqual([["u1", "hi"], ["turn-1", "Hello"]]);
+  });
+
+  it("keeps what the user wrote when the send was refused before it was kept", async () => {
+    const refused = "Replies are being written in 3 of your chats. Wait for one to finish.";
+    api.streamChat.mockReturnValue(stream([], new Error(refused)));
+    api.listMessages.mockResolvedValue([message("u0", "user", "earlier"), message("t0", "assistant", "answer")]);
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("my new question", "m"));
+
+    expect(result.current.error).toBe(refused);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "user", content: "my new question" });
+  });
+
+  it("stops a reply it came back to", async () => {
+    let abort!: () => void;
+    const aborted = new Promise<never>((_, reject) => {
+      abort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    });
+    async function* reader() {
+      yield { content: "Hal" };
+      await aborted;
+    }
+    api.listMessages.mockResolvedValue([message("u1", "user", "hi"), message("turn-7", "assistant", "", { status: "running" })]);
+    api.resumeStream.mockReturnValue({ reader: reader(), abort: () => abort() });
+    api.stopTurn.mockResolvedValue({ stopping: true });
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    let loading!: Promise<void>;
+    act(() => {
+      loading = result.current.loadHistory();
+    });
+    await waitFor(() => expect(result.current.streamingContent).toBe("Hal"));
+    act(() => result.current.stop());
+    await act(() => loading);
+
+    expect(api.stopTurn).toHaveBeenCalledWith(SID, "turn-7");
+  });
+
   it("shows a reply still being written as it streams, then as stored", async () => {
     const writing = message("turn-1", "assistant", "", { status: "running" });
     api.listMessages

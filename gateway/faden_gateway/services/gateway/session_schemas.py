@@ -70,6 +70,8 @@ class SessionDTO(BaseModel):
     metadata_json: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
+    #: A reply is being written in the chat (set by the sessions list).
+    writing: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

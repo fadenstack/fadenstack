@@ -10,21 +10,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { chatApi } from "~/api/chatClient";
 import type { ChatMessage } from "~/api/chatTypes";
 
-const hook = vi.hoisted(() => ({ messages: [] as ChatMessage[], retry: vi.fn() }));
+const hook = vi.hoisted(() => ({
+  messages: [] as ChatMessage[], retry: vi.fn(), loadHistory: vi.fn(), isStreaming: false,
+}));
 
 vi.mock("../hooks/useChatStream", () => ({
   useChatStream: () => ({
     messages: hook.messages,
     streamingContent: "",
     streamingUsage: null,
-    isStreaming: false,
+    isStreaming: hook.isStreaming,
     isLoading: false,
     error: null,
     getResponseMs: () => null,
     send: vi.fn(),
     retry: hook.retry,
     stop: vi.fn(),
-    loadHistory: vi.fn(),
+    loadHistory: hook.loadHistory,
   }),
 }));
 
@@ -38,7 +40,7 @@ function message(id: string, role: ChatMessage["role"], content: string, extra: 
   };
 }
 
-function renderChat() {
+function renderChat(onWritingChange?: (sessionId: string, writing: boolean) => void) {
   render(
     <MemoryRouter initialEntries={["/chat/s1"]}>
       <Routes>
@@ -49,6 +51,7 @@ function renderChat() {
               sessionId="s1" selectedModel="m" onModelChange={() => {}} onSessionCreated={() => {}}
               onSessionUpdated={() => {}} onToggleSidebar={() => {}} sidebarOpen languages={[]} language="en"
               onLanguageChange={() => {}} isSuperuser={false} onToolsToggle={() => {}} toolsOpen={false}
+              onWritingChange={onWritingChange}
             />
           }
         />
@@ -61,6 +64,8 @@ describe("ChatWindow's stored replies", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
     hook.retry.mockReset();
+    hook.loadHistory.mockReset();
+    hook.isStreaming = false;
     vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
   });
 
@@ -96,3 +101,39 @@ describe("ChatWindow's stored replies", () => {
     );
   });
 });
+
+describe("ChatWindow while a reply is written", () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    hook.loadHistory.mockReset();
+    hook.isStreaming = false;
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
+  });
+
+  it("tells the chat list, which marks the chat", () => {
+    hook.messages = [message("u1", "user", "hi")];
+    hook.isStreaming = true;
+    const onWritingChange = vi.fn();
+    renderChat(onWritingChange);
+    expect(onWritingChange).toHaveBeenCalledWith("s1", true);
+  });
+
+  it("reads a reply left running again when the tab is back", () => {
+    hook.messages = [message("u1", "user", "hi"), message("t1", "assistant", "Hal", { status: "running" })];
+    renderChat();
+    hook.loadHistory.mockClear();
+
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(hook.loadHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a finished chat alone when the tab is back", () => {
+    hook.messages = [message("u1", "user", "hi"), message("t1", "assistant", "Hello")];
+    renderChat();
+    hook.loadHistory.mockClear();
+
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(hook.loadHistory).not.toHaveBeenCalled();
+  });
+});
+

@@ -43,10 +43,12 @@ import { useSessionPiiPolicy } from "./hooks/useSessionPiiPolicy";
 import { ChatShellContext, type ChatShell } from "./ChatShellContext";
 import { useNavHand } from "~/lib/useNavHand";
 import { ChatSkillsProvider, useChatSkillsState } from "./hooks/useChatSkills";
-import { mergeSessions, withSession } from "./sessionList";
+import { mergeSessions, withSession, withWriting } from "./sessionList";
 import ProfilePage from "../admin/ProfilePage";
 
 const SIDEBAR_WIDTH = 260;
+/** How often the chats list is asked while a reply is written in one of them. */
+const WRITING_POLL_MS = 5_000;
 
 export default function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
@@ -272,6 +274,20 @@ export default function ChatPage() {
     setSessions((prev) => withSession(prev, updated));
   }, []);
 
+  const handleWritingChange = useCallback((id: string, writing: boolean) => {
+    setSessions((prev) => withWriting(prev, id, writing));
+  }, []);
+
+  // While a reply is written in any chat, the list is asked every few
+  // seconds: a reply goes on after the user left its chat, and its mark
+  // goes once it is done.
+  const anyWriting = sessions.some((s) => s.writing);
+  useEffect(() => {
+    if (!anyWriting) return;
+    const timer = window.setInterval(() => void refreshSidebar(), WRITING_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [anyWriting, refreshSidebar]);
+
   // Collapsed on a desktop, the sidebar is the admin console's rail.
   const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : CHAT_RAIL_WIDTH;
   // The bar's menu button is for the overlay; on a desktop the rail's logo
@@ -338,6 +354,7 @@ export default function ChatPage() {
             onModelChange={setSelectedModel}
             onSessionCreated={handleSessionCreated}
             onSessionUpdated={handleSessionUpdated}
+            onWritingChange={handleWritingChange}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
             sidebarOpen={barSidebarOpen}
             languages={languages}

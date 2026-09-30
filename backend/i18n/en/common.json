@@ -1857,7 +1857,8 @@
     "rename": "Rename",
     "rename_save": "Save",
     "rename_cancel": "Cancel",
-    "title_label": "Chat title"
+    "title_label": "Chat title",
+    "writing": "A reply is being written"
   },
   "mcp": {
     "servers_title": "MCP Servers",

@@ -156,3 +156,15 @@ async def test_replies_left_running_by_a_gateway_that_went_away_are_interrupted(
     assert ended == 1
     assert (left.status, left.error, left.content) == ("interrupted", TURN_INTERRUPTED_ERROR, "half")
     assert alive.status == "running"
+
+
+@pytest.mark.anyio
+async def test_the_chat_list_marks_the_chats_a_reply_is_being_written_in(
+    chat: uuid.UUID, client: AsyncClient, db_session: AsyncSession,  # noqa: F811
+) -> None:
+    """The sidebar shows them: a reply goes on while the user is in another chat."""
+    db_session.add(ChatMessage(session_id=chat, role="assistant", content="", status="running",
+                               updated_at=datetime.now(timezone.utc)))
+    await db_session.commit()
+    listed = (await client.get("/v1/sessions", headers=_auth())).json()["data"]
+    assert [(s["id"], s["writing"]) for s in listed] == [(str(chat), True)]

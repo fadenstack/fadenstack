@@ -2174,7 +2174,8 @@
     "rename": "重命名",
     "rename_save": "保存",
     "rename_cancel": "取消",
-    "title_label": "聊天标题"
+    "title_label": "聊天标题",
+    "writing": "正在编写回复"
   },
   "module_recommend": {
     "apply": "应用",

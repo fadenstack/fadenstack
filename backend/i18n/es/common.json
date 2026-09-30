@@ -2174,7 +2174,8 @@
     "rename": "Renombrar",
     "rename_save": "Guardar",
     "rename_cancel": "Cancelar",
-    "title_label": "Título del chat"
+    "title_label": "Título del chat",
+    "writing": "Se está escribiendo una respuesta"
   },
   "module_recommend": {
     "apply": "Aplicar",

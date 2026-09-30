@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ChatSession } from "~/api/chatTypes";
 
-import { mergeSessions, withSession } from "./sessionList";
+import { mergeSessions, withSession, withWriting } from "./sessionList";
 
 function chat(id: string, title: string | null, updated_at: string): ChatSession {
   return {
@@ -35,3 +35,19 @@ describe("the chat list", () => {
     expect(withSession([chat("new", null, "2026-09-26T12:00:05Z")], titled)).toEqual([titled]);
   });
 });
+
+describe("the chats a reply is being written in", () => {
+  it("are the gateway's word, whichever copy of the chat is newer", () => {
+    const renamed = { ...chat("a", "Renamed", "2026-09-26T12:00:00Z"), writing: true };
+    const fetched = [{ ...chat("a", "A", "2026-09-26T11:00:00Z"), writing: false }];
+    expect(mergeSessions(fetched, [renamed])[0]).toMatchObject({ title: "Renamed", writing: false });
+  });
+
+  it("are marked by the page that writes in one", () => {
+    const list = [chat("a", "A", "2026-09-26T11:00:00Z"), chat("b", "B", "2026-09-26T11:00:00Z")];
+    expect(withWriting(list, "b", true).map((s) => Boolean(s.writing))).toEqual([false, true]);
+    // A chat whose mark does not change is left as it is (no re-render for it).
+    expect(withWriting(list, "a", false)[0]).toBe(list[0]);
+  });
+});
+

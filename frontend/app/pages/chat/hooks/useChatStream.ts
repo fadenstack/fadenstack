@@ -120,85 +120,6 @@ export function useChatStream({
     skills?: string[];
   } | null>(null);
 
-  // Load existing messages for the current session
-  const loadHistory = useCallback(async () => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const msgs = await chatApi.listMessages(sid);
-      // A reply still being written is shown as it streams, not as its row.
-      const writing = msgs[msgs.length - 1]?.status === "running";
-      setMessages(writing ? msgs.slice(0, -1) : msgs);
-
-      // Check if there is an active stream we can reconnect to
-      try {
-        const { active } = await chatApi.streamStatus(sid);
-        if (active || writing) {
-          // Reconnect to the in-progress stream
-          setIsStreaming(true);
-          streamThrottle.reset();
-          setStreamingContent("");
-          reasoningThrottle.reset();
-          setStreamingReasoning("");
-          setStreamingUsage(null);
-
-          const { reader, abort } = resumeStream(sid);
-          abortRef.current = abort;
-
-          let accumulated = "";
-          let thought = "";
-          for await (const delta of reader) {
-            if (delta.reasoning) {
-              thought += delta.reasoning;
-              reasoningThrottle.push(thought);
-            }
-            if (delta.content) {
-              accumulated += delta.content;
-              streamThrottle.push(accumulated);
-            }
-            if (delta.usage) {
-              setStreamingUsage(delta.usage);
-            }
-          }
-
-          // Stream complete: the reply as the gateway stored it.
-          streamThrottle.flush();
-          setStreamingContent("");
-          reasoningThrottle.reset();
-          setStreamingReasoning("");
-          setStreamingUsage(null);
-          setIsStreaming(false);
-          abortRef.current = null;
-          setMessages(await chatApi.listMessages(sid));
-          return;
-        }
-      } catch {
-        // Stream status check failed — fall through to retry prompt
-      }
-
-      // If the last message is from the user with no assistant reply,
-      // the previous request likely failed — surface a retry prompt.
-      // (A failed reply the gateway stored shows itself, with its error.)
-      if (msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
-        const lastUser = msgs[msgs.length - 1];
-        lastSendRef.current = { text: lastUser.content, model: "" };
-        setError(
-          t("error_last_message_no_response", {
-            ns: "chat",
-            defaultValue:
-              "The last message did not receive a response. You can retry.",
-          }),
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   const stop = useCallback(() => {
     // The reply runs on its own: closing the stream alone would not stop it.
     const sid = sessionIdRef.current;
@@ -210,12 +131,22 @@ export function useChatStream({
   }, []);
 
   /**
-   * Read a reply as it streams, then keep it. A reply that failed is shown
-   * as the gateway stored it (with its error, to be tried again); one the
-   * user stopped keeps what was written.
+   * Read a reply as it streams, then keep it.
+   *
+   * A reply that failed is shown as the gateway stored it (with its error, to
+   * be tried again); one the user stopped keeps what was written. When the
+   * connection is lost while the reply is still being written -- a network
+   * change, a laptop waking up -- the page reads it again from the gateway
+   * (``resumed``), once. A reply read that way (``resumed``) is shown as
+   * stored once it ends.
    */
   const runStream = useCallback(
-    async (handle: StreamHandle, sid: string, model: string) => {
+    async (
+      handle: StreamHandle,
+      sid: string,
+      model: string,
+      { turn = null, resumed = false }: { turn?: string | null; resumed?: boolean } = {},
+    ): Promise<void> => {
       setIsStreaming(true);
       streamThrottle.reset();
       setStreamingContent("");
@@ -223,6 +154,7 @@ export function useChatStream({
       setStreamingReasoning("");
       setStreamingUsage(null);
       abortRef.current = handle.abort;
+      turnRef.current = turn;
 
       const streamStartedAt = performance.now();
       let accumulated = "";
@@ -231,7 +163,7 @@ export function useChatStream({
       let thoughtMs: number | null = null;
       let finalUsage: TokenUsage | null = null;
       let traceId: string | null = null;
-      let turnId: string | null = null;
+      let turnId: string | null = turn;
 
       const settle = () => {
         turnRef.current = null;
@@ -297,20 +229,45 @@ export function useChatStream({
           if (accumulated.trim()) setMessages((prev) => [...prev, reply("stopped")]);
           return;
         }
-        // The gateway stored the failed reply before it closed the stream:
-        // show it as stored, with its error and a way to try it again.
+        // Where the reply is now, as the gateway stored it.
+        let last: ChatMessage | undefined;
         try {
           const stored = await chatApi.listMessages(sid);
-          setMessages(stored);
-          const last = stored[stored.length - 1];
+          last = stored[stored.length - 1];
+          if (last?.role === "assistant" && last.status === "running") {
+            // Still being written: the connection went, not the reply.
+            if (!resumed) {
+              setMessages(stored.slice(0, -1));
+              await runStream(resumeStream(sid), sid, model, { turn: last.id, resumed: true });
+              return;
+            }
+            setMessages(stored);
+            return;
+          }
           if (last?.role === "assistant" && last.status && RETRYABLE_TURNS.has(last.status)) {
+            // Failed, and stored with its error, to be tried again.
+            setMessages(stored);
             setError(null);
             return;
           }
+          if (resumed) setMessages(stored);
         } catch {
           // Shown below instead.
         }
+        // Refused before it was kept (a limit, say): what the user wrote
+        // stays on the page, with why, to be sent again.
         setError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+
+      if (resumed) {
+        // Read again from the gateway: shown as it stored it.
+        settle();
+        try {
+          setMessages(await chatApi.listMessages(sid));
+        } catch {
+          setMessages((prev) => [...prev, reply("complete")]);
+        }
         return;
       }
 
@@ -333,6 +290,57 @@ export function useChatStream({
     },
     [onSessionUpdated],
   );
+
+  // Load existing messages for the current session
+  const loadHistory = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    setIsLoading(true);
+    setError(null);
+    let writing: ChatMessage | null = null;
+    try {
+      const msgs = await chatApi.listMessages(sid);
+      // A reply still being written is shown as it streams, not as its row.
+      const last = msgs[msgs.length - 1];
+      writing = last?.role === "assistant" && last.status === "running" ? last : null;
+      setMessages(writing ? msgs.slice(0, -1) : msgs);
+
+      if (!writing) {
+        let active = false;
+        try {
+          ({ active } = await chatApi.streamStatus(sid));
+        } catch {
+          // Stream status check failed — fall through to retry prompt
+        }
+        if (!active && msgs.length > 0 && msgs[msgs.length - 1].role === "user") {
+          // If the last message is from the user with no assistant reply,
+          // the previous request likely failed — surface a retry prompt.
+          // (A failed reply the gateway stored shows itself, with its error.)
+          const lastUser = msgs[msgs.length - 1];
+          lastSendRef.current = { text: lastUser.content, model: "" };
+          setError(
+            t("error_last_message_no_response", {
+              ns: "chat",
+              defaultValue:
+                "The last message did not receive a response. You can retry.",
+            }),
+          );
+          return;
+        }
+        if (!active) return;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      setIsLoading(false);
+    }
+    // Being written, here or on another gateway worker: read it from its start.
+    await runStream(resumeStream(sid), sid, writing?.model_alias ?? "", {
+      turn: writing?.id ?? null,
+      resumed: true,
+    });
+  }, [runStream]);
 
   const send = useCallback(
     async (text: string, model: string, files?: File[], skills?: string[]) => {

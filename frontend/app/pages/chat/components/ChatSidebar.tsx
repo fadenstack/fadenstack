@@ -26,6 +26,7 @@ import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import CircularProgress from "@mui/material/CircularProgress";
 import Tooltip from "@mui/material/Tooltip";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
@@ -818,7 +819,18 @@ function SessionItem({ session, secondary, active, onSelect, onDelete, onMoveCli
       }}
     >
       <ListItemIcon sx={{ minWidth: 28, color: "text.secondary" }}>
-        <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+        {session.writing ? (
+          <Tooltip title={t("chat.writing", { defaultValue: "A reply is being written" })}>
+            <CircularProgress
+              size={14}
+              thickness={5}
+              data-testid="chat-writing"
+              aria-label={t("chat.writing", { defaultValue: "A reply is being written" })}
+            />
+          </Tooltip>
+        ) : (
+          <ChatBubbleOutlineIcon sx={{ fontSize: 16 }} />
+        )}
       </ListItemIcon>
       <ListItemText
         primary={session.title || t("chat.untitled", { defaultValue: "Untitled chat" })}

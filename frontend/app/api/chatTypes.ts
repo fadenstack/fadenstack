@@ -30,6 +30,8 @@ export interface ChatSession {
   metadata_json?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  /** A reply is being written in the chat (the chats list says so). */
+  writing?: boolean;
 }
 
 /** Where a reply is: its row is written as it starts, and kept however it ends. */

@@ -1859,7 +1859,8 @@
     "rename": "Renommer",
     "rename_save": "Enregistrer",
     "rename_cancel": "Annuler",
-    "title_label": "Titre du chat"
+    "title_label": "Titre du chat",
+    "writing": "Une réponse est en cours de rédaction"
   },
   "mcp": {
     "servers_title": "Serveurs MCP",

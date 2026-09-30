@@ -2174,7 +2174,8 @@
     "rename": "Umbenennen",
     "rename_save": "Speichern",
     "rename_cancel": "Abbrechen",
-    "title_label": "Chat-Titel"
+    "title_label": "Chat-Titel",
+    "writing": "Eine Antwort wird geschrieben"
   },
   "module_recommend": {
     "apply": "Übernehmen",
