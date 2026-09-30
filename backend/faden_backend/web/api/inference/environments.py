@@ -516,6 +516,43 @@ async def switch_ray_tls(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
+class RuntimeSwitch(BaseModel):
+    """Request body for switching a cluster's runtime: the runtime id."""
+
+    runtime: str
+
+
+@router.get("/{environment_id}/runtime")
+async def runtime_status(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Which runtime each of this cluster's machines runs, the ones it could, and whether an update is out."""
+    from faden_backend.services.inference import runtime_choice  # noqa: PLC0415
+
+    try:
+        return await runtime_choice.environment_status(session, environment_id)
+    except runtime_choice.RuntimeChoiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/runtime")
+async def switch_runtime(
+    environment_id: uuid.UUID,
+    body: RuntimeSwitch,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Switch the cluster to another runtime. The cluster restarts on it."""
+    from faden_backend.services.inference import runtime_choice  # noqa: PLC0415
+
+    try:
+        return await runtime_choice.switch(session, environment_id, body.runtime)
+    except runtime_choice.RuntimeChoiceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 class ModelDownloadsSwitch(BaseModel):
     """Request body for the machines-download switch: on or off."""
 

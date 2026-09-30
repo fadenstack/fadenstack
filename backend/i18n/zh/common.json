@@ -2030,7 +2030,9 @@
       "provider_count_other": "{{count}} 个提供商",
       "cascade": "同时删除其上的提供商和运行时",
       "keep_runtimes": "运行时将从此机器解除分配，但会保留。"
-    }
+    },
+    "agent_update": "代理 {{version}} 可用",
+    "agent_update_hint": "请在维护窗口中更新：在该机器上再次运行此服务器的安装命令（节点 → 添加机器）。代理从不自行更新。"
   },
   "rag_lite": {
     "documents_title": "RAG 文档",
@@ -2624,6 +2626,28 @@
         "no_answer": "{{host}}：未响应"
       },
       "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。"
+    },
+    "runtime": {
+      "title": "运行时",
+      "detail": "机器运行的镜像，包含 Ray 和 vLLM。只有在此处切换时才会改变。",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "已认证",
+        "partial": "部分认证",
+        "failed": "认证失败",
+        "uncertified": "未认证"
+      },
+      "preview": "预览",
+      "recommended": "推荐",
+      "applying": "正在使用新运行时重启",
+      "applies_on_start": "集群启动时生效",
+      "update": "有更新的已认证运行时可用（vLLM {{vllm}}）。在您切换之前，集群保持当前运行时。",
+      "choose": "切换到",
+      "switch": "切换",
+      "restart_warning": "切换到 vLLM {{vllm}} 会重启集群：每台机器的容器将从新镜像重新创建，其上的每个模型都会重新加载。尚未拥有该镜像的机器会先获取它。",
+      "preview_hint": "预览版已通过认证，可以运行推荐运行时无法运行的模型，但它较新：请为需要这些模型的集群选择它。",
+      "restart_confirm": "使用此运行时重启"
     }
   },
   "inference": {

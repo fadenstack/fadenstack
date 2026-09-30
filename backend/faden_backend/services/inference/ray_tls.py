@@ -18,10 +18,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode
+from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO
+from faden_backend.db.models.inference import InferenceEnvironment
 from faden_backend.db.models.node_control import InfraNode
 from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
 
@@ -34,14 +34,6 @@ CAPABILITY_LEVEL = 2
 
 class RayTlsError(Exception):
     """Ray TLS cannot be switched now; the message says why."""
-
-
-async def _members(session: AsyncSession, environment_id: Any) -> list[InfraNode]:
-    return list((await session.execute(
-        select(InfraNode)
-        .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
-        .where(InferenceEnvironmentNode.environment_id == environment_id)
-    )).scalars().all())
 
 
 def supported(capabilities: dict | None) -> bool:
@@ -61,7 +53,7 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
     env = await session.get(InferenceEnvironment, environment_id)
     if env is None:
         raise RayTlsError("There is no such cluster.")
-    nodes = await _members(session, env.id)
+    nodes = await EnvironmentNodeDAO(session).machines(env.id)
     old = _old_agents(nodes)
     on = RayEnvironmentConfig.model_validate(env.config_json or {}).ray_tls
     # What each machine's agent said its runtime container runs.
@@ -90,7 +82,7 @@ async def switch(session: AsyncSession, environment_id: Any, *, on: bool) -> dic
     if env is None:
         raise RayTlsError("There is no such cluster.")
     if on:
-        old = _old_agents(await _members(session, env.id))
+        old = _old_agents(await EnvironmentNodeDAO(session).machines(env.id))
         if old:
             raise RayTlsError(
                 "Ray TLS needs agent 0.1.18 or later on every machine of the cluster; update "

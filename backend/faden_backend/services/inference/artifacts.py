@@ -15,12 +15,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
 
-from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
+from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO, ModelAvailabilityDAO
 from faden_backend.db.models.inference import (
     InferenceEnvironment,
-    InferenceEnvironmentNode,
     ModelAvailability,
     ModelAvailabilityStatus,
 )
@@ -140,13 +138,7 @@ class ModelArtifactCoordinator:
 
         Filters out nodes that are in maintenance, draining, or ineligible.
         """
-        stmt = (
-            select(InfraNode)
-            .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
-            .where(InferenceEnvironmentNode.environment_id == environment.id)
-        )
-        res = await self.session.execute(stmt)
-        nodes = list(res.scalars().all())
+        nodes = await EnvironmentNodeDAO(self.session).machines(environment.id)
 
         eligible: list[InfraNode] = []
         for node in nodes:

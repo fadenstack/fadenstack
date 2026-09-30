@@ -661,7 +661,7 @@ async def _follow_found_containers(session: Any, gateway_sync: Any) -> None:
 
 
 async def _prepare_runtime_image_exports(app: FastAPI) -> None:
-    """Export each catalogued runtime image once, and drop superseded exports.
+    """Export the runtime images machines will ask for, and drop superseded exports.
 
     A node asking for the runtime image is served a file with a length, which
     is what makes the transfer resumable and its progress real. Building that
@@ -670,20 +670,33 @@ async def _prepare_runtime_image_exports(app: FastAPI) -> None:
     it ready. Exports are keyed by image id, so this is a no-op after the
     first run until the image is rebuilt -- and the rebuild's predecessor,
     twelve gigabytes of it, is removed here rather than left to accumulate.
+
+    Only what clusters run and each flavor's default is exported up front:
+    a preview or an older runtime nobody chose is exported when a machine
+    first asks for it, rather than costing twelve gigabytes each at every
+    install. Their exports are kept all the same.
     """
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from faden_backend.db.models.inference import InferenceEnvironment  # noqa: PLC0415
     from faden_backend.services.inference import bundles, image_cache  # noqa: PLC0415
 
-    catalogued = [
-        bundle
-        for bundle in (
-            getattr(bundles, "CERTIFIED_DGX_SPARK_BUNDLE", None),
-            getattr(bundles, "GENERIC_X86_NVIDIA_BUNDLE", None),
-        )
-        if bundle is not None
-    ]
+    registry = bundles.default_bundle_registry
+    try:
+        async with app.state.db_session_factory() as session:
+            clusters = (await session.execute(select(InferenceEnvironment))).scalars().all()
+    except Exception:  # noqa: BLE001 - the defaults are still worth having ready
+        log.exception("Could not read which runtimes the clusters run; exporting the defaults only")
+        clusters = []
+    wanted = [
+        runtime
+        for env in clusters
+        for runtime in ((env.config_json or {}).get(bundles.RUNTIME_KEY), *bundles.started_runtimes(env).values())
+        if runtime
+    ] + sorted(registry.defaults())
     docker = getattr(app.state, "docker", None)
-    keep: set[str] = set()
-    for bundle in catalogued:
+    held: dict[str, tuple[str, str, int]] = {}  # runtime id -> (ref, image id, size)
+    for bundle in registry.list_bundles():
         ref = bundle.container.image
         try:
             info = await docker.client.images.inspect(ref)
@@ -699,16 +712,18 @@ async def _prepare_runtime_image_exports(app: FastAPI) -> None:
                 ref, image_id, bundle.container.digest,
             )
             continue
-        keep.add(image_id)
-        try:
-            await image_cache.ensure_export(
-                docker, ref, image_id, int(info.get("Size") or 0)
-            )
-        except Exception:  # noqa: BLE001 - served live instead, as before
-            log.exception("Could not export runtime image %s", ref)
-    removed = image_cache.prune(keep)
+        held[bundle.bundle_id] = (ref, image_id, int(info.get("Size") or 0))
+    removed = image_cache.prune({image_id for _, image_id, _ in held.values()})
     if removed:
         log.info("Removed %d superseded runtime image export(s)", removed)
+    for runtime_id in dict.fromkeys(wanted):
+        if runtime_id not in held:
+            continue
+        ref, image_id, size = held[runtime_id]
+        try:
+            await image_cache.ensure_export(docker, ref, image_id, size)
+        except Exception:  # noqa: BLE001 - served live instead, as before
+            log.exception("Could not export runtime image %s", ref)
 
 
 def _start_runtime_image_exports(app: FastAPI) -> None:

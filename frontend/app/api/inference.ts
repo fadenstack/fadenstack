@@ -611,6 +611,30 @@ export interface RayTlsStatus {
   can_switch_on: boolean;
 }
 
+/** A runtime this server ships for a cluster's machines, in the runtime list's words. */
+export type ClusterRuntime = Pick<
+  RuntimeBundle,
+  "bundle_id" | "image" | "runtime_version" | "vllm_version" | "certification_status"
+> & {
+  /** stable: what machines get unless their cluster chose another; preview: only when chosen. */
+  channel: "stable" | "preview";
+  /** What a machine of its flavor gets when its cluster chose none. */
+  default: boolean;
+};
+
+/** Which runtime a cluster's machines run, and which they could. */
+export interface ClusterRuntimeStatus {
+  /** The runtimes its machines run, or are to run once restarted. */
+  runs: string[];
+  /** Every machine runs what it is to run. */
+  applied: boolean;
+  /** Not applied, and the cluster is to run: it is restarting on the new runtime. */
+  restarting: boolean;
+  /** A newer certified stable runtime the cluster does not run. */
+  update: string | null;
+  runtimes: ClusterRuntime[];
+}
+
 /** One machine's answer: can it download a model from Hugging Face itself? */
 export interface MachineInternet {
   node_id: string;
@@ -937,6 +961,16 @@ export const inferenceApi = {
     return request<RayTlsStatus>(`/environments/${enc(environmentId)}/ray-tls`, {
       method: "POST",
       body: JSON.stringify({ on }),
+    });
+  },
+  runtime(environmentId: string) {
+    return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime`);
+  },
+  /** Restarts the cluster on that runtime: containers made again from its image, models loaded again. */
+  switchRuntime(environmentId: string, runtime: string) {
+    return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime`, {
+      method: "POST",
+      body: JSON.stringify({ runtime }),
     });
   },
   /** Asks each machine whether it reaches Hugging Face (answers are kept a few minutes unless `fresh`). */

@@ -15,13 +15,13 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
-import CircularProgress from "@mui/material/CircularProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 
 import { inferenceApi, type ModelTlsStatus } from "~/api/inference";
+import RestartConfirm from "./RestartConfirm";
 
 interface ModelTrafficCardProps {
   environmentId: string;
@@ -100,29 +100,14 @@ export default function ModelTrafficCard({ environmentId, onMoved }: ModelTraffi
           </Alert>
         )}
         {confirming && (
-          <Alert
-            severity="warning"
-            sx={{ mt: 2 }}
-            action={
-              <Stack direction="row" spacing={1}>
-                <Button size="small" color="inherit" onClick={() => setConfirming(false)} disabled={moving}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  size="small"
-                  color="warning"
-                  variant="contained"
-                  onClick={move}
-                  disabled={moving}
-                  startIcon={moving ? <CircularProgress size={14} /> : undefined}
-                >
-                  {t("clusters.model_tls.move_confirm")}
-                </Button>
-              </Stack>
-            }
+          <RestartConfirm
+            confirmLabel={t("clusters.model_tls.move_confirm")}
+            busy={moving}
+            onConfirm={move}
+            onCancel={() => setConfirming(false)}
           >
             {t("clusters.model_tls.move_warning")}
-          </Alert>
+          </RestartConfirm>
         )}
         {moved !== null && (
           <Alert severity="success" sx={{ mt: 2 }}>

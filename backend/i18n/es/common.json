@@ -2030,7 +2030,9 @@
       "provider_count_other": "{{count}} proveedores",
       "cascade": "Eliminar también los proveedores y runtimes que contiene",
       "keep_runtimes": "Los runtimes se desasignan de esta máquina pero se conservan."
-    }
+    },
+    "agent_update": "Agente {{version}} disponible",
+    "agent_update_hint": "Actualícelo en una ventana de mantenimiento: ejecute de nuevo la línea de instalación de este servidor en la máquina (Nodos → Añadir una máquina). Los agentes nunca se actualizan solos."
   },
   "rag_lite": {
     "documents_title": "Documentos RAG",
@@ -2624,6 +2626,28 @@
         "no_answer": "{{host}}: no respondió"
       },
       "applies_next": "Se aplica al próximo modelo que se coloque en el clúster; los modelos que ya están en las máquinas se quedan."
+    },
+    "runtime": {
+      "title": "Entorno de ejecución",
+      "detail": "La imagen que ejecutan las máquinas, con Ray y vLLM. Solo cambia cuando la cambia aquí.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Certificado",
+        "partial": "Certificado en parte",
+        "failed": "Certificación fallida",
+        "uncertified": "Sin certificar"
+      },
+      "preview": "Vista previa",
+      "recommended": "Recomendado",
+      "applying": "Reiniciando con el nuevo entorno",
+      "applies_on_start": "Se aplica cuando el clúster arranque",
+      "update": "Hay un entorno certificado más reciente (vLLM {{vllm}}). El clúster mantiene el suyo hasta que lo cambie.",
+      "choose": "Cambiar a",
+      "switch": "Cambiar",
+      "restart_warning": "Cambiar a vLLM {{vllm}} reinicia el clúster: el contenedor de cada máquina se crea de nuevo desde la nueva imagen y cada modelo vuelve a cargarse. Una máquina que aún no tiene la imagen la obtiene primero.",
+      "preview_hint": "Una vista previa ha superado su certificación y ejecuta modelos que el entorno recomendado no puede, pero es nueva: elíjala para un clúster que necesite esos modelos.",
+      "restart_confirm": "Reiniciar con este entorno"
     }
   },
   "inference": {

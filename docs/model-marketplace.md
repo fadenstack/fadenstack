@@ -95,9 +95,11 @@ The check gives one of these verdicts:
   would stop at the model's configuration, whatever the hardware. The
   cluster cannot be chosen, and the API refuses to host it (409). The reason
   names the model type, the runtime's Transformers and vLLM versions, and the
-  Transformers version the model was saved with. It needs a newer runtime
-  image. `ignore_compatibility: true` in the host request overrides the
-  check.
+  Transformers version the model was saved with. It needs a newer runtime:
+  if this server ships one that can load it, switch the cluster to it (see
+  [Switch a cluster to another runtime](upgrading.md#switch-a-cluster-to-another-runtime)).
+  The check always uses the runtime the cluster runs.
+  `ignore_compatibility: true` in the host request overrides the check.
 - **May not run.** The runtime can read the configuration, but its vLLM has
   no implementation of the architecture. It can only try its generic
   Transformers backend, which not every model supports.

@@ -208,20 +208,22 @@ class RayDriver(InferenceDriver):
     @staticmethod
     async def _runtime_bundle_payload_for(
         session: "AsyncSession",
+        environment: Any,
         node_id: "uuid.UUID | str | None",
     ) -> dict[str, Any] | None:
-        """The bundle for one machine, so a probe addresses the right container.
+        """The runtime one machine runs in *environment*, so a probe addresses the right container.
 
         Resolved per node rather than per environment: on a cluster spanning
         two platforms the container name is the same everywhere but the image
         behind it is not, and a payload built from the wrong one addressed a
-        container that was never started.
+        container that was never started. The cluster says which of the
+        machine's runtimes it runs.
         """
         from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             runtime_bundle_payload_for,
         )
 
-        return await runtime_bundle_payload_for(session, node_id, driver="ray")
+        return await runtime_bundle_payload_for(session, node_id, driver="ray", environment=environment)
 
     async def _deployment_context(
         self, session: "AsyncSession", deployment: Any
@@ -283,7 +285,7 @@ class RayDriver(InferenceDriver):
             # on the node hosting that replica, which need not be the head and
             # need not run the same image.
             runtime_bundle=await self._runtime_bundle_payload_for(
-                session, node_id or head_node_id
+                session, environment, node_id or head_node_id
             ),
         )
 
@@ -357,7 +359,7 @@ class RayDriver(InferenceDriver):
         try:
             serve_status = await client.probe_serve(
                 head_node_id=head_node_id,
-                runtime_bundle=await self._runtime_bundle_payload_for(session, head_node_id),
+                runtime_bundle=await self._runtime_bundle_payload_for(session, environment, head_node_id),
                 # A page is waiting on this.  If the node cannot answer
                 # quickly, say so as a partial rather than holding the
                 # connection open.
@@ -565,7 +567,7 @@ class RayDriver(InferenceDriver):
         try:
             status = await client.probe_cluster(
                 head_node_id=head_node_id,
-                runtime_bundle=await self._runtime_bundle_payload_for(session, head_node_id),
+                runtime_bundle=await self._runtime_bundle_payload_for(session, environment, head_node_id),
                 include_metrics=True,
                 budget_sec=_INTERACTIVE_PROBE_BUDGET_SEC,
             )

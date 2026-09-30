@@ -18,6 +18,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.node_control import InfraNode
 from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
@@ -391,6 +392,16 @@ class EnvironmentNodeDAO:
             select(InferenceEnvironmentNode).where(
                 InferenceEnvironmentNode.environment_id == environment_id
             )
+        )
+        return list(result.scalars().all())
+
+    async def machines(self, environment_id: Any) -> list[InfraNode]:
+        """The machines of an environment, by host."""
+        result = await self.session.execute(
+            select(InfraNode)
+            .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
+            .where(InferenceEnvironmentNode.environment_id == environment_id)
+            .order_by(InfraNode.host)
         )
         return list(result.scalars().all())
 

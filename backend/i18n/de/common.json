@@ -2030,7 +2030,9 @@
       "provider_count_other": "{{count}} Anbieter",
       "cascade": "Auch die Anbieter und Runtimes darauf löschen",
       "keep_runtimes": "Die Runtimes werden von dieser Maschine gelöst, bleiben aber erhalten."
-    }
+    },
+    "agent_update": "Agent {{version}} verfügbar",
+    "agent_update_hint": "Aktualisieren Sie ihn in einem Wartungsfenster: Führen Sie die Installationszeile dieses Servers auf der Maschine erneut aus (Knoten → Maschine hinzufügen). Agenten aktualisieren sich nie von selbst."
   },
   "rag_lite": {
     "documents_title": "RAG-Dokumente",
@@ -2624,6 +2626,28 @@
         "no_answer": "{{host}}: hat nicht geantwortet"
       },
       "applies_next": "Gilt für das nächste Modell, das auf den Cluster kommt; Modelle, die schon auf den Maschinen liegen, bleiben."
+    },
+    "runtime": {
+      "title": "Laufzeit",
+      "detail": "Das Image, das die Maschinen ausführen, mit Ray und vLLM. Es ändert sich nur, wenn Sie hier umschalten.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Zertifiziert",
+        "partial": "Teilweise zertifiziert",
+        "failed": "Zertifizierung fehlgeschlagen",
+        "uncertified": "Nicht zertifiziert"
+      },
+      "preview": "Vorschau",
+      "recommended": "Empfohlen",
+      "applying": "Startet mit der neuen Laufzeit neu",
+      "applies_on_start": "Gilt, sobald der Cluster startet",
+      "update": "Eine neuere zertifizierte Laufzeit ist verfügbar (vLLM {{vllm}}). Der Cluster behält seine Laufzeit, bis Sie umschalten.",
+      "choose": "Umschalten auf",
+      "switch": "Umschalten",
+      "restart_warning": "Das Umschalten auf vLLM {{vllm}} startet den Cluster neu: Der Container jeder Maschine wird aus dem neuen Image neu erstellt, und jedes Modell darauf lädt erneut. Eine Maschine, die das Image noch nicht hat, holt es zuerst.",
+      "preview_hint": "Eine Vorschau hat ihre Zertifizierung bestanden und führt Modelle aus, die die empfohlene Laufzeit nicht kann, ist aber neu: Wählen Sie sie für einen Cluster, der diese Modelle braucht.",
+      "restart_confirm": "Mit dieser Laufzeit neu starten"
     }
   },
   "inference": {

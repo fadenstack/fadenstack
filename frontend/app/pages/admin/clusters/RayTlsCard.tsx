@@ -22,6 +22,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 
 import { inferenceApi, type RayTlsStatus } from "~/api/inference";
+import RestartConfirm from "./RestartConfirm";
 
 interface RayTlsCardProps {
   environmentId: string;
@@ -108,29 +109,14 @@ export default function RayTlsCard({ environmentId, onSwitched }: RayTlsCardProp
           </Alert>
         )}
         {confirming && (
-          <Alert
-            severity="warning"
-            sx={{ mt: 2 }}
-            action={
-              <Stack direction="row" spacing={1}>
-                <Button size="small" color="inherit" onClick={() => setConfirming(false)} disabled={switching}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  size="small"
-                  color="warning"
-                  variant="contained"
-                  onClick={flip}
-                  disabled={switching}
-                  startIcon={switching ? <CircularProgress size={14} /> : undefined}
-                >
-                  {t("clusters.ray_tls.restart_confirm")}
-                </Button>
-              </Stack>
-            }
+          <RestartConfirm
+            confirmLabel={t("clusters.ray_tls.restart_confirm")}
+            busy={switching}
+            onConfirm={flip}
+            onCancel={() => setConfirming(false)}
           >
             {t("clusters.ray_tls.restart_warning")}
-          </Alert>
+          </RestartConfirm>
         )}
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>

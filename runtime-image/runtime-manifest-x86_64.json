@@ -1,6 +1,8 @@
 {
   "release_tag": "faden-ray-runtime-x86_64:2.58.0",
   "image_id": "sha256:724ddfe4c49efe8f498916d14100b5c0eb2ea1a1b014b0b50467c7c31f573c15",
+  "runtime_id": "faden-ray-vllm-x86_64-ray2.58",
+  "flavor": "x86_64",
   "rootfs_layers": [
     "sha256:a6dc765193a52cbaede3c93a9ff48b9540948dd0774bbe7031fcb5847606f9ac",
     "sha256:7ca599ccfc97fa428fcf941eda7c2d643f066feb947020dcdbbf913cec34d5dc",

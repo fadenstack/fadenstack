@@ -34,6 +34,11 @@ RUN apt-get update \
 
 RUN pip install "ray[serve,llm]==2.58.0" "vllm==0.26.0"
 
+# Every vLLM module and name Ray Serve LLM imports must resolve, so a vLLM
+# bump that moves one fails here instead of on a node.
+COPY check_ray_vllm.py /opt/llm-port/build/
+RUN python3 /opt/llm-port/build/check_ray_vllm.py
+
 # Air-gapped runtime defaults and telemetry suppression.
 ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \

@@ -87,7 +87,9 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
             ))
             if version is None:
                 try:
-                    bundle = default_bundle_registry.resolve_for_node(node, driver="ray")
+                    bundle = default_bundle_registry.resolve_for_node(
+                        node, driver="ray", environment=env,
+                    )
                     version = bundle.compatibility_matrix.vllm_version if bundle is not None else None
                     if bundle is not None:
                         matrix = bundle.compatibility_matrix

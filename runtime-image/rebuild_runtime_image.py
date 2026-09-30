@@ -15,7 +15,7 @@ only *execute* the target architecture, which emulation handles.
 What still requires the hardware is **certification**, not the build. A build
 asserts that the image is well-formed; a certification run on real machines is
 what earns ``overall_status``. So every manifest written here says
-``uncertified``, whatever the previous one said.
+``uncertified``; ``--record-certification`` adds a run's verdict.
 
 Why this script exists
 ----------------------
@@ -24,7 +24,10 @@ build that existed on neither DGX node, and the two nodes held byte-identical
 content under different config IDs. The cause was not the build -- it was that
 identity was **transcribed by hand** into places that then disagreed.
 
-So nothing is transcribed. The manifest carries ``rootfs_layers`` (the RootFS
+So nothing is transcribed. Each runtime has its own manifest
+(``runtime-manifest-<flavor>-<release>.json``; the backend ships every
+``runtime-manifest*.json`` here as one runtime of its flavor). The manifest
+carries ``rootfs_layers`` (the RootFS
 layer diff IDs, which survive a save/load transfer and a registry round trip)
 and the backend derives the content digest from them through
 ``RuntimeBundleManifest.from_runtime_manifest``. The digest algorithm lives in
@@ -45,12 +48,21 @@ Usage
     python3 rebuild_runtime_image.py --build --distribute sachi@10.250.10.71
     python3 rebuild_runtime_image.py --verify-peer sachi@10.250.10.71
 
+    # after certifying on the hardware (deploy_and_certify_2node.ps1):
+    python3 rebuild_runtime_image.py --manifest runtime-manifest-gb10-nv26.09.json \
+        --record-certification dgx_spark_2node_certification_report.json --channel preview
+
     # CI (.github/workflows/runtime-image-release.yml):
     python3 rebuild_runtime_image.py --flavor x86_64 --build --push \\
         --tag ghcr.io/fadenstack/ray-runtime-x86_64:2.58.0-1
 
 ``--verify-peer`` re-reads both nodes' layer lists and fails if they differ,
 which is the check that would have caught the original drift.
+
+``--record-certification`` puts a certification run's verdict into the
+manifest, and only when the report's layers are the manifest's: evidence from
+one build never certifies another. ``--channel preview`` records that clusters
+get the runtime only when an operator chooses it.
 """
 
 from __future__ import annotations
@@ -68,40 +80,73 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
+def _from_ref(dockerfile: str) -> str:
+    """The image a Dockerfile builds on: its last ``FROM``; empty when none."""
+    ref = ""
+    for line in (HERE / dockerfile).read_text(encoding="utf-8").splitlines():
+        words = line.split()
+        if words and words[0].upper() == "FROM":
+            ref = next((w for w in words[1:] if not w.startswith("--")), "")
+    return ref
+
+
+#: The GB10 runtime is named after its NVIDIA base: ``FROM
+#: nvcr.io/nvidia/vllm:26.09-py3`` makes it ``nv26.09``. A new release is the
+#: one edit to that line; its manifest, tag and runtime id follow, so the
+#: runtimes already shipped keep theirs.
+_GB10_RELEASE = "nv" + _from_ref("Dockerfile").rsplit(":", 1)[-1].split("-")[0]
+
+
 @dataclass(frozen=True)
 class Flavor:
-    """One runtime image: how it is built and where its manifest goes."""
+    """One runtime image: how it is built and where its manifest goes.
 
+    ``name`` goes into the manifest: the backend keeps what every runtime of a
+    flavor shares (the machine it is for, mounts, tuning) under that name.
+    """
+
+    name: str
     dockerfile: str
     manifest: str
     default_tag: str
     runtime_id: str
     hardware_target: str
-    #: The catalogue entry in bundles.py this manifest feeds (for the hint).
-    bundle: str
-    #: What the image is for, when no earlier manifest recorded it.
+    #: What the image is for.
     target_hardware: dict = field(default_factory=dict, compare=False, hash=False)
 
 
 FLAVORS: dict[str, Flavor] = {
-    "gb10": Flavor(
-        dockerfile="Dockerfile",
-        manifest="runtime-manifest.json",
-        default_tag="faden/ray-vllm-gb10:ray2.58-nv26.09",
-        runtime_id="faden-ray-vllm-gb10-ray2.58-nv26.09",
-        hardware_target="NVIDIA DGX Spark (GB10) pair",
-        bundle="bundle-dgx-spark-gb10-v1",
-    ),
-    "x86_64": Flavor(
-        dockerfile="Dockerfile.x86_64",
-        manifest="runtime-manifest-x86_64.json",
-        default_tag="faden-ray-runtime-x86_64:2.58.0",
-        runtime_id="faden-ray-vllm-x86_64-ray2.58",
-        hardware_target="generic x86_64 NVIDIA",
-        bundle="bundle-generic-x86_64-nvidia-v1",
-        target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},
-    ),
+    flavor.name: flavor
+    for flavor in (
+        Flavor(
+            name="gb10",
+            dockerfile="Dockerfile",
+            manifest=f"runtime-manifest-gb10-{_GB10_RELEASE}.json",
+            default_tag=f"faden/ray-vllm-gb10:ray2.58-{_GB10_RELEASE}",
+            runtime_id=f"faden-ray-vllm-gb10-ray2.58-{_GB10_RELEASE}",
+            hardware_target="NVIDIA DGX Spark / GB10",
+            target_hardware={
+                "platform": "NVIDIA DGX Spark", "gpu": "NVIDIA GB10", "compute_capability": "12.1",
+                "architecture": "aarch64", "interconnect": "200Gb/s direct link",
+            },
+        ),
+        Flavor(
+            name="x86_64",
+            dockerfile="Dockerfile.x86_64",
+            manifest="runtime-manifest-x86_64.json",
+            default_tag="faden-ray-runtime-x86_64:2.58.0",
+            runtime_id="faden-ray-vllm-x86_64-ray2.58",
+            hardware_target="generic x86_64 NVIDIA",
+            target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},
+        ),
+    )
 }
+
+#: The certification runner's verdicts, in the catalogue's words.
+_VERDICTS = {"PASSED": "passed", "PASSED_WITH_PARTIAL": "partial", "FAILED": "failed"}
+#: ``stable``: what clusters get unless they choose otherwise. ``preview``:
+#: only a cluster whose operator chose it.
+CHANNELS = ("stable", "preview")
 
 #: Read inside the image, with no GPU: the SM architectures torch was built for
 #: and the machine it runs on. ``torch.cuda.get_arch_list()`` would say [] on a
@@ -212,11 +257,7 @@ def base_image_of(flavor: Flavor) -> dict:
     pulled: its digest, architecture and OS. Empty when the Dockerfile names
     none; without a local copy, only the repository and tag.
     """
-    ref = ""
-    for line in (HERE / flavor.dockerfile).read_text(encoding="utf-8").splitlines():
-        words = line.split()
-        if words and words[0].upper() == "FROM":
-            ref = next((w for w in words[1:] if not w.startswith("--")), "")
+    ref = _from_ref(flavor.dockerfile)
     if not ref:
         return {}
     repository, tag = (ref.rsplit(":", 1) if ":" in ref.rsplit("/", 1)[-1] else (ref, "latest"))
@@ -351,8 +392,7 @@ def verify_peer(tag: str, target: str, local_layers: list[str]) -> None:
 
 
 def write_manifest(
-    path: Path, tag: str, flavor: Flavor, identity: dict, stack: dict, arch: dict, previous: dict,
-    support: dict | None = None,
+    path: Path, tag: str, flavor: Flavor, identity: dict, stack: dict, arch: dict, support: dict | None = None,
 ) -> dict:
     """Write the manifest with generated identity.
 
@@ -362,19 +402,18 @@ def write_manifest(
     """
     manifest = {
         "schema_version": "1.1.0",
-        "runtime_id": previous.get("runtime_id", flavor.runtime_id),
+        # The flavor's: carried over from the manifest before it, a 26.09
+        # build went on calling itself the 26.08 runtime.
+        "runtime_id": flavor.runtime_id,
+        "flavor": flavor.name,
         "release_tag": tag,
         "image_id": identity["image_id"],
         "rootfs_layers": identity["rootfs_layers"],
         "repo_digest": identity.get("repo_digest"),
         # What the image is built on: the Dockerfile's FROM and the base image
         # the build pulled (its digest is not recorded in the image itself).
-        # This used to carry the previous manifest's base over, so moving the
-        # Dockerfile to a newer NVIDIA base would have written a new build
-        # down as built on the old one. The earlier record is only a fallback
-        # for a Dockerfile that names no base. What it is *for* carries over.
-        "base_image": base_image_of(flavor) or previous.get("base_image"),
-        "target_hardware": previous.get("target_hardware") or dict(flavor.target_hardware),
+        "base_image": base_image_of(flavor),
+        "target_hardware": dict(flavor.target_hardware),
         "stack_components": stack,
         "machine": arch.get("machine") or identity.get("architecture"),
         "arch_list": arch.get("arch_list", []),
@@ -384,16 +423,9 @@ def write_manifest(
         "supported_model_types": (support or {}).get("supported_model_types", []),
         "supported_architectures": (support or {}).get("supported_architectures", []),
         # Certification is evidence from a run, not from a build, so none of
-        # it survives a rebuild. Only what the image is *for* carries over.
-        #
-        # This used to spread the previous certification and override the
-        # status, which carried the old run's checks, counts and timestamp
-        # along with it: a manifest reading "uncertified" and "11/11 checks
-        # passed" at once, the passes describing a run against a different
-        # image.
+        # it survives a rebuild (--record-certification adds it).
         "certification": {
-            "hardware_target": (previous.get("certification") or {}).get("hardware_target")
-            or flavor.hardware_target,
+            "hardware_target": flavor.hardware_target,
             "overall_status": "uncertified",
             "checks": [],
             "checks_passed": 0,
@@ -402,15 +434,58 @@ def write_manifest(
             "detail": "built; certify it on its hardware before the catalogue points at it",
         },
     }
-    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"==> wrote {path}")
+    _save(path, manifest)
     return manifest
 
 
-def print_summary(manifest: dict, flavor: Flavor) -> None:
+def _save(path: Path, manifest: dict) -> None:
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"==> wrote {path}")
+
+
+def record_certification(path: Path, report_path: Path, *, channel: str = "stable") -> dict:
+    """Put a certification run's verdict into the manifest of the image it ran.
+
+    The report names the RootFS layers each machine ran
+    (``deploy_and_certify_2node.ps1`` reads them off both), and they must be
+    this manifest's: evidence from another build is refused.
+    """
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    report = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    ran = (report.get("image") or {}).get("rootfs_layers") or {}
+    if not ran:
+        raise BuildError(f"{report_path.name} does not say which image ran; certify with deploy_and_certify_2node.ps1")
+    other = sorted(node for node, layers in ran.items() if list(layers) != manifest.get("rootfs_layers"))
+    if other:
+        raise BuildError(
+            f"the {' and '.join(other)} ran other content than {path.name} describes "
+            f"({manifest.get('release_tag')}); certify that image, or record against the right manifest"
+        )
+    verdict = _VERDICTS.get(str(report.get("overall_status") or "").upper())
+    if verdict is None:
+        raise BuildError(f"{report_path.name} carries no verdict (overall_status)")
+    checks = [
+        {"name": c.get("check"), "status": c.get("status"), "detail": str(c.get("detail") or "")}
+        for c in report.get("checks") or []
+    ]
+    manifest["certification"] = {
+        "hardware_target": (manifest.get("certification") or {}).get("hardware_target"),
+        "overall_status": verdict,
+        "channel": channel,
+        "checks": checks,
+        "checks_passed": sum(1 for c in checks if str(c["status"]).upper() == "PASS"),
+        "checks_total": len(checks),
+        "timestamp": report.get("timestamp"),
+        "detail": f"{report.get('target') or 'certification run'}: {', '.join(sorted(ran))}",
+    }
+    _save(path, manifest)
+    return manifest
+
+
+def print_summary(manifest: dict) -> None:
     """What was minted, in the terms the catalogue uses."""
     summary = {
-        "bundle": flavor.bundle,
+        "runtime_id": manifest["runtime_id"],
         "release_tag": manifest["release_tag"],
         "image_id": manifest["image_id"],
         "repo_digest": manifest["repo_digest"],
@@ -449,12 +524,30 @@ def main(argv: list[str] | None = None) -> int:
         metavar="USER@HOST",
         help="only compare this node's layers against a peer's, then exit",
     )
+    parser.add_argument(
+        "--record-certification",
+        metavar="REPORT",
+        help="only put this certification report's verdict into the manifest, then exit",
+    )
+    parser.add_argument(
+        "--channel", choices=CHANNELS, default="stable",
+        help="with --record-certification: stable (clusters get it) or preview (only when chosen)",
+    )
     args = parser.parse_args(argv)
     flavor = FLAVORS[args.flavor]
     tag = args.tag or flavor.default_tag
     manifest_path = Path(args.manifest) if args.manifest else HERE / flavor.manifest
 
     try:
+        if args.record_certification:
+            cert = record_certification(
+                manifest_path, Path(args.record_certification), channel=args.channel,
+            )["certification"]
+            print(
+                f"==> {manifest_path.name}: {cert['overall_status']} "
+                f"({cert['checks_passed']}/{cert['checks_total']}), {cert['channel']}"
+            )
+            return 0
         if args.verify_peer and not args.build:
             identity = inspect_image(tag)
             verify_peer(tag, args.verify_peer, identity["rootfs_layers"])
@@ -469,24 +562,17 @@ def main(argv: list[str] | None = None) -> int:
         stack = read_stack_versions(tag, platform=args.platform)
         arch = read_arch(tag, platform=args.platform)
         support = read_support(tag, platform=args.platform)
-        previous = {}
-        committed = HERE / flavor.manifest
-        if committed.exists():
-            try:
-                previous = json.loads(committed.read_text(encoding="utf-8"))
-            except ValueError:
-                previous = {}
-
-        manifest = write_manifest(manifest_path, tag, flavor, identity, stack, arch, previous, support)
+        manifest = write_manifest(manifest_path, tag, flavor, identity, stack, arch, support)
 
         if args.distribute:
             distribute(tag, args.distribute)
             verify_peer(tag, args.distribute, identity["rootfs_layers"])
 
-        print_summary(manifest, flavor)
+        print_summary(manifest)
         print(
-            f"\n==> next: certify it on its hardware, then commit {flavor.manifest}; "
-            f"the backend's catalogue ({flavor.bundle}) reads it."
+            f"\n==> next: certify it on its hardware, record the report "
+            f"(--record-certification), then commit {manifest_path.name}; "
+            f"the backend ships it as a {flavor.name} runtime."
         )
         return 0
     except (BuildError, subprocess.CalledProcessError) as exc:

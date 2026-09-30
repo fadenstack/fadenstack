@@ -195,8 +195,11 @@ disk to 51%.
 ## Update the machines' agents
 
 A release can expect a newer node agent than the machines run -- 0.3.0
-expects agent 0.1.13. The server doesn't update its machines; each one is
-updated by running its install line again, on the machine:
+expects agent 0.1.13. The **Machines** list and each machine's page mark a
+machine whose agent is older with **Agent <version> available**. The server
+doesn't update its machines, and an agent never updates itself: you pick
+the window. Each one is updated by running its install line again, on the
+machine:
 
 ```bash
 curl -fsSLO http://<server>/api/install/faden-agent.sh && sh faden-agent.sh --join http://<server> --user
@@ -228,6 +231,40 @@ earlier test, so the 0.1.13 download would have stopped with
 internet would have been given the 0.1.12 copy. From the release after 0.3.0,
 a server that can reach GitHub notices a copy that is not the expected
 version's build, sets it aside for the release, and says so in its log.
+
+## Switch a cluster to another runtime
+
+A runtime is the image a cluster's machines run: Ray and vLLM together. A
+release ships up to three per kind of machine, each certified on that
+hardware before it ships:
+
+- **Recommended**: the certified, stable runtime. A new cluster gets it.
+- **Preview**: certified, and newer. It loads models the recommended one
+  cannot. A cluster gets it only when you choose it.
+- **An older one**: to go back to.
+
+A cluster keeps the runtime it was started with. That holds through
+restarts, through a recovery after a fault, and through an upgrade of this
+server that ships a newer one. When a newer certified runtime is out, the
+cluster's page says so under **Runtime**. It changes nothing until you
+switch.
+
+To switch, open **Clusters → the cluster → Runtime**, choose the runtime,
+and confirm **Restart on this runtime**. The cluster restarts on it:
+
+1. Each machine's container is made again from the new image. A machine
+   that does not hold the image yet fetches it first, from this server or
+   from a machine that has it.
+2. Every model on the cluster loads again.
+
+Plan a window for it, as for the agents. Any agent can follow a switch, so
+switching needs no agent update.
+
+On the DGX pair, the recommended GB10 runtime is NVIDIA vLLM 26.08
+(vLLM 0.27.1). The preview is 26.09 (vLLM 0.29), and it is the one that
+loads Qwen3.8 (`qwen4_exp`). The marketplace says **Cannot run here** for
+that model until the cluster runs the preview. See
+[Can the cluster run it?](model-marketplace.md#can-the-cluster-run-it).
 
 ## If the upgrade stops
 

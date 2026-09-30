@@ -53,6 +53,7 @@ from faden_backend.db.models.node_control import (
     NodeCommandType,
     NodeHealthStatus,
 )
+from faden_backend.services.inference.bundles import RUNTIME_KEY
 from faden_backend.services.inference.drivers.ray.client import RayClusterClient
 from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 from faden_backend.services.inference.drivers.ray.schemas import (
@@ -396,7 +397,7 @@ class RayEnvironmentManager:
         self._clear_failure(environment)
 
         # 6. Verify cluster membership by probing the head.
-        status = await self._verify_cluster(session, head, gateway)
+        status = await self._verify_cluster(session, environment, head, gateway)
         # 7. Refresh the environment capability snapshot.
         await self._refresh_capabilities(environment, config)
         # 8. Persist the observed state for the cluster we just reconciled.
@@ -470,7 +471,7 @@ class RayEnvironmentManager:
                 environment.observed_generation = environment.generation
             return
 
-        status = await self._verify_cluster(session, head, gateway)
+        status = await self._verify_cluster(session, environment, head, gateway)
         if not status.observed:
             # No answer is not an answer: nothing is restarted on it.
             log.info("Environment %s: health check got no answer from the head's agent", environment.id)
@@ -719,7 +720,7 @@ class RayEnvironmentManager:
         loop = asyncio.get_event_loop()
         deadline = loop.time() + _SETTLE_SEC
         while True:
-            status = await self._verify_cluster(session, head, gateway)
+            status = await self._verify_cluster(session, environment, head, gateway)
             healthy = status.observed and self._diagnose(environment, status, head, nodes, members) is None
             if healthy or loop.time() >= deadline:
                 return status
@@ -782,7 +783,7 @@ class RayEnvironmentManager:
 
     async def _stop_payload(self, session, environment, node_id) -> dict[str, Any]:
         payload: dict[str, Any] = {"version": environment.runtime_version or "2.58.0"}
-        bundle, row = await self._bundle_of(session, node_id)
+        bundle, row = await self._bundle_of(session, environment, node_id)
         bundle_payload = self._bundle_payload(bundle, node=row)
         if bundle_payload is not None:
             payload["runtime_bundle"] = bundle_payload
@@ -1019,7 +1020,7 @@ class RayEnvironmentManager:
 
         parts = [f"gen={environment.generation}"]
         try:
-            bundles = await self._bundles_for(session, nodes)
+            bundles = await self._bundles_for(session, environment, nodes)
         except _LifecycleFailed:
             parts.append("bundles=none")
         else:
@@ -1238,8 +1239,8 @@ class RayEnvironmentManager:
             )
         return dict(final.result_json or {})
 
-    async def _bundles_for(self, session, nodes) -> "dict[Any, Any]":
-        """The certified bundle for each member node, keyed by node id.
+    async def _bundles_for(self, session, environment, nodes) -> "dict[Any, Any]":
+        """The runtime for each member node, keyed by node id.
 
         Raises :class:`_LifecycleFailed` when a member has none. That is a
         refusal on purpose: the alternative is the agent falling back to a
@@ -1255,7 +1256,7 @@ class RayEnvironmentManager:
         unsupported: list[str] = []
         for node in nodes:
             row, bundle = await node_and_bundle_for(
-                session, node.node_id, driver="ray"
+                session, node.node_id, driver="ray", environment=environment
             )
             if bundle is None:
                 unsupported.append(str(node.node_id))
@@ -1290,7 +1291,7 @@ class RayEnvironmentManager:
         different architectures, and each gets the image certified for its
         own.
         """
-        bundles = await self._bundles_for(session, nodes)
+        bundles = await self._bundles_for(session, environment, nodes)
         payloads = {
             node.node_id: self._bundle_payload(
                 bundles[node.node_id][0], node=bundles[node.node_id][1]
@@ -1341,23 +1342,26 @@ class RayEnvironmentManager:
                 reported[str(node.node_id)] = bool(result["ray_tls"])
         observed = dict(environment.observed_status_json or {})
         observed["ray_tls"] = reported
+        # What each member was started with, which it keeps (runtime_choice).
+        observed[RUNTIME_KEY] = {str(node.node_id): bundles[node.node_id][0].bundle_id for node in nodes}
         environment.observed_status_json = observed
 
     @staticmethod
-    async def _bundle_of(session, node_id) -> "tuple[Any, Any]":
-        """The bundle certified for one machine, and that machine's row.
+    async def _bundle_of(session, environment, node_id) -> "tuple[Any, Any]":
+        """The runtime one machine runs in this cluster, and that machine's row.
 
-        Keyed on the node rather than on the environment: architecture is a
-        property of a machine, and a cluster is allowed to span two of them.
-        The row comes back alongside because the launch spec is composed
-        against it -- the image is the bundle's, the host paths are the
-        node's -- and looking it up twice would be the only alternative.
+        Resolved per machine: architecture is a property of a machine, and a
+        cluster is allowed to span two of them. The cluster says which of the
+        runtimes for that machine (``runtime_choice``). The row
+        comes back alongside because the launch spec is composed against it
+        -- the image is the bundle's, the host paths are the node's -- and
+        looking it up twice would be the only alternative.
         """
         from faden_backend.services.inference.bundles import (  # noqa: PLC0415
             node_and_bundle_for,
         )
 
-        node, bundle = await node_and_bundle_for(session, node_id, driver="ray")
+        node, bundle = await node_and_bundle_for(session, node_id, driver="ray", environment=environment)
         return bundle, node
 
     @staticmethod
@@ -1512,7 +1516,7 @@ class RayEnvironmentManager:
                 env_vars.setdefault("NCCL_IB_HCA", str(head_binding["rdma_device"]))
                 env_vars.setdefault("UCX_NET_DEVICES", f"{head_binding['rdma_device']}:1")
 
-        bundle, head_row = await self._bundle_of(session, head.node_id)
+        bundle, head_row = await self._bundle_of(session, environment, head.node_id)
         for key, value in self._machine_env(head_row).items():
             env_vars.setdefault(key, value)  # the operator's own setting wins
         env_vars = self._bundle_env(environment, bundle, env_vars)
@@ -1556,7 +1560,7 @@ class RayEnvironmentManager:
         for worker in workers:
             # Per worker: the head may be a DGX and the worker a workstation,
             # and the image each joins with has to be its own.
-            bundle, worker_row = await self._bundle_of(session, worker.node_id)
+            bundle, worker_row = await self._bundle_of(session, environment, worker.node_id)
             bundle_payload = self._bundle_payload(bundle, node=worker_row)
             worker_binding = node_bindings.get(str(worker.node_id))
             host = (worker_binding or {}).get("ip") or await self._host_of(session, worker.node_id)
@@ -1602,7 +1606,7 @@ class RayEnvironmentManager:
         for worker, cmd in issued:
             await self._await_result(gateway, cmd, what=f"join_ray_cluster on node {worker.node_id}")
 
-    async def _verify_cluster(self, session, head, node_control) -> RayClusterStatus:
+    async def _verify_cluster(self, session, environment, head, node_control) -> RayClusterStatus:
         """Step 6: probe the head for authoritative cluster membership.
 
         The pinned bundle travels with the probe so a containerized
@@ -1611,7 +1615,7 @@ class RayEnvironmentManager:
         not have, and the cluster would read as dead.
         """
         client = RayClusterClient(node_control)
-        head_bundle, head_row = await self._bundle_of(session, head.node_id)
+        head_bundle, head_row = await self._bundle_of(session, environment, head.node_id)
         bundle_payload = self._bundle_payload(head_bundle, node=head_row)
         try:
             return await client.probe_cluster(
@@ -1656,7 +1660,7 @@ class RayEnvironmentManager:
             # never started and leave the runtime container running -- and
             # the bundle it has to name is the worker's own.
             leave_payload: dict[str, Any] = {"version": version}
-            worker_bundle, worker_row = await self._bundle_of(session, worker.node_id)
+            worker_bundle, worker_row = await self._bundle_of(session, environment, worker.node_id)
             worker_payload = self._bundle_payload(worker_bundle, node=worker_row)
             if worker_payload is not None:
                 leave_payload["runtime_bundle"] = worker_payload
@@ -1674,7 +1678,7 @@ class RayEnvironmentManager:
         # Head stops last.
         if head is not None:
             stop_payload: dict[str, Any] = {"force": True, "version": version}
-            head_bundle, head_row = await self._bundle_of(session, head.node_id)
+            head_bundle, head_row = await self._bundle_of(session, environment, head.node_id)
             head_payload = self._bundle_payload(head_bundle, node=head_row)
             if head_payload is not None:
                 stop_payload["runtime_bundle"] = head_payload

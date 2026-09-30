@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import select
 
 from faden_backend.db.dao.inference_dao import (
+    EnvironmentNodeDAO,
     EndpointDAO,
 )
 from faden_backend.db.models.inference import (
@@ -1161,7 +1162,7 @@ class RayDeploymentManager:
         facts.head_node_id = head
         facts.head_host = await self._host_of(session, head)
         head_row, facts.runtime_bundle = await node_and_bundle_for(
-            session, head, driver="ray"
+            session, head, driver="ray", environment=environment
         )
         # Behind the model-TLS proxy only where the head's agent can run it and
         # Serve runs in the runtime container (where the agent can see what it
@@ -1250,14 +1251,9 @@ class RayDeploymentManager:
     @staticmethod
     async def _members_away(session, environment) -> list[str]:
         """Names of the cluster's machines with no agent connected."""
-        rows = await session.execute(
-            select(InfraNode)
-            .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
-            .where(InferenceEnvironmentNode.environment_id == environment.id)
-        )
         return sorted(
             node.agent_id or node.host or str(node.id)
-            for node in rows.scalars()
+            for node in await EnvironmentNodeDAO(session).machines(environment.id)
             if str(node.status or "").lower() == NodeHealthStatus.OFFLINE.value
         )
 

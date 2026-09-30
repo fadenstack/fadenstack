@@ -2211,7 +2211,9 @@
       "provider_count_other": "{{count}} fournisseurs",
       "cascade": "Supprimer aussi les fournisseurs et runtimes qu'elle héberge",
       "keep_runtimes": "Les runtimes sont détachés de cette machine mais conservés."
-    }
+    },
+    "agent_update": "Agent {{version}} disponible",
+    "agent_update_hint": "Mettez-le à jour dans une fenêtre de maintenance : exécutez à nouveau la ligne d'installation de ce serveur sur la machine (Nœuds → Ajouter une machine). Les agents ne se mettent jamais à jour d'eux-mêmes."
   },
   "node_profiles": {
     "page_title": "Profils de machine",
@@ -2624,6 +2626,28 @@
         "no_answer": "{{host}} : n'a pas répondu"
       },
       "applies_next": "S'applique au prochain modèle placé sur le cluster ; les modèles déjà sur les machines restent."
+    },
+    "runtime": {
+      "title": "Environnement d'exécution",
+      "detail": "L'image qu'exécutent les machines, avec Ray et vLLM. Elle ne change que lorsque vous la changez ici.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Certifié",
+        "partial": "Certifié en partie",
+        "failed": "Certification échouée",
+        "uncertified": "Non certifié"
+      },
+      "preview": "Aperçu",
+      "recommended": "Recommandé",
+      "applying": "Redémarrage sur le nouvel environnement",
+      "applies_on_start": "S'applique au démarrage du cluster",
+      "update": "Un environnement certifié plus récent est disponible (vLLM {{vllm}}). Le cluster garde le sien jusqu'à ce que vous le changiez.",
+      "choose": "Passer à",
+      "switch": "Changer",
+      "restart_warning": "Passer à vLLM {{vllm}} redémarre le cluster : le conteneur de chaque machine est recréé depuis la nouvelle image et chaque modèle se recharge. Une machine qui n'a pas encore l'image la récupère d'abord.",
+      "preview_hint": "Un aperçu a réussi sa certification et exécute des modèles que l'environnement recommandé ne peut pas, mais il est récent : choisissez-le pour un cluster qui a besoin de ces modèles.",
+      "restart_confirm": "Redémarrer sur cet environnement"
     }
   },
   "inference": {

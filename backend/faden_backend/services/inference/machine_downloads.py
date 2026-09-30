@@ -28,6 +28,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO
 from faden_backend.db.models.inference import InferenceEnvironment, InferenceEnvironmentNode
 from faden_backend.db.models.node_control import InfraNode, NodeCommandType
 
@@ -108,15 +109,6 @@ def supported(capabilities: dict | None) -> bool:
         return False
 
 
-async def _members(session: AsyncSession, environment_id: Any) -> list[InfraNode]:
-    return list((await session.execute(
-        select(InfraNode)
-        .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
-        .where(InferenceEnvironmentNode.environment_id == environment_id)
-        .order_by(InfraNode.host)
-    )).scalars().all())
-
-
 def _answer(node: InfraNode, internet: bool | None, detail: str | None, problem: str | None = None) -> MachineCheck:
     if problem is None and internet is not True:
         problem = "no_internet" if internet is False else "no_answer"
@@ -154,7 +146,7 @@ async def check_machines(
     session: AsyncSession, gateway: Any, environment_id: Any, *, fresh: bool = False,
 ) -> list[MachineCheck]:
     """Whether each machine of the cluster can download from the Hub; asked at most every few minutes."""
-    nodes = await _members(session, environment_id)
+    nodes = await EnvironmentNodeDAO(session).machines(environment_id)
     now = time.monotonic()
     answers: dict[str, MachineCheck] = {}
     to_ask: list[InfraNode] = []
