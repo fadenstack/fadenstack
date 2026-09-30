@@ -667,6 +667,9 @@ class TurnStatus(str, enum.Enum):
     INTERRUPTED = "interrupted"
 
 
+#: Why an interrupted reply ended, as the chat stores it.
+TURN_INTERRUPTED_ERROR = "The server stopped while this reply was being written."
+
 #: Replies that are not part of the conversation the model is sent.
 TURNS_LEFT_OUT = frozenset({TurnStatus.RUNNING.value, TurnStatus.FAILED.value, TurnStatus.INTERRUPTED.value})
 #: Replies that can be tried again.

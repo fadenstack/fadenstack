@@ -15,7 +15,13 @@ from typing import Any
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, ProviderType, TurnStatus
+from faden_gateway.db.models.gateway import (
+    TURN_INTERRUPTED_ERROR,
+    TURNS_RETRYABLE,
+    ChatMessage,
+    ProviderType,
+    TurnStatus,
+)
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.gateway.auth import AuthContext
@@ -625,7 +631,7 @@ def _turn_outcome(
 ) -> tuple[str, str | None]:
     """How a streamed reply ended, for its row in the chat: (status, error)."""
     if interrupted:  # the gateway went away while writing it
-        return TurnStatus.INTERRUPTED.value, "The server stopped while this reply was being written."
+        return TurnStatus.INTERRUPTED.value, TURN_INTERRUPTED_ERROR
     if error:  # the model's server refused, or failed part way
         return TurnStatus.FAILED.value, error
     if status_code >= 500:

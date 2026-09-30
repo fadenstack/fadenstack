@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response, WebSocket
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.db.models.gateway import TURNS_RETRYABLE
+from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnStatus
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError, error_response
@@ -38,6 +40,7 @@ from faden_gateway.services.gateway.schemas import (
 )
 from faden_gateway.services.gateway.service import GatewayService, StreamingGatewayResponse
 from faden_gateway.services.gateway.stream_buffer import StreamBuffer
+from faden_gateway.services.gateway.turn_log import TurnLog
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 
@@ -172,7 +175,8 @@ def _stream_buffer(request: Request) -> StreamBuffer:
     """The app's one stream buffer: what a chat page's reply is read from."""
     buffer = getattr(request.app.state, "stream_buffer", None)
     if buffer is None:
-        buffer = request.app.state.stream_buffer = StreamBuffer()
+        log = TurnLog.of(getattr(request.app.state, "cache_backend", None))
+        buffer = request.app.state.stream_buffer = StreamBuffer(log=log)
     return buffer
 
 
@@ -853,17 +857,55 @@ async def stop_turn(
     turn_id: uuid.UUID,
     auth: AuthContext = Depends(get_auth_context),
     dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
 ) -> JSONResponse:
-    """Stop a reply being written in the chat; what was written is kept.
+    """Stop a reply being written in the chat, whichever worker writes it; what was written is kept.
 
-    ``stopping`` says whether the reply was found running here.
+    ``stopping`` says whether the reply was running.
     """
     try:
         await _require_session_owner(session_id, auth, dao)
     except GatewayError as exc:
         return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
-    stopping = _stream_buffer(request).request_stop(str(session_id), str(turn_id))
+    turn = await _last_turn(session_dao, session_id)
+    if turn is None or turn.id != turn_id or turn.status != TurnStatus.RUNNING.value:
+        return JSONResponse({"stopping": False})
+    stopping = await _stream_buffer(request).request_stop(str(session_id), str(turn_id))
     return JSONResponse({"stopping": stopping})
+
+
+async def _last_turn(session_dao: SessionDAO, session_id: uuid.UUID) -> ChatMessage | None:
+    """The chat's latest reply; the request's transaction is ended after it.
+
+    A reader of a reply holds its request for as long as the reply is
+    written: left in its transaction, the session would hold a pooled
+    connection all that time.
+    """
+    turn = await session_dao.last_reply(session_id=session_id)
+    await session_dao.session.commit()
+    return turn
+
+
+def _alive(turn: ChatMessage) -> bool:
+    """Whether *turn* is being written: running, with a heartbeat that has not stopped."""
+    beat = turn.updated_at
+    if turn.status != TurnStatus.RUNNING.value or beat is None:
+        return False
+    if beat.tzinfo is None:
+        beat = beat.replace(tzinfo=timezone.utc)
+    return beat > datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+
+
+async def _owned_session(session_id: str, auth: AuthContext, dao: GatewayDAO) -> uuid.UUID:
+    """*session_id* as a UUID, when it is the caller's chat."""
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError as exc:
+        raise GatewayError(
+            status_code=400, message="Invalid session_id format.", code="invalid_session_id",
+        ) from exc
+    await _require_session_owner(sid, auth, dao)
+    return sid
 
 
 # ── Stream reconnection ──────────────────────────────────────────
@@ -873,12 +915,18 @@ async def stream_status(
     request: Request,
     session_id: str,
     auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
 ) -> JSONResponse:
-    """Check whether a streaming response is still in progress for a session."""
-    buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
-    if buf and buf.has_buffer(session_id):
-        return JSONResponse({"active": buf.is_active(session_id)})
-    return JSONResponse({"active": False})
+    """Check whether a reply is being written in the chat, by this worker or another."""
+    try:
+        sid = await _owned_session(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    if _stream_buffer(request).is_active(session_id):
+        return JSONResponse({"active": True})
+    turn = await _last_turn(session_dao, sid)
+    return JSONResponse({"active": turn is not None and _alive(turn)})
 
 
 @router.get("/v1/sessions/{session_id}/stream")
@@ -886,23 +934,51 @@ async def stream_resume(
     request: Request,
     session_id: str,
     auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
 ) -> Response:
-    """Reconnect to an in-progress (or recently finished) SSE stream.
+    """Reconnect to a reply being written (or recently finished), on whichever worker writes it.
 
-    Replays all buffered chunks, then tails live chunks until the
-    stream completes.  Returns 204 if no buffer exists.
+    Replays it from the start, then follows it until it ends. This worker's
+    buffer when it writes the reply; the shared log (Redis) when another
+    does. 204 when there is nothing to read.
     """
-    buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
-    if not buf or not buf.has_buffer(session_id):
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    subscriber = await buf.subscribe(session_id)
+    try:
+        sid = await _owned_session(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    buf = _stream_buffer(request)
+    turn = await _last_turn(session_dao, sid)
     headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-    # As on the stream it resumes: the reply's info button needs it.
-    trace_id = buf.trace_id(session_id)
-    if trace_id:
-        headers["x-langfuse-trace-id"] = trace_id
-    return StreamingResponse(subscriber, media_type="text/event-stream", headers=headers)
+
+    if buf.has_buffer(session_id) and (turn is None or buf.turn_of(session_id) in (None, str(turn.id))):
+        # As on the stream it resumes: the reply's info button needs it.
+        trace_id = buf.trace_id(session_id)
+        if trace_id:
+            headers["x-langfuse-trace-id"] = trace_id
+        return StreamingResponse(
+            await buf.subscribe(session_id), media_type="text/event-stream", headers=headers,
+        )
+
+    # Another worker writes it: its events are in the shared log, or about to be.
+    if turn is not None and buf.log is not None and (_alive(turn) or await buf.log.exists(str(turn.id))):
+        bind = session_dao.session.bind
+        turn_id = turn.id
+
+        async def still_written() -> bool:
+            async with AsyncSession(bind, expire_on_commit=False) as own:
+                row = await own.get(ChatMessage, turn_id)
+                await own.commit()
+            return row is not None and _alive(row)
+
+        if turn.trace_id:
+            headers["x-langfuse-trace-id"] = turn.trace_id
+        return StreamingResponse(
+            buf.log.read(str(turn_id), still_written=still_written),
+            media_type="text/event-stream",
+            headers=headers,
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _request_id(request: Request) -> str:
