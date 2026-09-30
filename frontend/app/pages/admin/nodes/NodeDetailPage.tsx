@@ -43,6 +43,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import SystemUpdateDialog from "~/pages/admin/nodes/SystemUpdateDialog";
+import AgentUpdateChip from "~/pages/admin/nodes/AgentUpdateChip";
 import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 
 import GaugeCard from "~/components/GaugeCard";
@@ -510,6 +511,7 @@ export default function NodeDetailPage() {
                   label={t("nodes.maintenance")}
                 />
               )}
+              <AgentUpdateChip version={node.agent_update} />
               {node.draining && (
                 <Chip
                   size="small"

@@ -623,3 +623,17 @@ def test_the_backend_expects_the_agent_version_the_checkout_builds() -> None:
         pytest.skip("no agent source beside this backend")
     version = tomllib.loads(agent_pyproject.read_text(encoding="utf-8"))["project"]["version"]
     assert install_api.AGENT_VERSION == version
+
+
+@pytest.mark.parametrize(
+    ("running", "announced"),
+    [("0.1.18", True), ("v0.2.2", True), (install_api.AGENT_VERSION, False), ("9.0.0", False), (None, False), ("dev", False)],
+    ids=["older", "older-with-v", "current", "newer", "unknown", "unparsable"],
+)
+def test_a_newer_agent_is_announced_for_an_older_machine_only(running: str | None, announced: bool) -> None:
+    """Shown on the machine (NodeDTO.agent_update); updating stays the operator's step."""
+    from faden_backend.web.api.admin.system.schema import NodeDTO  # noqa: PLC0415
+
+    node = NodeDTO(id="n", agent_id="a", host="10.250.10.49", status="healthy", version=running,
+                   created_at="2026-09-29T00:00:00Z", updated_at="2026-09-29T00:00:00Z")
+    assert node.model_dump()["agent_update"] == (install_api.AGENT_VERSION if announced else None)

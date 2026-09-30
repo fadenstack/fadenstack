@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from faden_backend.web.api.install import newer_agent_version
 
 
 class SettingUpdateRequest(BaseModel):
@@ -262,6 +264,12 @@ class NodeDTO(BaseModel):
     profile_id: str | None = None
     latest_inventory: dict[str, Any] | None = None
     latest_utilization: dict[str, Any] | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def agent_update(self) -> str | None:
+        """The agent version this server installs, when this machine's is older; updating is the operator's step."""
+        return newer_agent_version(self.version)
 
 
 class NodeMaintenanceRequest(BaseModel):

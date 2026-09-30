@@ -12,6 +12,7 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { useAsyncData } from "~/lib/useAsyncData";
 import { usePendingJoins } from "~/lib/usePendingJoins";
+import AgentUpdateChip from "./AgentUpdateChip";
 import NodeOnboardingDrawer from "./NodeOnboardingPage";
 
 import Alert from "@mui/material/Alert";
@@ -159,7 +160,7 @@ export default function NodeFleetPage() {
       key: "flags",
       label: t("nodes.state"),
       searchValue: (row) =>
-        `${row.maintenance_mode ? "maintenance" : ""} ${row.draining ? "draining" : ""}`.trim(),
+        `${row.maintenance_mode ? "maintenance" : ""} ${row.draining ? "draining" : ""} ${row.agent_update ? "update" : ""}`.trim(),
       render: (row) => (
         <Stack direction="row" spacing={0.5} flexWrap="wrap">
           {row.maintenance_mode && (
@@ -178,7 +179,8 @@ export default function NodeFleetPage() {
               variant="outlined"
             />
           )}
-          {!row.maintenance_mode && !row.draining && (
+          <AgentUpdateChip version={row.agent_update} />
+          {!row.maintenance_mode && !row.draining && !row.agent_update && (
             <Typography variant="body2" color="text.secondary">
               -
             </Typography>
