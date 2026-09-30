@@ -168,3 +168,39 @@ async def test_the_chat_list_marks_the_chats_a_reply_is_being_written_in(
     await db_session.commit()
     listed = (await client.get("/v1/sessions", headers=_auth())).json()["data"]
     assert [(s["id"], s["writing"]) for s in listed] == [(str(chat), True)]
+
+
+@pytest.mark.anyio
+async def test_the_gateway_sweeps_at_start(chat: uuid.UUID, db_session: AsyncSession) -> None:  # noqa: F811
+    """The loop the gateway starts with: a coroutine, and its first pass ends a reply left running.
+
+    Placed between ``@asynccontextmanager`` and ``lifespan_setup``, it took
+    the decorator: the gateway did not start (.61, 2026-09-30).
+    """
+    import inspect  # noqa: PLC0415
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: PLC0415
+
+    from faden_gateway.web.lifespan import _turn_sweep_loop, lifespan_setup  # noqa: PLC0415
+
+    assert inspect.iscoroutinefunction(_turn_sweep_loop)
+    assert hasattr(lifespan_setup(SimpleNamespace()), "__aenter__"), "startup is still a context manager"
+
+    left = ChatMessage(session_id=chat, role="assistant", content="", status="running",
+                       updated_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+    db_session.add(left)
+    await db_session.commit()
+    app = SimpleNamespace(state=SimpleNamespace(
+        db_session_factory=async_sessionmaker(db_session.bind, expire_on_commit=False),
+    ))
+    sweeping = asyncio.create_task(_turn_sweep_loop(app))  # type: ignore[arg-type]
+    try:
+        for _ in range(200):
+            await db_session.refresh(left)
+            if left.status != "running":
+                break
+            await asyncio.sleep(0.01)
+    finally:
+        sweeping.cancel()
+    assert left.status == "interrupted"

@@ -218,7 +218,6 @@ def _setup_service_registry(app: FastAPI) -> None:
     app.state.service_registry = service_registry
 
 
-@asynccontextmanager
 async def _turn_sweep_loop(app: FastAPI) -> None:
     """End chat replies a gateway that went away left running, now and every minute.
 
@@ -247,6 +246,7 @@ async def _turn_sweep_loop(app: FastAPI) -> None:
         await asyncio.sleep(60)
 
 
+@asynccontextmanager
 async def lifespan_setup(
     app: FastAPI,
 ) -> AsyncGenerator[None, None]:  # pragma: no cover
