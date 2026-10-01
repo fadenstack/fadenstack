@@ -24,15 +24,16 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.groups import Group, UserGroup
+from faden_backend.db.models.groups import UserGroup
 from faden_backend.db.models.users import User
 from faden_backend.services.chat.gateway_client import shared_client
+from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.services.skills import drafting
 from faden_backend.services.skills.client import (
     SkillsPrincipal,
@@ -92,16 +93,8 @@ async def skills_principal(
 # ── Answered here ─────────────────────────────────────────────────────
 
 
-class PrincipalOption(BaseModel):
-    """A user or group a skill can be shared with."""
-
-    type: str
-    id: str
-    label: str
-
-
 @router.get("/principals", response_model=list[PrincipalOption])
-async def find_principals(
+async def list_principals(
     _user: Annotated[User, Depends(require_permission(RESOURCE, "share"))],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     q: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
@@ -112,43 +105,7 @@ async def find_principals(
     ``q`` searches e-mail addresses and group names; ``ids``
     (``user:<id>,group:<id>``) names the ones a skill is already shared with.
     """
-    users: list[User] = []
-    groups: list[Group] = []
-    if ids:
-        wanted_users, wanted_groups = _parse_ids(ids)
-        if wanted_users:
-            users = list(
-                (await session.execute(select(User).where(User.id.in_(wanted_users)))).scalars(),
-            )
-        if wanted_groups:
-            groups = list(
-                (await session.execute(select(Group).where(Group.id.in_(wanted_groups)))).scalars(),
-            )
-    elif q and q.strip():
-        pattern = f"%{q.strip()}%"
-        users = list(
-            (
-                await session.execute(
-                    select(User)
-                    .where(User.is_active.is_(True), User.email.ilike(pattern))
-                    .order_by(User.email)
-                    .limit(10),
-                )
-            ).scalars(),
-        )
-        groups = list(
-            (
-                await session.execute(
-                    select(Group)
-                    .where(or_(Group.name.ilike(pattern), Group.description.ilike(pattern)))
-                    .order_by(Group.name)
-                    .limit(10),
-                )
-            ).scalars(),
-        )
-    return [PrincipalOption(type="group", id=str(g.id), label=g.name) for g in groups] + [
-        PrincipalOption(type="user", id=str(u.id), label=u.email) for u in users
-    ]
+    return await find_principals(session, q=q, ids=ids)
 
 
 class DraftRequest(BaseModel):
@@ -312,22 +269,6 @@ async def _ask_model(gateway: Any, jwt: str, model: str, messages: list[dict[str
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The model's answer could not be read.",
         ) from exc
-
-
-def _parse_ids(ids: str) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
-    users: list[uuid.UUID] = []
-    groups: list[uuid.UUID] = []
-    for item in ids.split(","):
-        kind, _, raw = item.strip().partition(":")
-        try:
-            value = uuid.UUID(raw)
-        except ValueError:
-            continue
-        if kind == "user":
-            users.append(value)
-        elif kind == "group":
-            groups.append(value)
-    return users, groups
 
 
 def _gateway_error(response: Any) -> str:

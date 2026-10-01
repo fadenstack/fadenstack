@@ -16,6 +16,7 @@ from faden_backend.db.models.agents import (
     Agent,
     AgentGrant,
     AgentMember,
+    AgentMemberRole,
     AgentRefreshToken,
     AgentStatus,
     AgentVersion,
@@ -166,6 +167,16 @@ class AgentsDAO:
         )
         return list(rows.scalars())
 
+    async def maintains_any(self, user_id: uuid.UUID) -> bool:
+        """Whether *user_id* maintains at least one agent."""
+        return (
+            await self.session.scalar(
+                select(AgentMember.agent_id)
+                .where(AgentMember.user_id == user_id, AgentMember.role == AgentMemberRole.MAINTAINER.value)
+                .limit(1),
+            )
+        ) is not None
+
     async def member_role(self, agent_id: uuid.UUID, user_id: uuid.UUID) -> str | None:
         """The role of *user_id* on the agent, if any."""
         return await self.session.scalar(
@@ -190,12 +201,12 @@ class AgentsDAO:
         rows = await self.session.execute(select(UserGroup.group_id).where(UserGroup.user_id == user_id))
         return set(rows.scalars())
 
-    async def existing_users(self, ids: set[uuid.UUID]) -> set[uuid.UUID]:
-        """Those of *ids* that are users."""
+    async def existing_users(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """Those of *ids* that are users, with their e-mail addresses."""
         if not ids:
-            return set()
-        rows = await self.session.execute(select(User.id).where(User.id.in_(ids)))
-        return set(rows.scalars())
+            return {}
+        rows = await self.session.execute(select(User.id, User.email).where(User.id.in_(ids)))
+        return dict(rows.tuples().all())
 
     async def existing_groups(self, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
         """Those of *ids* that are groups, with their names."""

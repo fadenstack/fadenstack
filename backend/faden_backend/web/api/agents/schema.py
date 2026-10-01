@@ -110,6 +110,13 @@ class MemberEntry(BaseModel):
     role: str = "maintainer"
 
 
+class MemberDTO(MemberEntry):
+    """A member, with who it names."""
+
+    #: The user's e-mail address, for display.
+    label: str | None = None
+
+
 class ReplaceMembersRequest(BaseModel):
     """The full list of an agent's members."""
 

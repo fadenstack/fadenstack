@@ -54,6 +54,9 @@ class AdminUserDTO(BaseModel):
     is_verified: bool
     usage_group_id: uuid.UUID | None = None
     usage_group_name: str | None = None
+    #: Lets the user's agents attach any local MCP server (switched by admins).
+    developer_mode: bool = False
+    developer_mode_until: datetime | None = None
     roles: list[RoleDTO] = Field(default_factory=list)
     permissions: list[PermissionDTO] = Field(default_factory=list)
 

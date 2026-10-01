@@ -18,7 +18,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -37,6 +37,7 @@ from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.agents import access, tokens
 from faden_backend.services.extensions import registry
+from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.web.api.agents.schema import (
     AccessDTO,
     AgentDTO,
@@ -47,7 +48,7 @@ from faden_backend.web.api.agents.schema import (
     CreateAgentRequest,
     GrantDTO,
     IssueTokenRequest,
-    MemberEntry,
+    MemberDTO,
     RefreshTokenRequest,
     ReplaceGrantsRequest,
     ReplaceMembersRequest,
@@ -211,6 +212,24 @@ async def create_agent(
     return await _dto(dao, agent, can_manage=True)
 
 
+@router.get("/principals", response_model=list[PrincipalOption], name="find_agent_principals")
+async def list_principals(
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    q: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
+    ids: Annotated[str | None, Query(max_length=4000)] = None,
+) -> list[PrincipalOption]:
+    """Users and teams to grant an agent to or make its maintainers, for those who manage agents.
+
+    ``q`` searches e-mail addresses and group names; ``ids`` (``user:<id>,group:<id>``) names them.
+    """
+    rights = [await _has(rbac, user, action) for action in ("read", "create", "manage")]
+    if not any(rights) and not await dao.maintains_any(user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not manage agents.")
+    return await find_principals(dao.session, q=q, ids=ids)
+
+
 @router.get("/{agent_ref}", response_model=AgentDTO, name="get_agent")
 async def get_agent(
     agent_ref: str,
@@ -366,21 +385,21 @@ async def _grant_dtos(dao: AgentsDAO, agent: Agent) -> list[GrantDTO]:
     groups = await dao.existing_groups(
         {g.principal_id for g in grants if g.principal_type == PrincipalType.GROUP},
     )
-    users = {
-        g.principal_id: (await dao.session.get(User, g.principal_id))
-        for g in grants
-        if g.principal_type == PrincipalType.USER
-    }
+    users = await dao.existing_users(
+        {g.principal_id for g in grants if g.principal_type == PrincipalType.USER},
+    )
+    names = groups | users
     return [
         GrantDTO(
-            principal_type=g.principal_type,
-            principal_id=g.principal_id,
-            label=groups.get(g.principal_id)
-            if g.principal_type == PrincipalType.GROUP
-            else getattr(users.get(g.principal_id), "email", None),
+            principal_type=g.principal_type, principal_id=g.principal_id, label=names.get(g.principal_id),
         )
         for g in grants
     ]
+
+
+async def _member_dtos(dao: AgentsDAO, members: list[Any]) -> list[MemberDTO]:
+    emails = await dao.existing_users({m.user_id for m in members})
+    return [MemberDTO(user_id=m.user_id, role=m.role, label=emails.get(m.user_id)) for m in members]
 
 
 @router.get("/{agent_ref}/grants", response_model=list[GrantDTO], name="list_agent_grants")
@@ -408,8 +427,8 @@ async def replace_grants(
     agent = await _managed_agent(dao, rbac, agent_ref, user)
     user_ids = {g.principal_id for g in payload.grants if g.principal_type == PrincipalType.USER}
     group_ids = {g.principal_id for g in payload.grants if g.principal_type == PrincipalType.GROUP}
-    unknown = (user_ids - await dao.existing_users(user_ids)) | (
-        group_ids - set(await dao.existing_groups(group_ids))
+    unknown = (user_ids - (await dao.existing_users(user_ids)).keys()) | (
+        group_ids - (await dao.existing_groups(group_ids)).keys()
     )
     if unknown:
         raise HTTPException(
@@ -423,19 +442,19 @@ async def replace_grants(
     return await _grant_dtos(dao, agent)
 
 
-@router.get("/{agent_ref}/members", response_model=list[MemberEntry], name="list_agent_members")
+@router.get("/{agent_ref}/members", response_model=list[MemberDTO], name="list_agent_members")
 async def list_members(
     agent_ref: str,
     user: Annotated[User, Depends(current_active_user)],
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
-) -> list[MemberEntry]:
+) -> list[MemberDTO]:
     """The agent's maintainers."""
     agent = await _managed_agent(dao, rbac, agent_ref, user)
-    return [MemberEntry(user_id=m.user_id, role=m.role) for m in await dao.members(agent.id)]
+    return await _member_dtos(dao, await dao.members(agent.id))
 
 
-@router.put("/{agent_ref}/members", response_model=list[MemberEntry], name="replace_agent_members")
+@router.put("/{agent_ref}/members", response_model=list[MemberDTO], name="replace_agent_members")
 async def replace_members(
     agent_ref: str,
     payload: ReplaceMembersRequest,
@@ -443,7 +462,7 @@ async def replace_members(
     dao: AgentsDAO = Depends(),
     rbac: RbacDAO = Depends(),
     audit: AuditDAO = Depends(),
-) -> list[MemberEntry]:
+) -> list[MemberDTO]:
     """The agent's maintainers (and, with Enterprise, auditors); replaces the list."""
     agent = await _managed_agent(dao, rbac, agent_ref, user)
     bad_roles = {m.role for m in payload.members} - registry.member_roles
@@ -453,7 +472,7 @@ async def replace_members(
             detail="Unknown roles: " + ", ".join(sorted(bad_roles)),
         )
     ids = {m.user_id for m in payload.members}
-    unknown = ids - await dao.existing_users(ids)
+    unknown = ids - (await dao.existing_users(ids)).keys()
     if unknown:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -463,7 +482,7 @@ async def replace_members(
     await _audit(
         audit, user, "agent.members", str(agent.id), {"members": [m.model_dump() for m in payload.members]},
     )
-    return [MemberEntry(user_id=m.user_id, role=m.role) for m in rows]
+    return await _member_dtos(dao, rows)
 
 
 @router.get("/{agent_ref}/access/{user_id}", response_model=AccessDTO, name="explain_agent_access")

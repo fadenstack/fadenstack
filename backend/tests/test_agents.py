@@ -124,7 +124,7 @@ async def test_an_agent_starts_as_a_draft_its_creator_maintains(
     assert agent["status"] == "draft"
     assert agent["latest_version"] == 1 and agent["published_version"] is None
     members = (await client.get("/api/agents/eplan-assistant/members")).json()
-    assert members == [{"user_id": str(admin.id), "role": "maintainer"}]
+    assert members == [{"user_id": str(admin.id), "role": "maintainer", "label": admin.email}]
     # Addressed by slug or id alike.
     assert (await client.get(f"/api/agents/{agent['id']}")).json()["slug"] == "eplan-assistant"
 
@@ -294,6 +294,34 @@ async def test_grants_name_known_principals_only(
         "grants": [{"principal_type": "group", "principal_id": str(uuid.uuid4())}],
     })
     assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+
+async def test_grants_and_members_are_labelled_and_principals_found_by_agent_managers(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    member = await _user(dbsession)
+    team = await _team(dbsession, member)
+    await _agent(client, slug="labelled")
+    await _grant(client, "labelled", ("group", team.id), ("user", member.id))
+    grants = (await client.get("/api/agents/labelled/grants")).json()
+    assert {(g["principal_type"], g["label"]) for g in grants} == {("group", team.name), ("user", member.email)}
+    r = await client.put("/api/agents/labelled/members", json={"members": [
+        {"user_id": str(admin.id)}, {"user_id": str(member.id)},
+    ]})
+    assert sorted(m["label"] for m in r.json()) == sorted([admin.email, member.email])
+
+    found = (await client.get("/api/agents/principals", params={"q": member.email[:6]})).json()
+    assert {"type": "user", "id": str(member.id), "label": member.email} in found
+    named = (await client.get("/api/agents/principals", params={"ids": f"group:{team.id}"})).json()
+    assert named == [{"type": "group", "id": str(team.id), "label": team.name}]
+
+    # A maintainer without RBAC rights may look principals up; someone who manages no agent may not.
+    signed_in.user = member
+    assert (await client.get("/api/agents/principals", params={"q": "exam"})).status_code == status.HTTP_200_OK
+    signed_in.user = await _user(dbsession)
+    r = await client.get("/api/agents/principals", params={"q": "exam"})
+    assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
 # -- tokens --------------------------------------------------------------------------------
@@ -485,6 +513,8 @@ async def test_developer_mode_is_set_by_admins_and_reaches_the_token(
     signed_in.user = admin
     r = await client.put(f"/api/admin/users/{dev.id}/developer-mode", json={"enabled": True})
     assert r.status_code == status.HTTP_200_OK and r.json()["developer_mode"] is True
+    listed = {u["id"]: u for u in (await client.get("/api/admin/users/")).json()}
+    assert listed[str(dev.id)]["developer_mode"] is True, "the users page shows it"
     signed_in.user = dev
     token = (await _sign_in(client, "dev-agent")).json()["access_token"]
     assert jwt.decode(token, options={"verify_signature": False})["dev"] is True

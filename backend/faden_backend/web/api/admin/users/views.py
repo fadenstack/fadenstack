@@ -82,6 +82,8 @@ async def _build_admin_user_dto(user: User, rbac_dao: RbacDAO) -> AdminUserDTO:
         permissions=_permissions_to_dto(permissions),
         usage_group_id=user.usage_group_id,
         usage_group_name=usage_group.name if usage_group else None,
+        developer_mode=user.developer_mode,
+        developer_mode_until=user.developer_mode_until,
     )
 
 
