@@ -36,9 +36,18 @@ export function DiffView({ lines, emptyText, maxHeight = 480 }: DiffViewProps) {
       ) : (
         lines.map((line, i) => (
           // eslint-disable-next-line react/no-array-index-key -- lines have no identity but their place
-          <Box key={i} component="div" sx={{ color: COLOR[line.kind], bgcolor: line.kind === "same" ? undefined : "action.hover" }}>
-            {MARK[line.kind]}
-            {line.text || " "}
+          <Box
+            key={i}
+            component="div"
+            sx={{ display: "flex", color: COLOR[line.kind], bgcolor: line.kind === "same" ? undefined : "action.hover" }}
+          >
+            {/* The sign in a gutter of its own: never read (or copied) as part of the line. */}
+            <Box component="span" aria-hidden sx={{ flex: "0 0 2ch", userSelect: "none", opacity: 0.7 }}>
+              {MARK[line.kind]}
+            </Box>
+            <Box component="span" sx={{ minWidth: 0 }}>
+              {line.text || " "}
+            </Box>
           </Box>
         ))
       )}

@@ -180,7 +180,7 @@ export default function UsersPage() {
       label: t("users.flags"),
       searchValue: (u) => `${u.is_active} ${u.is_superuser} ${u.is_verified} ${hasDeveloperMode(u) ? "developer" : ""}`,
       render: (u) => (
-        <Stack direction="row" spacing={0.8}>
+        <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
           {u.is_superuser && <Chip size="small" color="warning" label={t("users.superuser")} />}
           {u.is_active ? (
             <Chip size="small" color="success" label={t("common.active")} />

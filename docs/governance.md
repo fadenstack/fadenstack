@@ -15,6 +15,9 @@ Content policies are an Enterprise extension: with none installed there is
 no input or output check, and a streamed answer is forwarded exactly as
 before -- no buffering.
 
+Superusers manage tool rules and tool classes, and read the decision log, in
+the console under **Agents → Governance** (`/admin/governance`).
+
 ---
 
 ## What the client gets

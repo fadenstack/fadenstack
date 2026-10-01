@@ -69,7 +69,7 @@ export function DecisionsTable() {
       key: "stage",
       label: t("governance.decisions.stage"),
       render: (d) => <Chip size="small" variant="outlined" label={label("governance.decisions.stage_value", d.stage)} />,
-      minWidth: 100,
+      minWidth: 90,
     },
     {
       key: "outcome",
@@ -87,13 +87,18 @@ export function DecisionsTable() {
         <>
           <Typography variant="body2">{d.message ?? "—"}</Typography>
           {(d.category || d.tool_id) && (
-            <Typography variant="caption" color="text.secondary" fontFamily={d.tool_id ? "monospace" : undefined}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontFamily={d.tool_id ? "monospace" : undefined}
+              sx={{ display: "block", overflowWrap: "anywhere" }}
+            >
               {[d.tool_id, d.category].filter(Boolean).join(" · ")}
             </Typography>
           )}
         </>
       ),
-      minWidth: 260,
+      minWidth: 340,
     },
     {
       key: "user",

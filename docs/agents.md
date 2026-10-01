@@ -10,8 +10,28 @@ an agent's sessions stay on the device.
 
 ## Setting up an agent
 
-Agents are managed under `/api/agents` (admin console pages follow). You need
-`agents:create` to create one; you then maintain it.
+In the console: **Agents → Agents** (`/admin/agents`). Each agent has four tabs:
+
+| Tab | What it does |
+|---|---|
+| Definition | Instructions, model, knowledge, server tools, local MCP, host tools, greeting and suggestions. Saving makes a new version; *Save and publish* serves it at once. |
+| Versions | Every version, which one is live, what changed between two, publish or roll back. |
+| Access | The users and teams who may use it, its maintainers, and "may this person use it, and why?" |
+| Activity | Requests and tokens per day, what the SDKs reported (tools run, approvals, local MCP servers), and the signed-in devices, which can be signed out. |
+
+*New agent* can start from a JSON definition, such as the Office agents'
+`contracts/*.json`. Tool rules, tool classes and the decision log are under
+**Agents → Governance** (superusers; see [governance.md](governance.md)), and
+developer mode is switched per user under **Access Control → Users**.
+
+Who sees what:
+
+- `agents:create` creates agents; the creator maintains them.
+- Maintainers and `agents:manage` change an agent, its versions and its access.
+- `agents:read` sees every agent and its details (versions, access,
+  activity), but changes nothing.
+
+The API is under `/api/agents`:
 
 | Step | Call |
 |---|---|
