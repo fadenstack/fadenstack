@@ -2897,8 +2897,11 @@
       "unknown_tool_parser": "This engine does not know the tool format \"{{value}}\".",
       "unknown_reasoning_parser": "This engine does not know the thinking format \"{{value}}\".",
       "remote_code": "The model's own code will run on your machines. Keep this on only for publishers you trust.",
-      "extra_invalid": "These flags are not accepted and will not be used: {{tokens}}"
-    }
+      "extra_invalid": "These flags are not accepted and will not be used: {{tokens}}",
+      "json_invalid": "Not valid JSON, so the copy will not start: {{flags}}"
+    },
+    "json_syntax": "Not valid JSON.",
+    "json_object": "Needs a JSON object, such as {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Hugging Face access",

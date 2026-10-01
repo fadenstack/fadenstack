@@ -466,9 +466,10 @@ async def test_the_cards_answer_for_a_cluster_backed_provider(
     environment = await dbsession.get(InferenceEnvironment, deployment.environment_id)
     asked: dict[str, object] = {}
 
-    async def fake_stats(self, runtime_id, runtime_name):  # noqa: ANN001
+    async def fake_stats(self, runtime_id, runtime_name, *, model_name=None):  # noqa: ANN001
         asked["id"] = runtime_id
         asked["name"] = runtime_name
+        asked["model"] = model_name
         return {
             "enabled": True,
             "stale": False,
@@ -489,6 +490,43 @@ async def test_the_cards_answer_for_a_cluster_backed_provider(
     # Asked under the environment's name, not the deployment's or provider's.
     assert asked["name"] == environment.name
     assert asked["id"] == environment.id
+
+
+async def test_the_cards_are_the_provider_s_own_model_not_the_whole_cluster(
+    client, fastapi_app, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every provider on a cluster showed the cluster's figures -- a stopped one too (.61, 2026-10-01).
+
+    The model is the one the endpoint serves: the name Serve labels its
+    metrics with.
+    """
+    await _admin(dbsession, fastapi_app)
+    deployment = await _deployment(dbsession)
+    endpoint = await EndpointDAO(dbsession).create(
+        deployment.id,
+        name="openai",
+        address="http://10.250.10.71:8000/faden-app",
+        path="/v1",
+        status=EndpointStatus.PUBLISHED,
+    )
+    endpoint.published_json = {"model": "Qwen3.8-27B-FP8", "base_url": "http://10.250.10.71:8000/faden-app/v1"}
+    await dbsession.flush()
+    await _coordinator(dbsession).reconcile_derived_provider(deployment)
+    await dbsession.commit()
+    provider = await _provider_for(dbsession, deployment.id)
+    asked: dict[str, object] = {}
+
+    async def fake_stats(self, runtime_id, runtime_name, *, model_name=None):  # noqa: ANN001
+        asked["model"] = model_name
+        return {"enabled": True, "stale": True, "dashboard_url": None, "stats": {}}
+
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
+
+    monkeypatch.setattr(MonitoringProvisioner, "stats", fake_stats, raising=False)
+    response = await client.get(f"/api/llm/providers/{provider.id}/monitoring-stats")
+
+    assert response.status_code == 200
+    assert asked["model"] == "Qwen3.8-27B-FP8"
 
 
 async def test_a_provider_with_nothing_to_report_says_so_rather_than_failing(

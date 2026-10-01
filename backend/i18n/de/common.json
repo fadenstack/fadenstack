@@ -2899,8 +2899,11 @@
       "unknown_tool_parser": "Diese Engine kennt das Tool-Format \"{{value}}\" nicht.",
       "unknown_reasoning_parser": "Diese Engine kennt das Denkformat \"{{value}}\" nicht.",
       "remote_code": "Der eigene Code des Modells läuft auf Ihren Maschinen. Nur für vertrauenswürdige Herausgeber aktiviert lassen.",
-      "extra_invalid": "Diese Flags werden nicht akzeptiert und nicht verwendet: {{tokens}}"
-    }
+      "extra_invalid": "Diese Flags werden nicht akzeptiert und nicht verwendet: {{tokens}}",
+      "json_invalid": "Kein gültiges JSON, die Kopie startet so nicht: {{flags}}"
+    },
+    "json_syntax": "Kein gültiges JSON.",
+    "json_object": "Braucht ein JSON-Objekt, etwa {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Hugging-Face-Zugang",

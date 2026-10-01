@@ -2899,8 +2899,11 @@
       "unknown_tool_parser": "Este motor no conoce el formato de herramientas \"{{value}}\".",
       "unknown_reasoning_parser": "Este motor no conoce el formato de razonamiento \"{{value}}\".",
       "remote_code": "El código propio del modelo se ejecutará en sus máquinas. Manténgalo activado solo para editores de confianza.",
-      "extra_invalid": "Estas opciones no se aceptan y no se usarán: {{tokens}}"
-    }
+      "extra_invalid": "Estas opciones no se aceptan y no se usarán: {{tokens}}",
+      "json_invalid": "No es JSON válido, así la copia no arranca: {{flags}}"
+    },
+    "json_syntax": "No es JSON válido.",
+    "json_object": "Necesita un objeto JSON, por ejemplo {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Acceso a Hugging Face",

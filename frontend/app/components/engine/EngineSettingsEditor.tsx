@@ -55,6 +55,7 @@ import {
   commandLine,
   formatBytes,
   formatTokens,
+  jsonProblem,
   type EngineConfig,
   type EngineTarget,
   type EngineValue,
@@ -611,6 +612,8 @@ function warningText(t: (k: string, o?: Record<string, unknown>) => string, w: E
       return t(`engine.warning.${w.code}`, { value: w.value });
     case "extra_invalid":
       return t("engine.warning.extra_invalid", { tokens: w.tokens.join(" ") });
+    case "json_invalid":
+      return t("engine.warning.json_invalid", { flags: w.flags.join(" ") });
     default:
       return t(`engine.warning.${w.code}`);
   }
@@ -813,6 +816,25 @@ function FlagRow({
           </MenuItem>
         ))}
       </TextField>
+    );
+  } else if (def.type === "json") {
+    // Kept as the JSON text it is typed in; a cluster reads it into an object.
+    const problem = jsonProblem(value);
+    control = (
+      <TextField
+        size="small"
+        multiline
+        minRows={1}
+        maxRows={6}
+        sx={{ minWidth: 260, "& textarea": { fontFamily: "monospace", fontSize: 12 } }}
+        disabled={disabled}
+        placeholder={def.default !== undefined ? defaultText : '{"key": "value"}'}
+        value={value === undefined ? "" : String(value)}
+        error={problem !== null}
+        helperText={problem !== null ? t(`engine.json_${problem}`) : undefined}
+        onChange={(e) => onSet(def.key, e.target.value === "" ? undefined : e.target.value)}
+        slotProps={{ htmlInput: { "data-testid": `engine-json-${def.flag}` } }}
+      />
     );
   } else {
     const numeric = def.type === "integer" || def.type === "number";

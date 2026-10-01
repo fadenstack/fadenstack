@@ -81,7 +81,11 @@ from faden_backend.services.inference.bundles import (
     default_bundle_registry,
     translate_host_path_to_container,
 )
-from faden_backend.services.inference.drivers.ray.logs import engine_root_cause
+from faden_backend.services.inference.drivers.ray.logs import (
+    START_FAILED,
+    EngineFailure,
+    engine_root_cause,
+)
 from faden_backend.services.inference.drivers.ray.client import (
     RayClusterClient,
     RayCommandError,
@@ -283,6 +287,36 @@ def _traceback_cause(text: str) -> str | None:
         match = _EXCEPTION_LINE.match(line)
         if match:
             return f"{match.group(1)}: {match.group(2).strip()}"
+    return None
+
+
+#: Serve's message, from the first failure on, for a copy that died while it was set up.
+_SETUP_FAILED = "failed to start with exception"
+
+
+def _setup_failure(app: dict[str, Any] | None) -> str | None:
+    """Why a copy of *app* died while Serve set it up, as Serve says while it retries.
+
+    "A replica failed to start with exception. Retrying 2 more time(s).
+    Error: <traceback>" sits on the model deployment from the first failure.
+    A copy that never reached its engine -- a setting vLLM cannot take --
+    leaves nothing in the engine's log, so this is where it is seen. An engine
+    that did start and fail reads the same here, with only "Engine core
+    initialization failed" for a cause; that one is left to the engine's log
+    (``engine_root_cause``), which names the real one.
+    """
+    if not app:
+        return None
+    for entry in _model_server_deployments(app).values():
+        text = str((entry or {}).get("message") or "") if isinstance(entry, dict) else ""
+        if _SETUP_FAILED not in text:
+            continue
+        cause = _traceback_cause(text)
+        if cause is None:
+            last = [line.strip() for line in text.split("Error:", 1)[-1].splitlines() if line.strip()]
+            cause = last[-1] if last else None
+        if cause and not START_FAILED.search(cause):
+            return cause
     return None
 
 
@@ -1046,6 +1080,22 @@ class RayDeploymentManager:
 
         app_status = ((observed or {}).get("status") or "").upper()
         applied_at = _applied_at(deployment)
+        if app_status == "DEPLOY_FAILED" and ready > 0:
+            # New copies could not start, and the ones already serving go on:
+            # Serve keeps the old version when the new one fails. Serving with
+            # fewer copies than asked is degraded, not failed -- and still
+            # routed to (publication goes by ready copies).
+            cause = await _failure_with_cause(observed, app_name, applied_at)
+            wanted = _copies_wanted(facts.spec_data)[0]
+            self._observe(
+                deployment, DeploymentPhase.DEGRADED,
+                f"{ready} of {wanted} copies serve; the others failed to start: {cause}".strip(), False,
+                observed={"reconciled": False, "reason": "copies-failed", "app": app_name},
+                ready_replicas=ready,
+                total_replicas=wanted,
+                config_hash=config_hash,
+            )
+            return
         if app_status == "DEPLOY_FAILED":
             # Terminal on Ray's side (replica startup exhausted its retries):
             # surface why.  Out of the queue until the spec changes or a
@@ -1139,7 +1189,14 @@ class RayDeploymentManager:
             # start already failed -- Serve only says so after three, each
             # loading the whole model again (fifteen minutes for Qwen3.8).
             failure = await engine_root_cause(app_name, after=applied_at) if ready < 1 else None
-            if failure is not None and failure.recurs:
+            # A copy that died while Serve set it up -- a setting vLLM cannot
+            # take -- never reached its engine; Serve says so while it retries.
+            setup = _setup_failure(observed)
+            if setup is not None and (failure is None or not failure.start_failed):
+                failure = EngineFailure(cause=setup, start_failed=True)
+            # Stopped only while no copy serves: stopping now would take down
+            # the copies of the version that works.
+            if failure is not None and failure.recurs and ready < 1:
                 # It would fail the same way on every attempt: stop now.
                 await self._stop_failed_start(
                     deployment, facts, client, failure.cause, config_hash=config_hash,

@@ -18,6 +18,7 @@ from faden_backend.db.dao.llm_dao import ArtifactDAO, ModelDAO, ProviderDAO, Run
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.inference import (
     InferenceDeployment,
+    InferenceEndpoint,
     InferenceEnvironment,
 )
 from faden_backend.db.models.llm import (
@@ -643,7 +644,16 @@ async def provider_monitoring_stats(
         environment = row.scalars().first()
         if environment is None:
             return off
-        return await monitoring.stats(environment.id, environment.name)
+        # The cluster runs other models too: the figures are this one's.
+        served = await session.execute(
+            select(InferenceEndpoint.published_json)
+            .where(InferenceEndpoint.deployment_id == deployment_id)
+            .order_by(InferenceEndpoint.name != "openai"),
+        )
+        model_name = next(
+            (str(doc["model"]) for doc in served.scalars() if isinstance(doc, dict) and doc.get("model")), None,
+        )
+        return await monitoring.stats(environment.id, environment.name, model_name=model_name)
 
     if provider.type != ProviderType.VLLM:
         return off

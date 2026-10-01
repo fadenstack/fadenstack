@@ -2899,8 +2899,11 @@
       "unknown_tool_parser": "此引擎不认识工具格式“{{value}}”。",
       "unknown_reasoning_parser": "此引擎不认识思考格式“{{value}}”。",
       "remote_code": "模型自带的代码将在您的机器上运行。仅对可信发布者保持开启。",
-      "extra_invalid": "以下参数不被接受，将不会使用：{{tokens}}"
-    }
+      "extra_invalid": "以下参数不被接受，将不会使用：{{tokens}}",
+      "json_invalid": "不是有效的 JSON，副本无法启动：{{flags}}"
+    },
+    "json_syntax": "不是有效的 JSON。",
+    "json_object": "需要一个 JSON 对象，例如 {\"method\": \"mtp\"}。"
   },
   "hf_access": {
     "title": "Hugging Face 访问",

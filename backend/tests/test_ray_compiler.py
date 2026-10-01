@@ -338,3 +338,35 @@ def test_a_deployment_that_asks_for_it_routes_a_chat_to_the_copy_holding_its_pre
     assert router["request_router_class"] == PREFIX_ROUTER
     # Balances again past this queue difference; the tree is kept bounded.
     assert router["request_router_kwargs"] == {"imbalanced_threshold": 10, "do_eviction": True}
+
+
+def test_json_settings_reach_vllm_as_objects() -> None:
+    """The editor keeps them as JSON text, and Ray Serve hands that to vLLM's Python side as it is.
+
+    vLLM then failed every copy with "'str' object has no attribute 'items'"
+    for an MTP ``speculative_config`` (.61, 2026-10-01).
+    """
+    doc = compile_deployment(
+        spec_data=_base_spec(engine={"name": "vllm", "config": {
+            "speculative_config": '{"method": "mtp", "num_speculative_tokens": 3}',
+            "compilation_config": " ",
+            "chat_template": "{% for m in messages %}{{ m.content }}{% endfor %}",
+            "max_model_len": 4096,
+        }}),
+        model_display_name="meta-llama/Llama-3-8B",
+        model_source="remote",
+    )
+    kwargs = doc["llm_configs"][0]["engine_kwargs"]
+    assert kwargs["speculative_config"] == {"method": "mtp", "num_speculative_tokens": 3}
+    assert "compilation_config" not in kwargs, "empty text is the setting left unset"
+    assert kwargs["chat_template"].startswith("{% for"), "a template is text, not JSON"
+    assert kwargs["max_model_len"] == 4096
+
+
+def test_a_json_setting_that_does_not_parse_is_refused_before_serve_tries_it() -> None:
+    with pytest.raises(ValueError, match="speculative_config is not valid JSON"):
+        compile_deployment(
+            spec_data=_base_spec(engine={"name": "vllm", "config": {"speculative_config": "{method: mtp}"}}),
+            model_display_name="meta-llama/Llama-3-8B",
+            model_source="remote",
+        )

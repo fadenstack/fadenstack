@@ -44,7 +44,7 @@ _WINDOW = timedelta(hours=24)
 _PREFIXES = re.compile(r"^(?:\([A-Za-z_][\w:.-]* pid=\d+(?:, ip=[\d.]+)?\)\s*)+")
 _EXCEPTION = re.compile(r"^(?P<cause>[A-Za-z_][\w.]*(?:Error|Exception)\b(?::\s.*)?)$")
 #: vLLM saying the engine did not come up (``core.py``), or Serve summing it up.
-_START_FAILED = re.compile(r"EngineCore failed to start|Engine core initialization failed")
+START_FAILED = re.compile(r"EngineCore failed to start|Engine core initialization failed")
 #: Failures that can pass on another attempt: memory a stopping copy still
 #: holds, a busy device or fabric, time running out. Anything else -- an
 #: unsupported model, weights the engine cannot load, a bad setting -- comes
@@ -178,12 +178,12 @@ async def engine_root_cause(app_name: str, *, after: datetime | None = None) -> 
         log.debug("Engine root cause for %s not read", app_name, exc_info=True)
         return None
     lines = [line for line in _lines_from_loki(payload) if line.ts is None or line.ts >= start]
-    start_failed = any(_START_FAILED.search(line.message) for line in lines)
+    start_failed = any(START_FAILED.search(line.message) for line in lines)
 
     def cause_of(line: LogLine) -> str | None:
         match = _EXCEPTION.match(_PREFIXES.sub("", line.message).strip())
         # Serve's own summary is not the cause it points at.
-        if not match or _START_FAILED.search(match.group("cause")):
+        if not match or START_FAILED.search(match.group("cause")):
             return None
         return f"{match.group('cause')} (on {line.host})" if line.host else match.group("cause")
 
