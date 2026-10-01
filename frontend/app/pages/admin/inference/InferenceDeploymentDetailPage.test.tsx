@@ -237,6 +237,31 @@ describe("InferenceDeploymentDetailPage", () => {
     });
   });
 
+  it("sets how long a reply may take to start, in the spec's service and nothing else", async () => {
+    // A busy 27B on the DGX pair held requests longer than the gateway's 60 s (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    await renderDetail();
+
+    expect(screen.getByTestId("reply-wait")).toHaveTextContent("the gateway's default (180 s)");
+    await userEvent.click(screen.getByTestId("reply-wait-change"));
+    const field = await screen.findByLabelText("Seconds");
+    await userEvent.type(field, "5");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.clear(field);
+    await userEvent.type(field, "300");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec).toEqual({
+      ...deployment.spec,
+      service: { ...(deployment.spec.service as object), first_token_timeout_sec: 300 },
+    });
+  });
+
   it("keeps the cluster and its machines after an action refreshes the page", async () => {
     // The refresh after an action used to re-run the first render's loaders,
     // which had no cluster to ask about, and blanked these cards.

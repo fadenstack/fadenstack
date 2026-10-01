@@ -7,13 +7,14 @@ upstream calls through this adapter instead of the raw HTTP proxy.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import ssl
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import aclosing
+from contextlib import AsyncExitStack, aclosing
 from dataclasses import dataclass
 from typing import Any
 
@@ -431,11 +432,14 @@ class LLMAdapter:
         ssl_ca_bundle_pem: str | None = None,
         ssl_client_cert_pem: str | None = None,
         ssl_client_key_pem: str | None = None,
+        first_token_timeout_sec: float | None = None,
     ) -> CompletionResult | AsyncIterator[Any]:
         """Run a chat completion (streaming or non-streaming).
 
         Returns ``CompletionResult`` for non-streaming, or an async
         iterator of ``ModelResponse`` chunks for streaming.
+        *first_token_timeout_sec* is the model's own wait for a streamed
+        reply to start (see :meth:`_stream_direct`).
         """
         model_name = _build_litellm_model_name(
             provider_type=provider_type,
@@ -507,7 +511,9 @@ class LLMAdapter:
             kwargs["stream_options"] = {"include_usage": True}
             if self._goes_direct(provider_type, kwargs, tls=tls, litellm_only=litellm_only):
                 http = upstream_tls.clients.http(tls) if tls is not None else self._http
-                return self._stream_direct(kwargs, extra_headers, http=http)
+                return self._stream_direct(
+                    kwargs, extra_headers, http=http, first_token_timeout_sec=first_token_timeout_sec,
+                )
             _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
             return self._stream_completion(**kwargs)
 
@@ -550,6 +556,7 @@ class LLMAdapter:
 
     async def _stream_direct(
         self, kwargs: dict[str, Any], extra_headers: dict[str, Any], *, http: httpx.AsyncClient | None = None,
+        first_token_timeout_sec: float | None = None,
     ) -> AsyncIterator[bytes]:
         """Stream a chat from vLLM as the engine sends it, event by event.
 
@@ -562,6 +569,11 @@ class LLMAdapter:
         boundaries: a network read can split one event or carry several, and
         every step after this one -- PII restore, usage, the saved reply --
         reads whole events.
+
+        Two waits: up to *first_token_timeout_sec* (else the gateway's
+        default) for the reply to start, then up to ``litellm_request_timeout``
+        between events. The engine sends nothing while a request waits in its
+        queue, so the first wait is the one a busy model needs to be long.
         """
         client = http or self._http
         assert client is not None  # noqa: S101 - _goes_direct checked it
@@ -569,13 +581,25 @@ class LLMAdapter:
         body = {key: value for key, value in kwargs.items() if key in _DIRECT_BODY_KEYS}
         body["model"] = str(kwargs["model"]).removeprefix("openai/")
         headers = {"Authorization": f"Bearer {kwargs.get('api_key') or 'EMPTY'}", **extra_headers}
-        timeout = httpx.Timeout(connect=10.0, read=settings.litellm_request_timeout, write=10.0, pool=10.0)
+        first_wait = first_token_timeout_sec or settings.first_token_timeout_sec
+        between = settings.litellm_request_timeout
+        # The socket may stay silent for the longer of the two; the waits
+        # themselves are kept below, around each step.
+        timeout = httpx.Timeout(connect=10.0, read=max(first_wait, between), write=10.0, pool=10.0)
+        loop = asyncio.get_running_loop()
         closed = False
         retried = False
+        started = False
         try:
             while True:
-                request = client.stream("POST", url, json=body, headers=headers, timeout=timeout)
-                async with request as response:
+                starts_by = loop.time() + first_wait
+                async with AsyncExitStack() as stack:
+                    # Ray Serve sends the headers with the first event, so the
+                    # first wait covers both.
+                    async with asyncio.timeout_at(starts_by):
+                        response = await stack.enter_async_context(
+                            client.stream("POST", url, json=body, headers=headers, timeout=timeout),
+                        )
                     if response.status_code >= 400:
                         detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
                         moved = None if retried else _late_system_refused(
@@ -593,13 +617,36 @@ class LLMAdapter:
                         yield _sse(_error_payload("server_error", refusal))
                         yield _DONE
                         return
-                    async with aclosing(_whole_events(response)) as events:
-                        async for event in events:
-                            yield f"{event}\n\n".encode()
-                            if _is_done(event):
-                                closed = True
-                                break
+                    events = await stack.enter_async_context(aclosing(_whole_events(response)))
+                    while True:
+                        # Only the wait for the next event is timed, never the
+                        # yield: the caller's time is its own.
+                        try:
+                            if started:
+                                async with asyncio.timeout(between):
+                                    event = await anext(events)
+                            else:
+                                async with asyncio.timeout_at(starts_by):
+                                    event = await anext(events)
+                        except StopAsyncIteration:
+                            break
+                        started = True
+                        yield f"{event}\n\n".encode()
+                        if _is_done(event):
+                            closed = True
+                            break
                 break
+        except (TimeoutError, httpx.ReadTimeout):
+            # Said as what it is, so the person whose reply failed knows whether
+            # to try again (a busy model) or to report it (one that went quiet).
+            if started:
+                message = f"The model stopped sending its reply for {between:g} s."
+            else:
+                message = f"The model did not start its reply within {first_wait:g} s; it may be busy."
+            logger.warning("Direct vLLM stream timed out: %s", message)
+            yield _sse(_error_payload("server_error", message))
+            yield _DONE
+            return
         except (httpx.HTTPError, ssl.SSLError) as exc:
             # A TLS alert after the handshake -- a proxy refusing this client's
             # certificate, under TLS 1.3 -- arrives on the first read, unmapped.

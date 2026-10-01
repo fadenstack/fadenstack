@@ -370,3 +370,16 @@ def test_a_json_setting_that_does_not_parse_is_refused_before_serve_tries_it() -
             model_display_name="meta-llama/Llama-3-8B",
             model_source="remote",
         )
+
+
+def test_the_wait_for_a_reply_is_not_part_of_what_ray_runs() -> None:
+    """Changing a model's first-token wait republishes it; it never restarts the copies."""
+    compiled = [
+        compile_deployment(
+            spec_data=_base_spec(service=service),
+            model_display_name="Qwen/Qwen3.8-27B-FP8",
+            model_source="remote",
+        )
+        for service in ({"path": "/v1"}, {"path": "/v1", "first_token_timeout_sec": 300})
+    ]
+    assert compiled[0] == compiled[1]

@@ -77,6 +77,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         health_status="healthy",
         is_routable=True,
         max_concurrency=2 * 256,  # two copies at vLLM's default max_num_seqs
+        capacity_hints=None,  # no wait of its own: the gateway's default
         tools=False,  # no engine config: vLLM's tool calls are off
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
@@ -121,9 +122,41 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         health_status="healthy",
         is_routable=True,
         max_concurrency=256,  # only the ready copy counts
+        capacity_hints=None,
         tools=False,  # no engine config: vLLM's tool calls are off
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
+
+
+@pytest.mark.anyio
+async def test_reconcile_publication_carries_the_models_wait_for_a_reply(mock_session, mock_gateway_sync):
+    """The deployment's own first-token wait goes to the routing row the gateway reads per request."""
+    dep_id = uuid.uuid4()
+    deployment = InferenceDeployment(
+        id=dep_id,
+        name="qwen-27b",
+        desired_state=DeploymentDesiredState.ACTIVE,
+        phase=DeploymentPhase.RUNNING,
+        ready_replicas=2,
+        total_replicas=2,
+        spec_json={"service": {"alias": "qwen", "first_token_timeout_sec": 300}},
+    )
+    endpoint = InferenceEndpoint(
+        id=uuid.uuid4(),
+        deployment_id=dep_id,
+        name="openai",
+        address="http://10.250.10.49:8000/faden-dep3",
+        path="/v1",
+        status=EndpointStatus.PUBLISHED,
+        published_json={"model": "Qwen/Qwen3.8-27B-FP8"},
+    )
+    coordinator = InferencePublicationCoordinator(mock_session, gateway_sync=mock_gateway_sync)
+    coordinator.endpoint_dao.list_for_deployment = AsyncMock(return_value=[endpoint])
+
+    await coordinator.reconcile_deployment_publication(deployment)
+
+    sent = mock_gateway_sync.publish_inference_endpoint.await_args.kwargs
+    assert sent["capacity_hints"] == {"first_token_timeout_sec": 300.0}
 
 
 @pytest.mark.parametrize(

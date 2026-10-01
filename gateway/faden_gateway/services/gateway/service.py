@@ -86,6 +86,19 @@ def _candidate_adapter_kwargs(candidate: Any) -> dict[str, Any]:
     }
 
 
+def _first_token_wait(candidate: Any) -> float | None:
+    """The model's own wait for a streamed reply to start, or None for the gateway's default.
+
+    Set on its deployment and published in the routing row's capacity hints,
+    which the gateway reads on every request: a change applies at once.
+    """
+    hints = getattr(candidate, "capacity_hints", None)
+    value = hints.get("first_token_timeout_sec") if isinstance(hints, dict) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return None
+    return float(value)
+
+
 # ── PII context system prompts ───────────────────────────────────────────────
 _PII_REDACT_SYSTEM_PROMPT = (
     "IMPORTANT — Privacy notice: The user's message has been processed by an "
@@ -1179,6 +1192,7 @@ class GatewayService:
                     **_candidate_adapter_kwargs(decision.candidate),
                     payload=egress_payload,
                     stream=True,
+                    first_token_timeout_sec=_first_token_wait(decision.candidate),
                 )
                 # raw_stream is a coroutine returning AsyncIterator[bytes]
                 raw_stream = await raw_stream  # type: ignore[misc]
@@ -2226,6 +2240,7 @@ class GatewayService:
         for iteration in range(settings.mcp_tool_loop_max_iterations + 1):
             raw = await self.adapter.completion(
                 **_candidate_adapter_kwargs(req.decision.candidate), payload=payload, stream=True,
+                first_token_timeout_sec=_first_token_wait(req.decision.candidate),
             )
             calls = ToolCalls()
             said: list[str] = []

@@ -58,6 +58,19 @@ def gateway_concurrency(deployment: InferenceDeployment) -> int:
     return max(deployment.ready_replicas or 0, 1) * per_copy
 
 
+def _capacity_hints(service: dict) -> dict | None:
+    """What the gateway reads per request from the routing row, or None for its defaults.
+
+    ``first_token_timeout_sec``: how long a request may wait for its reply to
+    start (``service.first_token_timeout_sec``). None clears a value set
+    before, so removing the setting brings the default back.
+    """
+    wait = service.get("first_token_timeout_sec")
+    if isinstance(wait, bool) or not isinstance(wait, (int, float)) or wait <= 0:
+        return None
+    return {"first_token_timeout_sec": float(wait)}
+
+
 class InferencePublicationCoordinator:
     """Synchronizes normalized inference endpoint status to the Gateway."""
 
@@ -161,6 +174,7 @@ class InferencePublicationCoordinator:
                 health_status=health_status,
                 is_routable=is_routable,
                 max_concurrency=gateway_concurrency(deployment),
+                capacity_hints=_capacity_hints(spec_service),
                 tools=deployment_calls_tools(deployment.spec_json),
                 # Behind the machine's model-TLS proxy: reached with the
                 # gateway's machine certificate (services/machine_tls).

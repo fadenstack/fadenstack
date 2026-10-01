@@ -487,6 +487,9 @@ export default function InferenceDeploymentDetailPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [waitOpen, setWaitOpen] = useState(false);
+  const [waitSaving, setWaitSaving] = useState(false);
+  const [waitInput, setWaitInput] = useState("");
 
   // --- Logs ---------------------------------------------------------------
   const [logTail, setLogTail] = useState(500);
@@ -500,6 +503,12 @@ export default function InferenceDeploymentDetailPage() {
   const observed = asRecord(deployment?.observed_status);
   const observation = asRecord(observed.observation);
   const chatAlias = asText(asRecord(deployment?.spec?.service).alias) || null;
+  // How long a request may wait for its reply to start; unset is the gateway's default.
+  const setWait = asRecord(deployment?.spec?.service).first_token_timeout_sec;
+  const replyWait = typeof setWait === "number" ? setWait : null;
+  const waitTyped = waitInput.trim();
+  const waitValid =
+    waitTyped === "" || (/^\d+$/.test(waitTyped) && Number(waitTyped) >= 10 && Number(waitTyped) <= 1800);
 
   // The operator's name for the machine, not the address it answers on --
   // same rule as the cluster screens, so the two never disagree.
@@ -617,6 +626,29 @@ export default function InferenceDeploymentDetailPage() {
       setError(err instanceof Error ? err.message : t("inference.detail.chat_failed"));
     } finally {
       setChatSaving(false);
+    }
+  }
+
+  async function handleReplyWait() {
+    if (!deployment || !waitValid) return;
+    setWaitSaving(true);
+    try {
+      // Like the alias: the gateway reads it, the engine does not, so the
+      // copies keep running and the next pass only republishes.
+      const current = asRecord(deployment.spec.service);
+      const { first_token_timeout_sec: _previous, ...service } = current;
+      const spec = {
+        ...deployment.spec,
+        service: waitTyped ? { ...service, first_token_timeout_sec: Number(waitTyped) } : service,
+      };
+      await inferenceApi.updateDeployment(deployment.id, { spec });
+      await inferenceApi.reconcileDeployment(deployment.id).catch(() => undefined);
+      setWaitOpen(false);
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("inference.detail.reply_wait_failed"));
+    } finally {
+      setWaitSaving(false);
     }
   }
 
@@ -842,6 +874,28 @@ export default function InferenceDeploymentDetailPage() {
                   }}
                 >
                   {chatAlias ? t("inference.detail.change") : t("inference.detail.offer_in_chat")}
+                </Button>
+              </Stack>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                {t("inference.detail.reply_wait")}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="body2" data-testid="reply-wait">
+                  {replyWait !== null
+                    ? t("inference.detail.reply_wait_value", { seconds: replyWait })
+                    : t("inference.detail.reply_wait_default")}
+                </Typography>
+                <Button
+                  size="small"
+                  data-testid="reply-wait-change"
+                  onClick={() => {
+                    setWaitInput(replyWait !== null ? String(replyWait) : "");
+                    setWaitOpen(true);
+                  }}
+                >
+                  {t("inference.detail.change")}
                 </Button>
               </Stack>
             </Grid>
@@ -1227,6 +1281,33 @@ export default function InferenceDeploymentDetailPage() {
           />
           <Typography variant="caption" color="text.secondary">
             {t("inference.detail.offer_as_help")}
+          </Typography>
+        </Stack>
+      </FormDialog>
+
+      <FormDialog
+        open={waitOpen}
+        title={t("inference.detail.reply_wait_title")}
+        loading={waitSaving}
+        submitLabel={t("common.save")}
+        submitDisabled={!waitValid}
+        onSubmit={() => void handleReplyWait()}
+        onClose={() => setWaitOpen(false)}
+      >
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label={t("inference.detail.reply_wait_label")}
+            value={waitInput}
+            autoFocus
+            fullWidth
+            placeholder={t("inference.detail.reply_wait_placeholder")}
+            error={!waitValid}
+            helperText={!waitValid ? t("inference.detail.reply_wait_invalid") : undefined}
+            slotProps={{ htmlInput: { inputMode: "numeric" } }}
+            onChange={(e) => setWaitInput(e.target.value)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {t("inference.detail.reply_wait_help")}
           </Typography>
         </Stack>
       </FormDialog>
