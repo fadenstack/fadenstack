@@ -130,6 +130,11 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
   const fit = detail?.fits[deployment.environment_id] ?? null;
   const cluster = detail?.clusters.find((c) => c.environment_id === deployment.environment_id) ?? null;
   const changed = JSON.stringify(toClusterConfig(value, extra).config) !== JSON.stringify(current);
+  // A copy's share of an accelerator caps its memory (compiler.py): more is
+  // asked for here than it will get, and only the Scale dialog raises the share.
+  const share = acceleratorsPerCopy(deployment);
+  const askedMemory = Number(value.gpu_memory_utilization);
+  const memoryCapped = share < 1 && askedMemory > share;
 
   return (
     <Card variant="outlined">
@@ -166,6 +171,11 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
         <DialogContent dividers>
           <Stack spacing={2}>
             <Alert severity="warning">{t("inference.engine.restart_warning")}</Alert>
+            {memoryCapped && (
+              <Alert severity="info" data-testid="engine-memory-capped">
+                {t("inference.engine.memory_capped", { asked: askedMemory, share })}
+              </Alert>
+            )}
             {error && <Alert severity="error">{error}</Alert>}
             <EngineSettingsEditor
               value={value}

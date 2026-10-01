@@ -2741,9 +2741,9 @@
       "apply": "Appliquer",
       "scale_help": "Plus de copies traitent plus de requêtes à la fois. Le modèle continue de servir pendant l'ajout ou le retrait de copies.",
       "share_label": "Accélérateurs par copie",
-      "share_help": "1 est un accélérateur entier. Moins permet aux copies d'en partager un ; plus de 0,5 garde chaque copie sur son propre accélérateur.",
+      "share_help": "1 est un accélérateur entier. Moins permet aux copies d'en partager un ; plus de 0,5 garde chaque copie sur son propre accélérateur. Le moteur prend la même part de sa mémoire (un entier : 0,8).",
       "share_invalid": "Saisissez de 0,05 à 1.",
-      "share_memory": "Le moteur prend {{percent}} % de la mémoire de chaque accélérateur (gpu_memory_utilization, jamais plus que la part).",
+      "share_memory": "Le moteur prend {{percent}} % de la mémoire de chaque accélérateur.",
       "share_restarts": "Changer la part redémarre toutes les copies. Le modèle est indisponible jusqu'à leur retour.",
       "accelerators_one": "{{count}} accélérateur",
       "accelerators_other": "{{count}} accélérateurs",
@@ -2776,6 +2776,7 @@
       "defaults": "Valeurs par défaut de vLLM : rien de modifié.",
       "dialog_title": "Réglages du moteur de {{name}}",
       "restart_warning": "L'enregistrement redémarre chaque copie avec les nouveaux réglages. Le modèle est indisponible jusqu'à leur retour. Si une copie ne démarre pas, cette page indique pourquoi et vous pouvez revenir aux réglages précédents.",
+      "memory_capped": "gpu_memory_utilization {{asked}} dépasse la part d'accélérateur de ce déploiement ({{share}}) : le moteur prend {{share}}. Augmentez la part sous Mise à l'échelle, la mémoire suit.",
       "save_restart": "Enregistrer et redémarrer"
     }
   },

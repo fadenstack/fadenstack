@@ -46,6 +46,37 @@ describe("DeploymentEngineCard", () => {
     expect(summary).toHaveTextContent("--enable-auto-tool-choice");
   });
 
+  it("says when the memory asked for is more than the copy's share of an accelerator", async () => {
+    // The share caps it (compiler.py); on .61 a 0.4 kept capping a raised share (2026-10-01).
+    vi.spyOn(marketplaceApi, "detail").mockRejectedValue(new Error("offline"));
+    const capped = {
+      ...DEPLOYMENT,
+      spec: {
+        ...DEPLOYMENT.spec,
+        engine: { name: "vllm", config: { gpu_memory_utilization: 0.9 } },
+        resources: { replica: { gpus: 0.5 } },
+      },
+    } as InferenceDeployment;
+    render(<DeploymentEngineCard deployment={capped} repoId={null} onSaved={() => {}} />);
+
+    await userEvent.click(screen.getByTestId("engine-edit"));
+    expect(screen.getByTestId("engine-memory-capped")).toHaveTextContent(
+      "gpu_memory_utilization 0.9 is more than this deployment's share of an accelerator (0.5)",
+    );
+  });
+
+  it("says nothing of a cap for a copy on a whole accelerator", async () => {
+    vi.spyOn(marketplaceApi, "detail").mockRejectedValue(new Error("offline"));
+    const whole = {
+      ...DEPLOYMENT,
+      spec: { ...DEPLOYMENT.spec, engine: { name: "vllm", config: { gpu_memory_utilization: 0.9 } } },
+    } as InferenceDeployment;
+    render(<DeploymentEngineCard deployment={whole} repoId={null} onSaved={() => {}} />);
+
+    await userEvent.click(screen.getByTestId("engine-edit"));
+    expect(screen.queryByTestId("engine-memory-capped")).not.toBeInTheDocument();
+  });
+
   it("saves the engine settings and nothing else, then asks for a restart", async () => {
     vi.spyOn(marketplaceApi, "detail").mockRejectedValue(new Error("offline"));
     // Since this page loaded, someone scaled the deployment up and set a

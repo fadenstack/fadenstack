@@ -2741,9 +2741,9 @@
       "apply": "Anwenden",
       "scale_help": "Mehr Kopien bedienen mehr Anfragen gleichzeitig. Das Modell bleibt verfügbar, während Kopien hinzukommen oder wegfallen.",
       "share_label": "Beschleuniger pro Kopie",
-      "share_help": "1 ist ein ganzer Beschleuniger. Weniger lässt Kopien sich einen teilen; mehr als 0,5 hält jede Kopie auf einem eigenen.",
+      "share_help": "1 ist ein ganzer Beschleuniger. Weniger lässt Kopien sich einen teilen; mehr als 0,5 hält jede Kopie auf einem eigenen. Die Engine belegt denselben Anteil seines Speichers (bei einem ganzen: 0,8).",
       "share_invalid": "0,05 bis 1 eingeben.",
-      "share_memory": "Die Engine belegt {{percent}} % des Speichers jedes Beschleunigers (gpu_memory_utilization, nie mehr als der Anteil).",
+      "share_memory": "Die Engine belegt {{percent}} % des Speichers jedes Beschleunigers.",
       "share_restarts": "Eine Änderung des Anteils startet alle Kopien neu. Das Modell ist nicht erreichbar, bis sie wieder laufen.",
       "accelerators_one": "{{count}} Beschleuniger",
       "accelerators_other": "{{count}} Beschleuniger",
@@ -2776,6 +2776,7 @@
       "defaults": "vLLM-Standardwerte: nichts geändert.",
       "dialog_title": "Engine-Einstellungen für {{name}}",
       "restart_warning": "Beim Speichern startet jede Kopie mit den neuen Einstellungen neu. Das Modell ist nicht erreichbar, bis sie wieder laufen. Startet eine Kopie nicht, zeigt diese Seite den Grund, und Sie können die Einstellungen zurücksetzen.",
+      "memory_capped": "gpu_memory_utilization {{asked}} ist mehr als der Anteil dieses Deployments an einem Beschleuniger ({{share}}): Die Engine belegt {{share}}. Den Anteil unter Skalieren erhöhen, der Speicher geht mit.",
       "save_restart": "Speichern und neu starten"
     }
   },

@@ -2739,9 +2739,9 @@
       "apply": "Apply",
       "scale_help": "More copies serve more requests at once. The model keeps serving while copies are added or removed.",
       "share_label": "Accelerators per copy",
-      "share_help": "1 is a whole accelerator. Less lets copies share one; more than 0.5 keeps each copy on an accelerator of its own.",
+      "share_help": "1 is a whole accelerator. Less lets copies share one; more than 0.5 keeps each copy on an accelerator of its own. The engine takes the same share of the accelerator's memory (a whole one: 0.8).",
       "share_invalid": "Enter 0.05 to 1.",
-      "share_memory": "The engine takes {{percent}} % of each accelerator's memory (gpu_memory_utilization, never more than the share).",
+      "share_memory": "The engine takes {{percent}} % of each accelerator's memory.",
       "share_restarts": "Changing the share restarts every copy. The model is unavailable until they are back.",
       "accelerators_one": "{{count}} accelerator",
       "accelerators_other": "{{count}} accelerators",
@@ -2774,6 +2774,7 @@
       "defaults": "vLLM's defaults: nothing changed.",
       "dialog_title": "Engine settings for {{name}}",
       "restart_warning": "Saving restarts every copy with the new settings. The model is unavailable until they are back up. If a copy does not start, this page says why and you can change the settings back.",
+      "memory_capped": "gpu_memory_utilization {{asked}} is more than this deployment's share of an accelerator ({{share}}): the engine takes {{share}}. Raise the share under Scale, which brings the memory along.",
       "save_restart": "Save and restart"
     }
   },

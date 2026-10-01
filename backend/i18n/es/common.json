@@ -2741,9 +2741,9 @@
       "apply": "Aplicar",
       "scale_help": "Más copias atienden más solicitudes a la vez. El modelo sigue sirviendo mientras se añaden o quitan copias.",
       "share_label": "Aceleradores por copia",
-      "share_help": "1 es un acelerador entero. Menos permite que las copias compartan uno; más de 0,5 mantiene cada copia en un acelerador propio.",
+      "share_help": "1 es un acelerador entero. Menos permite que las copias compartan uno; más de 0,5 mantiene cada copia en un acelerador propio. El motor usa la misma fracción de su memoria (uno entero: 0,8).",
       "share_invalid": "Introduzca de 0,05 a 1.",
-      "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador (gpu_memory_utilization, nunca más que la fracción).",
+      "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador.",
       "share_restarts": "Cambiar la fracción reinicia todas las copias. El modelo no está disponible hasta que vuelvan.",
       "accelerators_one": "{{count}} acelerador",
       "accelerators_other": "{{count}} aceleradores",
@@ -2776,6 +2776,7 @@
       "defaults": "Valores predeterminados de vLLM: nada cambiado.",
       "dialog_title": "Ajustes del motor de {{name}}",
       "restart_warning": "Al guardar, cada copia se reinicia con los nuevos ajustes. El modelo no está disponible hasta que vuelvan a funcionar. Si una copia no arranca, esta página indica por qué y puede volver a los ajustes anteriores.",
+      "memory_capped": "gpu_memory_utilization {{asked}} es más que la fracción de acelerador de este despliegue ({{share}}): el motor usa {{share}}. Aumente la fracción en Escalar, que ajusta también la memoria.",
       "save_restart": "Guardar y reiniciar"
     }
   },

@@ -2741,9 +2741,9 @@
       "apply": "应用",
       "scale_help": "更多副本可同时处理更多请求。增减副本时模型持续提供服务。",
       "share_label": "每个副本的加速器",
-      "share_help": "1 表示整个加速器。小于 1 时多个副本可共享一个；大于 0.5 时每个副本独占一个加速器。",
+      "share_help": "1 表示整个加速器。小于 1 时多个副本可共享一个；大于 0.5 时每个副本独占一个加速器。引擎占用相同份额的显存（整个加速器时为 0.8）。",
       "share_invalid": "请输入 0.05 到 1。",
-      "share_memory": "引擎占用每个加速器 {{percent}}% 的显存（gpu_memory_utilization，不超过该份额）。",
+      "share_memory": "引擎占用每个加速器 {{percent}}% 的显存。",
       "share_restarts": "更改份额会重启所有副本，在它们恢复之前模型不可用。",
       "accelerators_one": "{{count}} 个加速器",
       "accelerators_other": "{{count}} 个加速器",
@@ -2776,6 +2776,7 @@
       "defaults": "vLLM 默认值：未做任何更改。",
       "dialog_title": "{{name}} 的引擎设置",
       "restart_warning": "保存后，每个副本都会以新设置重启。在它们恢复运行前，模型不可用。如果某个副本无法启动，本页面会说明原因，您可以改回原来的设置。",
+      "memory_capped": "gpu_memory_utilization {{asked}} 超过了此部署的加速器份额（{{share}}）：引擎只占用 {{share}}。请在“扩缩容”中提高份额，显存会随之调整。",
       "save_restart": "保存并重启"
     }
   },

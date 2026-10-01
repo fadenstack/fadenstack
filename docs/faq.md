@@ -276,9 +276,11 @@ Scale back down, or add a machine to the cluster.
 
 A copy on one accelerator may also take a share of it: **Accelerators per
 copy** in the **Scale** dialog, from 0.05 to 1. Below 1, copies can share an
-accelerator; above 0.5, no two share one. The share also caps the memory the
-engine takes (`gpu_memory_utilization`), and the dialog says how much that
-comes to. Two copies of a 27B model sharing one DGX Spark split its memory
+accelerator; above 0.5, no two share one. The share is also the memory the
+engine takes: changing it sets `gpu_memory_utilization` to match in the same
+save (0.8 for a whole accelerator), and the dialog says how much that comes
+to. **How vLLM runs it** can lower the memory below the share, never raise it
+above: a higher value there is capped, and the dialog says so. Two copies of a 27B model sharing one DGX Spark split its memory
 bandwidth: together they produced about what one copy alone did on the other
 machine.
 

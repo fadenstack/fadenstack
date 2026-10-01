@@ -74,6 +74,7 @@ import {
   JsonBlock,
   LabeledValue,
   PartialsNotice,
+  COMPILER_DEFAULT_MEMORY,
   acceleratorsPerCopy,
   asRecord,
   asText,
@@ -82,6 +83,7 @@ import {
   endpointStatusColor,
   environmentStatusColor,
   formatTimestamp,
+  memoryForShare,
   reconcileSummary,
   shortId,
 } from "./common";
@@ -587,17 +589,19 @@ export default function InferenceDeploymentDetailPage() {
     !shareEditable || (shareInput.trim() !== "" && shareTyped >= 0.05 && shareTyped <= 1);
   const shareChanged = shareEditable && shareValid && shareTyped !== perCopy;
   const planShare = shareChanged ? shareTyped : perCopy;
-  // What the engine will take of each accelerator's memory: a share below 1
-  // caps gpu_memory_utilization (compiler.py), otherwise it is as set, or 0.80.
+  // What the engine will take of each accelerator's memory. A new share sets
+  // it (memoryForShare), in the same save; otherwise it is the engine's
+  // gpu_memory_utilization, which a share below 1 caps (compiler.py), or 0.80.
   const askedMemory = Number(asRecord(asRecord(deployment?.spec?.engine).config).gpu_memory_utilization);
-  const memoryShare =
-    planShare < 1
+  const memoryShare = shareChanged
+    ? memoryForShare(shareTyped)
+    : planShare < 1
       ? askedMemory > 0
         ? Math.min(askedMemory, planShare)
         : planShare
       : askedMemory > 0
         ? askedMemory
-        : 0.8;
+        : COMPILER_DEFAULT_MEMORY;
   const clusterAccelerators = data.members.reduce((sum, member) => {
     const node = data.nodes.find((n) => n.id === member.node_id);
     return sum + (node ? gpuCount(node) : 0);
@@ -611,12 +615,21 @@ export default function InferenceDeploymentDetailPage() {
     try {
       // Replace the whole spec: v1alpha1 is not partially patchable, and the
       // scale block is mutually exclusive between fixed and autoscaled.
+      // A new share brings the engine's memory along: the memory left as it
+      // was for the old share went on capping the new one (.61, 2026-10-01).
       const resources = asRecord(deployment.spec.resources);
+      const engine = asRecord(deployment.spec.engine);
       const spec = {
         ...deployment.spec,
         scale: { replicas: replicaInput },
         ...(shareChanged
-          ? { resources: { ...resources, replica: { ...asRecord(resources.replica), gpus: shareTyped } } }
+          ? {
+              resources: { ...resources, replica: { ...asRecord(resources.replica), gpus: shareTyped } },
+              engine: {
+                ...engine,
+                config: { ...asRecord(engine.config), gpu_memory_utilization: memoryForShare(shareTyped) },
+              },
+            }
           : {}),
       };
       await inferenceApi.updateDeployment(deployment.id, { spec });

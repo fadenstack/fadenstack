@@ -243,7 +243,39 @@ describe("InferenceDeploymentDetailPage", () => {
       ...deployment.spec,
       scale: { replicas: 2 },
       resources: { replica: { gpus: 0.75 } },
+      // The memory comes along in the same save: one restart, not two.
+      engine: { name: "vllm", config: { gpu_memory_utilization: 0.75 } },
     });
+  });
+
+  it("replaces a memory set for the old share, which would cap the new one", async () => {
+    // On .61 the 27B went from 0.35 to 0.7 of an accelerator and kept its
+    // gpu_memory_utilization of 0.4: the engine went on taking 40 % (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      spec: {
+        ...deployment.spec,
+        engine: { name: "vllm", config: { gpu_memory_utilization: 0.4, max_num_seqs: 128 } },
+        resources: { replica: { gpus: 0.35 } },
+      },
+    });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    const share = await screen.findByLabelText("Accelerators per copy");
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("35 %");
+    fireEvent.change(share, { target: { value: "1" } });
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("80 %");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec?.engine).toEqual({ name: "vllm", config: { gpu_memory_utilization: 0.8, max_num_seqs: 128 } });
+    expect(payload.spec?.resources).toEqual({ replica: { gpus: 1 } });
   });
 
   it("offers no share for a copy spread over several accelerators", async () => {
