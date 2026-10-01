@@ -6,32 +6,25 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
-import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import IconButton from "@mui/material/IconButton";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 import MenuItem from "@mui/material/MenuItem";
 import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import DeleteIcon from "@mui/icons-material/Delete";
-import GroupIcon from "@mui/icons-material/Group";
-import PersonIcon from "@mui/icons-material/Person";
 
+import { PrincipalList } from "~/components/PrincipalList";
+import { PrincipalPicker } from "~/components/PrincipalPicker";
+import { principalKey } from "~/api/principals";
 import {
   findPrincipals,
   namePrincipals,
   setGrants,
   setVisibility,
   type GrantAccess,
-  type PrincipalOption,
   type SkillDetail,
   type SkillGrant,
   type SkillVisibility,
@@ -59,8 +52,6 @@ export default function SkillSharingPanel({
   const { t } = useTranslation();
   const [visibility, setVis] = useState<SkillVisibility>(skill.visibility);
   const [rows, setRows] = useState<Row[]>([]);
-  const [options, setOptions] = useState<PrincipalOption[]>([]);
-  const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -75,12 +66,12 @@ export default function SkillSharingPanel({
     namePrincipals(grants)
       .then((names) => {
         if (cancelled) return;
-        const byKey = new Map(names.map((n) => [`${n.type}:${n.id}`, n.label]));
+        const byKey = new Map(names.map((n) => [principalKey(n.type, n.id), n.label]));
         setRows(
           grants.map((g) => ({
             ...g,
             label:
-              byKey.get(`${g.principal_type}:${g.principal_id}`) ??
+              byKey.get(principalKey(g.principal_type, g.principal_id)) ??
               t("skills.share_unknown_principal"),
           })),
         );
@@ -91,28 +82,8 @@ export default function SkillSharingPanel({
     };
   }, [skill, canShare, t]);
 
-  // Search as the user types.
-  useEffect(() => {
-    if (!canShare || query.trim().length < 2) {
-      setOptions([]);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      findPrincipals(query.trim())
-        .then((found) => {
-          if (!cancelled) setOptions(found);
-        })
-        .catch(() => {});
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [query, canShare]);
-
   const taken = useMemo(
-    () => new Set(rows.map((r) => `${r.principal_type}:${r.principal_id}`)),
+    () => new Set(rows.map((r) => principalKey(r.principal_type, r.principal_id))),
     [rows],
   );
   const grantsDirty =
@@ -201,95 +172,53 @@ export default function SkillSharingPanel({
           {t("skills.share_with_hint")}
         </Typography>
         {canShare ? (
-          <Autocomplete<PrincipalOption>
-            options={options.filter((o) => !taken.has(`${o.type}:${o.id}`))}
-            getOptionLabel={(o) => o.label}
-            filterOptions={(x) => x}
-            inputValue={query}
-            onInputChange={(_, v) => setQuery(v)}
-            value={null}
-            onChange={(_, picked) => {
-              if (!picked) return;
+          <PrincipalPicker
+            search={findPrincipals}
+            exclude={taken}
+            placeholder={t("skills.share_search")}
+            onPick={(picked) =>
               setRows((prev) => [
                 ...prev,
-                {
-                  principal_type: picked.type,
-                  principal_id: picked.id,
-                  access: "read",
-                  label: picked.label,
-                },
-              ]);
-              setQuery("");
-            }}
-            renderOption={(props, o) => (
-              <li {...props} key={`${o.type}:${o.id}`}>
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  {o.type === "group" ? <GroupIcon fontSize="small" /> : <PersonIcon fontSize="small" />}
-                </ListItemIcon>
-                {o.label}
-              </li>
-            )}
-            noOptionsText={
-              query.trim().length < 2 ? t("skills.share_search_hint") : t("skills.share_no_match")
+                { principal_type: picked.type, principal_id: picked.id, access: "read", label: picked.label },
+              ])
             }
-            renderInput={(params) => (
-              <TextField {...params} size="small" placeholder={t("skills.share_search")} />
-            )}
           />
         ) : (
           <Alert severity="info">{t("skills.share_not_allowed")}</Alert>
         )}
-        <List dense>
-          {rows.map((row, i) => (
-            <ListItem
-              key={`${row.principal_type}:${row.principal_id}`}
-              divider
-              secondaryAction={
-                canShare && (
-                  <IconButton
-                    edge="end"
-                    size="small"
-                    aria-label={t("common.delete")}
-                    onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+        <PrincipalList
+          items={rows.map((r) => ({ type: r.principal_type, id: r.principal_id, label: r.label, access: r.access }))}
+          emptyText={t("skills.share_nobody")}
+          onRemove={
+            canShare
+              ? (item) =>
+                  setRows((prev) =>
+                    prev.filter((r) => principalKey(r.principal_type, r.principal_id) !== principalKey(item.type, item.id)),
+                  )
+              : undefined
+          }
+          renderControl={(item) => (
+            <TextField
+              select
+              size="small"
+              value={item.access}
+              disabled={!canShare}
+              onChange={(e) =>
+                setRows((prev) =>
+                  prev.map((r) =>
+                    r.principal_type === item.type && r.principal_id === item.id
+                      ? { ...r, access: e.target.value as GrantAccess }
+                      : r,
+                  ),
                 )
               }
+              sx={{ minWidth: 130 }}
             >
-              <ListItemIcon sx={{ minWidth: 32 }}>
-                {row.principal_type === "group" ? (
-                  <GroupIcon fontSize="small" />
-                ) : (
-                  <PersonIcon fontSize="small" />
-                )}
-              </ListItemIcon>
-              <ListItemText primary={row.label} />
-              <TextField
-                select
-                size="small"
-                value={row.access}
-                disabled={!canShare}
-                onChange={(e) =>
-                  setRows((prev) =>
-                    prev.map((r, j) =>
-                      j === i ? { ...r, access: e.target.value as GrantAccess } : r,
-                    ),
-                  )
-                }
-                sx={{ mr: 5, minWidth: 130 }}
-              >
-                <MenuItem value="read">{t("skills.access_read")}</MenuItem>
-                <MenuItem value="write">{t("skills.access_write")}</MenuItem>
-              </TextField>
-            </ListItem>
-          ))}
-          {rows.length === 0 && (
-            <ListItem>
-              <ListItemText secondary={t("skills.share_nobody")} />
-            </ListItem>
+              <MenuItem value="read">{t("skills.access_read")}</MenuItem>
+              <MenuItem value="write">{t("skills.access_write")}</MenuItem>
+            </TextField>
           )}
-        </List>
+        />
       </Box>
 
       <Box>

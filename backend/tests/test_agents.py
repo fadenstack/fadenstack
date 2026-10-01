@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
@@ -21,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.agents import AgentRefreshToken, AgentVersion
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.users import User, current_active_user
@@ -283,6 +285,32 @@ async def test_a_user_lists_only_the_agents_they_can_use(
     assert [a["slug"] for a in (await client.get("/api/agents")).json()] == ["granted"]
     assert (await client.get("/api/agents/not-granted")).status_code == status.HTTP_404_NOT_FOUND
     assert (await client.put("/api/agents/granted/grants", json={"grants": []})).status_code == 403
+
+
+async def test_agents_read_sees_an_agents_details_but_changes_nothing(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, fastapi_app: FastAPI,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    await _agent(client, slug="inspected")
+
+    signed_in.user = await _user(dbsession)
+    reader = MagicMock(spec=RbacDAO)
+    reader.has_permission = AsyncMock(
+        side_effect=lambda _user, resource, action: (resource, action) == ("agents", "read"),
+    )
+    fastapi_app.dependency_overrides[RbacDAO] = lambda: reader
+    try:
+        agent = (await client.get("/api/agents/inspected")).json()
+        assert agent["can_manage"] is False
+        for path in ("versions", "versions/1", "grants", "members", "sign-ins"):
+            assert (await client.get(f"/api/agents/inspected/{path}")).status_code == status.HTTP_200_OK, path
+        for path in ("usage", "events"):  # served from the trace database, which tests have none of
+            assert (await client.get(f"/api/agents/inspected/{path}")).status_code != 403, path
+        assert (await client.put("/api/agents/inspected/grants", json={"grants": []})).status_code == 403
+        assert (await client.post("/api/agents/inspected/versions", json={})).status_code == 403
+        assert (await client.post("/api/agents/inspected/versions/1/publish")).status_code == 403
+    finally:
+        fastapi_app.dependency_overrides.pop(RbacDAO)
 
 
 async def test_grants_name_known_principals_only(

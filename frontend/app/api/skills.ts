@@ -6,7 +6,13 @@
  * use the same routes with the admin's rights.
  */
 
+import { query, requester } from "./http";
+import { principalIds, type PrincipalOption, type PrincipalType } from "./principals";
+
+export type { PrincipalOption, PrincipalType } from "./principals";
+
 const BASE = "/api/skills";
+const request = requester(BASE);
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -19,7 +25,6 @@ export type SkillStatus = "draft" | "published" | "archived";
 export type SkillAccess = "read" | "write" | "owner" | "admin";
 export type SkillListView = "all" | "mine" | "shared" | "org";
 export type GrantAccess = "read" | "write";
-export type PrincipalType = "user" | "group";
 
 export interface SkillTriggerRules {
   keywords?: string[];
@@ -153,12 +158,6 @@ export interface SaveVersionResult {
   skill: SkillDetail;
 }
 
-export interface PrincipalOption {
-  type: PrincipalType;
-  id: string;
-  label: string;
-}
-
 /** A skill the chat's model proposed; nothing is saved until the user saves it. */
 export interface SkillDraft {
   slug: string;
@@ -199,40 +198,6 @@ export interface CreateAssignmentPayload {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-/** The message of an error answer: ``{"detail": "..."}``, else its text. */
-export async function errorMessage(res: Response): Promise<string> {
-  const text = await res.text().catch(() => "");
-  try {
-    const body = JSON.parse(text) as { detail?: unknown };
-    if (typeof body.detail === "string") return body.detail;
-    if (Array.isArray(body.detail)) {
-      return body.detail
-        .map((d) => (d && typeof d === "object" && "msg" in d ? String(d.msg) : String(d)))
-        .join("; ");
-    }
-  } catch {
-    // not JSON
-  }
-  return text || `Skills API failed: ${res.status}`;
-}
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const isForm = init.body instanceof FormData;
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(isForm ? {} : { "Content-Type": "application/json" }),
-      ...(init.headers ?? {}),
-    },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(await errorMessage(res));
-  if (res.status === 204) return undefined as T;
-  const type = res.headers.get("content-type") ?? "";
-  if (!type.includes("json")) return (await res.text()) as T;
-  return res.json() as Promise<T>;
-}
 
 function id(value: string): string {
   return encodeURIComponent(value);
@@ -355,7 +320,7 @@ export async function setGrants(
 
 /** People and groups to share with, by e-mail or group name. */
 export async function findPrincipals(q: string): Promise<PrincipalOption[]> {
-  return request<PrincipalOption[]>(`/principals?q=${encodeURIComponent(q)}`);
+  return request<PrincipalOption[]>(`/principals${query({ q })}`);
 }
 
 /** The names of the people and groups a skill is shared with. */
@@ -363,8 +328,8 @@ export async function namePrincipals(
   grants: Pick<SkillGrant, "principal_type" | "principal_id">[],
 ): Promise<PrincipalOption[]> {
   if (grants.length === 0) return [];
-  const ids = grants.map((g) => `${g.principal_type}:${g.principal_id}`).join(",");
-  return request<PrincipalOption[]>(`/principals?ids=${encodeURIComponent(ids)}`);
+  const ids = principalIds(grants.map((g) => ({ type: g.principal_type, id: g.principal_id })));
+  return request<PrincipalOption[]>(`/principals${query({ ids })}`);
 }
 
 // ── Files ──────────────────────────────────────────────────────────────────

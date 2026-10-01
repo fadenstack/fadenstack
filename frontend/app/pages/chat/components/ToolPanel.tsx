@@ -10,7 +10,6 @@ import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
 import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
-import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
@@ -38,6 +37,7 @@ import {
   getToolCatalog,
   patchSessionToolPolicy,
 } from "~/api/tools";
+import { ToolClassChip } from "~/components/ToolClassChip";
 
 // ── Props ──────────────────────────────────────────────────────
 
@@ -521,19 +521,11 @@ interface ToolRowProps {
   onToggle: (toolId: string, enabled: boolean) => void;
 }
 
-const CLASS_COLOR: Record<string, "success" | "info" | "error" | "default"> = {
-  read: "success",
-  write: "info",
-  destructive: "error",
-  unknown: "default",
-};
-
 function ToolRow({ tool, onToggle }: ToolRowProps) {
   const { t } = useTranslation();
   const hidden = tool.mode_decision === "hidden";
   const disabled = !tool.policy_allowed || hidden;
   const dimmed = !tool.effective_enabled;
-  const toolClass = tool.tool_class ?? "unknown";
 
   return (
     <Box
@@ -566,16 +558,7 @@ function ToolRow({ tool, onToggle }: ToolRowProps) {
           }}
         >
           {toolShortName(tool)}
-          <Chip
-            size="small"
-            variant="outlined"
-            color={CLASS_COLOR[toolClass] ?? "default"}
-            label={t(`tools.class.${toolClass}`, {
-              read: "read", write: "write", destructive: "destructive", unknown: "unclassified",
-            }[toolClass] ?? toolClass)}
-            data-tool-class={toolClass}
-            sx={{ ml: 0.75, height: 18, fontSize: "0.68rem", verticalAlign: "middle" }}
-          />
+          <ToolClassChip value={tool.tool_class} dense />
           {tool.mode_decision === "ask" && (
             <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
               {t("tools.mode.asks", "asks first")}

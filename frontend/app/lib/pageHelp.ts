@@ -501,6 +501,41 @@ const ROUTE_MAP: RouteMapping[] = [
     },
   },
 
+  // ── Agents and governance ────────────────────────────────────────
+  {
+    prefix: "/admin/agents/",
+    entry: {
+      titleKey: "page_help.agent_detail.title",
+      descriptionKey: "page_help.agent_detail.description",
+      actionKeys: [
+        "page_help.agent_detail.action_definition",
+        "page_help.agent_detail.action_publish",
+        "page_help.agent_detail.action_access",
+        "page_help.agent_detail.action_activity",
+      ],
+    },
+  },
+  {
+    prefix: "/admin/agents",
+    entry: {
+      titleKey: "page_help.agents.title",
+      descriptionKey: "page_help.agents.description",
+      actionKeys: ["page_help.agents.action_create", "page_help.agents.action_open"],
+    },
+  },
+  {
+    prefix: "/admin/governance",
+    entry: {
+      titleKey: "page_help.governance.title",
+      descriptionKey: "page_help.governance.description",
+      actionKeys: [
+        "page_help.governance.action_rules",
+        "page_help.governance.action_classes",
+        "page_help.governance.action_decisions",
+      ],
+    },
+  },
+
   // ── Skills ───────────────────────────────────────────────────────
   {
     prefix: "/admin/skills/",

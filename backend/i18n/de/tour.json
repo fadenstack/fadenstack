@@ -439,6 +439,27 @@
       "description": "Kontoinformationen anzeigen und bearbeiten — Name, E-Mail, Passwort und persönliche Einstellungen.",
       "action_info": "Anzeigename und E-Mail aktualisieren",
       "action_password": "Passwort ändern"
+    },
+    "agents": {
+      "title": "Agenten",
+      "description": "Agenten, die in anderer Software laufen (Office, EPLAN, jede Desktop-Anwendung) und von diesem Server gesteuert werden.",
+      "action_create": "Einen Agenten anlegen oder mit einer JSON-Definition beginnen",
+      "action_open": "Einen Agenten öffnen, um ihn zu ändern, zu veröffentlichen und festzulegen, wer ihn nutzen darf"
+    },
+    "agent_detail": {
+      "title": "Agent",
+      "description": "Ein Agent: seine Definition, seine Versionen, wer ihn nutzen darf und was er getan hat.",
+      "action_definition": "Anweisungen, Modell, Wissen und Tools ändern; Speichern legt eine neue Version an",
+      "action_publish": "Eine Version veröffentlichen oder zu einer früheren zurückkehren",
+      "action_access": "Nutzern und Teams freigeben und Betreuer wählen",
+      "action_activity": "Nutzung, Meldungen der Anwendungen und angemeldete Geräte ansehen"
+    },
+    "governance": {
+      "title": "Governance",
+      "description": "Die Regeln, an die sich jeder Chat und jede Agentenanfrage hält, und was die Prüfungen entschieden haben.",
+      "action_rules": "Tools nach Namen sperren, erst nachfragen oder erlauben",
+      "action_classes": "Festlegen, was Tools tun, für die Tool-Modi",
+      "action_decisions": "Prüfen, was die Prüfungen entschieden haben, ohne den Text"
     }
   },
   "taskflows": {

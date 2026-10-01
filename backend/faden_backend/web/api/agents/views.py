@@ -2,7 +2,7 @@
 
 RBAC decides what a user may do with agents in general:
 
-- ``agents:read``    see every agent of the tenant
+- ``agents:read``    see every agent of the tenant: versions, access, activity
 - ``agents:create``  create agents (the creator maintains them)
 - ``agents:manage``  manage every agent (superusers always do)
 
@@ -86,6 +86,14 @@ async def _agent_or_404(dao: AgentsDAO, ref: str) -> Agent:
 async def _managed_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
     agent = await _agent_or_404(dao, ref)
     if not await _can_manage(dao, rbac, agent, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not maintain this agent.")
+    return agent
+
+
+async def _inspected_agent(dao: AgentsDAO, rbac: RbacDAO, ref: str, user: User) -> Agent:
+    """An agent whose details the user may see (``agents:read``) or manages."""
+    agent = await _agent_or_404(dao, ref)
+    if not (await _has(rbac, user, "read") or await _can_manage(dao, rbac, agent, user)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not maintain this agent.")
     return agent
 
@@ -306,7 +314,7 @@ async def list_versions(
     rbac: RbacDAO = Depends(),
 ) -> list[AgentVersion]:
     """Every version of the agent, newest first."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     return await dao.versions(agent.id)
 
 
@@ -337,7 +345,7 @@ async def get_version(
     rbac: RbacDAO = Depends(),
 ) -> AgentVersion:
     """One version of the agent."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     version = await dao.version(agent.id, number)
     if version is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
@@ -410,7 +418,7 @@ async def list_grants(
     rbac: RbacDAO = Depends(),
 ) -> list[GrantDTO]:
     """The users and teams allowed to use the agent."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     return await _grant_dtos(dao, agent)
 
 
@@ -450,7 +458,7 @@ async def list_members(
     rbac: RbacDAO = Depends(),
 ) -> list[MemberDTO]:
     """The agent's maintainers."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     return await _member_dtos(dao, await dao.members(agent.id))
 
 
@@ -494,7 +502,7 @@ async def explain_access(
     rbac: RbacDAO = Depends(),
 ) -> AccessDTO:
     """Whether a user may use the agent, and why."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     target = await dao.session.get(User, user_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -515,7 +523,7 @@ async def agent_usage(
     days: int = 30,
 ) -> UsageDTO:
     """Requests, tokens, users and conversations of the agent -- no content."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
         raise HTTPException(status_code=503, detail="Gateway database not available")
@@ -575,7 +583,7 @@ async def agent_client_events(
     limit: int = 100,
 ) -> list[ClientEventDTO]:
     """What the agent's SDKs reported (02 §9), newest first, for its maintainers."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
     if factory is None:
         raise HTTPException(status_code=503, detail="Gateway database not available")
@@ -617,7 +625,7 @@ async def list_agent_sign_ins(
     rbac: RbacDAO = Depends(),
 ) -> list[SignInDTO]:
     """The devices signed in to the agent, for its maintainers."""
-    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
     return [_sign_in(r) for r in await dao.active_families(now=datetime.now(UTC), agent_id=agent.id)]
 
 

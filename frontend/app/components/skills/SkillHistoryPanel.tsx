@@ -13,10 +13,11 @@ import CircularProgress from "@mui/material/CircularProgress";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
-import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
+import { DiffView } from "~/components/DiffView";
+import { parseUnifiedDiff } from "~/lib/textDiff";
 import {
   diffVersions,
   listVersions,
@@ -161,35 +162,7 @@ export default function SkillHistoryPanel({ skill, canPublish, onChanged }: Prop
               {t("common.close")}
             </Button>
           </Stack>
-          <Paper
-            variant="outlined"
-            sx={{ p: 1.5, fontFamily: "monospace", fontSize: 13, whiteSpace: "pre-wrap", overflowX: "auto" }}
-          >
-            {diff.text.trim() === "" ? (
-              <Typography variant="body2" color="text.secondary">
-                {t("skills.history_no_diff")}
-              </Typography>
-            ) : (
-              diff.text.split("\n").map((line, i) => (
-                <Box
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={i}
-                  component="div"
-                  sx={{
-                    color: line.startsWith("+") && !line.startsWith("+++")
-                      ? "success.main"
-                      : line.startsWith("-") && !line.startsWith("---")
-                        ? "error.main"
-                        : line.startsWith("@@")
-                          ? "info.main"
-                          : "text.primary",
-                  }}
-                >
-                  {line || " "}
-                </Box>
-              ))
-            )}
-          </Paper>
+          <DiffView lines={parseUnifiedDiff(diff.text)} emptyText={t("skills.history_no_diff")} />
         </Box>
       )}
     </Stack>

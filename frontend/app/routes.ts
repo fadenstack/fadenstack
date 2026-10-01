@@ -109,6 +109,10 @@ export default [
         "pages/admin/mcp/MCPServerDetailPage.tsx",
       ),
     ]),
+    // Agents and the rules they (and every chat) are held to.
+    route("/admin/agents", "pages/admin/agents/AgentsListPage.tsx"),
+    route("/admin/agents/:slug", "pages/admin/agents/AgentDetailPage.tsx"),
+    route("/admin/governance", "pages/admin/governance/GovernancePage.tsx"),
     // Skills routes — guarded by module status
     layout("routes/skills-guard.tsx", [
       route("/admin/skills", "pages/admin/skills/SkillsListPage.tsx"),

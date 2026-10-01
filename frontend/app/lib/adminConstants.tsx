@@ -64,6 +64,8 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
+import GavelIcon from "@mui/icons-material/Gavel";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -164,8 +166,10 @@ export interface NavChild {
   to: string;
   labelKey: string;
   icon: React.ReactNode;
-  permission?: string;
+  /** Shown to users with this permission; a list: with any of them. */
+  permission?: string | string[];
   module?: string;
+  superuserOnly?: boolean;
   /** When set, only show this item when RAG is in the specified mode. */
   ragMode?: "lite" | "pro";
   /** A live count to show beside the label, looked up by the sidebar. */
@@ -460,6 +464,27 @@ export const NAV: NavEntry[] = [
     ],
   },
   {
+    id: "agents",
+    kind: "group",
+    labelKey: "nav.agents_group",
+    icon: <SmartToyIcon />,
+    children: [
+      {
+        to: "/admin/agents",
+        labelKey: "nav.agents",
+        icon: <SmartToyIcon />,
+        permission: ["agents:read", "agents:create", "agents:manage"],
+      },
+      {
+        to: "/admin/governance",
+        labelKey: "nav.governance",
+        icon: <GavelIcon />,
+        // Its API (/api/admin/governance) is for superusers.
+        superuserOnly: true,
+      },
+    ],
+  },
+  {
     id: "extensions",
     kind: "group",
     labelKey: "nav.extensions_group",
@@ -565,8 +590,8 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/chat/attachments"))
     return t("chat_admin.attachments_title");
   if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.llm_calls");
-  if (pathname.startsWith("/admin/agents/api-docs")) return t("nav.endpoint");
-  if (pathname.startsWith("/admin/agents/graph")) return t("nav.llm_calls");
+  if (pathname.startsWith("/admin/agents")) return t("agents.title");
+  if (pathname.startsWith("/admin/governance")) return t("governance.title");
   if (pathname.startsWith("/admin/llm/graph")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/logs")) {
     const tab = new URLSearchParams(search).get("tab");

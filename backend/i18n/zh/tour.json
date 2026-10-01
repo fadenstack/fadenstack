@@ -439,6 +439,27 @@
       "description": "查看和编辑您的账户信息——显示名称、邮箱、密码和个人偏好。",
       "action_info": "更新显示名称和邮箱",
       "action_password": "更改密码"
+    },
+    "agents": {
+      "title": "智能体",
+      "description": "在其他软件（Office、EPLAN、任何桌面应用）中运行、由本服务器管控的智能体。",
+      "action_create": "创建智能体，或从 JSON 定义开始",
+      "action_open": "打开智能体进行修改、发布并决定谁可以使用"
+    },
+    "agent_detail": {
+      "title": "智能体",
+      "description": "一个智能体：它的定义、版本、谁可以使用以及它做了什么。",
+      "action_definition": "修改指令、模型、知识和工具；保存会创建新版本",
+      "action_publish": "发布某个版本，或回滚到较早的版本",
+      "action_access": "授权给用户和团队，并选择维护者",
+      "action_activity": "查看使用情况、应用上报的内容和已登录的设备"
+    },
+    "governance": {
+      "title": "治理",
+      "description": "每个聊天和智能体请求都须遵守的规则，以及检查做出的决定。",
+      "action_rules": "按名称禁止、先询问或允许工具",
+      "action_classes": "说明工具做什么，供工具模式使用",
+      "action_decisions": "查看检查做出的决定，不含文本"
     }
   },
   "taskflows": {

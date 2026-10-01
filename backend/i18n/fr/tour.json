@@ -439,6 +439,27 @@
       "description": "Voir et modifier vos informations — nom, e-mail, mot de passe et préférences.",
       "action_info": "Mettre à jour le nom et l'e-mail",
       "action_password": "Changer le mot de passe"
+    },
+    "agents": {
+      "title": "Agents",
+      "description": "Les agents qui s'exécutent dans d'autres logiciels (Office, EPLAN, toute application de bureau), gouvernés par ce serveur.",
+      "action_create": "Créer un agent, ou partir d'une définition JSON",
+      "action_open": "Ouvrir un agent pour le modifier, le publier et décider qui peut l'utiliser"
+    },
+    "agent_detail": {
+      "title": "Agent",
+      "description": "Un agent : sa définition, ses versions, qui peut l'utiliser et ce qu'il a fait.",
+      "action_definition": "Modifier les instructions, le modèle, les connaissances et les outils ; enregistrer crée une nouvelle version",
+      "action_publish": "Publier une version, ou revenir à une version antérieure",
+      "action_access": "L'accorder à des utilisateurs et des équipes, et choisir ses responsables",
+      "action_activity": "Voir son utilisation, ce que les applications ont signalé et les appareils connectés"
+    },
+    "governance": {
+      "title": "Gouvernance",
+      "description": "Les règles auxquelles est soumise chaque requête de chat ou d'agent, et ce que les contrôles ont décidé.",
+      "action_rules": "Interdire, demander avant ou autoriser des outils par nom",
+      "action_classes": "Indiquer ce que font les outils, pour les modes d'outils",
+      "action_decisions": "Consulter ce que les contrôles ont décidé, sans le texte"
     }
   },
   "taskflows": {

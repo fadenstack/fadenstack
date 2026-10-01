@@ -439,6 +439,27 @@
       "description": "Vea y edite su información de cuenta — nombre, correo, contraseña y preferencias.",
       "action_info": "Actualizar nombre y correo electrónico",
       "action_password": "Cambiar su contraseña"
+    },
+    "agents": {
+      "title": "Agentes",
+      "description": "Agentes que funcionan dentro de otro software (Office, EPLAN, cualquier aplicación de escritorio), gobernados por este servidor.",
+      "action_create": "Crear un agente, o empezar desde una definición JSON",
+      "action_open": "Abrir un agente para cambiarlo, publicarlo y decidir quién puede usarlo"
+    },
+    "agent_detail": {
+      "title": "Agente",
+      "description": "Un agente: su definición, sus versiones, quién puede usarlo y qué ha hecho.",
+      "action_definition": "Cambiar las instrucciones, el modelo, el conocimiento y las herramientas; guardar crea una versión nueva",
+      "action_publish": "Publicar una versión, o volver a una anterior",
+      "action_access": "Concederlo a usuarios y equipos, y elegir sus responsables",
+      "action_activity": "Ver su uso, lo que informaron las aplicaciones y los dispositivos con sesión iniciada"
+    },
+    "governance": {
+      "title": "Gobernanza",
+      "description": "Las reglas que debe cumplir cada solicitud de chat o de agente, y lo que decidieron las comprobaciones.",
+      "action_rules": "Prohibir, preguntar antes o permitir herramientas por nombre",
+      "action_classes": "Indicar lo que hacen las herramientas, para los modos de herramientas",
+      "action_decisions": "Revisar lo que decidieron las comprobaciones, sin el texto"
     }
   },
   "taskflows": {

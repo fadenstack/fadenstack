@@ -9,6 +9,7 @@ import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { RESIDENCY_CLASSES, type UsageRange } from "~/api/dashboard";
+import { localDay } from "~/lib/dates";
 import { fmtInt, fmtShare } from "../format";
 import { useTrafficSeries } from "../queries";
 import { RESIDENCY_LABEL_KEYS, residencyColor } from "../residency";
@@ -18,12 +19,6 @@ import TimeSeriesChart from "../TimeSeriesChart";
 import WidgetCard, { WidgetEmpty } from "../WidgetCard";
 
 const RANGES: UsageRange[] = ["7d", "30d"];
-
-/** "2026-09-26" as a local date (not UTC midnight, which is the day before west of Greenwich). */
-function localDate(label: string): Date {
-  const [y, m, d] = label.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
 
 const CHART_HEIGHT = { phone: 160, other: 190 };
 
@@ -69,7 +64,7 @@ export default function UsageWidget({ layout, onLayoutChange, refreshToken, fill
       <Box sx={fill ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}>
       <TimeSeriesChart
         x={buckets.map((b) => b.bucket)}
-        xFormat={(label) => dayFormat.format(localDate(String(label)))}
+        xFormat={(label) => dayFormat.format(localDay(String(label)))}
         series={RESIDENCY_CLASSES.map((c) => ({
           id: c,
           label: t(RESIDENCY_LABEL_KEYS[c]),

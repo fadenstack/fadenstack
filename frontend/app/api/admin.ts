@@ -605,6 +605,15 @@ export interface AdminUser {
   usage_group_name: string | null;
   roles: RbacRole[];
   permissions: RbacPermission[];
+  /** Agents may attach any local MCP server on this user's machines. */
+  developer_mode: boolean;
+  /** When developer mode ends by itself; null: until it is switched off. */
+  developer_mode_until: string | null;
+}
+
+/** Developer mode is on, and its end (if any) has not passed. */
+export function hasDeveloperMode(user: Pick<AdminUser, "developer_mode" | "developer_mode_until">, now = Date.now()) {
+  return user.developer_mode && (!user.developer_mode_until || Date.parse(user.developer_mode_until) > now);
 }
 
 export interface MeAccess {
@@ -658,6 +667,13 @@ export const adminUsers = {
       method: "PUT",
       body: JSON.stringify({ role_ids: roleIds }),
     });
+  },
+  /** Admins only, never the user: lets agents attach local MCP servers for this user. */
+  setDeveloperMode(userId: string, enabled: boolean, until: string | null) {
+    return request<{ user_id: string; developer_mode: boolean; developer_mode_until: string | null }>(
+      `/users/${userId}/developer-mode`,
+      { method: "PUT", body: JSON.stringify({ enabled, until }) },
+    );
   },
   setUsageGroup(userId: string, groupId: string | null) {
     return request<AdminUser>(`/users/${userId}/usage-group`, {

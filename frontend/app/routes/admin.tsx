@@ -355,9 +355,13 @@ function AdminLayoutInner() {
   }
 
   const isRootActive = rootStatus?.active ?? false;
-  const hasPermission = (permission?: string): boolean => {
+  /** No permission needed, or this one, or (a list) any of them. */
+  const hasPermission = (permission?: string | string[]): boolean => {
     if (!permission) return true;
-    return isSuperuser || permissionKeys.has(permission);
+    if (isSuperuser) return true;
+    return typeof permission === "string"
+      ? permissionKeys.has(permission)
+      : permission.some((p) => permissionKeys.has(p));
   };
   const { isModuleEnabled } = useServices();
 
@@ -373,6 +377,7 @@ function AdminLayoutInner() {
     }
     const children = entry.children.filter((child) => {
       if (child.module && !isModuleEnabled(child.module)) return false;
+      if (child.superuserOnly && !isSuperuser) return false;
       if (!hasPermission(child.permission)) return false;
       if (child.ragMode && ragMode && child.ragMode !== ragMode) return false;
       return true;

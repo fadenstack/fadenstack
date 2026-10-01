@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { adminGroups, adminUsers, type AdminUser, type Group, type RbacRole } from "~/api/admin";
+import { adminGroups, adminUsers, hasDeveloperMode, type AdminUser, type Group, type RbacRole } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { FormDialog } from "~/components/FormDialog";
+import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
+import { formatDateTime } from "~/lib/dates";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -18,9 +20,11 @@ import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import AddIcon from "@mui/icons-material/Add";
+import CodeIcon from "@mui/icons-material/Code";
 import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function UsersPage() {
@@ -47,6 +51,7 @@ export default function UsersPage() {
   );
 
   const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [developerModeOf, setDeveloperModeOf] = useState<AdminUser | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedUsageGroupId, setSelectedUsageGroupId] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -173,7 +178,7 @@ export default function UsersPage() {
     {
       key: "flags",
       label: t("users.flags"),
-      searchValue: (u) => `${u.is_active} ${u.is_superuser} ${u.is_verified}`,
+      searchValue: (u) => `${u.is_active} ${u.is_superuser} ${u.is_verified} ${hasDeveloperMode(u) ? "developer" : ""}`,
       render: (u) => (
         <Stack direction="row" spacing={0.8}>
           {u.is_superuser && <Chip size="small" color="warning" label={t("users.superuser")} />}
@@ -186,6 +191,20 @@ export default function UsersPage() {
             <Chip size="small" color="info" label={t("users.verified")} />
           ) : (
             <Chip size="small" color="default" label={t("users.unverified")} />
+          )}
+          {hasDeveloperMode(u) && (
+            <Chip
+              size="small"
+              color="secondary"
+              variant="outlined"
+              icon={<CodeIcon />}
+              label={t("users.developer_mode.chip")}
+              title={
+                u.developer_mode_until
+                  ? t("users.developer_mode.chip_until", { until: formatDateTime(u.developer_mode_until) })
+                  : undefined
+              }
+            />
           )}
         </Stack>
       ),
@@ -238,12 +257,17 @@ export default function UsersPage() {
           <Button size="small" variant="outlined" onClick={() => openEdit(u)}>
             {t("users.edit_roles")}
           </Button>
+          <Tooltip title={t("users.developer_mode.title")}>
+            <IconButton size="small" onClick={() => setDeveloperModeOf(u)}>
+              <CodeIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <IconButton size="small" color="error" onClick={() => setDeleteTarget(u)} title={t("common.delete")}>
             <DeleteIcon fontSize="small" />
           </IconButton>
         </Stack>
       ),
-      minWidth: 200,
+      minWidth: 240,
     },
   ];
 
@@ -326,6 +350,15 @@ export default function UsersPage() {
             ))}
           </TextField>
       </FormDialog>
+
+      <DeveloperModeDialog
+        user={developerModeOf}
+        onClose={() => setDeveloperModeOf(null)}
+        onSaved={() => {
+          setDeveloperModeOf(null);
+          void load();
+        }}
+      />
 
       {/* ── Create user dialog ── */}
       <FormDialog

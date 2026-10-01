@@ -439,6 +439,27 @@
       "description": "View and edit your account information — display name, email, password, and personal preferences.",
       "action_info": "Update your display name and email",
       "action_password": "Change your password"
+    },
+    "agents": {
+      "title": "Agents",
+      "description": "Agents that run inside other software (Office, EPLAN, any desktop application) and are governed by this server.",
+      "action_create": "Create an agent, or start from a definition in JSON",
+      "action_open": "Open an agent to change it, publish it and decide who may use it"
+    },
+    "agent_detail": {
+      "title": "Agent",
+      "description": "One agent: its definition, its versions, who may use it, and what it did.",
+      "action_definition": "Change the instructions, model, knowledge and tools; saving makes a new version",
+      "action_publish": "Publish a version, or roll back to an earlier one",
+      "action_access": "Grant it to users and teams, and choose its maintainers",
+      "action_activity": "See its usage, what the applications reported, and the signed-in devices"
+    },
+    "governance": {
+      "title": "Governance",
+      "description": "The rules every chat and agent request is held to, and what the checks decided.",
+      "action_rules": "Deny, ask before or allow tools by name",
+      "action_classes": "Say what tools do, for the tool modes",
+      "action_decisions": "Review what the checks decided, without the text"
     }
   },
   "taskflows": {

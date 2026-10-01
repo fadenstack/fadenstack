@@ -19,6 +19,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import type { MetricsPartial } from "~/api/inference";
+import { formatDateTime } from "~/lib/dates";
 
 export type ChipColor =
   | "success"
@@ -88,11 +89,7 @@ export function endpointStatusColor(status: string): ChipColor {
 }
 
 export function formatTimestamp(iso: string | null | undefined): string {
-  if (!iso) return i18n.t("inference.never");
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  // The reader's language, not the browser's default locale.
-  return parsed.toLocaleString(i18n.language || undefined);
+  return formatDateTime(iso, i18n.t("inference.never"));
 }
 
 /** Short id form for tables. Full ids stay available in tooltips. */
