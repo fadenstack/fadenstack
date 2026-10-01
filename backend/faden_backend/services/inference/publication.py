@@ -29,11 +29,33 @@ from faden_backend.services.llm.kinds import deployment_calls_tools
 #: at both layers.
 DERIVED_SOURCE_KIND = "inference_deployment"
 
+#: vLLM's own ``max_num_seqs`` for its OpenAI server on most GPUs, for a
+#: deployment that does not set one (GPUs of 70 GB and more default higher).
+DEFAULT_MAX_NUM_SEQS = 256
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from faden_backend.services.llm.gateway_sync import GatewaySyncService
 
 log = logging.getLogger(__name__)
+
+
+def gateway_concurrency(deployment: InferenceDeployment) -> int:
+    """How many requests the gateway lets through to *deployment* at once.
+
+    Each ready copy batches up to its ``max_num_seqs`` and queues the rest
+    itself, and Ray Serve LLM sets no limit of its own in front of a copy.
+    The gateway's fixed 16 refused the 17th chat of a three-copy deployment
+    whose copies take 128 each (.61, 2026-10-01).
+    """
+    config = ((deployment.spec_json or {}).get("engine") or {}).get("config") or {}
+    try:
+        per_copy = int(config.get("max_num_seqs") or DEFAULT_MAX_NUM_SEQS)
+    except (TypeError, ValueError):
+        per_copy = DEFAULT_MAX_NUM_SEQS
+    if per_copy < 1:
+        per_copy = DEFAULT_MAX_NUM_SEQS
+    return max(deployment.ready_replicas or 0, 1) * per_copy
 
 
 class InferencePublicationCoordinator:
@@ -138,6 +160,7 @@ class InferencePublicationCoordinator:
                 backend_provider_type="vllm",
                 health_status=health_status,
                 is_routable=is_routable,
+                max_concurrency=gateway_concurrency(deployment),
                 tools=deployment_calls_tools(deployment.spec_json),
                 # Behind the machine's model-TLS proxy: reached with the
                 # gateway's machine certificate (services/machine_tls).

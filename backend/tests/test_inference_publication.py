@@ -13,7 +13,10 @@ from faden_backend.db.models.inference import (
     InferenceDeployment,
     InferenceEndpoint,
 )
-from faden_backend.services.inference.publication import InferencePublicationCoordinator
+from faden_backend.services.inference.publication import (
+    InferencePublicationCoordinator,
+    gateway_concurrency,
+)
 
 
 @pytest.fixture
@@ -73,6 +76,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         backend_provider_type="vllm",
         health_status="healthy",
         is_routable=True,
+        max_concurrency=2 * 256,  # two copies at vLLM's default max_num_seqs
         tools=False,  # no engine config: vLLM's tool calls are off
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
@@ -116,9 +120,32 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         backend_provider_type="vllm",
         health_status="healthy",
         is_routable=True,
+        max_concurrency=256,  # only the ready copy counts
         tools=False,  # no engine config: vLLM's tool calls are off
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
+
+
+@pytest.mark.parametrize(
+    ("ready", "config", "expected"),
+    [
+        (3, {"max_num_seqs": 128}, 384),  # the 27B on the DGX pair: 16 refused its 17th chat
+        (1, {"max_num_seqs": "64"}, 64),  # a number typed as text still counts
+        (2, {}, 512),  # unset: vLLM's default
+        (2, {"max_num_seqs": 0}, 512),
+        (2, {"max_num_seqs": "many"}, 512),
+        (0, {"max_num_seqs": 32}, 32),  # never below one copy's worth
+    ],
+)
+def test_gateway_concurrency_is_ready_copies_times_their_batch(ready, config, expected):
+    """The gateway lets through what the ready copies batch, not a fixed 16."""
+    deployment = InferenceDeployment(
+        id=uuid.uuid4(),
+        name="qwen",
+        ready_replicas=ready,
+        spec_json={"engine": {"name": "vllm", "config": config}},
+    )
+    assert gateway_concurrency(deployment) == expected
 
 
 @pytest.mark.anyio
