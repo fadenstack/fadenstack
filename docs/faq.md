@@ -274,12 +274,22 @@ says why the rest cannot:
 
 Scale back down, or add a machine to the cluster.
 
+A copy on one accelerator may also take a share of it: **Accelerators per
+copy** in the **Scale** dialog, from 0.05 to 1. Below 1, copies can share an
+accelerator; above 0.5, no two share one. The share also caps the memory the
+engine takes (`gpu_memory_utilization`), and the dialog says how much that
+comes to. Two copies of a 27B model sharing one DGX Spark split its memory
+bandwidth: together they produced about what one copy alone did on the other
+machine.
+
 ### Does scaling interrupt the model?
 
-No. The copies already running are not restarted: the deployment stays
-**Serving** while copies are added or removed, and the page says what is
-left ("Serving on 1 of 2 copies; 1 more starting"). Adding a copy on the DGX
-pair took about two minutes, removing one about twelve seconds.
+Changing the number of copies does not. The copies already running are not
+restarted: the deployment stays **Serving** while copies are added or
+removed, and the page says what is left ("Serving on 1 of 2 copies; 1 more
+starting"). Adding a copy on the DGX pair took about two minutes, removing
+one about twelve seconds. Changing the accelerators per copy does: every copy
+restarts with its new share, and the dialog says so.
 
 ### The deployment page does not say which machine each copy is on.
 

@@ -215,6 +215,49 @@ describe("InferenceDeploymentDetailPage", () => {
     });
   });
 
+  it("changes the accelerators per copy with the copies, and says that restarts them", async () => {
+    // The 27B on the DGX pair needed one copy per machine (a share over 0.5) and
+    // more memory, which the share caps; neither could be set here (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    const share = await screen.findByLabelText("Accelerators per copy");
+    expect(share).toHaveValue(1);
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("80 %");
+    expect(screen.queryByTestId("scale-restarts")).not.toBeInTheDocument();
+
+    fireEvent.change(share, { target: { value: "1.5" } });
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    fireEvent.change(share, { target: { value: "0.75" } });
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("75 %");
+    expect(screen.getByTestId("scale-restarts")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec).toEqual({
+      ...deployment.spec,
+      scale: { replicas: 2 },
+      resources: { replica: { gpus: 0.75 } },
+    });
+  });
+
+  it("offers no share for a copy spread over several accelerators", async () => {
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      spec: { ...deployment.spec, topology: { tensor_parallel_size: 2 }, resources: { replica: { gpus: 2 } } },
+    });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    await screen.findByLabelText("Copies");
+    expect(screen.queryByLabelText("Accelerators per copy")).not.toBeInTheDocument();
+  });
+
   it("offers the deployment in chat by setting the alias, and nothing else", async () => {
     const update = vi
       .spyOn(inferenceApi, "updateDeployment")

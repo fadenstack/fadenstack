@@ -484,6 +484,7 @@ export default function InferenceDeploymentDetailPage() {
   const [scaleOpen, setScaleOpen] = useState(false);
   const [scaling, setScaling] = useState(false);
   const [replicaInput, setReplicaInput] = useState(1);
+  const [shareInput, setShareInput] = useState("1");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -575,12 +576,34 @@ export default function InferenceDeploymentDetailPage() {
   }
 
   const perCopy = deployment ? acceleratorsPerCopy(deployment) : 1;
+  // A copy on one device may take a share of it; one spread over several
+  // (tensor or pipeline parallel) takes exactly those, as the compiler requires.
+  const topology = asRecord(deployment?.spec?.topology);
+  const devicesPerCopy =
+    (Number(topology.tensor_parallel_size) || 1) * (Number(topology.pipeline_parallel_size) || 1);
+  const shareEditable = devicesPerCopy === 1;
+  const shareTyped = Number(shareInput);
+  const shareValid =
+    !shareEditable || (shareInput.trim() !== "" && shareTyped >= 0.05 && shareTyped <= 1);
+  const shareChanged = shareEditable && shareValid && shareTyped !== perCopy;
+  const planShare = shareChanged ? shareTyped : perCopy;
+  // What the engine will take of each accelerator's memory: a share below 1
+  // caps gpu_memory_utilization (compiler.py), otherwise it is as set, or 0.80.
+  const askedMemory = Number(asRecord(asRecord(deployment?.spec?.engine).config).gpu_memory_utilization);
+  const memoryShare =
+    planShare < 1
+      ? askedMemory > 0
+        ? Math.min(askedMemory, planShare)
+        : planShare
+      : askedMemory > 0
+        ? askedMemory
+        : 0.8;
   const clusterAccelerators = data.members.reduce((sum, member) => {
     const node = data.nodes.find((n) => n.id === member.node_id);
     return sum + (node ? gpuCount(node) : 0);
   }, 0);
   const copiesThatFit =
-    clusterAccelerators > 0 && perCopy > 0 ? Math.floor(clusterAccelerators / perCopy) : null;
+    clusterAccelerators > 0 && planShare > 0 ? Math.floor(clusterAccelerators / planShare) : null;
 
   async function handleScale() {
     if (!deployment) return;
@@ -588,9 +611,13 @@ export default function InferenceDeploymentDetailPage() {
     try {
       // Replace the whole spec: v1alpha1 is not partially patchable, and the
       // scale block is mutually exclusive between fixed and autoscaled.
+      const resources = asRecord(deployment.spec.resources);
       const spec = {
         ...deployment.spec,
         scale: { replicas: replicaInput },
+        ...(shareChanged
+          ? { resources: { ...resources, replica: { ...asRecord(resources.replica), gpus: shareTyped } } }
+          : {}),
       };
       await inferenceApi.updateDeployment(deployment.id, { spec });
       // Act now, not at the reconciler's next tick.
@@ -704,6 +731,7 @@ export default function InferenceDeploymentDetailPage() {
           startIcon={<TuneIcon />}
           onClick={() => {
             setReplicaInput(copiesWanted(deployment));
+            setShareInput(String(acceleratorsPerCopy(deployment)));
             setScaleOpen(true);
           }}
         >
@@ -1317,6 +1345,7 @@ export default function InferenceDeploymentDetailPage() {
         title={t("inference.detail.scale")}
         loading={scaling}
         submitLabel={t("inference.detail.apply")}
+        submitDisabled={!shareValid}
         onSubmit={() => void handleScale()}
         onClose={() => setScaleOpen(false)}
       >
@@ -1331,10 +1360,31 @@ export default function InferenceDeploymentDetailPage() {
               setReplicaInput(Math.max(1, Number(e.target.value) || 1))
             }
           />
+          {shareEditable && (
+            <TextField
+              label={t("inference.detail.share_label")}
+              type="number"
+              value={shareInput}
+              error={!shareValid}
+              slotProps={{ htmlInput: { min: 0.05, max: 1, step: 0.05 } }}
+              helperText={!shareValid ? t("inference.detail.share_invalid") : t("inference.detail.share_help")}
+              onChange={(e) => setShareInput(e.target.value)}
+            />
+          )}
+          {shareValid && (
+            <Typography variant="body2" color="text.secondary" data-testid="scale-memory">
+              {t("inference.detail.share_memory", { percent: Math.round(memoryShare * 100) })}
+            </Typography>
+          )}
+          {shareChanged && (
+            <Alert severity="info" data-testid="scale-restarts">
+              {t("inference.detail.share_restarts")}
+            </Alert>
+          )}
           {copiesThatFit !== null && (
             <Typography variant="body2" color="text.secondary" data-testid="scale-capacity">
               {t("inference.detail.scale_capacity", {
-                perCopy: t("inference.detail.accelerators", { count: perCopy }),
+                perCopy: t("inference.detail.accelerators", { count: planShare }),
                 total: clusterAccelerators,
                 fit: t("inference.detail.copies_fit", { count: copiesThatFit }),
               })}
