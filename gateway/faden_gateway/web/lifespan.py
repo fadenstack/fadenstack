@@ -220,6 +220,34 @@ def _setup_service_registry(app: FastAPI) -> None:
     app.state.service_registry = service_registry
 
 
+async def _turn_sweep_loop(app: FastAPI) -> None:
+    """End chat replies a gateway that went away left running, now and every minute.
+
+    Their heartbeat stopped (``chat_turn_stale_sec``); the chat shows them
+    interrupted, to be tried again. Every worker sweeps: the update is the
+    same whoever makes it.
+    """
+    import asyncio  # noqa: PLC0415
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    from faden_gateway.db.dao.session_dao import SessionDAO  # noqa: PLC0415
+    from faden_gateway.db.models.gateway import TURN_INTERRUPTED_ERROR  # noqa: PLC0415
+
+    while True:
+        try:
+            async with app.state.db_session_factory() as session:
+                stale_before = datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+                ended = await SessionDAO(session).interrupt_stale_turns(
+                    stale_before=stale_before, error=TURN_INTERRUPTED_ERROR,
+                )
+                await session.commit()
+            if ended:
+                log.warning("%d chat replies were left running by a gateway that went away", ended)
+        except Exception:
+            log.debug("Sweeping replies left running failed", exc_info=True)
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan_setup(
     app: FastAPI,
@@ -309,11 +337,14 @@ async def lifespan_setup(
         app.state.chat_file_store = LocalFileStore(settings.chat_file_store_root)
     else:
         app.state.chat_file_store = None
-    # Stream reconnection buffer
-    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
-    app.state.stream_buffer = StreamBuffer()
     setup_opentelemetry(app)
     _init_cache(app)
+    # Stream reconnection buffer; a chat page's reply also goes to the log
+    # every worker reads (Redis), for a page that comes back to another one.
+    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
+    from faden_gateway.services.gateway.turn_log import TurnLog  # noqa: PLC0415
+
+    app.state.stream_buffer = StreamBuffer(log=TurnLog.of(app.state.cache_backend))
     init_rabbit(app)
     setup_prometheus(app)
     # Security middleware (HSTS, security headers, host allowlist, CORS,
@@ -337,6 +368,7 @@ async def lifespan_setup(
                 log.debug("Price cache refresh failed", exc_info=True)
 
     pricing_task = asyncio.create_task(_pricing_refresh_loop())
+    turn_sweep_task = asyncio.create_task(_turn_sweep_loop(app), name="turn_sweep")
     # The machines' mutual TLS: the gateway's certificate and the machine CAs,
     # read from the backend every minute (services/gateway/upstream_tls.py).
     from faden_gateway.services.gateway import upstream_tls  # noqa: PLC0415
@@ -356,6 +388,7 @@ async def lifespan_setup(
     yield
     await device_hub.stop()
     pricing_task.cancel()
+    turn_sweep_task.cancel()
     machine_tls_task.cancel()
     if not broker.is_worker_process:
         await broker.shutdown()

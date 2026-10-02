@@ -180,6 +180,29 @@ plus 100 for Langfuse, migrations and backups, at least 250, in steps of 50:
 with the prefixes `FADEN_GATEWAY_`, `FADEN_BACKEND_`, `FADEN_MCP_` and
 `FADEN_SKILLS_`; the backend worker takes the backend's.
 
+`faden tune` also sizes by memory. It estimates what each part takes, from
+measurements on a production install: about 2.1 GB for the services that run
+once, per worker process 200 MB for the backend, 290 MB for the gateway and
+780 MB for PII, 160 MB per process of the backend's task worker, and the
+optional modules' own processes: PII's task worker holds its language
+models too, 1.5 GB. The operating system keeps 1 GB plus 5 % of
+the memory. When the workers the CPU allows do not fit, `tune` uses fewer:
+
+- It first reduces the workers of every service, down to one each.
+- Then it runs the backend's task worker as one process
+  (`FADEN_BACKEND_TASK_WORKERS`, two by default).
+- It sets how many ranges a model download fetches at once
+  (`FADEN_BACKEND_DOWNLOAD_RANGES`, passed to the worker as
+  `HF_XET_NUM_CONCURRENT_RANGE_GETS`). Each range can hold up to 64 MB in
+  memory. `tune` gives a download a quarter of the memory that is left, at
+  least 4 ranges and at most 32.
+
+`tune` prints the estimate. If a host is short of memory even at one worker
+each, it says by how much. On such a host, expect swapping, and processes
+killed while a large model downloads. On a 7 GB server that ran two of
+everything, one download took the task worker to 2.3 GB. Swap filled, and the
+kernel killed the task worker.
+
 ## What grows with what
 
 | When you add | What grows |

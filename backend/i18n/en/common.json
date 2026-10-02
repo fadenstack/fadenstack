@@ -1787,7 +1787,6 @@
     "sessions_title": "Chat Sessions",
     "attachments_title": "Chat Attachments",
     "col_name": "Name",
-    "col_title": "Title",
     "col_user": "User",
     "col_tenant": "Tenant",
     "col_model": "Model",
@@ -1799,7 +1798,6 @@
     "col_type": "Content Type",
     "col_extraction": "Extraction",
     "col_scope": "Scope",
-    "untitled_session": "(untitled)",
     "search_projects": "Search projects…",
     "search_sessions": "Search sessions…",
     "search_attachments": "Search attachments…",
@@ -1822,8 +1820,8 @@
     "extraction_skipped": "skipped",
     "scope_session": "session",
     "scope_project": "project",
-    "title_encrypted": "Encrypted",
-    "title_encrypted_hint": "Chat titles are encrypted like the messages; only the user who wrote them sees them."
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Its title and messages are its user's own and are not shown here."
   },
   "chat": {
     "title": "Chat",
@@ -1870,7 +1868,8 @@
     "rename": "Rename",
     "rename_save": "Save",
     "rename_cancel": "Cancel",
-    "title_label": "Chat title"
+    "title_label": "Chat title",
+    "writing": "A reply is being written"
   },
   "mcp": {
     "servers_title": "MCP Servers",
@@ -2209,7 +2208,9 @@
       "token_tooltip": "Create a one-time enrollment token for this machine",
       "token_title": "Enrollment token",
       "deployment_progress": "Deployment progress",
-      "container_logs": "Container logs"
+      "container_logs": "Container logs",
+      "deployments": "Deployments on this machine",
+      "no_deployments": "No deployment's cluster includes this machine."
     },
     "fleet": {
       "checking_resources": "Checking for associated resources…",
@@ -2220,7 +2221,9 @@
       "provider_count_other": "{{count}} providers",
       "cascade": "Also delete the providers and runtimes on it",
       "keep_runtimes": "The runtimes are unassigned from this machine but kept."
-    }
+    },
+    "agent_update": "Agent {{version}} available",
+    "agent_update_hint": "Update it in a maintenance window: run this server's install line on the machine again (Nodes → Add a machine). Agents never update by themselves."
   },
   "node_profiles": {
     "page_title": "Machine Profiles",
@@ -2633,6 +2636,48 @@
       "restart_warning": "The cluster restarts on every machine: its models stop, load again and answer again when loaded — minutes for a large model.",
       "restart_confirm": "Restart the cluster",
       "update_agents": "Encryption between the machines needs agent 0.1.18 or later on every machine. Update {{hosts}} by re-running the install line there."
+    },
+    "model_downloads": {
+      "title": "Where the machines get models",
+      "switch_label": "Machines download models themselves",
+      "on_chip": "From Hugging Face",
+      "off_chip": "From this server",
+      "on_detail": "Each machine downloads a model from Hugging Face into its own model store, with this server's Hugging Face token for a gated model. The server neither downloads it nor copies it.",
+      "off_detail": "This server downloads a model and each machine copies it from the server. That works with no internet on the machines; over a slow server link a large model takes that long twice.",
+      "checking": "Asking the machines whether they reach Hugging Face…",
+      "check_again": "Check again",
+      "reaches": "Reaches Hugging Face",
+      "cannot_switch_on": "Every machine must reach Hugging Face to switch this on:",
+      "problem": {
+        "no_internet": "{{host}}: cannot reach Hugging Face",
+        "store_not_writable": "{{host}}: its model store is not writable by the agent",
+        "old_agent": "{{host}}: agent too old, update it to 0.2.2 or later",
+        "offline": "{{host}}: offline",
+        "no_answer": "{{host}}: did not answer"
+      },
+      "applies_next": "Applies to the next model placed on the cluster; models already on the machines stay."
+    },
+    "applies_on_start": "Applies when the cluster starts",
+    "runtime": {
+      "title": "Runtime",
+      "detail": "The image the machines run, with Ray and vLLM together. It changes only when you switch it here.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Certified",
+        "partial": "Partly certified",
+        "failed": "Failed certification",
+        "uncertified": "Not certified"
+      },
+      "preview": "Preview",
+      "recommended": "Recommended",
+      "applying": "Restarting on the new runtime",
+      "update": "A newer certified runtime is available (vLLM {{vllm}}). The cluster keeps its runtime until you switch.",
+      "choose": "Switch to",
+      "switch": "Switch",
+      "restart_warning": "Switching to vLLM {{vllm}} restarts the cluster: each machine's container is made again from the new image and every model on it loads again. A machine that does not hold the image yet fetches it first.",
+      "preview_hint": "A preview has passed its certification and runs models the recommended runtime cannot, but it is new: choose it for a cluster that needs those models.",
+      "restart_confirm": "Restart on this runtime"
     }
   },
   "inference": {
@@ -2703,11 +2748,6 @@
       "col_ready": "Ready",
       "col_pending": "Pending",
       "logs": "Logs",
-      "log_source": "Source",
-      "log_runtime": "Runtime container",
-      "log_replica": "Serving copy",
-      "log_machine": "Machine",
-      "log_head": "Cluster head",
       "log_tail": "Lines",
       "fetch": "Fetch",
       "truncated_one": "Truncated to the last {{count}} line.",
@@ -2740,7 +2780,22 @@
       "traffic_window_one": "Measured at the gateway, last minute",
       "traffic_window_other": "Measured at the gateway, last {{count}} minutes",
       "engine_reported": "Reported by the engine",
-      "page_title": "Deployment"
+      "page_title": "Deployment",
+      "reply_wait": "A reply must start within",
+      "reply_wait_value": "{{seconds}} s",
+      "reply_wait_default": "the gateway's default (180 s)",
+      "reply_wait_title": "How long a reply may take to start",
+      "reply_wait_label": "Seconds",
+      "reply_wait_placeholder": "Empty: the gateway's default",
+      "reply_wait_help": "A busy model keeps new requests in its queue until it has room, and sends nothing meanwhile. After this long the request fails, and the person can try it again. 10 to 1800 seconds; empty uses the gateway's default (180 s). The model keeps running while this changes.",
+      "reply_wait_invalid": "Enter 10 to 1800 seconds, or leave it empty.",
+      "reply_wait_failed": "Could not change how long a reply may take to start.",
+      "share_label": "Accelerators per copy",
+      "share_help": "1 is a whole accelerator. Less lets copies share one; more than 0.5 keeps each copy on an accelerator of its own. The engine takes the same share of the accelerator's memory (a whole one: 0.8).",
+      "share_invalid": "Enter 0.05 to 1.",
+      "share_memory": "The engine takes {{percent}} % of each accelerator's memory.",
+      "share_restarts": "Changing the share restarts every copy. The model is unavailable until they are back.",
+      "show_in_logs": "Show the errors"
     },
     "engine": {
       "title": "Engine settings",
@@ -2748,7 +2803,8 @@
       "defaults": "vLLM's defaults: nothing changed.",
       "dialog_title": "Engine settings for {{name}}",
       "restart_warning": "Saving restarts every copy with the new settings. The model is unavailable until they are back up. If a copy does not start, this page says why and you can change the settings back.",
-      "save_restart": "Save and restart"
+      "save_restart": "Save and restart",
+      "memory_capped": "gpu_memory_utilization {{asked}} is more than this deployment's share of an accelerator ({{share}}): the engine takes {{share}}. Raise the share under Scale, which brings the memory along."
     }
   },
   "audit": {
@@ -2885,8 +2941,11 @@
       "unknown_tool_parser": "This engine does not know the tool format \"{{value}}\".",
       "unknown_reasoning_parser": "This engine does not know the thinking format \"{{value}}\".",
       "remote_code": "The model's own code will run on your machines. Keep this on only for publishers you trust.",
-      "extra_invalid": "These flags are not accepted and will not be used: {{tokens}}"
-    }
+      "extra_invalid": "These flags are not accepted and will not be used: {{tokens}}",
+      "json_invalid": "Not valid JSON, so the copy will not start: {{flags}}"
+    },
+    "json_syntax": "Not valid JSON.",
+    "json_object": "Needs a JSON object, such as {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Hugging Face access",
@@ -2972,7 +3031,11 @@
     "creating": "Creating the deployment…",
     "host": "Host",
     "revision_label": "Revision (optional)",
-    "revision_help": "A branch, tag or commit on Hugging Face. Leave empty for the latest."
+    "revision_help": "A branch, tag or commit on Hugging Face. Leave empty for the latest.",
+    "cannot_run": "Cannot run here",
+    "may_not_run": "May not run",
+    "compat_model_type": "This cluster's runtime cannot load it: neither Transformers {{transformers}} nor vLLM {{vllm}} in it knows the model type \"{{type}}\" (the model was saved with Transformers {{saved}}). It needs a newer runtime image; nothing is downloaded.",
+    "compat_architecture": "vLLM {{vllm}} in this cluster's runtime has no implementation of {{architecture}}. It can only try its generic Transformers backend, which not every model supports."
   },
   "marketplace": {
     "title": "Model marketplace",
@@ -3489,6 +3552,27 @@
         "rejected": "Rejected",
         "expired": "Expired"
       }
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Errors",
+      "warning": "Warnings",
+      "info": "Info",
+      "debug": "Debug",
+      "other": "Other"
+    },
+    "search": "Search the lines",
+    "follow": "Follow new lines",
+    "copy": "Copy the lines shown",
+    "download": "Download the lines shown",
+    "empty": "No log lines yet.",
+    "nothing_matches": "No line matches the filters.",
+    "source": {
+      "replica": "Model serving",
+      "engine": "Engine (vLLM)",
+      "agent": "System log",
+      "container": "Model containers"
     }
   }
 }

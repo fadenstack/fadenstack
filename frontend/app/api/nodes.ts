@@ -35,6 +35,8 @@ export interface ManagedNode {
   host: string;
   status: string;
   version?: string | null;
+  /** The agent version this server installs, when this machine's is older. Updating is the operator's step. */
+  agent_update?: string | null;
   labels: Record<string, unknown>;
   capabilities: Record<string, unknown>;
   maintenance_mode: boolean;

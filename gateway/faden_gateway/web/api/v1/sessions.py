@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -22,6 +23,7 @@ from faden_gateway.services.gateway.session_schemas import (
     SummaryDTO,
     TokenUsageDTO,
 )
+from faden_gateway.settings import settings
 
 router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
 
@@ -174,7 +176,17 @@ async def list_sessions(
         project_id=project_id,
         status=status_enum,
     )
-    data = [SessionDTO.model_validate(s).model_dump(mode="json") for s in sessions]
+    # The chats a reply is being written in: the sidebar marks them, since
+    # a reply goes on while the user is in another chat.
+    alive_since = datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+    writing = set(await dao.running_turn_sessions(
+        tenant_id=auth.tenant_id, user_id=auth.user_id, alive_since=alive_since,
+    ))
+    data = []
+    for s in sessions:
+        dto = SessionDTO.model_validate(s)
+        dto.writing = s.id in writing
+        data.append(dto.model_dump(mode="json"))
     return JSONResponse(status_code=200, content={"data": data})
 
 

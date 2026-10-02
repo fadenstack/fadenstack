@@ -35,6 +35,19 @@ def _profile_of(env: dict[str, str]) -> str:
     return "dev" if env.get("FADEN_BACKEND_ENVIRONMENT") == "dev" else "prod"
 
 
+#: The flag in ``.env`` that switches each optional module on.
+_MODULE_FLAGS = {
+    "pii": "FADEN_BACKEND_PII_ENABLED",
+    "mcp": "FADEN_BACKEND_MCP_ENABLED",
+    "skills": "FADEN_BACKEND_SKILLS_ENABLED",
+}
+
+
+def _modules_of(env: dict[str, str]) -> frozenset[str]:
+    """The optional modules the install has switched on."""
+    return frozenset(m for m, flag in _MODULE_FLAGS.items() if env.get(flag, "").strip().lower() == "true")
+
+
 def _resource_pct_of(env: dict[str, str]) -> float:
     try:
         pct = float(env.get("FADEN_TUNE_RESOURCE_PCT") or DEFAULT_RESOURCE_PCT)
@@ -59,7 +72,9 @@ def tune_env(
     env = read_env_file(env_path)
     profile = profile or _profile_of(env)
     resource_pct = resource_pct or _resource_pct_of(env)
-    tp = calculate_tune_profile(profile, system=detect_system(), resource_pct=resource_pct)
+    tp = calculate_tune_profile(
+        profile, system=detect_system(), resource_pct=resource_pct, modules=_modules_of(env),
+    )
     show(tp)
     if dry_run:
         console.print("[dim]Dry run — no files written.[/dim]")
@@ -109,4 +124,31 @@ def show(tp: TuneProfile) -> None:
         f"({', '.join(f'{name} {n}' for name, n in peaks.items())}); "
         f"Postgres max_connections {tp.max_connections}."
     )
+    console.print()
+    show_memory(tp)
+
+
+def show_memory(tp: TuneProfile) -> None:
+    """What the sizing takes of the memory, and whether the host has it."""
+    parts = tp.memory_mb()
+    mem_table = Table(title="Memory (estimate)", show_header=False, title_style="bold cyan")
+    mem_table.add_column("Part", style="dim")
+    mem_table.add_column("MB", justify="right")
+    for name, mb in parts.items():
+        mem_table.add_row(name, str(mb))
+    mem_table.add_row("[bold]total[/bold]", f"[bold]{sum(parts.values())}[/bold]")
+    mem_table.add_row("available to Fadenstack", str(tp.memory_budget_mb))
+    console.print(mem_table)
+    workers = max(tp.workers.values())
+    if workers < tp.cpu_workers:
+        console.print(
+            f"[yellow]Workers cut from {tp.cpu_workers} to {workers} to fit "
+            f"{tp.system.total_ram_gb} GB of memory.[/yellow]"
+        )
+    if tp.memory_short_mb:
+        console.print(
+            f"[bold red]This host is {tp.memory_short_mb} MB short of memory for what is switched on.[/bold red] "
+            f"Expect swapping, and processes killed when a model downloads. Give it more memory, "
+            f"or switch modules off (faden module disable ...)."
+        )
     console.print()

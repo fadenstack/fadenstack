@@ -18,6 +18,7 @@ from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User
+from faden_backend.services.marketplace import compat as compat_mod
 from faden_backend.services.marketplace import curated as curated_mod
 from faden_backend.services.marketplace import fit as fit_mod
 from faden_backend.services.marketplace import recipes as recipes_mod
@@ -326,6 +327,9 @@ async def model_detail(
         kv_heads=arch.get("num_kv_heads"),
     )
     fits = {c.environment_id: fit_mod.plan(needs, c, context=context).to_dict() for c in hardware}
+    # Whether each cluster's runtime can load it at all -- said here, before
+    # anyone downloads 132 GB to find out (services/marketplace/compat.py).
+    compatibility = {c.environment_id: compat_mod.check(arch, c.runtime).to_dict() for c in hardware}
     chosen = _cluster(hardware, cluster_id)
     chosen_fit = fit_mod.plan(needs, chosen, context=context) if chosen is not None else None
     suggestion = settings_mod.suggest(detail, chosen_fit if chosen_fit and chosen_fit.status == "fits" else None)
@@ -347,6 +351,7 @@ async def model_detail(
         "clusters": [c.to_dict() for c in hardware],
         "cluster_id": chosen.environment_id if chosen else None,
         "fits": fits,
+        "compatibility": compatibility,
         "suggested": suggestion,
         "recipe": recipe.to_dict(vllm_version=chosen.vllm_version if chosen else None) if recipe else None,
         "local": local.get(repo_id),
@@ -362,6 +367,25 @@ class HostBody(BaseModel):
     copies: int = Field(default=1, ge=1, le=64)
     gpus_per_copy: float = Field(default=1, gt=0, le=64)
     engine_config: dict[str, Any] = Field(default_factory=dict)
+    #: Host it even though the cluster's runtime cannot load it (it will fail to start).
+    ignore_compatibility: bool = False
+
+
+async def _refuse_if_it_cannot_run(session: AsyncSession, repo_id: str, environment_id: uuid.UUID) -> None:
+    """409 when the cluster's runtime cannot load the model; nothing is downloaded then.
+
+    Not knowing -- the Hub unreachable, no config -- is no reason to refuse.
+    """
+    try:
+        detail = await (await _hub(session)).detail(repo_id)
+    except (HubNotFound, HubUnavailable):
+        return
+    cluster = next((c for c in await cluster_hardware(session) if c.environment_id == str(environment_id)), None)
+    if cluster is None:
+        return
+    verdict = compat_mod.check(detail.get("architecture_facts"), cluster.runtime)
+    if verdict.status == compat_mod.CANNOT_RUN:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=verdict.message)
 
 
 @router.post("/host", status_code=status.HTTP_201_CREATED)
@@ -375,6 +399,8 @@ async def host_model(
     """Keep the model on this server (downloading it if needed) and deploy it to a cluster."""
     from faden_backend.services.inference.service import InferenceError  # noqa: PLC0415
 
+    if not body.ignore_compatibility:
+        await _refuse_if_it_cannot_run(session, body.repo_id.strip(), body.environment_id)
     try:
         return await host(session, llm_service, HostRequest(
             repo_id=body.repo_id.strip(),

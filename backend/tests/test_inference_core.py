@@ -54,6 +54,17 @@ def test_parse_valid_replicas_spec() -> None:
     assert spec.service.path == "/v1"
 
 
+@pytest.mark.parametrize(("wait", "ok"), [(300, True), (10, True), (1800, True), (5, False), (3600, False)])
+def test_a_models_wait_for_a_reply_is_bounded(wait: float, ok: bool) -> None:
+    """Long enough for a busy model, short enough that a hung request is not waited on for hours."""
+    doc = _spec(service={"path": "/v1", "first_token_timeout_sec": wait})
+    if ok:
+        assert parse_inference_deployment_spec(doc).service.first_token_timeout_sec == wait
+    else:
+        with pytest.raises(pydantic.ValidationError):
+            parse_inference_deployment_spec(doc)
+
+
 def test_parse_valid_autoscale_spec() -> None:
     spec = parse_inference_deployment_spec(
         _spec(scale={"autoscale": {"min_replicas": 0, "max_replicas": 4, "target_utilization": 0.9}}),

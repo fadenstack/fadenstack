@@ -351,12 +351,17 @@ export interface InferenceEndpoint {
 // Observability (mirrors the WI-1 DTOs)
 // ---------------------------------------------------------------------------
 
-export type LogSource = "runtime_container" | "serve_replica" | "agent";
+/** All of a deployment, its serving copies (Serve's log), the inference engine's own output, or the machines' agents. */
+export type LogSource = "all" | "serve_replica" | "engine" | "agent" | "runtime_container";
 
 export interface LogLine {
   ts: string | null;
   level: string | null;
   message: string;
+  /** The machine it was written on, when a page spans several. */
+  host?: string | null;
+  /** Which stream: replica (Serve), engine (vLLM) or agent. */
+  source?: string | null;
 }
 
 export interface LogPage {
@@ -603,12 +608,58 @@ export interface RayTlsStatus {
   on: boolean;
   /** Every machine's agent says its container runs Ray as the switch says. */
   applied: boolean;
+  /** Not applied, and the cluster is to run: it is restarting. A stopped cluster waits for its start. */
+  restarting?: boolean;
   /** Per machine: what its agent last said (null: not yet). */
   running: Record<string, boolean | null>;
   machines: number;
   /** Machines whose agent cannot run Ray with TLS yet. */
   old_agents: string[];
   can_switch_on: boolean;
+}
+
+/** A runtime this server ships for a cluster's machines, in the runtime list's words. */
+export type ClusterRuntime = Pick<
+  RuntimeBundle,
+  "bundle_id" | "image" | "runtime_version" | "vllm_version" | "certification_status"
+> & {
+  /** stable: what machines get unless their cluster chose another; preview: only when chosen. */
+  channel: "stable" | "preview";
+  /** What a machine of its flavor gets when its cluster chose none. */
+  default: boolean;
+};
+
+/** Which runtime a cluster's machines run, and which they could. */
+export interface ClusterRuntimeStatus {
+  /** The runtimes its machines run, or are to run once restarted. */
+  runs: string[];
+  /** Every machine runs what it is to run. */
+  applied: boolean;
+  /** Not applied, and the cluster is to run: it is restarting on the new runtime. */
+  restarting: boolean;
+  /** A newer certified stable runtime the cluster does not run. */
+  update: string | null;
+  runtimes: ClusterRuntime[];
+}
+
+/** One machine's answer: can it download a model from Hugging Face itself? */
+export interface MachineInternet {
+  node_id: string;
+  host: string;
+  /** null: it could not be asked (offline, an old agent, no answer). */
+  internet: boolean | null;
+  detail: string | null;
+  checked_at: string;
+  problem: "no_internet" | "store_not_writable" | "old_agent" | "offline" | "no_answer" | null;
+}
+
+/** Whether a cluster's machines download models from Hugging Face themselves. */
+export interface ModelDownloadsStatus {
+  on: boolean;
+  machines: MachineInternet[];
+  /** Every machine reaches Hugging Face and runs an agent that can. */
+  can_switch_on: boolean;
+  reason: string | null;
 }
 
 export interface StrayModels {
@@ -807,8 +858,9 @@ export const inferenceApi = {
 
   // --- Deployments ---------------------------------------------------------
 
-  listDeployments() {
-    return request<InferenceDeployment[]>("/deployments");
+  /** All deployments, or those on a cluster the machine *nodeId* is a member of. */
+  listDeployments(nodeId?: string) {
+    return request<InferenceDeployment[]>(nodeId ? `/deployments?node_id=${enc(nodeId)}` : "/deployments");
   },
 
   getDeployment(id: string) {
@@ -915,6 +967,29 @@ export const inferenceApi = {
   /** Restarts the cluster: every machine's Ray starts again with TLS, or without. */
   switchRayTls(environmentId: string, on: boolean) {
     return request<RayTlsStatus>(`/environments/${enc(environmentId)}/ray-tls`, {
+      method: "POST",
+      body: JSON.stringify({ on }),
+    });
+  },
+  runtime(environmentId: string) {
+    return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime`);
+  },
+  /** Restarts the cluster on that runtime: containers made again from its image, models loaded again. */
+  switchRuntime(environmentId: string, runtime: string) {
+    return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime`, {
+      method: "POST",
+      body: JSON.stringify({ runtime }),
+    });
+  },
+  /** Asks each machine whether it reaches Hugging Face (answers are kept a few minutes unless `fresh`). */
+  modelDownloads(environmentId: string, fresh = false) {
+    return request<ModelDownloadsStatus>(
+      `/environments/${enc(environmentId)}/model-downloads${fresh ? "?fresh=true" : ""}`,
+    );
+  },
+  /** On: every machine downloads models itself. Refused (409) while one cannot reach Hugging Face. */
+  switchModelDownloads(environmentId: string, on: boolean) {
+    return request<ModelDownloadsStatus>(`/environments/${enc(environmentId)}/model-downloads`, {
       method: "POST",
       body: JSON.stringify({ on }),
     });

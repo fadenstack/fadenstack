@@ -109,11 +109,14 @@ async def list_runtime_bundles(
             if not ok:
                 incompatible[str(node.id)] = reason
             elif chosen is not None:
-                # It would run, but something more specific was chosen.  Say
-                # so rather than reporting it as an incompatibility, which
-                # would read as a fault on a node that is perfectly fine.
+                # It would run, but another runtime is this machine's default
+                # (a more specific one, or the recommended one of its
+                # flavor).  Say so rather than reporting it as an
+                # incompatibility, which would read as a fault on a node that
+                # is perfectly fine.
                 incompatible[str(node.id)] = (
-                    f"{chosen.display_name} is the closer match for this machine"
+                    f"{chosen.display_name} (vLLM {chosen.compatibility_matrix.vllm_version}) is this "
+                    "machine's default; a cluster can be switched to this one"
                 )
             else:
                 machine = str((node.capabilities_json or {}).get("machine") or "")

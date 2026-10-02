@@ -73,7 +73,7 @@
   "blocked_prompt": "Nicht gesendet",
   "blocked_answer": "Antwort zurückgehalten",
   "blocked_default": "Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.",
-  "turn_failed": "Keine Antwort: Die Anfrage ist fehlgeschlagen.",
+  "turn_failed": "Die Antwort ist fehlgeschlagen.",
   "edit_and_resend": "Bearbeiten und erneut senden",
   "rate_limited_label": "Anfragelimit erreicht",
   "retry_after": "Erneut versuchen in {{seconds}} s.",
@@ -81,5 +81,7 @@
   "approval_title": "{{tool}} möchte ausgeführt werden",
   "approval_a_tool": "Ein Werkzeug",
   "approval_decline": "Ablehnen",
-  "approval_approve": "Zulassen"
+  "approval_approve": "Zulassen",
+  "turn_interrupted": "Der Server wurde neu gestartet, während diese Antwort geschrieben wurde.",
+  "turn_stopped": "Angehalten"
 }

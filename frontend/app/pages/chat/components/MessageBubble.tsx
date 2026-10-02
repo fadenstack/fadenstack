@@ -13,12 +13,13 @@ import { useTheme } from "@mui/material/styles";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonIcon from "@mui/icons-material/Person";
+import ReplayIcon from "@mui/icons-material/Replay";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useTranslation } from "react-i18next";
 
-import type { TokenUsage } from "~/api/chatTypes";
+import type { TokenUsage, TurnStatus } from "~/api/chatTypes";
 import ThinkingBlock from "./ThinkingBlock";
 import TokenUsageBadge from "./TokenUsageBadge";
 
@@ -38,9 +39,13 @@ interface Props {
   reasoning?: string | null;
   reasoningMs?: number | null;
   /** A refused or failed turn (see ChatMessage.status). */
-  status?: "ok" | "blocked_input" | "blocked_output" | "error";
+  status?: TurnStatus;
   /** What the user was told about a refused message; shown in its place. */
   notice?: string | null;
+  /** A reply the user stopped: it says so. */
+  stopped?: boolean;
+  /** Tries the reply again (the chat's last one, stopped). */
+  onRetry?: () => void;
 }
 
 export default function MessageBubble({
@@ -56,8 +61,10 @@ export default function MessageBubble({
   onDebugClick,
   reasoning = null,
   reasoningMs = null,
-  status = "ok",
+  status = "complete",
   notice = null,
+  stopped = false,
+  onRetry,
 }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -201,13 +208,14 @@ export default function MessageBubble({
               {content}
             </ReactMarkdown>
           )}
-          {status === "error" && (
+          {/* A question whose request failed before its reply was kept (the API's whole answers). */}
+          {isUser && status === "failed" && (
             <Typography
               variant="caption"
-              data-message-status="error"
+              data-message-status="failed"
               sx={{ display: "block", mt: 0.5, opacity: 0.8 }}
             >
-              {t("turn_failed", { ns: "chat", defaultValue: "No answer: the request failed." })}
+              {t("turn_failed", { ns: "chat", defaultValue: "The reply failed." })}
             </Typography>
           )}
 
@@ -241,6 +249,22 @@ export default function MessageBubble({
               alignItems: "center",
             }}
           >
+            {stopped && (
+              <Typography
+                variant="caption"
+                data-testid="reply-stopped"
+                sx={{ fontSize: "0.7rem", opacity: 0.7, mr: "auto" }}
+              >
+                {t("turn_stopped", { ns: "chat", defaultValue: "Stopped" })}
+              </Typography>
+            )}
+            {onRetry && (
+              <Tooltip title={t("retry", { ns: "chat", defaultValue: "Retry" })} arrow placement="top">
+                <IconButton size="small" onClick={onRetry} sx={{ opacity: 0.6, p: 0.25, "&:hover": { opacity: 1 } }}>
+                  <ReplayIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
             {responseMs != null && (
               <Typography
                 variant="caption"

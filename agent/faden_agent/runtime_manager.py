@@ -21,6 +21,9 @@ from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
 
+#: ``model_sync.source`` of a model the machine downloads from the Hub itself.
+HUGGING_FACE = "hugging_face"
+
 # Readiness probe defaults
 _READINESS_TIMEOUT_SEC = 600  # 10 minutes — large models can take a while
 _READINESS_POLL_INTERVAL_SEC = 5
@@ -77,6 +80,7 @@ class RuntimeManager:
         model_puller: Callable[..., Any] | None = None,
         image_loader: Callable[..., Any] | None = None,
         model_tls: Any = None,
+        model_downloader: Callable[..., Any] | None = None,
     ) -> None:
         self._runtime = runtime
         self._state = state_store
@@ -85,6 +89,8 @@ class RuntimeManager:
         self._advertise_scheme = advertise_scheme.strip().lower() or "http"
         self._model_store_root = model_store_root
         self._model_puller = model_puller
+        #: Downloads a model from the Hub into the store (``hf_download.py``).
+        self._model_downloader = model_downloader
         self._image_loader = image_loader
         #: The machine's model-TLS proxy (``model_tls.ModelTls``).
         self._model_tls = model_tls
@@ -355,8 +361,14 @@ class RuntimeManager:
     async def sync_model(
         self, payload: dict[str, Any], *, emit_progress: ProgressEmitter | None = None,
     ) -> dict[str, Any]:
-        """Pull model files from the backend without starting a container."""
+        """Pull model files from the backend without starting a container.
+
+        With ``source: hugging_face`` the machine downloads them from the Hub
+        instead: its cluster lets its machines download models themselves.
+        """
         model_sync = payload.get("model_sync")
+        if isinstance(model_sync, dict) and model_sync.get("source") == HUGGING_FACE:
+            return await self._sync_from_hub(payload, model_sync, emit_progress=emit_progress)
         if not isinstance(model_sync, dict) or not model_sync.get("blobs"):
             raise RuntimeManagerError("model_sync payload with files is required.")
         if self._model_puller is None:
@@ -435,6 +447,65 @@ class RuntimeManager:
             "manifest_sha256": manifest_sha256,
             "total_size": total_size,
             "files_synced": files_synced,
+        }
+
+    async def _sync_from_hub(
+        self,
+        payload: dict[str, Any],
+        model_sync: dict[str, Any],
+        *,
+        emit_progress: ProgressEmitter | None = None,
+    ) -> dict[str, Any]:
+        """Download the model from the Hub into this machine's store; answer as a copy from the server does."""
+        if self._model_downloader is None:
+            raise RuntimeManagerError("This agent cannot download models from Hugging Face.")
+        hf_repo_id = str(model_sync.get("hf_repo_id") or "")
+        if not hf_repo_id:
+            raise RuntimeManagerError("model_sync names no Hugging Face repository to download.")
+
+        async def _progress(p: dict[str, Any]) -> None:
+            if emit_progress is not None:
+                await emit_progress(p)
+
+        from faden_agent.model_puller import _lock_for_model_dir  # noqa: PLC0415
+
+        model_folder = Path(self._model_store_root) / f"models--{hf_repo_id.replace('/', '--')}"
+        try:
+            # One copy of a model at a time, from the Hub or from the server
+            # (``model_puller`` takes the same lock): transfers run beside each
+            # other now (command_order.py).
+            async with _lock_for_model_dir(model_folder):
+                fetched = await self._model_downloader(model_sync=model_sync, emit_progress=_progress)
+        except PermissionError as exc:
+            raise RuntimeManagerError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - the Hub's own words are the useful part
+            raise RuntimeManagerError(f"Downloading {hf_repo_id} from Hugging Face failed: {exc}") from exc
+
+        commit = str(fetched["commit"])
+        model_dir_name = str(fetched.get("model_dir_name") or f"models--{hf_repo_id.replace('/', '--')}")
+        cache_root = str(self._model_store_root)
+        clean_cache_root = cache_root.rstrip("/\\")
+        if cache_root.startswith("/"):
+            root_path = f"{clean_cache_root}/{model_dir_name}/snapshots/{commit}"
+        else:
+            root_path = str(Path(cache_root) / model_dir_name / "snapshots" / commit)
+        if not Path(root_path).is_dir():
+            raise RuntimeManagerError(
+                f"Downloaded {hf_repo_id} but found no snapshot directory at {root_path}; "
+                f"refusing to report a path that does not exist."
+            )
+        return {
+            "synced": True,
+            "source": HUGGING_FACE,
+            "model_id": str(payload.get("model_id") or model_sync.get("model_id") or ""),
+            "hf_repo_id": hf_repo_id,
+            "model_dir_name": model_dir_name,
+            "root_path": root_path,
+            "cache_root": cache_root,
+            "revision": commit,
+            "manifest_sha256": None,
+            "total_size": int(fetched.get("total_size") or 0),
+            "files_synced": int(fetched.get("files") or 0),
         }
 
     async def start_workload(

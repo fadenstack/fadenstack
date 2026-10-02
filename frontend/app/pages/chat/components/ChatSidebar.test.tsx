@@ -66,3 +66,14 @@ describe("a long chat list", () => {
     expect(screen.queryByText("Chat 88")).toBeNull();
   });
 });
+
+describe("a chat a reply is being written in", () => {
+  it("is marked, and the others are not", () => {
+    const list = sessions(3).map((s) => (s.id === "s1" ? { ...s, writing: true } : s));
+    renderList(list);
+
+    const marks = screen.getAllByTestId("chat-writing");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].closest("[role=button]")).toHaveTextContent("Chat 1");
+  });
+});

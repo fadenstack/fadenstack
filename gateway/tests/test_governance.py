@@ -273,7 +273,7 @@ async def test_a_refused_streamed_answer_ends_in_content_filter_and_is_not_store
     assert data[-1] == "[DONE]" and data[-2]["choices"][0]["finish_reason"] == "content_filter"
 
     user, reply = await _messages(db_session, sid)
-    assert (user.status, user.content) == ("ok", "What is the code name?")
+    assert (user.status, user.content) == ("complete", "What is the code name?")
     assert (reply.role, reply.status, reply.content) == ("assistant", "blocked_output", ""), "not even the part shown"
     assert reply.content_hmac and str(reply.decision_id) == event["value"]["decision_id"]
 
@@ -459,7 +459,7 @@ async def test_a_failed_turn_is_left_out_of_the_next_request(
                                json={**ask, "messages": [{"role": "user", "content": "First try"}]})
     assert failed.status_code == 502
     [first] = await _messages(db_session, sid)
-    assert first.status == "error"
+    assert first.status == "failed"
     await client.post("/v1/chat/completions", headers=_headers(),
                       json={**ask, "messages": [{"role": "user", "content": "Second try"}]})
     users = [m["content"] for m in model.sent[0]["messages"] if m["role"] == "user"]

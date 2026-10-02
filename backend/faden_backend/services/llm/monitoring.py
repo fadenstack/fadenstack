@@ -573,17 +573,26 @@ class MonitoringProvisioner:
             return []
 
     # ── stat cards ─────────────────────────────────────────────────────
-    async def stats(self, runtime_id: uuid.UUID | str, runtime_name: str) -> dict[str, Any]:
+    async def stats(
+        self, runtime_id: uuid.UUID | str, runtime_name: str, *, model_name: str | None = None,
+    ) -> dict[str, Any]:
         """Fetch stat-card values for one runtime (never raises).
+
+        *model_name* narrows a cluster's figures to one model: a cluster runs
+        several, and every provider on it showed the whole cluster's numbers
+        -- a stopped one too. Its dashboard opens on that model.
 
         Returns ``{"enabled", "stale": bool, "dashboard_url": str|None,
         "stats": {key: float|None}}`` — ``stale`` is True when not a
         single expression produced a value (no data / query failure).
         """
+        dashboard = self.dashboard_url(runtime_id)
+        if dashboard and model_name:
+            dashboard += "&" + urllib.parse.urlencode({"var-model": model_name})
         out: dict[str, Any] = {
             "enabled": True,
             "stale": True,
-            "dashboard_url": self.dashboard_url(runtime_id),
+            "dashboard_url": dashboard,
             "stats": {key: None for key in STAT_QUERIES},
         }
         # vLLM runtime names are validated to [a-z0-9-]+ upstream; the
@@ -591,6 +600,8 @@ class MonitoringProvisioner:
         if not runtime_name or '"' in runtime_name or "\x00" in runtime_name:
             return out
         rt = f'runtime_name="{runtime_name}"'
+        if model_name:
+            rt += ',model_name="' + model_name.replace("\\", "\\\\").replace('"', '\\"') + '"'
         exprs = [template.format(rt=rt) for template in STAT_QUERIES.values()]
         try:
             values = await asyncio.gather(*(self._prom_query(expr) for expr in exprs))

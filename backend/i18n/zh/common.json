@@ -1655,7 +1655,6 @@
     "sessions_title": "聊天会话",
     "attachments_title": "聊天附件",
     "col_name": "名称",
-    "col_title": "标题",
     "col_user": "用户",
     "col_tenant": "租户",
     "col_model": "模型",
@@ -1667,7 +1666,6 @@
     "col_type": "内容类型",
     "col_extraction": "提取状态",
     "col_scope": "范围",
-    "untitled_session": "（未命名）",
     "search_projects": "搜索项目…",
     "search_sessions": "搜索会话…",
     "search_attachments": "搜索附件…",
@@ -1690,8 +1688,8 @@
     "extraction_skipped": "已跳过",
     "scope_session": "会话",
     "scope_project": "项目",
-    "title_encrypted": "已加密",
-    "title_encrypted_hint": "聊天标题与消息一样加密存储，只有撰写者本人可见。"
+    "col_chat": "对话",
+    "chat_id_hint": "对话 {{id}}。其标题和消息归用户本人所有，此处不显示。"
   },
   "mcp": {
     "servers_title": "MCP 服务器",
@@ -2030,7 +2028,9 @@
       "token_tooltip": "为此机器创建一次性注册令牌",
       "token_title": "注册令牌",
       "deployment_progress": "部署进度",
-      "container_logs": "容器日志"
+      "container_logs": "容器日志",
+      "deployments": "此机器上的部署",
+      "no_deployments": "没有部署所在的集群包含此机器。"
     },
     "fleet": {
       "checking_resources": "正在检查关联资源…",
@@ -2041,7 +2041,9 @@
       "provider_count_other": "{{count}} 个提供商",
       "cascade": "同时删除其上的提供商和运行时",
       "keep_runtimes": "运行时将从此机器解除分配，但会保留。"
-    }
+    },
+    "agent_update": "代理 {{version}} 可用",
+    "agent_update_hint": "请在维护窗口中更新：在该机器上再次运行此服务器的安装命令（节点 → 添加机器）。代理从不自行更新。"
   },
   "rag_lite": {
     "documents_title": "RAG 文档",
@@ -2181,7 +2183,8 @@
     "rename": "重命名",
     "rename_save": "保存",
     "rename_cancel": "取消",
-    "title_label": "聊天标题"
+    "title_label": "聊天标题",
+    "writing": "正在编写回复"
   },
   "module_recommend": {
     "apply": "应用",
@@ -2635,6 +2638,48 @@
       "restart_warning": "集群将在每台机器上重启：其模型会停止、重新加载，加载完成后再次响应——大型模型需要几分钟。",
       "restart_confirm": "重启集群",
       "update_agents": "机器之间的加密需要每台机器上的代理为 0.1.18 或更高版本。请在 {{hosts}} 上重新运行安装命令以更新。"
+    },
+    "model_downloads": {
+      "title": "机器从哪里获取模型",
+      "switch_label": "机器自行下载模型",
+      "on_chip": "来自 Hugging Face",
+      "off_chip": "来自本服务器",
+      "on_detail": "每台机器从 Hugging Face 将模型下载到自己的模型存储；受限模型使用本服务器的 Hugging Face 令牌。服务器既不下载也不复制该模型。",
+      "off_detail": "本服务器下载模型，每台机器再从服务器复制。机器无需联网即可工作；若服务器链路较慢，大模型需要花两倍的时间。",
+      "checking": "正在询问各机器能否访问 Hugging Face…",
+      "check_again": "重新检查",
+      "reaches": "可访问 Hugging Face",
+      "cannot_switch_on": "要开启此项，每台机器都必须能访问 Hugging Face：",
+      "problem": {
+        "no_internet": "{{host}}：无法访问 Hugging Face",
+        "store_not_writable": "{{host}}：代理无法写入其模型存储",
+        "old_agent": "{{host}}：代理版本过旧，请升级到 0.2.2 或更高版本",
+        "offline": "{{host}}：离线",
+        "no_answer": "{{host}}：未响应"
+      },
+      "applies_next": "适用于下一个放到集群上的模型；已在机器上的模型保持不变。"
+    },
+    "applies_on_start": "集群启动时生效",
+    "runtime": {
+      "title": "运行时",
+      "detail": "机器运行的镜像，包含 Ray 和 vLLM。只有在此处切换时才会改变。",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "已认证",
+        "partial": "部分认证",
+        "failed": "认证失败",
+        "uncertified": "未认证"
+      },
+      "preview": "预览",
+      "recommended": "推荐",
+      "applying": "正在使用新运行时重启",
+      "update": "有更新的已认证运行时可用（vLLM {{vllm}}）。在您切换之前，集群保持当前运行时。",
+      "choose": "切换到",
+      "switch": "切换",
+      "restart_warning": "切换到 vLLM {{vllm}} 会重启集群：每台机器的容器将从新镜像重新创建，其上的每个模型都会重新加载。尚未拥有该镜像的机器会先获取它。",
+      "preview_hint": "预览版已通过认证，可以运行推荐运行时无法运行的模型，但它较新：请为需要这些模型的集群选择它。",
+      "restart_confirm": "使用此运行时重启"
     }
   },
   "inference": {
@@ -2705,11 +2750,6 @@
       "col_ready": "就绪",
       "col_pending": "等待中",
       "logs": "日志",
-      "log_source": "来源",
-      "log_runtime": "运行时容器",
-      "log_replica": "服务副本",
-      "log_machine": "机器",
-      "log_head": "集群主节点",
       "log_tail": "行数",
       "fetch": "获取",
       "truncated_one": "已截断为最后 {{count}} 行。",
@@ -2742,7 +2782,22 @@
       "traffic_window_one": "在网关测量，最近 1 分钟",
       "traffic_window_other": "在网关测量，最近 {{count}} 分钟",
       "engine_reported": "由引擎上报",
-      "page_title": "部署"
+      "page_title": "部署",
+      "reply_wait": "回复须在此时间内开始",
+      "reply_wait_value": "{{seconds}} 秒",
+      "reply_wait_default": "网关默认值（180 秒）",
+      "reply_wait_title": "回复开始前最长等待时间",
+      "reply_wait_label": "秒",
+      "reply_wait_placeholder": "留空：使用网关默认值",
+      "reply_wait_help": "繁忙的模型会把新请求放在队列中，直到有空间为止，期间不发送任何内容。超过此时间请求即失败，用户可以重试。10 到 1800 秒；留空则使用网关默认值（180 秒）。修改时模型保持运行。",
+      "reply_wait_invalid": "请输入 10 到 1800 秒，或留空。",
+      "reply_wait_failed": "无法更改回复开始前的等待时间。",
+      "share_label": "每个副本的加速器",
+      "share_help": "1 表示整个加速器。小于 1 时多个副本可共享一个；大于 0.5 时每个副本独占一个加速器。引擎占用相同份额的显存（整个加速器时为 0.8）。",
+      "share_invalid": "请输入 0.05 到 1。",
+      "share_memory": "引擎占用每个加速器 {{percent}}% 的显存。",
+      "share_restarts": "更改份额会重启所有副本，在它们恢复之前模型不可用。",
+      "show_in_logs": "显示错误"
     },
     "engine": {
       "title": "引擎设置",
@@ -2750,7 +2805,8 @@
       "defaults": "vLLM 默认值：未做任何更改。",
       "dialog_title": "{{name}} 的引擎设置",
       "restart_warning": "保存后，每个副本都会以新设置重启。在它们恢复运行前，模型不可用。如果某个副本无法启动，本页面会说明原因，您可以改回原来的设置。",
-      "save_restart": "保存并重启"
+      "save_restart": "保存并重启",
+      "memory_capped": "gpu_memory_utilization {{asked}} 超过了此部署的加速器份额（{{share}}）：引擎只占用 {{share}}。请在“扩缩容”中提高份额，显存会随之调整。"
     }
   },
   "audit": {
@@ -2887,8 +2943,11 @@
       "unknown_tool_parser": "此引擎不认识工具格式“{{value}}”。",
       "unknown_reasoning_parser": "此引擎不认识思考格式“{{value}}”。",
       "remote_code": "模型自带的代码将在您的机器上运行。仅对可信发布者保持开启。",
-      "extra_invalid": "以下参数不被接受，将不会使用：{{tokens}}"
-    }
+      "extra_invalid": "以下参数不被接受，将不会使用：{{tokens}}",
+      "json_invalid": "不是有效的 JSON，副本无法启动：{{flags}}"
+    },
+    "json_syntax": "不是有效的 JSON。",
+    "json_object": "需要一个 JSON 对象，例如 {\"method\": \"mtp\"}。"
   },
   "hf_access": {
     "title": "Hugging Face 访问",
@@ -2974,7 +3033,11 @@
     "creating": "正在创建部署…",
     "host": "托管",
     "revision_label": "修订版本（可选）",
-    "revision_help": "Hugging Face 上的分支、标签或提交。留空则使用最新版本。"
+    "revision_help": "Hugging Face 上的分支、标签或提交。留空则使用最新版本。",
+    "cannot_run": "无法在此运行",
+    "may_not_run": "可能无法运行",
+    "compat_model_type": "此集群的运行时无法加载它：其中的 Transformers {{transformers}} 和 vLLM {{vllm}} 都不认识模型类型“{{type}}”（该模型使用 Transformers {{saved}} 保存）。需要更新的运行时镜像；不会下载任何内容。",
+    "compat_architecture": "此集群运行时中的 vLLM {{vllm}} 没有 {{architecture}} 的实现。它只能尝试其通用的 Transformers 后端，而并非所有模型都受支持。"
   },
   "marketplace": {
     "title": "模型市场",
@@ -3491,6 +3554,27 @@
         "rejected": "已拒绝",
         "expired": "已过期"
       }
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "错误",
+      "warning": "警告",
+      "info": "信息",
+      "debug": "调试",
+      "other": "其他"
+    },
+    "search": "搜索日志行",
+    "follow": "跟随新行",
+    "copy": "复制显示的行",
+    "download": "下载显示的行",
+    "empty": "还没有日志行。",
+    "nothing_matches": "没有与筛选条件匹配的行。",
+    "source": {
+      "replica": "模型服务",
+      "engine": "推理引擎 (vLLM)",
+      "agent": "系统日志",
+      "container": "模型容器"
     }
   }
 }

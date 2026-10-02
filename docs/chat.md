@@ -28,6 +28,39 @@ completion and total. The ⓘ beside it names the model that answered.
 
 ---
 
+## Leaving a reply that is being written
+
+A reply keeps being written when you leave it: when you open another chat or
+another page, reload, or close the tab. Come back to the chat and it shows
+the reply from its start and follows it to the end. A chat whose reply is
+still being written has a small spinner in the sidebar.
+
+- **One reply per chat, three at once.** A chat takes a new message once its
+  reply is done. You can have replies written in up to three chats at the
+  same time; a fourth is refused until one finishes, and what you typed stays
+  in the box. An administrator sets the number:
+  `FADEN_GATEWAY_CHAT_TURNS_PER_USER` in the install's `.env`, applied when
+  the gateway is next started (`faden upgrade` does).
+- **Stop.** The square button stops the reply, whichever chat you started it
+  in. What was written stays, marked **Stopped**.
+- **Failed replies stay.** A reply that failed stays in the chat with the
+  reason, for example a model refusing the request. **Retry** under the
+  chat's last reply asks again with the model now selected, and the new reply
+  takes its place. Sending the same message again does the same. A failed
+  reply is not sent to the model with later messages; a stopped one is.
+- **A server restart** ends the replies being written; they are marked as
+  cut off and can be tried again.
+- **Where it is kept meanwhile.** So that any of the gateway's workers can
+  show it, a reply's parts also go to the stack's Redis while it is written,
+  and stay there for a minute after it ends. With chat encryption on
+  (`FADEN_GATEWAY_ENCRYPTION_KEY`), they are encrypted with the same key as
+  the messages. The finished reply itself is in the database.
+
+This is the chat's own behaviour. A request to the gateway's OpenAI-style API
+still ends when its client disconnects.
+
+---
+
 ## Titles
 
 A chat is named from its first message: its first line, cut at a word, at
@@ -40,8 +73,14 @@ the chat in place: Enter saves, Escape cancels.
 ![Renaming a chat](images/chat/02-rename.png)
 
 Titles are stored encrypted, as the messages are: they are the start of what
-you wrote. The admin console's list of chat sessions shows an encrypted title
-as "Encrypted", never its text.
+you wrote. The admin console lists chats by their id and never shows a title.
+
+The key they are encrypted with is `FADEN_GATEWAY_ENCRYPTION_KEY` in the
+install's `.env`, which `faden deploy` generates. Until October 2026 it never
+reached the gateway, so chats were stored in plain text on every install; an
+upgrade passes it on, and from then on new messages and titles are
+encrypted. Chats from before stay readable as they were. Losing the key makes
+the encrypted chats unreadable: keep the `.env` with your backups.
 
 ---
 

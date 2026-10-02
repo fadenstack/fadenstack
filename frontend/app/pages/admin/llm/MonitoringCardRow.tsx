@@ -206,18 +206,21 @@ export default function MonitoringCardRow({
             </Button>
           )}
           {dashboardUrl && (
-            <Typography
-              variant="caption"
-              color="text.disabled"
-              sx={{
-                ml: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: 0.5,
-              }}
+            // A link that looks like one: it was a hint in the muted colour of
+            // a disabled control, and read as unavailable.
+            <Button
+              size="small"
+              variant="text"
+              href={dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+              sx={{ ml: "auto", py: 0, minHeight: 0, textTransform: "none" }}
+              onClick={(event) => event.stopPropagation()}
+              data-testid="monitoring-dashboard-link"
             >
               {t("llm_monitoring.dashboard")}
-            </Typography>
+            </Button>
           )}
         </Stack>
       }

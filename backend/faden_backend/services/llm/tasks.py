@@ -14,9 +14,36 @@ log = logging.getLogger(__name__)
 #: How often the size of the file being downloaded is read for progress.
 _PROGRESS_POLL_SEC = 2.0
 
+#: How often a running download says it is alive (``download_jobs.heartbeat_at``).
+HEARTBEAT_SEC = 20.0
+#: How long a running download may say nothing before another delivery of its
+#: task takes it over. Several heartbeats: a busy host can miss one or two.
+TAKEOVER_AFTER_SEC = 120.0
+#: Attempts at a download that the network broke off, before it is failed.
+_NETWORK_ATTEMPTS = 3
+_NETWORK_BACKOFF_SEC = 15.0
+
 
 class DownloadCanceled(Exception):
     """The download job was canceled while it ran."""
+
+
+class _Run:
+    """One run of the download task: whether it still holds the job.
+
+    RabbitMQ hands a task message out again when the worker's channel closes
+    -- after 30 minutes without an acknowledgement by default, and a large
+    model downloads for hours -- and when a worker is killed. The second
+    delivery used to start a second download of the same model next to the
+    first, in the same worker, doubling its memory until the kernel killed it.
+    """
+
+    def __init__(self) -> None:
+        self.id = uuid.uuid4().hex
+        #: Set when this run must stop: the job was canceled, or is another run's now.
+        self.stop = threading.Event()
+        #: Another run holds the job: leave the job and the model as they are.
+        self.lost = False
 
 
 #: Weights in a format vLLM loads, at the top of a repository.
@@ -181,6 +208,74 @@ def _run_download_sync(
     return snapshot_dir
 
 
+async def _claim(app: object, job_id: uuid.UUID, model_id: uuid.UUID, run: _Run) -> str | None:
+    """Take the job for *run*: None once it holds it, else why this run should not download.
+
+    A job another run is downloading is left to it: ``busy``. That run may
+    also have died a moment ago -- a killed worker's message comes back at
+    once, with the dead run's heartbeat still fresh -- so a heartbeat that
+    stays where it was is waited out until the job can be taken over.
+    """
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
+    from faden_backend.db.models.llm import DownloadJobStatus, ModelStatus  # noqa: PLC0415
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + TAKEOVER_AFTER_SEC + 2 * HEARTBEAT_SEC
+    first_beat: object = None
+    while True:
+        session = app.state.db_session_factory()  # type: ignore[attr-defined]
+        try:
+            dao = DownloadJobDAO(session)
+            if await dao.claim(job_id, run.id, stale_after_sec=TAKEOVER_AFTER_SEC):
+                await ModelDAO(session).set_status(model_id, ModelStatus.DOWNLOADING)
+                await session.commit()
+                return None
+            job = await dao.get(job_id)
+            status, beat = (job.status, job.heartbeat_at) if job is not None else (None, None)
+            await session.rollback()
+        finally:
+            await session.close()
+        if status is None:
+            return "gone"
+        if status not in (DownloadJobStatus.QUEUED, DownloadJobStatus.RUNNING):
+            return str(status.value)
+        if first_beat is None:
+            first_beat = beat
+        elif beat != first_beat:
+            return "busy"  # its heartbeat moves: another run is downloading it
+        if loop.time() >= deadline:
+            return "busy"
+        await asyncio.sleep(HEARTBEAT_SEC / 2)
+
+
+async def _heartbeat(app: object, job_id: uuid.UUID, model_id: uuid.UUID, run: _Run) -> None:
+    """Say every ``HEARTBEAT_SEC`` that *run* is downloading; stop it when the job is not its own any more."""
+    from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
+    from faden_backend.db.models.llm import ModelStatus  # noqa: PLC0415
+
+    while not run.stop.is_set():
+        await asyncio.sleep(HEARTBEAT_SEC)
+        session = app.state.db_session_factory()  # type: ignore[attr-defined]
+        try:
+            state = await DownloadJobDAO(session).heartbeat(job_id, run.id)
+            if state == "resumed":
+                # Taken for interrupted while this host was too busy to say
+                # otherwise; it is downloading, so say that again.
+                await ModelDAO(session).set_status(model_id, ModelStatus.DOWNLOADING)
+            await session.commit()
+        except Exception:  # noqa: BLE001 - a missed heartbeat is not a failed download
+            log.warning("Heartbeat of download job %s failed (non-fatal)", job_id, exc_info=True)
+            continue
+        finally:
+            await session.close()
+        if state in ("running", "resumed"):
+            continue
+        if state != "canceled":
+            run.lost = True
+            log.info("Download job %s is not this run's any more (%s); stopping after the current file", job_id, state)
+        run.stop.set()
+
+
 @broker.task(retry_on_error=False)
 async def download_model_task(
     model_id: str,
@@ -194,6 +289,10 @@ async def download_model_task(
 
     The HF token is resolved at runtime from the encrypted system settings
     (or env-var fallback) -- it is never transmitted over RabbitMQ.
+
+    Safe to deliver twice: a run first takes the job (``_claim``), and a
+    second delivery of the message finds it taken and returns. A run that
+    died is taken over, and the download resumes from what is on disk.
     """
     from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
     from faden_backend.db.models.llm import ModelStatus  # noqa: PLC0415
@@ -201,10 +300,16 @@ async def download_model_task(
     _model_id = uuid.UUID(model_id)
     _job_id = uuid.UUID(job_id)
 
-    hf_token = await _resolve_hf_token()
-
     app = broker.state.fastapi_app
+    run = _Run()
+    not_mine = await _claim(app, _job_id, _model_id, run)
+    if not_mine is not None:
+        log.info("Not downloading %s for job %s: %s", hf_repo_id, _job_id, not_mine)
+        return {"status": "skipped", "reason": not_mine}
+
+    hf_token = await _resolve_hf_token()
     session = app.state.db_session_factory()
+    beat = asyncio.create_task(_heartbeat(app, _job_id, _model_id, run), name=f"download-heartbeat-{_job_id}")
 
     try:
         return await _do_download(
@@ -215,8 +320,12 @@ async def download_model_task(
             hf_revision=hf_revision,
             target_dir=target_dir,
             hf_token=hf_token,
+            run=run,
         )
     except Exception as exc:
+        if run.lost:
+            log.info("Download run for %s ended after another run took the job: %s", hf_repo_id, exc)
+            return {"status": "superseded"}
         log.exception("Download task crashed for %s: %s", hf_repo_id, exc)
         # Best-effort status update in a *fresh* session so we don't reuse a
         # potentially broken one.
@@ -233,7 +342,33 @@ async def download_model_task(
             await err_session.close()
         return {"status": "failed", "error": str(exc)}
     finally:
+        run.stop.set()
+        beat.cancel()
         await session.close()
+
+
+def _network_error(exc: BaseException) -> bool:
+    """Whether *exc* is the network breaking off, which trying again can get past.
+
+    A wrong token or repository name is not: trying again only repeats it.
+    """
+    markers = ("connection", "timed out", "timeout", "reset by peer", "broken pipe", "incomplete", "chunked")
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (ConnectionError, TimeoutError)):
+            return True
+        module = type(current).__module__ or ""
+        name = type(current).__name__.lower()
+        if module.startswith(("requests", "urllib3", "httpx", "httpcore", "http.client")) and any(
+            m in name for m in ("connection", "timeout", "chunked", "protocol", "readerror", "incomplete", "remotedisconnected")
+        ):
+            return True
+        if module.startswith("hf_xet") or "xet" in name:
+            return any(m in str(current).lower() for m in markers)
+        current = current.__cause__ or current.__context__
+    return False
 
 
 async def _do_download(
@@ -245,6 +380,7 @@ async def _do_download(
     hf_revision: str | None,
     target_dir: str,
     hf_token: str | None,
+    run: _Run | None = None,
 ) -> dict:
     """Inner download logic — any exception propagates to caller."""
     from faden_backend.db.dao.llm_dao import ArtifactDAO, DownloadJobDAO, ModelDAO  # noqa: PLC0415
@@ -257,7 +393,7 @@ async def _do_download(
 
     _last_pct = 0
     _loop = asyncio.get_running_loop()
-    canceled = threading.Event()
+    canceled = run.stop if run is not None else threading.Event()
 
     async def _flush_progress(pct: int) -> None:
         nonlocal _last_pct
@@ -289,22 +425,45 @@ async def _do_download(
     # Run the blocking HF download in a thread with progress callbacks.
     # target_dir is used as the HF hub cache_dir; the function returns
     # the snapshot directory containing the actual model files.
-    try:
-        snapshot_dir = await asyncio.to_thread(
-            _run_download_sync,
-            hf_repo_id,
-            revision,
-            target_dir,
-            hf_token,
-            _sync_progress,
-            canceled,
-        )
-    except DownloadCanceled:
-        # The job already says canceled; the model has no complete copy.
-        await model_dao.set_status(model_id, ModelStatus.FAILED)
-        await session.commit()  # type: ignore[union-attr]
-        log.info("Download canceled: %s", hf_repo_id)
-        return {"status": "canceled"}
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            snapshot_dir = await asyncio.to_thread(
+                _run_download_sync,
+                hf_repo_id,
+                revision,
+                target_dir,
+                hf_token,
+                _sync_progress,
+                canceled,
+            )
+            break
+        except DownloadCanceled:
+            if run is not None and run.lost:
+                # Another run holds the job and downloads the model: leave both alone.
+                log.info("Stopped downloading %s: another run holds the job", hf_repo_id)
+                return {"status": "superseded"}
+            # The job already says canceled; the model has no complete copy.
+            await model_dao.set_status(model_id, ModelStatus.FAILED)
+            await session.commit()  # type: ignore[union-attr]
+            log.info("Download canceled: %s", hf_repo_id)
+            return {"status": "canceled"}
+        except Exception as exc:
+            # A download of hours is broken off by the network now and then.
+            # What arrived stays on disk, so trying again picks up there.
+            if attempt >= _NETWORK_ATTEMPTS or canceled.is_set() or not _network_error(exc):
+                raise
+            wait = _NETWORK_BACKOFF_SEC * attempt
+            log.warning(
+                "Downloading %s broke off (%s); trying again in %.0f s (attempt %d of %d)",
+                hf_repo_id, exc, wait, attempt + 1, _NETWORK_ATTEMPTS,
+            )
+            await asyncio.sleep(wait)
+
+    if run is not None and run.lost:
+        log.info("Downloaded %s, but another run holds the job now; it records the result", hf_repo_id)
+        return {"status": "superseded"}
 
     # 90%: scanning artifacts
     await _flush_progress(90)

@@ -271,6 +271,36 @@ async def list_messages(
         return await _proxy_error(exc)
 
 
+# ── Turns ─────────────────────────────────────────────────────────
+
+
+@router.post("/sessions/{session_id}/turns/{turn_id}/retry", response_model=None)
+async def retry_turn(session_id: str, turn_id: str, request: Request) -> StreamingResponse | JSONResponse:
+    """Proxy trying a chat's last failed or stopped reply again; it streams like a completion."""
+    jwt = _jwt_from_cookie(request)
+    body: dict[str, Any] = await request.json() if await request.body() else {}
+    try:
+        stream = await _client().open_stream_retry(session_id, turn_id, body, jwt)
+        return StreamingResponse(
+            stream.body,
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", **stream.headers},
+            background=BackgroundTask(stream.aclose),
+        )
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
+@router.post("/sessions/{session_id}/turns/{turn_id}/stop")
+async def stop_turn(session_id: str, turn_id: str, request: Request) -> JSONResponse:
+    """Proxy stopping a reply being written; what was written is kept."""
+    jwt = _jwt_from_cookie(request)
+    try:
+        return JSONResponse(content=await _client().stop_turn(session_id, turn_id, jwt))
+    except Exception as exc:
+        return await _proxy_error(exc)
+
+
 # ── Stream reconnection ──────────────────────────────────────────
 
 

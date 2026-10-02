@@ -244,7 +244,7 @@ async def pull_model(
             # Skip verified blobs already present in cache.
             if target.is_file() and (not expected_size or target_size == expected_size):
                 if expected_digest:
-                    actual_digest = _sha256_file(target)
+                    actual_digest = await asyncio.to_thread(_sha256_file, target)
                     if actual_digest == expected_digest:
                         skipped += target_size
                         completed += expected_size or target_size
@@ -290,7 +290,7 @@ async def pull_model(
 
                 # A fully downloaded .part can happen after interruption right before replace().
                 if start_byte > 0 and expected_size and start_byte == expected_size:
-                    if expected_digest and _sha256_file(tmp_path) != expected_digest:
+                    if expected_digest and await asyncio.to_thread(_sha256_file, tmp_path) != expected_digest:
                         log.warning("Discarding invalid completed partial blob %s", blob_hash)
                         tmp_path.unlink(missing_ok=True)
                         start_byte = 0

@@ -23,14 +23,29 @@ export interface ChatSession {
   tenant_id: string;
   user_id: string;
   project_id: string | null;
-  title: string | null;
-  /** Admin lists: the title is encrypted at rest and not shown (only to its user). */
-  title_encrypted?: boolean;
+  /** Its user's own; admin lists do not carry it. */
+  title?: string | null;
   status: string;
   metadata_json?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  /** A reply is being written in the chat (the chats list says so). */
+  writing?: boolean;
 }
+
+/** Where a reply is: its row is written as it starts, and kept however it ends. */
+export type TurnStatus =
+  | "running"
+  | "complete"
+  | "failed"
+  | "stopped"
+  | "interrupted"
+  /** A prompt or an answer governance refused: no text, ``notice`` instead. */
+  | "blocked_input"
+  | "blocked_output";
+
+/** Replies that can be tried again (the chat's last one). */
+export const RETRYABLE_TURNS: ReadonlySet<TurnStatus> = new Set(["failed", "stopped", "interrupted"]);
 
 export interface ChatMessage {
   id: string;
@@ -51,9 +66,11 @@ export interface ChatMessage {
   reasoning?: string | null;
   /** How long it thought, in ms. */
   reasoning_ms?: number | null;
-  /** A turn the gateway refused or that failed: its text is not stored
-   * (``blocked_*``), and it is not sent to the model again. */
-  status?: "ok" | "blocked_input" | "blocked_output" | "error";
+  /** A reply's state; every other message is complete. A refused message
+   * (``blocked_*``) has no stored text and is not sent to the model again. */
+  status?: TurnStatus;
+  /** Why a failed reply failed. */
+  error?: string | null;
   /** What the user was told about a refused message. */
   notice?: string | null;
 }
@@ -119,6 +136,8 @@ export interface StreamDelta {
   finish_reason?: string | null;
   usage?: TokenUsage;
   trace_id?: string;
+  /** The reply's row in the chat (its turn), from the stream's headers. */
+  turn_id?: string;
   /** One of the gateway's events (AG-UI): a tool waiting for approval, one refused, ... */
   faden?: FadenEvent;
 }

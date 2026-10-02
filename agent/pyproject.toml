@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "faden-agent"
-version = "0.2.1"
+version = "0.2.4"
 description = "Node execution agent for Fadenstack cluster-managed runtimes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,10 @@ dependencies = [
   # The machine's model-TLS proxy: its key and certificate request are made
   # here, and the certificates it is handed are read (model_tls.py).
   "cryptography>=42",
+  # A cluster whose machines download models themselves fetches them from the
+  # Hub here (hf_download.py); hf-xet, which it brings on x86_64 and aarch64,
+  # is what makes a large download fast.
+  "huggingface-hub>=0.32,<2",
 ]
 
 [project.scripts]
@@ -52,8 +56,9 @@ llm = [
   "ray[serve,llm]==2.58.0",
   "jinja2>=3.1,<4",
 ]
+# In the base dependencies since 0.2.2; kept so `faden-agent[hf]` still installs.
 hf = [
-  "huggingface-hub>=0.27,<2",
+  "huggingface-hub>=0.32,<2",
 ]
 build = [
   "pyinstaller>=6.0,<7.0",

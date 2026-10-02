@@ -26,6 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from faden_backend.services.inference.bundles import RUNTIME_KEY, default_bundle_registry
 from faden_backend.services.inference.drivers.ray.compiler import (
     DEFAULT_LOGGING_CONFIG,
 )
@@ -321,6 +322,23 @@ async def _machines(session: Any) -> list[Any]:
     from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
 
     return list((await session.execute(select(InfraNode))).scalars())
+
+
+async def _runtimes_running(session: Any, machines: list[Any]) -> dict[str, str]:
+    """The catalogued runtime each machine's container runs, by the image its agent reports."""
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+
+    snapshots = await NodeControlDAO(session).latest_inventory_snapshots(node_ids=[m.id for m in machines])
+    found: dict[str, str] = {}
+    for machine in machines:
+        runtime = (getattr(snapshots.get(machine.id), "inventory_json", None) or {}).get("ray_runtime") or {}
+        match = next(
+            (b for b in default_bundle_registry.runtimes_for(machine) if b.container.image == runtime.get("image")),
+            None,
+        )
+        if match is not None:
+            found[str(machine.id)] = match.bundle_id
+    return found
 
 
 async def _members_elsewhere(session: Any) -> set[Any]:
@@ -652,6 +670,9 @@ async def take_over(
         "from_machine": head.get("name"),
         "gcs_address": doc.get("gcs_address"),
     }
+    # The runtime each machine runs, so a restart or recovery keeps it
+    # (runtime_choice) instead of moving the cluster to the default.
+    observed[RUNTIME_KEY] = await _runtimes_running(session, [by_id[m["node_id"]] for m in seen["members"]])
     environment.observed_status_json = observed
     try:
         environment.capabilities_json = (await RayDriver().capabilities(environment)).raw or {}

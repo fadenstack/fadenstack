@@ -13,11 +13,16 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from faden_agent.log_cursors import LogCursors
 from faden_agent.loki_client import LokiClient
 from faden_agent.runtimes import ContainerRuntime
 from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
+
+#: Lines sent per container per pass. A backlog waits in Docker's log file
+#: and drains at this pace instead of being dropped.
+_MAX_LINES_PER_PASS = 1000
 
 
 class ContainerLogForwarder:
@@ -31,14 +36,19 @@ class ContainerLogForwarder:
         loki: LokiClient,
         host: str,
         interval_sec: int = 5,
+        cursors: LogCursors | None = None,
     ) -> None:
         self._runtime = runtime
         self._state = state_store
         self._loki = loki
         self._host = host
         self._interval = max(interval_sec, 2)
-        # Track last-seen timestamp (RFC 3339) per container to resume tailing
-        self._cursors: dict[str, str] = {}
+        self._store = cursors or LogCursors(None)
+        # The timestamp (RFC 3339) of the last line Loki took, per container:
+        # Docker's log file is the queue, and this is where to resume in it.
+        self._cursors: dict[str, str] = {
+            key.removeprefix("container:"): value for key, value in self._store.with_prefix("container:").items()
+        }
 
     async def run_forever(self) -> None:
         """Periodically collect container logs and push to Loki."""
@@ -67,6 +77,8 @@ class ContainerLogForwarder:
                 await self._tail_container(runtime_id, info, container_name)
             except Exception:
                 log.debug("Failed to tail %s", container_name, exc_info=True)
+        self._store.replace_prefix("container:", {f"container:{k}": v for k, v in self._cursors.items()})
+        self._store.save()
 
     async def _tail_container(
         self,
@@ -106,7 +118,7 @@ class ContainerLogForwarder:
 
         entries: list[tuple[int, str]] = []
         latest_ts: str | None = None
-        for line in lines:
+        for line in lines[:_MAX_LINES_PER_PASS]:
             ts_str, _, text = line.partition(" ")
             try:
                 dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
@@ -117,8 +129,9 @@ class ContainerLogForwarder:
             entries.append((ns, text))
             latest_ts = ts_str
 
-        if entries:
-            await self._loki.push_streams(labels=labels, entries=entries)
+        if entries and not await self._loki.push_streams(labels=labels, entries=entries):
+            # Not taken: the cursor stays, and the next pass sends them again.
+            return
 
         # Advance cursor so next iteration only gets new lines
         if latest_ts:

@@ -270,6 +270,14 @@ class InferenceEnvironment(Base):
         onupdate=func.now(),
     )
 
+    def restarting(self, *, applied: bool) -> bool:
+        """A setting that restarts the cluster is not in place yet, and the cluster is to run.
+
+        Not applied on a stopped cluster is waiting for its start, not
+        restarting: a screen that polled until "applied" looked forever.
+        """
+        return not applied and self.desired_state == EnvironmentDesiredState.RUNNING.value
+
 
 class InferenceEnvironmentBinding(Base):
     """Backend binding that implements an environment's roles.

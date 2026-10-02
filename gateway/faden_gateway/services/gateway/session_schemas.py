@@ -70,6 +70,8 @@ class SessionDTO(BaseModel):
     metadata_json: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
+    #: A reply is being written in the chat (set by the sessions list).
+    writing: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -97,11 +99,14 @@ class MessageDTO(BaseModel):
     token_estimate: int | None
     trace_id: str | None
     created_at: datetime
+    #: A reply's state: running, complete, failed, stopped or interrupted; a
+    #: message governance refused is blocked_input or blocked_output, has no
+    #: content, and shows ``notice`` in its place.
+    status: str = "complete"
+    #: Why a failed reply failed.
+    error: str | None = None
     #: A reply's request usage (set by the messages list; null when unknown).
     usage: TokenUsageDTO | None = None
-    #: ``ok``, ``blocked_input``, ``blocked_output`` or ``error``. A blocked
-    #: message has no content: show ``notice`` in its place.
-    status: str = "ok"
     decision_id: uuid.UUID | None = None
     #: What the user was told about a blocked message (the admin's message).
     notice: str | None = None
@@ -123,6 +128,9 @@ class MessageDTO(BaseModel):
             token_estimate=msg.token_estimate,
             trace_id=msg.trace_id,
             created_at=msg.created_at,
+            status=msg.status,
+            error=msg.error,
+            decision_id=msg.decision_id,
         )
 
 

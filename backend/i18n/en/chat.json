@@ -73,7 +73,7 @@
   "blocked_prompt": "Not sent",
   "blocked_answer": "Answer withheld",
   "blocked_default": "This was stopped by your organisation's policy.",
-  "turn_failed": "No answer: the request failed.",
+  "turn_failed": "The reply failed.",
   "edit_and_resend": "Edit and resend",
   "rate_limited_label": "Rate limit reached",
   "retry_after": "Try again in {{seconds}} s.",
@@ -81,5 +81,7 @@
   "approval_title": "{{tool}} wants to run",
   "approval_a_tool": "A tool",
   "approval_decline": "Decline",
-  "approval_approve": "Approve"
+  "approval_approve": "Approve",
+  "turn_interrupted": "The server restarted while this reply was being written.",
+  "turn_stopped": "Stopped"
 }

@@ -2,7 +2,7 @@
  * Admin → LLM → Runtime detail page.
  * Shows runtime metadata, health status, live logs, and config editing.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -61,6 +61,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import MemoryIcon from "@mui/icons-material/Memory";
 import MonitorIcon from "@mui/icons-material/Monitor";
+import LogViewer, { fromText } from "~/components/logs/LogViewer";
 
 /* ── Node Deployment Progress ─────────────────────────────────────── */
 
@@ -229,7 +230,6 @@ export default function RuntimeDetailPage() {
   const [logsRefreshing, setLogsRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const logRef = useRef<HTMLPreElement>(null);
 
   // ── Edit mode state ──────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
@@ -621,12 +621,7 @@ export default function RuntimeDetailPage() {
     return () => clearInterval(interval);
   }, [rt?.status, id, health?.healthy]);
 
-  // Auto-scroll logs
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [logs]);
+  const logLines = useMemo(() => fromText(logs), [logs]);
 
   async function handleAction(action: "start" | "stop" | "restart") {
     if (!id) return;
@@ -1141,44 +1136,21 @@ export default function RuntimeDetailPage() {
       {/* Logs */}
       {showLogs && (
         <Box sx={{ flexGrow: 1, minHeight: 200 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-            <Typography variant="subtitle2">
-              {t("llm_runtime_detail.container_logs")}
-            </Typography>
-            <Button
-              size="small"
-              startIcon={
-                logsRefreshing ? (
-                  <CircularProgress size={14} />
-                ) : (
-                  <RefreshIcon />
-                )
-              }
-              onClick={refreshLogs}
-              disabled={logsRefreshing}
-            >
-              {t("common.refresh", "Refresh")}
-            </Button>
-          </Stack>
-          <Box
-            ref={logRef}
-            component="pre"
-            sx={{
-              bgcolor: "grey.900",
-              color: "grey.100",
-              p: 2,
-              borderRadius: 1,
-              fontFamily: "monospace",
-              fontSize: "0.75rem",
-              lineHeight: 1.6,
-              overflow: "auto",
-              maxHeight: 400,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-            }}
-          >
-            {logs || t("llm_runtime_detail.no_logs")}
-          </Box>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            {t("llm_runtime_detail.container_logs")}
+          </Typography>
+          <LogViewer
+            lines={logLines}
+            loading={logsRefreshing}
+            empty={t("llm_runtime_detail.no_logs")}
+            maxHeight={400}
+            downloadName={`${rt.name}.log`}
+            toolbar={
+              <Button size="small" startIcon={<RefreshIcon />} onClick={refreshLogs} disabled={logsRefreshing}>
+                {t("common.refresh", "Refresh")}
+              </Button>
+            }
+          />
         </Box>
       )}
     </Box>

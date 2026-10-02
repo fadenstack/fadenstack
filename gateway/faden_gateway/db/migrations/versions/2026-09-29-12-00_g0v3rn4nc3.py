@@ -1,13 +1,13 @@
-"""Governance: decision records, the tenant's HMAC key, tool rules, turn status.
+"""Governance: decision records, the tenant's HMAC key, tool rules, blocked turns.
 
 A governance check that objects leaves a decision record -- stage, outcome,
 policy, category and an HMAC of the text, never the text. ``chat_message``
-gets the turn's status (``ok``, ``blocked_input``, ``blocked_output``,
-``error``), so a blocked or failed turn stays in the history the user sees
-and out of what the model is sent.
+gets the decision and that HMAC: a blocked turn (status ``blocked_input`` or
+``blocked_output``, the column 9n0p1q2r3s4t added) stays in the history the
+user sees and out of what the model is sent.
 
 Revision ID: g0v3rn4nc3
-Revises: 9n0p1q2r3s4t
+Revises: 4g3ntr3q5
 Create Date: 2026-09-29 12:00:00.000000
 """
 
@@ -17,14 +17,13 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "g0v3rn4nc3"
-down_revision = "9n0p1q2r3s4t"
+down_revision = "4g3ntr3q5"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
     """Add the tables and columns."""
-    op.add_column("chat_message", sa.Column("status", sa.String(32), nullable=False, server_default="ok"))
     op.add_column("chat_message", sa.Column("decision_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column("chat_message", sa.Column("content_hmac", sa.String(64), nullable=True))
 
@@ -83,4 +82,3 @@ def downgrade() -> None:
     op.drop_table("llm_gateway_policy_decision")
     op.drop_column("chat_message", "content_hmac")
     op.drop_column("chat_message", "decision_id")
-    op.drop_column("chat_message", "status")

@@ -361,6 +361,13 @@ services:
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
       FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend
       FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      # The key chats are encrypted with at rest: messages, titles, memory, a
+      # reply's events in Redis. `faden deploy` writes one into .env; it never
+      # reached the gateway, and every install stored its chats in plain text
+      # (2026-10-02). Empty still stores plain text. Rows from before stay
+      # readable. Without this key the encrypted chats cannot be read: .env
+      # belongs in every backup (`faden backup` takes it; --db-only does not).
+      FADEN_GATEWAY_ENCRYPTION_KEY: ${FADEN_GATEWAY_ENCRYPTION_KEY:-}
       FADEN_GATEWAY_JWT_ALGORITHM: HS256
       FADEN_GATEWAY_DB_HOST: postgres
       FADEN_GATEWAY_DB_PORT: 5432
@@ -393,6 +400,8 @@ services:
       FADEN_GATEWAY_SKILLS_SERVICE_TOKEN: ${FADEN_GATEWAY_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
       # Scalability tuning (set via faden tune)
       FADEN_GATEWAY_WORKERS_COUNT: ${FADEN_GATEWAY_WORKERS_COUNT:-4}
+      # Chat replies one user may have written at once, across their chats.
+      FADEN_GATEWAY_CHAT_TURNS_PER_USER: ${FADEN_GATEWAY_CHAT_TURNS_PER_USER:-3}
       FADEN_GATEWAY_DB_POOL_SIZE: ${FADEN_GATEWAY_DB_POOL_SIZE:-5}
       FADEN_GATEWAY_DB_MAX_OVERFLOW: ${FADEN_GATEWAY_DB_MAX_OVERFLOW:-5}
       FADEN_GATEWAY_RABBIT_POOL_SIZE: ${FADEN_GATEWAY_RABBIT_POOL_SIZE:-2}
@@ -496,9 +505,11 @@ services:
       FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
       FADEN_BACKEND_MODEL_STORE_ROOT: /srv/faden/models
       FADEN_BACKEND_HOST_HF_CACHE_DIR: ${FADEN_BACKEND_HOST_HF_CACHE_DIR:-}
-      # Runtime monitoring (prometheus + per-runtime dashboards).
-      # OFF by default; enable with FADEN_BACKEND_LLM_MONITORING_ENABLED=true.
-      FADEN_BACKEND_LLM_MONITORING_ENABLED: ${FADEN_BACKEND_LLM_MONITORING_ENABLED:-false}
+      # Runtime monitoring: the clusters' and runtimes' scrape targets for the
+      # Prometheus above and their Grafana dashboards. The cluster page and the
+      # providers' live figures read it. Off with
+      # FADEN_BACKEND_LLM_MONITORING_ENABLED=false.
+      FADEN_BACKEND_LLM_MONITORING_ENABLED: ${FADEN_BACKEND_LLM_MONITORING_ENABLED:-true}
       FADEN_BACKEND_PROM_URL: http://prometheus:9090
       FADEN_BACKEND_PROM_TARGETS_FILE: /opt/faden/monitoring/prometheus/targets.json
       FADEN_BACKEND_PROM_DASHBOARD_DIR: /opt/faden/monitoring/dashboards
@@ -538,6 +549,9 @@ services:
       - worker
       - faden_backend.tkq:broker
       - --fs-discover
+      # Processes: two, or one on a server short of memory (set via faden tune).
+      - --workers
+      - ${FADEN_BACKEND_TASK_WORKERS:-2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -586,6 +600,9 @@ services:
       FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_BACKEND_RABBIT_CHANNEL_POOL_SIZE:-10}
       FADEN_BACKEND_MODEL_STORE_ROOT: /srv/faden/models
       FADEN_BACKEND_HOST_HF_CACHE_DIR: ${FADEN_BACKEND_HOST_HF_CACHE_DIR:-}
+      # Ranges a model download fetches at once, up to 64 MB each in memory
+      # (set via faden tune: fewer on a server short of memory).
+      HF_XET_NUM_CONCURRENT_RANGE_GETS: ${FADEN_BACKEND_DOWNLOAD_RANGES:-16}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - faden_models:/srv/faden/models

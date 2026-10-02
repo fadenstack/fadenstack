@@ -59,6 +59,32 @@ CONNECTION_HEADROOM = 100
 #: The shared compose file's default; tuning never goes below it.
 MIN_MAX_CONNECTIONS = 250
 
+# ── Memory: what each part takes (docker stats, release VM, 2026-09-28) ──
+# Sized by CPU alone, a 7 GB server got two of everything: a model download
+# took the task worker to 2.3 GB, swap filled, the kernel killed the worker,
+# the web backend's supervisor replaced a child that had stopped answering,
+# and at last the VM stopped answering at all. So the workers are cut to
+# what the memory holds. Measured after start-up with every module on; PII
+# loads its language models in each web worker and in its task worker.
+#: The operating system and Docker, and some page cache to breathe: 1 GB plus 5 %.
+OS_RESERVE_MB = 1024
+OS_RESERVE_PCT = 0.05
+#: The services that run once whatever the sizing: the gateway's task worker
+#: ~440, ClickHouse ~290, Postgres ~250, Alloy ~210, the web app ~190,
+#: Grafana ~180, the console ~150, Loki, RabbitMQ (capped at 512), MinIO,
+#: Prometheus, Redis, nginx.
+FIXED_MB = 2100
+#: One worker process of each service ``faden tune`` sizes.
+PER_WORKER_MB = {"backend": 200, "gateway": 290, "pii": 780}
+#: The optional modules' own processes (PII's task worker holds its models too).
+MODULE_MB = {"mcp": 110, "skills": 90, "pii": 1550}
+#: One process of the backend's task worker (taskiq), before any download.
+TASK_WORKER_MB = 160
+#: A model download holds up to one xet range (64 MB) per range it fetches at once.
+XET_RANGE_MB = 64
+#: Ranges fetched at once: fewer on a small server, never so few a download crawls.
+MIN_DOWNLOAD_RANGES, MAX_DOWNLOAD_RANGES = 4, 32
+
 
 # ── System snapshot ───────────────────────────────────────────────
 
@@ -107,6 +133,15 @@ class TuneProfile:
     rabbit_pool_size: dict[str, int] = field(default_factory=dict)
     rabbit_channel_pool_size: dict[str, int] = field(default_factory=dict)
 
+    #: Optional modules switched on ("pii", "mcp", "skills"): they take memory.
+    modules: frozenset[str] = frozenset()
+    #: Processes of the backend's task worker (taskiq ``--workers``).
+    task_workers: int = BACKEND_TASK_WORKERS
+    #: Ranges a model download fetches at once (``HF_XET_NUM_CONCURRENT_RANGE_GETS``).
+    download_ranges: int = MAX_DOWNLOAD_RANGES
+    #: Workers the CPU budget allowed, before the memory had its say.
+    cpu_workers: int = 0
+
     # ── Prefix map ────────────────────────────────────────────
     _ENV_PREFIX: dict[str, str] = field(
         default_factory=lambda: {
@@ -126,9 +161,55 @@ class TuneProfile:
         """What each database client can open at its peak: workers x (kept + on demand)."""
         per_worker = {svc: self.db_pool_size[svc] + self.db_max_overflow[svc] for svc in DB_SERVICES}
         peaks = {svc: self.workers[svc] * per_worker[svc] for svc in DB_SERVICES}
-        peaks["backend-worker"] = BACKEND_TASK_WORKERS * per_worker["backend"]
+        peaks["backend-worker"] = self.task_workers * per_worker["backend"]
         peaks.update(UNTUNED_CONNECTIONS)
         return peaks
+
+    @property
+    def memory_budget_mb(self) -> int:
+        """The memory Fadenstack may take on this host: all of it but the OS reserve."""
+        total_mb = self.system.total_ram_bytes // (1024**2)
+        return max(0, int(total_mb - OS_RESERVE_MB - total_mb * OS_RESERVE_PCT))
+
+    def memory_mb(self) -> dict[str, int]:
+        """What each part takes at its sizing, in MB: at rest, and a download under way."""
+        parts = {"services that run once": FIXED_MB}
+        for module in sorted(self.modules):
+            parts[f"{module} module"] = MODULE_MB.get(module, 0)
+        for svc in ALL_SERVICES:
+            if svc == "pii" and "pii" not in self.modules:
+                continue
+            parts[f"{svc} x{self.workers[svc]}"] = self.workers[svc] * PER_WORKER_MB[svc]
+        parts[f"task worker x{self.task_workers}"] = self.task_workers * TASK_WORKER_MB
+        parts["a model download"] = self.download_ranges * XET_RANGE_MB
+        return parts
+
+    @property
+    def memory_short_mb(self) -> int:
+        """How much more memory the smallest sizing needs than this host has; 0 when it fits."""
+        return max(0, sum(self.memory_mb().values()) - self.memory_budget_mb)
+
+    def _fit_memory(self) -> None:
+        """Cut the workers, then the task worker, then the download's ranges, to what the memory holds."""
+        def rest(workers: int, task_workers: int) -> int:
+            per_set = sum(
+                PER_WORKER_MB[svc] for svc in ALL_SERVICES if svc != "pii" or "pii" in self.modules
+            )
+            modules = sum(MODULE_MB.get(m, 0) for m in self.modules)
+            return FIXED_MB + modules + workers * per_set + task_workers * TASK_WORKER_MB
+
+        budget = self.memory_budget_mb
+        smallest_download = MIN_DOWNLOAD_RANGES * XET_RANGE_MB
+        workers = max(self.workers.values()) if self.workers else 1
+        while workers > 1 and rest(workers, self.task_workers) + smallest_download > budget:
+            workers -= 1
+        if rest(workers, self.task_workers) + smallest_download > budget:
+            self.task_workers = 1
+        for svc in HEAVY_SERVICES:
+            self.workers[svc] = min(self.workers[svc], workers)
+        # A quarter of what is left may go to a download, in whole ranges.
+        left = budget - rest(workers, self.task_workers)
+        self.download_ranges = max(MIN_DOWNLOAD_RANGES, min(MAX_DOWNLOAD_RANGES, left // 4 // XET_RANGE_MB))
 
     @property
     def max_connections(self) -> int:
@@ -143,6 +224,9 @@ class TuneProfile:
             # What deploy and upgrade tune with again.
             "FADEN_TUNE_PROFILE": self.profile,
             "FADEN_TUNE_RESOURCE_PCT": str(self.resource_pct),
+            # Sized by the memory (see ``_fit_memory``).
+            "FADEN_BACKEND_TASK_WORKERS": str(self.task_workers),
+            "FADEN_BACKEND_DOWNLOAD_RANGES": str(self.download_ranges),
         }
 
         for svc in ALL_SERVICES:
@@ -172,6 +256,7 @@ def calculate_tune_profile(
     system: SystemInfo | None = None,
     *,
     resource_pct: float = DEFAULT_RESOURCE_PCT,
+    modules: frozenset[str] | set[str] = frozenset(),
 ) -> TuneProfile:
     """Calculate optimal scalability parameters for *profile*.
 
@@ -187,9 +272,15 @@ def calculate_tune_profile(
         Fraction (0.0–1.0) of host CPU to allocate to the control
         plane.  Only affects the ``"prod"`` profile.  Defaults to
         :data:`DEFAULT_RESOURCE_PCT` (25 %).
+    modules
+        The optional modules switched on (``pii``, ``mcp``, ``skills``):
+        they take memory, and PII's workers are counted only with it on.
+
+    The CPU sets the number of workers, and the memory then cuts it to what
+    the host holds -- see ``TuneProfile._fit_memory``.
     """
     sys = system or detect_system()
-    tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct)
+    tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct, modules=frozenset(modules))
 
     # Workers: dev keeps things light (1-2); prod scales within the CPU
     # budget (resource_pct of the physical cores, e.g. 2 of 8 at 25 %).
@@ -198,6 +289,8 @@ def calculate_tune_profile(
         tp.workers[svc] = max(1, workers)
     for svc in LIGHT_SERVICES:
         tp.workers[svc] = 1
+    tp.cpu_workers = max(1, workers)
+    tp._fit_memory()
 
     # Pools: the same per worker process, whatever the number of workers.
     for svc in DB_SERVICES:

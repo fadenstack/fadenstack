@@ -158,6 +158,17 @@ class ServiceSpec(BaseModel):
         max_length=128,
         description="Name to offer this model under in chat; omit to publish no alias.",
     )
+    #: How long a request may wait for its reply to start. A busy model holds
+    #: requests in its queue until the KV cache has room and sends nothing
+    #: meanwhile, so how long is reasonable depends on the model and how busy
+    #: its cluster gets. Not part of what the engine runs: changing it only
+    #: republishes the deployment.
+    first_token_timeout_sec: float | None = Field(
+        default=None,
+        ge=10,
+        le=1800,
+        description="Seconds a request may wait for its reply to start; omit for the gateway's default (180).",
+    )
 
 
 class InferenceDeploymentSpecV1Alpha1(BaseModel):

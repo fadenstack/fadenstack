@@ -6,7 +6,7 @@ may use it is granted to users and groups -- default deny. Agent sign-ins
 keep one refresh token per device, stored as a SHA-256 hash.
 
 Revision ID: 4g3nt5
-Revises: r4yt1sca
+Revises: dl0adh3art
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "4g3nt5"
-down_revision = "r4yt1sca"
+down_revision = "dl0adh3art"
 branch_labels = None
 depends_on = None
 

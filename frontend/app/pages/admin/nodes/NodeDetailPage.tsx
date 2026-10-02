@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   nodesApi,
@@ -9,7 +9,11 @@ import {
   type NodeEnrollmentToken,
   type NodeProfile,
 } from "~/api/nodes";
+import { inferenceApi, type InferenceDeployment, type InferenceEnvironment } from "~/api/inference";
 import { logsApi, type LogStream } from "~/api/logs";
+import { phaseLabel } from "~/pages/admin/clusters/presentation";
+import { deploymentPhaseColor } from "~/pages/admin/inference/common";
+import LogViewer, { fromLokiStreams } from "~/components/logs/LogViewer";
 import { NodeDeploymentProgress } from "~/pages/admin/llm/RuntimeDetailPage";
 
 import Alert from "@mui/material/Alert";
@@ -22,6 +26,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
 import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
@@ -43,6 +48,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import SystemUpdateDialog from "~/pages/admin/nodes/SystemUpdateDialog";
+import AgentUpdateChip from "~/pages/admin/nodes/AgentUpdateChip";
 import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 
 import GaugeCard from "~/components/GaugeCard";
@@ -50,6 +56,9 @@ import GaugeCard from "~/components/GaugeCard";
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
 const REFRESH_INTERVAL_MS = 10_000;
+/** A deploy command is shown while it runs, and for this long after: then it is history (Commands). */
+const DEPLOY_SHOWN_AFTER_MS = 10 * 60_000;
+const DEPLOY_IN_FLIGHT = new Set(["queued", "dispatched", "acked", "running"]);
 
 function statusColor(
   status: string,
@@ -165,12 +174,10 @@ export default function NodeDetailPage() {
   const [logsExpanded, setLogsExpanded] = useState(true);
   const [commandsExpanded, setCommandsExpanded] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
-  const [containerLogStreams, setContainerLogStreams] = useState<LogStream[]>(
-    [],
-  );
-  const [containerLogsExpanded, setContainerLogsExpanded] = useState(true);
   const [deployTimeline, setDeployTimeline] =
     useState<NodeCommandTimeline | null>(null);
+  const [deployments, setDeployments] = useState<InferenceDeployment[] | null>(null);
+  const [clusters, setClusters] = useState<InferenceEnvironment[]>([]);
   const [enrollToken, setEnrollToken] = useState<NodeEnrollmentToken | null>(
     null,
   );
@@ -246,7 +253,7 @@ export default function NodeDetailPage() {
         query: `{host="${host}"}`,
         start: start.toISOString(),
         end: end.toISOString(),
-        limit: 100,
+        limit: 500,
         direction: "BACKWARD",
       });
       setLogStreams(res.streams);
@@ -255,29 +262,19 @@ export default function NodeDetailPage() {
     }
   }, []);
 
-  const loadContainerLogs = useCallback(async (host: string) => {
-    try {
-      const end = new Date();
-      const start = new Date(end);
-      start.setMinutes(start.getMinutes() - 15);
-      const res = await logsApi.queryRange({
-        query: `{job="node-container", host="${host}"}`,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        limit: 200,
-        direction: "BACKWARD",
-      });
-      setContainerLogStreams(res.streams);
-    } catch {
-      /* container logs are best-effort */
-    }
-  }, []);
-
   const loadDeployTimeline = useCallback(
     async (nodeId: string, cmds: NodeCommand[]) => {
-      // Find the most recent DEPLOY_WORKLOAD command
+      // A container deploy running on this machine now, or just finished.
+      // The latest one ever read as the machine's current deployment: a
+      // test that failed three days before, beside a model serving fine.
+      const now = Date.now();
       const deployCmds = cmds
-        .filter((c) => c.command_type === "deploy_workload")
+        .filter(
+          (c) =>
+            c.command_type === "deploy_workload" &&
+            (DEPLOY_IN_FLIGHT.has(c.status) ||
+              now - Date.parse(c.completed_at ?? c.issued_at) < DEPLOY_SHOWN_AFTER_MS),
+        )
         .sort((a, b) => Date.parse(b.issued_at) - Date.parse(a.issued_at));
       if (deployCmds.length === 0) {
         setDeployTimeline(null);
@@ -292,6 +289,20 @@ export default function NodeDetailPage() {
     },
     [],
   );
+
+  // The deployments on a cluster this machine is a member of: what it serves.
+  const loadDeployments = useCallback(async (nodeId: string) => {
+    try {
+      const [onMachine, allClusters] = await Promise.all([
+        inferenceApi.listDeployments(nodeId),
+        inferenceApi.listEnvironments(),
+      ]);
+      setDeployments(onMachine);
+      setClusters(allClusters);
+    } catch {
+      /* best-effort: the rest of the page stands without it */
+    }
+  }, []);
 
   async function runAction(key: string, action: () => Promise<void>) {
     setBusyKey(key);
@@ -371,12 +382,15 @@ export default function NodeDetailPage() {
 
   useEffect(() => {
     if (node?.host) void loadLogs(node.host);
-    if (node?.host) void loadContainerLogs(node.host);
-  }, [node?.host, loadLogs, loadContainerLogs]);
+  }, [node?.host, loadLogs]);
 
   useEffect(() => {
     if (id && commands.length > 0) void loadDeployTimeline(id, commands);
   }, [id, commands, loadDeployTimeline]);
+
+  useEffect(() => {
+    if (id) void loadDeployments(id);
+  }, [id, loadDeployments]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -385,9 +399,9 @@ export default function NodeDetailPage() {
         void silentRefresh();
         if (node?.host) {
           void loadLogs(node.host);
-          void loadContainerLogs(node.host);
         }
         if (id && commands.length > 0) void loadDeployTimeline(id, commands);
+        if (id) void loadDeployments(id);
       }, REFRESH_INTERVAL_MS);
     }
     return () => {
@@ -399,7 +413,6 @@ export default function NodeDetailPage() {
     silentRefresh,
     node?.host,
     loadLogs,
-    loadContainerLogs,
     loadDeployTimeline,
     commands,
   ]);
@@ -422,42 +435,7 @@ export default function NodeDetailPage() {
     (inv.gpu_count ?? gpu?.count ?? 0) > 0 &&
     (gpuVramPct != null || (gpu?.devices?.length ?? 0) > 0);
 
-  const flatLogs = useMemo(() => {
-    const lines: { ts: string; line: string; tsMs: number }[] = [];
-    for (const stream of logStreams) {
-      for (const entry of stream.entries) {
-        const ms = new Date(entry.ts).getTime();
-        lines.push({
-          ts: entry.ts,
-          line: entry.line,
-          tsMs: Number.isNaN(ms) ? 0 : ms,
-        });
-      }
-    }
-    return lines.sort((a, b) => b.tsMs - a.tsMs).slice(0, 100);
-  }, [logStreams]);
-
-  const flatContainerLogs = useMemo(() => {
-    const lines: {
-      ts: string;
-      line: string;
-      tsMs: number;
-      container: string;
-    }[] = [];
-    for (const stream of containerLogStreams) {
-      const container = stream.labels?.container ?? "";
-      for (const entry of stream.entries) {
-        const ms = new Date(entry.ts).getTime();
-        lines.push({
-          ts: entry.ts,
-          line: entry.line,
-          tsMs: Number.isNaN(ms) ? 0 : ms,
-          container,
-        });
-      }
-    }
-    return lines.sort((a, b) => a.tsMs - b.tsMs).slice(-200);
-  }, [containerLogStreams]);
+  const logLines = useMemo(() => fromLokiStreams(logStreams), [logStreams]);
 
   /* ── render ────────────────────────────────────────────────────── */
 
@@ -510,6 +488,7 @@ export default function NodeDetailPage() {
                   label={t("nodes.maintenance")}
                 />
               )}
+              <AgentUpdateChip version={node.agent_update} />
               {node.draining && (
                 <Chip
                   size="small"
@@ -911,7 +890,7 @@ faden-agent run`}
               <Typography variant="caption" color="text.secondary">
                 {t("nodes.logs_last_15_min")}
                 {" \u00B7 "}
-                {t("nodes.logs_entries", { count: flatLogs.length })}
+                {t("nodes.logs_entries", { count: logLines.length })}
               </Typography>
             </Stack>
             {/* The full logs page, already narrowed to this machine. */}
@@ -934,50 +913,60 @@ faden-agent run`}
             </IconButton>
           </Stack>
           <Collapse in={logsExpanded}>
-            {flatLogs.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {t("nodes.no_logs_for_host", { host: node.host })}
-              </Typography>
-            ) : (
-              <Box
-                sx={{
-                  mt: 1,
-                  maxHeight: 320,
-                  overflow: "auto",
-                  fontFamily: "monospace",
-                  fontSize: "0.75rem",
-                  lineHeight: 1.6,
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                  p: 1,
-                }}
-              >
-                {flatLogs.map((entry, i) => (
-                  <Box
-                    key={i}
-                    sx={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
-                  >
-                    <Typography
-                      component="span"
-                      sx={{
-                        fontSize: "inherit",
-                        fontFamily: "inherit",
-                        color: "text.secondary",
-                        mr: 1,
-                      }}
-                    >
-                      {new Date(entry.ts).toLocaleTimeString()}
-                    </Typography>
-                    {entry.line}
-                  </Box>
-                ))}
-              </Box>
-            )}
+            <Box sx={{ mt: 1 }}>
+              <LogViewer
+                lines={logLines}
+                empty={t("nodes.no_logs_for_host", { host: node.host })}
+                maxHeight={420}
+                downloadName={`${node.host}.log`}
+              />
+            </Box>
           </Collapse>
         </CardContent>
       </Card>
 
-      {/* ── Latest Deployment Progress ──────────────────────────── */}
+      {/* ── Deployments on this machine ─────────────────────────── */}
+      {deployments !== null && (
+        <Card variant="outlined">
+          <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              {t("nodes.detail.deployments")}
+            </Typography>
+            {deployments.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                {t("nodes.detail.no_deployments")}
+              </Typography>
+            ) : (
+              <Stack spacing={0.75}>
+                {deployments.map((dep) => {
+                  const cluster = clusters.find((c) => c.id === dep.environment_id);
+                  return (
+                    <Stack key={dep.id} direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+                      <Link component={RouterLink} to={`/admin/deployments/${dep.id}`} underline="hover">
+                        {dep.name}
+                      </Link>
+                      <Chip size="small" label={phaseLabel(dep.phase)} color={deploymentPhaseColor(dep.phase)} />
+                      {cluster && (
+                        <Link
+                          component={RouterLink}
+                          to={`/admin/clusters/${cluster.id}`}
+                          underline="hover"
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          {cluster.name}
+                        </Link>
+                      )}
+                    </Stack>
+                  );
+                })}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── A container deploy in progress ──────────────────────── */}
       {deployTimeline && (
         <Card variant="outlined">
           <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -997,91 +986,6 @@ faden-agent run`}
           </CardContent>
         </Card>
       )}
-
-      {/* ── Container Logs ──────────────────────────────────────── */}
-      <Card variant="outlined">
-        <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="subtitle2">{t("nodes.detail.container_logs")}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                last 15 min &middot; {flatContainerLogs.length} entries
-              </Typography>
-            </Stack>
-            <IconButton
-              size="small"
-              onClick={() => setContainerLogsExpanded((v) => !v)}
-              sx={{
-                transform: containerLogsExpanded
-                  ? "rotate(180deg)"
-                  : "rotate(0deg)",
-                transition: "transform 0.2s",
-              }}
-            >
-              <ExpandMoreIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-          <Collapse in={containerLogsExpanded}>
-            {flatContainerLogs.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                No container logs found for host {node.host}
-              </Typography>
-            ) : (
-              <Box
-                sx={{
-                  mt: 1,
-                  maxHeight: 400,
-                  overflow: "auto",
-                  fontFamily: "monospace",
-                  fontSize: "0.75rem",
-                  lineHeight: 1.6,
-                  bgcolor: "grey.900",
-                  color: "grey.100",
-                  borderRadius: 1,
-                  p: 1,
-                }}
-              >
-                {flatContainerLogs.map((entry, i) => (
-                  <Box
-                    key={i}
-                    sx={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
-                  >
-                    <Typography
-                      component="span"
-                      sx={{
-                        fontSize: "inherit",
-                        fontFamily: "inherit",
-                        color: "grey.500",
-                        mr: 1,
-                      }}
-                    >
-                      {new Date(entry.ts).toLocaleTimeString()}
-                    </Typography>
-                    {entry.container && (
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: "inherit",
-                          fontFamily: "inherit",
-                          color: "info.main",
-                          mr: 1,
-                        }}
-                      >
-                        [{entry.container}]
-                      </Typography>
-                    )}
-                    {entry.line}
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Collapse>
-        </CardContent>
-      </Card>
 
       {/* ── Commands ─────────────────────────────────────────────── */}
       <Card variant="outlined">

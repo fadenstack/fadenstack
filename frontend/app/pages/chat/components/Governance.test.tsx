@@ -71,8 +71,8 @@ describe("a refused turn in the history", () => {
   });
 
   it("marks a failed turn", () => {
-    const { container } = render(<MessageBubble role="user" content="Hello?" status="error" />);
+    const { container } = render(<MessageBubble role="user" content="Hello?" status="failed" />);
     expect(screen.getByText("Hello?")).toBeTruthy();
-    expect(container.querySelector('[data-message-status="error"]')).toBeTruthy();
+    expect(container.querySelector('[data-message-status="failed"]')).toBeTruthy();
   });
 });

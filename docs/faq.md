@@ -227,6 +227,28 @@ minute or two:
 Two deployments given the same name share it. Chat sends each request to
 whichever of them is healthy.
 
+### Replies fail with "The model did not start its reply within … s".
+
+The model was busy. A model whose memory for conversations (its KV cache) is
+full keeps new requests in its queue until a running one finishes, and sends
+nothing while they wait. The gateway gives up after a while, the reply is
+marked failed, and **Retry** under it sends it again.
+
+How long it waits is set per deployment. Its page shows **A reply must start
+within**, which is 180 s unless changed. **Change** sets 10 to 1800 seconds,
+or empty for the default. The model keeps running; only its publication
+changes. A reply that has started may pause for at most 60 s between two
+parts, however long this is.
+
+If replies fail like this often, the model needs more room rather than more
+patience: more copies, or more memory per copy (`gpu_memory_utilization` in
+**How vLLM runs it**).
+
+How many requests the gateway sends a deployment at once follows its copies:
+each ready copy takes as many as its `max_num_seqs` (256 when not set), and
+the gateway asks no more than that of it. It used to send 16 at most,
+whatever the copies, and refused the rest after 30 s with "no free capacity".
+
 ### The deployment page said "syncing" after the model was already serving.
 
 Fixed. The page used to read the model files, the machines and the endpoints
@@ -252,12 +274,24 @@ says why the rest cannot:
 
 Scale back down, or add a machine to the cluster.
 
+A copy on one accelerator may also take a share of it: **Accelerators per
+copy** in the **Scale** dialog, from 0.05 to 1. Below 1, copies can share an
+accelerator; above 0.5, no two share one. The share is also the memory the
+engine takes: changing it sets `gpu_memory_utilization` to match in the same
+save (0.8 for a whole accelerator), and the dialog says how much that comes
+to. **How vLLM runs it** can lower the memory below the share, never raise it
+above: a higher value there is capped, and the dialog says so. Two copies of a 27B model sharing one DGX Spark split its memory
+bandwidth: together they produced about what one copy alone did on the other
+machine.
+
 ### Does scaling interrupt the model?
 
-No. The copies already running are not restarted: the deployment stays
-**Serving** while copies are added or removed, and the page says what is
-left ("Serving on 1 of 2 copies; 1 more starting"). Adding a copy on the DGX
-pair took about two minutes, removing one about twelve seconds.
+Changing the number of copies does not. The copies already running are not
+restarted: the deployment stays **Serving** while copies are added or
+removed, and the page says what is left ("Serving on 1 of 2 copies; 1 more
+starting"). Adding a copy on the DGX pair took about two minutes, removing
+one about twelve seconds. Changing the accelerators per copy does: every copy
+restarts with its new share, and the dialog says so.
 
 ### The deployment page does not say which machine each copy is on.
 

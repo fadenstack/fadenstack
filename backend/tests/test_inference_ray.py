@@ -1273,18 +1273,165 @@ async def test_deployment_deploy_failed_surfaces_ray_message(
     _fast_readiness(monkeypatch)
     dep, _node = deployment_env
     app = f"faden-{dep.id}"
+    status = _serve_status(app, app_status="DEPLOY_FAILED", message="Engine core initialization failed")
+    # No copy serves: with one that does, it is degraded (below).
+    status["serve"]["apps"][app]["deployments"]["LLMServer:tiny-model"].update(
+        status="DEPLOY_FAILED", num_replicas_ready=0,
+    )
     fake = _FakeNodeControl(
         result_json=_healthy_probe_result(),
         results={
             NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
-            NodeCommandType.GET_RAY_SERVE_STATUS.value: _serve_status(
-                app, app_status="DEPLOY_FAILED", message="Engine core initialization failed"
-            ),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: status,
         },
     )
     await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
     assert dep.phase == "failed"
     assert "Engine core initialization failed" in dep.phase_message
+
+
+def _serve_starting(app_name: str) -> dict[str, Any]:
+    """Serve still starting the first copy: DEPLOYING, none ready."""
+    status = _serve_status(app_name, app_status="DEPLOYING")
+    for entry in status["serve"]["apps"][app_name]["deployments"].values():
+        entry.update(status="UPDATING", num_replicas_ready=0, num_replicas_pending=1)
+    return status
+
+
+@pytest.mark.parametrize(
+    ("cause", "stops"),
+    [
+        ("ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)", True),
+        ("ValueError: Free memory on device cuda:0 (1.6/121.69 GiB) on startup is less than desired (on 10.250.10.71)",
+         False),
+    ],
+    ids=["comes-back-every-time", "can-pass"],
+)
+async def test_a_failed_start_is_said_at_once_and_stopped_when_it_would_recur(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch, cause: str, stops: bool,
+) -> None:
+    """Serve tries three times, each loading the whole model, and says why only after the third."""
+    from faden_backend.services.inference.drivers.ray import deployment as deployment_mod
+    from faden_backend.services.inference.drivers.ray.logs import EngineFailure
+
+    _fast_readiness(monkeypatch)
+
+    async def failed(app_name: str, *, after: Any = None) -> EngineFailure:
+        assert after is not None, "only this run's output counts"
+        return EngineFailure(cause=cause, start_failed=True)
+
+    monkeypatch.setattr(deployment_mod, "engine_root_cause", failed)
+    dep, _node = deployment_env
+    app = f"faden-{dep.id}"
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: _serve_starting(app),
+            NodeCommandType.DELETE_SERVE_APP.value: {"deleted": True},
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    deleted = fake.by_type(NodeCommandType.DELETE_SERVE_APP.value)
+    if stops:
+        assert dep.phase == "failed" and len(deleted) == 1
+        assert dep.phase_message.startswith("Start failed: ValueError: There is no module")
+        assert "Not tried again" in dep.phase_message
+    else:
+        assert dep.phase == "applying" and deleted == []
+        assert dep.phase_message.startswith("A start failed: ValueError: Free memory")
+        assert "trying again" in dep.phase_message
+
+
+_SETUP_TRACEBACK = (
+    "Traceback (most recent call last):\n"
+    '  File "/usr/local/lib/python3.12/dist-packages/ray/llm/_internal/serve/core/server/llm_server.py", '
+    "line 212, in start\n"
+    "RuntimeError: Failed to create vLLM engine config: 'str' object has no attribute 'items'"
+)
+
+
+def _copy_died_while_set_up(app_name: str, *, summary: bool = False) -> dict[str, Any]:
+    """Serve retrying a copy that died in its constructor, as it says from the first failure on."""
+    status = _serve_starting(app_name)
+    error = (
+        "Traceback (most recent call last):\nRuntimeError: Engine core initialization failed. See root cause above."
+        if summary else _SETUP_TRACEBACK
+    )
+    status["serve"]["apps"][app_name]["deployments"]["LLMServer:tiny-model"]["message"] = (
+        f"A replica failed to start with exception. Retrying 2 more time(s). Error:\n{error}"
+    )
+    return status
+
+
+@pytest.mark.parametrize("summary", [False, True], ids=["setup-error", "engine-summary-only"])
+async def test_a_copy_that_dies_while_it_is_set_up_is_stopped_at_once(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch, summary: bool,
+) -> None:
+    """A setting vLLM cannot take never reaches the engine: its log has nothing, Serve says it (.61, 2026-10-01).
+
+    Serve's own summary of an engine failure ("Engine core initialization
+    failed") is not a cause: that one waits for the engine's log.
+    """
+    from faden_backend.services.inference.drivers.ray import deployment as deployment_mod
+
+    _fast_readiness(monkeypatch)
+
+    async def nothing_yet(app_name: str, *, after: Any = None) -> None:
+        return None
+
+    monkeypatch.setattr(deployment_mod, "engine_root_cause", nothing_yet)
+    dep, _node = deployment_env
+    app = f"faden-{dep.id}"
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: _copy_died_while_set_up(app, summary=summary),
+            NodeCommandType.DELETE_SERVE_APP.value: {"deleted": True},
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    deleted = fake.by_type(NodeCommandType.DELETE_SERVE_APP.value)
+    if summary:
+        assert dep.phase == "applying" and deleted == []
+        assert "A start failed" not in (dep.phase_message or "")
+    else:
+        assert dep.phase == "failed" and len(deleted) == 1
+        assert dep.phase_message.startswith(
+            "Start failed: RuntimeError: Failed to create vLLM engine config: 'str' object has no attribute 'items'",
+        )
+
+
+async def test_copies_that_still_serve_make_a_failed_update_degraded_not_failed(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """2 of 3 copies served the version that worked; the deployment read "failed" (.61, 2026-10-01)."""
+    _fast_readiness(monkeypatch)
+    dep, _node = deployment_env
+    dep.spec_json = {**dep.spec_json, "scale": {"replicas": 3}}
+    app = f"faden-{dep.id}"
+    status = _serve_status(app, app_status="DEPLOY_FAILED")
+    server = status["serve"]["apps"][app]["deployments"]["LLMServer:tiny-model"]
+    server.update(
+        status="DEPLOY_FAILED", num_replicas_ready=2, num_replicas_pending=0,
+        message=f"The deployment failed to start 9 times in a row. Error:\n{_SETUP_TRACEBACK}",
+    )
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: status,
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+
+    assert dep.phase == "degraded"
+    assert (dep.ready_replicas, dep.total_replicas) == (2, 3)
+    assert dep.phase_message.startswith("2 of 3 copies serve; the others failed to start:")
+    assert "Failed to create vLLM engine config" in dep.phase_message
 
 
 async def test_deployment_run_timeout_stays_applying(

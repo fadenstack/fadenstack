@@ -552,3 +552,62 @@ async def test_recipes_offline_are_no_recipe(monkeypatch: pytest.MonkeyPatch) ->
         assert await recipes.recipe_for("Qwen/Qwen3-8B", client=client) is None
     recipes.clear_cache()
 
+
+
+# ── whether the cluster's runtime can load it, before the download ──────
+
+QWEN4_EXP_CONFIG = {
+    "model_type": "qwen4_exp", "architectures": ["Qwen4ExpForConditionalGeneration"],
+    "transformers_version": "5.16.0.dev0",
+    "text_config": {"num_hidden_layers": 48, "hidden_size": 4096, "num_attention_heads": 32, "num_key_value_heads": 4},
+}
+
+
+@pytest.mark.anyio
+async def test_a_model_the_runtime_cannot_load_is_refused_before_any_download(
+    authed: FastAPI, client: AsyncClient, dbsession: AsyncSession, fake_hub: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """nvidia/Qwen3.8-Flash-Next-NVFP4: 132.7 GB on two DGX Sparks, then "Transformers does not recognize this architecture"."""
+    from faden_backend.web.api.llm.dependencies import get_llm_service
+
+    async def detail(self: Any, repo_id: str) -> dict[str, Any]:
+        arch = facts.architecture_from_config(QWEN4_EXP_CONFIG)
+        return {"repo_id": repo_id, "name": repo_id.split("/")[-1], "capabilities": ["chat"], "task": "chat",
+                "runnable": True, "weights_bytes": 132_700_000_000, "architecture_facts": arch.to_dict(),
+                "max_context": 262144, "kv_bytes_per_token": arch.kv_bytes_per_token(), "needs_remote_code": False,
+                "files": []}
+
+    monkeypatch.setattr(hub.HubClient, "detail", detail)
+    env_id = await _dgx_cluster(dbsession)
+    started: list[str] = []
+
+    class _Llm:
+        async def start_download(self, *a: Any, hf_repo_id: str, **kw: Any) -> Any:
+            started.append(hf_repo_id)
+            raise AssertionError("nothing may be downloaded")
+
+    authed.dependency_overrides[get_llm_service] = lambda: _Llm()
+
+    r = await client.get("/api/llm/marketplace/models/nvidia/Qwen3.8-Flash-Next-NVFP4")
+    verdict = r.json()["compatibility"][env_id]
+    assert verdict["status"] == "cannot_run" and verdict["code"] == "model_type_unknown"
+    assert "qwen4_exp" in verdict["message"] and "5.16.0.dev0" in verdict["message"]
+    assert verdict["transformers_version"] == "5.14.1"
+
+    r = await client.post("/api/llm/marketplace/host", json={
+        "repo_id": "nvidia/Qwen3.8-Flash-Next-NVFP4", "environment_id": env_id, "name": "qwen3-8-flash-next-nvfp4",
+        "copies": 1, "gpus_per_copy": 2, "engine_config": {},
+    })
+    assert r.status_code == 409 and "qwen4_exp" in r.json()["detail"]
+    assert started == []
+
+
+@pytest.mark.anyio
+async def test_a_model_the_runtime_knows_is_said_to_run(
+    authed: FastAPI, client: AsyncClient, dbsession: AsyncSession, fake_hub: dict[str, Any],
+) -> None:
+    env_id = await _dgx_cluster(dbsession)
+    r = await client.get("/api/llm/marketplace/models/Qwen/Qwen3-8B")
+    assert r.json()["compatibility"][env_id]["status"] == "runs"
+    assert "runtime" not in r.json()["clusters"][0], "hundreds of names are not sent to the console"

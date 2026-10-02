@@ -32,8 +32,13 @@ class LogSource(StrEnum):
     without knowing what runs underneath.
     """
 
+    #: Everything the deployment wrote -- its copies and its engine -- in one stream.
+    ALL = "all"
+    #: The old name of ``SERVE_REPLICA``, still accepted.
     RUNTIME_CONTAINER = "runtime_container"
     SERVE_REPLICA = "serve_replica"
+    #: The inference engine's own output (vLLM): where a failed start says why.
+    ENGINE = "engine"
     AGENT = "agent"
 
 
@@ -45,6 +50,10 @@ class LogLine(BaseModel):
     ts: datetime | None = None
     level: str | None = None
     message: str
+    #: The machine it was written on, when a page spans several.
+    host: str | None = None
+    #: Which stream: ``replica`` (Serve), ``engine`` (vLLM) or ``agent``.
+    source: str | None = None
 
 
 class LogPage(BaseModel):

@@ -42,6 +42,7 @@ import httpx
 import psutil
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse, Response
+from packaging.version import InvalidVersion, Version
 from yarl import URL
 
 from faden_backend.services import edge_trust
@@ -54,7 +55,21 @@ router = APIRouter(prefix="/install", tags=["install"])
 
 #: Agent version this backend expects.  Bumping it here is what makes a fleet
 #: converge, because every fresh install reads it from the running backend.
-AGENT_VERSION = "0.2.1"
+AGENT_VERSION = "0.2.4"
+
+
+def newer_agent_version(running: str | None) -> str | None:
+    """:data:`AGENT_VERSION` when a machine runs an older agent, else None.
+
+    Shown, never applied: an agent is updated by re-running the install line
+    on the machine, in a window its operator picks -- not under a production
+    load by itself.
+    """
+    try:
+        return AGENT_VERSION if running and Version(running) < Version(AGENT_VERSION) else None
+    except InvalidVersion:
+        return None
+
 
 #: Where published binaries live when this backend has no local copy: the
 #: release .github/workflows/node-agent-release.yml makes for a

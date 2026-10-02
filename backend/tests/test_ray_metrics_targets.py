@@ -640,3 +640,21 @@ def test_an_operator_can_still_turn_them_off() -> None:
         pipeline_parallel_size=None,
     )
     assert kwargs["kv_cache_metrics"] is False
+
+
+@pytest.mark.anyio
+async def test_stat_cards_for_one_model_ask_for_that_model_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cluster runs several models; a provider's cards and its dashboard link are its own model's."""
+    from faden_backend.services.llm.monitoring import MonitoringProvisioner
+
+    asked: list[str] = []
+
+    async def query(self, expr: str) -> float:  # noqa: ANN001
+        asked.append(expr)
+        return 0.0
+
+    monkeypatch.setattr(MonitoringProvisioner, "_prom_query", query)
+    out = await MonitoringProvisioner().stats(uuid.uuid4(), "dgx-pair", model_name="Qwen3.8-27B-FP8")
+
+    assert asked and all('runtime_name="dgx-pair",model_name="Qwen3.8-27B-FP8"' in expr for expr in asked)
+    assert out["dashboard_url"].endswith("&var-model=Qwen3.8-27B-FP8")

@@ -24,6 +24,7 @@ from typing import Any
 
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import (
+    TURNS_LEFT_OUT,
     ChatAttachment,
     ChatMessage,
     ChatProject,
@@ -55,11 +56,12 @@ class AssembledContext:
 def in_context(msg: Any) -> bool:
     """Whether a stored message goes to the model (04-skills-and-governance §8).
 
-    A refused prompt (``blocked_input``) and a failed turn (``error``) are
-    left out whole; of a refused answer (``blocked_output``) the question
-    stays and the answer goes.
+    A refused prompt (``blocked_input``) is left out whole; of a refused
+    answer (``blocked_output``) the question stays and the answer goes. A
+    reply that failed, was cut off by a restart or is still being written is
+    the chat's record, not part of the conversation (``TURNS_LEFT_OUT``).
     """
-    return getattr(msg, "status", "ok") in ("ok", None)
+    return getattr(msg, "status", None) not in TURNS_LEFT_OUT
 
 
 def merge_consecutive_users(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -5,8 +5,8 @@ in to it, and the conversation and turn the SDK names -- the conversation
 itself stays on the device. ``agent_client_event`` keeps what an SDK reports
 about its work (tools run, approvals, local MCP servers), never content.
 
-Revision ID: 9n0p1q2r3s4t
-Revises: 8m9n0p1q2r3s
+Revision ID: 4g3ntr3q5
+Revises: 9n0p1q2r3s4t
 Create Date: 2026-09-28 12:00:00.000000
 """
 
@@ -15,8 +15,8 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "9n0p1q2r3s4t"
-down_revision = "8m9n0p1q2r3s"
+revision = "4g3ntr3q5"
+down_revision = "9n0p1q2r3s4t"
 branch_labels = None
 depends_on = None
 

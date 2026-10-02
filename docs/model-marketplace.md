@@ -71,6 +71,125 @@ engine settings step shows the numbers before anything starts.
 
 The server downloads the model, copies it to the machines and starts the
 copies. The deployment page shows each step. Nothing waits in the dialog.
+A cluster can have its machines download models from Hugging Face
+themselves instead. See [Where the machines get models](#where-the-machines-get-models).
+
+A deployment never sends the machines a model whose download has not
+finished. If the server's download stops (its worker restarts, or runs out of
+memory), the download is marked **interrupted**. It resumes by itself when a
+deployment waits for the model, and from where it stopped: the files already
+on disk are kept.
+
+## Can the cluster run it?
+
+Before anything is downloaded, the host dialog checks each cluster's runtime
+against the model's `config.json`. Each runtime image lists what it can load.
+The image build reads the lists off the image into the runtime manifest:
+
+- the model types its Transformers and vLLM can read a configuration of
+- the architectures its vLLM runs natively
+
+The check gives one of these verdicts:
+
+- **Cannot run here.** No part of the runtime knows the model type. vLLM
+  would stop at the model's configuration, whatever the hardware. The
+  cluster cannot be chosen, and the API refuses to host it (409). The reason
+  names the model type, the runtime's Transformers and vLLM versions, and the
+  Transformers version the model was saved with. It needs a newer runtime:
+  if this server ships one that can load it, switch the cluster to it (see
+  [Switch a cluster to another runtime](upgrading.md#switch-a-cluster-to-another-runtime)).
+  The check always uses the runtime the cluster runs.
+  `ignore_compatibility: true` in the host request overrides the check.
+- **May not run.** The runtime can read the configuration, but its vLLM has
+  no implementation of the architecture. It can only try its generic
+  Transformers backend, which not every model supports.
+
+A model that brings its own code (`auto_map`, `trust-remote-code`) is not
+judged by the lists. If Hugging Face cannot be reached, nothing is refused.
+
+## Reading a deployment's logs
+
+A deployment's page shows its logs from Loki, where the machines ship them
+as they are written. It is one log, from every machine of the cluster, with
+two streams in it:
+
+- **Model serving**: Serve's log of the model's copies. It shows a copy
+  start, get ready, or be stopped.
+- **Engine (vLLM)**: what the inference engine itself printed. When a model
+  fails to start, Serve only says "Engine core initialization failed. See
+  root cause above". The root cause is in this stream, for example
+  `ValueError: There is no module or parameter named 'ngram_embedding.weight_scale'`.
+
+Each line shows its time, its level, its stream and the machine that wrote
+it. The level sets the line's colour: errors red, warnings yellow, debug
+grey. A traceback's frames take the level of the exception they belong to.
+Above the lines are filters:
+
+- the levels, each with a count: click **Errors** to hide it, or
+  click every other level to see only the errors;
+- the streams and the machines, when there is more than one;
+- a search box, which also marks the words it found.
+
+The log follows new lines while you are at the bottom and stops when you
+scroll up to read. Copy and download take the lines the filters show. While
+the deployment starts, the page reads its log again every five seconds.
+
+The machine agent's own log is on the machine's page, which shows
+everything that machine sent in the last 15 minutes: the agent, its
+containers, and Serve and the engine of every deployment on it. Container
+and runtime pages use the same log view.
+
+### When a model fails to start
+
+Serve tries to start a copy three times, and each attempt loads the whole
+model again. Serve only gives the reason after the third attempt, which
+can be fifteen minutes for a large model. Fadenstack doesn't wait for
+that. While no copy is up, it reads the engine's stream after each check:
+
+- **An error that will come back** (weights the engine cannot load, a
+  configuration it rejects): the deployment is stopped at once. Its phase
+  becomes **Failed**, and the page says
+  `Start failed: <the engine's error>. Not tried again: this error comes back on every attempt.`
+- **An error that can pass** (not enough free memory yet, a CUDA or NCCL
+  error, a timeout): Serve keeps trying. The page shows a warning,
+  `A start failed: <the error>. Ray is trying again.`
+
+Either message sits at the top of the page. **Show the errors** in the
+message filters the log to its errors and scrolls to it. Only this
+attempt's lines count: an error an earlier start printed is not taken for
+this one. A stopped deployment stays stopped. After fixing the cause,
+change the deployment or click **Check now**, and it starts over.
+
+The machines keep sending what the server has not taken yet: nothing is lost
+while the server restarts or Loki is down (agents 0.2.4). A page looks back
+24 hours; older lines are in Grafana, under **Observability**.
+
+## Where the machines get models
+
+By default the server downloads a model and each machine of the cluster
+copies it from the server. This works when the machines have no internet
+access. But a server on a slow link makes every model pay twice: once to the
+server, then again to each machine over the same link.
+
+A cluster's page has a switch, **Machines download models themselves**. It is
+off by default. When it is on, each machine downloads the model from Hugging
+Face into its own model store, and the server neither downloads nor copies
+it. The engine still runs offline and loads the model from the store.
+
+- The switch can be turned on only when every machine of the cluster
+  reaches Hugging Face. The card asks each machine and shows the answer.
+  While a machine cannot reach it, the switch stays off, and its tooltip names
+  the machine and the reason: no internet access, an agent older than 0.2.2,
+  offline, or no answer. **Check again** asks the machines again. The server
+  checks too, so the API refuses it as well.
+- A machine uses a proxy set in its environment (`HTTPS_PROXY`) and a mirror
+  set in `HF_ENDPOINT`, for the check and the download alike.
+- For a gated model, a machine asks the server for its Hugging Face token at
+  the start of each download. Only machines of a cluster with the switch on
+  get it, and they do not store it.
+- It applies to the next model placed on the cluster. Models already on the
+  machines stay where they are. Turning it off goes back to copying from the
+  server.
 
 ## Engine settings
 
@@ -122,10 +241,12 @@ or in **Settings → LLM → Hugging Face**.
 - It is stored encrypted with the settings master key, and no screen or API
   returns it. You see only the account it belongs to. If the token can also
   write, a note says so: a read token is all the server needs.
-- It is used only by the server itself: to search, to read model details and
+- It is used by the server itself: to search, to read model details and
   to download. Cluster machines get their models from the server and never
-  receive the token. A legacy container gets it only when it is allowed
-  onto the network to fetch model code (`trust-remote-code`).
+  receive the token, unless their cluster lets them download models
+  themselves (see [Where the machines get models](#where-the-machines-get-models)).
+  A legacy container gets it only when it is allowed onto the network to
+  fetch model code (`trust-remote-code`).
 - The server will not save a token while it still uses the default settings
   master key. `faden deploy` generates a random one for each installation.
 - Setting and removing the token are recorded in the audit log, without the

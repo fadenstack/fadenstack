@@ -89,10 +89,15 @@ Never the refused text.
 
   | Status | The user sees | The model is sent next time |
   |---|---|---|
-  | `ok` | the message | yes |
+  | `complete` | the message | yes |
+  | `stopped` | the reply as far as it was written | yes |
   | `blocked_input` | the notice (the message has no text) | no |
   | `blocked_output` | the question, and the notice for the answer | the question only |
-  | `error` | the question, with an error notice | no |
+  | `failed`, `interrupted` | the question, with the reply's error | the question only |
+  | `running` | the reply as it is written | no |
+
+  A question whose whole (not streamed) request failed before a reply was
+  kept is itself `failed`, and left out.
 
   Consecutive user messages reach the model as one: strict chat templates
   refuse roles that do not alternate. The rolling summary skips the same

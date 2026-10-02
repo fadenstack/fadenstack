@@ -37,6 +37,15 @@ from faden_backend.services.nodes.wakeup import get_command_notifier
 from faden_backend.services.nodes.auth import constant_time_equal, hash_with_pepper, random_secret
 
 
+#: A command in one of these is over, whatever its agent says next.
+_OVER = frozenset({
+    NodeCommandStatus.SUCCEEDED.value,
+    NodeCommandStatus.FAILED.value,
+    NodeCommandStatus.TIMED_OUT.value,
+    NodeCommandStatus.CANCELED.value,
+})
+
+
 class NodeControlService:
     """Implements onboarding, command lifecycle, and scheduler selection."""
 
@@ -422,7 +431,12 @@ class NodeControlService:
         """
         node.status = NodeHealthStatus.OFFLINE
         await self._demote_node_runtimes(node_id=node.id)
-        await self._fail_commands_lost_with_the_stream(node_id=node.id)
+        if not self.keeps_commands_across_connections(node):
+            await self._fail_commands_lost_with_the_stream(node_id=node.id)
+        # An agent that keeps them (agent 0.2.3) carries on, and says as it
+        # connects again what still runs and what finished
+        # (``settle_commands_on_connect``). One that never comes back is
+        # reaped as offline past its commands' timeouts.
         await self._recheck_member_clusters(node_id=node.id)
 
     async def _recheck_member_clusters(self, *, node_id: uuid.UUID) -> int:
@@ -468,7 +482,87 @@ class NodeControlService:
             wake_reconciler_after_commit(self._dao.session)
         return len(clusters)
 
-    async def _fail_commands_lost_with_the_stream(self, *, node_id: uuid.UUID) -> int:
+    #: Header an agent connects with (agent 0.2.3): ``v1; running=<ids>;
+    #: finished=<ids>`` -- what it is still executing, and its latest results.
+    COMMANDS_HEADER = "x-faden-commands"
+    #: What an agent says it can do: keep a command running when its
+    #: connection drops, and send its result on the next one.
+    CONTINUITY_CAPABILITY = "command_continuity"
+
+    @classmethod
+    def commands_reported(cls, headers: Any) -> tuple[set[str], set[str]] | None:
+        """The (running, finished) command ids an agent connected with; None when it does not say."""
+        raw = headers.get(cls.COMMANDS_HEADER) if headers is not None else None
+        if raw is None:
+            return None
+        parts = [part.strip() for part in str(raw).split(";")]
+        if not parts or parts[0] != "v1":
+            return None
+        found: dict[str, set[str]] = {"running": set(), "finished": set()}
+        for part in parts[1:]:
+            name, _, ids = part.partition("=")
+            if name.strip() in found:
+                found[name.strip()] = {i.strip() for i in ids.split(",") if i.strip()}
+        return found["running"], found["finished"]
+
+    @classmethod
+    def keeps_commands_across_connections(cls, node: InfraNode | None) -> bool:
+        """Whether *node*'s agent carries on with a command when its connection drops."""
+        try:
+            return int(((node.capabilities_json if node else None) or {}).get(cls.CONTINUITY_CAPABILITY) or 0) >= 1
+        except (TypeError, ValueError):
+            return False
+
+    async def settle_commands_on_connect(
+        self, *, node_id: uuid.UUID, running: set[str], finished: set[str],
+    ) -> list[InfraNodeCommand]:
+        """What the backend had accepted or running on a machine, set straight as its agent connects.
+
+        Still running there: left alone, its result comes on this connection.
+        Finished there: returned, to be sent again -- the agent answers from
+        its result store, which is how a result sent as the last connection
+        closed (or never sent) reaches the backend. Neither: lost, failed now.
+        That last one is what a restart of the backend used to leave behind:
+        the model copies both DGX Sparks had been running read "running" for
+        the hour it takes to call a command overdue. A command sent but never
+        accepted is sent again as before.
+        """
+        try:
+            commands = await self._dao.list_inflight_commands(node_id=node_id)
+        except Exception:  # pragma: no cover - defensive
+            log.exception("Could not list in-flight commands for node %s", node_id)
+            return []
+        accepted = [c for c in commands if c.status != NodeCommandStatus.DISPATCHED.value]
+        replay = [c for c in accepted if str(c.id) in finished and str(c.id) not in running]
+        await self._fail_commands_lost_with_the_stream(
+            node_id=node_id,
+            keep=lambda command: (
+                command.status == NodeCommandStatus.DISPATCHED.value
+                or str(command.id) in running
+                or str(command.id) in finished
+            ),
+            reason=(
+                "The node's agent was no longer running this command when it connected again "
+                "(it had restarted, or the command ended with no result), so it did not finish. "
+                "It is safe to try again."
+            ),
+        )
+        for command in replay:
+            await self._dao.append_command_event(
+                command_id=command.id,
+                phase="re-dispatched",
+                message="The agent finished it while disconnected; sent again for its stored result.",
+                payload_json=None,
+            )
+        return replay
+
+    async def _fail_commands_lost_with_the_stream(
+        self,
+        *,
+        node_id: uuid.UUID,
+        keep: Any = None,
+        reason: str | None = None,
+    ) -> int:
         """Fail commands that were in flight on a stream that has just closed.
 
         A command runs inside the agent that holds the socket. When the socket
@@ -495,12 +589,14 @@ class NodeControlService:
 
         failed = 0
         for command in commands:
+            if keep is not None and keep(command):
+                continue
             try:
                 await self._dao.set_command_status(
                     command,
                     status=NodeCommandStatus.FAILED,
                     error_code="node_stream_lost",
-                    error_message=(
+                    error_message=reason or (
                         "The node's connection closed while this command was "
                         "running, so it did not finish. Nothing is left running "
                         "on the node; it is safe to try again."
@@ -1074,6 +1170,18 @@ class NodeControlService:
     ) -> None:
         command = await self._dao.get_command(command_id)
         if command is None or command.node_id != node_id:
+            return
+        if command.status in _OVER:
+            # Its agent carried on after the backend had given it up (timed
+            # out while the machine was away). Noted, but it stays over: what
+            # was retried in its place is what counts now. Its result, when
+            # it comes, is still recorded -- the truth about the machine.
+            await self._dao.append_command_event(
+                command_id=command.id,
+                phase="late-progress",
+                message=str(payload.get("message") or "Progress after the command was over."),
+                payload_json=None,
+            )
             return
         await self._dao.set_command_status(command, status=NodeCommandStatus.RUNNING)
         await self._dao.append_command_event(

@@ -514,3 +514,82 @@ async def switch_ray_tls(
         return await ray_tls.switch(session, environment_id, on=body.on)
     except ray_tls.RayTlsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+class RuntimeSwitch(BaseModel):
+    """Request body for switching a cluster's runtime: the runtime id."""
+
+    runtime: str
+
+
+@router.get("/{environment_id}/runtime")
+async def runtime_status(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Which runtime each of this cluster's machines runs, the ones it could, and whether an update is out."""
+    from faden_backend.services.inference import runtime_choice  # noqa: PLC0415
+
+    try:
+        return await runtime_choice.environment_status(session, environment_id)
+    except runtime_choice.RuntimeChoiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/runtime")
+async def switch_runtime(
+    environment_id: uuid.UUID,
+    body: RuntimeSwitch,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Switch the cluster to another runtime. The cluster restarts on it."""
+    from faden_backend.services.inference import runtime_choice  # noqa: PLC0415
+
+    try:
+        return await runtime_choice.switch(session, environment_id, body.runtime)
+    except runtime_choice.RuntimeChoiceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+class ModelDownloadsSwitch(BaseModel):
+    """Request body for the machines-download switch: on or off."""
+
+    on: bool
+
+
+@router.get("/{environment_id}/model-downloads")
+async def model_downloads_status(
+    environment_id: uuid.UUID,
+    request: Request,
+    fresh: bool = Query(False, description="Ask the machines again rather than use an answer from the last minutes."),
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Whether this cluster's machines download models from Hugging Face themselves, and whether each could."""
+    from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+
+    try:
+        return await machine_downloads.environment_status(
+            session, _command_gateway(request), environment_id, fresh=fresh,
+        )
+    except machine_downloads.MachineDownloadsError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{environment_id}/model-downloads")
+async def switch_model_downloads(
+    environment_id: uuid.UUID,
+    body: ModelDownloadsSwitch,
+    request: Request,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Have the machines download models themselves, or copy them from this server. On needs every machine online."""
+    from faden_backend.services.inference import machine_downloads  # noqa: PLC0415
+
+    try:
+        return await machine_downloads.switch(session, _command_gateway(request), environment_id, on=body.on)
+    except machine_downloads.MachineDownloadsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

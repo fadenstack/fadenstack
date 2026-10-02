@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+from faden_agent import ray_log_forwarder
+from faden_agent.log_cursors import LogCursors
 from faden_agent.ray_log_forwarder import RayServeLogForwarder
 
 pytestmark = pytest.mark.anyio()
@@ -38,8 +40,12 @@ class _Loki:
 
     def __init__(self) -> None:
         self.pushes: list[tuple[dict[str, str], list[tuple[int, str]]]] = []
+        #: While True, every push is refused (Loki or the backend unreachable).
+        self.down = False
 
     async def push_streams(self, *, labels: dict[str, str], entries: list) -> bool:
+        if self.down:
+            return False
         self.pushes.append((dict(labels), list(entries)))
         return True
 
@@ -414,3 +420,127 @@ async def test_rays_own_timestamp_format_is_understood(
     ts_ns, _ = entries[0]
     expected = datetime(2026, 9, 22, 9, 48, 0, 673_000, tzinfo=UTC)
     assert ts_ns == int(expected.timestamp() * 1_000_000_000)
+
+
+# ── nothing is dropped: the file is the queue ─────────────────────────────
+
+
+async def test_lines_loki_did_not_take_are_sent_on_the_next_pass(serve_dir: Path, tmp_path: Path) -> None:
+    """A push that fails used to advance the cursor anyway: every server restart lost lines."""
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    log_file = serve_dir / REPLICA_FILE
+    log_file.write_text(_entry("a") + "\n", encoding="utf-8")
+    await forwarder._collect_all()
+
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write(_entry("during the outage") + "\n")
+    loki.down = True
+    await forwarder._collect_all()
+    loki.down = False
+    await forwarder._collect_all()
+
+    assert [json.loads(line)["message"] for line in loki.lines] == ["during the outage"]
+
+
+async def test_a_burst_drains_over_passes_rather_than_being_dropped(
+    serve_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ray_log_forwarder, "_MAX_READ_BYTES", 400)
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    log_file = serve_dir / REPLICA_FILE
+    log_file.write_text("", encoding="utf-8")
+    await forwarder._collect_all()
+
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write("".join(_entry(f"line {i}") + "\n" for i in range(40)))
+    for _ in range(40):
+        await forwarder._collect_all()
+
+    assert [json.loads(line)["message"] for line in loki.lines] == [f"line {i}" for i in range(40)]
+
+
+async def test_a_restarted_agent_resumes_where_it_stopped(serve_dir: Path, tmp_path: Path) -> None:
+    """Lines written while the agent was down are sent when it is back, not skipped."""
+    cursors = tmp_path / "log-cursors.json"
+    log_file = serve_dir / REPLICA_FILE
+    log_file.write_text(_entry("before") + "\n", encoding="utf-8")
+    first = RayServeLogForwarder(loki=_Loki(), host="h", session_dir=str(tmp_path), cursors=LogCursors(cursors))
+    await first._collect_all()
+
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write(_entry("while it was down") + "\n")
+    loki = _Loki()
+    again = RayServeLogForwarder(loki=loki, host="h", session_dir=str(tmp_path), cursors=LogCursors(cursors))
+    await again._collect_all()
+
+    assert [json.loads(line)["message"] for line in loki.lines] == ["while it was down"]
+
+
+async def test_a_rotated_file_is_finished_before_the_new_one(serve_dir: Path, tmp_path: Path) -> None:
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    log_file = serve_dir / REPLICA_FILE
+    log_file.write_text(_entry("old") + "\n", encoding="utf-8")
+    await forwarder._collect_all()
+
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write(_entry("last before rotation") + "\n")
+    log_file.rename(serve_dir / (REPLICA_FILE + ".1"))
+    log_file.write_text(_entry("first after rotation") + "\n", encoding="utf-8")
+    await forwarder._collect_all()
+
+    assert {json.loads(line)["message"] for line in loki.lines} == {"last before rotation", "first after rotation"}
+
+
+async def test_lines_rotated_away_before_they_were_sent_are_reported(serve_dir: Path, tmp_path: Path) -> None:
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    log_file = serve_dir / REPLICA_FILE
+    log_file.write_text(_entry("a") + "\n", encoding="utf-8")
+    await forwarder._collect_all()
+    with log_file.open("a", encoding="utf-8") as handle:
+        handle.write(_entry("never sent") + "\n")
+    loki.down = True
+    await forwarder._collect_all()
+
+    log_file.unlink()  # Ray deleted it before Loki was back
+    loki.down = False
+    await forwarder._collect_all()
+
+    assert any("rotated away before they could be sent" in line for line in loki.lines)
+
+
+# ── the engine behind a replica ───────────────────────────────────────────
+
+WORKER_ID = "2335e3e9602c6f404fe66daba2681511b773f828def4d25fefba02f5"
+
+
+async def test_the_engine_output_of_a_replica_is_shipped_as_its_own_stream(
+    serve_dir: Path, tmp_path: Path
+) -> None:
+    """The root cause of a failed start is only in the replica process's console."""
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    (serve_dir / REPLICA_FILE).write_text(
+        json.dumps({"levelname": "INFO", "message": "Started initializing replica.", "worker_id": WORKER_ID}) + "\n",
+        encoding="utf-8",
+    )
+    engine = serve_dir.parent / f"worker-{WORKER_ID}-04000000-12809.err"
+    engine.write_text("", encoding="utf-8")
+    (serve_dir.parent / "worker-ffffffffffffffffffffffffffffffff-01-1.err").write_text("someone else\n", encoding="utf-8")
+    await forwarder._collect_all()
+
+    with engine.open("a", encoding="utf-8") as handle:
+        handle.write("\x1b[36m(EngineCore pid=13728)\x1b[0m ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start.\n")
+        handle.write("(EngineCore pid=13728) ValueError: There is no module or parameter named 'ngram_embedding.weight_scale'\n")
+    await forwarder._collect_all()
+
+    engine_pushes = [(labels, entries) for labels, entries in loki.pushes if labels["source"] == "engine"]
+    assert engine_pushes and all(labels["app"] == APP for labels, _ in engine_pushes)
+    assert {labels["level"] for labels, _ in engine_pushes} == {"error"}
+    texts = [text for _, entries in engine_pushes for _, text in entries]
+    assert texts[0] == "(EngineCore pid=13728) ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start."
+    assert "weight_scale" in texts[1]
+    assert not any("someone else" in line for line in loki.lines)

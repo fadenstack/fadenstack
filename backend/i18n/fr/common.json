@@ -1789,7 +1789,6 @@
     "sessions_title": "Sessions de conversation",
     "attachments_title": "Pièces jointes de conversation",
     "col_name": "Nom",
-    "col_title": "Titre",
     "col_user": "Utilisateur",
     "col_tenant": "Locataire",
     "col_model": "Modèle",
@@ -1801,7 +1800,6 @@
     "col_type": "Type de contenu",
     "col_extraction": "Extraction",
     "col_scope": "Portée",
-    "untitled_session": "(sans titre)",
     "search_projects": "Rechercher des projets…",
     "search_sessions": "Rechercher des sessions…",
     "search_attachments": "Rechercher des pièces jointes…",
@@ -1824,8 +1822,8 @@
     "extraction_skipped": "ignorée",
     "scope_session": "session",
     "scope_project": "projet",
-    "title_encrypted": "Chiffré",
-    "title_encrypted_hint": "Les titres de chat sont chiffrés comme les messages ; seule la personne qui les a écrits les voit."
+    "col_chat": "Discussion",
+    "chat_id_hint": "Discussion {{id}}. Son titre et ses messages appartiennent à son utilisateur et ne sont pas affichés ici."
   },
   "chat": {
     "title": "Conversation",
@@ -1872,7 +1870,8 @@
     "rename": "Renommer",
     "rename_save": "Enregistrer",
     "rename_cancel": "Annuler",
-    "title_label": "Titre du chat"
+    "title_label": "Titre du chat",
+    "writing": "Une réponse est en cours de rédaction"
   },
   "mcp": {
     "servers_title": "Serveurs MCP",
@@ -2211,7 +2210,9 @@
       "token_tooltip": "Créer un jeton d'inscription à usage unique pour cette machine",
       "token_title": "Jeton d'inscription",
       "deployment_progress": "Progression du déploiement",
-      "container_logs": "Journaux du conteneur"
+      "container_logs": "Journaux du conteneur",
+      "deployments": "Déploiements sur cette machine",
+      "no_deployments": "Aucun déploiement n'est sur un cluster qui comprend cette machine."
     },
     "fleet": {
       "checking_resources": "Recherche des ressources associées…",
@@ -2222,7 +2223,9 @@
       "provider_count_other": "{{count}} fournisseurs",
       "cascade": "Supprimer aussi les fournisseurs et runtimes qu'elle héberge",
       "keep_runtimes": "Les runtimes sont détachés de cette machine mais conservés."
-    }
+    },
+    "agent_update": "Agent {{version}} disponible",
+    "agent_update_hint": "Mettez-le à jour dans une fenêtre de maintenance : exécutez à nouveau la ligne d'installation de ce serveur sur la machine (Nœuds → Ajouter une machine). Les agents ne se mettent jamais à jour d'eux-mêmes."
   },
   "node_profiles": {
     "page_title": "Profils de machine",
@@ -2635,6 +2638,48 @@
       "restart_warning": "Le cluster redémarre sur chaque machine : ses modèles s'arrêtent, se rechargent et répondent de nouveau une fois chargés — quelques minutes pour un grand modèle.",
       "restart_confirm": "Redémarrer le cluster",
       "update_agents": "Le chiffrement entre les machines exige l'agent 0.1.18 ou plus récent sur chaque machine. Mettez à jour {{hosts}} en relançant la ligne d'installation sur place."
+    },
+    "model_downloads": {
+      "title": "D'où les machines obtiennent les modèles",
+      "switch_label": "Les machines téléchargent elles-mêmes les modèles",
+      "on_chip": "Depuis Hugging Face",
+      "off_chip": "Depuis ce serveur",
+      "on_detail": "Chaque machine télécharge un modèle depuis Hugging Face dans son propre stockage de modèles, avec le jeton Hugging Face de ce serveur pour un modèle à accès restreint. Le serveur ne le télécharge ni ne le copie.",
+      "off_detail": "Ce serveur télécharge un modèle et chaque machine le copie depuis le serveur. Cela fonctionne sans internet sur les machines ; avec une liaison lente du serveur, un grand modèle prend ce temps deux fois.",
+      "checking": "Les machines sont interrogées : atteignent-elles Hugging Face…",
+      "check_again": "Vérifier à nouveau",
+      "reaches": "Atteint Hugging Face",
+      "cannot_switch_on": "Pour l'activer, chaque machine doit atteindre Hugging Face :",
+      "problem": {
+        "no_internet": "{{host}} : n'atteint pas Hugging Face",
+        "store_not_writable": "{{host}} : l'agent ne peut pas écrire dans son stockage de modèles",
+        "old_agent": "{{host}} : agent trop ancien, mettez-le à jour en 0.2.2 ou plus récent",
+        "offline": "{{host}} : hors ligne",
+        "no_answer": "{{host}} : n'a pas répondu"
+      },
+      "applies_next": "S'applique au prochain modèle placé sur le cluster ; les modèles déjà sur les machines restent."
+    },
+    "applies_on_start": "S'applique au démarrage du cluster",
+    "runtime": {
+      "title": "Environnement d'exécution",
+      "detail": "L'image qu'exécutent les machines, avec Ray et vLLM. Elle ne change que lorsque vous la changez ici.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Certifié",
+        "partial": "Certifié en partie",
+        "failed": "Certification échouée",
+        "uncertified": "Non certifié"
+      },
+      "preview": "Aperçu",
+      "recommended": "Recommandé",
+      "applying": "Redémarrage sur le nouvel environnement",
+      "update": "Un environnement certifié plus récent est disponible (vLLM {{vllm}}). Le cluster garde le sien jusqu'à ce que vous le changiez.",
+      "choose": "Passer à",
+      "switch": "Changer",
+      "restart_warning": "Passer à vLLM {{vllm}} redémarre le cluster : le conteneur de chaque machine est recréé depuis la nouvelle image et chaque modèle se recharge. Une machine qui n'a pas encore l'image la récupère d'abord.",
+      "preview_hint": "Un aperçu a réussi sa certification et exécute des modèles que l'environnement recommandé ne peut pas, mais il est récent : choisissez-le pour un cluster qui a besoin de ces modèles.",
+      "restart_confirm": "Redémarrer sur cet environnement"
     }
   },
   "inference": {
@@ -2705,11 +2750,6 @@
       "col_ready": "Prêtes",
       "col_pending": "En attente",
       "logs": "Journaux",
-      "log_source": "Source",
-      "log_runtime": "Conteneur du runtime",
-      "log_replica": "Copie en service",
-      "log_machine": "Machine",
-      "log_head": "Nœud principal du cluster",
       "log_tail": "Lignes",
       "fetch": "Récupérer",
       "truncated_one": "Tronqué à la dernière {{count}} ligne.",
@@ -2742,7 +2782,22 @@
       "traffic_window_one": "Mesuré à la passerelle, dernière minute",
       "traffic_window_other": "Mesuré à la passerelle, {{count}} dernières minutes",
       "engine_reported": "Remonté par le moteur",
-      "page_title": "Déploiement"
+      "page_title": "Déploiement",
+      "reply_wait": "Une réponse doit commencer sous",
+      "reply_wait_value": "{{seconds}} s",
+      "reply_wait_default": "la valeur par défaut de la passerelle (180 s)",
+      "reply_wait_title": "Délai avant le début d'une réponse",
+      "reply_wait_label": "Secondes",
+      "reply_wait_placeholder": "Vide : la valeur par défaut de la passerelle",
+      "reply_wait_help": "Un modèle occupé garde les nouvelles requêtes dans sa file jusqu'à avoir de la place, sans rien envoyer entre-temps. Passé ce délai, la requête échoue et la personne peut la relancer. De 10 à 1800 secondes ; vide utilise la valeur par défaut de la passerelle (180 s). Le modèle continue de tourner pendant le changement.",
+      "reply_wait_invalid": "Saisissez de 10 à 1800 secondes, ou laissez vide.",
+      "reply_wait_failed": "Impossible de modifier le délai avant le début d'une réponse.",
+      "share_label": "Accélérateurs par copie",
+      "share_help": "1 est un accélérateur entier. Moins permet aux copies d'en partager un ; plus de 0,5 garde chaque copie sur son propre accélérateur. Le moteur prend la même part de sa mémoire (un entier : 0,8).",
+      "share_invalid": "Saisissez de 0,05 à 1.",
+      "share_memory": "Le moteur prend {{percent}} % de la mémoire de chaque accélérateur.",
+      "share_restarts": "Changer la part redémarre toutes les copies. Le modèle est indisponible jusqu'à leur retour.",
+      "show_in_logs": "Afficher les erreurs"
     },
     "engine": {
       "title": "Réglages du moteur",
@@ -2750,7 +2805,8 @@
       "defaults": "Valeurs par défaut de vLLM : rien de modifié.",
       "dialog_title": "Réglages du moteur de {{name}}",
       "restart_warning": "L'enregistrement redémarre chaque copie avec les nouveaux réglages. Le modèle est indisponible jusqu'à leur retour. Si une copie ne démarre pas, cette page indique pourquoi et vous pouvez revenir aux réglages précédents.",
-      "save_restart": "Enregistrer et redémarrer"
+      "save_restart": "Enregistrer et redémarrer",
+      "memory_capped": "gpu_memory_utilization {{asked}} dépasse la part d'accélérateur de ce déploiement ({{share}}) : le moteur prend {{share}}. Augmentez la part sous Mise à l'échelle, la mémoire suit."
     }
   },
   "audit": {
@@ -2887,8 +2943,11 @@
       "unknown_tool_parser": "Ce moteur ne connaît pas le format d'outils « {{value}} ».",
       "unknown_reasoning_parser": "Ce moteur ne connaît pas le format de réflexion « {{value}} ».",
       "remote_code": "Le code du modèle s'exécutera sur vos machines. Ne l'activez que pour des éditeurs de confiance.",
-      "extra_invalid": "Ces options ne sont pas acceptées et ne seront pas utilisées : {{tokens}}"
-    }
+      "extra_invalid": "Ces options ne sont pas acceptées et ne seront pas utilisées : {{tokens}}",
+      "json_invalid": "JSON non valide, la copie ne démarrera pas : {{flags}}"
+    },
+    "json_syntax": "JSON non valide.",
+    "json_object": "Il faut un objet JSON, par exemple {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Accès à Hugging Face",
@@ -2974,7 +3033,11 @@
     "creating": "Création du déploiement…",
     "host": "Héberger",
     "revision_label": "Révision (facultatif)",
-    "revision_help": "Une branche, un tag ou un commit sur Hugging Face. Laissez vide pour la plus récente."
+    "revision_help": "Une branche, un tag ou un commit sur Hugging Face. Laissez vide pour la plus récente.",
+    "cannot_run": "Ne peut pas tourner ici",
+    "may_not_run": "Pourrait ne pas tourner",
+    "compat_model_type": "L'environnement d'exécution de ce cluster ne peut pas le charger : ni Transformers {{transformers}} ni vLLM {{vllm}} ne connaissent le type de modèle « {{type}} » (le modèle a été enregistré avec Transformers {{saved}}). Il faut une image d'exécution plus récente ; rien n'est téléchargé.",
+    "compat_architecture": "vLLM {{vllm}} dans l'environnement d'exécution de ce cluster n'a pas d'implémentation de {{architecture}}. Il ne peut qu'essayer son backend Transformers générique, qui ne prend pas en charge tous les modèles."
   },
   "marketplace": {
     "title": "Catalogue de modèles",
@@ -3491,6 +3554,27 @@
         "rejected": "Refusé",
         "expired": "Expiré"
       }
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Erreurs",
+      "warning": "Avertissements",
+      "info": "Info",
+      "debug": "Débogage",
+      "other": "Autres"
+    },
+    "search": "Rechercher dans les lignes",
+    "follow": "Suivre les nouvelles lignes",
+    "copy": "Copier les lignes affichées",
+    "download": "Télécharger les lignes affichées",
+    "empty": "Aucune ligne de journal pour l’instant.",
+    "nothing_matches": "Aucune ligne ne correspond aux filtres.",
+    "source": {
+      "replica": "Service du modèle",
+      "engine": "Moteur (vLLM)",
+      "agent": "Journal système",
+      "container": "Conteneurs de modèles"
     }
   }
 }

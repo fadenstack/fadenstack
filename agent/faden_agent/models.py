@@ -53,6 +53,9 @@ class NodeCommandType(enum.StrEnum):
     ENSURE_RUNTIME_IMAGE = "ensure_runtime_image"
     SERVE_RUNTIME_IMAGE = "serve_runtime_image"
 
+    # --- Can this machine download models itself? ---
+    CHECK_INTERNET = "check_internet"
+
 
 class CommandResult(TypedDict, total=False):
     """Normalized command result sent over stream."""

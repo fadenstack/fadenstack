@@ -727,3 +727,86 @@ async def test_deployment_offline_only_blocks_on_unmapped_mount(
     assert dep.phase == DeploymentPhase.FAILED.value
     assert "mount" in (dep.phase_message or "").lower()
 
+
+
+async def _deployment_whose_copies_failed(dbsession: AsyncSession, model_status: ModelStatus) -> tuple[Any, Any, Any]:
+    """The release VM on 2026-09-28: both machines failed on a copy of a model the server was still downloading."""
+    cp = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:8]}", driver="ray")
+    dbsession.add(cp)
+    await dbsession.flush()
+    node = InfraNode(
+        agent_id=f"head-{uuid.uuid4().hex[:8]}", host="10.250.10.71", status="healthy",
+        capabilities_json=dict(DGX_SPARK_PLATFORM),
+    )
+    dbsession.add(node)
+    await dbsession.flush()
+    env = InferenceEnvironment(
+        control_plane_id=cp.id, name=f"env-{uuid.uuid4().hex[:8]}", head_node_id=node.id,
+        status=EnvironmentStatus.READY.value, config_json={"runtime_bundle_id": "bundle-dgx-spark-gb10-v1"},
+    )
+    dbsession.add(env)
+    await dbsession.flush()
+    dbsession.add(InferenceEnvironmentNode(environment_id=env.id, node_id=node.id, role="head"))
+    model = LLMModel(
+        display_name="Qwen3.8-Flash-Next-NVFP4", source=ModelSource.HUGGINGFACE, status=model_status,
+        hf_repo_id=f"nvidia/Qwen3.8-Flash-Next-NVFP4-{uuid.uuid4().hex[:6]}", hf_revision="main",
+    )
+    dbsession.add(model)
+    await dbsession.flush()
+    dep = InferenceDeployment(
+        environment_id=env.id, model_id=model.id, name=f"dep-{uuid.uuid4().hex[:8]}",
+        spec_json=_spec(), phase=DeploymentPhase.PENDING.value,
+    )
+    dbsession.add(dep)
+    dbsession.add(ModelAvailability(
+        model_id=model.id, node_id=node.id, status=ModelAvailabilityStatus.FAILED.value,
+        status_message="HTTP error downloading blob 3218ddc1: peer closed connection",
+    ))
+    await dbsession.commit()
+    return dep, model, node
+
+
+@pytest.mark.anyio
+async def test_failed_copies_of_a_model_still_downloading_wait_for_it(dbsession: AsyncSession) -> None:
+    """Not "failed": the copies were of the half that had arrived, and the rest is on its way."""
+    from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus  # noqa: PLC0415
+
+    dep, model, _node = await _deployment_whose_copies_failed(dbsession, ModelStatus.DOWNLOADING)
+    dbsession.add(DownloadJob(model_id=model.id, status=DownloadJobStatus.RUNNING, progress=41))
+    await dbsession.commit()
+
+    fake_control = _FakeNodeControlService()
+    await RayDeploymentManager().reconcile_deployment(dbsession, dep, node_control=fake_control)
+
+    assert dep.phase == DeploymentPhase.PREPARING.value
+    assert "Downloading" in (dep.phase_message or "") and "41%" in (dep.phase_message or "")
+    assert not any(c["command_type"] == NodeCommandType.SYNC_MODEL.value for c in fake_control.issued)
+    assert not any(c["command_type"] == NodeCommandType.RUN_SERVE_APP.value for c in fake_control.issued)
+
+
+@pytest.mark.anyio
+async def test_failed_copies_of_an_interrupted_download_resume_it(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from faden_backend.db.dao.llm_dao import INTERRUPTED  # noqa: PLC0415
+    from faden_backend.db.models.llm import DownloadJob, DownloadJobStatus  # noqa: PLC0415
+    from faden_backend.services.llm import tasks as llm_tasks  # noqa: PLC0415
+
+    sent: list[dict] = []
+
+    async def kiq(**kwargs: Any) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr(llm_tasks.download_model_task, "kiq", kiq)
+    dep, model, _node = await _deployment_whose_copies_failed(dbsession, ModelStatus.FAILED)
+    job = DownloadJob(model_id=model.id, status=DownloadJobStatus.FAILED, error_code=INTERRUPTED, progress=41)
+    dbsession.add(job)
+    await dbsession.commit()
+
+    fake_control = _FakeNodeControlService()
+    await RayDeploymentManager().reconcile_deployment(dbsession, dep, node_control=fake_control)
+
+    assert dep.phase == DeploymentPhase.PREPARING.value
+    assert "Resuming" in (dep.phase_message or "")
+    assert [s["job_id"] for s in sent] == [str(job.id)]
+    assert not any(c["command_type"] == NodeCommandType.SYNC_MODEL.value for c in fake_control.issued)

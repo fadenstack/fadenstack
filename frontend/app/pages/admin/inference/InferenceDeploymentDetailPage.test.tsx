@@ -215,6 +215,81 @@ describe("InferenceDeploymentDetailPage", () => {
     });
   });
 
+  it("changes the accelerators per copy with the copies, and says that restarts them", async () => {
+    // The 27B on the DGX pair needed one copy per machine (a share over 0.5) and
+    // more memory, which the share caps; neither could be set here (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    const share = await screen.findByLabelText("Accelerators per copy");
+    expect(share).toHaveValue(1);
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("80 %");
+    expect(screen.queryByTestId("scale-restarts")).not.toBeInTheDocument();
+
+    fireEvent.change(share, { target: { value: "1.5" } });
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    fireEvent.change(share, { target: { value: "0.75" } });
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("75 %");
+    expect(screen.getByTestId("scale-restarts")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec).toEqual({
+      ...deployment.spec,
+      scale: { replicas: 2 },
+      resources: { replica: { gpus: 0.75 } },
+      // The memory comes along in the same save: one restart, not two.
+      engine: { name: "vllm", config: { gpu_memory_utilization: 0.75 } },
+    });
+  });
+
+  it("replaces a memory set for the old share, which would cap the new one", async () => {
+    // On .61 the 27B went from 0.35 to 0.7 of an accelerator and kept its
+    // gpu_memory_utilization of 0.4: the engine went on taking 40 % (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      spec: {
+        ...deployment.spec,
+        engine: { name: "vllm", config: { gpu_memory_utilization: 0.4, max_num_seqs: 128 } },
+        resources: { replica: { gpus: 0.35 } },
+      },
+    });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    const share = await screen.findByLabelText("Accelerators per copy");
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("35 %");
+    fireEvent.change(share, { target: { value: "1" } });
+    expect(screen.getByTestId("scale-memory")).toHaveTextContent("80 %");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec?.engine).toEqual({ name: "vllm", config: { gpu_memory_utilization: 0.8, max_num_seqs: 128 } });
+    expect(payload.spec?.resources).toEqual({ replica: { gpus: 1 } });
+  });
+
+  it("offers no share for a copy spread over several accelerators", async () => {
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      spec: { ...deployment.spec, topology: { tensor_parallel_size: 2 }, resources: { replica: { gpus: 2 } } },
+    });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /Scale/ }));
+    await screen.findByLabelText("Copies");
+    expect(screen.queryByLabelText("Accelerators per copy")).not.toBeInTheDocument();
+  });
+
   it("offers the deployment in chat by setting the alias, and nothing else", async () => {
     const update = vi
       .spyOn(inferenceApi, "updateDeployment")
@@ -234,6 +309,31 @@ describe("InferenceDeploymentDetailPage", () => {
     expect(payload.spec).toEqual({
       ...deployment.spec,
       service: { ...(deployment.spec.service as object), alias: "qwen3-8b" },
+    });
+  });
+
+  it("sets how long a reply may take to start, in the spec's service and nothing else", async () => {
+    // A busy 27B on the DGX pair held requests longer than the gateway's 60 s (2026-10-01).
+    const update = vi
+      .spyOn(inferenceApi, "updateDeployment")
+      .mockResolvedValue(deployment);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(deployment);
+    await renderDetail();
+
+    expect(screen.getByTestId("reply-wait")).toHaveTextContent("the gateway's default (180 s)");
+    await userEvent.click(screen.getByTestId("reply-wait-change"));
+    const field = await screen.findByLabelText("Seconds");
+    await userEvent.type(field, "5");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.clear(field);
+    await userEvent.type(field, "300");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const [, payload] = update.mock.calls[0];
+    expect(payload.spec).toEqual({
+      ...deployment.spec,
+      service: { ...(deployment.spec.service as object), first_token_timeout_sec: 300 },
     });
   });
 
@@ -315,5 +415,40 @@ describe("InferenceDeploymentDetailPage", () => {
         desired_state: "stopped",
       }),
     );
+  });
+
+  it("reads the whole deployment -- Serve and the engine -- as one log", async () => {
+    await renderDetail();
+    await waitFor(() =>
+      expect(inferenceApi.deploymentLogs).toHaveBeenCalledWith(DEPLOYMENT_ID, { source: "all", tail: 500 }),
+    );
+  });
+
+  it("says why a start failed at the top, and takes the reader to the errors", async () => {
+    const cause = "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)";
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
+      ...deployment,
+      phase: "failed",
+      phase_message: `Start failed: ${cause}. Not tried again: this error comes back on every attempt.`,
+    });
+    vi.spyOn(inferenceApi, "deploymentLogs").mockResolvedValue({
+      ...logPage,
+      source: "all",
+      lines: [
+        { ts: "2026-09-30T06:44:00Z", level: "INFO", message: "Started LLMDeployment:qwen", source: "replica" },
+        { ts: "2026-09-30T06:44:12Z", level: null, message: `(EngineCore pid=1) ${cause}`, source: "engine" },
+      ],
+    });
+    // jsdom has no layout, so no scrollIntoView.
+    Element.prototype.scrollIntoView = vi.fn();
+    await renderDetail();
+
+    const banner = await screen.findByTestId("start-failure");
+    expect(banner).toHaveTextContent("Not tried again");
+    await screen.findByText("Started LLMDeployment:qwen");
+
+    await userEvent.click(within(banner).getByRole("button", { name: "Show the errors" }));
+    expect(screen.queryByText("Started LLMDeployment:qwen")).not.toBeInTheDocument();
+    expect(screen.getByText(/\(EngineCore pid=1\) ValueError/)).toBeInTheDocument();
   });
 });

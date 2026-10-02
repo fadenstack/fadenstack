@@ -143,6 +143,18 @@ export function acceleratorsPerCopy(deployment: { spec?: Record<string, unknown>
   return typeof gpus === "number" ? gpus : 1;
 }
 
+/** The engine memory share (gpu_memory_utilization) the compiler gives a whole accelerator when none is set. */
+export const COMPILER_DEFAULT_MEMORY = 0.8;
+
+/**
+ * The gpu_memory_utilization that goes with *share* of an accelerator: the
+ * share itself, which the compiler never lets the engine exceed, or its
+ * default for a whole accelerator.
+ */
+export function memoryForShare(share: number): number {
+  return share < 1 ? share : COMPILER_DEFAULT_MEMORY;
+}
+
 export interface PartialsNoticeProps {
   partials: MetricsPartial[];
   title?: string;

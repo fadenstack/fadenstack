@@ -176,6 +176,8 @@ async def test_coordinator_ensure_issues_commands() -> None:
         patch("faden_backend.services.inference.artifacts.build_model_sync_payload", return_value=fake_payload),
         # No download of it under way on this server (the session is a mock).
         patch("faden_backend.services.inference.server_copy.download_under_way", AsyncMock(return_value=None)),
+        # ... and the copy it has is complete.
+        patch("faden_backend.services.inference.server_copy.incomplete_server_copy", AsyncMock(return_value=None)),
     ):
         res = await coordinator.ensure(model=model, environment=env, gateway=gateway_mock)
 

@@ -97,6 +97,24 @@ def _fernet_for(purpose: str) -> Fernet | None:
     return Fernet(base64.urlsafe_b64encode(raw))
 
 
+def seal(purpose: str, data: bytes) -> bytes | None:
+    """*data* encrypted with *purpose*'s key, or ``None`` while encryption is off.
+
+    For chat text kept outside the database -- a reply's events in Redis --
+    so it is no plainer there than in the columns.
+    """
+    f = _fernet_for(purpose)
+    return None if f is None else f.encrypt(data)
+
+
+def unseal(purpose: str, token: bytes) -> bytes:
+    """What :func:`seal` encrypted. Raises ``InvalidToken`` for another key, or with encryption off."""
+    f = _fernet_for(purpose)
+    if f is None:
+        raise InvalidToken
+    return f.decrypt(token)
+
+
 def _is_ciphertext(value: str) -> bool:
     """Heuristic: does *value* look like a Fernet token?"""
     try:

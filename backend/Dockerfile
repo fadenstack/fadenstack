@@ -11,8 +11,8 @@ COPY . .
 # The runtime manifests pin the images clusters run. The runtime image's
 # build writes them beside this directory (../runtime-image), so
 # they come in as a named build context -- compose's additional_contexts,
-# CI's build-contexts. Without them the backend did not start: "runtime
-# manifest 'runtime-manifest.json' not found".
+# CI's build-contexts. Every runtime-manifest*.json is one runtime the
+# backend can hand out; without them no machine can run a cluster.
 COPY --from=runtime_manifests runtime-manifest*.json runtime-image/
 
 RUN --mount=type=cache,target=/root/.cache/uv \

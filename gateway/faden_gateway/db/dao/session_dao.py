@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import Depends
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -247,7 +248,7 @@ class SessionDAO:
         token_estimate: int | None = None,
         trace_id: str | None = None,
         tool_call_json: dict | None = None,
-        status: str = "ok",
+        status: str = "complete",
         decision_id: uuid.UUID | None = None,
         content_hmac: str | None = None,
     ) -> ChatMessage:
@@ -358,6 +359,47 @@ class SessionDAO:
             ),
         )
         return list(result.scalars().all())
+
+    async def running_turn_sessions(
+        self, *, tenant_id: str, user_id: str, alive_since: datetime,
+    ) -> list[uuid.UUID]:
+        """The user's chats with a reply being written: one per reply alive since *alive_since*."""
+        result = await self.session.execute(
+            select(ChatMessage.session_id)
+            .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+            .where(
+                ChatSession.tenant_id == tenant_id,
+                ChatSession.user_id == user_id,
+                ChatMessage.status == "running",
+                ChatMessage.updated_at > alive_since,
+            ),
+        )
+        return [row[0] for row in result.all()]
+
+    async def last_reply(self, *, session_id: uuid.UUID) -> ChatMessage | None:
+        """The chat's latest reply (its turn), if it has one."""
+        result = await self.session.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session_id, ChatMessage.role == "assistant")
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1),
+        )
+        return result.scalar_one_or_none()
+
+    async def interrupt_stale_turns(self, *, stale_before: datetime, error: str) -> int:
+        """End the replies left running by a gateway that went away: heartbeat before *stale_before*."""
+        result = await self.session.execute(
+            update(ChatMessage)
+            .where(ChatMessage.status == "running", ChatMessage.updated_at < stale_before)
+            .values(status="interrupted", error=error, updated_at=func.now()),
+        )
+        return result.rowcount or 0
+
+    async def delete_message(self, *, message_id: uuid.UUID) -> bool:
+        """Delete one message: a reply that is replaced by trying again."""
+        result = await self.session.execute(delete(ChatMessage).where(ChatMessage.id == message_id))
+        await self.session.flush()
+        return (result.rowcount or 0) > 0
 
     async def count_messages(self, *, session_id: uuid.UUID) -> int:
         result = await self.session.execute(

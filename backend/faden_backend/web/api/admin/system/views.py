@@ -1081,12 +1081,25 @@ async def system_node_stream(websocket: WebSocket) -> None:
         # Don't overwrite node.host on connect; wait for the first
         # heartbeat which carries advertise_host from the agent.
         stream_session = await service.create_stream_session(node=node, credential=credential)
+        # What the agent says it is still running: the rest of what it had
+        # accepted died with its last connection -- which this process may
+        # never have seen close, if it is a new one after a restart.
+        report = service.commands_reported(websocket.headers)
+        replay: list[Any] = []
+        if report is not None:
+            running, finished = report
+            replay = await service.settle_commands_on_connect(node_id=_node_id, running=running, finished=finished)
         # Reconnect is the safe moment to re-send in-flight commands that
         # went past their timeout without a result (agent WS died mid-deploy,
         # result frame lost).  Done at hello_ack only — NOT on the per-message
         # path — so a long-running transfer is never re-sent every heartbeat
         # while the agent is still legitimately executing it.
         commands = await service.list_dispatchable_commands(node_id=_node_id)
+        # Finished while the agent was away: sent again for the stored result.
+        queued = {item["id"] for item in commands}
+        for command in replay:
+            if str(command.id) not in queued:
+                commands.append(service.serialize_command(command) | {"redispatch": True})
         profile_payload = await service.get_node_profile(node_id=_node_id)
         await websocket.send_json(
             {

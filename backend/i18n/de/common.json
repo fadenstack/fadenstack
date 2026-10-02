@@ -1655,7 +1655,6 @@
     "sessions_title": "Chat-Sitzungen",
     "attachments_title": "Chat-Anhänge",
     "col_name": "Name",
-    "col_title": "Titel",
     "col_user": "Benutzer",
     "col_tenant": "Mandant",
     "col_model": "Modell",
@@ -1667,7 +1666,6 @@
     "col_type": "Inhaltstyp",
     "col_extraction": "Extraktion",
     "col_scope": "Bereich",
-    "untitled_session": "(ohne Titel)",
     "search_projects": "Projekte suchen…",
     "search_sessions": "Sitzungen suchen…",
     "search_attachments": "Anhänge suchen…",
@@ -1690,8 +1688,8 @@
     "extraction_skipped": "übersprungen",
     "scope_session": "Sitzung",
     "scope_project": "Projekt",
-    "title_encrypted": "Verschlüsselt",
-    "title_encrypted_hint": "Chat-Titel sind wie die Nachrichten verschlüsselt; nur die Person, die sie geschrieben hat, sieht sie."
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Titel und Nachrichten gehören der Person, die ihn führt, und werden hier nicht gezeigt."
   },
   "mcp": {
     "servers_title": "MCP-Server",
@@ -2030,7 +2028,9 @@
       "token_tooltip": "Einmal-Registrierungstoken für diese Maschine erstellen",
       "token_title": "Registrierungstoken",
       "deployment_progress": "Bereitstellungsfortschritt",
-      "container_logs": "Container-Protokolle"
+      "container_logs": "Container-Protokolle",
+      "deployments": "Bereitstellungen auf dieser Maschine",
+      "no_deployments": "Keine Bereitstellung läuft auf einem Cluster mit dieser Maschine."
     },
     "fleet": {
       "checking_resources": "Zugehörige Ressourcen werden geprüft…",
@@ -2041,7 +2041,9 @@
       "provider_count_other": "{{count}} Anbieter",
       "cascade": "Auch die Anbieter und Runtimes darauf löschen",
       "keep_runtimes": "Die Runtimes werden von dieser Maschine gelöst, bleiben aber erhalten."
-    }
+    },
+    "agent_update": "Agent {{version}} verfügbar",
+    "agent_update_hint": "Aktualisieren Sie ihn in einem Wartungsfenster: Führen Sie die Installationszeile dieses Servers auf der Maschine erneut aus (Knoten → Maschine hinzufügen). Agenten aktualisieren sich nie von selbst."
   },
   "rag_lite": {
     "documents_title": "RAG-Dokumente",
@@ -2181,7 +2183,8 @@
     "rename": "Umbenennen",
     "rename_save": "Speichern",
     "rename_cancel": "Abbrechen",
-    "title_label": "Chat-Titel"
+    "title_label": "Chat-Titel",
+    "writing": "Eine Antwort wird geschrieben"
   },
   "module_recommend": {
     "apply": "Übernehmen",
@@ -2635,6 +2638,48 @@
       "restart_warning": "Der Cluster startet auf jeder Maschine neu: Seine Modelle halten an, laden neu und antworten wieder, sobald sie geladen sind — Minuten bei einem großen Modell.",
       "restart_confirm": "Cluster neu starten",
       "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.18 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
+    },
+    "model_downloads": {
+      "title": "Woher die Maschinen Modelle bekommen",
+      "switch_label": "Maschinen laden Modelle selbst herunter",
+      "on_chip": "Von Hugging Face",
+      "off_chip": "Von diesem Server",
+      "on_detail": "Jede Maschine lädt ein Modell von Hugging Face in ihren eigenen Modellspeicher, für ein zugangsbeschränktes Modell mit dem Hugging-Face-Token dieses Servers. Der Server lädt es weder herunter noch kopiert er es.",
+      "off_detail": "Dieser Server lädt ein Modell herunter, und jede Maschine kopiert es vom Server. Das funktioniert ohne Internet auf den Maschinen; über eine langsame Leitung des Servers dauert ein großes Modell dann zweimal so lange.",
+      "checking": "Die Maschinen werden gefragt, ob sie Hugging Face erreichen…",
+      "check_again": "Erneut prüfen",
+      "reaches": "Erreicht Hugging Face",
+      "cannot_switch_on": "Zum Einschalten muss jede Maschine Hugging Face erreichen:",
+      "problem": {
+        "no_internet": "{{host}}: erreicht Hugging Face nicht",
+        "store_not_writable": "{{host}}: der Agent kann nicht in seinen Modellspeicher schreiben",
+        "old_agent": "{{host}}: Agent zu alt, auf 0.2.2 oder neuer aktualisieren",
+        "offline": "{{host}}: offline",
+        "no_answer": "{{host}}: hat nicht geantwortet"
+      },
+      "applies_next": "Gilt für das nächste Modell, das auf den Cluster kommt; Modelle, die schon auf den Maschinen liegen, bleiben."
+    },
+    "applies_on_start": "Gilt, sobald der Cluster startet",
+    "runtime": {
+      "title": "Laufzeit",
+      "detail": "Das Image, das die Maschinen ausführen, mit Ray und vLLM. Es ändert sich nur, wenn Sie hier umschalten.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Zertifiziert",
+        "partial": "Teilweise zertifiziert",
+        "failed": "Zertifizierung fehlgeschlagen",
+        "uncertified": "Nicht zertifiziert"
+      },
+      "preview": "Vorschau",
+      "recommended": "Empfohlen",
+      "applying": "Startet mit der neuen Laufzeit neu",
+      "update": "Eine neuere zertifizierte Laufzeit ist verfügbar (vLLM {{vllm}}). Der Cluster behält seine Laufzeit, bis Sie umschalten.",
+      "choose": "Umschalten auf",
+      "switch": "Umschalten",
+      "restart_warning": "Das Umschalten auf vLLM {{vllm}} startet den Cluster neu: Der Container jeder Maschine wird aus dem neuen Image neu erstellt, und jedes Modell darauf lädt erneut. Eine Maschine, die das Image noch nicht hat, holt es zuerst.",
+      "preview_hint": "Eine Vorschau hat ihre Zertifizierung bestanden und führt Modelle aus, die die empfohlene Laufzeit nicht kann, ist aber neu: Wählen Sie sie für einen Cluster, der diese Modelle braucht.",
+      "restart_confirm": "Mit dieser Laufzeit neu starten"
     }
   },
   "inference": {
@@ -2705,11 +2750,6 @@
       "col_ready": "Bereit",
       "col_pending": "Ausstehend",
       "logs": "Protokolle",
-      "log_source": "Quelle",
-      "log_runtime": "Runtime-Container",
-      "log_replica": "Bereitstellungskopie",
-      "log_machine": "Maschine",
-      "log_head": "Kopfknoten des Clusters",
       "log_tail": "Zeilen",
       "fetch": "Abrufen",
       "truncated_one": "Auf die letzte {{count}} Zeile gekürzt.",
@@ -2742,7 +2782,22 @@
       "traffic_window_one": "Am Gateway gemessen, letzte Minute",
       "traffic_window_other": "Am Gateway gemessen, letzte {{count}} Minuten",
       "engine_reported": "Von der Engine gemeldet",
-      "page_title": "Bereitstellung"
+      "page_title": "Bereitstellung",
+      "reply_wait": "Eine Antwort muss beginnen innerhalb von",
+      "reply_wait_value": "{{seconds}} s",
+      "reply_wait_default": "Standard des Gateways (180 s)",
+      "reply_wait_title": "Wie lange der Beginn einer Antwort dauern darf",
+      "reply_wait_label": "Sekunden",
+      "reply_wait_placeholder": "Leer: Standard des Gateways",
+      "reply_wait_help": "Ein ausgelastetes Modell hält neue Anfragen in seiner Warteschlange, bis Platz frei ist, und sendet so lange nichts. Nach dieser Zeit schlägt die Anfrage fehl und kann erneut versucht werden. 10 bis 1800 Sekunden; leer verwendet den Standard des Gateways (180 s). Das Modell läuft während der Änderung weiter.",
+      "reply_wait_invalid": "10 bis 1800 Sekunden eingeben oder leer lassen.",
+      "reply_wait_failed": "Die Wartezeit auf den Beginn einer Antwort konnte nicht geändert werden.",
+      "share_label": "Beschleuniger pro Kopie",
+      "share_help": "1 ist ein ganzer Beschleuniger. Weniger lässt Kopien sich einen teilen; mehr als 0,5 hält jede Kopie auf einem eigenen. Die Engine belegt denselben Anteil seines Speichers (bei einem ganzen: 0,8).",
+      "share_invalid": "0,05 bis 1 eingeben.",
+      "share_memory": "Die Engine belegt {{percent}} % des Speichers jedes Beschleunigers.",
+      "share_restarts": "Eine Änderung des Anteils startet alle Kopien neu. Das Modell ist nicht erreichbar, bis sie wieder laufen.",
+      "show_in_logs": "Fehler anzeigen"
     },
     "engine": {
       "title": "Engine-Einstellungen",
@@ -2750,7 +2805,8 @@
       "defaults": "vLLM-Standardwerte: nichts geändert.",
       "dialog_title": "Engine-Einstellungen für {{name}}",
       "restart_warning": "Beim Speichern startet jede Kopie mit den neuen Einstellungen neu. Das Modell ist nicht erreichbar, bis sie wieder laufen. Startet eine Kopie nicht, zeigt diese Seite den Grund, und Sie können die Einstellungen zurücksetzen.",
-      "save_restart": "Speichern und neu starten"
+      "save_restart": "Speichern und neu starten",
+      "memory_capped": "gpu_memory_utilization {{asked}} ist mehr als der Anteil dieses Deployments an einem Beschleuniger ({{share}}): Die Engine belegt {{share}}. Den Anteil unter Skalieren erhöhen, der Speicher geht mit."
     }
   },
   "audit": {
@@ -2887,8 +2943,11 @@
       "unknown_tool_parser": "Diese Engine kennt das Tool-Format \"{{value}}\" nicht.",
       "unknown_reasoning_parser": "Diese Engine kennt das Denkformat \"{{value}}\" nicht.",
       "remote_code": "Der eigene Code des Modells läuft auf Ihren Maschinen. Nur für vertrauenswürdige Herausgeber aktiviert lassen.",
-      "extra_invalid": "Diese Flags werden nicht akzeptiert und nicht verwendet: {{tokens}}"
-    }
+      "extra_invalid": "Diese Flags werden nicht akzeptiert und nicht verwendet: {{tokens}}",
+      "json_invalid": "Kein gültiges JSON, die Kopie startet so nicht: {{flags}}"
+    },
+    "json_syntax": "Kein gültiges JSON.",
+    "json_object": "Braucht ein JSON-Objekt, etwa {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Hugging-Face-Zugang",
@@ -2974,7 +3033,11 @@
     "creating": "Bereitstellung wird erstellt…",
     "host": "Bereitstellen",
     "revision_label": "Revision (optional)",
-    "revision_help": "Ein Branch, Tag oder Commit auf Hugging Face. Leer lassen für den neuesten Stand."
+    "revision_help": "Ein Branch, Tag oder Commit auf Hugging Face. Leer lassen für den neuesten Stand.",
+    "cannot_run": "Läuft hier nicht",
+    "may_not_run": "Läuft vielleicht nicht",
+    "compat_model_type": "Die Laufzeit dieses Clusters kann es nicht laden: Weder Transformers {{transformers}} noch vLLM {{vllm}} darin kennt den Modelltyp „{{type}}“ (das Modell wurde mit Transformers {{saved}} gespeichert). Es braucht ein neueres Laufzeit-Image; es wird nichts heruntergeladen.",
+    "compat_architecture": "vLLM {{vllm}} in der Laufzeit dieses Clusters hat keine Implementierung von {{architecture}}. Es kann nur sein allgemeines Transformers-Backend versuchen, das nicht jedes Modell unterstützt."
   },
   "marketplace": {
     "title": "Modell-Marktplatz",
@@ -3491,6 +3554,27 @@
         "rejected": "Abgelehnt",
         "expired": "Abgelaufen"
       }
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Fehler",
+      "warning": "Warnungen",
+      "info": "Info",
+      "debug": "Debug",
+      "other": "Sonstige"
+    },
+    "search": "Zeilen durchsuchen",
+    "follow": "Neuen Zeilen folgen",
+    "copy": "Angezeigte Zeilen kopieren",
+    "download": "Angezeigte Zeilen herunterladen",
+    "empty": "Noch keine Logzeilen.",
+    "nothing_matches": "Keine Zeile passt zu den Filtern.",
+    "source": {
+      "replica": "Modellbereitstellung",
+      "engine": "Engine (vLLM)",
+      "agent": "Systemprotokoll",
+      "container": "Modell-Container"
     }
   }
 }

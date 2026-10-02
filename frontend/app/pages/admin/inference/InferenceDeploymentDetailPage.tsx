@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router";
+import { Link as RouterLink, useNavigate, useParams } from "react-router";
 
 import { inferenceApi } from "~/api/inference";
 import type { RuntimeMonitoring, StatKey } from "~/api/llm";
@@ -32,11 +32,11 @@ import type {
   InferenceEndpoint,
   InferenceEnvironment,
   LogPage,
-  LogSource,
 } from "~/api/inference";
 import { models as modelsApi, type Model } from "~/api/llm";
 import { nodesApi, type ManagedNode } from "~/api/nodes";
 import { FormDialog } from "~/components/FormDialog";
+import LogViewer, { LOG_LEVELS, type LogLevel } from "~/components/logs/LogViewer";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -47,7 +47,7 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
-import MenuItem from "@mui/material/MenuItem";
+import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -74,6 +74,7 @@ import {
   JsonBlock,
   LabeledValue,
   PartialsNotice,
+  COMPILER_DEFAULT_MEMORY,
   acceleratorsPerCopy,
   asRecord,
   asText,
@@ -82,6 +83,7 @@ import {
   endpointStatusColor,
   environmentStatusColor,
   formatTimestamp,
+  memoryForShare,
   reconcileSummary,
   shortId,
 } from "./common";
@@ -484,14 +486,18 @@ export default function InferenceDeploymentDetailPage() {
   const [scaleOpen, setScaleOpen] = useState(false);
   const [scaling, setScaling] = useState(false);
   const [replicaInput, setReplicaInput] = useState(1);
+  const [shareInput, setShareInput] = useState("1");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [waitOpen, setWaitOpen] = useState(false);
+  const [waitSaving, setWaitSaving] = useState(false);
+  const [waitInput, setWaitInput] = useState("");
 
   // --- Logs ---------------------------------------------------------------
-  const [logSource, setLogSource] = useState<LogSource>("runtime_container");
-  const [logNodeId, setLogNodeId] = useState("");
-  const [logTail, setLogTail] = useState(200);
+  const [logTail, setLogTail] = useState(500);
+  const [logLevels, setLogLevels] = useState<LogLevel[]>(LOG_LEVELS);
+  const logsCard = useRef<HTMLDivElement | null>(null);
   const [logPage, setLogPage] = useState<LogPage | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
@@ -500,6 +506,12 @@ export default function InferenceDeploymentDetailPage() {
   const observed = asRecord(deployment?.observed_status);
   const observation = asRecord(observed.observation);
   const chatAlias = asText(asRecord(deployment?.spec?.service).alias) || null;
+  // How long a request may wait for its reply to start; unset is the gateway's default.
+  const setWait = asRecord(deployment?.spec?.service).first_token_timeout_sec;
+  const replyWait = typeof setWait === "number" ? setWait : null;
+  const waitTyped = waitInput.trim();
+  const waitValid =
+    waitTyped === "" || (/^\d+$/.test(waitTyped) && Number(waitTyped) >= 10 && Number(waitTyped) <= 1800);
 
   // The operator's name for the machine, not the address it answers on --
   // same rule as the cluster screens, so the two never disagree.
@@ -514,17 +526,14 @@ export default function InferenceDeploymentDetailPage() {
     [data.nodes],
   );
 
+  // All of the deployment -- Serve and the engine, on every machine -- in
+  // one stream; which part to read is a filter in the viewer, not a query.
   const loadLogs = useCallback(async () => {
     if (!id) return;
     setLogLoading(true);
     setLogError(null);
     try {
-      const page = await inferenceApi.deploymentLogs(id, {
-        source: logSource,
-        node_id: logNodeId || undefined,
-        tail: logTail,
-      });
-      setLogPage(page);
+      setLogPage(await inferenceApi.deploymentLogs(id, { source: "all", tail: logTail }));
     } catch (err: unknown) {
       // A driver that cannot serve logs answers 501; say so rather than
       // showing an empty log view that reads as "nothing happened".
@@ -533,43 +542,28 @@ export default function InferenceDeploymentDetailPage() {
     } finally {
       setLogLoading(false);
     }
-  }, [id, logSource, logNodeId, logTail]);
+  }, [id, logTail]);
 
   useEffect(() => {
     void loadLogs();
   }, [loadLogs]);
 
-  /**
-   * Make "the next refresh should show it" true.
-   *
-   * A cold read has nothing cached, so the backend starts a fetch on the node
-   * and answers with whatever it has -- which on the first load is nothing,
-   * plus a note saying the fetch is still running. The page then never asked
-   * again, so that note was the final state: an operator opening a deployment
-   * saw "the node has not answered within 30s" and sat there.
-   *
-   * So when a page comes back empty *and* still in flight, try again a few
-   * times. Bounded, and only for that case: a genuinely empty log is not a
-   * reason to keep polling a node.
-   */
-  const emptyAndPending =
-    logPage !== null && logPage.lines.length === 0 && Boolean(logPage.detail);
-  const [logRetries, setLogRetries] = useState(0);
-
+  // A deployment that is starting is watched as it starts.
+  const starting = ["pending", "preparing", "applying"].includes(deployment?.phase ?? "");
   useEffect(() => {
-    // Reset the budget whenever the operator changes what they are asking for.
-    setLogRetries(0);
-  }, [id, logSource, logNodeId, logTail]);
+    if (!starting) return;
+    const timer = window.setInterval(() => void loadLogs(), 5_000);
+    return () => window.clearInterval(timer);
+  }, [starting, loadLogs]);
 
-  useEffect(() => {
-    if (!emptyAndPending || logLoading || logRetries >= 4) return;
-    const timer = setTimeout(() => {
-      setLogRetries((n) => n + 1);
-      void loadLogs();
-    }, 3_000);
-    return () => clearTimeout(timer);
-  }, [emptyAndPending, logLoading, logRetries, loadLogs]);
-
+  // A failed start, or one Ray is trying again: said at the top, with the way to its lines.
+  const failureReason = asText(observation.reason);
+  const startFailure =
+    deployment?.phase === "failed" || failureReason === "start-retrying" ? deployment?.phase_message : null;
+  function showErrorsInLogs() {
+    setLogLevels(["error"]);
+    logsCard.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function runAction(key: string, action: () => Promise<unknown>) {
     setBusy(key);
@@ -584,12 +578,36 @@ export default function InferenceDeploymentDetailPage() {
   }
 
   const perCopy = deployment ? acceleratorsPerCopy(deployment) : 1;
+  // A copy on one device may take a share of it; one spread over several
+  // (tensor or pipeline parallel) takes exactly those, as the compiler requires.
+  const topology = asRecord(deployment?.spec?.topology);
+  const devicesPerCopy =
+    (Number(topology.tensor_parallel_size) || 1) * (Number(topology.pipeline_parallel_size) || 1);
+  const shareEditable = devicesPerCopy === 1;
+  const shareTyped = Number(shareInput);
+  const shareValid =
+    !shareEditable || (shareInput.trim() !== "" && shareTyped >= 0.05 && shareTyped <= 1);
+  const shareChanged = shareEditable && shareValid && shareTyped !== perCopy;
+  const planShare = shareChanged ? shareTyped : perCopy;
+  // What the engine will take of each accelerator's memory. A new share sets
+  // it (memoryForShare), in the same save; otherwise it is the engine's
+  // gpu_memory_utilization, which a share below 1 caps (compiler.py), or 0.80.
+  const askedMemory = Number(asRecord(asRecord(deployment?.spec?.engine).config).gpu_memory_utilization);
+  const memoryShare = shareChanged
+    ? memoryForShare(shareTyped)
+    : planShare < 1
+      ? askedMemory > 0
+        ? Math.min(askedMemory, planShare)
+        : planShare
+      : askedMemory > 0
+        ? askedMemory
+        : COMPILER_DEFAULT_MEMORY;
   const clusterAccelerators = data.members.reduce((sum, member) => {
     const node = data.nodes.find((n) => n.id === member.node_id);
     return sum + (node ? gpuCount(node) : 0);
   }, 0);
   const copiesThatFit =
-    clusterAccelerators > 0 && perCopy > 0 ? Math.floor(clusterAccelerators / perCopy) : null;
+    clusterAccelerators > 0 && planShare > 0 ? Math.floor(clusterAccelerators / planShare) : null;
 
   async function handleScale() {
     if (!deployment) return;
@@ -597,9 +615,22 @@ export default function InferenceDeploymentDetailPage() {
     try {
       // Replace the whole spec: v1alpha1 is not partially patchable, and the
       // scale block is mutually exclusive between fixed and autoscaled.
+      // A new share brings the engine's memory along: the memory left as it
+      // was for the old share went on capping the new one (.61, 2026-10-01).
+      const resources = asRecord(deployment.spec.resources);
+      const engine = asRecord(deployment.spec.engine);
       const spec = {
         ...deployment.spec,
         scale: { replicas: replicaInput },
+        ...(shareChanged
+          ? {
+              resources: { ...resources, replica: { ...asRecord(resources.replica), gpus: shareTyped } },
+              engine: {
+                ...engine,
+                config: { ...asRecord(engine.config), gpu_memory_utilization: memoryForShare(shareTyped) },
+              },
+            }
+          : {}),
       };
       await inferenceApi.updateDeployment(deployment.id, { spec });
       // Act now, not at the reconciler's next tick.
@@ -635,6 +666,29 @@ export default function InferenceDeploymentDetailPage() {
       setError(err instanceof Error ? err.message : t("inference.detail.chat_failed"));
     } finally {
       setChatSaving(false);
+    }
+  }
+
+  async function handleReplyWait() {
+    if (!deployment || !waitValid) return;
+    setWaitSaving(true);
+    try {
+      // Like the alias: the gateway reads it, the engine does not, so the
+      // copies keep running and the next pass only republishes.
+      const current = asRecord(deployment.spec.service);
+      const { first_token_timeout_sec: _previous, ...service } = current;
+      const spec = {
+        ...deployment.spec,
+        service: waitTyped ? { ...service, first_token_timeout_sec: Number(waitTyped) } : service,
+      };
+      await inferenceApi.updateDeployment(deployment.id, { spec });
+      await inferenceApi.reconcileDeployment(deployment.id).catch(() => undefined);
+      setWaitOpen(false);
+      await refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("inference.detail.reply_wait_failed"));
+    } finally {
+      setWaitSaving(false);
     }
   }
 
@@ -690,6 +744,7 @@ export default function InferenceDeploymentDetailPage() {
           startIcon={<TuneIcon />}
           onClick={() => {
             setReplicaInput(copiesWanted(deployment));
+            setShareInput(String(acceleratorsPerCopy(deployment)));
             setScaleOpen(true);
           }}
         >
@@ -741,6 +796,21 @@ export default function InferenceDeploymentDetailPage() {
           </Button>
         )}
       </Stack>
+
+      {/* --- why it did not start --------------------------------------- */}
+      {startFailure && (
+        <Alert
+          severity={deployment.phase === "failed" ? "error" : "warning"}
+          data-testid="start-failure"
+          action={
+            <Button color="inherit" size="small" onClick={showErrorsInLogs}>
+              {t("inference.detail.show_in_logs")}
+            </Button>
+          }
+        >
+          {startFailure}
+        </Alert>
+      )}
 
       {/* --- 1, 2, 3, 9: health, replicas, environment, reconcile -------- */}
       <Card variant="outlined">
@@ -848,6 +918,28 @@ export default function InferenceDeploymentDetailPage() {
                 </Button>
               </Stack>
             </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                {t("inference.detail.reply_wait")}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="body2" data-testid="reply-wait">
+                  {replyWait !== null
+                    ? t("inference.detail.reply_wait_value", { seconds: replyWait })
+                    : t("inference.detail.reply_wait_default")}
+                </Typography>
+                <Button
+                  size="small"
+                  data-testid="reply-wait-change"
+                  onClick={() => {
+                    setWaitInput(replyWait !== null ? String(replyWait) : "");
+                    setWaitOpen(true);
+                  }}
+                >
+                  {t("inference.detail.change")}
+                </Button>
+              </Stack>
+            </Grid>
           </Grid>
         </CardContent>
       </Card>
@@ -884,7 +976,9 @@ export default function InferenceDeploymentDetailPage() {
                   <TableRow key={member.node_id}>
                     <TableCell>
                       <Tooltip title={member.node_id}>
-                        <span>{nodeHost(member.node_id)}</span>
+                        <Link component={RouterLink} to={`/admin/nodes/${member.node_id}`} underline="hover">
+                          {nodeHost(member.node_id)}
+                        </Link>
                       </Tooltip>
                     </TableCell>
                     <TableCell>
@@ -970,7 +1064,11 @@ export default function InferenceDeploymentDetailPage() {
                 <TableBody>
                   {artifactRows.map((row) => (
                     <TableRow key={row.nodeId}>
-                      <TableCell>{nodeHost(row.nodeId)}</TableCell>
+                      <TableCell>
+                        <Link component={RouterLink} to={`/admin/nodes/${row.nodeId}`} underline="hover">
+                          {nodeHost(row.nodeId)}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         <Chip
                           size="small"
@@ -1147,113 +1245,44 @@ export default function InferenceDeploymentDetailPage() {
       </Card>
 
       {/* --- 7: logs ------------------------------------------------------ */}
-      <Card variant="outlined">
+      <Card variant="outlined" ref={logsCard}>
         <CardContent>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ mb: 1 }}
-          >
-            <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-              {t("inference.detail.logs")}
-            </Typography>
-            <TextField
-              select
-              size="small"
-              label={t("inference.detail.log_source")}
-              value={logSource}
-              sx={{ minWidth: 180 }}
-              onChange={(e) => setLogSource(e.target.value as LogSource)}
-            >
-              <MenuItem value="runtime_container">{t("inference.detail.log_runtime")}</MenuItem>
-              <MenuItem value="serve_replica">{t("inference.detail.log_replica")}</MenuItem>
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label={t("inference.detail.log_machine")}
-              value={logNodeId}
-              sx={{ minWidth: 180 }}
-              onChange={(e) => setLogNodeId(e.target.value)}
-            >
-              <MenuItem value="">{t("inference.detail.log_head")}</MenuItem>
-              {data.members.map((member) => (
-                <MenuItem key={member.node_id} value={member.node_id}>
-                  {nodeHost(member.node_id)} ({roleLabel(member.role)})
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              size="small"
-              type="number"
-              label={t("inference.detail.log_tail")}
-              value={logTail}
-              sx={{ width: 110 }}
-              slotProps={{ htmlInput: { min: 1, max: 5000 } }}
-              onChange={(e) =>
-                setLogTail(
-                  Math.max(1, Math.min(5000, Number(e.target.value) || 200)),
-                )
-              }
-            />
-            <Button
-              size="small"
-              startIcon={<RefreshIcon />}
-              disabled={logLoading}
-              onClick={() => void loadLogs()}
-            >
-              {t("inference.detail.fetch")}
-            </Button>
-          </Stack>
-
-          {logError && <Alert severity="warning">{logError}</Alert>}
-
-          {logLoading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : logPage && logPage.lines.length > 0 ? (
-            <>
-              {logPage.truncated && (
-                <Typography variant="caption" color="text.secondary">
-                  {t("inference.detail.truncated", { count: logTail })}
-                </Typography>
-              )}
-              <Box
-                component="pre"
-                sx={{
-                  mt: 1,
-                  p: 1.5,
-                  maxHeight: 420,
-                  overflow: "auto",
-                  bgcolor: "action.hover",
-                  borderRadius: 1,
-                  fontFamily: "monospace",
-                  fontSize: 12,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {logPage.lines
-                  .map((line) =>
-                    [
-                      line.ts ? new Date(line.ts).toISOString() : "",
-                      line.level ?? "",
-                      line.message,
-                    ]
-                      .filter(Boolean)
-                      .join("  "),
-                  )
-                  .join("\n")}
-              </Box>
-            </>
-          ) : (
-            // An empty page carries its own reason, so "nothing logged" and
-            // "the node never answered" never look the same.
-            <Typography variant="body2" color="text.secondary">
-              {logPage?.detail ?? t("inference.detail.no_log_lines")}
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            {t("inference.detail.logs")}
+          </Typography>
+          {logError && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              {logError}
+            </Alert>
+          )}
+          <LogViewer
+            lines={logPage?.lines ?? []}
+            loading={logLoading}
+            empty={logPage?.detail ?? t("inference.detail.no_log_lines")}
+            hostLabel={(host) => nodeLabel(data.nodes.find((n) => n.host === host), host)}
+            levels={logLevels}
+            onLevelsChange={setLogLevels}
+            downloadName={`${deployment.name}.log`}
+            toolbar={
+              <>
+                <TextField
+                  size="small"
+                  type="number"
+                  label={t("inference.detail.log_tail")}
+                  value={logTail}
+                  sx={{ width: 100 }}
+                  slotProps={{ htmlInput: { min: 1, max: 5000 } }}
+                  onChange={(e) => setLogTail(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
+                />
+                <Button size="small" startIcon={<RefreshIcon />} disabled={logLoading} onClick={() => void loadLogs()}>
+                  {t("inference.detail.fetch")}
+                </Button>
+              </>
+            }
+          />
+          {logPage?.truncated && (
+            <Typography variant="caption" color="text.secondary">
+              {t("inference.detail.truncated", { count: logTail })}
             </Typography>
           )}
         </CardContent>
@@ -1298,10 +1327,38 @@ export default function InferenceDeploymentDetailPage() {
       </FormDialog>
 
       <FormDialog
+        open={waitOpen}
+        title={t("inference.detail.reply_wait_title")}
+        loading={waitSaving}
+        submitLabel={t("common.save")}
+        submitDisabled={!waitValid}
+        onSubmit={() => void handleReplyWait()}
+        onClose={() => setWaitOpen(false)}
+      >
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            label={t("inference.detail.reply_wait_label")}
+            value={waitInput}
+            autoFocus
+            fullWidth
+            placeholder={t("inference.detail.reply_wait_placeholder")}
+            error={!waitValid}
+            helperText={!waitValid ? t("inference.detail.reply_wait_invalid") : undefined}
+            slotProps={{ htmlInput: { inputMode: "numeric" } }}
+            onChange={(e) => setWaitInput(e.target.value)}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {t("inference.detail.reply_wait_help")}
+          </Typography>
+        </Stack>
+      </FormDialog>
+
+      <FormDialog
         open={scaleOpen}
         title={t("inference.detail.scale")}
         loading={scaling}
         submitLabel={t("inference.detail.apply")}
+        submitDisabled={!shareValid}
         onSubmit={() => void handleScale()}
         onClose={() => setScaleOpen(false)}
       >
@@ -1316,10 +1373,31 @@ export default function InferenceDeploymentDetailPage() {
               setReplicaInput(Math.max(1, Number(e.target.value) || 1))
             }
           />
+          {shareEditable && (
+            <TextField
+              label={t("inference.detail.share_label")}
+              type="number"
+              value={shareInput}
+              error={!shareValid}
+              slotProps={{ htmlInput: { min: 0.05, max: 1, step: 0.05 } }}
+              helperText={!shareValid ? t("inference.detail.share_invalid") : t("inference.detail.share_help")}
+              onChange={(e) => setShareInput(e.target.value)}
+            />
+          )}
+          {shareValid && (
+            <Typography variant="body2" color="text.secondary" data-testid="scale-memory">
+              {t("inference.detail.share_memory", { percent: Math.round(memoryShare * 100) })}
+            </Typography>
+          )}
+          {shareChanged && (
+            <Alert severity="info" data-testid="scale-restarts">
+              {t("inference.detail.share_restarts")}
+            </Alert>
+          )}
           {copiesThatFit !== null && (
             <Typography variant="body2" color="text.secondary" data-testid="scale-capacity">
               {t("inference.detail.scale_capacity", {
-                perCopy: t("inference.detail.accelerators", { count: perCopy }),
+                perCopy: t("inference.detail.accelerators", { count: planShare }),
                 total: clusterAccelerators,
                 fit: t("inference.detail.copies_fit", { count: copiesThatFit }),
               })}

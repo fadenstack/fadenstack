@@ -36,7 +36,31 @@ interface Catalog {
   flags: FlagDef[];
 }
 
-export const CATALOG = catalogJson as Catalog;
+/**
+ * vLLM's help marks the settings that take JSON ("Should either be a valid
+ * JSON string or JSON keys passed individually"); its catalog types most of
+ * them "string". They are JSON here, so the editor checks them: a cluster
+ * hands them to vLLM as objects, and text that is not JSON never starts.
+ */
+const JSON_HELP = /valid JSON string or JSON keys passed individually/;
+
+export const CATALOG: Catalog = {
+  ...(catalogJson as Catalog),
+  flags: (catalogJson as Catalog).flags.map((f) =>
+    f.type === "string" && JSON_HELP.test(f.help ?? "") ? { ...f, type: "json" as const } : f,
+  ),
+};
+
+/** Why *value* is not usable for a JSON setting, or null when it is (empty is unset). */
+export function jsonProblem(value: EngineValue | undefined): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed !== null && typeof parsed === "object" ? null : "object";
+  } catch {
+    return "syntax";
+  }
+}
 
 const BY_KEY = new Map(CATALOG.flags.map((f) => [f.key, f]));
 const BY_FLAG = new Map(CATALOG.flags.map((f) => [f.flag, f]));
@@ -269,7 +293,8 @@ export type EngineWarning =
   | { code: "unknown_tool_parser"; value: string }
   | { code: "unknown_reasoning_parser"; value: string }
   | { code: "remote_code" }
-  | { code: "extra_invalid"; tokens: string[] };
+  | { code: "extra_invalid"; tokens: string[] }
+  | { code: "json_invalid"; flags: string[] };
 
 export function checkSettings(
   config: EngineConfig,
@@ -300,6 +325,11 @@ export function checkSettings(
   if (config.trust_remote_code === true) warnings.push({ code: "remote_code" });
   const { issues } = parseExtraFlags(extra);
   if (issues.length) warnings.push({ code: "extra_invalid", tokens: issues });
+  // A cluster refuses to start a copy whose JSON setting does not parse.
+  const badJson = Object.entries(config)
+    .filter(([key, value]) => flagDef(key)?.type === "json" && jsonProblem(value) !== null)
+    .map(([key]) => `--${toFlag(key)}`);
+  if (badJson.length) warnings.push({ code: "json_invalid", flags: badJson });
   return warnings;
 }
 

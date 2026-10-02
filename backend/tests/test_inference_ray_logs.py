@@ -1,235 +1,203 @@
-"""Unit tests for Ray log normalization (Phase 6, WI-2).
+"""A Ray deployment's log page is one Loki query, and the choice on the page is the query.
 
-The boundary these defend: whatever a container runtime emits, the driver must
-hand back :class:`LogPage`. The interesting cases are the ones that do not
-parse -- a line an operator needs is often exactly the one with no timestamp.
+The page used to read Loki first -- ignoring which source and machine it
+asked for -- and fall back to a command that had a machine tail its files.
+The engine's own output, where a failed start's root cause is, was read by
+neither.
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from faden_backend.services.inference.drivers.ray import logs
 from faden_backend.services.inference.drivers.ray.logs import (
     RayLogReader,
-    _result_text,
-    normalize_log_text,
-    parse_log_line,
+    _lines_from_loki,
+    engine_root_cause,
+    log_selector,
 )
 from faden_backend.services.inference.observability import LogSource
 
-
-def test_parses_iso_timestamp_and_level() -> None:
-    line = parse_log_line("2026-09-20T17:26:29.252000Z  WARNING  worker restarting")
-    assert line.level == "WARNING"
-    assert line.message == "worker restarting"
-    assert line.ts is not None
-    assert line.ts.year == 2026
+APP = "faden-534e4266-257f-407d-b5b7-b4bb19fad198"
+HOSTS = ["10.250.10.49", "10.250.10.71"]
 
 
-def test_parses_bracketed_form() -> None:
-    line = parse_log_line("[2026-09-20 17:26:29] [INFO] replica ready")
-    assert line.level == "INFO"
-    assert line.message == "replica ready"
-    assert line.ts is not None
-
-
-def test_parses_level_first_form() -> None:
-    line = parse_log_line("ERROR 2026-09-20T17:26:29 engine failed to load")
-    assert line.level == "ERROR"
-    assert line.message == "engine failed to load"
-
-
-def test_unparseable_line_keeps_its_full_text() -> None:
-    """A traceback line has no timestamp; dropping it would hide the failure."""
-    raw = "  File \"/opt/vllm/engine.py\", line 42, in load"
-    line = parse_log_line(raw)
-    assert line.ts is None
-    assert line.level is None
-    assert line.message == raw
-
-
-def test_capitalised_first_word_is_not_treated_as_a_level() -> None:
-    """``CUDA`` is not a log level; the line must survive intact."""
-    line = parse_log_line("CUDA 2026-09-20T17:26:29 out of memory")
-    assert line.level is None
-    assert "CUDA" in line.message
-
-
-def test_normalize_drops_blank_lines_and_marks_truncation() -> None:
-    text = "\n".join(["line-1", "", "line-2", "   ", "line-3"])
-    page = normalize_log_text(text, source=LogSource.RUNTIME_CONTAINER, tail=2)
-    assert [entry.message for entry in page.lines] == ["line-2", "line-3"]
-    assert page.truncated is True
-
-
-def test_normalize_without_tail_is_not_truncated() -> None:
-    page = normalize_log_text("a\nb", source=LogSource.SERVE_REPLICA)
-    assert page.truncated is False
-    assert len(page.lines) == 2
+# ── the selector ───────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
-    "result,expected",
+    ("source", "hosts", "expected"),
     [
-        ({"logs": "from-logs"}, "from-logs"),
-        ({"output": "from-output"}, "from-output"),
-        ({"stdout": ["a", "b"]}, "a\nb"),
-        ({"error": "boom"}, ""),
+        (LogSource.SERVE_REPLICA, HOSTS,
+         '{job="ray-serve", app="%s", source!="engine", host=~"10\\\\.250\\\\.10\\\\.49|10\\\\.250\\\\.10\\\\.71"}' % APP),
+        (LogSource.ENGINE, ["10.250.10.71"], '{job="ray-serve", app="%s", source="engine", host="10.250.10.71"}' % APP),
+        (LogSource.AGENT, ["10.250.10.49"], '{job="node-agent", host="10.250.10.49"}'),
     ],
+    ids=["replicas-on-every-machine", "engine-on-one", "agent-of-one"],
 )
-def test_result_text_accepts_the_agent_s_key_variants(
-    result: dict[str, Any], expected: str
+def test_the_source_and_machine_chosen_are_the_query(source: LogSource, hosts: list[str], expected: str) -> None:
+    assert log_selector(source, app_name=APP, hosts=hosts) == expected
+
+
+def test_a_replica_narrows_the_replica_page() -> None:
+    assert 'replica="wib8cvxx"' in log_selector(LogSource.SERVE_REPLICA, app_name=APP, hosts=[], replica_id="wib8cvxx")
+
+
+# ── reading ─────────────────────────────────────────────────────────────────
+
+
+def _loki(*streams: tuple[dict[str, str], list[tuple[int, str]]]) -> dict[str, Any]:
+    return {"data": {"result": [
+        {"stream": labels, "values": [[str(ts), line] for ts, line in values]} for labels, values in streams
+    ]}}
+
+
+def test_lines_carry_their_machine_and_read_oldest_first() -> None:
+    lines = _lines_from_loki(_loki(
+        ({"host": "10.250.10.71", "level": "error"}, [(2_000, "(EngineCore pid=1) ValueError: no")]),
+        ({"host": "10.250.10.49", "level": "info"}, [(1_000, '{"levelname": "INFO", "message": "Started"}')]),
+    ))
+    assert [(line.host, line.level, line.message) for line in lines] == [
+        ("10.250.10.49", "INFO", "Started"),
+        ("10.250.10.71", "ERROR", "(EngineCore pid=1) ValueError: no"),
+    ]
+
+
+@pytest.mark.anyio()
+async def test_a_page_says_when_loki_cannot_be_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def down(*_: Any, **__: Any) -> dict[str, Any]:
+        raise RuntimeError("Loki connection failed")
+
+    monkeypatch.setattr(logs, "_query", down)
+    page = await RayLogReader().read(SimpleNamespace(id=uuid.uuid4()), source=LogSource.ENGINE, app_name=APP, hosts=HOSTS)
+    assert page.lines == [] and "Loki could not be asked" in (page.detail or "")
+
+
+@pytest.mark.anyio()
+async def test_the_old_source_name_reads_the_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[str] = []
+
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        asked.append(selector)
+        return _loki()
+
+    monkeypatch.setattr(logs, "_query", query)
+    page = await RayLogReader().read(
+        SimpleNamespace(id=uuid.uuid4()), source=LogSource.RUNTIME_CONTAINER, app_name=APP, hosts=HOSTS, tail=10,
+    )
+    assert page.source == LogSource.SERVE_REPLICA and 'source!="engine"' in asked[0]
+    assert page.detail == "nothing logged here in the last 24 hours"
+
+
+# ── the root cause of a failed start ───────────────────────────────────────
+
+
+def _failed_start(*lines: tuple[int, str]) -> dict[str, Any]:
+    return _loki(({"host": "10.250.10.71", "source": "engine"}, list(lines)))
+
+
+NOW_NS = int(datetime.now(tz=UTC).timestamp() * 1_000_000_000)
+
+
+@pytest.mark.anyio()
+async def test_the_root_cause_is_the_engine_s_last_exception_not_serve_s_summary(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert _result_text(result) == expected
-
-
-class _FakeGateway:
-    """Records issued commands and returns a canned terminal result."""
-
-    def __init__(self, result: dict[str, Any] | None, *, fail: bool = False) -> None:
-        self.result = result
-        self.fail = fail
-        self.issued: list[dict[str, Any]] = []
-
-    async def issue(self, **kwargs: Any) -> Any:
-        if self.fail:
-            msg = "node offline"
-            raise RuntimeError(msg)
-        self.issued.append(kwargs)
-        return SimpleNamespace(id=uuid.uuid4())
-
-    async def wait(self, command_id: Any, *, budget_sec: float) -> Any:
-        if self.result is None:
-            return None
-        return SimpleNamespace(result_json=self.result)
-
-
-def _deployment() -> Any:
-    return SimpleNamespace(id=uuid.uuid4())
-
-
-@pytest.mark.anyio
-async def test_reader_normalizes_agent_output() -> None:
-    gateway = _FakeGateway({"logs": "2026-09-20T10:00:00Z INFO started\nplain line"})
-    reader = RayLogReader(gateway)
-
-    page = await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="faden-app",
-        tail=100,
-    )
-
-    assert page.source == LogSource.RUNTIME_CONTAINER
-    assert [entry.message for entry in page.lines] == ["started", "plain line"]
-    assert gateway.issued[0]["payload"]["tail"] == 100
-
-
-@pytest.mark.anyio
-async def test_reader_clamps_an_absurd_tail() -> None:
-    """Defence in depth: the route bounds ``tail``, and so does the reader."""
-    gateway = _FakeGateway({"logs": "x"})
-    reader = RayLogReader(gateway)
-
-    await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="app",
-        tail=10_000_000,
-    )
-    assert gateway.issued[0]["payload"]["tail"] == 5000
-
-
-@pytest.mark.anyio
-async def test_reader_never_replays_an_older_page() -> None:
-    """Each read gets a fresh idempotency key, or the agent would return a cached page."""
-    gateway = _FakeGateway({"logs": "x"})
-    reader = RayLogReader(gateway)
-    deployment = _deployment()
-    head = uuid.uuid4()
-
-    for _ in range(2):
-        await reader.read(
-            deployment,
-            source=LogSource.RUNTIME_CONTAINER,
-            head_node_id=head,
-            app_name="app",
+    """Qwen3.8 on vLLM 0.29, 2026-09-30: Serve only said "See root cause above"."""
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        assert 'source="engine"' in selector
+        return _failed_start(
+            (NOW_NS - 3_000, "(EngineCore pid=13728) ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start."),
+            (NOW_NS - 2_000, "(EngineCore pid=13728) ValueError: There is no module or parameter named "
+                             "'ngram_embedding.weight_scale' in Qwen4ExpNGramEmbedding"),
+            (NOW_NS - 1_000, "RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}"),
         )
 
-    keys = [issued["idempotency_key"] for issued in gateway.issued]
-    assert keys[0] != keys[1]
-
-
-@pytest.mark.anyio
-async def test_reader_targets_the_requested_node() -> None:
-    gateway = _FakeGateway({"logs": "x"})
-    reader = RayLogReader(gateway)
-    worker = uuid.uuid4()
-
-    page = await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="app",
-        node_id=str(worker),
+    monkeypatch.setattr(logs, "_query", query)
+    failure = await engine_root_cause(APP)
+    assert failure is not None and failure.cause == (
+        "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' "
+        "in Qwen4ExpNGramEmbedding (on 10.250.10.71)"
     )
-
-    assert gateway.issued[0]["node_id"] == worker
-    assert page.node_id == str(worker)
+    assert failure.start_failed and failure.recurs, "loading the same weights again fails again"
 
 
-@pytest.mark.anyio
-async def test_unreachable_node_yields_a_reason_not_an_exception() -> None:
-    """A failed log read must not fail the request; it explains itself."""
-    reader = RayLogReader(_FakeGateway(None, fail=True))
+@pytest.mark.anyio()
+async def test_a_failure_that_can_pass_is_left_to_ray_s_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Memory a stopping copy still holds is freed by the next attempt."""
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        return _failed_start(
+            (NOW_NS - 2_000, "(EngineCore pid=1) ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start."),
+            (NOW_NS - 1_000, "(EngineCore pid=1) ValueError: Free memory on device cuda:0 (1.6/121.69 GiB) on startup "
+                             "is less than desired GPU memory utilization"),
+        )
 
-    page = await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="app",
-    )
-
-    assert page.lines == []
-    assert page.detail is not None
-    assert "node offline" in page.detail
+    monkeypatch.setattr(logs, "_query", query)
+    failure = await engine_root_cause(APP)
+    assert failure is not None and failure.start_failed and not failure.recurs
 
 
-@pytest.mark.anyio
-async def test_timeout_is_reported_as_a_reason() -> None:
-    reader = RayLogReader(_FakeGateway(None))
+@pytest.mark.anyio()
+async def test_an_exception_the_engine_lived_through_is_not_a_failed_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The engine logs tracebacks it recovers from; without "failed to start" nothing is stopped."""
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        return _failed_start((NOW_NS - 1_000, "(EngineCore pid=1) ModuleNotFoundError: No module named 'hf_transfer'"))
 
-    page = await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="app",
-    )
-
-    assert page.lines == []
-    assert page.detail is not None
-    # The wording says what happens next, not just that nothing came back:
-    # the fetch is still running (they take ~35s here, dominated by how long
-    # a queued command waits to be delivered), so the next poll shows it.
-    assert "has not answered" in page.detail
-    assert "next refresh" in page.detail
+    monkeypatch.setattr(logs, "_query", query)
+    failure = await engine_root_cause(APP)
+    assert failure is not None and not failure.start_failed and not failure.recurs
 
 
-@pytest.mark.anyio
-async def test_empty_output_is_distinguished_from_a_failure() -> None:
-    reader = RayLogReader(_FakeGateway({"logs": ""}))
+@pytest.mark.anyio()
+async def test_the_cause_is_the_exception_after_the_failed_start_not_one_lived_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exception printed before "failed to start" would stop a start that can pass."""
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        return _failed_start(
+            (NOW_NS - 4_000, "(EngineCore pid=1) ModuleNotFoundError: No module named 'hf_transfer'"),
+            (NOW_NS - 3_000, "(EngineCore pid=1) ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start."),
+            (NOW_NS - 2_000, "(EngineCore pid=1) torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB"),
+            (NOW_NS - 1_000, "RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}"),
+        )
 
-    page = await reader.read(
-        _deployment(),
-        source=LogSource.RUNTIME_CONTAINER,
-        head_node_id=uuid.uuid4(),
-        app_name="app",
-    )
+    monkeypatch.setattr(logs, "_query", query)
+    failure = await engine_root_cause(APP)
+    assert failure is not None and failure.cause.startswith("torch.OutOfMemoryError: CUDA out of memory")
+    assert failure.start_failed and not failure.recurs
 
-    assert page.detail == "the node returned no log output"
+
+@pytest.mark.anyio()
+async def test_an_earlier_run_s_failure_is_not_this_one_s(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def query(selector: str, **_: Any) -> dict[str, Any]:
+        return _failed_start(
+            (NOW_NS - 10_000_000_000, "(EngineCore pid=1) EngineCore failed to start."),
+            (NOW_NS - 9_000_000_000, "(EngineCore pid=1) ValueError: from the run before"),
+        )
+
+    monkeypatch.setattr(logs, "_query", query)
+    assert await engine_root_cause(APP, after=datetime.now(tz=UTC) - timedelta(seconds=1)) is None
+
+
+def test_the_whole_deployment_is_one_stream_and_each_line_says_where_from() -> None:
+    assert log_selector(LogSource.ALL, app_name=APP, hosts=[]) == f'{{job="ray-serve", app="{APP}"}}'
+    lines = _lines_from_loki(_loki(
+        ({"host": "10.250.10.71", "source": "engine"}, [(2_000, "vLLM")]),
+        ({"host": "10.250.10.49"}, [(1_000, '{"message": "Serve, shipped before the source label"}')]),
+    ))
+    assert [(line.source, line.host) for line in lines] == [("replica", "10.250.10.49"), ("engine", "10.250.10.71")]
+
+
+@pytest.mark.anyio()
+async def test_no_cause_found_leaves_serve_s_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def down(*_: Any, **__: Any) -> dict[str, Any]:
+        raise RuntimeError("no Loki")
+
+    monkeypatch.setattr(logs, "_query", down)
+    assert await engine_root_cause(APP) is None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import logging
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from faden_agent.dispatcher import CommandDispatcher
 from faden_agent.event_buffer import EventBuffer
 from faden_agent.gpu import detect_gpu
 from faden_agent.log_collector import LogCollector
+from faden_agent.log_cursors import LogCursors
 from faden_agent.loki_client import LokiClient
 from faden_agent.ray_log_forwarder import RayServeLogForwarder
 from faden_agent.image_loader import load_image_from_backend
@@ -81,6 +83,14 @@ class NodeAgentService:
         # 2: and say in each ENSURE_RAY_RUNTIME result what the container runs
         # (1 was a lab build that did not).
         static_capabilities["ray_tls"] = 2
+        # ... and download a model from the Hub itself, and say whether it can
+        # reach it (hf_download.py): a cluster's "machines download models".
+        static_capabilities["model_download"] = 1
+        # ... and keep a command running when its connection drops, deliver its
+        # result on the next, and say on connecting what runs and what finished
+        # (stream_client.py): the server then leaves them alone when it sees a
+        # connection close, instead of failing them as lost.
+        static_capabilities["command_continuity"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")
@@ -105,6 +115,47 @@ class NodeAgentService:
                 model_sync=model_sync,
                 model_store_root=self._config.model_store_root,
                 emit_progress=emit_progress,
+            )
+
+        async def _download_model(
+            *,
+            model_sync: dict,
+            emit_progress: Callable[[dict[str, Any]], Any] | None = None,
+        ) -> dict[str, Any]:
+            """Download a model from the Hub, with the server's token for a gated one."""
+            from faden_agent import hf_download  # noqa: PLC0415
+
+            credential = self._state_store.state.credential
+            if not credential:
+                raise RuntimeError("No credential available to ask the server for its Hugging Face token.")
+            token = await hf_download.fetch_token(self._client.http, credential)
+            repo = str(model_sync.get("hf_repo_id") or "")
+            loop = asyncio.get_running_loop()
+            last = [0.0]
+
+            def _progress(done: int, total: int, _file: str) -> None:
+                # Every ten seconds is plenty: each report is a row on the server.
+                now = time.monotonic()
+                if emit_progress is None or (now - last[0] < 10.0 and done < total):
+                    return
+                last[0] = now
+                pct = round(done / total * 100, 1) if total else 0.0
+                message = (
+                    f"Downloading {repo} from Hugging Face: "
+                    f"{done / 1e9:.1f} of {total / 1e9:.1f} GB ({pct}%)"
+                )
+                asyncio.run_coroutine_threadsafe(
+                    emit_progress({"message": message, "progress_pct": pct, "bytes_done": done, "bytes_total": total}),
+                    loop,
+                )
+
+            return await asyncio.to_thread(
+                hf_download.download_model,
+                hf_repo_id=repo,
+                revision=model_sync.get("revision"),
+                cache_dir=self._config.model_store_root,
+                token=token,
+                progress=_progress,
             )
 
         async def _load_image(
@@ -186,6 +237,7 @@ class NodeAgentService:
             model_puller=_pull_model,
             image_loader=_load_image,
             model_tls=self._model_tls,
+            model_downloader=_download_model,
         )
         stream = StreamClient(
             config=self._config,
@@ -330,7 +382,6 @@ class NodeAgentService:
                 log.debug("ray manager close failed", exc_info=True)
         await self._client.close()
         if self._loki:
-            await self._loki.flush()
             await self._loki.close()
 
     def _start_log_forwarding(self, loki_url: str, runtime: Any) -> None:
@@ -361,8 +412,10 @@ class NodeAgentService:
         )
         self._loki = loki_client
         collector = LogCollector(max_lines=self._config.log_batch_size)
+        # Where each shipper has got to, kept across restarts (log_cursors).
+        cursors = LogCursors(self._config.state_path.parent / "log-cursors.json")
         self._log_tasks.append(
-            asyncio.create_task(self._log_push_loop(collector, loki_client), name="log_push"),
+            asyncio.create_task(self._log_push_loop(collector, loki_client, cursors), name="log_push"),
         )
         # Container log forwarding — tails docker logs for tracked workloads
         self._log_tasks.append(
@@ -373,6 +426,7 @@ class NodeAgentService:
                     loki=loki_client,
                     host=self._config.advertise_host,
                     interval_sec=self._config.log_flush_interval_sec,
+                    cursors=cursors,
                 ).run_forever(),
                 name="container_log_forwarder",
             ),
@@ -388,6 +442,7 @@ class NodeAgentService:
                     host=self._config.advertise_host,
                     session_dir=self._config.ray_session_dir,
                     interval_sec=self._config.log_flush_interval_sec,
+                    cursors=cursors,
                 ).run_forever(),
                 name="ray_serve_log_forwarder",
             ),
@@ -422,15 +477,22 @@ class NodeAgentService:
         self,
         collector: LogCollector,
         loki: LokiClient,
+        cursors: LogCursors,
     ) -> None:
-        """Collect system logs and push to Loki on a timer."""
+        """Collect system logs and push to Loki on a timer.
+
+        The journal position moves only once Loki took the entries; a refused
+        push reads the same entries again next time.
+        """
         interval = max(self._config.log_flush_interval_sec, 2)
+        position = cursors.get("journal")
         while True:
             try:
-                entries = await collector.collect()
-                if entries:
-                    loki.add_many(entries)
-                await loki.flush()
+                entries, proposed = await collector.collect(after=position)
+                if await loki.push(entries) and proposed and proposed != position:
+                    position = proposed
+                    cursors.set("journal", position)
+                    cursors.save()
             except Exception:
                 log.warning("Log push cycle failed.", exc_info=True)
             await asyncio.sleep(interval)

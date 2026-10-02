@@ -18,6 +18,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.node_control import InfraNode
 from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
@@ -394,6 +395,16 @@ class EnvironmentNodeDAO:
         )
         return list(result.scalars().all())
 
+    async def machines(self, environment_id: Any) -> list[InfraNode]:
+        """The machines of an environment, by host."""
+        result = await self.session.execute(
+            select(InfraNode)
+            .join(InferenceEnvironmentNode, InferenceEnvironmentNode.node_id == InfraNode.id)
+            .where(InferenceEnvironmentNode.environment_id == environment_id)
+            .order_by(InfraNode.host)
+        )
+        return list(result.scalars().all())
+
     async def list_for_node(
         self, node_id: uuid.UUID
     ) -> list[InferenceEnvironmentNode]:
@@ -483,13 +494,18 @@ class DeploymentDAO:
         *,
         environment_id: uuid.UUID | None = None,
         model_id: uuid.UUID | None = None,
+        node_id: uuid.UUID | None = None,
         phase: DeploymentPhase | None = None,
         include_deleted: bool = False,
     ) -> list[InferenceDeployment]:
-        """Return deployments, optionally filtered."""
+        """Return deployments, optionally filtered; *node_id*: those on a cluster the machine is a member of."""
         stmt = select(InferenceDeployment)
         if environment_id is not None:
             stmt = stmt.where(InferenceDeployment.environment_id == environment_id)
+        if node_id is not None:
+            stmt = stmt.where(InferenceDeployment.environment_id.in_(
+                select(InferenceEnvironmentNode.environment_id).where(InferenceEnvironmentNode.node_id == node_id)
+            ))
         if model_id is not None:
             stmt = stmt.where(InferenceDeployment.model_id == model_id)
         if phase is not None:

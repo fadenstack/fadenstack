@@ -83,8 +83,8 @@ class Summarizer:
         if previous_summary:
             parts.append(f"[Previous Summary]\n{previous_summary.summary_text}")
         for msg in new_messages:
-            # Blocked and failed turns are not summarised, as they are not sent
-            # to the model (context_assembler.in_context).
+            # Blocked, failed and unfinished turns are not summarised, as they
+            # are not sent to the model (context_assembler.in_context).
             if in_context(msg):
                 parts.append(f"{msg.role}: {msg.content}")
 

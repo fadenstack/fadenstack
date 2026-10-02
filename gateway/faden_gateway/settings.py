@@ -153,7 +153,16 @@ class Settings(BaseSettings):
 
     # LiteLLM settings
     litellm_drop_params: bool = True
+    # Also the longest silence between two events of a reply streamed straight
+    # from vLLM, once it has started.
     litellm_request_timeout: float = 60.0
+    # How long a reply streamed straight from vLLM may take to start, for a
+    # model that sets no wait of its own (its deployment's
+    # ``service.first_token_timeout_sec``). The engine sends nothing while a
+    # request waits in its queue for room in the KV cache; at 60 s, the
+    # timeout between events, a busy 27B on the DGX pair failed the replies it
+    # would have started a minute later (2026-10-01).
+    first_token_timeout_sec: float = 180.0
     litellm_verbose: bool = False
     # A streamed chat to a vLLM engine goes straight to it, its events passed
     # through, instead of through LiteLLM (see LLMAdapter._stream_direct).
@@ -201,6 +210,15 @@ class Settings(BaseSettings):
 
     # Optional module: Sessions & Memory
     sessions_enabled: bool = True
+    # A chat page's reply runs on its own (a background turn): leaving the
+    # page does not stop it. Replies one user may have written at once,
+    # across their chats (one per chat).
+    chat_turns_per_user: int = 3
+    # How often a running reply's text so far is saved: its heartbeat.
+    chat_turn_checkpoint_sec: float = 3.0
+    # A running reply whose heartbeat is older than this was left by a
+    # gateway that went away.
+    chat_turn_stale_sec: float = 30.0
     session_max_recent_messages: int = 20
     session_token_budget: int = 4096
     session_summary_threshold: int = 10

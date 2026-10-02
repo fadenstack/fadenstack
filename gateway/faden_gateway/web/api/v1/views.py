@@ -4,15 +4,18 @@ import json
 import logging
 import uuid
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
+from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnStatus
 from faden_gateway.services.gateway import faden_events, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
@@ -39,7 +42,9 @@ from faden_gateway.services.gateway.schemas import (
     SessionToolPolicyPatchDTO,
     ToolAvailabilityResponse,
 )
-from faden_gateway.services.gateway.service import GatewayService
+from faden_gateway.services.gateway.service import GatewayService, StreamingGatewayResponse
+from faden_gateway.services.gateway.stream_buffer import StreamBuffer
+from faden_gateway.services.gateway.turn_log import TurnLog
 from faden_gateway.services.registry import service_registry
 from faden_gateway.settings import settings
 
@@ -167,8 +172,17 @@ def get_gateway_service(
         usage_groups=getattr(request.app.state, "usage_group_resolver", None),
         group_memberships=getattr(request.app.state, "group_membership_resolver", None),
     )
-    service.stream_buffer = getattr(request.app.state, "stream_buffer", None)
+    service.stream_buffer = _stream_buffer(request)
     return service
+
+
+def _stream_buffer(request: Request) -> StreamBuffer:
+    """The app's one stream buffer: what a chat page's reply is read from."""
+    buffer = getattr(request.app.state, "stream_buffer", None)
+    if buffer is None:
+        log = TurnLog.of(getattr(request.app.state, "cache_backend", None))
+        buffer = request.app.state.stream_buffer = StreamBuffer(log=log)
+    return buffer
 
 
 def _shared_tool_cache(request: Request, mcp_client: MCPClient) -> MCPToolCache:
@@ -725,6 +739,9 @@ async def serve_chat_completions(
         skills = _requested_skills(payload.pop("skills", None))
         events = faden_events.wanted(request.headers.get(faden_events.HEADER))
         tool_mode = request.headers.get(tool_classes.MODE_HEADER)
+        # The chat page's replies run on their own: the page may leave and
+        # come back. Not the model's field either.
+        background = payload.pop("background", None) is True
 
         if parsed.stream:
             streamed = await service.route_stream_chat(
@@ -736,19 +753,9 @@ async def serve_chat_completions(
                 agent=agent,
                 faden_events=events,
                 tool_mode=tool_mode,
+                background=background,
             )
-            stream_response = StreamingResponse(
-                streamed.stream,
-                media_type="text/event-stream",
-            )
-            stream_response.headers["x-request-id"] = request_id
-            stream_response.headers["x-provider-instance-id"] = (
-                streamed.provider_instance_id
-            )
-            stream_response.headers["cache-control"] = "no-cache"
-            if streamed.trace_id:
-                stream_response.headers["x-langfuse-trace-id"] = streamed.trace_id
-            return stream_response
+            return _streamed_response(streamed, request_id)
 
         non_stream = await service.route_non_stream(
             auth=auth,
@@ -819,6 +826,153 @@ async def _log_refusal(
         logger.warning("Could not log the refused request", exc_info=True)
 
 
+def _streamed_response(streamed: StreamingGatewayResponse, request_id: str) -> StreamingResponse:
+    """A streamed chat completion, with the ids the client reads from its headers."""
+    response = StreamingResponse(streamed.stream, media_type="text/event-stream")
+    response.headers["x-request-id"] = request_id
+    response.headers["x-provider-instance-id"] = streamed.provider_instance_id
+    response.headers["cache-control"] = "no-cache"
+    if streamed.trace_id:
+        response.headers["x-langfuse-trace-id"] = streamed.trace_id
+    # The reply's row in the chat: what the chat page tries again or stops.
+    if streamed.turn_id:
+        response.headers["x-faden-turn-id"] = streamed.turn_id
+    return response
+
+
+# ── Turns ─────────────────────────────────────────────────────────
+
+
+@router.post("/v1/sessions/{session_id}/turns/{turn_id}/retry", response_model=None)
+async def retry_turn(
+    request: Request,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    service: GatewayService = Depends(get_gateway_service),
+) -> Response:
+    """Try the chat's last reply again, once it has failed or stopped.
+
+    The new reply replaces it and answers the same question. The body may
+    name another model (``model``; the failed reply's by default) and the
+    skills to use (``skills``). It streams as a chat completion does.
+    """
+    try:
+        dao = service.session_dao
+        sess = await dao.get_session(
+            session_id=session_id, tenant_id=auth.tenant_id, user_id=auth.user_id,
+        ) if dao is not None else None
+        if dao is None or sess is None:
+            raise GatewayError(status_code=404, message="Session not found.", code="session_not_found")
+        last = await dao.get_recent_messages(session_id=session_id, limit=2)
+        if (
+            len(last) < 2
+            or last[-1].id != turn_id
+            or last[-1].role != "assistant"
+            or last[-1].status not in TURNS_RETRYABLE
+            or last[-2].role != "user"
+        ):
+            raise GatewayError(
+                status_code=409,
+                message="Only the chat's last reply can be tried again, once it has failed or stopped.",
+                code="turn_not_retryable",
+            )
+        raw = await request.body()
+        try:
+            body = json.loads(raw) if raw else {}
+        except ValueError as exc:
+            raise GatewayError(status_code=400, message="The body is not JSON.", code="invalid_json") from exc
+        body = body if isinstance(body, dict) else {}
+        model = body.get("model") or last[-1].model_alias
+        if not model:
+            raise GatewayError(
+                status_code=400, message="Name the model to try again with.", code="model_required",
+            )
+        question = last[-2]
+        request_id = _request_id(request)
+        # The question as it was asked: the session sees it is already there,
+        # and the reply it replaces goes (``_inject_session_context``).
+        streamed = await service.route_stream_chat(
+            auth=auth,
+            payload={
+                "model": model,
+                "stream": True,
+                "messages": [{"role": "user", "content": question.content_parts_json or question.content}],
+            },
+            request_id=request_id,
+            session_id=str(session_id),
+            skills=_requested_skills(body.get("skills")),
+            background=True,
+        )
+        return _streamed_response(streamed, request_id)
+    except GatewayError as exc:
+        return error_response(
+            status_code=exc.status_code,
+            message=exc.message,
+            error_type=exc.error_type,
+            param=exc.param,
+            code=exc.code,
+        )
+
+
+@router.post("/v1/sessions/{session_id}/turns/{turn_id}/stop")
+async def stop_turn(
+    request: Request,
+    session_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
+) -> JSONResponse:
+    """Stop a reply being written in the chat, whichever worker writes it; what was written is kept.
+
+    ``stopping`` says whether the reply was running.
+    """
+    try:
+        await _require_session_owner(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    turn = await _last_turn(session_dao, session_id)
+    if turn is None or turn.id != turn_id or turn.status != TurnStatus.RUNNING.value:
+        return JSONResponse({"stopping": False})
+    stopping = await _stream_buffer(request).request_stop(str(session_id), str(turn_id))
+    return JSONResponse({"stopping": stopping})
+
+
+async def _last_turn(session_dao: SessionDAO, session_id: uuid.UUID) -> ChatMessage | None:
+    """The chat's latest reply; the request's transaction is ended after it.
+
+    A reader of a reply holds its request for as long as the reply is
+    written: left in its transaction, the session would hold a pooled
+    connection all that time.
+    """
+    turn = await session_dao.last_reply(session_id=session_id)
+    await session_dao.session.commit()
+    return turn
+
+
+def _alive(turn: ChatMessage) -> bool:
+    """Whether *turn* is being written: running, with a heartbeat that has not stopped."""
+    beat = turn.updated_at
+    if turn.status != TurnStatus.RUNNING.value or beat is None:
+        return False
+    if beat.tzinfo is None:
+        beat = beat.replace(tzinfo=timezone.utc)
+    return beat > datetime.now(timezone.utc) - timedelta(seconds=settings.chat_turn_stale_sec)
+
+
+async def _owned_session(session_id: str, auth: AuthContext, dao: GatewayDAO) -> uuid.UUID:
+    """*session_id* as a UUID, when it is the caller's chat."""
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError as exc:
+        raise GatewayError(
+            status_code=400, message="Invalid session_id format.", code="invalid_session_id",
+        ) from exc
+    await _require_session_owner(sid, auth, dao)
+    return sid
+
+
 # ── Stream reconnection ──────────────────────────────────────────
 
 @router.get("/v1/sessions/{session_id}/stream/status")
@@ -826,13 +980,18 @@ async def stream_status(
     request: Request,
     session_id: str,
     auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
 ) -> JSONResponse:
-    """Check whether a streaming response is still in progress for a session."""
-    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
-    buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
-    if buf and buf.has_buffer(session_id):
-        return JSONResponse({"active": buf.is_active(session_id)})
-    return JSONResponse({"active": False})
+    """Check whether a reply is being written in the chat, by this worker or another."""
+    try:
+        sid = await _owned_session(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    if _stream_buffer(request).is_active(session_id):
+        return JSONResponse({"active": True})
+    turn = await _last_turn(session_dao, sid)
+    return JSONResponse({"active": turn is not None and _alive(turn)})
 
 
 @router.get("/v1/sessions/{session_id}/stream")
@@ -840,24 +999,51 @@ async def stream_resume(
     request: Request,
     session_id: str,
     auth: AuthContext = Depends(get_auth_context),
+    dao: GatewayDAO = Depends(),
+    session_dao: SessionDAO = Depends(),
 ) -> Response:
-    """Reconnect to an in-progress (or recently finished) SSE stream.
+    """Reconnect to a reply being written (or recently finished), on whichever worker writes it.
 
-    Replays all buffered chunks, then tails live chunks until the
-    stream completes.  Returns 204 if no buffer exists.
+    Replays it from the start, then follows it until it ends. This worker's
+    buffer when it writes the reply; the shared log (Redis) when another
+    does. 204 when there is nothing to read.
     """
-    from faden_gateway.services.gateway.stream_buffer import StreamBuffer  # noqa: PLC0415
-    buf: StreamBuffer | None = getattr(request.app.state, "stream_buffer", None)
-    if not buf or not buf.has_buffer(session_id):
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    subscriber = await buf.subscribe(session_id)
+    try:
+        sid = await _owned_session(session_id, auth, dao)
+    except GatewayError as exc:
+        return error_response(status_code=exc.status_code, message=exc.message, code=exc.code)
+    buf = _stream_buffer(request)
+    turn = await _last_turn(session_dao, sid)
     headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-    # As on the stream it resumes: the reply's info button needs it.
-    trace_id = buf.trace_id(session_id)
-    if trace_id:
-        headers["x-langfuse-trace-id"] = trace_id
-    return StreamingResponse(subscriber, media_type="text/event-stream", headers=headers)
+
+    if buf.has_buffer(session_id) and (turn is None or buf.turn_of(session_id) in (None, str(turn.id))):
+        # As on the stream it resumes: the reply's info button needs it.
+        trace_id = buf.trace_id(session_id)
+        if trace_id:
+            headers["x-langfuse-trace-id"] = trace_id
+        return StreamingResponse(
+            await buf.subscribe(session_id), media_type="text/event-stream", headers=headers,
+        )
+
+    # Another worker writes it: its events are in the shared log, or about to be.
+    if turn is not None and buf.log is not None and (_alive(turn) or await buf.log.exists(str(turn.id))):
+        bind = session_dao.session.bind
+        turn_id = turn.id
+
+        async def still_written() -> bool:
+            async with AsyncSession(bind, expire_on_commit=False) as own:
+                row = await own.get(ChatMessage, turn_id)
+                await own.commit()
+            return row is not None and _alive(row)
+
+        if turn.trace_id:
+            headers["x-langfuse-trace-id"] = turn.trace_id
+        return StreamingResponse(
+            buf.log.read(str(turn_id), still_written=still_written),
+            media_type="text/event-stream",
+            headers=headers,
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _request_id(request: Request) -> str:

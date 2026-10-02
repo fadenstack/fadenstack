@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/vllm:26.08-py3
+FROM nvcr.io/nvidia/vllm:26.09-py3
 
 # Air-gapped runtime defaults and telemetry suppression
 ENV HF_HUB_OFFLINE=1 \
@@ -10,9 +10,28 @@ ENV HF_HUB_OFFLINE=1 \
     DO_NOT_TRACK=1
 
 # Install Ray 2.58.0, pyarrow, and dashboard/metrics agent dependencies
-# (preserving NVIDIA-optimized vLLM, PyTorch, and CUDA stack)
+# (preserving NVIDIA-optimized vLLM, PyTorch, and CUDA stack).
+#
+# Nothing NVIDIA ships may move: pip resolves our additions against the base's
+# own versions (constraints). Without them the first 26.09 build pulled
+# opentelemetry-sdk 1.45 over the base's 1.44 for the Prometheus exporter.
+# What `pip check` already says about the base is kept, so the check below
+# holds our layer to adding nothing to it.
+WORKDIR /opt/llm-port/build
+RUN pip list --format=freeze > base-packages.txt && \
+    { pip check > base-pip-check.txt 2>&1 || true; }
 RUN pip install --no-cache-dir --no-deps ray==2.58.0 pyarrow && \
-    pip install --no-cache-dir aiohttp-cors opencensus opentelemetry-exporter-prometheus
+    pip install --no-cache-dir -c base-packages.txt aiohttp-cors opencensus opentelemetry-exporter-prometheus
+RUN { pip check > pip-check.txt 2>&1 || true; } && \
+    if grep -vxFf base-pip-check.txt pip-check.txt | grep -v '^No broken requirements found'; then \
+        echo "our layer added the conflicts above"; exit 1; \
+    fi
+
+# Ray 2.58 imports two vLLM modules from where vLLM 0.29 no longer has them
+# (vllm_compat.py, temporary); then every vLLM module and name Ray Serve LLM
+# imports must resolve, or the build fails here instead of on a node.
+COPY vllm_compat.py check_ray_vllm.py /opt/llm-port/build/
+RUN python3 vllm_compat.py && python3 check_ray_vllm.py
 
 # Fail the build if the per-node metrics path cannot load.
 #

@@ -32,8 +32,9 @@ _CONNECT_TIMEOUT = 10.0
 _READ_TIMEOUT = 300.0  # 5 min for long generation
 
 #: Gateway response headers the browser needs from a streamed completion: the
-#: trace id a reply's info button opens the debug panel with.
-FORWARDED_STREAM_HEADERS = ("x-langfuse-trace-id",)
+#: trace id a reply's info button opens the debug panel with, and the reply's
+#: row in the chat (its turn), which the page tries again.
+FORWARDED_STREAM_HEADERS = ("x-langfuse-trace-id", "x-faden-turn-id")
 
 
 async def _nothing() -> None:
@@ -197,6 +198,23 @@ class GatewayChatClient:
             # the user's approval, one the chat's tool mode refused.
             extra_headers={"X-Faden-Events": "ag-ui"},
         )
+
+    async def open_stream_retry(
+        self, session_id: str, turn_id: str, body: dict[str, Any], jwt: str,
+    ) -> GatewayStream:
+        """Try a chat's last failed or stopped reply again; it streams like a completion."""
+        return await self._open_stream(
+            "POST", f"/v1/sessions/{session_id}/turns/{turn_id}/retry", jwt, json=body,
+        )
+
+    async def stop_turn(self, session_id: str, turn_id: str, jwt: str) -> Any:
+        """Stop a reply being written in a chat; what was written is kept."""
+        client = self._ensure_client()
+        resp = await client.post(
+            f"/v1/sessions/{session_id}/turns/{turn_id}/stop", headers=self._headers(jwt),
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def open_stream_resume(self, session_id: str, jwt: str) -> GatewayStream:
         """Reconnect to a session's in-progress (or just finished) stream.

@@ -1,23 +1,21 @@
 /**
  * ChatWindow — active chat session with message history + streaming.
  */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
-import ReplayIcon from "@mui/icons-material/Replay";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
-import Avatar from "@mui/material/Avatar";
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import type { InitialMessageState } from "./ChatWelcome";
 import { useChatSkills } from "../hooks/useChatSkills";
 import { useChatStream } from "../hooks/useChatStream";
+import FailedReply from "./FailedReply";
 import MessageBubble from "./MessageBubble";
 import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
@@ -30,6 +28,8 @@ interface Props {
   onModelChange: (alias: string) => void;
   onSessionCreated: (session: ChatSession) => void;
   onSessionUpdated: (session: ChatSession) => void;
+  /** Whether a reply is being written in this chat, for the sidebar. */
+  onWritingChange?: (sessionId: string, writing: boolean) => void;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   languages: UiLanguage[];
@@ -50,6 +50,7 @@ export default function ChatWindow({
   onModelChange,
   onSessionCreated,
   onSessionUpdated,
+  onWritingChange,
   onToggleSidebar,
   sidebarOpen,
   languages,
@@ -129,6 +130,28 @@ export default function ChatWindow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
+  // The sidebar marks the chat while its reply is written; it goes on when
+  // the user moves to another chat.
+  useEffect(() => {
+    if (isStreaming && sessionId) onWritingChange?.(sessionId, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming, sessionId]);
+
+  // Back to the tab, or back online: a reply that was being written is read
+  // again (a phone suspends a page and its connection).
+  useEffect(() => {
+    const catchUp = () => {
+      if (document.visibilityState !== "visible" || isStreaming) return;
+      if (messages[messages.length - 1]?.status === "running") void loadHistory();
+    };
+    document.addEventListener("visibilitychange", catchUp);
+    window.addEventListener("online", catchUp);
+    return () => {
+      document.removeEventListener("visibilitychange", catchUp);
+      window.removeEventListener("online", catchUp);
+    };
+  }, [isStreaming, messages, loadHistory]);
+
   // Auto-scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,26 +208,52 @@ export default function ChatWindow({
           )}
 
           {/* Rendered messages */}
-          {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              role={msg.role}
-              content={msg.content}
-              modelAlias={msg.model_alias}
-              usage={msg.role === "assistant" ? (msg.usage ?? null) : null}
-              replyTokens={msg.role === "assistant" ? msg.token_estimate : null}
-              responseMs={
-                msg.role === "assistant" ? getResponseMs(msg.id) : null
-              }
-              traceId={msg.trace_id}
-              canDebug={canDebug}
-              onDebugClick={setDebugTraceId}
-              reasoning={msg.role === "assistant" ? msg.reasoning : null}
-              reasoningMs={msg.role === "assistant" ? msg.reasoning_ms : null}
-              status={msg.status}
-              notice={msg.notice}
-            />
-          ))}
+          {messages.map((msg, i) => {
+            // The chat's last reply, once it failed or stopped, is tried again from here.
+            const onRetry = i === messages.length - 1 && !isStreaming ? retry : undefined;
+            const failed = msg.status === "failed" || msg.status === "interrupted";
+            const bubble = (!failed || msg.content) && (
+              <MessageBubble
+                key={msg.id}
+                role={msg.role}
+                content={msg.content}
+                modelAlias={msg.model_alias}
+                usage={msg.role === "assistant" ? (msg.usage ?? null) : null}
+                replyTokens={msg.role === "assistant" ? msg.token_estimate : null}
+                responseMs={
+                  msg.role === "assistant" ? getResponseMs(msg.id) : null
+                }
+                traceId={msg.trace_id}
+                canDebug={canDebug}
+                onDebugClick={setDebugTraceId}
+                reasoning={msg.role === "assistant" ? msg.reasoning : null}
+                reasoningMs={msg.role === "assistant" ? msg.reasoning_ms : null}
+                streaming={msg.status === "running"}
+                status={msg.status}
+                notice={msg.notice}
+                stopped={msg.status === "stopped"}
+                onRetry={msg.status === "stopped" ? onRetry : undefined}
+              />
+            );
+            if (!failed) return bubble;
+            return (
+              <Fragment key={msg.id}>
+                {bubble}
+                <FailedReply
+                  message={
+                    msg.status === "interrupted"
+                      ? t("turn_interrupted", {
+                          ns: "chat",
+                          defaultValue: "The server restarted while this reply was being written.",
+                        })
+                      : msg.error ||
+                        t("turn_failed", { ns: "chat", defaultValue: "The reply failed." })
+                  }
+                  onRetry={onRetry}
+                />
+              </Fragment>
+            );
+          })}
 
           {/* Streaming assistant message */}
           {isStreaming && streamingContent && (
@@ -279,84 +328,25 @@ export default function ChatWindow({
             </Box>
           )}
 
-          {/* Error bubble — on the turn that failed, the last one */}
+          {/* An error only this page saw: no reply was stored for it */}
           {error && errorInfo?.kind !== "blocked" && (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "flex-start",
-                gap: 1,
-                mb: 1.5,
-                px: 1,
-              }}
-            >
-              <Avatar
-                sx={{
-                  width: 32,
-                  height: 32,
-                  mt: 0.5,
-                  bgcolor: theme.palette.error.dark,
-                  display: { xs: "none", sm: "flex" },
-                }}
-              >
-                <ErrorOutlineIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-              <Box
-                sx={{
-                  maxWidth: { xs: "100%", sm: "75%" },
-                  minWidth: 60,
-                  px: 2,
-                  py: 1.5,
-                  borderRadius: "4px 12px 12px 12px",
-                  bgcolor:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.background.paper
-                      : theme.palette.grey[100],
-                  border: `1px solid ${theme.palette.error.main}`,
-                  color: theme.palette.text.primary,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "error.main",
-                    fontWeight: 600,
-                    mb: 0.5,
-                    display: "block",
-                  }}
-                >
-                  {errorInfo?.kind === "rate_limit"
-                    ? t("rate_limited_label", { ns: "chat", defaultValue: "Rate limit reached" })
-                    : t("error_label", { ns: "chat", defaultValue: "Error" })}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ mb: 1, wordBreak: "break-word" }}
-                >
-                  {error}
-                  {errorInfo?.kind === "rate_limit" && errorInfo.retryAfter
-                    ? ` ${t("retry_after", {
-                        ns: "chat",
-                        defaultValue: "Try again in {{seconds}} s.",
-                        seconds: errorInfo.retryAfter,
-                      })}`
-                    : ""}
-                </Typography>
-                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    startIcon={<ReplayIcon />}
-                    onClick={retry}
-                    sx={{ textTransform: "none" }}
-                  >
-                    {t("retry", { ns: "chat", defaultValue: "Retry" })}
-                  </Button>
-                </Box>
-              </Box>
-            </Box>
+            <FailedReply
+              message={
+                errorInfo?.kind === "rate_limit" && errorInfo.retryAfter
+                  ? `${error} ${t("retry_after", {
+                      ns: "chat",
+                      defaultValue: "Try again in {{seconds}} s.",
+                      seconds: errorInfo.retryAfter,
+                    })}`
+                  : error
+              }
+              label={
+                errorInfo?.kind === "rate_limit"
+                  ? t("rate_limited_label", { ns: "chat", defaultValue: "Rate limit reached" })
+                  : undefined
+              }
+              onRetry={retry}
+            />
           )}
 
           {/* Streaming indicator when waiting for first token */}

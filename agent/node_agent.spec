@@ -42,12 +42,27 @@ _LICENCE_FILES = [
     if (HERE / name).is_file()
 ]
 
+# Downloading a model on the machine (hf_download.py). huggingface_hub loads
+# its submodules lazily, by name, so the analysis cannot follow them; and it
+# asks the installed packages' metadata whether hf-xet is there -- without
+# that metadata in the binary it would say no and download over plain HTTP,
+# one connection per file, many times slower.
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+
+_HF_DATAS = copy_metadata("huggingface_hub")
+try:
+    _HF_DATAS += copy_metadata("hf_xet")
+    _HF_IMPORTS = ["hf_xet"]
+except Exception:  # a platform hf-xet has no wheel for: plain HTTP it is
+    _HF_IMPORTS = []
+_HF_IMPORTS += collect_submodules("huggingface_hub")
+
 a = Analysis(
     ["faden_agent/__main__.py"],
     pathex=["."],
     binaries=[],
-    datas=_LICENCE_FILES,
-    hiddenimports=[
+    datas=_LICENCE_FILES + _HF_DATAS,
+    hiddenimports=_HF_IMPORTS + [
         # psutil platform backends — PyInstaller misses these on cross-collect
         "psutil._pslinux",
         "psutil._pswindows",

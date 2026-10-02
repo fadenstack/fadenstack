@@ -55,11 +55,12 @@ _DEP = "inference.deployments"
 async def list_deployments(
     environment_id: uuid.UUID | None = None,
     model_id: uuid.UUID | None = None,
+    node_id: uuid.UUID | None = Query(None, description="Only deployments on a cluster this machine is a member of."),
     _user: User = Depends(require_permission(_DEP, "read")),
     service: DeploymentService = Depends(),
 ) -> list[DeploymentDTO]:
-    """List inference deployments, optionally filtered by environment or model."""
-    return [_dto_from_dep(d) for d in await service.list(environment_id, model_id)]
+    """List inference deployments, optionally filtered by environment, model or machine."""
+    return [_dto_from_dep(d) for d in await service.list(environment_id, model_id, node_id)]
 
 
 @router.post("", response_model=DeploymentDTO, status_code=status.HTTP_201_CREATED)
@@ -171,10 +172,10 @@ def _dto_from_dep(dep) -> DeploymentDTO:
 async def get_deployment_logs(
     deployment_id: uuid.UUID,
     source: LogSource = Query(
-        LogSource.RUNTIME_CONTAINER,
-        description="Which process to read: the runtime container or a Serve replica.",
+        LogSource.ALL,
+        description="What to read: all of the deployment, its Serve replicas, its engine, or the agents.",
     ),
-    node_id: uuid.UUID | None = Query(None, description="Read from this member node instead of the head."),
+    node_id: uuid.UUID | None = Query(None, description="Only this member machine; all of them when omitted."),
     replica_id: str | None = Query(None, description="Narrow a serve_replica read to one replica."),
     tail: int = Query(200, ge=1, le=5000, description="How many trailing lines to return."),
     since: str | None = Query(None, description="Only lines at or after this timestamp."),

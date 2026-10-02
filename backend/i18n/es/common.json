@@ -1655,7 +1655,6 @@
     "sessions_title": "Sesiones de chat",
     "attachments_title": "Adjuntos de chat",
     "col_name": "Nombre",
-    "col_title": "Título",
     "col_user": "Usuario",
     "col_tenant": "Inquilino",
     "col_model": "Modelo",
@@ -1667,7 +1666,6 @@
     "col_type": "Tipo de contenido",
     "col_extraction": "Extracción",
     "col_scope": "Ámbito",
-    "untitled_session": "(sin título)",
     "search_projects": "Buscar proyectos…",
     "search_sessions": "Buscar sesiones…",
     "search_attachments": "Buscar adjuntos…",
@@ -1690,8 +1688,8 @@
     "extraction_skipped": "omitido",
     "scope_session": "sesión",
     "scope_project": "proyecto",
-    "title_encrypted": "Cifrado",
-    "title_encrypted_hint": "Los títulos de chat se cifran como los mensajes; solo los ve quien los escribió."
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Su título y sus mensajes son de su usuario y no se muestran aquí."
   },
   "mcp": {
     "servers_title": "Servidores MCP",
@@ -2030,7 +2028,9 @@
       "token_tooltip": "Crear un token de registro de un solo uso para esta máquina",
       "token_title": "Token de registro",
       "deployment_progress": "Progreso del despliegue",
-      "container_logs": "Registros del contenedor"
+      "container_logs": "Registros del contenedor",
+      "deployments": "Despliegues en esta máquina",
+      "no_deployments": "Ningún despliegue está en un clúster con esta máquina."
     },
     "fleet": {
       "checking_resources": "Buscando recursos asociados…",
@@ -2041,7 +2041,9 @@
       "provider_count_other": "{{count}} proveedores",
       "cascade": "Eliminar también los proveedores y runtimes que contiene",
       "keep_runtimes": "Los runtimes se desasignan de esta máquina pero se conservan."
-    }
+    },
+    "agent_update": "Agente {{version}} disponible",
+    "agent_update_hint": "Actualícelo en una ventana de mantenimiento: ejecute de nuevo la línea de instalación de este servidor en la máquina (Nodos → Añadir una máquina). Los agentes nunca se actualizan solos."
   },
   "rag_lite": {
     "documents_title": "Documentos RAG",
@@ -2181,7 +2183,8 @@
     "rename": "Renombrar",
     "rename_save": "Guardar",
     "rename_cancel": "Cancelar",
-    "title_label": "Título del chat"
+    "title_label": "Título del chat",
+    "writing": "Se está escribiendo una respuesta"
   },
   "module_recommend": {
     "apply": "Aplicar",
@@ -2635,6 +2638,48 @@
       "restart_warning": "El clúster se reinicia en todas las máquinas: sus modelos se detienen, vuelven a cargarse y responden de nuevo al terminar — minutos para un modelo grande.",
       "restart_confirm": "Reiniciar el clúster",
       "update_agents": "El cifrado entre máquinas necesita el agente 0.1.18 o posterior en cada máquina. Actualice {{hosts}} ejecutando de nuevo allí la línea de instalación."
+    },
+    "model_downloads": {
+      "title": "De dónde obtienen los modelos las máquinas",
+      "switch_label": "Las máquinas descargan los modelos por sí mismas",
+      "on_chip": "Desde Hugging Face",
+      "off_chip": "Desde este servidor",
+      "on_detail": "Cada máquina descarga un modelo de Hugging Face en su propio almacén de modelos, con el token de Hugging Face de este servidor para un modelo restringido. El servidor ni lo descarga ni lo copia.",
+      "off_detail": "Este servidor descarga un modelo y cada máquina lo copia desde el servidor. Funciona sin internet en las máquinas; con un enlace lento del servidor, un modelo grande tarda ese tiempo dos veces.",
+      "checking": "Preguntando a las máquinas si llegan a Hugging Face…",
+      "check_again": "Comprobar de nuevo",
+      "reaches": "Llega a Hugging Face",
+      "cannot_switch_on": "Para activarlo, todas las máquinas deben llegar a Hugging Face:",
+      "problem": {
+        "no_internet": "{{host}}: no llega a Hugging Face",
+        "store_not_writable": "{{host}}: el agente no puede escribir en su almacén de modelos",
+        "old_agent": "{{host}}: agente demasiado antiguo, actualícelo a 0.2.2 o posterior",
+        "offline": "{{host}}: sin conexión",
+        "no_answer": "{{host}}: no respondió"
+      },
+      "applies_next": "Se aplica al próximo modelo que se coloque en el clúster; los modelos que ya están en las máquinas se quedan."
+    },
+    "applies_on_start": "Se aplica cuando el clúster arranque",
+    "runtime": {
+      "title": "Entorno de ejecución",
+      "detail": "La imagen que ejecutan las máquinas, con Ray y vLLM. Solo cambia cuando la cambia aquí.",
+      "stack": "Ray {{ray}} · vLLM {{vllm}}",
+      "option": "vLLM {{vllm}} · Ray {{ray}}",
+      "status": {
+        "passed": "Certificado",
+        "partial": "Certificado en parte",
+        "failed": "Certificación fallida",
+        "uncertified": "Sin certificar"
+      },
+      "preview": "Vista previa",
+      "recommended": "Recomendado",
+      "applying": "Reiniciando con el nuevo entorno",
+      "update": "Hay un entorno certificado más reciente (vLLM {{vllm}}). El clúster mantiene el suyo hasta que lo cambie.",
+      "choose": "Cambiar a",
+      "switch": "Cambiar",
+      "restart_warning": "Cambiar a vLLM {{vllm}} reinicia el clúster: el contenedor de cada máquina se crea de nuevo desde la nueva imagen y cada modelo vuelve a cargarse. Una máquina que aún no tiene la imagen la obtiene primero.",
+      "preview_hint": "Una vista previa ha superado su certificación y ejecuta modelos que el entorno recomendado no puede, pero es nueva: elíjala para un clúster que necesite esos modelos.",
+      "restart_confirm": "Reiniciar con este entorno"
     }
   },
   "inference": {
@@ -2705,11 +2750,6 @@
       "col_ready": "Listas",
       "col_pending": "Pendientes",
       "logs": "Registros",
-      "log_source": "Origen",
-      "log_runtime": "Contenedor del runtime",
-      "log_replica": "Copia en servicio",
-      "log_machine": "Máquina",
-      "log_head": "Nodo principal del clúster",
       "log_tail": "Líneas",
       "fetch": "Obtener",
       "truncated_one": "Recortado a la última {{count}} línea.",
@@ -2742,7 +2782,22 @@
       "traffic_window_one": "Medido en la pasarela, último minuto",
       "traffic_window_other": "Medido en la pasarela, últimos {{count}} minutos",
       "engine_reported": "Informado por el motor",
-      "page_title": "Despliegue"
+      "page_title": "Despliegue",
+      "reply_wait": "La respuesta debe empezar en",
+      "reply_wait_value": "{{seconds}} s",
+      "reply_wait_default": "el valor por defecto del gateway (180 s)",
+      "reply_wait_title": "Cuánto puede tardar en empezar una respuesta",
+      "reply_wait_label": "Segundos",
+      "reply_wait_placeholder": "Vacío: el valor por defecto del gateway",
+      "reply_wait_help": "Un modelo ocupado mantiene las nuevas solicitudes en su cola hasta tener espacio y no envía nada mientras tanto. Pasado este tiempo la solicitud falla y la persona puede reintentarla. De 10 a 1800 segundos; vacío usa el valor por defecto del gateway (180 s). El modelo sigue funcionando mientras cambia.",
+      "reply_wait_invalid": "Introduzca de 10 a 1800 segundos o déjelo vacío.",
+      "reply_wait_failed": "No se pudo cambiar cuánto puede tardar en empezar una respuesta.",
+      "share_label": "Aceleradores por copia",
+      "share_help": "1 es un acelerador entero. Menos permite que las copias compartan uno; más de 0,5 mantiene cada copia en un acelerador propio. El motor usa la misma fracción de su memoria (uno entero: 0,8).",
+      "share_invalid": "Introduzca de 0,05 a 1.",
+      "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador.",
+      "share_restarts": "Cambiar la fracción reinicia todas las copias. El modelo no está disponible hasta que vuelvan.",
+      "show_in_logs": "Mostrar los errores"
     },
     "engine": {
       "title": "Ajustes del motor",
@@ -2750,7 +2805,8 @@
       "defaults": "Valores predeterminados de vLLM: nada cambiado.",
       "dialog_title": "Ajustes del motor de {{name}}",
       "restart_warning": "Al guardar, cada copia se reinicia con los nuevos ajustes. El modelo no está disponible hasta que vuelvan a funcionar. Si una copia no arranca, esta página indica por qué y puede volver a los ajustes anteriores.",
-      "save_restart": "Guardar y reiniciar"
+      "save_restart": "Guardar y reiniciar",
+      "memory_capped": "gpu_memory_utilization {{asked}} es más que la fracción de acelerador de este despliegue ({{share}}): el motor usa {{share}}. Aumente la fracción en Escalar, que ajusta también la memoria."
     }
   },
   "audit": {
@@ -2887,8 +2943,11 @@
       "unknown_tool_parser": "Este motor no conoce el formato de herramientas \"{{value}}\".",
       "unknown_reasoning_parser": "Este motor no conoce el formato de razonamiento \"{{value}}\".",
       "remote_code": "El código propio del modelo se ejecutará en sus máquinas. Manténgalo activado solo para editores de confianza.",
-      "extra_invalid": "Estas opciones no se aceptan y no se usarán: {{tokens}}"
-    }
+      "extra_invalid": "Estas opciones no se aceptan y no se usarán: {{tokens}}",
+      "json_invalid": "No es JSON válido, así la copia no arranca: {{flags}}"
+    },
+    "json_syntax": "No es JSON válido.",
+    "json_object": "Necesita un objeto JSON, por ejemplo {\"method\": \"mtp\"}."
   },
   "hf_access": {
     "title": "Acceso a Hugging Face",
@@ -2974,7 +3033,11 @@
     "creating": "Creando el despliegue…",
     "host": "Alojar",
     "revision_label": "Revisión (opcional)",
-    "revision_help": "Una rama, etiqueta o commit en Hugging Face. Déjelo vacío para la más reciente."
+    "revision_help": "Una rama, etiqueta o commit en Hugging Face. Déjelo vacío para la más reciente.",
+    "cannot_run": "No se ejecuta aquí",
+    "may_not_run": "Puede que no se ejecute",
+    "compat_model_type": "El entorno de ejecución de este clúster no puede cargarlo: ni Transformers {{transformers}} ni vLLM {{vllm}} conocen el tipo de modelo \"{{type}}\" (el modelo se guardó con Transformers {{saved}}). Necesita una imagen de ejecución más reciente; no se descarga nada.",
+    "compat_architecture": "vLLM {{vllm}} en el entorno de ejecución de este clúster no tiene implementación de {{architecture}}. Solo puede intentar su backend genérico de Transformers, que no admite todos los modelos."
   },
   "marketplace": {
     "title": "Mercado de modelos",
@@ -3491,6 +3554,27 @@
         "rejected": "Rechazado",
         "expired": "Caducado"
       }
+    }
+  },
+  "logviewer": {
+    "level": {
+      "error": "Errores",
+      "warning": "Avisos",
+      "info": "Info",
+      "debug": "Depuración",
+      "other": "Otros"
+    },
+    "search": "Buscar en las líneas",
+    "follow": "Seguir las líneas nuevas",
+    "copy": "Copiar las líneas mostradas",
+    "download": "Descargar las líneas mostradas",
+    "empty": "Todavía no hay líneas de registro.",
+    "nothing_matches": "Ninguna línea coincide con los filtros.",
+    "source": {
+      "replica": "Servicio del modelo",
+      "engine": "Motor (vLLM)",
+      "agent": "Registro del sistema",
+      "container": "Contenedores de modelos"
     }
   }
 }

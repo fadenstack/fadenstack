@@ -369,6 +369,9 @@ class DownloadJobDTO(BaseModel):
     progress: int
     log_ref: str | None = None
     error_message: str | None = None
+    #: ``interrupted``: its worker went away; starting it again resumes it.
+    error_code: str | None = None
+    heartbeat_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -73,7 +73,7 @@
   "blocked_prompt": "未发送",
   "blocked_answer": "回答已被拦截",
   "blocked_default": "此内容已被您所在组织的策略阻止。",
-  "turn_failed": "没有回答：请求失败。",
+  "turn_failed": "回复失败。",
   "edit_and_resend": "编辑并重新发送",
   "rate_limited_label": "已达到请求限制",
   "retry_after": "请在 {{seconds}} 秒后重试。",
@@ -81,5 +81,7 @@
   "approval_title": "{{tool}} 请求运行",
   "approval_a_tool": "一个工具",
   "approval_decline": "拒绝",
-  "approval_approve": "批准"
+  "approval_approve": "批准",
+  "turn_interrupted": "编写此回复时服务器重新启动了。",
+  "turn_stopped": "已停止"
 }

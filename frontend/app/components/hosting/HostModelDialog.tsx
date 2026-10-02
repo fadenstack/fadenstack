@@ -233,7 +233,10 @@ export function HostModelDialog({
   const extraIssues = parsedExtra.issues;
   const settingsCount = Object.keys({ ...config, ...parsedExtra.config }).length;
   const nameOk = DEPLOYMENT_NAME.test(name.trim());
-  const fitBlocks = fit?.status === "too_large" || fit?.status === "no_accelerators";
+  // A runtime that cannot read the model's config stops it before its
+  // weights are even looked at -- after the download, which is the waste.
+  const cannotRun = Boolean(cluster && detail?.compatibility?.[cluster]?.status === "cannot_run");
+  const fitBlocks = fit?.status === "too_large" || fit?.status === "no_accelerators" || cannotRun;
   const canNext: Record<StepId, boolean> = {
     model: Boolean(kept),
     where: Boolean(chosen) && !fitBlocks && detailState !== "loading",
@@ -614,9 +617,11 @@ function WhereStep({
         {shown.map((c) => {
           const f = detail?.fits[c.environment_id] ?? null;
           const summary = hasRepo && detail ? fitSummary(f) : null;
+          const compat = hasRepo ? (detail?.compatibility?.[c.environment_id] ?? null) : null;
           // A cluster that has reported no accelerator is not refused: the
           // agent may have only just joined, and a CPU-only cluster is a choice.
-          const blocked = f?.status === "too_large";
+          // One whose runtime cannot load the model is: it would fail to start.
+          const blocked = f?.status === "too_large" || compat?.status === "cannot_run";
           return (
             <Paper
               key={c.environment_id}
@@ -638,6 +643,12 @@ function WhereStep({
                       {c.name}
                     </Typography>
                     {summary && <Chip size="small" label={summary.label} color={tone[summary.tone]} />}
+                    {compat?.status === "cannot_run" && (
+                      <Chip size="small" color="error" label={t("hosting.cannot_run")} data-testid="host-cannot-run" />
+                    )}
+                    {compat?.status === "may_not_run" && (
+                      <Chip size="small" color="warning" label={t("hosting.may_not_run")} data-testid="host-may-not-run" />
+                    )}
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
                     {c.gpu_count > 0
@@ -651,6 +662,28 @@ function WhereStep({
                   {f && hasRepo && (
                     <Typography variant="caption" color="text.secondary">
                       {fitDetail(f, c)}
+                    </Typography>
+                  )}
+                  {compat && (compat.status === "cannot_run" || compat.status === "may_not_run") && (
+                    <Typography
+                      variant="caption"
+                      component="p"
+                      color={compat.status === "cannot_run" ? "error" : "warning.main"}
+                      data-testid={`host-compat-${c.environment_id}`}
+                    >
+                      {compat.code === "model_type_unknown"
+                        ? t("hosting.compat_model_type", {
+                            type: compat.model_type ?? "",
+                            transformers: compat.transformers_version ?? "?",
+                            vllm: compat.vllm_version ?? "?",
+                            saved: compat.model_transformers_version ?? "?",
+                          })
+                        : compat.code === "architecture_not_native"
+                          ? t("hosting.compat_architecture", {
+                              architecture: compat.architectures.join(", "),
+                              vllm: compat.vllm_version ?? "?",
+                            })
+                          : compat.message}
                     </Typography>
                   )}
                 </Box>

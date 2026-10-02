@@ -5,6 +5,7 @@ import {
   applyPreset,
   checkSettings,
   commandLine,
+  jsonProblem,
   fromContainerFields,
   parseExtraFlags,
   toClusterConfig,
@@ -98,3 +99,27 @@ describe("checks", () => {
     expect(checkSettings({}, "", {})).toEqual([]);
   });
 });
+
+describe("settings vLLM takes as JSON", () => {
+  it("are JSON in the catalog, whatever vLLM types them", () => {
+    // vLLM's help marks them; its catalog types most "string".
+    const spec = CATALOG.flags.find((f) => f.key === "speculative_config");
+    expect(spec?.type).toBe("json");
+    expect(CATALOG.flags.find((f) => f.key === "compilation_config")?.type).toBe("json");
+    expect(CATALOG.flags.find((f) => f.key === "chat_template")?.type).toBe("string");
+  });
+
+  it("are checked: an object, or nothing", () => {
+    expect(jsonProblem('{"method": "mtp", "num_speculative_tokens": 3}')).toBeNull();
+    expect(jsonProblem("")).toBeNull();
+    expect(jsonProblem("{method: mtp}")).toBe("syntax");
+    expect(jsonProblem("3")).toBe("object");
+  });
+
+  it("are named among the warnings when they do not parse: the copy would not start", () => {
+    const warnings = checkSettings({ speculative_config: "{method: mtp}", max_model_len: 4096 }, "");
+    expect(warnings).toContainEqual({ code: "json_invalid", flags: ["--speculative-config"] });
+    expect(checkSettings({ speculative_config: '{"method": "mtp"}' }, "")).toEqual([]);
+  });
+});
+

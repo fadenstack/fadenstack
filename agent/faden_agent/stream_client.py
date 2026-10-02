@@ -32,6 +32,13 @@ from faden_agent.tls import websockets_ssl
 
 log = logging.getLogger(__name__)
 
+#: Header the agent connects with: ``v1; running=<ids>; finished=<ids>`` --
+#: the commands it is still executing, and the ones it finished last, whose
+#: result the server may not have (backend ``NodeControlService.COMMANDS_HEADER``).
+COMMANDS_HEADER = "X-Faden-Commands"
+#: How many of the latest results the header names as finished.
+_FINISHED_REPORTED = 100
+
 #: How often the control channel checks the backend is still there.
 _PING_INTERVAL_SEC = 20
 
@@ -74,6 +81,11 @@ class StreamClient:
         self._backend_client = backend_client
         self._gpu_collector: GpuCollector = gpu_collector or NullCollector()
         self._send_lock = asyncio.Lock()
+        #: The connection open now, if any. A command outlives the connection
+        #: it came on: its progress and its result go out on this one.
+        self._ws: Any = None
+        #: Commands being handled, by id, across connections.
+        self._command_tasks: dict[str, asyncio.Task[None]] = {}
         self._inventory_trigger = asyncio.Event()
         self._health_supervisor = HealthSupervisor(
             runtime=runtime,
@@ -89,7 +101,11 @@ class StreamClient:
         # the stream was opened with, for as long as it stays open.
         self._signing_key = derive_signing_key(credential)
         ws_url = self._ws_url()
-        headers = {"Authorization": f"Bearer {credential}", SIGNING_HEADER: SIGNING_SCHEME}
+        headers = {
+            "Authorization": f"Bearer {credential}",
+            SIGNING_HEADER: SIGNING_SCHEME,
+            COMMANDS_HEADER: self._commands_header(),
+        }
         log.info("Connecting node stream to %s", ws_url)
         async with websockets.connect(
             ws_url,
@@ -101,6 +117,7 @@ class StreamClient:
             max_size=2**22,
             ssl=websockets_ssl(self._config) if ws_url.startswith("wss://") else None,
         ) as ws:
+            self._ws = ws
             tasks = {
                 asyncio.create_task(self._receive_loop(ws), name="receive"),
                 asyncio.create_task(self._heartbeat_loop(ws), name="heartbeat"),
@@ -110,13 +127,86 @@ class StreamClient:
                 asyncio.create_task(self._health_supervisor.run_forever(), name="health"),
                 asyncio.create_task(self._credential_rotation_loop(), name="cred_rotate"),
             }
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+            try:
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+            finally:
+                # The commands carry on; what they say next waits for the
+                # next connection (``_send_live``).
+                if self._ws is ws:
+                    self._ws = None
             for task in pending:
                 task.cancel()
             for task in done:
                 exc = task.exception()
                 if exc is not None:
                     raise exc
+
+    def _commands_header(self) -> str:
+        """What the server should make of the commands it sent here, said as the agent connects.
+
+        ``running``: still executing -- their results come on this
+        connection. ``finished``: the latest results, kept on disk; one the
+        server has not recorded (it was sent as the last connection closed,
+        or not at all) it sends again, and the agent answers from the store.
+        Anything else the server had here is lost, and it fails it at once --
+        which it could not do after a restart of its own, having never seen
+        the last connection close.
+        """
+        tasks = getattr(self, "_command_tasks", {})
+        running = [command_id for command_id, task in tasks.items() if not task.done()]
+        listing = getattr(self._dispatcher, "running_command_ids", None)
+        for command_id in (listing() if callable(listing) else []):
+            if command_id not in running:
+                running.append(command_id)
+        state = getattr(self, "_state", None)
+        completed = list(getattr(getattr(state, "state", None), "completed_commands", {}) or {})
+        finished = [c for c in completed[-_FINISHED_REPORTED:] if c not in running]
+        return f"v1; running={','.join(running[:100])}; finished={','.join(finished)}"
+
+    def _start_command(self, ws: websockets.WebSocketClientProtocol, command: dict[str, Any]) -> None:
+        """Handle *command* beside the reading, not inside it.
+
+        Handled inline, a command of half an hour kept everything else the
+        server sent unread; with the websocket's buffer full the socket was
+        not read at all, the replies to keepalive pings included, and the
+        connection was dropped as dead. A command delivered again while it
+        still runs (the server sends overdue ones again) is not run twice.
+        """
+        command_id = str(command.get("id") or "").strip()
+        if not command_id:
+            return
+        tasks = self.__dict__.setdefault("_command_tasks", {})
+        running = tasks.get(command_id)
+        if running is not None and not running.done():
+            log.info("Command %s delivered again while it runs; its result comes when it is done", command_id)
+            return
+        task = asyncio.create_task(self._handle_command(ws, command), name=f"handle:{command_id}")
+        tasks[command_id] = task
+
+        def _done(finished: asyncio.Task[None]) -> None:
+            if tasks.get(command_id) is finished:
+                tasks.pop(command_id, None)
+            if not finished.cancelled() and finished.exception() is not None:
+                log.error("Handling command %s failed", command_id, exc_info=finished.exception())
+
+        task.add_done_callback(_done)
+
+    async def _send_live(self, payload: dict[str, Any], ws: Any = None) -> bool:
+        """Send on the connection open now (else *ws*); False when there is none to send on.
+
+        A result that cannot go out now is not lost: it is in the result
+        store, the next connection names it as finished, and the server
+        asks for it again.
+        """
+        target = getattr(self, "_ws", None) or ws
+        if target is None:
+            return False
+        try:
+            await self._send_json(target, payload)
+            return True
+        except (ConnectionClosed, OSError, RuntimeError) as exc:
+            log.debug("Not sent (%s): %s for %s", type(exc).__name__, payload.get("type"), payload.get("command_id"))
+            return False
 
     async def _receive_loop(self, ws: websockets.WebSocketClientProtocol) -> None:
         while True:
@@ -137,7 +227,7 @@ class StreamClient:
                 if isinstance(commands, list):
                     for item in commands:
                         if isinstance(item, dict):
-                            await self._handle_command(ws, item)
+                            self._start_command(ws, item)
                 node_id = payload.get("node_id")
                 if isinstance(node_id, str) and node_id:
                     self._state.state.node_id = node_id
@@ -151,7 +241,7 @@ class StreamClient:
             elif msg_type == "command":
                 command = payload.get("command")
                 if isinstance(command, dict):
-                    await self._handle_command(ws, command)
+                    self._start_command(ws, command)
 
     async def _heartbeat_loop(self, ws: websockets.WebSocketClientProtocol) -> None:
         interval = max(self._config.heartbeat_interval_sec, 5)
@@ -251,8 +341,7 @@ class StreamClient:
         ):
             reason = "missing" if unsigned else "invalid"
             log.warning("Rejected command %s (%s): signature %s.", command_id, command_type, reason)
-            await self._send_json(
-                ws,
+            await self._send_live(
                 {
                     "type": "command_result",
                     "command_id": command_id,
@@ -261,6 +350,7 @@ class StreamClient:
                     "error_code": f"signature_{reason}",
                     "error_message": f"Command signature {reason}: the agent refused to run it.",
                 },
+                ws,
             )
             return
 
@@ -271,8 +361,7 @@ class StreamClient:
         # dispatcher deduplicates an execution that already finished.
         if command.get("redispatch") is not True and not validate_command_age(command):
             log.warning("Rejected command %s: expired issued_at.", command_id)
-            await self._send_json(
-                ws,
+            await self._send_live(
                 {
                     "type": "command_result",
                     "command_id": command_id,
@@ -281,40 +370,44 @@ class StreamClient:
                     "error_code": "command_expired",
                     "error_message": "Command issued_at is too old.",
                 },
+                ws,
             )
             return
 
-        await self._send_json(
-            ws,
+        await self._send_live(
             {
                 "type": "command_ack",
                 "command_id": command_id,
                 "message": f"Accepted {command_type}",
                 "correlation_id": correlation_id,
             },
+            ws,
         )
 
         async def emit_progress(progress_payload: dict[str, Any]) -> None:
-            await self._send_json(
-                ws,
+            # Progress while no connection is open is dropped: the next says where it has got to.
+            await self._send_live(
                 {
                     "type": "command_progress",
                     "command_id": command_id,
                     "correlation_id": correlation_id,
                     **progress_payload,
                 },
+                ws,
             )
 
         result = await self._dispatcher.handle(command, emit_progress)
-        await self._send_json(
-            ws,
+        sent = await self._send_live(
             {
                 "type": "command_result",
                 "command_id": command_id,
                 "correlation_id": correlation_id,
                 **result,
             },
+            ws,
         )
+        if not sent:
+            log.info("Command %s finished with no connection open; the next one reports it as finished", command_id)
 
     async def _send_json(self, ws: websockets.WebSocketClientProtocol, payload: dict[str, Any]) -> None:
         async with self._send_lock:

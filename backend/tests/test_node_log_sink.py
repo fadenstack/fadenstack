@@ -110,15 +110,13 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
 
     monkeypatch.setattr(settings, "loki_base_url", "http://faden-loki:3100")
     monkeypatch.setattr(views, "_loki_http", httpx.AsyncClient(transport=httpx.MockTransport(loki)))
-    fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(
-        id="n1", host="10.250.10.49", agent_id="gpu-02",
-    )
+    fastapi_app.dependency_overrides[views._push_sender] = lambda: "10.250.10.49"
     push = {"streams": [{"stream": {"job": "node-agent", "host": "10.250.10.71"}, "values": [["1", "hello"]]}]}
     try:
         response = await client.post("/api/node-files/logs/loki/api/v1/push", json=push)
         bad = await client.post("/api/node-files/logs/loki/api/v1/push", json={"lines": ["x"]})
     finally:
-        fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
+        fastapi_app.dependency_overrides.pop(views._push_sender, None)
         monkeypatch.setattr(views, "_loki_http", None)
     assert response.status_code == 204
     assert str(forwarded[0].url) == "http://faden-loki:3100/loki/api/v1/push"
@@ -127,3 +125,28 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
     sent = json.loads(forwarded[0].content)
     assert sent["streams"][0]["stream"] == {"job": "node-agent", "host": "10.250.10.49"}, "no machine speaks for another"
     assert bad.status_code == 400 and len(forwarded) == 1
+
+
+@pytest.mark.anyio()
+async def test_a_pushing_machine_is_not_checked_against_the_database_every_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every machine pushes every few seconds; each push opened a session to check the same credential."""
+    from starlette.requests import Request
+
+    checked: list[str] = []
+
+    async def authenticate(request: Request) -> SimpleNamespace:
+        checked.append(request.headers["authorization"])
+        return SimpleNamespace(host="10.250.10.71", agent_id="gpu-01")
+
+    monkeypatch.setattr(views, "_authenticate_node", authenticate)
+    monkeypatch.setattr(views, "_push_auth", {})
+
+    def request(credential: str) -> Request:
+        return Request({"type": "http", "headers": [(b"authorization", f"Bearer {credential}".encode())]})
+
+    assert await views._push_sender(request("a")) == "10.250.10.71"
+    assert await views._push_sender(request("a")) == "10.250.10.71"
+    await views._push_sender(request("b"))  # another credential is checked on its own
+    assert checked == ["Bearer a", "Bearer b"]

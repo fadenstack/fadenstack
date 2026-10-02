@@ -573,7 +573,7 @@ class MultiNodeFabricPlanner:
             else "No eligible nodes available"
         )
 
-        runtime = self._runtime_readiness(nodes)
+        runtime = self._runtime_readiness(env, nodes)
         if not runtime.compatible:
             # A warning, not a blocker, deliberately.  Binding a fabric and
             # starting a runtime are separate steps: the network can be
@@ -607,7 +607,7 @@ class MultiNodeFabricPlanner:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _runtime_readiness(nodes: list[InfraNode]) -> RuntimeReadiness:
+    def _runtime_readiness(environment: Any, nodes: list[InfraNode]) -> RuntimeReadiness:
         """Resolve a runtime bundle for each member node.
 
         Derived from the machines, never pinned on the cluster. A bundle is an
@@ -631,7 +631,9 @@ class MultiNodeFabricPlanner:
         node_bundles: dict[str, str] = {}
         unresolved: list[str] = []
         for node in nodes:
-            bundle = default_bundle_registry.resolve_for_node(node, driver="ray")
+            bundle = default_bundle_registry.resolve_for_node(
+                node, driver="ray", environment=environment,
+            )
             if bundle is None:
                 machine = str((node.capabilities_json or {}).get("machine") or "unknown")
                 results[str(node.id)] = (

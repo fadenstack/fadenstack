@@ -73,7 +73,7 @@
   "blocked_prompt": "No enviado",
   "blocked_answer": "Respuesta retenida",
   "blocked_default": "Una política de su organización lo ha detenido.",
-  "turn_failed": "Sin respuesta: la solicitud falló.",
+  "turn_failed": "La respuesta ha fallado.",
   "edit_and_resend": "Editar y reenviar",
   "rate_limited_label": "Límite de solicitudes alcanzado",
   "retry_after": "Inténtelo de nuevo en {{seconds}} s.",
@@ -81,5 +81,7 @@
   "approval_title": "{{tool}} quiere ejecutarse",
   "approval_a_tool": "Una herramienta",
   "approval_decline": "Rechazar",
-  "approval_approve": "Aprobar"
+  "approval_approve": "Aprobar",
+  "turn_interrupted": "El servidor se reinició mientras se escribía esta respuesta.",
+  "turn_stopped": "Detenida"
 }

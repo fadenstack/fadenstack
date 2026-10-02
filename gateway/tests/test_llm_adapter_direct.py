@@ -10,6 +10,7 @@ tests hold the events to the same shape and the rest to the same results.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any
@@ -261,3 +262,87 @@ async def test_pii_usage_and_the_saved_reply_work_on_the_direct_stream(
         select(LLMGatewayRequestLog).where(LLMGatewayRequestLog.session_id == str(sid)),
     )).scalar_one()
     assert (row.prompt_tokens, row.completion_tokens, row.status_code) == (12, 5, 200)
+
+
+# ── How long a reply may take to start, and to go on ────────────────
+
+
+def _slow_engine(first_after: float, then_after: float = 0.0) -> httpx.AsyncClient:
+    """A vLLM that holds a request *first_after* seconds before it starts, as its queue does when the KV
+    cache is full, and pauses *then_after* seconds before its second event."""
+
+    async def body() -> AsyncIterator[bytes]:
+        await asyncio.sleep(first_after)
+        yield _event({"role": "assistant", "content": "Hel"})
+        await asyncio.sleep(then_after)
+        yield _event({"content": "lo"})
+        yield b"data: [DONE]\n\n"
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body())
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+def _text(chunks: list[bytes]) -> str:
+    return "".join(
+        (json.loads(line[6:]).get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+        for chunk in chunks for line in chunk.decode().splitlines() if line.startswith("data: {")
+    )
+
+
+def _error(chunks: list[bytes]) -> str | None:
+    for chunk in chunks:
+        for line in chunk.decode().splitlines():
+            if line.startswith("data: {") and "error" in json.loads(line[6:]):
+                return json.loads(line[6:])["error"]["message"]
+    return None
+
+
+@pytest.mark.anyio
+async def test_a_reply_may_take_its_models_wait_to_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Longer than the wait between events: a busy 27B failed such replies at 60 s (2026-10-01)."""
+    monkeypatch.setattr(settings, "litellm_request_timeout", 0.05)
+    async with _slow_engine(first_after=0.2) as http:
+        chunks = await _stream(LLMAdapter(http_client=http), first_token_timeout_sec=1.0)
+    assert _error(chunks) is None
+    assert _text(chunks) == "Hello"
+
+
+@pytest.mark.anyio
+async def test_a_reply_that_does_not_start_in_time_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "first_token_timeout_sec", 0.1)  # no wait of the model's own: the default
+    async with _slow_engine(first_after=2.0) as http:
+        chunks = await _stream(LLMAdapter(http_client=http))
+    assert _error(chunks) == "The model did not start its reply within 0.1 s; it may be busy."
+    assert chunks[-1] == b"data: [DONE]\n\n"
+
+
+@pytest.mark.anyio
+async def test_a_reply_that_stops_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Once started, the wait between events is the short one: a long first wait never covers a hang."""
+    monkeypatch.setattr(settings, "litellm_request_timeout", 0.1)
+    async with _slow_engine(first_after=0.0, then_after=2.0) as http:
+        chunks = await _stream(LLMAdapter(http_client=http), first_token_timeout_sec=30.0)
+    assert _text(chunks) == "Hel"
+    assert _error(chunks) == "The model stopped sending its reply for 0.1 s."
+    assert chunks[-1] == b"data: [DONE]\n\n"
+
+
+@pytest.mark.parametrize(
+    ("hints", "expected"),
+    [
+        ({"first_token_timeout_sec": 300}, 300.0),
+        ({"first_token_timeout_sec": 0}, None),
+        ({"first_token_timeout_sec": "300"}, None),
+        ({}, None),
+        (None, None),
+    ],
+)
+def test_a_models_own_wait_comes_from_its_routing_row(hints: dict[str, Any] | None, expected: float | None) -> None:
+    from faden_gateway.services.gateway.service import _first_token_wait  # noqa: PLC0415
+
+    class _Candidate:
+        capacity_hints = hints
+
+    assert _first_token_wait(_Candidate()) == expected

@@ -66,11 +66,18 @@ runtime image:
 
 1. Certify it on its hardware (the suite is in
    `fadenstack-dev/llm_port_ray_migration/runtime_image/`).
-2. Commit its manifest to `runtime-image/`
-   (`runtime-manifest.json` for GB10, `runtime-manifest-x86_64.json` for x86_64).
-3. Release core; the new backend image carries the manifest.
+2. Record the report in its manifest and choose its channel:
+   `rebuild_runtime_image.py --manifest <manifest> --record-certification <report> --channel stable|preview`.
+   The recorder refuses a report from another build.
+3. Commit the manifest to `runtime-image/`, one per runtime
+   (`runtime-manifest-<flavor>-<release>.json`), at most three per flavor:
+   drop the oldest when a fourth arrives (`runtime-image/README.md`).
+4. Release core; the new backend image carries the manifests.
 
-Until step 3 the released backend keeps the build it was certified with.
+Until step 4 the released backend keeps the runtimes it shipped with. A new
+release never moves a running cluster to another runtime: its page says an
+update is out, and the operator switches it
+([Upgrading](upgrading.md#switch-a-cluster-to-another-runtime)).
 
 A server gets the runtime images when it is deployed or upgraded: the CLI
 reads the manifests out of the release's backend image and pulls every image

@@ -35,6 +35,7 @@ defaults and a later phase.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -393,6 +394,60 @@ DEFAULT_GPU_MEMORY_UTILIZATION = 0.80
 DEFAULT_KV_CACHE_METRICS = True
 
 
+#: vLLM settings that take JSON.  vLLM's command line reads
+#: ``--speculative-config '{"method": "mtp"}'`` into an object; Ray Serve hands
+#: ``engine_kwargs`` to vLLM's Python side, which does not, and a setting kept
+#: as JSON text -- what the deployment page's editor saves -- reached vLLM as a
+#: string: "Failed to create vLLM engine config: 'str' object has no
+#: attribute 'items'", nine times, before Serve gave up (.61, 2026-10-01).
+#: The vLLM help marks each of these "Should either be a valid JSON string or
+#: JSON keys passed individually".
+JSON_ENGINE_SETTINGS = frozenset({
+    "attention_config",
+    "compilation_config",
+    "default_chat_template_kwargs",
+    "default_mm_loras",
+    "diffusion_config",
+    "ec_transfer_config",
+    "fault_tolerance_config",
+    "hf_overrides",
+    "ir_op_priority",
+    "kernel_config",
+    "kv_events_config",
+    "kv_transfer_config",
+    "limit_mm_per_prompt",
+    "media_io_kwargs",
+    "mm_processor_kwargs",
+    "model_class_overrides",
+    "override_generation_config",
+    "pooler_config",
+    "quantization_config",
+    "reasoning_config",
+    "speculative_config",
+    "structured_outputs_config",
+    "weight_transfer_config",
+})
+
+
+def _json_settings(kwargs: dict[str, Any]) -> None:
+    """Read JSON-valued settings kept as text into objects, in place.
+
+    Text that is not JSON is refused here, before Serve tries the copy;
+    empty text is the setting left unset.
+    """
+    for key in JSON_ENGINE_SETTINGS & kwargs.keys():
+        value = kwargs[key]
+        if not isinstance(value, str):
+            continue
+        if not value.strip():
+            del kwargs[key]
+            continue
+        try:
+            kwargs[key] = json.loads(value)
+        except ValueError as exc:
+            raise ValueError(f"engine setting {key} is not valid JSON ({exc})") from exc
+
+
 def _engine_kwargs(
     *,
     engine_config: dict[str, Any],
@@ -416,6 +471,7 @@ def _engine_kwargs(
     afterwards, from the deployment page or the API.
     """
     kwargs: dict[str, Any] = dict(engine_config or {})
+    _json_settings(kwargs)
     if tensor_parallel_size is not None:
         kwargs.setdefault("tensor_parallel_size", int(tensor_parallel_size))
     if pipeline_parallel_size is not None:

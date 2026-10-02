@@ -14,7 +14,7 @@ and platform workarounds from deployment specifications:
   on GB10 unified memory).
 
 Bundle identity is **generated from the build/certification artifacts**
-(``runtime-manifest.json`` produced by the image build in ``runtime-image``)
+(a ``runtime-manifest*.json`` per runtime, produced by the image build in ``runtime-image``)
 via :meth:`RuntimeBundleManifest.from_runtime_manifest` — never hand-written,
 because a hand-written digest that disagrees with the artifact makes the
 catalog authoritative-looking and wrong at the same time.
@@ -27,14 +27,17 @@ import json
 import logging
 import re
 import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from faden_backend.db.models.node_control import InfraNode
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
 
@@ -231,6 +234,11 @@ class CompatibilityMatrix(BaseModel):
     triton_version: str | None = None
     transformers_version: str | None = None
     supported_fabrics: list[str] = Field(default_factory=lambda: ["roce", "infiniband", "ethernet"])
+    #: Model types the image's Transformers and vLLM can read a config.json of,
+    #: and the architectures its vLLM runs natively (``runtime-image``
+    #: ``rebuild_runtime_image.py`` reads them off the image). Empty: not known.
+    supported_model_types: list[str] = Field(default_factory=list)
+    supported_architectures: list[str] = Field(default_factory=list)
 
 
 class CertificationEvidence(BaseModel):
@@ -239,6 +247,9 @@ class CertificationEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str = "uncertified"  # "passed", "partial", "failed", "uncertified"
+    #: "stable": what a machine of the flavor gets unless its cluster chose
+    #: another. "preview": only a cluster whose operator chose it.
+    channel: str = "stable"
     hardware_target: str | None = None
     timestamp: str | None = None
     checks_passed: int = 0
@@ -284,7 +295,7 @@ class RuntimeBundleManifest(BaseModel):
         requirements: ContainerRequirements | None = None,
         report_ref: str | None = None,
     ) -> "RuntimeBundleManifest":
-        """Build a bundle entry from a built image's ``runtime-manifest.json``.
+        """Build a bundle entry from a built image's runtime manifest.
 
         This is the only supported way to mint a bundle's *identity*: image
         reference, digest, stack versions and certification evidence all come
@@ -337,9 +348,12 @@ class RuntimeBundleManifest(BaseModel):
                 nccl_version=_opt(stack.get("nccl")),
                 triton_version=_opt(stack.get("triton")),
                 transformers_version=_opt(stack.get("transformers")),
+                supported_model_types=[str(t) for t in manifest.get("supported_model_types") or []],
+                supported_architectures=[str(a) for a in manifest.get("supported_architectures") or []],
             ),
             certification=CertificationEvidence(
                 status=status,
+                channel=str(cert.get("channel") or "stable").lower(),
                 hardware_target=_opt(cert.get("hardware_target")),
                 timestamp=_opt(cert.get("timestamp")),
                 checks_passed=passed,
@@ -359,35 +373,10 @@ def _opt(value: Any) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Built-in certified DGX Spark Blackwell GB10 bundle
+# The catalogue: one runtime per minted manifest
 # ---------------------------------------------------------------------------
 #
-def _load_runtime_manifest(name: str) -> dict[str, Any]:
-    """Read a minted runtime manifest that ships beside the code.
-
-    Kept as a file rather than a literal because it is the build's output,
-    not something a person should be editing: the image reference, its id and
-    its layer digests all have to match the artifact exactly or the pin is a
-    fiction.
-    """
-    here = Path(__file__).resolve()
-    roots = (
-        # Canonical: the runtime image component of this repo.
-        here.parents[4] / "runtime-image",
-        # A deployment that vendors the manifests beside the backend.
-        here.parents[3] / "runtime-image",
-    )
-    for root in roots:
-        candidate = root / name
-        if candidate.is_file():
-            return json.loads(candidate.read_text(encoding="utf-8"))
-    looked = ", ".join(str(root) for root in roots)
-    raise BundleValidationError(
-        f"runtime manifest {name!r} not found. Looked in: {looked}"
-    )
-
-
-# Read from the manifest the image build writes, not transcribed beside it.
+# Read from the manifests the image build writes, not transcribed beside them.
 #
 # This used to be a hand-copied dict "read off the images that are actually on
 # the two DGX Spark nodes". It was accurate the day it was typed, and then it
@@ -399,144 +388,212 @@ def _load_runtime_manifest(name: str) -> dict[str, Any]:
 # 303 times, on every cluster start.
 #
 # One record makes that impossible. ``rebuild_runtime_image.py`` builds the
-# image and writes ``runtime-manifest.json`` from ``docker image inspect`` and
-# the in-image helper; this reads that file. Rebuild, and the catalogue follows.
-CERTIFIED_DGX_SPARK_BUNDLE = RuntimeBundleManifest.from_runtime_manifest(
-    _load_runtime_manifest("runtime-manifest.json"),
-    bundle_id="bundle-dgx-spark-gb10-v1",
-    display_name="NVIDIA DGX Spark Blackwell GB10 Runtime",
-    description=(
-        "Ray 2.58 + vLLM 0.27.1 (NVIDIA nv26.08 build) image with "
-        "Blackwell GB10 support over 200 Gb/s RoCE"
-    ),
-    report_ref="runtime-image/runtime-manifest.json",
-    target_architecture=TargetArchitecture(
-        cpu="aarch64",
-        os="linux",
-        accelerator=AcceleratorSpec(
-            vendor="nvidia",
-            families=["Blackwell", "GB10"],
-            compute_capabilities=["12.1"],
-            min_driver_version="570.86.10",
-        ),
-    ),
-    requirements=ContainerRequirements(
-        network_mode="host",
-        ipc_mode="host",
-        gpus="all",
-        # Verified present on both DGX Spark nodes.
-        devices=["/dev/infiniband"],
-        capabilities=["IPC_LOCK"],
-    ),
-    mounts=[
-        ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
-        # Mounted at Hugging Face's own default location rather than nested
-        # under /models.  The previous target, /models/huggingface, sat inside
-        # the read-only bind mount above, and the host source of that mount has
-        # no "huggingface" directory -- so runc could not create the mountpoint
-        # and every container start failed with "read-only file system".
-        # /root/.cache is ordinary image rootfs, so the mountpoint is created
-        # normally, and HF_HOME needs no override because this *is* the default.
-        ContainerMount(
-            host_path="/home/sachi/.cache/huggingface",
-            container_path="/root/.cache/huggingface",
-            mode="ro",
-        ),
-        # Ray's session directory, on the host.
-        #
-        # Every Serve replica writes its own log file under
-        # ``session_latest/logs/serve/``, and the runtime container itself
-        # idles on ``sleep infinity`` -- so its console is empty and the only
-        # record of what a replica did lives in these files. Without the
-        # mount the agent has to shell into the container to read them, which
-        # costs an exec per poll and loses the byte offsets that make tailing
-        # cheap. With it they are ordinary files.
-        #
-        # Read-write because Ray owns the directory and writes to it; a
-        # read-only mount would stop the cluster starting at all.
-        ContainerMount(
-            host_path="/var/lib/faden/ray",
-            container_path="/tmp/ray",
-            mode="rw",
-        ),
-    ],
-    platform_tuning=PlatformTuning(
-        ray=RayPlatformTuning(
-            env={
-                # Certified necessary: the GB10's unified memory makes Ray's
-                # host memory monitor evict workers spuriously.
-                "RAY_memory_monitor_refresh_ms": "0",
-                # Raylet and Python worker logs do not rotate by default.
-                # That is survivable while the session directory lives inside
-                # a container that gets recreated; once it is persisted on the
-                # host (see the /tmp/ray mount above) an unbounded log
-                # directory is how a node's disk fills, quietly, weeks later.
-                #
-                # 256 MiB across 5 files per log is roughly 1.2 GiB worst case
-                # per log family -- enough to keep a long incident readable,
-                # small enough to sit on a system disk.
-                "RAY_ROTATION_MAX_BYTES": str(256 * 1024 * 1024),
-                "RAY_ROTATION_BACKUP_COUNT": "5",
-            },
-            start_args={
-                "disable_usage_stats": True,
-                "metrics_export_port": 8089,
-            },
-        ),
-        nccl=NcclPlatformTuning(
-            env={
-                "NCCL_IB_RETRY_CNT": "7",
-                "NCCL_BUFFSIZE": "16777216",
-            },
-        ),
-        # Opt-in only: NCCL_DEBUG=INFO produces verbose per-rank output on
-        # every collective and is a diagnostic, not a runtime setting.
-        diagnostics={"NCCL_DEBUG": "INFO"},
-    ),
-)
+# image and writes its manifest from ``docker image inspect`` and the in-image
+# helper; this reads that file. Every ``runtime-manifest*.json`` is one
+# runtime -- several per flavor, so a newer one can ship as a preview beside
+# the certified one clusters run, and an older one stays to go back to.
+def _manifest_paths() -> list[Path]:
+    """The minted manifests shipped beside the code, one per runtime."""
+    here = Path(__file__).resolve()
+    for root in (
+        # Canonical: the runtime image component of this repo.
+        here.parents[4] / "runtime-image",
+        # A deployment that vendors the manifests beside the backend.
+        here.parents[3] / "runtime-image",
+    ):
+        if paths := sorted(root.glob("runtime-manifest*.json")):
+            return paths
+    return []
 
 
+def _described(manifest: dict[str, Any], what: str) -> str:
+    """What the image carries, in words, from its own manifest: typed beside it, it went stale."""
+    stack = manifest.get("stack_components") or {}
+    base = manifest.get("base_image") or {}
+    base_tag = f" ({base.get('repository')}:{base.get('tag')})" if base.get("tag") else ""
+    return f"Ray {stack.get('ray', '?')} + vLLM {stack.get('vllm', '?')}{base_tag} image {what}"
 
-#: The generic x86_64 NVIDIA runtime.
-#:
-#: One bundle for the whole platform, not one per card. Its kernels are
-#: compiled for sm_75 through sm_120 -- Turing to Blackwell -- so a TITAN RTX,
-#: an A100 and an RTX 5090 all run the same image, and adding a GPU model is
-#: usually adding nothing at all.
-#:
-#: Ray 2.58.0 matches the DGX bundle on purpose: Ray refuses to form a cluster
-#: across mismatched versions, so the two platforms have to move together.
-#:
-#: It carries no mounts. The DGX bundle's paths are that machine's
-#: (``/home/sachi/.cache/huggingface``), and a generic bundle has no business
-#: guessing where a model store lives -- the agent supplies it.
-try:
-    GENERIC_X86_NVIDIA_BUNDLE: RuntimeBundleManifest | None = (
-        RuntimeBundleManifest.from_runtime_manifest(
-            _load_runtime_manifest("runtime-manifest-x86_64.json"),
-            bundle_id="bundle-generic-x86_64-nvidia-v1",
-            display_name="NVIDIA x86_64 Runtime (generic)",
-            description=(
-                "Ray 2.58 + vLLM 0.26 for any mainstream NVIDIA card on "
-                "x86_64, from Turing (sm_75) to Blackwell (sm_120)"
+
+#: What every runtime of a flavor shares, whichever build it is: the machine
+#: it is for, what its container needs and the tuning certified there. A
+#: runtime's identity -- image, digest, stack, certification -- is its
+#: manifest's, and the manifest names its flavor.
+_FLAVORS: dict[str, dict[str, Any]] = {
+    "gb10": {
+        "display_name": "NVIDIA DGX Spark Blackwell GB10 Runtime",
+        "what": "with Blackwell GB10 support over 200 Gb/s RoCE",
+        "target_architecture": TargetArchitecture(
+            cpu="aarch64",
+            os="linux",
+            accelerator=AcceleratorSpec(
+                vendor="nvidia",
+                families=["Blackwell", "GB10"],
+                compute_capabilities=["12.1"],
+                min_driver_version="570.86.10",
             ),
-            driver="ray",
-            report_ref="runtime-image/runtime-manifest-x86_64.json",
-            target_architecture=TargetArchitecture(
-                cpu="x86_64",
-                os="linux",
-                accelerator=AcceleratorSpec(
-                    vendor="nvidia",
-                    families=[],  # deliberately open: the capability list is the gate
-                    compute_capabilities=[
-                        "7.5", "8.0", "8.6", "9.0", "10.0", "12.0",
-                    ],
-                ),
+        ),
+        "requirements": ContainerRequirements(
+            network_mode="host",
+            ipc_mode="host",
+            gpus="all",
+            # Verified present on both DGX Spark nodes.
+            devices=["/dev/infiniband"],
+            capabilities=["IPC_LOCK"],
+        ),
+        "mounts": [
+            ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
+            # Mounted at Hugging Face's own default location rather than nested
+            # under /models.  The previous target, /models/huggingface, sat inside
+            # the read-only bind mount above, and the host source of that mount has
+            # no "huggingface" directory -- so runc could not create the mountpoint
+            # and every container start failed with "read-only file system".
+            # /root/.cache is ordinary image rootfs, so the mountpoint is created
+            # normally, and HF_HOME needs no override because this *is* the default.
+            ContainerMount(
+                host_path="/home/sachi/.cache/huggingface",
+                container_path="/root/.cache/huggingface",
+                mode="ro",
             ),
+            # Ray's session directory, on the host.
+            #
+            # Every Serve replica writes its own log file under
+            # ``session_latest/logs/serve/``, and the runtime container itself
+            # idles on ``sleep infinity`` -- so its console is empty and the only
+            # record of what a replica did lives in these files. Without the
+            # mount the agent has to shell into the container to read them, which
+            # costs an exec per poll and loses the byte offsets that make tailing
+            # cheap. With it they are ordinary files.
+            #
+            # Read-write because Ray owns the directory and writes to it; a
+            # read-only mount would stop the cluster starting at all.
+            ContainerMount(
+                host_path="/var/lib/faden/ray",
+                container_path="/tmp/ray",
+                mode="rw",
+            ),
+        ],
+        "platform_tuning": PlatformTuning(
+            ray=RayPlatformTuning(
+                env={
+                    # Certified necessary: the GB10's unified memory makes Ray's
+                    # host memory monitor evict workers spuriously.
+                    "RAY_memory_monitor_refresh_ms": "0",
+                    # Raylet and Python worker logs do not rotate by default.
+                    # That is survivable while the session directory lives inside
+                    # a container that gets recreated; once it is persisted on the
+                    # host (see the /tmp/ray mount above) an unbounded log
+                    # directory is how a node's disk fills, quietly, weeks later.
+                    #
+                    # 256 MiB across 5 files per log is roughly 1.2 GiB worst case
+                    # per log family -- enough to keep a long incident readable,
+                    # small enough to sit on a system disk.
+                    "RAY_ROTATION_MAX_BYTES": str(256 * 1024 * 1024),
+                    "RAY_ROTATION_BACKUP_COUNT": "5",
+                },
+                start_args={
+                    "disable_usage_stats": True,
+                    "metrics_export_port": 8089,
+                },
+            ),
+            nccl=NcclPlatformTuning(
+                env={
+                    "NCCL_IB_RETRY_CNT": "7",
+                    "NCCL_BUFFSIZE": "16777216",
+                },
+            ),
+            # Opt-in only: NCCL_DEBUG=INFO produces verbose per-rank output on
+            # every collective and is a diagnostic, not a runtime setting.
+            diagnostics={"NCCL_DEBUG": "INFO"},
+        ),
+    },
+    # The generic x86_64 NVIDIA runtime.
+    #
+    # One flavor for the whole platform, not one per card. Its kernels are
+    # compiled for sm_75 through sm_120 -- Turing to Blackwell -- so a TITAN RTX,
+    # an A100 and an RTX 5090 all run the same image, and adding a GPU model is
+    # usually adding nothing at all.
+    #
+    # Ray 2.58.0 matches the DGX runtime on purpose: Ray refuses to form a
+    # cluster across mismatched versions, so the two platforms move together.
+    #
+    # It carries no mounts. The DGX flavor's paths are that machine's
+    # (``/home/sachi/.cache/huggingface``), and a generic runtime has no business
+    # guessing where a model store lives -- the agent supplies it.
+    "x86_64": {
+        "display_name": "NVIDIA x86_64 Runtime (generic)",
+        "what": "for any mainstream NVIDIA card on x86_64, from Turing (sm_75) to Blackwell (sm_120)",
+        "target_architecture": TargetArchitecture(
+            cpu="x86_64",
+            os="linux",
+            accelerator=AcceleratorSpec(
+                vendor="nvidia",
+                families=[],  # deliberately open: the capability list is the gate
+                compute_capabilities=["7.5", "8.0", "8.6", "9.0", "10.0", "12.0"],
+            ),
+        ),
+    },
+}
+
+
+def _catalogue() -> dict[str, RuntimeBundleManifest]:
+    """Every runtime shipped beside the code, by runtime id."""
+    paths = _manifest_paths()
+    if not paths:  # pragma: no cover - a slim checkout without runtime-image/
+        log.warning("No runtime manifests shipped with this backend; no machine can run a cluster")
+    runtimes: dict[str, RuntimeBundleManifest] = {}
+    for path in paths:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        flavor = dict(_FLAVORS.get(str(manifest.get("flavor")), {}))
+        runtime_id = str(manifest.get("runtime_id") or "")
+        if not flavor or not runtime_id:
+            raise BundleValidationError(
+                f"{path.name} names no known flavor ({manifest.get('flavor')!r}) or no runtime_id; "
+                "mint it with runtime-image/rebuild_runtime_image.py"
+            )
+        if runtime_id in runtimes:
+            raise BundleValidationError(f"{path.name}: runtime {runtime_id} is minted twice")
+        runtimes[runtime_id] = RuntimeBundleManifest.from_runtime_manifest(
+            manifest,
+            bundle_id=runtime_id,
+            description=_described(manifest, flavor.pop("what")),
+            report_ref=f"runtime-image/{path.name}",
+            **flavor,
         )
-    )
-except BundleValidationError:  # pragma: no cover - manifest absent in a slim checkout
-    GENERIC_X86_NVIDIA_BUNDLE = None
+    return runtimes
+
+
+#: The order a machine's default runtime is picked in, best evidence first.
+#: A failed certification is never a default.
+_EVIDENCE = ("passed", "partial", "uncertified")
+
+
+def _certified_at(bundle: RuntimeBundleManifest) -> float:
+    """When the runtime was certified, as a number to sort by; 0 when never."""
+    timestamp = bundle.certification.timestamp
+    try:
+        return datetime.fromisoformat(timestamp).timestamp() if timestamp else 0.0
+    except ValueError:
+        return 0.0
+
+
+#: Where a cluster keeps its runtime: ``config_json[RUNTIME_KEY]`` is the one it
+#: was switched to, ``observed_status_json[RUNTIME_KEY]`` what each machine
+#: was started with (by node id).
+RUNTIME_KEY = "runtime"
+
+
+def started_runtimes(environment: Any) -> dict[str, str]:
+    """The runtime each of a cluster's machines was started with, by node id."""
+    return dict((environment.observed_status_json or {}).get(RUNTIME_KEY) or {})
+
+
+def _preference(environment: Any, node_id: Any) -> tuple[str, ...]:
+    """The runtimes a cluster's machine runs, first say first (``runtime_choice``)."""
+    if environment is None:
+        return ()
+    chosen = (environment.config_json or {}).get(RUNTIME_KEY)
+    started = started_runtimes(environment).get(str(node_id))
+    return tuple(str(runtime) for runtime in (chosen, started) if runtime)
 
 
 #: Container paths a node fills from its own configuration.
@@ -555,13 +612,7 @@ class RuntimeBundleRegistry:
     """In-memory and file-backed registry for certified runtime bundles."""
 
     def __init__(self) -> None:
-        self._bundles: dict[str, RuntimeBundleManifest] = {
-            CERTIFIED_DGX_SPARK_BUNDLE.bundle_id: CERTIFIED_DGX_SPARK_BUNDLE,
-        }
-        if GENERIC_X86_NVIDIA_BUNDLE is not None:
-            self._bundles[GENERIC_X86_NVIDIA_BUNDLE.bundle_id] = (
-                GENERIC_X86_NVIDIA_BUNDLE
-            )
+        self._bundles: dict[str, RuntimeBundleManifest] = _catalogue()
 
     def register_bundle(self, bundle: RuntimeBundleManifest) -> None:
         """Register a new or updated bundle after validating its identity."""
@@ -594,9 +645,13 @@ class RuntimeBundleRegistry:
             )
 
     def resolve_for_node(
-        self, node: InfraNode, *, driver: str = "ray"
+        self, node: InfraNode, *, driver: str = "ray", environment: Any = None
     ) -> RuntimeBundleManifest | None:
-        """The certified bundle that runs *driver* on *node*, if there is one.
+        """The runtime that runs *driver* on *node*, as a member of *environment*.
+
+        The one the cluster was switched to, else the one the machine was
+        started with, else the machine's default (``runtime_choice`` says
+        why). No *environment*: the default.
 
         This replaces pinning a bundle id on the environment. Architecture is
         a property of a machine, so an artifact keyed by architecture cannot
@@ -612,35 +667,61 @@ class RuntimeBundleRegistry:
         caller must treat as a refusal rather than a reason to fall back to
         something that will not run.
         """
-        # A node that has not reported its platform cannot be resolved for.
-        # ``validate_node_compatibility`` is permissive by design -- it
-        # answers "is there a reason this cannot work", and an unknown field
-        # is not a reason -- so on a node with no inventory yet every bundle
-        # passed and the sort below picked one by capability count. That is
-        # how an aarch64 image would be chosen for an unknown machine.
-        caps = node.capabilities_json or {}
-        if not str(caps.get("machine") or "").strip():
-            return None
+        matches = self.runtimes_for(node, driver=driver)
+        for runtime_id in _preference(environment, node.id):
+            chosen = next((b for b in matches if b.bundle_id == runtime_id), None)
+            if chosen is not None:
+                return chosen
+        return self.default_among(matches)
 
-        matches = [
+    def runtimes_for(self, node: InfraNode, *, driver: str = "ray") -> list[RuntimeBundleManifest]:
+        """Every runtime that runs *driver* on *node*.
+
+        Empty for a node that has not reported its platform:
+        ``validate_node_compatibility`` answers "is there a reason this cannot
+        work", and an unknown field is not one, so an unknown machine would
+        otherwise match every runtime -- an aarch64 image for an x86 box.
+        """
+        if not str((node.capabilities_json or {}).get("machine") or "").strip():
+            return []
+        return [
             bundle
             for bundle in self._bundles.values()
-            if bundle.driver == driver
-            and self.validate_node_compatibility(bundle, node)[0]
+            if bundle.driver == driver and self.validate_node_compatibility(bundle, node)[0]
         ]
-        if not matches:
+
+    @staticmethod
+    def default_among(matches: list[RuntimeBundleManifest]) -> RuntimeBundleManifest | None:
+        """The runtime a machine gets when its cluster chose none.
+
+        Never a preview -- that is for a cluster whose operator chose it --
+        and never one that failed certification. Among the rest: the narrowest
+        capability set (a runtime built more specifically for this hardware),
+        then the best evidence, then the most recently certified, then the id,
+        so a cluster's image never depends on dict ordering.
+        """
+        candidates = [
+            b for b in matches
+            if b.certification.channel != "preview" and b.certification.status in _EVIDENCE
+        ]
+        if not candidates:
             return None
-        # Deterministic when several fit: the narrowest capability set wins,
-        # then bundle_id. A bundle that names fewer capabilities was built
-        # more specifically for this hardware, and an arbitrary pick here
-        # would make a cluster's image depend on dict ordering.
-        matches.sort(
+        return min(
+            candidates,
             key=lambda b: (
                 len(b.target_architecture.accelerator.compute_capabilities) or 999,
+                _EVIDENCE.index(b.certification.status),
+                -_certified_at(b),
                 b.bundle_id,
-            )
+            ),
         )
-        return matches[0]
+
+    def defaults(self) -> set[str]:
+        """The runtime each kind of machine gets unless its cluster chose another."""
+        kinds: dict[str, list[RuntimeBundleManifest]] = {}
+        for bundle in self._bundles.values():
+            kinds.setdefault(bundle.target_architecture.model_dump_json(), []).append(bundle)
+        return {default.bundle_id for group in kinds.values() if (default := self.default_among(group))}
 
     def bundles_for_driver(self, driver: str) -> list[RuntimeBundleManifest]:
         """Every bundle that serves *driver*, for the operator-facing list."""
@@ -838,6 +919,7 @@ async def runtime_bundle_payload_for(
     session: "AsyncSession",
     node_id: "uuid.UUID | str | None",
     *,
+    environment: Any,
     driver: str = "ray",
     env: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
@@ -848,45 +930,34 @@ async def runtime_bundle_payload_for(
     that genuinely has one; :func:`~...planner` refuses a deployment onto a
     node without a bundle before it gets this far.
     """
-    node = await _node_row(session, node_id)
-    if node is None:
-        return None
-    bundle = default_bundle_registry.resolve_for_node(node, driver=driver)
-    if bundle is None:
+    node, bundle = await node_and_bundle_for(session, node_id, driver=driver, environment=environment)
+    if node is None or bundle is None:
         return None
     return default_bundle_registry.container_launch_spec(
         bundle, name=RUNTIME_CONTAINER_NAME, env=env or {}, node=node,
     )
 
 
-async def bundle_for_node(
-    session: "AsyncSession", node_id: "uuid.UUID | str | None", *, driver: str = "ray"
-) -> RuntimeBundleManifest | None:
-    """The bundle that runs *driver* on the machine *node_id* names.
-
-    A small async wrapper so callers that hold an id rather than a row do not
-    each write the same two lines, and so there is one place to change when
-    resolution grows a cache.
-    """
-    node = await _node_row(session, node_id)
-    if node is None:
-        return None
-    return default_bundle_registry.resolve_for_node(node, driver=driver)
-
-
 async def node_and_bundle_for(
-    session: "AsyncSession", node_id: "uuid.UUID | str | None", *, driver: str = "ray"
+    session: "AsyncSession",
+    node_id: "uuid.UUID | str | None",
+    *,
+    environment: Any,
+    driver: str = "ray",
 ) -> "tuple[InfraNode | None, RuntimeBundleManifest | None]":
-    """The node row and the bundle certified for it, from one lookup.
+    """The node row and the runtime it runs as a member of *environment*.
 
     Callers need both -- the bundle for the image, the row for the host paths
     the launch spec is composed from -- and fetching the row twice for one
-    command is the kind of thing that only shows up under load.
+    command is the kind of thing that only shows up under load. *environment*
+    is required (None only for a machine outside any cluster): resolved
+    without it, a probe named the default runtime's image while the machine
+    ran the one its cluster chose.
     """
     node = await _node_row(session, node_id)
     if node is None:
         return None, None
-    return node, default_bundle_registry.resolve_for_node(node, driver=driver)
+    return node, default_bundle_registry.resolve_for_node(node, driver=driver, environment=environment)
 
 
 async def _node_row(
