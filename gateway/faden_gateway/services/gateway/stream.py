@@ -57,8 +57,18 @@ def _contains_data_event(chunk: bytes) -> bool:
 
 def _extract_usage_from_chunk(chunk: bytes, stats: StreamStats) -> None:
     text = chunk.decode("utf-8", errors="ignore")
+    event: str | None = None
     for line in text.splitlines():
-        if not line.startswith("data:"):
+        if not line.strip():
+            event = None
+            continue
+        if line.startswith("event:"):
+            event = line[len("event:") :].strip()
+            continue
+        # The gateway's own events are not the model's: a gateway tool that
+        # failed or was refused says "error": true in its TOOL_CALL_END, and
+        # read as the model's error it failed a complete answer.
+        if not line.startswith("data:") or event == "faden":
             continue
         payload = line[len("data:") :].strip()
         if not payload or payload == "[DONE]":
