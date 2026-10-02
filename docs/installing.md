@@ -111,6 +111,11 @@ A backup holds a dump of every database, the `.env`, and the migration
 versions. Keep copies off the server: a backup on the same disk doesn't
 survive losing the disk.
 
+The `.env` holds the key the chats are encrypted with
+(`FADEN_GATEWAY_ENCRYPTION_KEY`): databases restored without it have chats
+nobody can read. `faden backup --db-only` leaves the `.env` out, so keep a
+copy of it apart from such backups, as private as the backups themselves.
+
 `faden deploy` offers a nightly backup (at 03:00, keeping the last 7), and
 turns it on with `-y`. To change or stop it:
 

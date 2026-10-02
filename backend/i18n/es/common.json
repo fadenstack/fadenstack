@@ -1642,8 +1642,9 @@
     "sessions_title": "Sesiones de chat",
     "attachments_title": "Adjuntos de chat",
     "col_name": "Nombre",
-    "col_title": "Título",
     "col_user": "Usuario",
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Su título y sus mensajes son de su usuario y no se muestran aquí.",
     "col_tenant": "Inquilino",
     "col_model": "Modelo",
     "col_created": "Creado",
@@ -1654,7 +1655,6 @@
     "col_type": "Tipo de contenido",
     "col_extraction": "Extracción",
     "col_scope": "Ámbito",
-    "untitled_session": "(sin título)",
     "search_projects": "Buscar proyectos…",
     "search_sessions": "Buscar sesiones…",
     "search_attachments": "Buscar adjuntos…",
@@ -1676,9 +1676,7 @@
     "extraction_failed": "fallido",
     "extraction_skipped": "omitido",
     "scope_session": "sesión",
-    "scope_project": "proyecto",
-    "title_encrypted": "Cifrado",
-    "title_encrypted_hint": "Los títulos de chat se cifran como los mensajes; solo los ve quien los escribió."
+    "scope_project": "proyecto"
   },
   "mcp": {
     "servers_title": "Servidores MCP",

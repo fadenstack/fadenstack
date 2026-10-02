@@ -1,7 +1,8 @@
-"""The admin chat sessions list shows no ciphertext for an encrypted title.
+"""The admin chat sessions list shows chats by id, and never reads their titles.
 
-The gateway encrypts chat titles like the messages; the backend has no key,
-so an encrypted title is listed as encrypted rather than as its token.
+A chat's title is the start of its user's first message: theirs, as the
+messages are, and encrypted with them. It used to be listed in plain text
+wherever the gateway had no key, which was every install (2026-10-02).
 """
 
 from __future__ import annotations
@@ -22,25 +23,27 @@ pytestmark = pytest.mark.anyio()
 
 
 class _Gateway:
-    """Enough of an AsyncSession for the sessions list."""
+    """Enough of an AsyncSession for the sessions list, keeping what it was asked."""
 
     def __init__(self, rows: list[dict[str, Any]]) -> None:
         self._rows = rows
+        self.asked: list[str] = []
 
-    async def execute(self, *_args: Any, **_kwargs: Any) -> list[SimpleNamespace]:
+    async def execute(self, statement: Any, *_args: Any, **_kwargs: Any) -> list[SimpleNamespace]:
+        self.asked.append(str(statement))
         return [SimpleNamespace(_mapping=row) for row in self._rows]
 
 
-def _row(title: str | None) -> dict[str, Any]:
+def _row() -> dict[str, Any]:
     now = datetime.now(tz=UTC)
     return {
         "id": uuid.uuid4(), "tenant_id": "t", "user_id": "u", "project_id": None,
-        "title": title, "status": "active", "created_at": now, "updated_at": now,
+        "status": "active", "created_at": now, "updated_at": now,
     }
 
 
-async def test_an_encrypted_title_is_listed_as_encrypted(fastapi_app: FastAPI, client: AsyncClient) -> None:
-    gateway = _Gateway([_row("Launch plan"), _row("gAAAAABm-ciphertext-of-a-title"), _row(None)])
+async def test_chats_are_listed_by_id_without_their_titles(fastapi_app: FastAPI, client: AsyncClient) -> None:
+    gateway = _Gateway([_row(), _row()])
 
     async def gateway_session() -> Any:
         yield gateway
@@ -55,8 +58,6 @@ async def test_an_encrypted_title_is_listed_as_encrypted(fastapi_app: FastAPI, c
 
     assert resp.status_code == 200
     rows = resp.json()["data"]
-    assert [(r["title"], r.get("title_encrypted", False)) for r in rows] == [
-        ("Launch plan", False),
-        (None, True),
-        (None, False),
-    ]
+    assert len(rows) == 2 and all(uuid.UUID(r["id"]) for r in rows)
+    assert all("title" not in r for r in rows)
+    assert "title" not in gateway.asked[0]

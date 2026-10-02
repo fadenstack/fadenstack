@@ -1642,8 +1642,9 @@
     "sessions_title": "Chat-Sitzungen",
     "attachments_title": "Chat-Anhänge",
     "col_name": "Name",
-    "col_title": "Titel",
     "col_user": "Benutzer",
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Titel und Nachrichten gehören der Person, die ihn führt, und werden hier nicht gezeigt.",
     "col_tenant": "Mandant",
     "col_model": "Modell",
     "col_created": "Erstellt",
@@ -1654,7 +1655,6 @@
     "col_type": "Inhaltstyp",
     "col_extraction": "Extraktion",
     "col_scope": "Bereich",
-    "untitled_session": "(ohne Titel)",
     "search_projects": "Projekte suchen…",
     "search_sessions": "Sitzungen suchen…",
     "search_attachments": "Anhänge suchen…",
@@ -1676,9 +1676,7 @@
     "extraction_failed": "fehlgeschlagen",
     "extraction_skipped": "übersprungen",
     "scope_session": "Sitzung",
-    "scope_project": "Projekt",
-    "title_encrypted": "Verschlüsselt",
-    "title_encrypted_hint": "Chat-Titel sind wie die Nachrichten verschlüsselt; nur die Person, die sie geschrieben hat, sieht sie."
+    "scope_project": "Projekt"
   },
   "mcp": {
     "servers_title": "MCP-Server",

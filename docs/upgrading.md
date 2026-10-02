@@ -29,6 +29,16 @@ machines -- formed again by itself once the agents were back, its model
 serving again after its usual reload. Every later upgrade is `faden upgrade`
 as below.
 
+## Chats encrypted from the October 2026 upgrade on
+
+`faden deploy` has always written a chat encryption key into `.env`
+(`FADEN_GATEWAY_ENCRYPTION_KEY`), but the gateway was never given it, and
+chats were stored in plain text. From the upgrade that passes it on, new
+messages and titles are encrypted with it; chats from before stay readable
+as they are, unencrypted. Nothing has to be done, except to keep the `.env`
+with the backups: without that key the encrypted chats cannot be read (see
+[Back up and restore](installing.md#back-up-and-restore)).
+
 ## What `faden upgrade` does
 
 It upgrades the installation the CLI is configured for

@@ -55,22 +55,25 @@ export default function ChatSessionsPage() {
 
   const columns: ColumnDef<ChatSession>[] = [
     {
-      key: "title",
-      label: t("chat_admin.col_title"),
-      sortable: true,
-      sortValue: (r) => r.title ?? "",
-      searchValue: (r) => r.title ?? "",
-      render: (r) =>
-        r.title_encrypted ? (
-          <Tooltip title={t("chat_admin.title_encrypted_hint")}>
-            <Stack direction="row" alignItems="center" gap={0.5} sx={{ color: "text.secondary" }}>
-              <LockOutlinedIcon sx={{ fontSize: 16 }} />
-              {t("chat_admin.title_encrypted")}
-            </Stack>
-          </Tooltip>
-        ) : (
-          r.title || t("chat_admin.untitled_session")
-        ),
+      // By id: a chat's title is the start of its user's first message, and
+      // theirs as the messages are. The backend does not send it.
+      key: "id",
+      label: t("chat_admin.col_chat"),
+      searchValue: (r) => r.id,
+      render: (r) => (
+        <Tooltip title={t("chat_admin.chat_id_hint", { id: r.id })}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={0.5}
+            sx={{ fontFamily: "monospace" }}
+            data-testid="chat-id"
+          >
+            <LockOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+            {r.id.slice(0, 8)}
+          </Stack>
+        </Tooltip>
+      ),
     },
     {
       key: "user_id",

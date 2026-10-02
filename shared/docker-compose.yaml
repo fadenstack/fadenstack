@@ -361,6 +361,13 @@ services:
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
       FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend
       FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      # The key chats are encrypted with at rest: messages, titles, memory, a
+      # reply's events in Redis. `faden deploy` writes one into .env; it never
+      # reached the gateway, and every install stored its chats in plain text
+      # (2026-10-02). Empty still stores plain text. Rows from before stay
+      # readable. Without this key the encrypted chats cannot be read: .env
+      # belongs in every backup (`faden backup` takes it; --db-only does not).
+      FADEN_GATEWAY_ENCRYPTION_KEY: ${FADEN_GATEWAY_ENCRYPTION_KEY:-}
       FADEN_GATEWAY_JWT_ALGORITHM: HS256
       FADEN_GATEWAY_DB_HOST: postgres
       FADEN_GATEWAY_DB_PORT: 5432

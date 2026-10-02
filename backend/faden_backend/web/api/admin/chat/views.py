@@ -25,9 +25,6 @@ from faden_backend.web.api.admin.dependencies import require_superuser
 
 logger = logging.getLogger(__name__)
 
-#: Fernet tokens start with this (version byte 0x80, base64).
-_FERNET_PREFIX = "gAAAAA"
-
 router = APIRouter()
 
 
@@ -104,8 +101,10 @@ async def list_sessions(
     gw: AsyncSession = Depends(_get_gateway_session),
     project_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
+    # Listed by id: a chat's title is the start of its user's first message,
+    # theirs as the messages are, and is not read here at all.
     q = (
-        "SELECT id, tenant_id, user_id, project_id, title, status, "
+        "SELECT id, tenant_id, user_id, project_id, status, "
         "created_at, updated_at FROM chat_session"
     )
     params: dict[str, Any] = {}
@@ -128,11 +127,6 @@ async def list_sessions(
         for k in ("created_at", "updated_at"):
             if row.get(k):
                 row[k] = row[k].isoformat()
-        # The gateway encrypts titles like the messages (a title is the start
-        # of the first one); the backend has no key and shows no ciphertext.
-        if isinstance(row.get("title"), str) and row["title"].startswith(_FERNET_PREFIX):
-            row["title"] = None
-            row["title_encrypted"] = True
     return {"data": rows}
 
 

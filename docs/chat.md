@@ -73,8 +73,14 @@ the chat in place: Enter saves, Escape cancels.
 ![Renaming a chat](images/chat/02-rename.png)
 
 Titles are stored encrypted, as the messages are: they are the start of what
-you wrote. The admin console's list of chat sessions shows an encrypted title
-as "Encrypted", never its text.
+you wrote. The admin console lists chats by their id and never shows a title.
+
+The key they are encrypted with is `FADEN_GATEWAY_ENCRYPTION_KEY` in the
+install's `.env`, which `faden deploy` generates. Until October 2026 it never
+reached the gateway, so chats were stored in plain text on every install; an
+upgrade passes it on, and from then on new messages and titles are
+encrypted. Chats from before stay readable as they were. Losing the key makes
+the encrypted chats unreadable: keep the `.env` with your backups.
 
 ---
 

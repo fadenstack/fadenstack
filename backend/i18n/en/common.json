@@ -1774,8 +1774,9 @@
     "sessions_title": "Chat Sessions",
     "attachments_title": "Chat Attachments",
     "col_name": "Name",
-    "col_title": "Title",
     "col_user": "User",
+    "col_chat": "Chat",
+    "chat_id_hint": "Chat {{id}}. Its title and messages are its user's own and are not shown here.",
     "col_tenant": "Tenant",
     "col_model": "Model",
     "col_created": "Created",
@@ -1786,7 +1787,6 @@
     "col_type": "Content Type",
     "col_extraction": "Extraction",
     "col_scope": "Scope",
-    "untitled_session": "(untitled)",
     "search_projects": "Search projects…",
     "search_sessions": "Search sessions…",
     "search_attachments": "Search attachments…",
@@ -1808,9 +1808,7 @@
     "extraction_failed": "failed",
     "extraction_skipped": "skipped",
     "scope_session": "session",
-    "scope_project": "project",
-    "title_encrypted": "Encrypted",
-    "title_encrypted_hint": "Chat titles are encrypted like the messages; only the user who wrote them sees them."
+    "scope_project": "project"
   },
   "chat": {
     "title": "Chat",

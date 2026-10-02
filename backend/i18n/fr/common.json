@@ -1776,8 +1776,9 @@
     "sessions_title": "Sessions de conversation",
     "attachments_title": "Pièces jointes de conversation",
     "col_name": "Nom",
-    "col_title": "Titre",
     "col_user": "Utilisateur",
+    "col_chat": "Discussion",
+    "chat_id_hint": "Discussion {{id}}. Son titre et ses messages appartiennent à son utilisateur et ne sont pas affichés ici.",
     "col_tenant": "Locataire",
     "col_model": "Modèle",
     "col_created": "Créé",
@@ -1788,7 +1789,6 @@
     "col_type": "Type de contenu",
     "col_extraction": "Extraction",
     "col_scope": "Portée",
-    "untitled_session": "(sans titre)",
     "search_projects": "Rechercher des projets…",
     "search_sessions": "Rechercher des sessions…",
     "search_attachments": "Rechercher des pièces jointes…",
@@ -1810,9 +1810,7 @@
     "extraction_failed": "échec",
     "extraction_skipped": "ignorée",
     "scope_session": "session",
-    "scope_project": "projet",
-    "title_encrypted": "Chiffré",
-    "title_encrypted_hint": "Les titres de chat sont chiffrés comme les messages ; seule la personne qui les a écrits les voit."
+    "scope_project": "projet"
   },
   "chat": {
     "title": "Conversation",

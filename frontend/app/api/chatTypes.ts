@@ -23,9 +23,8 @@ export interface ChatSession {
   tenant_id: string;
   user_id: string;
   project_id: string | null;
-  title: string | null;
-  /** Admin lists: the title is encrypted at rest and not shown (only to its user). */
-  title_encrypted?: boolean;
+  /** Its user's own; admin lists do not carry it. */
+  title?: string | null;
   status: string;
   metadata_json?: Record<string, unknown> | null;
   created_at: string;
