@@ -50,6 +50,11 @@ still being written has a small spinner in the sidebar.
   reply is not sent to the model with later messages; a stopped one is.
 - **A server restart** ends the replies being written; they are marked as
   cut off and can be tried again.
+- **Where it is kept meanwhile.** So that any of the gateway's workers can
+  show it, a reply's parts also go to the stack's Redis while it is written,
+  and stay there for a minute after it ends. With chat encryption on
+  (`FADEN_GATEWAY_ENCRYPTION_KEY`), they are encrypted with the same key as
+  the messages. The finished reply itself is in the database.
 
 This is the chat's own behaviour. A request to the gateway's OpenAI-style API
 still ends when its client disconnects.

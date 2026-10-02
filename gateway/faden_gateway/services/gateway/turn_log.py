@@ -7,6 +7,13 @@ writing it the same way (a key it looks at with each batch of events).
 
 The events go in batches (``StreamBuffer``'s pump, every 100 ms), not one
 per token. Redis runs with ``noeviction``, so every key here has a TTL.
+
+The events are chat text, and this Redis snapshots to disk: with encryption
+on they are encrypted with the key of the chat's messages ("chat-content"),
+and a finished reply's are kept only a minute -- a page that comes back later
+reads it from the database. Kept 15 minutes in plain text, they came to 110 MB
+after 9,500 turns on .61 (2026-10-02), while the same replies were encrypted
+in Postgres.
 """
 
 from __future__ import annotations
@@ -15,12 +22,22 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
+from cryptography.fernet import InvalidToken
 from redis.asyncio import ConnectionPool, Redis
+
+from faden_gateway.db.crypto import seal, unseal
 
 log = logging.getLogger(__name__)
 
-#: How long a finished reply's events are kept, for a page that comes back late.
-KEEP_SEC = 900
+#: How long a reply's events are kept while it is written, from its last batch:
+#: longer than the longest a reply may take to start (a deployment's
+#: first_token_timeout_sec, up to 1800 s), so a slow start keeps them.
+LIVE_SEC = 3600
+#: How long a finished reply's events are kept: for a page reading it as it
+#: ended to catch up. A page that comes back later reads the database.
+DONE_SEC = 60
+#: The key the events are encrypted with: the one the chat's messages use.
+_PURPOSE = "chat-content"
 #: How long a stop request waits for the worker writing the reply.
 STOP_SEC = 600
 #: At most this many batches are kept per reply (about 30 minutes of them).
@@ -54,7 +71,7 @@ class TurnLog:
         async with Redis(connection_pool=self._pool) as redis:
             pipe = redis.pipeline(transaction=False)
             pipe.xadd(_events(turn_id), {"begin": b"1"}, maxlen=MAX_BATCHES, approximate=True)
-            pipe.expire(_events(turn_id), KEEP_SEC)
+            pipe.expire(_events(turn_id), LIVE_SEC)
             await pipe.execute()
 
     async def append(self, turn_id: str, data: bytes) -> bool:
@@ -62,19 +79,22 @@ class TurnLog:
         async with Redis(connection_pool=self._pool) as redis:
             pipe = redis.pipeline(transaction=False)
             if data:
-                pipe.xadd(_events(turn_id), {"d": data}, maxlen=MAX_BATCHES, approximate=True)
+                # "x" encrypted, "d" plain: encryption is off, or was when it was written.
+                sealed = seal(_PURPOSE, data)
+                fields = {"x": sealed} if sealed is not None else {"d": data}
+                pipe.xadd(_events(turn_id), fields, maxlen=MAX_BATCHES, approximate=True)
                 # Until the end sets the real one: a writer that dies leaves nothing for good.
-                pipe.expire(_events(turn_id), KEEP_SEC)
+                pipe.expire(_events(turn_id), LIVE_SEC)
             pipe.exists(_stop(turn_id))
             answers = await pipe.execute()
         return bool(answers[-1])
 
     async def end(self, turn_id: str) -> None:
-        """Mark the reply's end, for its readers; its events stay a while."""
+        """Mark the reply's end, for its readers; its events stay a minute."""
         async with Redis(connection_pool=self._pool) as redis:
             pipe = redis.pipeline(transaction=False)
             pipe.xadd(_events(turn_id), {"end": b"1"}, maxlen=MAX_BATCHES, approximate=True)
-            pipe.expire(_events(turn_id), KEEP_SEC)
+            pipe.expire(_events(turn_id), DONE_SEC)
             pipe.delete(_stop(turn_id))
             await pipe.execute()
 
@@ -109,5 +129,13 @@ class TurnLog:
                     if b"end" in fields:
                         return
                     data = fields.get(b"d")
+                    sealed = fields.get(b"x")
+                    if sealed:
+                        try:
+                            data = unseal(_PURPOSE, sealed)
+                        except InvalidToken:
+                            # Another key: the page reads the reply from the database instead.
+                            log.error("A chat reply's events could not be decrypted (turn %s)", turn_id)
+                            return
                     if data:
                         yield data

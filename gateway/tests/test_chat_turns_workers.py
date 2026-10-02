@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
-from redis.asyncio import ConnectionPool
+from redis.asyncio import ConnectionPool, Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.dao.session_dao import SessionDAO
@@ -127,6 +127,56 @@ async def test_a_stop_is_seen_with_the_next_batch(fake_redis_pool: ConnectionPoo
     assert await log.append("t3", b"") is False
     await log.request_stop("t3")
     assert await log.append("t3", b"more") is True
+
+
+@pytest.mark.anyio
+async def test_a_finished_replys_events_are_kept_a_minute_not_fifteen(fake_redis_pool: ConnectionPool) -> None:
+    """A page that comes back later reads the database; 15 minutes came to 110 MB on .61 (2026-10-02)."""
+    log = TurnLog(fake_redis_pool)
+    await log.begin("t4")
+    await log.append("t4", b"one")
+    async with Redis(connection_pool=fake_redis_pool) as redis:
+        assert await redis.ttl("faden:turn:t4:events") > 1800  # a slow start keeps them
+        await log.end("t4")
+        assert 0 < await redis.ttl("faden:turn:t4:events") <= 60
+
+
+@pytest.mark.anyio
+async def test_a_replys_events_are_encrypted_as_its_messages_are(
+    fake_redis_pool: ConnectionPool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """This Redis snapshots to disk, and the chat's messages in Postgres are encrypted."""
+    _encrypt_with(monkeypatch, "a key")
+    log = TurnLog(fake_redis_pool)
+    await log.append("t5", b'data: {"content": "the budget is 40k"}\n\n')
+    async with Redis(connection_pool=fake_redis_pool) as redis:
+        stored = await redis.xrange("faden:turn:t5:events")
+    assert b"budget" not in b"".join(b"".join(fields.values()) for _, fields in stored)
+    await log.end("t5")
+
+    read = [data async for data in log.read("t5", still_written=_true)]
+    assert read == [b'data: {"content": "the budget is 40k"}\n\n']
+
+
+@pytest.mark.anyio
+async def test_events_written_under_another_key_are_not_passed_on(
+    fake_redis_pool: ConnectionPool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The page reads the reply from the database instead of being sent ciphertext."""
+    _encrypt_with(monkeypatch, "the old key")
+    log = TurnLog(fake_redis_pool)
+    await log.append("t6", b"one")
+    await log.end("t6")
+    _encrypt_with(monkeypatch, "a new key")
+
+    assert [data async for data in log.read("t6", still_written=_true)] == []
+
+
+def _encrypt_with(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
+    from faden_gateway.db import crypto  # noqa: PLC0415
+
+    monkeypatch.setattr(crypto, "_key_provider", None)
+    crypto.configure(key)
 
 
 async def _true() -> bool:
