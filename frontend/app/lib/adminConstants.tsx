@@ -66,6 +66,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import GavelIcon from "@mui/icons-material/Gavel";
+import { AGENTS_PAGE_KEYS } from "~/api/agents";
 
 // ── Drawer sizing ────────────────────────────────────────────────
 export const DRAWER_WIDTH_OPEN = 240;
@@ -473,7 +474,7 @@ export const NAV: NavEntry[] = [
         to: "/admin/agents",
         labelKey: "nav.agents",
         icon: <SmartToyIcon />,
-        permission: ["agents:read", "agents:create", "agents:manage"],
+        permission: AGENTS_PAGE_KEYS,
       },
       {
         to: "/admin/governance",

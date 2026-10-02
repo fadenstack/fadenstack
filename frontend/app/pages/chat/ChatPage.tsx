@@ -28,8 +28,10 @@ import { listLanguages, type UiLanguage } from "~/api/i18n";
 import { clearCachedAccess } from "~/lib/adminConstants";
 import { patchSessionPiiPolicy } from "~/api/pii";
 import { patchSessionToolPolicy } from "~/api/tools";
+import { agentRights } from "~/api/agents";
 import { skillRights } from "~/api/skills";
 import CreateSkillDialog from "~/components/skills/CreateSkillDialog";
+import { useCan } from "~/lib/useCan";
 import { useSkillsModule } from "~/lib/useSkillsModule";
 import type { InitialMessageState } from "./components/ChatWelcome";
 import ChatSidebar, { CHAT_RAIL_WIDTH } from "./components/ChatSidebar";
@@ -50,12 +52,11 @@ const SIDEBAR_WIDTH = 260;
 
 export default function ChatPage() {
   const { sessionId } = useParams<{ sessionId?: string }>();
-  const { user, permissions } = useOutletContext<{
-    user: AuthUser;
-    permissions: Set<string>;
-  }>();
-  const canDebug = permissions.has("*") || permissions.has("chat.debug:read");
-  const skillsAllowed = skillRights((p) => permissions.has("*") || permissions.has(p));
+  const { user } = useOutletContext<{ user: AuthUser }>();
+  const can = useCan();
+  const canDebug = can("chat.debug:read");
+  const skillsAllowed = skillRights((p) => can(p));
+  const agentsAllowed = agentRights(can).open;
   const skillsModule = useSkillsModule();
   const navigate = useNavigate();
   const { t } = useTranslation("chat");
@@ -285,11 +286,12 @@ export default function ChatPage() {
       onProfile: () => setProfileOpen(true),
       onLogout: handleLogout,
       onSkills: chatSkills.value.enabled ? () => navigate("/skills") : undefined,
+      onAgents: agentsAllowed ? () => navigate("/agents") : undefined,
       phoneNav: isPhone
         ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
         : null,
     }),
-    [user.email, handleLogout, isPhone, navHand, sidebarOpen, chatSkills.value.enabled, navigate],
+    [user.email, handleLogout, isPhone, navHand, sidebarOpen, chatSkills.value.enabled, agentsAllowed, navigate],
   );
 
   // A phone's 100vh reaches behind the browser's toolbar.

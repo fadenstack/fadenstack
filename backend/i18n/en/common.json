@@ -3405,7 +3405,9 @@
       "sign_out": "Sign out",
       "sign_out_title": "Sign this device out?",
       "sign_out_confirm": "{{device}} ({{user}}) must sign in again to use the agent."
-    }
+    },
+    "back_to_chat": "Back to the chat",
+    "no_access": "You do not look after any agents. Ask an administrator to make you a maintainer of one."
   },
   "governance": {
     "title": "Governance",

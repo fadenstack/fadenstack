@@ -11,7 +11,7 @@ import { agentsApi } from "~/api/agents";
 import { agentFixture, versionFixture } from "~/test/agentFixtures";
 import { renderPage } from "~/test/renderPage";
 
-import AgentDetailPage from "./AgentDetailPage";
+import { AgentDetail } from "./AgentDetail";
 
 vi.mock("~/api/agents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/agents")>();
@@ -32,7 +32,7 @@ vi.mock("~/api/chatClient", () => ({ chatApi: { listModels: vi.fn().mockResolved
 const api = vi.mocked(agentsApi);
 
 function openAgent(tab = "definition") {
-  renderPage(<AgentDetailPage />, {
+  renderPage(<AgentDetail slug="excel-assistant" basePath="/admin/agents" />, {
     path: "/admin/agents/:slug",
     initialPath: `/admin/agents/excel-assistant?tab=${tab}`,
   });
@@ -44,7 +44,7 @@ beforeEach(() => {
   api.versions.mockResolvedValue([versionFixture(1)]);
 });
 
-describe("AgentDetailPage", () => {
+describe("AgentDetail", () => {
   it("edits the latest version and saves the change as a new one", async () => {
     api.addVersion.mockResolvedValue(versionFixture(2));
     openAgent();

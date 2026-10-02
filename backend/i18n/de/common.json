@@ -3407,7 +3407,9 @@
       "sign_out": "Abmelden",
       "sign_out_title": "Dieses Gerät abmelden?",
       "sign_out_confirm": "{{device}} ({{user}}) muss sich erneut anmelden, um den Agenten zu nutzen."
-    }
+    },
+    "back_to_chat": "Zurück zum Chat",
+    "no_access": "Sie betreuen keine Agenten. Bitten Sie einen Administrator, Sie zum Betreuer eines Agenten zu machen."
   },
   "governance": {
     "title": "Governance",

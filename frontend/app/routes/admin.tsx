@@ -7,7 +7,7 @@
  */
 import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { adminUsers, rootMode, type RootModeStatus } from "~/api/admin";
+import { accessKeys, adminUsers, rootMode, type MeAccess, type RootModeStatus } from "~/api/admin";
 import { auth } from "~/api/auth";
 import { useThemeMode } from "~/theme-mode";
 import { listLanguages, type UiLanguage } from "~/api/i18n";
@@ -129,14 +129,8 @@ function AdminLayoutInner() {
     DEFAULT_PINNED_IDS,
   );
 
-  function applyAccessState(access: {
-    email: string;
-    is_superuser: boolean;
-    permissions: Array<{ resource: string; action: string }>;
-  }) {
-    const permissions = access.permissions.map(
-      (p) => `${p.resource}:${p.action}`,
-    );
+  function applyAccessState(access: MeAccess) {
+    const permissions = accessKeys(access);
     setCurrentUserEmail(access.email);
     setIsSuperuser(access.is_superuser);
     setPermissionKeys(new Set(permissions));
@@ -155,9 +149,7 @@ function AdminLayoutInner() {
         writeCachedAccess({
           email: access.email,
           isSuperuser: access.is_superuser,
-          permissions: access.permissions.map(
-            (p) => `${p.resource}:${p.action}`,
-          ),
+          permissions: accessKeys(access),
         });
         navigate("/chat", { replace: true });
         return;

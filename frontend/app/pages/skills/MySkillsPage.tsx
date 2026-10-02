@@ -3,7 +3,7 @@
  * organization's -- outside the admin pages. Reached from the chat.
  */
 import { useEffect, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
@@ -23,7 +23,6 @@ import AddIcon from "@mui/icons-material/Add";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
 
-import type { AuthUser } from "~/api/auth";
 import {
   listSkills,
   skillRights,
@@ -37,6 +36,8 @@ import {
   SkillStatusChip,
   SkillVisibilityChip,
 } from "~/components/skills/SkillChips";
+import { UserPageFrame } from "~/components/UserPageFrame";
+import { useCan } from "~/lib/useCan";
 import { useSkillsModule } from "~/lib/useSkillsModule";
 
 const VIEWS: SkillListView[] = ["mine", "shared", "org", "all"];
@@ -44,8 +45,8 @@ const VIEWS: SkillListView[] = ["mine", "shared", "org", "all"];
 export default function MySkillsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { permissions } = useOutletContext<{ user: AuthUser; permissions: Set<string> }>();
-  const rights = skillRights((p) => permissions.has("*") || permissions.has(p));
+  const can = useCan();
+  const rights = skillRights((p) => can(p));
   const skillsModule = useSkillsModule();
 
   const [view, setView] = useState<SkillListView>("mine");
@@ -179,7 +180,7 @@ export default function MySkillsPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", px: { xs: 2, md: 3 }, py: 3, height: "100vh", overflow: "auto" }}>
+    <UserPageFrame maxWidth={1100}>
       {header}
       {body}
       <CreateSkillDialog
@@ -190,6 +191,6 @@ export default function MySkillsPage() {
           navigate(`/skills/${s.id}`);
         }}
       />
-    </Box>
+    </UserPageFrame>
   );
 }

@@ -63,13 +63,13 @@ export function DecisionsTable() {
       sortable: true,
       sortValue: (d) => d.created_at,
       render: (d) => formatDateTime(d.created_at),
-      minWidth: 170,
+      width: 170,
     },
     {
       key: "stage",
       label: t("governance.decisions.stage"),
       render: (d) => <Chip size="small" variant="outlined" label={label("governance.decisions.stage_value", d.stage)} />,
-      minWidth: 90,
+      width: 90,
     },
     {
       key: "outcome",
@@ -77,7 +77,7 @@ export function DecisionsTable() {
       render: (d) => (
         <Chip size="small" color={OUTCOME_COLOR[d.outcome] ?? "default"} label={label("governance.decisions.outcome_value", d.outcome)} />
       ),
-      minWidth: 150,
+      width: 150,
     },
     {
       key: "message",
@@ -98,21 +98,21 @@ export function DecisionsTable() {
           )}
         </>
       ),
-      minWidth: 340,
+      width: 380,
     },
     {
       key: "user",
       label: t("governance.decisions.user"),
       searchValue: (d) => (d.user_id ? userName(d.user_id) : ""),
       render: (d) => (d.user_id ? userName(d.user_id) : "—"),
-      minWidth: 170,
+      width: 210,
     },
     {
       key: "agent",
       label: t("governance.decisions.agent"),
       searchValue: (d) => agentName(d.agent_id),
       render: (d) => agentName(d.agent_id),
-      minWidth: 140,
+      width: 160,
     },
   ];
 

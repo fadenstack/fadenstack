@@ -9,7 +9,7 @@ import { Outlet, useNavigate } from "react-router";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import { auth, type AuthUser } from "~/api/auth";
-import { adminUsers } from "~/api/admin";
+import { accessKeys, adminUsers } from "~/api/admin";
 import { servicesApi } from "~/api/services";
 
 export default function ChatLayout() {
@@ -44,10 +44,7 @@ export default function ChatLayout() {
         try {
           const access = await adminUsers.meAccess();
           if (!cancelled) {
-            const keys = access.permissions.map(
-              (p) => `${p.resource}:${p.action}`,
-            );
-            setPermissions(new Set(access.is_superuser ? ["*"] : keys));
+            setPermissions(new Set(access.is_superuser ? ["*"] : accessKeys(access)));
           }
         } catch {
           // Permissions fetch failed — user keeps empty set (no debug)

@@ -3407,7 +3407,9 @@
       "sign_out": "Cerrar sesión",
       "sign_out_title": "¿Cerrar la sesión de este dispositivo?",
       "sign_out_confirm": "{{device}} ({{user}}) tendrá que volver a iniciar sesión para usar el agente."
-    }
+    },
+    "back_to_chat": "Volver al chat",
+    "no_access": "No es responsable de ningún agente. Pida a un administrador que le haga responsable de uno."
   },
   "governance": {
     "title": "Gobernanza",

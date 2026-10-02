@@ -11,6 +11,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from faden_backend.db.dao.agents_dao import AgentsDAO
 from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
@@ -121,6 +122,7 @@ async def _resolve_users_secret(session: AsyncSession) -> str:
 async def me_access(
     user: Annotated[User, Depends(current_active_user)],
     rbac_dao: RbacDAO = Depends(),
+    agents_dao: AgentsDAO = Depends(),
 ) -> MeAccessDTO:
     """Return effective roles and permissions for the current user."""
     roles = await rbac_dao.get_user_roles(user.id)
@@ -131,6 +133,7 @@ async def me_access(
         is_superuser=user.is_superuser,
         roles=[_role_to_dto(role) for role in sorted(roles, key=lambda r: r.name)],
         permissions=_permissions_to_dto(permissions),
+        maintains_agents=await agents_dao.maintains_any(user.id),
     )
 
 

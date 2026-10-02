@@ -3407,7 +3407,9 @@
       "sign_out": "Déconnecter",
       "sign_out_title": "Déconnecter cet appareil ?",
       "sign_out_confirm": "{{device}} ({{user}}) devra se reconnecter pour utiliser l'agent."
-    }
+    },
+    "back_to_chat": "Retour au chat",
+    "no_access": "Vous ne gérez aucun agent. Demandez à un administrateur de vous désigner comme responsable d'un agent."
   },
   "governance": {
     "title": "Gouvernance",

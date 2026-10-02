@@ -313,6 +313,24 @@ async def test_agents_read_sees_an_agents_details_but_changes_nothing(
         fastapi_app.dependency_overrides.pop(RbacDAO)
 
 
+async def test_me_access_says_whether_the_user_maintains_an_agent(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    await _agent(client, slug="looked-after")
+
+    signed_in.user = user
+    assert (await client.get("/api/admin/users/me/access")).json()["maintains_agents"] is False
+
+    signed_in.user = admin
+    r = await client.put("/api/agents/looked-after/members", json={"members": [{"user_id": str(user.id), "role": "maintainer"}]})
+    assert r.status_code == status.HTTP_200_OK, r.text
+
+    signed_in.user = user
+    assert (await client.get("/api/admin/users/me/access")).json()["maintains_agents"] is True
+
+
 async def test_grants_name_known_principals_only(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:

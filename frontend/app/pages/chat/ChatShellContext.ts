@@ -22,6 +22,8 @@ export interface ChatShell {
   onLogout: () => void;
   /** Open the user's skills page; no entry when skills are off. */
   onSkills?: () => void;
+  /** Open the agents the user looks after; no entry without the right to. */
+  onAgents?: () => void;
   /** Set on a phone (below 600 px). */
   phoneNav: ChatPhoneNav | null;
 }

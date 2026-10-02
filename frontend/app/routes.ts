@@ -20,6 +20,10 @@ export default [
     // The skills a user owns, is shared or can see -- outside the admin pages.
     route("/skills", "pages/skills/MySkillsPage.tsx"),
     route("/skills/:id", "pages/skills/MySkillPage.tsx"),
+    // The agents a user looks after (maintainers, agents permissions) -- the
+    // admin console is for superusers.
+    route("/agents", "pages/agents/MyAgentsPage.tsx"),
+    route("/agents/:slug", "pages/agents/MyAgentPage.tsx"),
   ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),

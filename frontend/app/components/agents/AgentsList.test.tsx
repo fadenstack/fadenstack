@@ -1,13 +1,13 @@
-/** The agents list: what each agent's users get, and creating one. */
+/** The agents list: what each agent's users get, who sees which, and creating one. */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { agentsApi } from "~/api/agents";
 import { agentFixture } from "~/test/agentFixtures";
 
-import AgentsListPage from "./AgentsListPage";
+import { AgentsList } from "./AgentsList";
 
 vi.mock("~/api/agents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/agents")>();
@@ -21,12 +21,15 @@ function Where() {
   return <div data-testid="where">{location.pathname + location.search}</div>;
 }
 
-function renderList() {
+/** The list under the chat layout's context: the user's permission keys (`*` for a superuser). */
+function renderList(permissions = ["*"]) {
   render(
-    <MemoryRouter initialEntries={["/admin/agents"]}>
+    <MemoryRouter initialEntries={["/agents"]}>
       <Routes>
-        <Route path="/admin/agents" element={<AgentsListPage />} />
-        <Route path="/admin/agents/:slug" element={<Where />} />
+        <Route element={<Outlet context={{ permissions: new Set(permissions) }} />}>
+          <Route path="/agents" element={<AgentsList basePath="/agents" />} />
+          <Route path="/agents/:slug" element={<Where />} />
+        </Route>
       </Routes>
     </MemoryRouter>,
   );
@@ -36,7 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("AgentsListPage", () => {
+describe("AgentsList", () => {
   it("shows each agent with its status and versions", async () => {
     api.list.mockResolvedValue([
       agentFixture(),
@@ -49,6 +52,24 @@ describe("AgentsListPage", () => {
     expect(screen.getByText("Word writer")).toBeInTheDocument();
     expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("v2 not published")).toBeInTheDocument();
+  });
+
+  it("shows a maintainer only the agents they manage, and no create button", async () => {
+    api.list.mockResolvedValue([
+      agentFixture(),
+      agentFixture({ id: "a-2", slug: "used-only", name: "Used only", can_manage: false }),
+    ]);
+    renderList(["agents:maintain"]);
+
+    expect(await screen.findByText("Excel assistant")).toBeInTheDocument();
+    expect(screen.queryByText("Used only")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New agent" })).not.toBeInTheDocument();
+  });
+
+  it("shows agents:read every agent", async () => {
+    api.list.mockResolvedValue([agentFixture({ can_manage: false })]);
+    renderList(["agents:read"]);
+    expect(await screen.findByText("Excel assistant")).toBeInTheDocument();
   });
 
   it("says so when there are none", async () => {
@@ -67,7 +88,7 @@ describe("AgentsListPage", () => {
     expect(screen.getByRole("textbox", { name: /Address/ })).toHaveValue("pp-helper");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
 
-    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/agents/pp-helper?tab=definition"));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/agents/pp-helper?tab=definition"));
     expect(api.create).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "pp-helper", name: "PP Helper", description: null }),
     );

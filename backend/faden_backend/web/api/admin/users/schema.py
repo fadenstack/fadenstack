@@ -69,6 +69,8 @@ class MeAccessDTO(BaseModel):
     is_superuser: bool
     roles: list[RoleDTO] = Field(default_factory=list)
     permissions: list[PermissionDTO] = Field(default_factory=list)
+    #: Maintains at least one agent: a right on those agents, not an RBAC permission.
+    maintains_agents: bool = False
 
 
 class UpdateUserRolesRequest(BaseModel):

@@ -3407,7 +3407,9 @@
       "sign_out": "注销",
       "sign_out_title": "注销此设备？",
       "sign_out_confirm": "{{device}}（{{user}}）需要重新登录才能使用该智能体。"
-    }
+    },
+    "back_to_chat": "返回聊天",
+    "no_access": "您没有负责任何智能体。请让管理员将您设为某个智能体的维护者。"
   },
   "governance": {
     "title": "治理",

@@ -18,6 +18,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ExtensionIcon from "@mui/icons-material/Extension";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 import InputBase from "@mui/material/InputBase";
 import Stack from "@mui/material/Stack";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
@@ -153,11 +154,20 @@ export default function ChatTopbar({
             onProfile={shell.onProfile}
             onLogout={shell.onLogout}
             iconSize="small"
-            extraItems={
-              shell.onSkills
-                ? [{ key: "skills", label: t("skills.my_title"), icon: <ExtensionIcon fontSize="small" />, onClick: shell.onSkills }]
-                : undefined
-            }
+            extraItems={[
+              shell.onSkills && {
+                key: "skills",
+                label: t("skills.my_title"),
+                icon: <ExtensionIcon fontSize="small" />,
+                onClick: shell.onSkills,
+              },
+              shell.onAgents && {
+                key: "agents",
+                label: t("agents.title", { ns: "common" }),
+                icon: <SmartToyIcon fontSize="small" />,
+                onClick: shell.onAgents,
+              },
+            ].filter((item) => !!item)}
           />
         )}
       </Box>

@@ -175,6 +175,28 @@ export const agentsApi = {
       : request<PrincipalOption[]>(`/principals${query({ ids: principalIds(principals) })}`),
 };
 
+// ── Rights ───────────────────────────────────────────────────────────────
+
+/**
+ * Maintaining an agent is a right on that agent, not an RBAC permission;
+ * `/users/me/access` says whether the user has it (`maintains_agents`), and
+ * the UI gates on it under this key like on a permission.
+ */
+export const AGENT_MAINTAINER = "agents:maintain";
+
+/** Any of these opens the agents pages. */
+export const AGENTS_PAGE_KEYS = ["agents:read", "agents:create", "agents:manage", AGENT_MAINTAINER];
+
+/** What the user may do with agents in general; each agent says itself whether they manage it (`can_manage`). */
+export function agentRights(can: (permission: string) => boolean) {
+  return {
+    open: AGENTS_PAGE_KEYS.some((key) => can(key)),
+    create: can("agents:create"),
+    /** Every agent of the tenant; otherwise only those the user manages. */
+    seeAll: can("agents:read") || can("agents:manage"),
+  };
+}
+
 /** Ends a device's sign-in (`/api/agent-tokens/{device}`): its user, or the agent's maintainers. */
 export const revokeSignIn = (deviceId: string) =>
   requester("/api/agent-tokens")<void>(`/${segment(deviceId)}`, json("DELETE"));

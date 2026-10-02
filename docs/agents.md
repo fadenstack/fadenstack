@@ -31,6 +31,14 @@ Who sees what:
 - `agents:read` sees every agent and its details (versions, access,
   activity), but changes nothing.
 
+The admin console is for superusers. Everyone else who looks after agents --
+maintainers, and users with an `agents` permission -- opens the same pages at
+`/agents`, from **Agents** in the chat's user menu. Without `agents:read` or
+`agents:manage` the list holds only the agents they manage; the agents they
+merely use are their SDK's business. (`GET /api/admin/users/me/access` says
+`maintains_agents`, since maintaining is a right on an agent, not an RBAC
+permission.)
+
 The API is under `/api/agents`:
 
 | Step | Call |
