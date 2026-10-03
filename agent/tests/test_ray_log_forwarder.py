@@ -544,3 +544,46 @@ async def test_the_engine_output_of_a_replica_is_shipped_as_its_own_stream(
     assert texts[0] == "(EngineCore pid=13728) ERROR 09-30 06:44:12 [core.py:1349] EngineCore failed to start."
     assert "weight_scale" in texts[1]
     assert not any("someone else" in line for line in loki.lines)
+
+
+async def test_two_tracebacks_in_one_second_come_back_in_the_order_they_were_written(
+    serve_dir: Path, tmp_path: Path
+) -> None:
+    """vLLM stamps to the second; a traceback's own lines carry no time.
+
+    Each traceback took its ERROR line's second plus a nanosecond per line, so
+    two requests failing in the same second (a replica shutting down under
+    load) had the same times line for line. Loki sorts by time: the page read
+    six "Traceback" lines, then six first frames. Every line of a file now
+    goes strictly after the one before it -- across passes too.
+    """
+    loki = _Loki()
+    forwarder = _forwarder(tmp_path, loki)
+    (serve_dir / REPLICA_FILE).write_text(
+        json.dumps({"levelname": "INFO", "message": "Started initializing replica.", "worker_id": WORKER_ID}) + "\n",
+        encoding="utf-8",
+    )
+    engine = serve_dir.parent / f"worker-{WORKER_ID}-04000000-12809.err"
+    engine.write_text("", encoding="utf-8")
+    await forwarder._collect_all()
+
+    one = [
+        "ERROR 10-03 23:24:34 [server.py:1] Exception in ASGI application",
+        "Traceback (most recent call last):",
+        '  File "starlette/_exception_handler.py", line 42, in wrapped_app',
+        "    await app(scope, receive, sender)",
+    ]
+    two = [line.replace("line 42", "line 53") for line in one]
+    with engine.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(one + two) + "\n")
+    await forwarder._collect_all()
+    with engine.open("a", encoding="utf-8") as handle:
+        handle.write("ERROR 10-03 23:24:34 [server.py:1] Exception in ASGI application\n")
+    await forwarder._collect_all()
+
+    sent = sorted(
+        (ts, text) for labels, entries in loki.pushes if labels["source"] == "engine" for ts, text in entries
+    )
+    assert [text for _, text in sent] == [*one, *two, one[0]]
+    stamps = [ts for ts, _ in sent]
+    assert len(set(stamps)) == len(stamps), "no two lines of a file share a time"

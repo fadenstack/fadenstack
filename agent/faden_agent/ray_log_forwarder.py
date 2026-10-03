@@ -127,6 +127,10 @@ class RayServeLogForwarder:
         self._seen: dict[tuple[int, int], tuple[str, dict[str, str], int]] = {}
         #: Replica log -> the Ray worker id of its process (read once).
         self._worker_ids: dict[tuple[int, int], str | None] = {}
+        #: File -> the timestamp its last sent line went to Loki with. Lines
+        #: are stamped strictly later than the line before them in the same
+        #: file, so Loki gives them back in the order they were written.
+        self._last_ts: dict[tuple[int, int], int] = {}
         #: Whether a pass has completed.
         #:
         #: The distinction this draws is the difference between skipping a
@@ -213,6 +217,7 @@ class RayServeLogForwarder:
         # still unsent are lost with it -- say so, in the stream it was part of.
         for key in set(self._cursors) - set(followed):
             offset = self._cursors.pop(key)
+            self._last_ts.pop(key, None)
             name, meta, size = self._seen.pop(key, ("", {}, offset))
             if size > offset and meta:
                 await self._push(
@@ -290,7 +295,7 @@ class RayServeLogForwarder:
         )
         for i in range(0, len(lines), _MAX_BATCH_LINES):
             batch = lines[i : i + _MAX_BATCH_LINES]
-            if not await self._push([text for text, _ in batch], meta):
+            if not await self._push([text for text, _ in batch], meta, key=key):
                 # Loki (or the way to it) did not take them: the cursor stays,
                 # and the next pass sends them again.
                 return
@@ -356,7 +361,9 @@ class RayServeLogForwarder:
             out["deployment"] = deployment
         return out
 
-    async def _push(self, lines: list[str], meta: dict[str, str]) -> bool:
+    async def _push(
+        self, lines: list[str], meta: dict[str, str], *, key: tuple[int, int] | None = None,
+    ) -> bool:
         """Send one batch, splitting it by level so the label is accurate; True when Loki took all of it.
 
         Loki labels belong to a stream, not to a line, so a batch containing
@@ -364,18 +371,28 @@ class RayServeLogForwarder:
         level keeps the label true; the cost is at most a handful of small
         pushes instead of one, and in practice a batch is nearly all one
         level.
+
+        Every line of file *key* is stamped strictly later than the one
+        before it. vLLM stamps to the second, and a traceback's lines took
+        that stamp plus a nanosecond each: two requests failing in the same
+        second gave their tracebacks the same times, and they came back from
+        Loki interleaved line by line -- six "Traceback" lines, then six
+        first frames.
         """
         by_level: dict[str, list[tuple[int, str]]] = {}
         engine = meta.get("source") == "engine"
+        floor = self._last_ts.get(key) if key is not None else None
         last_ts: int | None = None
         for line in lines:
             if not line:
                 continue
             if engine:
                 line, ts_ns, level = self._read_engine_line(line, last_ts)
-                last_ts = ts_ns
             else:
                 ts_ns, level = self._read_fields(line)
+            if floor is not None and ts_ns <= floor:
+                ts_ns = floor + 1
+            floor = last_ts = ts_ns
             by_level.setdefault(level, []).append((ts_ns, line))
 
         accepted = True
@@ -390,6 +407,10 @@ class RayServeLogForwarder:
                 **meta,
             }
             accepted = await self._loki.push_streams(labels=labels, entries=entries) and accepted
+        # Only once Loki has them: a batch sent again is stamped the same,
+        # and Loki keeps one of each.
+        if accepted and key is not None and floor is not None:
+            self._last_ts[key] = floor
         return accepted
 
     @staticmethod

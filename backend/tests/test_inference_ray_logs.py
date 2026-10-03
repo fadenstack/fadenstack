@@ -69,6 +69,24 @@ def test_lines_carry_their_machine_and_read_oldest_first() -> None:
     ]
 
 
+def test_lines_that_share_a_timestamp_read_in_the_order_they_were_written() -> None:
+    """Loki answers a BACKWARD query newest first -- equal timestamps included.
+
+    Sorted by time alone, those stayed reversed: a traceback whose lines carry
+    one second's stamp read from its last frame up to "Traceback (most
+    recent call last):".
+    """
+    written = [
+        "Traceback (most recent call last):",
+        '  File "starlette/_exception_handler.py", line 42, in wrapped_app',
+        "    await app(scope, receive, sender)",
+        "RuntimeError: replica is shutting down",
+    ]
+    newest_first = [(5_000, line) for line in reversed(written)]
+    lines = _lines_from_loki(_loki(({"host": "10.250.10.71", "source": "engine"}, newest_first)))
+    assert [line.message for line in lines] == written
+
+
 @pytest.mark.anyio()
 async def test_a_page_says_when_loki_cannot_be_asked(monkeypatch: pytest.MonkeyPatch) -> None:
     async def down(*_: Any, **__: Any) -> dict[str, Any]:

@@ -212,7 +212,11 @@ def _lines_from_loki(payload: dict[str, Any]) -> list[LogLine]:
         if not isinstance(stream, dict):
             continue
         labels = stream.get("stream") or {}
-        for value in stream.get("values") or []:
+        # Every query here is BACKWARD: a stream's values come newest first,
+        # and lines that share a timestamp in the order opposite to how they
+        # were written. Read forwards, the sort below keeps that order -- a
+        # traceback no longer reads upside down.
+        for value in reversed(stream.get("values") or []):
             if not isinstance(value, (list, tuple)) or len(value) < 2:
                 continue
             raw_ts, raw_line = value[0], value[1]
