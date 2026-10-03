@@ -110,6 +110,44 @@ async def test_the_engine_is_asked_as_an_openai_server() -> None:
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("given", "sent"),
+    [
+        ({"reasoning_effort": "none"}, {"chat_template_kwargs": {"enable_thinking": False}}),
+        ({"reasoning_effort": "minimal"}, {"chat_template_kwargs": {"enable_thinking": False}}),
+        ({"reasoning_effort": "high"}, {"reasoning_effort": "high"}),
+        ({"reasoning_effort": "xhigh"}, {"reasoning_effort": "high"}),
+        ({"chat_template_kwargs": {"enable_thinking": False}}, {"chat_template_kwargs": {"enable_thinking": False}}),
+        (
+            {"reasoning_effort": "none", "chat_template_kwargs": {"enable_thinking": True, "x": 1}},
+            {"chat_template_kwargs": {"enable_thinking": True, "x": 1}},
+        ),
+        ({"reasoning_effort": "unheard-of"}, {}),
+    ],
+    ids=["none", "minimal", "high", "xhigh", "template", "template-wins", "unknown"],
+)
+async def test_how_much_the_model_reasons_reaches_vllm(given: dict[str, Any], sent: dict[str, Any]) -> None:
+    """A client's "no thinking" reaches the engine as Qwen's switch; vLLM's own efforts go as they are."""
+    seen: list[httpx.Request] = []
+    async with _engine([b"data: [DONE]\n\n"], seen) as http:
+        await _stream(LLMAdapter(http_client=http), payload={"model": "qwen", "messages": [{"role": "user", "content": "hi"}], **given})
+    body = json.loads(seen[0].content)
+    assert {k: body[k] for k in ("reasoning_effort", "chat_template_kwargs") if k in body} == sent
+
+
+@pytest.mark.anyio
+async def test_reasoning_through_litellm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Through LiteLLM: OpenAI's field for other providers, vLLM's own fields as extra_body (unknown ones are dropped)."""
+    calls = _litellm_answers(monkeypatch)
+    payload = {"model": "qwen", "messages": [{"role": "user", "content": "hi"}], "reasoning_effort": "none"}
+    await _stream(LLMAdapter(), provider_type=ProviderType.REMOTE_OPENAI, payload=payload)
+    await _stream(LLMAdapter(), extra_params={"api_version": "2024-01"}, payload=payload)
+    remote, vllm = calls
+    assert remote["reasoning_effort"] == "none" and "chat_template_kwargs" not in remote
+    assert "reasoning_effort" not in vllm and vllm["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
+
+
+@pytest.mark.anyio
 async def test_a_providers_headers_go_along() -> None:
     seen: list[httpx.Request] = []
     async with _engine([b"data: [DONE]\n\n"], seen) as http:

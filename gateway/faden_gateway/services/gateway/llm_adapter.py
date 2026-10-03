@@ -45,8 +45,12 @@ _OPENAI_PARAMS = (
     "seed",
     "n",
 )
+#: vLLM's field for a chat template's own switches (Qwen's ``enable_thinking``, ...).
+_TEMPLATE_KWARGS = "chat_template_kwargs"
+#: The ``reasoning_effort`` values vLLM accepts: it validates the field.
+_VLLM_EFFORTS = frozenset({"low", "medium", "high"})
 #: What the body of a direct streamed chat is made of.
-_DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", *_OPENAI_PARAMS})
+_DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", "reasoning_effort", _TEMPLATE_KWARGS, *_OPENAI_PARAMS})
 _DONE = b"data: [DONE]\n\n"
 
 
@@ -54,6 +58,45 @@ _DONE = b"data: [DONE]\n\n"
 # as one, first, from then on (see _late_system_refused).
 _SYSTEM_FIRST: set[str] = set()
 _TEMPLATE_REFUSAL = re.compile(r"template|roles? must alternate|system (role|message)", re.IGNORECASE)
+
+
+def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str, Any]:
+    """How much the model reasons, in the form its server understands.
+
+    ``reasoning_effort`` is OpenAI's: LiteLLM maps it per provider and drops it
+    for a model without one (``drop_params``). vLLM validates it (low, medium,
+    high), and a template with an on/off switch (Qwen's ``enable_thinking``)
+    ignores it; so for vLLM "none" and "minimal" turn the switch off instead,
+    "xhigh" asks for "high", and the client's own ``chat_template_kwargs`` go
+    along. Until 2026-10-03 neither field reached any model: a client's "no
+    thinking" was dropped here.
+    """
+    effort = payload.get("reasoning_effort")
+    effort = effort.lower() if isinstance(effort, str) and effort else None
+    if provider_type != ProviderType.VLLM:
+        return {"reasoning_effort": effort} if effort else {}
+    given = payload.get(_TEMPLATE_KWARGS)
+    template: dict[str, Any] = dict(given) if isinstance(given, dict) else {}
+    out: dict[str, Any] = {}
+    if effort in ("none", "minimal"):
+        template.setdefault("enable_thinking", False)
+    elif effort == "xhigh":
+        out["reasoning_effort"] = "high"
+    elif effort in _VLLM_EFFORTS:
+        out["reasoning_effort"] = effort
+    if template:
+        out[_TEMPLATE_KWARGS] = template
+    return out
+
+
+def _for_litellm(kwargs: dict[str, Any], provider_type: ProviderType) -> dict[str, Any]:
+    """vLLM's own fields go to LiteLLM as ``extra_body``: it would drop them as unknown parameters."""
+    if provider_type != ProviderType.VLLM:
+        return kwargs
+    own = {key: kwargs.pop(key) for key in ("reasoning_effort", _TEMPLATE_KWARGS) if key in kwargs}
+    if own:
+        kwargs["extra_body"] = {**(kwargs.get("extra_body") or {}), **own}
+    return kwargs
 
 
 def _text_of(content: Any) -> str:
@@ -469,6 +512,7 @@ class LLMAdapter:
         for key in _OPENAI_PARAMS:
             if key in payload:
                 kwargs[key] = payload[key]
+        kwargs.update(_reasoning(payload, provider_type))
 
         # Merge extra_params (custom headers, api_version, etc.)
         extra_headers: dict[str, Any] = {}
@@ -515,9 +559,10 @@ class LLMAdapter:
                     kwargs, extra_headers, http=http, first_token_timeout_sec=first_token_timeout_sec,
                 )
             _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
-            return self._stream_completion(**kwargs)
+            return self._stream_completion(**_for_litellm(kwargs, provider_type))
 
         _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
+        kwargs = _for_litellm(kwargs, provider_type)
 
         result = await self._non_stream_completion(**kwargs)
         moved = _late_system_refused(result.status_code, json.dumps(result.payload), kwargs["messages"])
