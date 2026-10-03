@@ -29,6 +29,7 @@
     "i18next-browser-languagedetector": "^8.0.4",
     "i18next-http-backend": "^3.0.2",
     "isbot": "^5.1.31",
+    "marked": "^18.0.14",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-i18next": "^15.5.0",
@@ -37,7 +38,8 @@
     "react-router": "7.18.3",
     "reactflow": "^11.11.4",
     "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "remend": "^1.4.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

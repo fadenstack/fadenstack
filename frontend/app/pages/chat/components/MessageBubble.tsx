@@ -14,9 +14,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonIcon from "@mui/icons-material/Person";
 import ReplayIcon from "@mui/icons-material/Replay";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
+import Markdown, { markdownSx } from "~/components/markdown/Markdown";
 import { useTranslation } from "react-i18next";
 
 import type { TokenUsage, TurnStatus } from "~/api/chatTypes";
@@ -133,49 +131,7 @@ export default function MessageBubble({
         {/* Content */}
         <Box
           sx={{
-            "& p": { m: 0, mb: 1, "&:last-child": { mb: 0 } },
-            "& pre": {
-              bgcolor:
-                theme.palette.mode === "dark"
-                  ? "rgba(0,0,0,0.35)"
-                  : "rgba(0,0,0,0.06)",
-              borderRadius: 1,
-              p: 1.5,
-              overflowX: "auto",
-              fontSize: "0.85rem",
-            },
-            "& code": {
-              fontSize: "0.85rem",
-              fontFamily: '"Fira Code", "Fira Mono", monospace',
-            },
-            "& :not(pre) > code": {
-              bgcolor:
-                theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.06)",
-              borderRadius: 0.5,
-              px: 0.5,
-              py: 0.25,
-            },
-            "& table": {
-              borderCollapse: "collapse",
-              width: "100%",
-              mb: 1,
-            },
-            "& th, & td": {
-              border: `1px solid ${theme.palette.divider}`,
-              px: 1,
-              py: 0.5,
-              fontSize: "0.85rem",
-            },
-            "& blockquote": {
-              borderLeft: `3px solid ${theme.palette.primary.main}`,
-              pl: 1.5,
-              ml: 0,
-              color: "text.secondary",
-            },
-            "& a": { color: isUser ? "inherit" : theme.palette.primary.main },
-            "& ul, & ol": { pl: 2.5, mb: 1 },
+            ...markdownSx(theme, { linkColor: isUser ? "inherit" : undefined }),
             fontSize: "0.925rem",
             lineHeight: 1.65,
             wordBreak: "break-word",
@@ -201,12 +157,7 @@ export default function MessageBubble({
               </Box>
             </Box>
           ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-            >
-              {content}
-            </ReactMarkdown>
+            <Markdown streaming={streaming}>{content}</Markdown>
           )}
           {/* A question whose request failed before its reply was kept (the API's whole answers). */}
           {isUser && status === "failed" && (

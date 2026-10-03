@@ -20,8 +20,7 @@ import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import Markdown, { markdownSx } from "~/components/markdown/Markdown";
 
 import type {
   SkillActivation,
@@ -174,9 +173,12 @@ export function SkillInstructionsFields({
     />
   );
   const preview = (
-    <Paper variant="outlined" sx={{ px: 2, py: 1, minHeight: minRows * 20, overflow: "auto" }}>
+    <Paper
+      variant="outlined"
+      sx={{ px: 2, py: 1, minHeight: minRows * 20, overflow: "auto", fontSize: "0.925rem", ...markdownSx(theme) }}
+    >
       {values.body.trim() ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{values.body}</ReactMarkdown>
+        <Markdown highlight={false}>{values.body}</Markdown>
       ) : (
         <Typography color="text.secondary" variant="body2" sx={{ py: 1 }}>
           {t("skills.preview_empty")}
