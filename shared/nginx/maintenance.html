@@ -4,54 +4,136 @@
   (faden upgrade), switched to maintenance (faden maintenance on), or while a
   service behind it does not answer. Self-contained: nothing it needs may come
   from a service that is restarting. It asks every few seconds whether the
-  page it stands in for is back, and reloads it when it is.
+  page it stands in for is back, and reloads it when it is. It takes the
+  light/dark mode and accent the console stored for this browser.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
 <title>Fadenstack · Maintenance</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230A0E1A'/%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M22 26H78' stroke='%23F3F4F6' stroke-width='13'/%3E%3Cpath d='M22 50H62' stroke='%23FF4D6D' stroke-width='13'/%3E%3Cpath d='M22 74H34' stroke='%23F3F4F6' stroke-width='13'/%3E%3C/g%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #f5f7fa; --card: #ffffff; --text: #111827; --muted: #4b5563;
-    --border: #e5e7eb; --accent: #4c6a92;
+    --bg: #f5f7fb; --card: #ffffff; --text: #111827; --muted: #5b6474;
+    --border: #e3e7ee; --plate: #0a0e1a; --thread: #e2325a; --accent: #4c6a92;
+    --note: #f1f4f9; --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 12px 32px rgba(16, 24, 40, .08);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0a0e1a; --card: #111827; --text: #e5e7eb; --muted: #9ca3af;
-      --border: #1f2937; --accent: #81a1c1;
-    }
+  :root[data-mode="dark"] {
+    --bg: #0a0e1a; --card: #111827; --text: #e5e7eb; --muted: #9aa3b2;
+    --border: #1f2937; --plate: #f3f4f6; --thread: #ff4d6d; --accent: #81a1c1;
+    --note: #0d1322; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .35);
   }
+  :root[data-accent="graphite"] { --accent: #1f2937; }
+  :root[data-mode="dark"][data-accent="graphite"] { --accent: #e5e7eb; }
+  :root[data-accent="aurora"] { --accent: #7c4dff; }
+
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
   body {
-    background: var(--bg); color: var(--text);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    display: flex; align-items: center; justify-content: center; padding: 16px;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.6 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   main {
-    width: 100%; max-width: 480px; background: var(--card);
-    border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px;
+    width: 100%; max-width: 520px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 36px 32px 20px;
   }
-  .brand { font-weight: 700; letter-spacing: .02em; color: var(--accent); margin: 0 0 24px; }
-  h1 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 12px; }
-  p { margin: 0 0 12px; color: var(--muted); }
-  #message { color: var(--text); white-space: pre-wrap; }
-  .status { display: flex; align-items: center; gap: 10px; margin-top: 24px; font-size: .9rem; color: var(--muted); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+
+  /* ── centred: who and what ── */
+  header { text-align: center; }
+  .mark { width: 72px; height: 72px; display: block; margin: 0 auto 4px; }
+  .mark .plate { stroke: var(--plate); }
+  .mark .thread { stroke: var(--thread); stroke-dasharray: 70; animation: thread 2.4s ease-in-out infinite; }
+  @keyframes thread { 0% { stroke-dashoffset: 70; } 45%, 60% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -70; } }
+  h1 { margin: 12px 0 0; font-size: 1.45rem; line-height: 1.3; font-weight: 650; letter-spacing: -0.01em; }
+  .bar { position: relative; height: 4px; margin: 20px auto 0; max-width: 220px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 18%, transparent); overflow: hidden; }
+  .bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: 999px;
+    background: var(--accent); animation: slide 1.6s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+
+  /* ── left: the details ── */
+  .body { margin-top: 24px; text-align: left; }
+  .body p { margin: 0 0 12px; color: var(--muted); }
+  .note {
+    margin: 4px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--note);
+    border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  }
+  .note-label { display: block; font-size: .78rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--muted); margin-bottom: 2px; }
+  .note-text { color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* ── left and right: where it stands ── */
+  footer {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border);
+    font-size: .85rem; color: var(--muted);
+  }
+  .status { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+  .since { flex: none; margin-left: auto; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .back .dot { background: #2e7d32; animation: none; }
+
+  @media (max-width: 480px) {
+    main { padding: 28px 20px 16px; } h1 { font-size: 1.25rem; }
+    footer { flex-wrap: wrap; row-gap: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mark .thread, .bar::after, .dot { animation: none; }
+    .mark .thread { stroke-dashoffset: 0; }
+    .bar::after { width: 100%; opacity: .5; }
+  }
 </style>
+<script>
+  // The console's own choices for this browser (theme-mode.tsx), else the system's.
+  (function () {
+    var root = document.documentElement, mode = null, accent = null;
+    try {
+      mode = localStorage.getItem("faden-theme-mode");
+      accent = localStorage.getItem("faden-accent");
+    } catch (e) {}
+    if (mode !== "light" && mode !== "dark") {
+      mode = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    root.dataset.mode = mode;
+    if (accent === "graphite" || accent === "aurora") root.dataset.accent = accent;
+  })();
+</script>
 </head>
 <body>
 <main>
-  <p class="brand">Fadenstack</p>
-  <h1 id="title">Fadenstack is being updated</h1>
-  <p id="detail">The platform is restarting with the new version. This usually takes a few minutes; nothing you saved is lost.</p>
-  <p id="message" hidden></p>
-  <p id="since" hidden></p>
-  <div class="status" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status">This page reloads by itself when Fadenstack is back.</span></div>
+  <header>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+      <g transform="translate(0 6)" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-width="8">
+        <path class="plate" d="M50 10L86 28L50 46L14 28Z"/>
+        <path class="thread" d="M14 44L50 62L72.3 50.8"/>
+        <path class="plate" d="M14 60L50 78L57.9 74"/>
+      </g>
+    </svg>
+    <h1 id="title">Fadenstack is being updated</h1>
+    <div class="bar" role="progressbar" aria-label="In progress"></div>
+  </header>
+  <div class="body">
+    <p id="detail">The platform is restarting with the new version. This usually takes a few minutes; nothing you saved is lost.</p>
+    <div class="note" id="note" hidden>
+      <span class="note-label" id="note-label">Note from the administrator</span>
+      <span class="note-text" id="message"></span>
+    </div>
+  </div>
+  <footer>
+    <span class="status" id="status-row" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status">Reloads by itself when it is back.</span></span>
+    <span class="since" id="since" hidden></span>
+  </footer>
 </main>
 <script>
 (function () {
@@ -60,57 +142,63 @@
       upgrade: ["Fadenstack is being updated", "The platform is restarting with the new version. This usually takes a few minutes; nothing you saved is lost."],
       manual: ["Fadenstack is under maintenance", "An administrator is working on the platform. It will be back shortly."],
       down: ["Fadenstack is not reachable right now", "A service is restarting or not answering. If this lasts, tell your administrator."],
-      since: "Since {t}", status: "This page reloads by itself when Fadenstack is back."
+      note: "Note from the administrator", since: "Since {t}", status: "Reloads by itself when it is back.", back: "Back. Reloading…"
     },
     de: {
       upgrade: ["Fadenstack wird aktualisiert", "Die Plattform startet mit der neuen Version neu. Das dauert meist ein paar Minuten; nichts Gespeichertes geht verloren."],
       manual: ["Fadenstack wird gewartet", "Ein Administrator arbeitet an der Plattform. Sie ist gleich wieder da."],
       down: ["Fadenstack ist gerade nicht erreichbar", "Ein Dienst startet neu oder antwortet nicht. Wenn das anhält, wenden Sie sich an Ihren Administrator."],
-      since: "Seit {t}", status: "Diese Seite lädt sich neu, sobald Fadenstack wieder da ist."
+      note: "Hinweis des Administrators", since: "Seit {t}", status: "Lädt neu, sobald es wieder da ist.", back: "Wieder da. Wird neu geladen…"
     },
     es: {
       upgrade: ["Fadenstack se está actualizando", "La plataforma se reinicia con la nueva versión. Suele tardar unos minutos; no se pierde nada de lo guardado."],
       manual: ["Fadenstack está en mantenimiento", "Un administrador está trabajando en la plataforma. Volverá en breve."],
       down: ["Fadenstack no está disponible ahora mismo", "Un servicio se está reiniciando o no responde. Si continúa, avise a su administrador."],
-      since: "Desde las {t}", status: "Esta página se recargará sola cuando Fadenstack vuelva."
+      note: "Nota del administrador", since: "Desde las {t}", status: "Se recarga sola cuando vuelva.", back: "De vuelta. Recargando…"
     },
     fr: {
       upgrade: ["Fadenstack est en cours de mise à jour", "La plateforme redémarre avec la nouvelle version. Cela prend généralement quelques minutes ; rien de ce qui est enregistré n'est perdu."],
       manual: ["Fadenstack est en maintenance", "Un administrateur intervient sur la plateforme. Elle sera bientôt de retour."],
       down: ["Fadenstack n'est pas joignable pour le moment", "Un service redémarre ou ne répond pas. Si cela dure, prévenez votre administrateur."],
-      since: "Depuis {t}", status: "Cette page se rechargera d'elle-même dès le retour de Fadenstack."
+      note: "Note de l'administrateur", since: "Depuis {t}", status: "Se recharge dès son retour.", back: "De retour. Rechargement…"
     },
     zh: {
       upgrade: ["Fadenstack 正在更新", "平台正在以新版本重新启动，通常需要几分钟；已保存的内容不会丢失。"],
       manual: ["Fadenstack 正在维护", "管理员正在维护平台，很快就会恢复。"],
       down: ["Fadenstack 暂时无法访问", "某个服务正在重启或没有响应。如果持续，请联系管理员。"],
-      since: "开始于 {t}", status: "Fadenstack 恢复后，此页面会自动重新加载。"
+      note: "管理员留言", since: "开始于 {t}", status: "恢复后自动重新加载。", back: "已恢复，正在重新加载…"
     }
   };
   var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
   var t = text[lang] || text.en;
   document.documentElement.lang = text[lang] ? lang : "en";
+  var $ = function (id) { return document.getElementById(id); };
+  var startedAt = null;
+
+  function elapsed(ms) {
+    var minutes = Math.floor(ms / 60000);
+    if (minutes < 1) return "<1 min";
+    if (minutes < 60) return minutes + " min";
+    return Math.floor(minutes / 60) + " h " + (minutes % 60) + " min";
+  }
+  function showSince() {
+    if (!startedAt) { $("since").hidden = true; return; }
+    var clock = new Date(startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    $("since").textContent = t.since.replace("{t}", clock) + " · " + elapsed(Date.now() - startedAt);
+    $("since").hidden = false;
+  }
 
   function show(kind, state) {
     var words = t[kind];
-    document.getElementById("title").textContent = words[0];
-    document.getElementById("detail").textContent = words[1];
+    $("title").textContent = words[0];
+    $("detail").textContent = words[1];
     document.title = "Fadenstack · " + words[0];
-    var message = document.getElementById("message");
-    if (state && typeof state.message === "string" && state.message) {
-      message.textContent = state.message;
-      message.hidden = false;
-    } else {
-      message.hidden = true;
-    }
-    var since = document.getElementById("since");
+    var message = state && typeof state.message === "string" ? state.message : "";
+    $("message").textContent = message;
+    $("note").hidden = !message;
     var when = state && Date.parse(state.since);
-    if (when) {
-      since.textContent = t.since.replace("{t}", new Date(when).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-      since.hidden = false;
-    } else {
-      since.hidden = true;
-    }
+    startedAt = when || null;
+    showSince();
   }
 
   // Why this page is up: the flag the CLI puts down says, else a service is not answering.
@@ -128,7 +216,9 @@
     fetch(location.href, { cache: "no-store", headers: { Accept: "text/html" } })
       .then(function (r) {
         if (r.status < 500) {
-          location.reload();
+          $("status-row").classList.add("back");
+          $("status").textContent = t.back;
+          setTimeout(function () { location.reload(); }, 400);
         } else {
           readState();
           schedule();
@@ -138,7 +228,9 @@
   }
   function schedule() { setTimeout(check, 5000); }
 
-  document.getElementById("status").textContent = t.status;
+  $("note-label").textContent = t.note;
+  $("status").textContent = t.status;
+  setInterval(showSince, 30000);
   readState();
   schedule();
 })();
