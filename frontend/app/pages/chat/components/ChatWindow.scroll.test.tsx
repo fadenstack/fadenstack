@@ -3,7 +3,8 @@
  *
  * Every token used to scroll the window to the bottom, so a user who scrolled
  * up to read an earlier answer (or the thinking) was pulled straight back down
- * and could not read anything while a reply was being written.
+ * and could not read anything while a reply was being written. When to let go
+ * is followScroll's (followScroll.test.ts); this is the window around it.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -60,6 +61,13 @@ function sized(el: HTMLElement, scrollHeight: number) {
   Object.defineProperty(el, "clientHeight", { configurable: true, value: 400 });
 }
 
+/** The reader turns the wheel up a little, as a trackpad does. */
+function scrollUp(box: HTMLElement, to: number) {
+  fireEvent.wheel(box, { deltaY: -8 });
+  box.scrollTop = to;
+  fireEvent.scroll(box);
+}
+
 describe("ChatWindow scrolling while a reply is written", () => {
   beforeEach(() => {
     stream.streamingContent = "";
@@ -80,13 +88,14 @@ describe("ChatWindow scrolling while a reply is written", () => {
     const { rerender } = render(view());
     const box = screen.getByTestId("chat-messages");
     sized(box, 1000);
-    box.scrollTop = 200;
-    fireEvent.scroll(box);
+    stream.streamingContent = "Hello";
+    rerender(view());
+    scrollUp(box, 990);
 
     stream.streamingContent = "Hello, a longer reply";
     sized(box, 1400);
     rerender(view());
-    expect(box.scrollTop).toBe(200);
+    expect(box.scrollTop).toBe(990);
 
     act(() => screen.getByTestId("jump-to-latest").click());
     expect(box.scrollTop).toBe(1400);
@@ -102,8 +111,9 @@ describe("ChatWindow scrolling while a reply is written", () => {
     const { rerender } = render(view());
     const box = screen.getByTestId("chat-messages");
     sized(box, 1000);
-    box.scrollTop = 100;
-    fireEvent.scroll(box);
+    stream.streamingContent = "Hello";
+    rerender(view());
+    scrollUp(box, 100);
     expect(screen.getByTestId("jump-to-latest")).toBeTruthy();
 
     box.scrollTop = 600; // 1000 - 600 - 400 = 0 left below

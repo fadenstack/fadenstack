@@ -24,9 +24,7 @@ import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
-
-/** This close to the bottom still counts as reading the latest message. */
-const FOLLOW_SLACK_PX = 32;
+import { followScroll, type Follower } from "../followScroll";
 
 interface Props {
   sessionId: string;
@@ -159,38 +157,34 @@ export default function ChatWindow({
   }, [isStreaming, messages, loadHistory]);
 
   // The view follows a reply as it is written -- until the user scrolls up to
-  // read. Pulled back down on every token, they could not scroll up at all
-  // while a reply or its thinking was being written. Back at the bottom, or
-  // sending, it follows again.
-  const followRef = useRef(true);
+  // read (followScroll.ts: read from the wheel, touch and keys themselves; a
+  // trackpad's small steps used to be undone by the next token). Back at the
+  // bottom, or sending, it follows again.
+  const followerRef = useRef<Follower | null>(null);
   const [following, setFollowing] = useState(true);
-  const setFollow = (value: boolean) => {
-    followRef.current = value;
-    setFollowing(value);
-  };
-  const scrollToLatest = () => {
-    const el = scrollerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-  const handleScroll = () => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX;
-    if (atBottom !== followRef.current) setFollow(atBottom);
-  };
+  useEffect(() => {
+    const box = scrollerRef.current;
+    if (!box) return;
+    const follower = followScroll(box, setFollowing);
+    followerRef.current = follower;
+    follower.follow();
+    return () => {
+      follower.dispose();
+      followerRef.current = null;
+    };
+  }, []);
 
   // Another chat opens at its latest message.
   useEffect(() => {
-    setFollow(true);
+    followerRef.current?.follow();
   }, [sessionId]);
 
   useEffect(() => {
-    if (followRef.current) scrollToLatest();
+    followerRef.current?.keepUp();
   }, [messages, streamingContent, streamingReasoning, toolNotices, pendingApproval, error]);
 
   const jumpToLatest = () => {
-    setFollow(true);
-    scrollToLatest();
+    followerRef.current?.follow();
   };
 
   const handleSend = (text: string, files: File[]) => {
@@ -227,7 +221,6 @@ export default function ChatWindow({
       {/* Messages area */}
       <Box
         ref={scrollerRef}
-        onScroll={handleScroll}
         data-testid="chat-messages"
         sx={{
           flex: 1,
