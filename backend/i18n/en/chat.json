@@ -83,5 +83,6 @@
   "approval_decline": "Decline",
   "approval_approve": "Approve",
   "turn_interrupted": "The server restarted while this reply was being written.",
-  "turn_stopped": "Stopped"
+  "turn_stopped": "Stopped",
+  "jump_to_latest": "Jump to the latest message"
 }

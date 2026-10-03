@@ -83,5 +83,6 @@
   "approval_decline": "拒绝",
   "approval_approve": "批准",
   "turn_interrupted": "编写此回复时服务器重新启动了。",
-  "turn_stopped": "已停止"
+  "turn_stopped": "已停止",
+  "jump_to_latest": "跳到最新消息"
 }

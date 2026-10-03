@@ -5,8 +5,11 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Fab from "@mui/material/Fab";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router";
 
@@ -21,6 +24,9 @@ import ThinkingBlock from "./ThinkingBlock";
 import MessageDebugPanel from "./MessageDebugPanel";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
+
+/** This close to the bottom still counts as reading the latest message. */
+const FOLLOW_SLACK_PX = 32;
 
 interface Props {
   sessionId: string;
@@ -67,7 +73,7 @@ export default function ChatWindow({
   const theme = useTheme();
   const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const initialSentRef = useRef(false);
   const skills = useChatSkills();
@@ -152,13 +158,49 @@ export default function ChatWindow({
     };
   }, [isStreaming, messages, loadHistory]);
 
-  // Auto-scroll to bottom on new content
+  // The view follows a reply as it is written -- until the user scrolls up to
+  // read. Pulled back down on every token, they could not scroll up at all
+  // while a reply or its thinking was being written. Back at the bottom, or
+  // sending, it follows again.
+  const followRef = useRef(true);
+  const [following, setFollowing] = useState(true);
+  const setFollow = (value: boolean) => {
+    followRef.current = value;
+    setFollowing(value);
+  };
+  const scrollToLatest = () => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX;
+    if (atBottom !== followRef.current) setFollow(atBottom);
+  };
+
+  // Another chat opens at its latest message.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, streamingReasoning]);
+    setFollow(true);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (followRef.current) scrollToLatest();
+  }, [messages, streamingContent, streamingReasoning, toolNotices, pendingApproval, error]);
+
+  const jumpToLatest = () => {
+    setFollow(true);
+    scrollToLatest();
+  };
 
   const handleSend = (text: string, files: File[]) => {
+    jumpToLatest();
     send(text, selectedModel, files, skills.selected);
+  };
+
+  const handleRetry = () => {
+    jumpToLatest();
+    return retry();
   };
 
   return (
@@ -184,6 +226,9 @@ export default function ChatWindow({
 
       {/* Messages area */}
       <Box
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        data-testid="chat-messages"
         sx={{
           flex: 1,
           overflowY: "auto",
@@ -210,7 +255,7 @@ export default function ChatWindow({
           {/* Rendered messages */}
           {messages.map((msg, i) => {
             // The chat's last reply, once it failed or stopped, is tried again from here.
-            const onRetry = i === messages.length - 1 && !isStreaming ? retry : undefined;
+            const onRetry = i === messages.length - 1 && !isStreaming ? handleRetry : undefined;
             const failed = msg.status === "failed" || msg.status === "interrupted";
             const bubble = (!failed || msg.content) && (
               <MessageBubble
@@ -345,7 +390,7 @@ export default function ChatWindow({
                   ? t("rate_limited_label", { ns: "chat", defaultValue: "Rate limit reached" })
                   : undefined
               }
-              onRetry={retry}
+              onRetry={handleRetry}
             />
           )}
 
@@ -382,7 +427,38 @@ export default function ChatWindow({
             </Box>
           )}
 
-          <div ref={bottomRef} />
+          {/* Scrolled up: the way back down, kept in view at the bottom edge. */}
+          {!following && (
+            <Box
+              sx={{
+                position: "sticky",
+                bottom: 12,
+                height: 0,
+                display: "flex",
+                justifyContent: "center",
+                overflow: "visible",
+              }}
+            >
+              <Tooltip title={t("jump_to_latest", { ns: "chat", defaultValue: "Jump to the latest message" })}>
+                <Fab
+                  size="small"
+                  onClick={jumpToLatest}
+                  aria-label={t("jump_to_latest", { ns: "chat", defaultValue: "Jump to the latest message" })}
+                  data-testid="jump-to-latest"
+                  sx={{
+                    transform: "translateY(-100%)",
+                    bgcolor: "background.paper",
+                    color: "text.primary",
+                    border: `1px solid ${theme.palette.divider}`,
+                    boxShadow: 2,
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  <KeyboardArrowDownIcon />
+                </Fab>
+              </Tooltip>
+            </Box>
+          )}
         </Box>
       </Box>
 

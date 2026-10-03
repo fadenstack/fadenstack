@@ -83,5 +83,6 @@
   "approval_decline": "Ablehnen",
   "approval_approve": "Zulassen",
   "turn_interrupted": "Der Server wurde neu gestartet, während diese Antwort geschrieben wurde.",
-  "turn_stopped": "Angehalten"
+  "turn_stopped": "Angehalten",
+  "jump_to_latest": "Zur neuesten Nachricht"
 }

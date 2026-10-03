@@ -83,5 +83,6 @@
   "approval_decline": "Rechazar",
   "approval_approve": "Aprobar",
   "turn_interrupted": "El servidor se reinició mientras se escribía esta respuesta.",
-  "turn_stopped": "Detenida"
+  "turn_stopped": "Detenida",
+  "jump_to_latest": "Ir al último mensaje"
 }
