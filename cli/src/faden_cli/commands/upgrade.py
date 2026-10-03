@@ -297,6 +297,32 @@ def upgrade_cmd(
         console.print("\n[dim]Skipping image build (--no-build).[/dim]")
 
     # ── 5. Rolling restart ────────────────────────────────────
+    # Behind the maintenance page, from here until the backend is healthy:
+    # users see "being updated" rather than a gateway error, and an open
+    # console reloads into that page and comes back by itself afterwards.
+    # Lifted however this ends -- a failed upgrade is better reached.
+    from faden_cli.core import maintenance  # noqa: PLC0415
+
+    with maintenance.during(shared_dir, reason="upgrade"):
+        step = _restart_and_check(ctx, shared_dir, env_path, step)
+
+    # ── 7. Runtime images ─────────────────────────────────────
+    # After the restart, not before it: the service images are what the
+    # upgrade waits on, and a runtime image is several gigabytes that only
+    # matters once a machine starts a cluster.
+    step += 1
+    console.print(f"\n[bold cyan]Step {step}: Runtime images for machines…[/bold cyan]")
+    from faden_cli.commands.runtime_images import run_step  # noqa: PLC0415
+
+    run_step(cfg, value=runtime_images)
+
+    # ── Done ──────────────────────────────────────────────────
+    console.print()
+    success("Upgrade complete.")
+
+
+def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, step: int) -> int:
+    """Steps 5 and 6: restart on the new images, then wait for the backend; returns the last step's number."""
     step += 1
     console.print(f"\n[bold cyan]Step {step}: Rolling restart…[/bold cyan]")
 
@@ -305,8 +331,26 @@ def upgrade_cmd(
 
     _sync_postgres_password(ctx, env_path)
 
+    # The front door first, on its own: recreated with this release's config
+    # it serves the maintenance page while the rest restarts -- even on the
+    # first upgrade to a release that has one. Then everything else, so it
+    # is not recreated a second time (a few seconds of nothing answering).
+    from faden_cli.core.compose import service_names  # noqa: PLC0415
+
+    front = "nginx"
+    names = service_names(ctx)
+    if front in names:
+        rc = compose_up(ctx, services=[front], no_deps=True, pull="missing", force_recreate=True)
+        if rc != 0:
+            warning("The front door did not restart first; it restarts with the rest.")
+            names = []
+    rest = [name for name in names if name != front] if front in names and names else None
+
     # Bring everything up (force-recreate to pick up new images)
-    rc = compose_up(ctx, detach=True, build=False, pull="missing", force_recreate=True, wait=True, timeout=180)
+    rc = compose_up(
+        ctx, services=rest, detach=True, build=False, pull="missing",
+        force_recreate=True, wait=True, timeout=180,
+    )
     if rc != 0:
         error(f"docker compose up failed (exit code {rc}).")
         sys.exit(rc)
@@ -341,20 +385,7 @@ def upgrade_cmd(
             "Backend did not become healthy within 120 s.\n"
             "  Check logs: faden logs backend"
         )
-
-    # ── 7. Runtime images ─────────────────────────────────────
-    # After the restart, not before it: the service images are what the
-    # upgrade waits on, and a runtime image is several gigabytes that only
-    # matters once a machine starts a cluster.
-    step += 1
-    console.print(f"\n[bold cyan]Step {step}: Runtime images for machines…[/bold cyan]")
-    from faden_cli.commands.runtime_images import run_step  # noqa: PLC0415
-
-    run_step(cfg, value=runtime_images)
-
-    # ── Done ──────────────────────────────────────────────────
-    console.print()
-    success("Upgrade complete.")
+    return step
 
 
 def _older(a: str, b: str) -> bool:

@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+  Fadenstack -- the page nginx answers with while the platform is updated
+  (faden upgrade), switched to maintenance (faden maintenance on), or while a
+  service behind it does not answer. Self-contained: nothing it needs may come
+  from a service that is restarting. It asks every few seconds whether the
+  page it stands in for is back, and reloads it when it is.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fadenstack · Maintenance</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card: #ffffff; --text: #111827; --muted: #4b5563;
+    --border: #e5e7eb; --accent: #4c6a92;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0e1a; --card: #111827; --text: #e5e7eb; --muted: #9ca3af;
+      --border: #1f2937; --accent: #81a1c1;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  main {
+    width: 100%; max-width: 480px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px;
+  }
+  .brand { font-weight: 700; letter-spacing: .02em; color: var(--accent); margin: 0 0 24px; }
+  h1 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 12px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  #message { color: var(--text); white-space: pre-wrap; }
+  .status { display: flex; align-items: center; gap: 10px; margin-top: 24px; font-size: .9rem; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="brand">Fadenstack</p>
+  <h1 id="title">Fadenstack is being updated</h1>
+  <p id="detail">The platform is restarting with the new version. This usually takes a few minutes; nothing you saved is lost.</p>
+  <p id="message" hidden></p>
+  <p id="since" hidden></p>
+  <div class="status" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status">This page reloads by itself when Fadenstack is back.</span></div>
+</main>
+<script>
+(function () {
+  var text = {
+    en: {
+      upgrade: ["Fadenstack is being updated", "The platform is restarting with the new version. This usually takes a few minutes; nothing you saved is lost."],
+      manual: ["Fadenstack is under maintenance", "An administrator is working on the platform. It will be back shortly."],
+      down: ["Fadenstack is not reachable right now", "A service is restarting or not answering. If this lasts, tell your administrator."],
+      since: "Since {t}", status: "This page reloads by itself when Fadenstack is back."
+    },
+    de: {
+      upgrade: ["Fadenstack wird aktualisiert", "Die Plattform startet mit der neuen Version neu. Das dauert meist ein paar Minuten; nichts Gespeichertes geht verloren."],
+      manual: ["Fadenstack wird gewartet", "Ein Administrator arbeitet an der Plattform. Sie ist gleich wieder da."],
+      down: ["Fadenstack ist gerade nicht erreichbar", "Ein Dienst startet neu oder antwortet nicht. Wenn das anhält, wenden Sie sich an Ihren Administrator."],
+      since: "Seit {t}", status: "Diese Seite lädt sich neu, sobald Fadenstack wieder da ist."
+    },
+    es: {
+      upgrade: ["Fadenstack se está actualizando", "La plataforma se reinicia con la nueva versión. Suele tardar unos minutos; no se pierde nada de lo guardado."],
+      manual: ["Fadenstack está en mantenimiento", "Un administrador está trabajando en la plataforma. Volverá en breve."],
+      down: ["Fadenstack no está disponible ahora mismo", "Un servicio se está reiniciando o no responde. Si continúa, avise a su administrador."],
+      since: "Desde las {t}", status: "Esta página se recargará sola cuando Fadenstack vuelva."
+    },
+    fr: {
+      upgrade: ["Fadenstack est en cours de mise à jour", "La plateforme redémarre avec la nouvelle version. Cela prend généralement quelques minutes ; rien de ce qui est enregistré n'est perdu."],
+      manual: ["Fadenstack est en maintenance", "Un administrateur intervient sur la plateforme. Elle sera bientôt de retour."],
+      down: ["Fadenstack n'est pas joignable pour le moment", "Un service redémarre ou ne répond pas. Si cela dure, prévenez votre administrateur."],
+      since: "Depuis {t}", status: "Cette page se rechargera d'elle-même dès le retour de Fadenstack."
+    },
+    zh: {
+      upgrade: ["Fadenstack 正在更新", "平台正在以新版本重新启动，通常需要几分钟；已保存的内容不会丢失。"],
+      manual: ["Fadenstack 正在维护", "管理员正在维护平台，很快就会恢复。"],
+      down: ["Fadenstack 暂时无法访问", "某个服务正在重启或没有响应。如果持续，请联系管理员。"],
+      since: "开始于 {t}", status: "Fadenstack 恢复后，此页面会自动重新加载。"
+    }
+  };
+  var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+  var t = text[lang] || text.en;
+  document.documentElement.lang = text[lang] ? lang : "en";
+
+  function show(kind, state) {
+    var words = t[kind];
+    document.getElementById("title").textContent = words[0];
+    document.getElementById("detail").textContent = words[1];
+    document.title = "Fadenstack · " + words[0];
+    var message = document.getElementById("message");
+    if (state && typeof state.message === "string" && state.message) {
+      message.textContent = state.message;
+      message.hidden = false;
+    } else {
+      message.hidden = true;
+    }
+    var since = document.getElementById("since");
+    var when = state && Date.parse(state.since);
+    if (when) {
+      since.textContent = t.since.replace("{t}", new Date(when).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      since.hidden = false;
+    } else {
+      since.hidden = true;
+    }
+  }
+
+  // Why this page is up: the flag the CLI puts down says, else a service is not answering.
+  function readState() {
+    return fetch("/_faden/maintenance.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (state) {
+        show(state ? (state.reason === "upgrade" ? "upgrade" : "manual") : "down", state);
+      });
+  }
+
+  // Back once the page this one stands in for answers with anything but a 5xx.
+  function check() {
+    fetch(location.href, { cache: "no-store", headers: { Accept: "text/html" } })
+      .then(function (r) {
+        if (r.status < 500) {
+          location.reload();
+        } else {
+          readState();
+          schedule();
+        }
+      })
+      .catch(schedule);
+  }
+  function schedule() { setTimeout(check, 5000); }
+
+  document.getElementById("status").textContent = t.status;
+  readState();
+  schedule();
+})();
+</script>
+</body>
+</html>

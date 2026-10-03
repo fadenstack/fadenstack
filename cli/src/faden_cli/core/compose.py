@@ -202,6 +202,7 @@ def up(
     wait: bool = False,
     timeout: int = 0,
     force_recreate: bool = False,
+    no_deps: bool = False,
 ) -> int:
     """Run ``docker compose up``.
 
@@ -210,10 +211,13 @@ def up(
     *wait* blocks until services are healthy (implies ``-d``).
     *timeout* sets the max wait time in seconds (requires *wait*).
     *force_recreate* recreates containers even if config hasn't changed.
+    *no_deps* starts only *services*, not what they depend on.
     """
     cmd = ctx.base_cmd() + ["up"]
     if detach:
         cmd.append("-d")
+    if no_deps:
+        cmd.append("--no-deps")
     if build:
         cmd.append("--build")
     if pull:
@@ -228,6 +232,14 @@ def up(
         cmd.extend(services)
     result = _run(cmd, stream=True)
     return result.returncode
+
+
+def service_names(ctx: ComposeContext) -> list[str]:
+    """The services this compose setup runs (its active profiles included); empty when compose cannot say."""
+    result = _run(ctx.base_cmd() + ["config", "--services"], capture=True)
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
 
 
 def down(

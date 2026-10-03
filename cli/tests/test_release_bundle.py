@@ -85,6 +85,7 @@ def test_unpacking_keeps_what_the_install_made(carried: Path, tmp_path: Path) ->
 def _no_docker(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
     monkeypatch.setattr(compose, "has_nvidia_gpu", lambda: False)
     monkeypatch.setattr(compose, "foreign_containers", lambda ctx: [])
+    monkeypatch.setattr(compose, "service_names", lambda ctx: ["postgres", "faden-backend", "nginx"])
     monkeypatch.setattr(compose, "pull", lambda ctx, **k: calls.append("pull") or 0)
     monkeypatch.setattr(upgrade_module, "compose_up", lambda *a, **k: calls.append("up") or 0)
     monkeypatch.setattr(upgrade_module, "compose_build", lambda *a, **k: calls.append("build") or 0)
@@ -127,7 +128,8 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
     assert env["GRAFANA_ADMIN_USER"] == "ops@example.com"
     assert env["FADEN_HTTP_PORT"] == "8080"
     assert "REDIS_AUTH" in env, "keys a release introduces are added"
-    assert calls == ["pull", "up"], "published images are pulled, not built"
+    # Pulled, not built; then the front door restarts first, and the rest.
+    assert calls == ["pull", "up", "up"], "published images are pulled, not built"
     assert bundle.installed_release(install) == __version__
 
 

@@ -56,10 +56,12 @@ It upgrades the installation the CLI is configured for
    the images of the CLI's version. An install from a source checkout builds
    them from the checkout (`--no-build` skips this).
 5. **Restarts** everything: infrastructure, then the migrations, then the
-   application and modules. Database migrations run here.
+   application and modules. Database migrations run here. From here until
+   step 7 passes, the platform is in [maintenance mode](#maintenance-mode):
+   users see "Fadenstack is being updated" instead of errors.
 6. **Clears ClickHouse's old diagnostic logs** (see
    [The disk is full](#the-disk-is-full)).
-7. **Waits for the backend** to report healthy.
+7. **Waits for the backend** to report healthy, then lifts maintenance mode.
 8. **Gets the runtime images** this release pins -- the containers the
    machines run models in, which they download from this server. Read out
    of the new backend image, so they are exactly the builds it will hand
@@ -81,6 +83,35 @@ CLI -- so its checkout has to be at the new release too. `faden upgrade
 images)`, or `Build images: yes`.
 
 Machines are updated separately: see [Update the machines' agents](#update-the-machines-agents).
+
+## Maintenance mode
+
+While the services restart, nginx -- the front door, restarted first and on
+its own -- answers every page with a maintenance page instead of the console:
+"Fadenstack is being updated", in the browser's language. The page checks
+every few seconds and reloads itself into the console once it is back, on
+the new version. A console left open reloads into the page at its next call.
+The APIs answer `503` with `Retry-After: 30` and `X-Faden-Maintenance:
+maintenance` (`/v1` in the OpenAI error format), so SDKs and scripts can
+wait and retry. `/api/health` stays open.
+
+The upgrade lifts it once the backend is healthy, and also when it fails:
+whatever runs then is better reached than hidden.
+
+It can be switched on by hand -- the services keep running, only the front
+door changes:
+
+```bash
+faden maintenance on -m "Back at 15:00"   # the note is shown on the page
+faden maintenance status
+faden maintenance off
+```
+
+An upgrade leaves maintenance that was switched on by hand on. The switch is
+the file `nginx/maintenance.flag` in the install; nginx needs no restart.
+A service that does not answer at all gets the same page (saying it is not
+reachable, not that it is being updated), and API calls a `503` with
+`X-Faden-Maintenance: unavailable`.
 
 ## Before you start
 

@@ -197,6 +197,7 @@ Use `--local-node-no-sudo` to skip privileged systemd setup.
 | `faden deploy [DIR]`                       | Full production deployment with pre-flight checks             |
 | `faden upgrade`                            | Back up, move to the CLI's release, restart with health gate  |
 | `faden backup` / `faden restore DIR`     | Dump every database and `.env` / put them back                |
+| `faden maintenance on\|off\|status`       | Show the maintenance page instead of the platform (`-m` note) |
 | `faden deploy [DIR] --local-node`          | Deploy + provision node-agent (local or SSH host)            |
 | `faden up [SERVICES...]`                   | Start services (supports `--build`, `--pull`)                 |
 | `faden down`                               | Stop and remove containers (`--volumes`, `--all`)             |

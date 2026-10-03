@@ -15,3 +15,6 @@ tls-ca/
 tls/edge.json
 # Output of the daily jobs (faden tls renew).
 logs/
+# Put down by faden upgrade / faden maintenance on while the platform is down
+# for maintenance; nginx answers with maintenance.html while it exists.
+nginx/maintenance.flag

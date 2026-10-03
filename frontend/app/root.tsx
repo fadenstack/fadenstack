@@ -24,6 +24,7 @@ import {
   ThemeModeContext,
 } from "./theme-mode";
 import i18n from "./i18n";
+import { followMaintenance } from "./lib/maintenance";
 
 import type { Route } from "./+types/root";
 import "@fontsource/sora/600.css";
@@ -179,6 +180,8 @@ function useTranslationsReady(): boolean {
 
 export default function App() {
   const ready = useTranslationsReady();
+  // An update or maintenance takes every open page to nginx's maintenance page.
+  useEffect(() => followMaintenance(), []);
   if (!ready) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", pt: 12 }} data-testid="app-loading">
