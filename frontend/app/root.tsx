@@ -193,7 +193,8 @@ export default function App() {
   return (
     <>
       <Outlet />
-      <NewVersionNotice />
+      {/* The dev server hands every page a fresh build version: only a built console can tell. */}
+      {!import.meta.env.DEV && <NewVersionNotice />}
     </>
   );
 }
