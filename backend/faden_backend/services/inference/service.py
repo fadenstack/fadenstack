@@ -41,6 +41,7 @@ from faden_backend.db.dao.llm_dao import ModelDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.inference import (
     DeploymentDesiredState,
+    DeploymentPhase,
     EnvironmentDesiredState,
     EnvironmentNodeRole,
     InferenceControlPlane,
@@ -230,7 +231,7 @@ def _may_be_on_the_cluster(deployment: InferenceDeployment) -> bool:
     if phase in ("stopped", "deleted"):
         return False
     applied = bool((deployment.observed_status_json or {}).get("applied_config_hash"))
-    return applied or phase in ("running", "degraded", "applying")
+    return applied or phase in ("running", "degraded", "applying", "stopping")
 
 
 def _queue_for_reconcile(row: Any) -> None:
@@ -738,6 +739,16 @@ class DeploymentService:
             raise ConflictError("deployment update violated a constraint") from exc
         if updated is None:
             raise NotFoundError("deployment", deployment_id)
+        if dds == DeploymentDesiredState.STOPPED and updated.phase not in (
+            DeploymentPhase.STOPPED.value,
+            DeploymentPhase.STOPPING.value,
+        ):
+            # Said at once, everywhere the deployment is shown: the stop itself
+            # is the reconciler's next pass, and Serve may take minutes over it.
+            updated.phase = DeploymentPhase.STOPPING.value
+            updated.phase_message = "stop requested"
+            await self.session.flush()
+            await self.session.refresh(updated)
         return updated
 
     async def request_reconcile(self, deployment_id: uuid.UUID) -> InferenceDeployment:

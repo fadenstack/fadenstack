@@ -11,8 +11,9 @@ Lifecycle (observed ``DeploymentPhase``):
     PENDING -> PREPARING -> APPLYING -> RUNNING
                                     \-> DEGRADED
                                     \-> FAILED
-    STOPPED (desired stop converged)
-    DELETED (desired delete converged)
+    STOPPING -> STOPPED (desired stop converged)
+             -> DELETED (desired delete converged)
+             -> FAILED  (the application still there after STOP_DEADLINE)
 
 Design constraints (verified against the Phase 2/3 code):
 
@@ -125,6 +126,14 @@ _RUNTIME_CONTAINER_NAME = "faden-ray-runtime"
 # loop's 30s cadence re-enters the row until readiness is observed.
 _READINESS_POLL_SEC = 5.0
 _READINESS_PASS_BUDGET_SEC = 60.0
+
+#: How long a stop may take before it is called failed. Serve deletes an
+#: application by stopping its copies, and a big model's engine can take
+#: minutes to let go of its GPU; the helper on the machine waits a minute and
+#: then reports "not deleted". That was recorded as a failed stop, which left
+#: the reconciler's queue -- so the page read Failed until something else
+#: looked again, by which time the application was long gone.
+STOP_DEADLINE_SEC = 600.0
 
 
 def app_name_for(deployment: InferenceDeployment) -> str:
@@ -577,6 +586,7 @@ class RayDeploymentManager:
                     total_replicas=0,
                 )
                 return
+            reason: str | None = None
             try:
                 result = await self._client_for(node_control).delete_serve_app(
                     head_node_id=facts.head_node_id,
@@ -584,28 +594,35 @@ class RayDeploymentManager:
                     runtime_bundle=facts.runtime_bundle_payload,
                 )
                 ok = bool(result.get("deleted"))
+                reason = result.get("error") or result.get("detail")
             except RayCommandError as exc:
                 # Deleting a not-yet-deployed app is a common first pass
                 # after a never-applied active->deleted transition; treat as
                 # converged (the desired absence already holds locally).
                 log.info("delete_serve_app(%s) on %s: %s", app_name, facts.head_node_id, exc.detail)
                 ok = True
-            phase = converged_phase if ok else DeploymentPhase.FAILED
+            if not ok:
+                self._observe_stopping(deployment, app_name, action_name, reason)
+                return
+            observed_status = dict(deployment.observed_status_json or {})
+            observed_status.pop("stopping_since", None)
+            observed_status.pop("stopping_generation", None)
+            deployment.observed_status_json = observed_status
             self._observe(
-                deployment, phase,
-                f"serve.delete({app_name}) {'ok' if ok else 'failed'}",
-                ok,
-                observed={"reconciled": ok, "action": action_name, "app": app_name},
+                deployment, converged_phase,
+                f"serve.delete({app_name}) ok",
+                True,
+                observed={"reconciled": True, "action": action_name, "app": app_name},
                 # Nothing is serving once the application is gone. Without
                 # this the row kept the counts it had while it was running,
                 # so a stopped deployment's page read "Copies (ready /
                 # wanted) 1 / 1" over a cluster with no Serve application on
                 # it at all -- and the screen an operator checks to confirm a
                 # stop told them it had not happened.
-                **({"ready_replicas": 0, "total_replicas": 0} if ok else {}),
+                ready_replicas=0,
+                total_replicas=0,
             )
-            if ok:
-                await self._retire_endpoints(session, deployment.id)
+            await self._retire_endpoints(session, deployment.id)
             return
 
         # ------------------------------------------------------------------
@@ -1799,6 +1816,54 @@ class RayDeploymentManager:
             config_hash=config_hash,
             ready_replicas=0,
             total_replicas=0,
+        )
+
+    def _observe_stopping(
+        self,
+        deployment: InferenceDeployment,
+        app_name: str,
+        action_name: str,
+        reason: str | None,
+    ) -> None:
+        """Serve has not removed *app_name* yet: still stopping, or failed once past the deadline.
+
+        Stopping stays in the reconciler's queue (not observed), so the next
+        pass asks again -- by then the copies have usually let go and the
+        application is gone. The clock runs from the first pass that found
+        it still there, for this generation of the deployment.
+        """
+        now = datetime.now(tz=UTC)
+        status = dict(deployment.observed_status_json or {})
+        since = now
+        if status.get("stopping_generation") == deployment.generation:
+            try:
+                since = datetime.fromisoformat(str(status.get("stopping_since")))
+            except ValueError:
+                since = now
+        waited = (now - since).total_seconds()
+        observed = {"reconciled": False, "action": action_name, "app": app_name, "reason": reason}
+        if waited < STOP_DEADLINE_SEC:
+            status["stopping_since"] = since.isoformat()
+            status["stopping_generation"] = deployment.generation
+            deployment.observed_status_json = status
+            self._observe(
+                deployment, DeploymentPhase.STOPPING,
+                f"serve.delete({app_name}) not done yet" + (f": {reason}" if reason else ""),
+                False,
+                observed=observed,
+                mark_observed=False,
+            )
+            return
+        # Given up on: a stop asked for again starts a new wait.
+        status.pop("stopping_since", None)
+        status.pop("stopping_generation", None)
+        deployment.observed_status_json = status
+        self._observe(
+            deployment, DeploymentPhase.FAILED,
+            f"serve.delete({app_name}) did not finish within {int(STOP_DEADLINE_SEC // 60)} minutes"
+            + (f": {reason}" if reason else ""),
+            False,
+            observed=observed,
         )
 
     def _observe(

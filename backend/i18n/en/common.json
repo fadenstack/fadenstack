@@ -2366,6 +2366,7 @@
       "applying": "Starting",
       "running": "Serving",
       "degraded": "Degraded",
+      "stopping": "Stopping",
       "stopped": "Stopped",
       "failed": "Failed",
       "deleted": "Removed"
@@ -2429,10 +2430,20 @@
         "title_many": "Starting {{count}} deployments",
         "detail": "Copying the model to the machines that need it, then starting the copies."
       },
+      "stopping": {
+        "title_one": "Stopping {{name}}",
+        "title_many": "Stopping {{count}} deployments",
+        "detail": "Ray Serve is letting the copies go. A large model can take a few minutes to free its GPU."
+      },
       "failed": {
         "title_one": "{{count}} deployment failed to start",
         "title_other": "{{count}} deployments failed to start",
         "detail": "Open the deployment to read its logs."
+      },
+      "stop_failed": {
+        "title_one": "{{count}} deployment did not stop",
+        "title_other": "{{count}} deployments did not stop",
+        "detail": "Open the deployment to read why, then stop it again."
       },
       "serving": {
         "title": "Serving",

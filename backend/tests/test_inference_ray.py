@@ -1062,6 +1062,91 @@ async def test_deployment_delete_converges_and_retires(deployment_env, dbsession
     assert dep.observed_status_json["observation"]["action"] == "delete"
 
 
+async def test_a_slow_stop_is_stopping_not_failed(deployment_env, dbsession: AsyncSession) -> None:
+    """Serve still removing the application is "stopping", asked again next pass -- then stopped.
+
+    A big model's copies take longer to stop than the machine's helper waits
+    for (a minute), which reports "not deleted". That was a failed stop, out
+    of the reconciler's queue: the page read Failed although the application
+    was gone a pass later.
+    """
+    from faden_backend.db.dao.inference_dao import DeploymentDAO
+
+    dep, _node = deployment_env
+    dep.desired_state = "stopped"
+    dep.generation += 1
+    app = f"faden-{dep.id}"
+    slow = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.DELETE_SERVE_APP.value: {
+                "deleted": False, "app_name": app, "error": "no result from helper",
+            },
+        },
+    )
+    manager = _ray_driver().deployment_manager
+    await manager.reconcile_deployment(dbsession, dep, node_control=slow)
+
+    assert dep.phase == "stopping"
+    assert "no result from helper" in dep.phase_message
+    assert dep.observed_generation != dep.generation
+    await dbsession.flush()
+    assert dep.id in {d.id for d in await DeploymentDAO(dbsession).list_pending_observation()}
+
+    done = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={NodeCommandType.DELETE_SERVE_APP.value: {"deleted": True, "app_name": app}},
+    )
+    await manager.reconcile_deployment(dbsession, dep, node_control=done)
+    assert dep.phase == "stopped"
+    assert dep.observed_generation == dep.generation
+    assert "stopping_since" not in dep.observed_status_json
+
+
+async def test_a_stop_that_never_finishes_fails_after_the_deadline(
+    deployment_env, dbsession: AsyncSession,
+) -> None:
+    """Past the deadline the stop is failed, with the reason, and a new stop starts a new wait."""
+    from datetime import UTC, datetime, timedelta
+
+    from faden_backend.services.inference.drivers.ray.deployment import STOP_DEADLINE_SEC
+
+    dep, _node = deployment_env
+    dep.desired_state = "stopped"
+    dep.generation += 1
+    app = f"faden-{dep.id}"
+    dep.observed_status_json = {
+        "stopping_since": (datetime.now(tz=UTC) - timedelta(seconds=STOP_DEADLINE_SEC + 1)).isoformat(),
+        "stopping_generation": dep.generation,
+    }
+    stuck = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.DELETE_SERVE_APP.value: {
+                "deleted": False, "app_name": app, "error": "Cannot attach to Ray",
+            },
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=stuck)
+
+    assert dep.phase == "failed"
+    assert "Cannot attach to Ray" in dep.phase_message
+    assert "stopping_since" not in dep.observed_status_json
+
+
+async def test_a_stop_request_reads_stopping_at_once(deployment_env, dbsession: AsyncSession) -> None:
+    """The stop is the reconciler's; the deployment says "stopping" from the moment it is asked."""
+    from faden_backend.services.inference.service import DeploymentService
+
+    dep, _node = deployment_env
+    dep.phase = "running"
+    await dbsession.flush()
+    updated = await DeploymentService(dbsession).update(dep.id, desired_state="stopped")
+
+    assert updated.phase == "stopping"
+    assert updated.desired_state == "stopped"
+
+
 async def test_deployment_without_node_control_is_honest(deployment_env, dbsession: AsyncSession) -> None:
     """Without a node control service the row stays pending and honest - no
     live action is taken and it is NOT marked observed."""

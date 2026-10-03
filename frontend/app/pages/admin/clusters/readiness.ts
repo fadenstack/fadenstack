@@ -29,6 +29,7 @@ export type ReadinessStage =
   | "stopped"
   | "ready"
   | "deploying"
+  | "stopping"
   | "serving";
 
 export type ReadinessTone = "action" | "progress" | "warning" | "success";
@@ -187,12 +188,36 @@ export function clusterReadiness(
     };
   }
 
+  const stopping = active.filter((d) => d.phase === "stopping");
+  if (stopping.length > 0) {
+    return {
+      stage: "stopping",
+      title:
+        stopping.length === 1
+          ? i18n.t("clusters.next.stopping.title_one", { name: stopping[0].name })
+          : i18n.t("clusters.next.stopping.title_many", { count: stopping.length }),
+      detail: i18n.t("clusters.next.stopping.detail"),
+      tone: "progress",
+    };
+  }
+
+  // A deployment told to stop that failed did not fail to start: it failed
+  // to stop, and is said so.
   const failed = active.filter((d) => d.phase === "failed");
+  const failedStarts = failed.filter((d) => d.desired_state !== "stopped");
+  if (failedStarts.length > 0) {
+    return {
+      stage: "degraded",
+      title: i18n.t("clusters.next.failed.title", { count: failedStarts.length }),
+      detail: failedStarts[0].phase_message ?? i18n.t("clusters.next.failed.detail"),
+      tone: "warning",
+    };
+  }
   if (failed.length > 0) {
     return {
       stage: "degraded",
-      title: i18n.t("clusters.next.failed.title", { count: failed.length }),
-      detail: failed[0].phase_message ?? i18n.t("clusters.next.failed.detail"),
+      title: i18n.t("clusters.next.stop_failed.title", { count: failed.length }),
+      detail: failed[0].phase_message ?? i18n.t("clusters.next.stop_failed.detail"),
       tone: "warning",
     };
   }

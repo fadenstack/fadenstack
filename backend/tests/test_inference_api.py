@@ -477,6 +477,8 @@ async def test_deployment_update_desired_state_stops(
     r = await client.patch(f"{API}/deployments/{dep['id']}", json={"desired_state": "stopped"})
     assert r.status_code == 200
     assert r.json()["desired_state"] == "stopped"
+    # Said at once; the stop itself is the reconciler's next pass.
+    assert r.json()["phase"] == "stopping"
 
 
 async def test_deployment_update_invalid_desired_state_409(

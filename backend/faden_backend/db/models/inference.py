@@ -108,6 +108,8 @@ class DeploymentPhase(enum.StrEnum):
     APPLYING = "applying"
     RUNNING = "running"
     DEGRADED = "degraded"
+    #: Told to stop (or to go), its application not gone from the cluster yet.
+    STOPPING = "stopping"
     STOPPED = "stopped"
     FAILED = "failed"
     DELETED = "deleted"

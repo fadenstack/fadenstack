@@ -2368,6 +2368,7 @@
       "applying": "正在启动",
       "running": "服务中",
       "degraded": "降级",
+      "stopping": "正在停止",
       "stopped": "已停止",
       "failed": "失败",
       "deleted": "已删除"
@@ -2431,10 +2432,20 @@
         "title_many": "正在启动 {{count}} 个部署",
         "detail": "正在将模型复制到需要的机器，然后启动副本。"
       },
+      "stopping": {
+        "title_one": "正在停止 {{name}}",
+        "title_many": "正在停止 {{count}} 个部署",
+        "detail": "Ray Serve 正在释放副本。大型模型可能需要几分钟才能释放 GPU。"
+      },
       "failed": {
         "title_one": "{{count}} 个部署启动失败",
         "title_other": "{{count}} 个部署启动失败",
         "detail": "打开该部署以查看其日志。"
+      },
+      "stop_failed": {
+        "title_one": "{{count}} 个部署未能停止",
+        "title_other": "{{count}} 个部署未能停止",
+        "detail": "打开该部署查看原因，然后再次停止。"
       },
       "serving": {
         "title": "服务中",

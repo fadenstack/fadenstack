@@ -2368,6 +2368,7 @@
       "applying": "Iniciando",
       "running": "Sirviendo",
       "degraded": "Degradado",
+      "stopping": "Deteniendo",
       "stopped": "Detenido",
       "failed": "Fallido",
       "deleted": "Eliminado"
@@ -2431,10 +2432,20 @@
         "title_many": "Iniciando {{count}} despliegues",
         "detail": "Copiando el modelo a las máquinas que lo necesitan y luego iniciando las copias."
       },
+      "stopping": {
+        "title_one": "Deteniendo {{name}}",
+        "title_many": "Deteniendo {{count}} despliegues",
+        "detail": "Ray Serve está liberando las copias. Un modelo grande puede tardar unos minutos en liberar su GPU."
+      },
       "failed": {
         "title_one": "{{count}} despliegue no pudo iniciarse",
         "title_other": "{{count}} despliegues no pudieron iniciarse",
         "detail": "Abra el despliegue para leer sus registros."
+      },
+      "stop_failed": {
+        "title_one": "{{count}} despliegue no se detuvo",
+        "title_other": "{{count}} despliegues no se detuvieron",
+        "detail": "Abra el despliegue para ver el motivo y deténgalo de nuevo."
       },
       "serving": {
         "title": "Sirviendo",

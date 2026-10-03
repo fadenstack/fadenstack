@@ -57,6 +57,7 @@ export function deploymentPhaseColor(phase: string): ChipColor {
     case "pending":
     case "preparing":
     case "applying":
+    case "stopping":
       return "info";
     case "degraded":
       return "warning";

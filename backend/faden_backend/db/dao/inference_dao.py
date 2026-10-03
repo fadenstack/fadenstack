@@ -524,8 +524,8 @@ class DeploymentDAO:
 
         These are the rows the reconciler must visit:
         * Rows where observed_generation lags generation (new desired state or spec change);
-        * Rows in an active transition phase (pending, preparing, applying) where
-          convergence is still in progress.
+        * Rows in an active transition phase (pending, preparing, applying,
+          stopping) where convergence is still in progress.
         Terminal rows (running, stopped, failed, deleted) whose generation is
         observed stay out of the queue so the reconciler does not busy-spin.
         """
@@ -540,6 +540,7 @@ class DeploymentDAO:
                             DeploymentPhase.PREPARING.value,
                             DeploymentPhase.APPLYING.value,
                             DeploymentPhase.DEGRADED.value,
+                            DeploymentPhase.STOPPING.value,
                         ]),
                         InferenceDeployment.desired_state
                         != DeploymentDesiredState.DELETED.value,

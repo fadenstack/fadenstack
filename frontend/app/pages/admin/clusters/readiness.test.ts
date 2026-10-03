@@ -102,6 +102,28 @@ describe("clusterReadiness", () => {
     expect(step.detail).toBe("engine out of memory");
   });
 
+  it("says a deployment told to stop is stopping, not starting", () => {
+    const stopping = { ...deployment, desired_state: "stopped", phase: "stopping" };
+    const step = clusterReadiness(environment, environmentNodes, [stopping]);
+    expect(step.stage).toBe("stopping");
+    expect(step.tone).toBe("progress");
+    expect(step.title).toBe(`Stopping ${deployment.name}`);
+  });
+
+  it("says a stop that failed is a failed stop, not a failed start", () => {
+    const failedStop = {
+      ...deployment,
+      desired_state: "stopped",
+      phase: "failed",
+      phase_message: "serve.delete(app) did not finish within 10 minutes",
+    };
+    const step = clusterReadiness(environment, environmentNodes, [failedStop]);
+    expect(step.stage).toBe("degraded");
+    expect(step.title).toBe("1 deployment did not stop");
+    expect(step.title).not.toContain("failed to start");
+    expect(step.detail).toContain("did not finish");
+  });
+
   it("settles on serving when everything is running", () => {
     const step = clusterReadiness(environment, environmentNodes, [deployment]);
     expect(step.stage).toBe("serving");

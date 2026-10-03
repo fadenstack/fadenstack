@@ -2368,6 +2368,7 @@
       "applying": "Wird gestartet",
       "running": "Aktiv",
       "degraded": "Eingeschränkt",
+      "stopping": "Wird gestoppt",
       "stopped": "Gestoppt",
       "failed": "Fehlgeschlagen",
       "deleted": "Entfernt"
@@ -2431,10 +2432,20 @@
         "title_many": "{{count}} Bereitstellungen werden gestartet",
         "detail": "Das Modell wird auf die Maschinen kopiert, die es brauchen; dann werden die Kopien gestartet."
       },
+      "stopping": {
+        "title_one": "{{name}} wird gestoppt",
+        "title_many": "{{count}} Bereitstellungen werden gestoppt",
+        "detail": "Ray Serve gibt die Kopien frei. Ein großes Modell kann einige Minuten brauchen, bis seine GPU frei ist."
+      },
       "failed": {
         "title_one": "{{count}} Bereitstellung konnte nicht starten",
         "title_other": "{{count}} Bereitstellungen konnten nicht starten",
         "detail": "Öffnen Sie die Bereitstellung, um ihre Protokolle zu lesen."
+      },
+      "stop_failed": {
+        "title_one": "{{count}} Bereitstellung wurde nicht gestoppt",
+        "title_other": "{{count}} Bereitstellungen wurden nicht gestoppt",
+        "detail": "Öffnen Sie die Bereitstellung, um den Grund zu lesen, und stoppen Sie sie erneut."
       },
       "serving": {
         "title": "Aktiv",

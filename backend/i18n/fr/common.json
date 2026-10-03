@@ -2368,6 +2368,7 @@
       "applying": "Démarrage",
       "running": "En service",
       "degraded": "Dégradé",
+      "stopping": "Arrêt en cours",
       "stopped": "Arrêté",
       "failed": "Échec",
       "deleted": "Supprimé"
@@ -2431,10 +2432,20 @@
         "title_many": "Démarrage de {{count}} déploiements",
         "detail": "Copie du modèle sur les machines qui en ont besoin, puis démarrage des copies."
       },
+      "stopping": {
+        "title_one": "Arrêt de {{name}}",
+        "title_many": "Arrêt de {{count}} déploiements",
+        "detail": "Ray Serve libère les copies. Un grand modèle peut mettre quelques minutes à libérer son GPU."
+      },
       "failed": {
         "title_one": "{{count}} déploiement n'a pas pu démarrer",
         "title_other": "{{count}} déploiements n'ont pas pu démarrer",
         "detail": "Ouvrez le déploiement pour lire ses journaux."
+      },
+      "stop_failed": {
+        "title_one": "{{count}} déploiement ne s'est pas arrêté",
+        "title_other": "{{count}} déploiements ne se sont pas arrêtés",
+        "detail": "Ouvrez le déploiement pour en lire la raison, puis arrêtez-le à nouveau."
       },
       "serving": {
         "title": "En service",

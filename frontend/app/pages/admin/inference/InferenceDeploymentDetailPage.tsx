@@ -385,7 +385,8 @@ export default function InferenceDeploymentDetailPage() {
   // was copying went on saying "syncing, on 0 of 2 machines" next to a
   // health of Serving.
   const phase = deployment?.phase ?? null;
-  const settling = phase === "pending" || phase === "preparing" || phase === "applying";
+  const settling =
+    phase === "pending" || phase === "preparing" || phase === "applying" || phase === "stopping";
   const followMs = settling ? 10_000 : 0;
 
   const environmentLoad = useAsyncData(

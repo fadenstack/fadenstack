@@ -68,6 +68,7 @@ export function phaseLabel(phase: string): string {
     case "applying":
     case "running":
     case "degraded":
+    case "stopping":
     case "stopped":
     case "failed":
     case "deleted":
