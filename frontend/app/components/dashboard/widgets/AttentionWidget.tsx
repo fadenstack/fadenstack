@@ -3,26 +3,32 @@
  *
  * The server sends a code and parameters for each; the words are rendered
  * here, in the viewer's language (`dashboard.attention.<code>.title|detail`).
- * A problem clears when its cause does. Rules that could not run make the
- * widget "partial" rather than hiding what the others found.
+ * A problem clears when its cause does. One an administrator has seen can be
+ * muted: it moves under "N muted" for everyone, out of the counts, until it
+ * clears or gets worse. Rules that could not run make the widget "partial"
+ * rather than hiding what the others found.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
+import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import type { AttentionItem, Severity } from "~/api/dashboard";
+import { dashboardFleet, type AttentionItem, type MutedAttentionItem, type Severity } from "~/api/dashboard";
 import { useFitCount } from "../fit";
 import { fmtAgo } from "../format";
 import { useAttention } from "../queries";
@@ -36,15 +42,63 @@ export default function AttentionWidget({ refreshToken, fill = false }: WidgetPr
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const [all, setAll] = useState(false);
+  const [showMuted, setShowMuted] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionFailed, setActionFailed] = useState(false);
   const query = useAttention({ refreshToken });
   const items = query.data?.items ?? [];
+  const muted = query.data?.muted ?? [];
   // Filling the row's height: every item is laid out and those that do not
   // fit whole are hidden. Sized to content: the first few.
-  const fitting = fill && !all;
+  const fitting = fill && !all && !showMuted;
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null);
   const fitCount = useFitCount(fitting ? listEl : null);
   const limit = fitting ? (fitCount ?? items.length) : isPhone ? SHOWN.phone : SHOWN.other;
   const laidOut = all || fitting ? items : items.slice(0, limit);
+
+  // Muting changes what every administrator sees: read the list again after.
+  async function change(id: string, action: () => Promise<unknown>) {
+    setBusy(id);
+    setActionFailed(false);
+    try {
+      await action();
+      await query.refresh();
+    } catch {
+      setActionFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  }
+  const muteButton = (item: AttentionItem) => (
+    <Tooltip title={t("dashboard.attention.mute_hint")}>
+      <span>
+        <IconButton
+          size="small"
+          aria-label={t("dashboard.attention.mute")}
+          disabled={busy !== null}
+          onClick={() => void change(item.id, () => dashboardFleet.acknowledge(item))}
+          sx={{ width: 40, height: 40, color: "text.secondary" }}
+        >
+          <NotificationsOffOutlinedIcon fontSize="small" />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+  const unmuteButton = (item: MutedAttentionItem) => (
+    <Tooltip title={t("dashboard.attention.unmute")}>
+      <span>
+        <IconButton
+          size="small"
+          aria-label={t("dashboard.attention.unmute")}
+          disabled={busy !== null}
+          onClick={() => void change(item.id, () => dashboardFleet.unacknowledge(item.id))}
+          sx={{ width: 40, height: 40, color: "text.secondary" }}
+        >
+          <NotificationsActiveOutlinedIcon fontSize="small" />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
 
   return (
     <WidgetCard
@@ -66,9 +120,10 @@ export default function AttentionWidget({ refreshToken, fill = false }: WidgetPr
           ))}
         </Stack>
       }
-      empty={query.data && items.length === 0 ? <AllClear /> : undefined}
+      empty={query.data && items.length === 0 && muted.length === 0 ? <AllClear /> : undefined}
     >
       <Box sx={fitting ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : undefined}>
+        {items.length === 0 && <AllClear />}
         <List
           ref={setListEl}
           disablePadding
@@ -85,20 +140,61 @@ export default function AttentionWidget({ refreshToken, fill = false }: WidgetPr
           }}
         >
           {laidOut.map((item, index) => (
-            <Item key={item.id} item={item} hidden={fitting && index >= limit} />
+            <Item key={item.id} item={item} hidden={fitting && index >= limit} action={muteButton(item)} />
           ))}
         </List>
-        {items.length > limit && (
-          <Button onClick={() => setAll((v) => !v)} size="small" sx={{ mt: 1, minHeight: 44, alignSelf: "flex-start" }}>
-            {all ? t("dashboard.attention.show_fewer") : t("dashboard.attention.show_all", { count: items.length })}
-          </Button>
+        {actionFailed && (
+          <Typography variant="caption" color="error" role="alert" sx={{ display: "block", mt: 1 }}>
+            {t("dashboard.attention.mute_failed")}
+          </Typography>
+        )}
+        {(items.length > limit || muted.length > 0) && (
+          <Stack direction="row" gap={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+            {items.length > limit && (
+              <Button onClick={() => setAll((v) => !v)} size="small" sx={{ minHeight: 44 }}>
+                {all ? t("dashboard.attention.show_fewer") : t("dashboard.attention.show_all", { count: items.length })}
+              </Button>
+            )}
+            {muted.length > 0 && (
+              <Button
+                onClick={() => setShowMuted((v) => !v)}
+                size="small"
+                startIcon={<NotificationsOffOutlinedIcon />}
+                aria-expanded={showMuted}
+                sx={{ minHeight: 44 }}
+              >
+                {showMuted
+                  ? t("dashboard.attention.hide_muted")
+                  : t("dashboard.attention.show_muted", { count: muted.length })}
+              </Button>
+            )}
+          </Stack>
+        )}
+        {showMuted && muted.length > 0 && (
+          <List disablePadding data-testid="attention-muted" sx={{ display: "grid", gap: 0.75, mt: 0.5 }}>
+            {muted.map((item) => (
+              <Item key={item.id} item={item} muted action={unmuteButton(item)} />
+            ))}
+          </List>
         )}
       </Box>
     </WidgetCard>
   );
 }
 
-function Item({ item, hidden = false }: { item: AttentionItem; hidden?: boolean }) {
+function Item({
+  item,
+  hidden = false,
+  muted = false,
+  action,
+}: {
+  item: AttentionItem | MutedAttentionItem;
+  hidden?: boolean;
+  /** Listed under "muted": dimmed, with who muted it. */
+  muted?: boolean;
+  /** A control beside the item, outside its link. */
+  action?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const params = localise(item.params, t);
@@ -124,6 +220,16 @@ function Item({ item, hidden = false }: { item: AttentionItem; hidden?: boolean 
         <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
           {title}
         </Typography>
+        {muted && "acknowledged_at" in item && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.35 }}>
+            {item.acknowledged_by
+              ? t("dashboard.attention.muted_by", {
+                  who: item.acknowledged_by,
+                  ago: fmtAgo(item.acknowledged_at, i18n.language),
+                })
+              : t("dashboard.attention.muted_ago", { ago: fmtAgo(item.acknowledged_at, i18n.language) })}
+          </Typography>
+        )}
         {detail && (
           // Two lines at most (a cluster's message can run long); all of it on hover.
           <Typography
@@ -151,24 +257,32 @@ function Item({ item, hidden = false }: { item: AttentionItem; hidden?: boolean 
     </Box>
   );
 
-  const sx = {
-    borderRadius: 1,
-    border: 1,
-    borderColor: "divider",
-    bgcolor: "dashboard.surfaceSubtle",
-    px: 1.25,
-    py: 1,
-    minHeight: 48,
-    // Past what fits: kept in the layout (so the fit can be measured), not shown.
-    ...(hidden ? { visibility: "hidden" } : {}),
-  };
-  return item.link ? (
-    <ListItemButton component={RouterLink} to={item.link} sx={sx} aria-hidden={hidden || undefined}>
-      {body}
-    </ListItemButton>
-  ) : (
-    <Box component="li" sx={{ ...sx, listStyle: "none", display: "flex" }} aria-hidden={hidden || undefined}>
-      {body}
+  const inner = { px: 1.25, py: 1, minHeight: 48, flex: 1, minWidth: 0, borderRadius: 1 };
+  return (
+    <Box
+      component="li"
+      aria-hidden={hidden || undefined}
+      sx={{
+        borderRadius: 1,
+        border: 1,
+        borderColor: "divider",
+        bgcolor: "dashboard.surfaceSubtle",
+        listStyle: "none",
+        display: "flex",
+        alignItems: "center",
+        ...(muted ? { opacity: 0.75 } : {}),
+        // Past what fits: kept in the layout (so the fit can be measured), not shown.
+        ...(hidden ? { visibility: "hidden" } : {}),
+      }}
+    >
+      {item.link ? (
+        <ListItemButton component={RouterLink} to={item.link} sx={inner}>
+          {body}
+        </ListItemButton>
+      ) : (
+        <Box sx={{ ...inner, display: "flex" }}>{body}</Box>
+      )}
+      {action && <Box sx={{ pr: 0.5, flexShrink: 0 }}>{action}</Box>}
     </Box>
   );
 }

@@ -370,3 +370,105 @@ async def test_capacity_and_attention_never_ask_ray_or_probe_a_runtime(
     assert attention.status_code == status.HTTP_200_OK, attention.text
     failed = attention.json()["rule_errors"]
     assert not {"machines", "clusters_and_deployments", "runtimes"} & set(failed), failed
+
+
+# ── muting what someone has seen ────────────────────────────────────
+
+
+def _offline_item(severity: str = "critical") -> attention_rules.Item:
+    return attention_rules.Item(
+        "node_offline:x", "node_offline", severity, "infrastructure", {"node": "spark-1"}, NOW, "/admin/nodes/x"
+    )
+
+
+def _disk_item(severity: str = "warning") -> attention_rules.Item:
+    return attention_rules.Item("disk_low", "disk_low", severity, "platform", {"free": 8.0})
+
+
+async def _attention(fastapi_app: FastAPI, client: AsyncClient, *items: attention_rules.Item, broken: bool = False):  # noqa: ANN202
+    """Read the attention list as if the rules found *items* (and one rule failed, with *broken*)."""
+
+    async def found(_facts: object) -> list[attention_rules.Item]:
+        return list(items)
+
+    async def failing(_facts: object) -> list[attention_rules.Item]:
+        raise RuntimeError("boom")
+
+    attention_rules.RULES[:] = [found, failing] if broken else [found]
+    fastapi_app.state.dashboard_fact_cache = None  # evaluated afresh, not from the last read
+    response = await client.get(fastapi_app.url_path_for("admin_dashboard_attention"))
+    assert response.status_code == status.HTTP_200_OK, response.text
+    return response.json()
+
+
+async def _mute(fastapi_app: FastAPI, client: AsyncClient, item_id: str, severity: str):  # noqa: ANN202
+    return await client.put(
+        fastapi_app.url_path_for("admin_dashboard_attention_acknowledge", item_id=item_id),
+        json={"severity": severity},
+    )
+
+
+@pytest.fixture()
+async def admin(fastapi_app: FastAPI, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> User:
+    monkeypatch.setattr(attention_rules, "RULES", [])
+    user = await _user(dbsession, superuser=True)
+    fastapi_app.dependency_overrides[current_active_user] = lambda: user
+    return user
+
+
+async def test_a_muted_item_leaves_the_list_and_the_counts_for_everyone(
+    fastapi_app: FastAPI, client: AsyncClient, admin: User
+) -> None:
+    assert (await _mute(fastapi_app, client, "node_offline:x", "critical")).json() == {
+        "item_id": "node_offline:x", "muted": True,
+    }
+    body = await _attention(fastapi_app, client, _offline_item(), _disk_item())
+
+    assert [i["id"] for i in body["items"]] == ["disk_low"]
+    assert body["counts"] == {"critical": 0, "warning": 1, "info": 0}
+    assert [(m["id"], m["acknowledged_by"]) for m in body["muted"]] == [("node_offline:x", admin.email)]
+
+
+async def test_a_muted_item_that_gets_worse_is_shown_again(
+    fastapi_app: FastAPI, client: AsyncClient, admin: User
+) -> None:
+    await _mute(fastapi_app, client, "disk_low", "warning")
+    assert (await _attention(fastapi_app, client, _disk_item("warning")))["items"] == []
+
+    worse = await _attention(fastapi_app, client, _disk_item("critical"))
+    assert [i["id"] for i in worse["items"]] == ["disk_low"] and worse["muted"] == []
+    # And it takes a new look to mute it: back to a warning, it is not muted by the old one.
+    assert [i["id"] for i in (await _attention(fastapi_app, client, _disk_item("warning")))["items"]] == ["disk_low"]
+
+
+async def test_a_problem_that_clears_and_comes_back_is_new(
+    fastapi_app: FastAPI, client: AsyncClient, admin: User
+) -> None:
+    await _mute(fastapi_app, client, "node_offline:x", "critical")
+    # Unknown while its rule fails: still muted.
+    assert (await _attention(fastapi_app, client, broken=True))["muted"] == []
+    assert (await _attention(fastapi_app, client, _offline_item(), broken=True))["items"] == []
+
+    assert (await _attention(fastapi_app, client))["items"] == []  # cleared
+    back = await _attention(fastapi_app, client, _offline_item())
+    assert [i["id"] for i in back["items"]] == ["node_offline:x"]
+
+
+async def test_a_muted_item_can_be_shown_again(
+    fastapi_app: FastAPI, client: AsyncClient, admin: User
+) -> None:
+    await _mute(fastapi_app, client, "node_offline:x", "critical")
+    response = await client.delete(
+        fastapi_app.url_path_for("admin_dashboard_attention_unacknowledge", item_id="node_offline:x")
+    )
+    assert response.json() == {"item_id": "node_offline:x", "muted": False}
+    assert [i["id"] for i in (await _attention(fastapi_app, client, _offline_item()))["items"]] == ["node_offline:x"]
+
+
+async def test_muting_needs_a_known_severity_and_a_superuser(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, admin: User
+) -> None:
+    assert (await _mute(fastapi_app, client, "disk_low", "whatever")).status_code == 422
+    operator = await _user(dbsession, superuser=False)
+    fastapi_app.dependency_overrides[current_active_user] = lambda: operator
+    assert (await _mute(fastapi_app, client, "disk_low", "warning")).status_code == status.HTTP_403_FORBIDDEN

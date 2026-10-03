@@ -9,13 +9,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User
 from faden_backend.services.dashboard import attention as attention_rules
 from faden_backend.services.dashboard import capacity as capacity_service
 from faden_backend.web.api.admin.dashboard.common import build_facts, dashboard_now
 from faden_backend.web.api.admin.dashboard.schema import (
+    AcknowledgeDTO,
+    AcknowledgementDTO,
     AttentionDTO,
     AttentionItemDTO,
     CapacityDTO,
@@ -27,6 +31,7 @@ from faden_backend.web.api.admin.dashboard.schema import (
     MachineDTO,
     MachineRefDTO,
     McpSummaryDTO,
+    MutedAttentionItemDTO,
     ProvidersSummaryDTO,
     SkillsSummaryDTO,
 )
@@ -130,31 +135,80 @@ async def get_capacity(
     )
 
 
+def _item_fields(i: attention_rules.Item) -> dict:
+    return {
+        "id": i.id,
+        "code": i.code,
+        "severity": i.severity,
+        "category": i.category,
+        "params": i.params,
+        "since": i.since,
+        "link": i.link,
+    }
+
+
 @router.get("/attention", response_model=AttentionDTO, name="admin_dashboard_attention")
 async def get_attention(
     request: Request,
     _user: Annotated[User, Depends(require_superuser)],
     now: Annotated[datetime, Depends(dashboard_now)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AttentionDTO:
-    """Current problems from stored state, most severe first; failing rules are listed, not fatal."""
+    """Current problems from stored state, most severe first; failing rules are listed, not fatal.
+
+    What an administrator muted is listed apart and not counted.
+    """
     items, failed = await build_facts(request, now).attention()
+    shown, muted = await attention_rules.apply_acknowledgements(session, items, complete=not failed)
     return AttentionDTO(
         generated_at=now,
-        items=[
-            AttentionItemDTO(
-                id=i.id,
-                code=i.code,
-                severity=i.severity,
-                category=i.category,
-                params=i.params,
-                since=i.since,
-                link=i.link,
-            )
-            for i in items
-        ],
-        counts=attention_rules.counts(items),
+        items=[AttentionItemDTO(**_item_fields(i)) for i in shown],
+        counts=attention_rules.counts(shown),
         rule_errors=failed,
+        muted=[
+            MutedAttentionItemDTO(
+                **_item_fields(m.item), acknowledged_at=m.acknowledged_at, acknowledged_by=m.acknowledged_by
+            )
+            for m in muted
+        ],
     )
+
+
+_ITEM_ID = Path(min_length=1, max_length=255)
+
+
+@router.put(
+    "/attention/acknowledgements/{item_id}",
+    response_model=AcknowledgementDTO,
+    name="admin_dashboard_attention_acknowledge",
+)
+async def acknowledge_attention(
+    item_id: Annotated[str, _ITEM_ID],
+    body: AcknowledgeDTO,
+    user: Annotated[User, Depends(require_superuser)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AcknowledgementDTO:
+    """Mute an item for every administrator until it clears or gets worse."""
+    try:
+        await attention_rules.acknowledge(session, item_id, body.severity, user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AcknowledgementDTO(item_id=item_id, muted=True)
+
+
+@router.delete(
+    "/attention/acknowledgements/{item_id}",
+    response_model=AcknowledgementDTO,
+    name="admin_dashboard_attention_unacknowledge",
+)
+async def unacknowledge_attention(
+    item_id: Annotated[str, _ITEM_ID],
+    _user: Annotated[User, Depends(require_superuser)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AcknowledgementDTO:
+    """Show a muted item again."""
+    await attention_rules.unacknowledge(session, item_id)
+    return AcknowledgementDTO(item_id=item_id, muted=False)
 
 
 @router.get("/integrations", response_model=IntegrationsDTO, name="admin_dashboard_integrations")

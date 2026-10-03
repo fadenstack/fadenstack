@@ -305,14 +305,37 @@ class AttentionItemDTO(BaseModel):
     link: str | None = None
 
 
+class MutedAttentionItemDTO(AttentionItemDTO):
+    """A current problem an administrator muted: left out of ``items`` and the counts."""
+
+    acknowledged_at: datetime
+    #: Who muted it (email); ``None`` once that user is gone.
+    acknowledged_by: str | None = None
+
+
 class AttentionDTO(BaseModel):
     """Current problems, most severe first."""
 
     generated_at: datetime
     items: list[AttentionItemDTO]
+    #: Of ``items`` only: what is muted is not counted.
     counts: dict[str, int]
     #: Rules that could not be evaluated this time.
     rule_errors: list[str] = Field(default_factory=list)
+    muted: list[MutedAttentionItemDTO] = Field(default_factory=list)
+
+
+class AcknowledgeDTO(BaseModel):
+    """Muting an item: the severity it had when the administrator saw it."""
+
+    severity: str
+
+
+class AcknowledgementDTO(BaseModel):
+    """An item's mute after a change."""
+
+    item_id: str
+    muted: bool
 
 
 class ProvidersSummaryDTO(BaseModel):

@@ -8,7 +8,10 @@ with a time limit; one that fails is named in ``rule_errors`` and the others
 still answer. Items carry a code and parameters, never English: the UI
 renders ``dashboard.attention.<code>`` in the viewer's language.
 
-An item clears when its cause clears; there is no acknowledging.
+An item clears when its cause clears. An administrator can mute one they
+have seen (``acknowledge``): it leaves the list and the counts for every
+administrator until it clears -- the same problem coming back is new -- or
+gets worse than it was when muted.
 """
 
 from __future__ import annotations
@@ -524,6 +527,82 @@ async def evaluate(facts: Facts, rules: list[Rule] | None = None) -> tuple[list[
             items.extend(result)
     items.sort(key=lambda i: (_ORDER.get(i.severity, 9), -(i.since.timestamp() if i.since else 0)))
     return items, failed
+
+
+@dataclass
+class Muted:
+    """An item someone muted: still a problem, no longer shouted about."""
+
+    item: Item
+    acknowledged_at: datetime
+    #: Who muted it (their email); ``None`` once that user is gone.
+    acknowledged_by: str | None
+
+
+async def apply_acknowledgements(
+    session: Any, items: list[Item], *, complete: bool,
+) -> tuple[list[Item], list[Muted]]:
+    """Split *items* into those to show and those muted; drop mutes that no longer hold.
+
+    A mute goes when its item got worse than it was when muted (shown again,
+    to be muted anew) and, when every rule ran (*complete*), when its item is
+    gone: cleared, so if it comes back it is a new problem. With a rule that
+    failed, its items are merely unknown this time, and their mutes stay.
+    """
+    from faden_backend.db.models.dashboard import AttentionAcknowledgement  # noqa: PLC0415
+    from faden_backend.db.models.users import User  # noqa: PLC0415
+
+    rows = (
+        await session.execute(
+            select(AttentionAcknowledgement, User.email).outerjoin(
+                User, User.id == AttentionAcknowledgement.acknowledged_by
+            )
+        )
+    ).all()
+    acks = {ack.item_id: (ack, email) for ack, email in rows}
+    shown: list[Item] = []
+    muted: list[Muted] = []
+    for item in items:
+        found = acks.pop(item.id, None)
+        if found is None:
+            shown.append(item)
+            continue
+        ack, email = found
+        if _ORDER.get(item.severity, 9) < _ORDER.get(ack.severity, 9):
+            await session.delete(ack)
+            shown.append(item)
+            continue
+        muted.append(Muted(item, ack.acknowledged_at, email))
+    if complete:
+        for ack, _email in acks.values():
+            await session.delete(ack)
+    return shown, muted
+
+
+async def acknowledge(session: Any, item_id: str, severity: str, user_id: Any) -> None:
+    """Mute *item_id* at *severity*, for every administrator (muting it again renews it)."""
+    from faden_backend.db.models.dashboard import AttentionAcknowledgement  # noqa: PLC0415
+
+    if severity not in _ORDER:
+        raise ValueError(f"unknown severity {severity!r}")
+    ack = await session.get(AttentionAcknowledgement, item_id)
+    if ack is None:
+        session.add(AttentionAcknowledgement(item_id=item_id, severity=severity, acknowledged_by=user_id))
+    else:
+        ack.severity = severity
+        ack.acknowledged_by = user_id
+        ack.acknowledged_at = func.now()
+    await session.flush()
+
+
+async def unacknowledge(session: Any, item_id: str) -> None:
+    """Show *item_id* again."""
+    from faden_backend.db.models.dashboard import AttentionAcknowledgement  # noqa: PLC0415
+
+    ack = await session.get(AttentionAcknowledgement, item_id)
+    if ack is not None:
+        await session.delete(ack)
+        await session.flush()
 
 
 def counts(items: list[Item]) -> dict[str, int]:

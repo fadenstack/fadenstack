@@ -244,11 +244,20 @@ export interface AttentionItem {
   link: string | null;
 }
 
+/** An item an administrator muted: still a problem, left out of `items` and the counts. */
+export interface MutedAttentionItem extends AttentionItem {
+  acknowledged_at: string;
+  /** Who muted it; null once that user is gone. */
+  acknowledged_by: string | null;
+}
+
 export interface AttentionResponse {
   generated_at: string;
   items: AttentionItem[];
+  /** Of `items` only. */
   counts: Record<Severity, number>;
   rule_errors: string[];
+  muted?: MutedAttentionItem[];
 }
 
 export const dashboardFleet = {
@@ -260,6 +269,19 @@ export const dashboardFleet = {
   },
   attention() {
     return request<AttentionResponse>("/attention");
+  },
+  /** Mute an item for every administrator until it clears or gets worse. */
+  acknowledge(item: Pick<AttentionItem, "id" | "severity">) {
+    return request<{ item_id: string; muted: boolean }>(
+      `/attention/acknowledgements/${encodeURIComponent(item.id)}`,
+      { method: "PUT", body: JSON.stringify({ severity: item.severity }) },
+    );
+  },
+  unacknowledge(itemId: string) {
+    return request<{ item_id: string; muted: boolean }>(
+      `/attention/acknowledgements/${encodeURIComponent(itemId)}`,
+      { method: "DELETE" },
+    );
   },
 };
 
