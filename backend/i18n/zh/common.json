@@ -2,7 +2,9 @@
   "app": {
     "title": "Fadenstack",
     "subtitle": "控制台",
-    "check_session": "正在检查会话..."
+    "check_session": "正在检查会话...",
+    "new_version": "Fadenstack 已更新。",
+    "reload": "重新加载"
   },
   "theme": {
     "light": "切换到浅色模式",

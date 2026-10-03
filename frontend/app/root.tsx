@@ -25,6 +25,7 @@ import {
 } from "./theme-mode";
 import i18n from "./i18n";
 import { followMaintenance } from "./lib/maintenance";
+import NewVersionNotice from "./components/NewVersionNotice";
 
 import type { Route } from "./+types/root";
 import "@fontsource/sora/600.css";
@@ -189,7 +190,12 @@ export default function App() {
       </Box>
     );
   }
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <NewVersionNotice />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

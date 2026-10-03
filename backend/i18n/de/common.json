@@ -2,7 +2,9 @@
   "app": {
     "title": "Fadenstack",
     "subtitle": "Konsole",
-    "check_session": "Sitzung wird geprueft..."
+    "check_session": "Sitzung wird geprueft...",
+    "new_version": "Fadenstack wurde aktualisiert.",
+    "reload": "Neu laden"
   },
   "theme": {
     "light": "Zu hellem Modus wechseln",

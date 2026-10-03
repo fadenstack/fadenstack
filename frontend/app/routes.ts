@@ -10,6 +10,8 @@ export default [
   route("/login", "routes/login.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
+  // Which build this server runs: open pages ask, to notice an upgrade.
+  route("/_build", "routes/build.ts"),
   // Standalone chat UI
   layout("routes/chat.tsx", [
     // One route, not two: as separate entries, starting a chat (/chat ->
