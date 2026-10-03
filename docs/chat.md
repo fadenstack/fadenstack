@@ -26,6 +26,14 @@ while it is being written.
 Under a reply, the badge counts its tokens; hover it for the prompt,
 completion and total. The ⓘ beside it names the model that answered.
 
+While a reply (or the model's thinking) is being written, the chat follows it
+to the bottom. Scroll up -- with the wheel, the trackpad, a finger or the
+keys -- and it stops following, so you can read an earlier answer while the
+new one goes on. The round button at the bottom goes back to the latest
+message and follows again; so does scrolling back down, or sending.
+
+![Scrolled up while the chat goes on, with the button back to the latest message](images/chat/06-scrolled-up.png)
+
 ---
 
 ## Leaving a reply that is being written

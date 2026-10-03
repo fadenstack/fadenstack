@@ -88,9 +88,14 @@ Machines are updated separately: see [Update the machines' agents](#update-the-m
 
 While the services restart, nginx -- the front door, restarted first and on
 its own -- answers every page with a maintenance page instead of the console:
-"Fadenstack is being updated", in the browser's language. The page checks
-every few seconds and reloads itself into the console once it is back, on
-the new version. A console left open reloads into the page at its next call.
+"Fadenstack is being updated", in the browser's language and in the light or
+dark theme the console was last used in. The page checks every few seconds
+and reloads itself into the console once it is back, on the new version. A
+console left open reloads into the page at its next call.
+
+![The maintenance page during an upgrade](images/upgrading/09-maintenance-page.png)
+
+![The same page on a phone](images/upgrading/10-maintenance-phone.png)
 The APIs answer `503` with `Retry-After: 30` and `X-Faden-Maintenance:
 maintenance` (`/v1` in the OpenAI error format), so SDKs and scripts can
 wait and retry. `/api/health` stays open.
@@ -112,6 +117,18 @@ the file `nginx/maintenance.flag` in the install; nginx needs no restart.
 A service that does not answer at all gets the same page (saying it is not
 reachable, not that it is being updated), and API calls a `503` with
 `X-Faden-Maintenance: unavailable`.
+
+### Open consoles move to the new version
+
+A console page that was open during the upgrade notices the new version by
+itself: it asks the server which build it runs every two minutes, and when
+its tab comes back to the front. A tab in the background reloads at once; the
+page in front says "Fadenstack has been updated" with **Reload**, and loads the
+new version at the next click to another page. Nobody needs to force a
+reload. A page with text typed and not sent is never reloaded on its own --
+nothing would keep the text.
+
+![An open console after an upgrade](images/upgrading/11-new-version.png)
 
 ## Before you start
 

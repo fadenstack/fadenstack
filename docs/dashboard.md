@@ -21,7 +21,7 @@ not load" with a **Retry**, and the others carry on.
 |---|---|---|
 | Key metrics | Up to six figures you choose (below), each with its trend | |
 | AI traffic | Where requests were served: a ring with the in-house share in its centre, the busiest destinations, request count, P50, P95 and errors. **Today**, **24 h**, **7 d** or **30 d** | Observability traffic |
-| Needs attention | Current problems, worst first: machines offline or silent, failed clusters and deployments, runtimes in error, providers not answering, hot GPUs, machines waiting to join, failed model downloads and document ingestion, a spike of gateway errors, dependencies down, low disk, restarting containers, MCP servers with problems. **Show all** when there are more than fit | |
+| Needs attention | Current problems, worst first: machines offline or silent, failed clusters and deployments, runtimes in error, providers not answering, hot GPUs, machines waiting to join, failed model downloads and document ingestion, a spike of gateway errors, dependencies down, low disk, restarting containers, MCP servers with problems. **Show all** when there are more than fit; a problem you have seen can be muted (below) | |
 | Local AI capacity | Clusters healthy, machines online, GPUs and free GPUs, and each machine's CPU, GPU and VRAM. Colour by **Health**, **GPU** or **VRAM** | Machines |
 | Usage | Requests per day for the last **7** or **30 days**, stacked by where they were served | Observability |
 | Integrations | LLM providers by where they run, MCP servers healthy, skills active | Each module's page |
@@ -46,6 +46,20 @@ per machine, then a summary per group; select a group to list its machines.
 
 **Time** follows your browser's time zone. "Today" is compared with yesterday
 up to the same time, and a month with the previous month up to the same day.
+
+### Muting a problem you have seen
+
+The bell beside a problem in **Needs attention** mutes it. A muted problem
+moves under **N muted** at the end of the list, for every administrator, and
+leaves the header's count; the list says who muted it and when. **Show again**
+(the bell in the muted list) brings it back.
+
+A mute lasts while the problem does. Once it clears -- the machine reports
+again, the cluster recovers, the failed download falls out of the last 24
+hours -- the mute is dropped, so the same problem coming back is shown as new.
+A muted problem that gets worse (a warning turning critical) is shown again.
+
+![Needs attention with two problems muted](images/dashboard/08-attention-muted.png)
 
 ### The header
 
