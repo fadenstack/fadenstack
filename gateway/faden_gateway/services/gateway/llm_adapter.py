@@ -50,7 +50,9 @@ _TEMPLATE_KWARGS = "chat_template_kwargs"
 #: The ``reasoning_effort`` values vLLM accepts: it validates the field.
 _VLLM_EFFORTS = frozenset({"low", "medium", "high"})
 #: What the body of a direct streamed chat is made of.
-_DIRECT_BODY_KEYS = frozenset({"messages", "stream", "stream_options", "reasoning_effort", _TEMPLATE_KWARGS, *_OPENAI_PARAMS})
+_DIRECT_BODY_KEYS = frozenset(
+    {"messages", "stream", "stream_options", "reasoning_effort", _TEMPLATE_KWARGS, *_OPENAI_PARAMS},
+)
 _DONE = b"data: [DONE]\n\n"
 
 
@@ -58,6 +60,20 @@ _DONE = b"data: [DONE]\n\n"
 # as one, first, from then on (see _late_system_refused).
 _SYSTEM_FIRST: set[str] = set()
 _TEMPLATE_REFUSAL = re.compile(r"template|roles? must alternate|system (role|message)", re.IGNORECASE)
+
+#: How much a model may reason, least first: the order a refused level steps along.
+_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+#: Where a refused level goes when the refusal names none the model takes.
+_EFFORT_STEP = {"none": "low", "minimal": "low", "xhigh": "high", "max": "high"}
+_EFFORT_REFUSAL = re.compile(r"reasoning|thinking|effort", re.IGNORECASE)
+#: A quoted word, as refusals list the levels a model takes: 'low', "low", or \"low\" inside JSON.
+_QUOTED_WORD = re.compile(r"""['"`]([a-z]+)\\?['"`]""")
+# Levels a model refused, per model, and what it is asked for instead ("": no
+# level at all, its default), from then on (see _effort_refused).
+_EFFORT_INSTEAD: dict[tuple[str, str], str] = {}
+#: How many times a refused request goes again, at most: with its system
+#: messages up front, at a nearer level of reasoning, without one.
+_RETRIES = 3
 
 
 def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str, Any]:
@@ -69,7 +85,8 @@ def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str
     ignores it; so for vLLM "none" and "minimal" turn the switch off instead,
     "xhigh" asks for "high", and the client's own ``chat_template_kwargs`` go
     along. Until 2026-10-03 neither field reached any model: a client's "no
-    thinking" was dropped here.
+    thinking" was dropped here. A level the model refuses goes again at the
+    nearest one it takes, or not at all (see _effort_refused).
     """
     effort = payload.get("reasoning_effort")
     effort = effort.lower() if isinstance(effort, str) and effort else None
@@ -90,7 +107,7 @@ def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str
 
 
 def _for_litellm(kwargs: dict[str, Any], provider_type: ProviderType) -> dict[str, Any]:
-    """vLLM's own fields go to LiteLLM as ``extra_body``: it would drop them as unknown parameters."""
+    """The fields of vLLM's own go to LiteLLM as ``extra_body``: it would drop them as unknown parameters."""
     if provider_type != ProviderType.VLLM:
         return kwargs
     own = {key: kwargs.pop(key) for key in ("reasoning_effort", _TEMPLATE_KWARGS) if key in kwargs}
@@ -149,6 +166,99 @@ def _remember_system_first(model: str) -> None:
             "its system messages go as one, before the history, from now on",
             model,
         )
+
+
+def _effort_of(request: dict[str, Any]) -> str | None:
+    """The level of reasoning *request* asks for: its own field, or vLLM's in ``extra_body``."""
+    extra = request.get("extra_body")
+    value = extra.get("reasoning_effort") if isinstance(extra, dict) else None
+    if value is None:
+        value = request.get("reasoning_effort")
+    return value if isinstance(value, str) and value else None
+
+
+def _with_effort(request: dict[str, Any], effort: str | None) -> dict[str, Any]:
+    """*request* asking for *effort* instead, or for no level at all (None): the model's default."""
+    extra = request.get("extra_body")
+    if isinstance(extra, dict) and "reasoning_effort" in extra:
+        # vLLM's through LiteLLM: the field sits in extra_body, as at the top of a direct body.
+        return {**request, "extra_body": _with_effort(extra, effort)}
+    changed = {key: value for key, value in request.items() if key != "reasoning_effort"}
+    if effort:
+        changed["reasoning_effort"] = effort
+    return changed
+
+
+def _effort_instead(model: str, refused: str, detail: str) -> str | None:
+    """The level to ask *model* for after it refused *refused*; None for no level at all.
+
+    The nearest of the levels the refusal names ("Supported values are:
+    'low', 'medium', and 'high'"), on a tie the one nearer "medium"; else
+    one step toward the middle: "none" and "minimal" to "low", "xhigh" and
+    "max" to "high". A level the model refused before is not asked for
+    again. A "low", "medium" or "high" refused without a list has nowhere
+    to go: the model has no levels, or not these.
+    """
+    tried = {level for name, level in _EFFORT_INSTEAD if name == model} | {refused}
+    if refused in _EFFORTS:
+        named = {word for word in _QUOTED_WORD.findall(detail.lower()) if word in _EFFORTS} - tried
+        if named:
+            at, middle = _EFFORTS.index(refused), _EFFORTS.index("medium")
+
+            def distance(level: str) -> tuple[int, int]:
+                return abs(_EFFORTS.index(level) - at), abs(_EFFORTS.index(level) - middle)
+
+            return min(named, key=distance)
+    step = _EFFORT_STEP.get(refused)
+    return step if step not in tried else None
+
+
+def _remember_effort(model: str, refused: str, instead: str | None) -> None:
+    """Ask *model* for *instead* rather than *refused* from now on; say so once."""
+    if _EFFORT_INSTEAD.get((model, refused)) != (instead or ""):
+        _EFFORT_INSTEAD[(model, refused)] = instead or ""
+        logger.warning(
+            "%s refuses reasoning_effort %r: it is asked for %s from now on",
+            model, refused, repr(instead) if instead else "no level, its own default,",
+        )
+
+
+def _remembered_effort(request: dict[str, Any], model: str) -> dict[str, Any]:
+    """*request* at the level *model* takes, for one it refused before."""
+    asked = effort = _effort_of(request)
+    seen: set[str] = set()
+    while effort is not None and (model, effort) in _EFFORT_INSTEAD and effort not in seen:
+        seen.add(effort)
+        effort = _EFFORT_INSTEAD[(model, effort)] or None
+    return request if effort == asked else _with_effort(request, effort)
+
+
+def _effort_refused(status: int, detail: str, request: dict[str, Any], model: str) -> dict[str, Any] | None:
+    """The request to try again with, when the model refused the level of reasoning it was asked for.
+
+    ``reasoning_effort`` is the client's preference, not a condition, so the
+    client never sees such a refusal. A model with levels of its own refuses
+    one it lacks -- OpenAI's reasoning models list the ones they take, a
+    model that always thinks refuses "none", LiteLLM refuses "xhigh" for a
+    Claude without it -- and a model without levels may refuse the field.
+    The request goes again at the nearest level the model takes (see
+    _effort_instead), or without one, and the model gets that from then on.
+    """
+    refused = _effort_of(request)
+    if refused is None or status not in (400, 422) or not _EFFORT_REFUSAL.search(detail):
+        return None
+    instead = _effort_instead(model, refused, detail)
+    _remember_effort(model, refused, instead)
+    return _with_effort(request, instead)
+
+
+def _try_again(status: int, detail: str, request: dict[str, Any], model: str) -> dict[str, Any] | None:
+    """The request to send again after a refusal one change may cure; None after any other."""
+    moved = _late_system_refused(status, detail, request.get("messages") or [])
+    if moved is not None:
+        _remember_system_first(model)
+        return {**request, "messages": moved}
+    return _effort_refused(status, detail, request, model)
 
 
 async def _whole_events(response: httpx.Response) -> AsyncIterator[str]:
@@ -549,6 +659,7 @@ class LLMAdapter:
 
         if str(kwargs["model"]) in _SYSTEM_FIRST:
             kwargs["messages"] = _system_first(kwargs["messages"]) or kwargs["messages"]
+        kwargs = _remembered_effort(kwargs, str(kwargs["model"]))
 
         if stream:
             # Request token usage in the final streaming chunk (OpenAI-compatible).
@@ -562,14 +673,7 @@ class LLMAdapter:
             return self._stream_completion(**_for_litellm(kwargs, provider_type))
 
         _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
-        kwargs = _for_litellm(kwargs, provider_type)
-
-        result = await self._non_stream_completion(**kwargs)
-        moved = _late_system_refused(result.status_code, json.dumps(result.payload), kwargs["messages"])
-        if moved is not None:
-            _remember_system_first(str(kwargs["model"]))
-            result = await self._non_stream_completion(**{**kwargs, "messages": moved})
-        return result
+        return await self._whole_answer(_for_litellm(kwargs, provider_type))
 
     def _goes_direct(
         self,
@@ -633,7 +737,7 @@ class LLMAdapter:
         timeout = httpx.Timeout(connect=10.0, read=max(first_wait, between), write=10.0, pool=10.0)
         loop = asyncio.get_running_loop()
         closed = False
-        retried = False
+        tries = 0
         started = False
         try:
             while True:
@@ -647,15 +751,13 @@ class LLMAdapter:
                         )
                     if response.status_code >= 400:
                         detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
-                        moved = None if retried else _late_system_refused(
-                            response.status_code, detail, body["messages"],
+                        again = None if tries == _RETRIES else _try_again(
+                            response.status_code, detail, body, str(kwargs["model"]),
                         )
-                        if moved is not None:
+                        if again is not None:
                             # Refused before a byte went to the client: again,
-                            # with the system messages up front.
-                            _remember_system_first(str(kwargs["model"]))
-                            body = {**body, "messages": moved}
-                            retried = True
+                            # with what was refused changed.
+                            body, tries = again, tries + 1
                             continue
                         logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
                         refusal = f"upstream {response.status_code}: {detail}"
@@ -702,6 +804,19 @@ class LLMAdapter:
         if not closed:
             yield _DONE
 
+    async def _whole_answer(self, kwargs: dict[str, Any]) -> CompletionResult:
+        """A chat that is not streamed, sent again after a refusal one change may cure (see _try_again)."""
+        result = await self._non_stream_completion(**kwargs)
+        for _ in range(_RETRIES):
+            again = None if result.status_code < 400 else _try_again(
+                result.status_code, json.dumps(result.payload), kwargs, str(kwargs["model"]),
+            )
+            if again is None:
+                break
+            kwargs = again
+            result = await self._non_stream_completion(**kwargs)
+        return result
+
     async def _non_stream_completion(self, **kwargs: Any) -> CompletionResult:
         """Execute a non-streaming completion."""
         try:
@@ -734,14 +849,18 @@ class LLMAdapter:
     async def _stream_completion(self, **kwargs: Any) -> AsyncIterator[bytes]:
         """Execute a streaming completion, yielding SSE-encoded bytes."""
         try:
-            try:
-                response = await litellm.acompletion(**kwargs)
-            except litellm.exceptions.BadRequestError as refused:
-                moved = _late_system_refused(400, str(refused), kwargs.get("messages") or [])
-                if moved is None:
-                    raise
-                _remember_system_first(str(kwargs["model"]))
-                response = await litellm.acompletion(**{**kwargs, "messages": moved})
+            tries = 0
+            while True:
+                try:
+                    response = await litellm.acompletion(**kwargs)
+                    break
+                except litellm.exceptions.BadRequestError as refused:
+                    again = None if tries == _RETRIES else _try_again(
+                        400, str(refused), kwargs, str(kwargs["model"]),
+                    )
+                    if again is None:
+                        raise
+                    kwargs, tries = again, tries + 1
         except Exception as exc:
             # Pre-stream failure — yield the error as an SSE event so the
             # client receives a structured error instead of a broken stream.
