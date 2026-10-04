@@ -69,13 +69,19 @@ export function AgentAppsPanel({ agent, review, loading, error, onRefresh, onCha
   const { t } = useTranslation();
   const editable = agent.can_manage;
   const accept = useAction();
-  const [choices, setChoices] = useState<Record<string, Choice>>({});
+  // Each review starts from what it suggests -- from its first render, so "Accept" is never briefly disabled --
+  // and the admin's changes go on top until the next review.
+  const suggested = useMemo(
+    () => Object.fromEntries((review?.tools ?? []).filter((x) => PENDING.includes(x.status)).map((x) => [x.name, suggestedChoice(x)])),
+    [review],
+  );
+  const [changed, setChanged] = useState<Record<string, Choice>>({});
   const [removing, setRemoving] = useState<Set<string>>(new Set());
   const [takeUi, setTakeUi] = useState(true);
+  const choices = useMemo(() => ({ ...suggested, ...changed }), [suggested, changed]);
 
-  // Each review starts from what it suggests.
   useEffect(() => {
-    setChoices(Object.fromEntries((review?.tools ?? []).filter((x) => PENDING.includes(x.status)).map((x) => [x.name, suggestedChoice(x)])));
+    setChanged({});
     setRemoving(new Set());
     setTakeUi(true);
   }, [review]);
@@ -115,7 +121,7 @@ export function AgentAppsPanel({ agent, review, loading, error, onRefresh, onCha
         review={review}
         editable={editable}
         choices={choices}
-        onChoose={(name, choice) => setChoices((prev) => ({ ...prev, [name]: choice }))}
+        onChoose={(name, choice) => setChanged((prev) => ({ ...prev, [name]: choice }))}
         removing={removing}
         onRemove={(name, on) =>
           setRemoving((prev) => {

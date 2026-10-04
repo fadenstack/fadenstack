@@ -62,6 +62,7 @@ beforeEach(() => {
 describe("AgentAppsPanel", () => {
   it("takes in everything the apps bring with one click, as they suggest", async () => {
     const { onChanged } = show(PENDING);
+    expect(screen.getByRole("button", { name: "Accept and publish" })).toBeEnabled(); // from the first render
     expect(screen.getByText("The apps bring 2 tool changes that version 1 does not have.")).toBeInTheDocument();
     expect(screen.getByText("Instructs the model")).toBeInTheDocument();
     expect(screen.getByText("Ask about your workbook.")).toBeInTheDocument();
