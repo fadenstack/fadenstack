@@ -184,9 +184,12 @@ cookie_transport = CookieTransport(
 )
 auth_cookie = AuthenticationBackend(name="cookie", transport=cookie_transport, get_strategy=get_jwt_strategy)
 
+# The first that yields a user wins: a token the caller sends on purpose before the browser's ambient cookie.
+# Cookie first, an app in a browser where someone is signed in to the console (an extension, a web add-in) acted
+# as that person instead of the one who signed in to the app (found on .61, 4 October 2026).
 backends = [
-    auth_cookie,
     auth_jwt,
+    auth_cookie,
 ]
 
 api_users = FastAPIUsers[User, uuid.UUID](get_user_manager, backends)
