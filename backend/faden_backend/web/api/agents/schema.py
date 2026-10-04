@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -182,6 +182,77 @@ class ClientEventDTO(BaseModel):
     data: dict[str, Any]
     occurred_at: datetime | None
     created_at: datetime
+
+
+class AppSeenDTO(BaseModel):
+    """An app (one version) that runs the agent, as its SDK reported it; or requests whose tools were held."""
+
+    source: str
+    name: str
+    version: str
+    sdk: str | None
+    first_seen_at: datetime
+    last_seen_at: datetime
+    reports: int
+    last_user_id: str
+    #: The e-mail address of who reported it last.
+    last_user_label: str | None = None
+    tools: list[str]
+    context: list[dict[str, Any]]
+
+
+class ToolReviewDTO(BaseModel):
+    """One tool the apps bring, or the contract lists: what each says, and what to do."""
+
+    name: str
+    #: ``new``, ``changed``, ``riskier``, ``unused`` or ``same``.
+    status: str
+    #: The app's class for it (``unknown`` when it gives none): a suggestion.
+    suggested_class: str
+    contract_class: str | None
+    in_contract: bool
+    description: str | None
+    schema_sha256: str | None
+    contract_schema_sha256: str | None
+    open_world: bool | None
+    apps: list[str]
+    last_seen_at: datetime | None
+    #: ``instructions``, ``hidden_characters``, ``link``, ``long``: hints about the description.
+    warnings: list[str]
+
+
+class AppsReviewDTO(BaseModel):
+    """What the apps that run the agent bring, against its latest version."""
+
+    compared_with: int | None
+    #: The latest version lists no host tools, so it allows any.
+    unrestricted: bool
+    apps: list[AppSeenDTO]
+    tools: list[ToolReviewDTO]
+    #: The greeting and suggestions the newest app would show, when the version's differ.
+    ui: dict[str, Any] | None
+    #: Tools waiting for a decision (new, changed, riskier).
+    pending: int
+
+
+class AcceptedTool(BaseModel):
+    """A tool to take into the contract, with the class the admin gives it."""
+
+    name: str = Field(min_length=1, max_length=128)
+    #: ``unknown`` leaves it unclassified: it always asks.
+    risk: Literal["read", "write", "destructive", "unknown"]
+
+
+class AcceptAppsRequest(BaseModel):
+    """What to take from the apps into a new version."""
+
+    tools: list[AcceptedTool] = Field(default_factory=list, max_length=200)
+    #: Contract tools to take out (no app brings them any more).
+    remove: list[str] = Field(default_factory=list, max_length=200)
+    #: Take the apps' greeting and suggestions.
+    ui: bool = False
+    #: Publish the new version at once.
+    publish: bool = False
 
 
 class SignInDTO(BaseModel):

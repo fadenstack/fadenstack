@@ -22,6 +22,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -37,15 +38,18 @@ from faden_backend.db.models.agents import (
 )
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
-from faden_backend.services.agents import access, tokens
+from faden_backend.services.agents import access, app_review, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.web.api.agents.schema import (
+    AcceptAppsRequest,
     AccessDTO,
     AgentDTO,
     AgentTokensDTO,
     AgentVersionDTO,
     AgentVersionFields,
+    AppSeenDTO,
+    AppsReviewDTO,
     ClientEventDTO,
     CreateAgentRequest,
     GrantDTO,
@@ -55,6 +59,7 @@ from faden_backend.web.api.agents.schema import (
     ReplaceGrantsRequest,
     ReplaceMembersRequest,
     SignInDTO,
+    ToolReviewDTO,
     UpdateAgentRequest,
     UsageDTO,
 )
@@ -398,22 +403,27 @@ async def publish_version(
 ) -> AgentDTO:
     """Serve this version to the agent's users. An older one rolls back."""
     agent = await _managed_agent(dao, rbac, agent_ref, user)
+    version = await dao.version(agent.id, number)
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+    await _publish(dao, audit, user, agent, version)
+    await dao.session.refresh(agent)
+    return await _dto(dao, agent, can_manage=True)
+
+
+async def _publish(dao: AgentsDAO, audit: AuditDAO, user: User, agent: Agent, version: AgentVersion) -> None:
+    """Serve *version* to the agent's users."""
     if agent.status == AgentStatus.RETIRED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Restore the agent before publishing.",
         )
-    version = await dao.version(agent.id, number)
-    if version is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
     _check_extensions(version.extensions)
     if version.published_at is None:
         version.published_at = datetime.now(UTC)
     agent.published_version_id = version.id
     agent.status = AgentStatus.PUBLISHED
     await dao.session.flush()
-    await _audit(audit, user, "agent.publish", str(agent.id), {"version": number})
-    await dao.session.refresh(agent)
-    return await _dto(dao, agent, can_manage=True)
+    await _audit(audit, user, "agent.publish", str(agent.id), {"version": version.version})
 
 
 # -- grants, members, access ----------------------------------------------------
@@ -633,6 +643,126 @@ async def agent_client_events(
             )
         ).mappings().all()
     return [ClientEventDTO(**row) for row in rows]
+
+
+# -- what the apps bring ---------------------------------------------------------------
+
+
+async def _manifests(request: Request, agent_id: uuid.UUID) -> list[app_review.ManifestRow]:
+    """The manifests the gateway kept for the agent, newest first; none while its table is not there yet."""
+    factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
+    if factory is None:
+        raise HTTPException(status_code=503, detail="Gateway database not available")
+    since = datetime.now(UTC) - timedelta(days=app_review.CURRENT_DAYS)
+    async with factory() as gw:
+        try:
+            rows = (
+                await gw.execute(
+                    text("""
+                    SELECT source, app_name, app_version, manifest, first_seen_at, last_seen_at, reports,
+                           last_user_id
+                    FROM agent_client_manifest
+                    WHERE agent_id = :agent AND last_seen_at >= :since
+                    ORDER BY last_seen_at DESC LIMIT 500
+                    """),
+                    {"agent": str(agent_id), "since": since},
+                )
+            ).mappings().all()
+        except ProgrammingError:  # a gateway not upgraded yet
+            return []
+    return [
+        app_review.ManifestRow(
+            source=row["source"],
+            app_name=row["app_name"],
+            app_version=row["app_version"],
+            manifest=json.loads(row["manifest"]) if isinstance(row["manifest"], str) else row["manifest"],
+            first_seen_at=row["first_seen_at"],
+            last_seen_at=row["last_seen_at"],
+            reports=row["reports"],
+            last_user_id=row["last_user_id"],
+        )
+        for row in rows
+    ]
+
+
+async def _review(
+    request: Request, dao: AgentsDAO, agent: Agent,
+) -> tuple[app_review.Review, AgentVersion | None]:
+    """What the apps bring, against the agent's latest version; and that version."""
+    latest = await dao.latest_version(agent.id)
+    return app_review.review(await _manifests(request, agent.id), latest, now=datetime.now(UTC)), latest
+
+
+@router.get("/{agent_ref}/apps", response_model=AppsReviewDTO, name="agent_apps")
+async def agent_apps(
+    agent_ref: str,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+) -> AppsReviewDTO:
+    """The apps that run the agent and what they bring, against its latest version (``app_review``)."""
+    agent = await _inspected_agent(dao, rbac, agent_ref, user)
+    review, _ = await _review(request, dao, agent)
+    labels: dict[str, str | None] = {}
+    for app in review.apps:
+        if app.last_user_id not in labels:
+            try:
+                found = await dao.session.get(User, uuid.UUID(app.last_user_id))
+            except ValueError:
+                found = None
+            labels[app.last_user_id] = found.email if found else None
+    return AppsReviewDTO(
+        compared_with=review.compared_with,
+        unrestricted=review.unrestricted,
+        apps=[AppSeenDTO(**vars(app), last_user_label=labels.get(app.last_user_id)) for app in review.apps],
+        tools=[ToolReviewDTO(**vars(tool)) for tool in review.tools],
+        ui=review.ui,
+        pending=review.pending,
+    )
+
+
+@router.post(
+    "/{agent_ref}/apps/accept",
+    response_model=AgentVersionDTO,
+    status_code=status.HTTP_201_CREATED,
+    name="accept_agent_apps",
+)
+async def accept_agent_apps(
+    agent_ref: str,
+    payload: AcceptAppsRequest,
+    request: Request,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> AgentVersion:
+    """A new version with what the apps bring, as the admin chose it -- published at once if asked."""
+    agent = await _managed_agent(dao, rbac, agent_ref, user)
+    review, latest = await _review(request, dao, agent)
+    base = AgentVersionFields.model_validate(latest, from_attributes=True) if latest else AgentVersionFields()
+    try:
+        fields = app_review.accept(
+            base.model_dump(mode="json"),
+            review,
+            tools=[(t.name, t.risk) for t in payload.tools],
+            remove=payload.remove,
+            take_ui=payload.ui,
+        )
+    except app_review.AcceptError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    version = await dao.add_version(
+        agent.id, {**_version_fields(AgentVersionFields.model_validate(fields)), "created_by": user.id},
+    )
+    await _audit(audit, user, "agent.apps_accept", str(agent.id), {
+        "version": version.version,
+        "tools": {t.name: t.risk for t in payload.tools},
+        "removed": payload.remove,
+        "ui": payload.ui,
+    })
+    if payload.publish:
+        await _publish(dao, audit, user, agent, version)
+    return version
 
 
 def _sign_in(row: Any) -> SignInDTO:

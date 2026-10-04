@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -998,6 +999,38 @@ class AgentClientEvent(Base):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class AgentClientManifest(Base):
+    """What an app that runs an agent brings: its tools, context and defaults -- once per distinct manifest.
+
+    An SDK reports it when it starts (``source`` ``app``); tools the gateway held back from a request because
+    the agent's contract does not list them come in as ``request``. The console compares them with the
+    agent's contract for review: nothing here changes what the agent may do.
+    """
+
+    __tablename__ = "agent_client_manifest"
+    __table_args__ = (UniqueConstraint("agent_id", "sha256", name="uq_agent_client_manifest_sha"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    #: SHA-256 of the manifest as stored (canonical JSON).
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: ``app`` (the SDK reported it) or ``request`` (tools held back from a request).
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    app_name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    app_version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    reports: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    last_device_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 # ---------------------------------------------------------------------------

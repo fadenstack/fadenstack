@@ -7,8 +7,9 @@ The endpoint governs; the agent loop runs in the SDK. Each request:
 2. checks access on cached data: grants to the user or their teams, the
    agent's state, Enterprise rules;
 3. applies the agent's version: its instructions go first, its model is the
-   model, the caller's tools must be in its host tool contract, and the
-   gateway tools it offers are limited to those it allows;
+   model, the caller's tools outside its host tool contract are held back
+   (and kept for review), and the gateway tools it offers are limited to
+   those it allows;
 4. runs the one chat pipeline the plain ``/v1/chat/completions`` runs, with no
    server session -- an agent's conversation stays on the device;
 5. logs the agent, device, conversation and turn with the usage.
@@ -18,6 +19,7 @@ Responses are exactly the OpenAI shapes, streamed or whole.
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -30,7 +32,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.models.gateway import AgentClientEvent
 from faden_gateway.services.extensions import registry
-from faden_gateway.services.gateway import tool_classes
+from faden_gateway.services.gateway import agent_manifests, tool_classes
 from faden_gateway.services.gateway.agents import (
     AgentLookupError,
     AgentProfile,
@@ -48,10 +50,13 @@ from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 CONVERSATION_HEADER = "x-faden-conversation-id"
 TURN_HEADER = "x-faden-turn-id"
+#: The tools held back from the request, because the agent's contract does not list them.
+HELD_TOOLS_HEADER = "x-faden-held-tools"
 
 
 def _error(exc: GatewayError) -> JSONResponse:
@@ -143,12 +148,44 @@ async def agent_request(
     )
 
 
-def apply_agent(profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False) -> dict[str, Any]:
-    """The request body as the agent's version shapes it.
+def _tool_name(tool: Any) -> str:
+    return str((tool.get("function") or {}).get("name") or "") if isinstance(tool, dict) else ""
 
-    Tools outside the host tool contract are refused, unless the device may
-    attach local MCP servers (*local_mcp*): their tools are not in any
-    contract, and the tool mode treats them as unclassified.
+
+def hold_back(
+    payload: dict[str, Any], allowed: frozenset[str],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The request without the tools *allowed* does not name, and those tools.
+
+    The model never sees a held tool, and a ``tool_choice`` that named one becomes ``auto``; with no tool
+    left, the request has none.
+    """
+    tools = payload.get("tools") or []
+    held = [t for t in tools if isinstance(t, dict) and _tool_name(t) not in allowed]
+    if not held:
+        return payload, []
+    kept = [t for t in tools if not (isinstance(t, dict) and _tool_name(t) not in allowed)]
+    shaped = dict(payload)
+    if not kept:
+        for field in ("tools", "tool_choice", "parallel_tool_calls"):
+            shaped.pop(field, None)
+        return shaped, held
+    shaped["tools"] = kept
+    choice = shaped.get("tool_choice")
+    if isinstance(choice, dict) and _tool_name(choice) in {_tool_name(t) for t in held}:
+        shaped["tool_choice"] = "auto"
+    return shaped, held
+
+
+def apply_agent(
+    profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The request body as the agent's version shapes it, and the tools it held back.
+
+    Tools outside the host tool contract are held back, not refused: an app updated with new tools keeps
+    working with the ones the agent allows, and the new ones wait for review (``agent_manifests``). Unless
+    the device may attach local MCP servers (*local_mcp*): their tools are in no contract, and the tool mode
+    treats them as unclassified.
     """
     if "session_id" in payload:
         raise GatewayError(
@@ -157,21 +194,9 @@ def apply_agent(profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bo
             code="session_not_supported",
             param="session_id",
         )
+    held: list[dict[str, Any]] = []
     if profile.host_tool_contract and not local_mcp:
-        allowed = profile.host_tools
-        declared = [
-            (tool.get("function") or {}).get("name") or ""
-            for tool in payload.get("tools") or []
-            if isinstance(tool, dict)
-        ]
-        outside = sorted({name for name in declared if name not in allowed})
-        if outside:
-            raise GatewayError(
-                status_code=400,
-                message="Tools not in the agent's host tool contract: " + ", ".join(outside),
-                code="tool_not_in_contract",
-                param="tools",
-            )
+        payload, held = hold_back(payload, profile.host_tools)
     shaped = dict(payload)
     if profile.model_alias:
         shaped["model"] = profile.model_alias
@@ -179,7 +204,28 @@ def apply_agent(profile: AgentProfile, payload: dict[str, Any], *, local_mcp: bo
         messages = shaped.get("messages")
         if isinstance(messages, list):
             shaped["messages"] = [{"role": "system", "content": profile.instructions}, *messages]
-    return shaped
+    return shaped, held
+
+
+async def _keep_held(
+    request: Request, auth: AuthContext, agent: AgentRequest, held: list[dict[str, Any]],
+) -> None:
+    """The held-back tools, for the agent's review: once in a while per tool set, never failing the chat.
+
+    On a session of their own: the request's may still serve a stream.
+    """
+    manifest = agent_manifests.held_manifest(held)
+    digest = agent_manifests.sha256_of(manifest)
+    if not manifest["tools"] or agent_manifests.recently_recorded(agent.id, digest):
+        return
+    try:
+        async with request.app.state.db_session_factory() as own:
+            await agent_manifests.record(
+                own, tenant_id=auth.tenant_id, agent_id=agent.id, user_id=auth.user_id,
+                device_id=agent.device_id, manifest=manifest, source="request",
+            )
+    except Exception:  # the answer matters more than the note
+        logger.warning("Could not keep the tools held back for agent %s", agent.id, exc_info=True)
 
 
 @router.post("/v1/agents/{agent}/chat/completions", response_model=None)
@@ -188,15 +234,23 @@ async def agent_chat_completions(
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
     service: Annotated[GatewayService, Depends(get_gateway_service)],
 ) -> Response:
-    """OpenAI-compatible chat under the agent's rules; streamed or whole."""
+    """OpenAI-compatible chat under the agent's rules; streamed or whole.
+
+    Tools the agent's contract does not list are held back: ``X-Faden-Held-Tools`` names them.
+    """
     auth, agent = caller
-    return await serve_chat_completions(
-        request,
-        auth=auth,
-        service=service,
-        agent=agent,
-        prepare=lambda payload: apply_agent(agent.agent, payload, local_mcp=agent.local_mcp_allowed),
-    )
+    held: list[dict[str, Any]] = []
+
+    def prepare(payload: dict[str, Any]) -> dict[str, Any]:
+        shaped, held_now = apply_agent(agent.agent, payload, local_mcp=agent.local_mcp_allowed)
+        held.extend(held_now)
+        return shaped
+
+    response = await serve_chat_completions(request, auth=auth, service=service, agent=agent, prepare=prepare)
+    if held:
+        response.headers[HELD_TOOLS_HEADER] = ",".join(sorted({_tool_name(t) or "?" for t in held}))
+        await _keep_held(request, auth, agent, held)
+    return response
 
 
 @router.get("/v1/agents/{agent}/profile")
@@ -365,6 +419,47 @@ async def agent_events(
     ])
     await dao.session.commit()
     return JSONResponse({"accepted": len(batch.events)}, status_code=status.HTTP_202_ACCEPTED)
+
+
+# -- what the app brings --------------------------------------------------------------
+
+
+@router.put("/v1/agents/{agent}/manifest", response_model=None)
+async def agent_manifest(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    dao: Annotated[GatewayDAO, Depends()],
+) -> Response:
+    """Keep what the app brings -- its tools with their classes, its context and defaults -- for review.
+
+    Sent by the SDK when it starts; the same manifest again is only counted. Nothing in it changes what the
+    agent may do: its maintainers compare it with the contract in the console and take in what they accept.
+    """
+    auth, agent = caller
+    body = await request.body()
+    if len(body) > agent_manifests.MAX_MANIFEST_BYTES:
+        return error_response(
+            status_code=413,
+            message=f"A manifest may be {agent_manifests.MAX_MANIFEST_BYTES} bytes at most.",
+            error_type="invalid_request_error",
+            code="manifest_too_large",
+        )
+    try:
+        manifest = agent_manifests.AppManifest.model_validate_json(body)
+    except ValidationError as exc:
+        return error_response(
+            status_code=400, message=str(exc), error_type="invalid_request_error", code="invalid_manifest",
+        )
+    try:
+        digest, new = await agent_manifests.record(
+            dao.session, tenant_id=auth.tenant_id, agent_id=agent.id, user_id=auth.user_id,
+            device_id=agent.device_id, manifest=manifest.stored(), source="app",
+        )
+    except agent_manifests.ManifestLimitError as exc:
+        return error_response(
+            status_code=429, message=str(exc), error_type="rate_limit_error", code="too_many_manifests",
+        )
+    return JSONResponse({"sha256": digest, "new": new})
 
 
 # -- features --------------------------------------------------------------------------

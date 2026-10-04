@@ -22,10 +22,17 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from faden_gateway.db.models.gateway import AgentClientEvent, ChatSession, LLMGatewayRequestLog, ProviderType
+from faden_gateway.db.models.gateway import (
+    AgentClientEvent,
+    AgentClientManifest,
+    ChatSession,
+    LLMGatewayRequestLog,
+    ProviderType,
+)
 from faden_gateway.services.extensions import registry
+from faden_gateway.services.gateway import agent_manifests
 from faden_gateway.services.gateway.agents import (
     AgentDirectory,
     AgentLookupError,
@@ -413,26 +420,63 @@ async def test_a_bad_conversation_id_is_refused(client: AsyncClient, backend: _B
 # -- what the agent's version does --------------------------------------------------------
 
 
+def _tool(name: str, **function: Any) -> dict[str, Any]:
+    return {"type": "function", "function": {"name": name, "parameters": {"type": "object"}, **function}}
+
+
+@pytest.fixture
+def manifests(fastapi_app: FastAPI, db_session: AsyncSession) -> Iterator[None]:
+    """Manifests written on a session of their own, as the gateway does -- on the test's connection."""
+    fastapi_app.state.db_session_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    agent_manifests.forget_recent()
+    yield
+    agent_manifests.forget_recent()
+
+
+async def _kept(db_session: AsyncSession) -> list[AgentClientManifest]:
+    db_session.expire_all()
+    return list((await db_session.execute(select(AgentClientManifest))).scalars())
+
+
 @pytest.mark.anyio
-async def test_the_callers_tools_must_be_in_the_host_tool_contract(
+async def test_tools_outside_the_contract_are_held_back_and_kept_for_review(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    manifests: None,
 ) -> None:
     await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
     sent: list[dict[str, Any]] = []
     _model(monkeypatch, sent)
+    tools = [_tool("read_page"), _tool("delete_page", description="Deletes a page.")]
 
-    def tool(name: str) -> dict[str, Any]:
-        return {"type": "function", "function": {"name": name, "parameters": {"type": "object"}}}
-
-    r = await client.post(URL, headers=_headers(), json=_chat(tools=[tool("read_page"), tool("delete_page")]))
-    assert r.status_code == 400
-    assert r.json()["error"]["code"] == "tool_not_in_contract"
-    assert "delete_page" in r.json()["error"]["message"]
-
-    r = await client.post(URL, headers=_headers(), json=_chat(tools=[tool("read_page")]))
+    # The app was updated with a tool the contract does not list yet: it keeps working with the others.
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=tools, tool_choice="auto"))
     assert r.status_code == 200, r.text
-    names = [t["function"]["name"] for t in sent[-1]["tools"]]
-    assert "read_page" in names and "delete_page" not in names
+    assert [t["function"]["name"] for t in sent[-1]["tools"] if t["function"]["name"].endswith("_page")] == ["read_page"]
+    assert r.headers["x-faden-held-tools"] == "delete_page"
+
+    [row] = await _kept(db_session)
+    assert (row.source, row.agent_id, row.last_user_id, row.app_name, row.reports) == ("request", AGENT_ID, USER, "", 1)
+    assert [t["name"] for t in row.manifest["tools"]] == ["delete_page"]
+    assert row.manifest["tools"][0]["description"] == "Deletes a page."
+    assert len(row.manifest["tools"][0]["schema_sha256"]) == 64
+
+    # Asked again at once: held again, written once in a while.
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=tools))
+    assert r.headers["x-faden-held-tools"] == "delete_page"
+    assert [(m.sha256, m.reports) for m in await _kept(db_session)] == [(row.sha256, 1)]
+
+    # A choice that named the held tool lets the model choose; with nothing left, the request has no tools.
+    r = await client.post(URL, headers=_headers(), json=_chat(
+        tools=tools, tool_choice={"type": "function", "function": {"name": "delete_page"}},
+    ))
+    assert r.status_code == 200, r.text
+    assert sent[-1]["tool_choice"] == "auto"
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=[_tool("delete_page")], tool_choice="required"))
+    assert r.status_code == 200, r.text
+    assert not any(t["function"]["name"] == "delete_page" for t in sent[-1].get("tools") or [])
+
+    r = await client.post(URL, headers=_headers(), json=_chat(tools=[_tool("read_page")]))
+    assert "x-faden-held-tools" not in r.headers
 
 
 @pytest.mark.anyio
@@ -441,21 +485,100 @@ async def test_the_callers_tools_must_be_in_the_host_tool_contract(
 ])
 async def test_local_mcp_tools_pass_the_contract_only_where_local_mcp_is_allowed(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
-    mode: str, dev: bool, allowed: bool,
+    manifests: None, mode: str, dev: bool, allowed: bool,
 ) -> None:
     await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
     backend.put(_profile(local_mcp_mode=mode))
     sent: list[dict[str, Any]] = []
     _model(monkeypatch, sent)
-    tools = [{"type": "function", "function": {"name": n, "parameters": {"type": "object"}}}
-             for n in ("read_page", "count_terminals")]
+    tools = [_tool(n) for n in ("read_page", "count_terminals")]
     r = await client.post(URL, headers=_headers(_agent_token(dev=dev)), json=_chat(tools=tools))
-    if not allowed:
-        assert r.status_code == 400
-        assert r.json()["error"]["code"] == "tool_not_in_contract"
-        return
     assert r.status_code == 200, r.text
-    assert {t["function"]["name"] for t in sent[-1]["tools"]} >= {"read_page", "count_terminals"}
+    names = {t["function"]["name"] for t in sent[-1]["tools"]}
+    if allowed:
+        assert names >= {"read_page", "count_terminals"}
+        assert "x-faden-held-tools" not in r.headers
+    else:
+        assert "read_page" in names and "count_terminals" not in names
+        assert r.headers["x-faden-held-tools"] == "count_terminals"
+
+
+# -- what the app brings ---------------------------------------------------------------------------
+
+MANIFEST: dict[str, Any] = {
+    "app": {"name": "EPLAN add-in", "version": "2.1.0"},
+    "sdk": {"language": "dotnet", "version": "0.4.0"},
+    "tools": [
+        {"name": "read_page", "description": "Reads a page.", "parameters": {"type": "object"}, "class": "read"},
+        {"name": "delete_page", "description": "Deletes a page.", "class": "destructive",
+         "parameters": {"type": "object", "properties": {"page": {"type": "integer"}}}},
+    ],
+    "context": [{"id": "project:pages", "title": "The project's pages"}],
+    "ui": {"greeting": "Ask about your project.", "suggestions": ["Which pages changed?"]},
+}
+MANIFEST_URL = "/v1/agents/eplan-assistant/manifest"
+
+
+@pytest.mark.anyio
+async def test_an_app_reports_what_it_brings_once_per_version(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, manifests: None,
+) -> None:
+    r = await client.put(MANIFEST_URL, headers=_headers(), json=MANIFEST)
+    assert r.status_code == 200, r.text
+    assert r.json()["new"] is True
+    [row] = await _kept(db_session)
+    assert (row.source, row.app_name, row.app_version, row.reports) == ("app", "EPLAN add-in", "2.1.0", 1)
+    tools = row.manifest["tools"]
+    assert [(t["name"], t["class"]) for t in tools] == [("delete_page", "destructive"), ("read_page", "read")]
+    assert tools[0]["schema_sha256"] != tools[1]["schema_sha256"]
+    assert row.manifest["context"] == [{"id": "project:pages", "title": "The project's pages"}]
+
+    # The same again (another device): counted, not stored twice. A new version: a row of its own.
+    r = await client.put(MANIFEST_URL, headers=_headers(_agent_token(did="device-8")), json=MANIFEST)
+    assert r.json() == {"sha256": row.sha256, "new": False}
+    updated = {**MANIFEST, "app": {"name": "EPLAN add-in", "version": "2.2.0"}}
+    assert (await client.put(MANIFEST_URL, headers=_headers(), json=updated)).json()["new"] is True
+    rows = {m.app_version: m for m in await _kept(db_session)}
+    assert rows["2.1.0"].reports == 2 and rows["2.1.0"].last_device_id == "device-8"
+    assert set(rows) == {"2.1.0", "2.2.0"}
+
+
+@pytest.mark.anyio
+async def test_a_manifest_is_checked_and_bounded(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, manifests: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for bad in (
+        {**MANIFEST, "tools": [MANIFEST["tools"][0], MANIFEST["tools"][0]]},  # the same name twice
+        {**MANIFEST, "tools": [{"name": "rm -rf"}]},
+        {**MANIFEST, "tools": [{"name": "x", "class": "harmless"}]},
+        {"tools": []},  # no app
+    ):
+        r = await client.put(MANIFEST_URL, headers=_headers(), json=bad)
+        assert r.status_code == 400, bad
+        assert r.json()["error"]["code"] == "invalid_manifest"
+
+    huge = {**MANIFEST, "tools": [{"name": "big", "parameters": {"description": "x" * 40_000}}]}
+    assert (await client.put(MANIFEST_URL, headers=_headers(), json=huge)).status_code == 400
+    r = await client.put(MANIFEST_URL, headers=_headers(), content=b"{" + b" " * 600_000 + b"}")
+    assert r.status_code == 413
+
+    # Fields it does not know are dropped, not kept.
+    r = await client.put(MANIFEST_URL, headers=_headers(), json={**MANIFEST, "secret": "s3cr3t"})
+    assert r.status_code == 200
+    assert all("s3cr3t" not in json.dumps(m.manifest) for m in await _kept(db_session))
+
+    monkeypatch.setattr(agent_manifests, "MAX_MANIFESTS_PER_AGENT", 1)
+    r = await client.put(MANIFEST_URL, headers=_headers(), json={**MANIFEST, "app": {"name": "Other"}})
+    assert r.status_code == 429
+    assert r.json()["error"]["code"] == "too_many_manifests"
+
+
+@pytest.mark.anyio
+async def test_only_those_who_may_use_the_agent_report_for_it(client: AsyncClient, backend: _Backend) -> None:
+    outsider = _agent_token(sub="44444444-4444-4444-4444-444444444444")
+    assert (await client.put(MANIFEST_URL, headers=_headers(outsider), json=MANIFEST)).status_code == 403
+    assert (await client.put(MANIFEST_URL, json=MANIFEST)).status_code == 401
 
 
 def test_only_the_gateway_tools_the_agent_allows_are_offered() -> None:
