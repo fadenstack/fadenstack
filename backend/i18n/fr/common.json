@@ -3328,6 +3328,11 @@
     "restore": "Restaurer",
     "retire_title": "Retirer {{name}} ?",
     "retire_confirm": "Plus personne ne peut utiliser l'agent et ses connexions cessent de fonctionner. Ses versions, accès et historique sont conservés ; il peut être restauré.",
+    "retire_then_delete": "Il pourra ensuite aussi être supprimé définitivement.",
+    "delete": "Supprimer",
+    "delete_title": "Supprimer {{name}} définitivement ?",
+    "delete_confirm": "Ses versions, accès et connexions sont supprimés et ne peuvent pas être récupérés. Ce qu’il a fait reste dans les journaux d’utilisation et d’audit, et son adresse redevient libre pour un nouvel agent.",
+    "delete_type": "Saisissez {{slug}} pour confirmer",
     "status": {
       "draft": "Brouillon",
       "published": "Publié",

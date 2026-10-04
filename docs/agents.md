@@ -27,9 +27,20 @@ developer mode is switched per user under **Access Control → Users**.
 Who sees what:
 
 - `agents:create` creates agents; the creator maintains them.
-- Maintainers and `agents:manage` change an agent, its versions and its access.
+- Maintainers and `agents:manage` change an agent, its versions and its access,
+  and retire it.
 - `agents:read` sees every agent and its details (versions, access,
   activity), but changes nothing.
+- `agents:delete` deletes a retired agent for good. Maintaining an agent does
+  not give it: it is a role's right. The built-in admin role has it; give it
+  to another role under **Access Control → Roles**.
+
+Retiring closes an agent to everyone at once and can be undone. Deleting
+takes a retired agent: the console offers *Delete* on it, after you type its
+address. Its versions, grants, maintainers and device sign-ins go with it.
+What it did stays -- the request log, the governance decisions and the SDKs'
+events keep its id, and the audit log records who deleted it, by name -- and
+its address is free for a new agent.
 
 The admin console is for superusers. Everyone else who looks after agents --
 maintainers, and users with an `agents` permission -- opens the same pages at
@@ -50,7 +61,8 @@ The API is under `/api/agents`:
 | Maintainers | `PUT /api/agents/{slug}/members` |
 | Why may someone use it (or not)? | `GET /api/agents/{slug}/access/{user_id}` |
 | Usage (no content) | `GET /api/agents/{slug}/usage?days=30` |
-| Retire / restore | `DELETE /api/agents/{slug}`, `POST /api/agents/{slug}/restore` |
+| Retire / restore | `POST /api/agents/{slug}/retire`, `POST /api/agents/{slug}/restore` |
+| Delete a retired agent (`agents:delete`) | `DELETE /api/agents/{slug}` -- 409 while it is not retired |
 
 Nobody can use an agent until it is published and granted: grants go to users
 or to groups (teams), and everyone else is refused. Maintainers can use their

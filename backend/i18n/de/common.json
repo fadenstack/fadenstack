@@ -3328,6 +3328,11 @@
     "restore": "Wiederherstellen",
     "retire_title": "{{name}} stilllegen?",
     "retire_confirm": "Niemand kann den Agenten mehr nutzen, und seine Anmeldungen enden. Versionen, Zugriffe und Verlauf bleiben erhalten; er lässt sich wiederherstellen.",
+    "retire_then_delete": "Danach kann er auch endgültig gelöscht werden.",
+    "delete": "Löschen",
+    "delete_title": "{{name}} endgültig löschen?",
+    "delete_confirm": "Versionen, Zugriffe und Anmeldungen werden gelöscht und lassen sich nicht wiederherstellen. Was der Agent getan hat, bleibt in den Nutzungs- und Audit-Protokollen, und seine Adresse wird für einen neuen Agenten frei.",
+    "delete_type": "Zum Bestätigen {{slug}} eingeben",
     "status": {
       "draft": "Entwurf",
       "published": "Veröffentlicht",

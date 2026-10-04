@@ -3328,6 +3328,11 @@
     "restore": "恢复",
     "retire_title": "停用 {{name}}？",
     "retire_confirm": "任何人都无法再使用该智能体，其登录也将失效。版本、访问权限和历史记录会保留，并可恢复。",
+    "retire_then_delete": "之后还可以将其永久删除。",
+    "delete": "删除",
+    "delete_title": "永久删除 {{name}}？",
+    "delete_confirm": "其版本、访问权限和登录将被删除，且无法恢复。它的操作记录保留在使用和审计日志中，其地址可供新的智能体使用。",
+    "delete_type": "输入 {{slug}} 以确认",
     "status": {
       "draft": "草稿",
       "published": "已发布",

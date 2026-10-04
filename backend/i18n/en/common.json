@@ -3326,6 +3326,11 @@
     "restore": "Restore",
     "retire_title": "Retire {{name}}?",
     "retire_confirm": "Nobody can use the agent any more, and its sign-ins stop working. Its versions, access and history are kept, and it can be restored.",
+    "retire_then_delete": "After that, it can also be deleted for good.",
+    "delete": "Delete",
+    "delete_title": "Delete {{name}} for good?",
+    "delete_confirm": "Its versions, access and sign-ins are deleted and cannot be brought back. What it did stays in the usage and audit logs, and its address is free for a new agent.",
+    "delete_type": "Type {{slug}} to confirm",
     "status": {
       "draft": "Draft",
       "published": "Published",

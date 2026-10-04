@@ -4,7 +4,8 @@
  * (usage, the SDKs' events, device sign-ins). See docs/agents.md.
  *
  * Every route answers for the caller's rights: maintainers manage their own
- * agents, `agents:manage` manages all of them.
+ * agents, `agents:manage` manages all of them, `agents:delete` deletes retired
+ * ones.
  */
 import { json, query, requester, segment } from "./http";
 import { principalIds, type PrincipalOption, type PrincipalType } from "./principals";
@@ -140,8 +141,10 @@ export const agentsApi = {
   update: (agent: string, changes: { name?: string; description?: string | null }) =>
     request<Agent>(at(agent), json("PATCH", changes)),
   /** Closed to everyone; versions, grants and history stay. */
-  retire: (agent: string) => request<Agent>(at(agent), json("DELETE")),
+  retire: (agent: string) => request<Agent>(`${at(agent)}/retire`, json("POST")),
   restore: (agent: string) => request<Agent>(`${at(agent)}/restore`, json("POST")),
+  /** Gone for good, with its versions, access and sign-ins (`agents:delete`; a retired agent only). */
+  remove: (agent: string) => request<void>(at(agent), json("DELETE")),
 
   versions: (agent: string) => request<AgentVersion[]>(`${at(agent)}/versions`),
   version: (agent: string, number: number) => request<AgentVersion>(`${at(agent)}/versions/${number}`),
@@ -194,6 +197,8 @@ export function agentRights(can: (permission: string) => boolean) {
     create: can("agents:create"),
     /** Every agent of the tenant; otherwise only those the user manages. */
     seeAll: can("agents:read") || can("agents:manage"),
+    /** Delete retired agents for good: a role's right, not the agent's maintainers'. */
+    delete: can("agents:delete"),
   };
 }
 

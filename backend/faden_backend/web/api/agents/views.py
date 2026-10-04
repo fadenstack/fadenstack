@@ -5,10 +5,12 @@ RBAC decides what a user may do with agents in general:
 - ``agents:read``    see every agent of the tenant: versions, access, activity
 - ``agents:create``  create agents (the creator maintains them)
 - ``agents:manage``  manage every agent (superusers always do)
+- ``agents:delete``  delete retired agents for good
 
-Maintainers manage their own agents -- versions, grants, maintainers -- without
-``agents:manage``. Anyone may list the agents they can use, and sign in to one
-of them (``POST /api/agent-tokens``) when a grant allows it.
+Maintainers manage their own agents -- versions, grants, maintainers, retiring
+them -- without ``agents:manage``; deleting one takes ``agents:delete``. Anyone
+may list the agents they can use, and sign in to one of them
+(``POST /api/agent-tokens``) when a grant allows it.
 """
 
 from __future__ import annotations
@@ -269,7 +271,7 @@ async def update_agent(
     return await _dto(dao, agent, can_manage=True)
 
 
-@router.delete("/{agent_ref}", response_model=AgentDTO, name="retire_agent")
+@router.post("/{agent_ref}/retire", response_model=AgentDTO, name="retire_agent")
 async def retire_agent(
     agent_ref: str,
     user: Annotated[User, Depends(current_active_user)],
@@ -284,6 +286,35 @@ async def retire_agent(
     await _audit(audit, user, "agent.retire", str(agent.id))
     await dao.session.refresh(agent)
     return await _dto(dao, agent, can_manage=True)
+
+
+@router.delete("/{agent_ref}", status_code=status.HTTP_204_NO_CONTENT, name="delete_agent")
+async def delete_agent(
+    agent_ref: str,
+    user: Annotated[User, Depends(current_active_user)],
+    dao: AgentsDAO = Depends(),
+    rbac: RbacDAO = Depends(),
+    audit: AuditDAO = Depends(),
+) -> None:
+    """Delete a retired agent for good: its versions, access and sign-ins.
+
+    A role's ``agents:delete``, not maintaining the agent, allows it. Retired first, so a live agent is never
+    deleted by mistake -- and a client from before this route, when ``DELETE`` retired, cannot delete one.
+    What the agent did stays: the gateway's request log and decisions, and the SDKs' events, keep its id.
+    """
+    if not await _has(rbac, user, "delete"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied: agents:delete")
+    agent = await _agent_or_404(dao, agent_ref)
+    if agent.status != AgentStatus.RETIRED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Retire the agent first (POST /api/agents/{agent.slug}/retire); "
+            "only a retired agent can be deleted.",
+        )
+    # By name: once deleted, the id resolves to nothing.
+    record = {"slug": agent.slug, "name": agent.name, "versions": len(await dao.versions(agent.id))}
+    await _audit(audit, user, "agent.delete", str(agent.id), record)
+    await dao.remove(agent)
 
 
 @router.post("/{agent_ref}/restore", response_model=AgentDTO, name="restore_agent")

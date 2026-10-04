@@ -3328,6 +3328,11 @@
     "restore": "Restaurar",
     "retire_title": "¿Retirar {{name}}?",
     "retire_confirm": "Nadie podrá usar el agente y sus inicios de sesión dejarán de funcionar. Se conservan sus versiones, accesos e historial, y se puede restaurar.",
+    "retire_then_delete": "Después también se podrá eliminar definitivamente.",
+    "delete": "Eliminar",
+    "delete_title": "¿Eliminar {{name}} definitivamente?",
+    "delete_confirm": "Se eliminan sus versiones, accesos e inicios de sesión y no se pueden recuperar. Lo que hizo queda en los registros de uso y de auditoría, y su dirección queda libre para un nuevo agente.",
+    "delete_type": "Escribe {{slug}} para confirmar",
     "status": {
       "draft": "Borrador",
       "published": "Publicado",

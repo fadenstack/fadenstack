@@ -11,7 +11,12 @@ const perm = (resource: string, action: string) => ({ id: `${resource}:${action}
 describe("access keys and agent rights", () => {
   it("a maintainer without agents permissions opens the agents pages, sees their own, creates none", () => {
     const can = canFrom(new Set(accessKeys({ permissions: [perm("chat", "use")], maintains_agents: true })));
-    expect(agentRights(can)).toEqual({ open: true, create: false, seeAll: false });
+    expect(agentRights(can)).toEqual({ open: true, create: false, seeAll: false, delete: false });
+  });
+
+  it("deleting agents is a role's agents:delete, which maintaining does not give", () => {
+    const can = canFrom(new Set(accessKeys({ permissions: [perm("agents", "delete")], maintains_agents: false })));
+    expect(agentRights(can)).toMatchObject({ delete: true, create: false });
   });
 
   it("someone with neither does not get the agents pages", () => {
@@ -24,7 +29,8 @@ describe("access keys and agent rights", () => {
       open: true,
       create: false,
       seeAll: true,
+      delete: false,
     });
-    expect(agentRights(canFrom(new Set(["*"])))).toEqual({ open: true, create: true, seeAll: true });
+    expect(agentRights(canFrom(new Set(["*"])))).toEqual({ open: true, create: true, seeAll: true, delete: true });
   });
 });

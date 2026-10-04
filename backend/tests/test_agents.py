@@ -8,6 +8,7 @@ rotate, and a reused refresh token ends the sign-in everywhere.
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -23,7 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.agents import AgentRefreshToken, AgentVersion
+from faden_backend.db.models.agents import AgentGrant, AgentMember, AgentRefreshToken, AgentVersion
+from faden_backend.db.models.containers import AuditEvent
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.extensions import registry
@@ -228,7 +230,7 @@ async def test_drafts_are_for_maintainers_and_retired_agents_for_nobody(
 
     await client.post("/api/agents/drafty/versions/1/publish")
     assert (await _access(client, "drafty", user))["allowed"] is True
-    await client.delete("/api/agents/drafty")
+    await client.post("/api/agents/drafty/retire")
     assert (await _access(client, "drafty", user))["code"] == "agent_retired"
     await client.post("/api/agents/drafty/restore")
     assert (await _access(client, "drafty", user))["allowed"] is True
@@ -375,6 +377,85 @@ async def test_grants_and_members_are_labelled_and_principals_found_by_agent_man
 
 async def _sign_in(client: AsyncClient, slug: str, device: str = "EPLAN on PC-7") -> Any:
     return await client.post("/api/agent-tokens", json={"agent": slug, "device_label": device})
+
+
+# -- deleting --------------------------------------------------------------------------------
+
+
+async def _give_role(db: AsyncSession, user: User, name: str, *permissions: tuple[str, str]) -> None:
+    """Gives *user* the built-in role *name* as seeded at start-up, or a custom one with *permissions*."""
+    rbac = RbacDAO(db)
+    await rbac.seed_defaults()
+    if permissions:
+        known = {(p.resource, p.action): p.id for p in await rbac.list_permissions()}
+        role = await rbac.create_role(f"{name}-{uuid.uuid4().hex[:6]}", None, [known[p] for p in permissions])
+    else:
+        found = await rbac.get_role_by_name(name)
+        assert found is not None
+        role = found
+    await rbac.assign_role(user.id, role.id)
+    await db.flush()
+
+
+async def test_deleting_takes_a_role_with_agents_delete_not_maintaining_the_agent(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    maintainer, operator, cleaner = await _user(dbsession), await _user(dbsession), await _user(dbsession)
+    await _give_role(dbsession, operator, "operator")
+    await _give_role(dbsession, cleaner, "agent-cleaner", ("agents", "delete"))
+    await _agent(client, slug="throwaway")
+    r = await client.put("/api/agents/throwaway/members", json={"members": [{"user_id": str(maintainer.id)}]})
+    assert r.status_code == status.HTTP_200_OK, r.text
+
+    signed_in.user = maintainer
+    assert (await client.post("/api/agents/throwaway/retire")).status_code == status.HTTP_200_OK, "a maintainer retires"
+    r = await client.delete("/api/agents/throwaway")
+    assert r.status_code == status.HTTP_403_FORBIDDEN and "agents:delete" in r.json()["detail"]
+    signed_in.user = operator
+    assert (await client.delete("/api/agents/throwaway")).status_code == status.HTTP_403_FORBIDDEN
+    signed_in.user = cleaner
+    assert (await client.delete("/api/agents/throwaway")).status_code == status.HTTP_204_NO_CONTENT
+    assert (await client.delete("/api/agents/never-was")).status_code == status.HTTP_404_NOT_FOUND
+
+    admin_role = await RbacDAO(dbsession).get_role_by_name("admin")
+    assert admin_role is not None
+    assert ("agents", "delete") in {(p.resource, p.action) for p in admin_role.permissions}, "admins have it by default"
+
+
+async def test_only_a_retired_agent_is_deleted_and_its_versions_access_and_sign_ins_go_with_it(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    user = await _user(dbsession)
+    agent = await _agent(client, slug="short-lived")
+    await client.post("/api/agents/short-lived/versions", json={"instructions": "Be thorough."})
+    await _grant(client, "short-lived", ("user", user.id))
+    signed_in.user = user
+    tokens = (await _sign_in(client, "short-lived")).json()
+
+    signed_in.user = admin
+    r = await client.delete("/api/agents/short-lived")
+    assert r.status_code == status.HTTP_409_CONFLICT, "a live agent is retired first"
+    assert "/api/agents/short-lived/retire" in r.json()["detail"]
+    await client.post("/api/agents/short-lived/retire")
+    assert (await client.delete("/api/agents/short-lived")).status_code == status.HTTP_204_NO_CONTENT
+
+    assert (await client.get("/api/agents/short-lived")).status_code == status.HTTP_404_NOT_FOUND
+    agent_id = uuid.UUID(agent["id"])
+    for model in (AgentVersion, AgentGrant, AgentMember, AgentRefreshToken):
+        left = (await dbsession.execute(select(model).where(model.agent_id == agent_id))).scalars().all()
+        assert left == [], model.__name__
+    r = await client.post("/api/agent-tokens/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+    # Who deleted what stays on record, by name: the id resolves to nothing any more.
+    event = (await dbsession.execute(
+        select(AuditEvent).where(AuditEvent.action == "agent.delete", AuditEvent.target_id == agent["id"]),
+    )).scalar_one()
+    assert event.actor_id == admin.id
+    assert json.loads(event.metadata_json or "{}") == {"slug": "short-lived", "name": "Short-Lived", "versions": 2}
+    # The address is free again; the old sign-ins were for the old agent's id.
+    await _agent(client, slug="short-lived")
 
 
 async def test_a_token_is_bound_to_its_agent_and_marked_as_an_agent_token(

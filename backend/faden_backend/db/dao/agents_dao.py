@@ -88,6 +88,15 @@ class AgentsDAO:
         await self.session.flush()
         return agent
 
+    async def remove(self, agent: Agent) -> None:
+        """Delete the agent; its versions, grants, members and sign-ins go with it (``ON DELETE CASCADE``)."""
+        agent_id = agent.id
+        # The agent points at a version and its versions at it: let go of the version first.
+        agent.published_version_id = None
+        await self.session.flush()
+        self.session.expunge(agent)
+        await self.session.execute(delete(Agent).where(Agent.id == agent_id))
+
     # -- versions -------------------------------------------------------------
 
     async def versions(self, agent_id: uuid.UUID) -> list[AgentVersion]:

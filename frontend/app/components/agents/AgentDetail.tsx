@@ -18,14 +18,16 @@ import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import EditIcon from "@mui/icons-material/Edit";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 
-import { agentsApi, type Agent, type AgentVersion } from "~/api/agents";
+import { agentRights, agentsApi, type Agent, type AgentVersion } from "~/api/agents";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
+import { useCan } from "~/lib/useCan";
 import { useTabParam } from "~/lib/useTabParam";
 
 import { AgentAccessPanel } from "./AgentAccessPanel";
@@ -109,7 +111,7 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
 
   return (
     <Stack spacing={2}>
-      <AgentHeader agent={agent} back={back} onChanged={() => void reload()} />
+      <AgentHeader agent={agent} back={back} onChanged={() => void reload()} onDeleted={() => navigate(basePath)} />
       {versions.error && <Alert severity="error">{versions.error}</Alert>}
       <Tabs
         value={tab}
@@ -131,13 +133,29 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
   );
 }
 
-/** Name, address, status and versions; edit, retire and restore for those who manage it. */
-function AgentHeader({ agent, back, onChanged }: { agent: Agent; back: React.ReactNode; onChanged: () => void }) {
+/**
+ * Name, address, status and versions; edit, retire and restore for those who manage it. Deleting a retired agent
+ * is a role's right (`agents:delete`), not its maintainers'.
+ */
+function AgentHeader({
+  agent,
+  back,
+  onChanged,
+  onDeleted,
+}: {
+  agent: Agent;
+  back: React.ReactNode;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
   const { t } = useTranslation();
+  const rights = agentRights(useCan());
   const [editing, setEditing] = useState(false);
   const [retiring, setRetiring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const change = useAction();
   const retired = agent.status === "retired";
+  const canDelete = retired && rights.delete;
 
   return (
     <>
@@ -162,12 +180,25 @@ function AgentHeader({ agent, back, onChanged }: { agent: Agent; back: React.Rea
             )}
           </Box>
         </Stack>
-        {agent.can_manage && (
+        {(agent.can_manage || canDelete) && (
           <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)}>
-              {t("common.edit")}
-            </Button>
-            {retired ? (
+            {agent.can_manage && (
+              <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)}>
+                {t("common.edit")}
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="small"
+                color="error"
+                variant="outlined"
+                startIcon={<DeleteForeverIcon />}
+                onClick={() => setDeleting(true)}
+              >
+                {t("agents.delete")}
+              </Button>
+            )}
+            {!agent.can_manage ? null : retired ? (
               <Button
                 size="small"
                 variant="outlined"
@@ -207,9 +238,29 @@ function AgentHeader({ agent, back, onChanged }: { agent: Agent; back: React.Rea
         }}
       />
       <ConfirmDialog
+        open={deleting}
+        title={t("agents.delete_title", { name: agent.name })}
+        message={t("agents.delete_confirm")}
+        confirmLabel={t("agents.delete")}
+        cancelLabel={t("common.cancel")}
+        confirmText={agent.slug}
+        confirmTextLabel={t("agents.delete_type", { slug: agent.slug })}
+        loading={change.busy}
+        onClose={() => setDeleting(false)}
+        onConfirm={() =>
+          void change.run(
+            () => agentsApi.remove(agent.slug),
+            () => {
+              setDeleting(false);
+              onDeleted();
+            },
+          )
+        }
+      />
+      <ConfirmDialog
         open={retiring}
         title={t("agents.retire_title", { name: agent.name })}
-        message={t("agents.retire_confirm")}
+        message={rights.delete ? `${t("agents.retire_confirm")} ${t("agents.retire_then_delete")}` : t("agents.retire_confirm")}
         confirmLabel={t("agents.retire")}
         cancelLabel={t("common.cancel")}
         loading={change.busy}

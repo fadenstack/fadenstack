@@ -24,6 +24,7 @@ vi.mock("~/api/agents", async (importOriginal) => {
       addVersion: vi.fn(),
       publish: vi.fn(),
       retire: vi.fn(),
+      remove: vi.fn(),
     },
   };
 });
@@ -104,5 +105,53 @@ describe("AgentDetail", () => {
 
     await waitFor(() => expect(api.retire).toHaveBeenCalledWith("excel-assistant"));
     expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+  });
+
+  it("deletes a retired agent for good once its address is typed, and goes back to the list", async () => {
+    api.get.mockResolvedValue(agentFixture({ status: "retired" }));
+    api.remove.mockResolvedValue(undefined);
+    renderPage(<AgentDetail slug="excel-assistant" basePath="/admin/agents" />, {
+      path: "/admin/agents/:slug",
+      initialPath: "/admin/agents/excel-assistant",
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Delete Excel assistant for good?")).toBeInTheDocument();
+    const confirm = within(dialog).getByRole("button", { name: "Delete" });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Type excel-assistant to confirm" }), "excel-assistant");
+    await userEvent.click(confirm);
+
+    await waitFor(() => expect(api.remove).toHaveBeenCalledWith("excel-assistant"));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Excel assistant" })).not.toBeInTheDocument());
+  });
+
+  it("offers deleting only on a retired agent, and only to a role with agents:delete", async () => {
+    const open = (permissions: string[]) =>
+      renderPage(<AgentDetail slug="excel-assistant" basePath="/admin/agents" />, {
+        path: "/admin/agents/:slug",
+        initialPath: "/admin/agents/excel-assistant",
+        context: { permissions: new Set(permissions) },
+      });
+
+    // A live agent: retire first, whoever asks.
+    const live = open(["agents:delete"]);
+    expect(await screen.findByRole("button", { name: "Retire" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    live.unmount();
+
+    // Retired, seen by its maintainer: restore, but no delete.
+    api.get.mockResolvedValue(agentFixture({ status: "retired" }));
+    const maintainer = open(["agents:maintain"]);
+    expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    maintainer.unmount();
+
+    // Retired, seen by a role that may delete but does not maintain it.
+    api.get.mockResolvedValue(agentFixture({ status: "retired", can_manage: false }));
+    open(["agents:delete"]);
+    expect(await screen.findByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument();
   });
 });
