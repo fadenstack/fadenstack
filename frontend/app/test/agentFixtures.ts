@@ -1,5 +1,55 @@
 /** Agents as the API returns them, for page tests. */
-import type { Agent, AgentVersion } from "~/api/agents";
+import type { Agent, AgentVersion, AppSeen, AppsReview, ToolReview } from "~/api/agents";
+
+export function toolReviewFixture(name: string, overrides: Partial<ToolReview> = {}): ToolReview {
+  return {
+    name,
+    status: "new",
+    suggested_class: "read",
+    contract_class: null,
+    in_contract: false,
+    description: null,
+    schema_sha256: null,
+    contract_schema_sha256: null,
+    open_world: null,
+    apps: ["Excel add-in 2.0"],
+    last_seen_at: "2026-10-04T10:00:00Z",
+    warnings: [],
+    ...overrides,
+  };
+}
+
+export function appSeenFixture(overrides: Partial<AppSeen> = {}): AppSeen {
+  return {
+    source: "app",
+    name: "Excel add-in",
+    version: "2.0",
+    sdk: "dotnet 0.4.0",
+    first_seen_at: "2026-10-01T10:00:00Z",
+    last_seen_at: "2026-10-04T10:00:00Z",
+    reports: 12,
+    last_user_id: "u-1",
+    last_user_label: "jane@plant.example",
+    tools: ["read_range", "write_range", "delete_sheet"],
+    context: [{ id: "workbook:selection", title: "The selected range" }],
+    ...overrides,
+  };
+}
+
+/** What the apps bring: nothing reported unless the overrides say. */
+export function appsReviewFixture(overrides: Partial<AppsReview> = {}): AppsReview {
+  return {
+    compared_with: 1,
+    unrestricted: false,
+    apps: [],
+    tools: [],
+    ui: null,
+    pending: 0,
+    published_version: 1,
+    live_pending: 0,
+    ...overrides,
+  };
+}
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return {

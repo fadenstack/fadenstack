@@ -563,6 +563,10 @@
         "title": "模型下载失败（24 小时）：{{count}}",
         "detail": "打开模型市场重试。"
       },
+      "agent_apps_pending": {
+        "title": "{{name}}：其应用的 {{count}} 项工具变更未生效",
+        "detail": "请在智能体的“应用”标签页中查看。在包含它们的版本发布之前，网关会扣留它们。"
+      },
       "gateway_error_spike": {
         "title": "网关服务器错误：{{rate}} %",
         "detail": "最近 {{minutes}} 分钟内有 {{errors}} 个错误。"
@@ -3304,6 +3308,87 @@
     "no_changes": "没有更改。"
   },
   "agents": {
+    "apps": {
+      "none": "尚无应用向此智能体报告。使用 Fadenstack SDK 构建的应用会在启动时说明它们带来哪些工具；网关从请求中扣留的工具也会显示在这里。",
+      "unrestricted": "此版本未列出任何宿主工具，因此智能体允许任何工具。接受后将仅限于你接收的工具。",
+      "pending_one": "应用带来了 {{count}} 项版本 {{version}} 中没有的工具变更。",
+      "pending_other": "应用带来了 {{count}} 项版本 {{version}} 中没有的工具变更。",
+      "pending_hint": "类别是应用的建议：接受前可按需修改。在包含新工具的版本发布之前，网关会扣留这些工具。",
+      "greeting_only": "最新的应用建议了自己的问候语。",
+      "accept_publish": "接受并发布",
+      "accept_draft": "接受为草稿",
+      "not_live_one": "版本 {{version}} 已包含应用带来的内容，但尚未发布：网关仍在扣留 {{count}} 个工具。",
+      "not_live_other": "版本 {{version}} 已包含应用带来的内容，但尚未发布：网关仍在扣留 {{count}} 个工具。",
+      "all_in": "版本 {{version}} 已包含应用带来的全部内容。",
+      "badge_one": "{{count}} 项工具变更未生效",
+      "badge_other": "{{count}} 项工具变更未生效",
+      "tools_title": "工具",
+      "no_tools": "没有报告的工具。",
+      "tool": "工具",
+      "status_column": "状态",
+      "class_column": "类别",
+      "class_for": "{{tool}} 的类别",
+      "class_now": "应用：{{app}} · 当前：{{contract}}",
+      "class_app": "应用标注：{{app}}",
+      "skip": "不纳入",
+      "remove": "移除",
+      "brought_by": "来自",
+      "requests": "请求（已扣留）",
+      "class": {
+        "read": "读取",
+        "write": "写入",
+        "destructive": "破坏性",
+        "unknown": "未分类（始终询问）"
+      },
+      "status": {
+        "new": {
+          "label": "新增",
+          "detail": "合约未列出：网关会扣留它。"
+        },
+        "changed": {
+          "label": "已变更",
+          "detail": "其参数与已接受的不同。"
+        },
+        "riskier": {
+          "label": "风险更高",
+          "detail": "应用现在将其风险评得比合约更高。"
+        },
+        "unused": {
+          "label": "未使用",
+          "detail": "在合约中，但当前没有应用带来它。"
+        },
+        "same": {
+          "label": "在合约中",
+          "detail": "无需操作。"
+        }
+      },
+      "warning": {
+        "instructions": {
+          "label": "指示模型",
+          "detail": "其描述告诉模型该做什么。模型会像读指令一样读取工具描述：接受前请检查。"
+        },
+        "hidden_characters": {
+          "label": "隐藏字符",
+          "detail": "其描述包含不可见或改变文字方向的字符。"
+        },
+        "link": {
+          "label": "链接",
+          "detail": "其描述包含网址。"
+        },
+        "long": {
+          "label": "过长",
+          "detail": "其描述异常地长。"
+        }
+      },
+      "greeting_title": "应用建议的问候语",
+      "greeting_take": "采用此问候语和这些建议",
+      "apps_title": "使用中的应用",
+      "app": "应用",
+      "last_seen": "最近一次",
+      "reports": "报告次数",
+      "reported_by": "最近报告者",
+      "context": "提供的上下文"
+    },
     "title": "智能体",
     "subtitle": "在其他软件中运行、由本服务器管控的智能体：它们是什么、谁可以使用、做了什么。",
     "search": "搜索智能体…",
@@ -3312,6 +3397,11 @@
     "create": "新建智能体",
     "create_title": "新建智能体",
     "create_hint": "智能体以草稿开始：在发布并授权给用户或团队之前，任何人都无法使用。",
+    "create_from": "从应用开始",
+    "create_from_hint": "Fadenstack 自己的应用自带定义：指令、工具和问候语。也可以从空白开始，或在下方粘贴 JSON。",
+    "create_grants": "谁可以使用",
+    "create_publish": "立即发布",
+    "create_publish_hint": "发布后，上方的用户和团队可立即使用。其应用带来的内容显示在“应用”标签页中。",
     "edit_title": "编辑智能体",
     "name": "名称",
     "slug": "地址",
@@ -3342,7 +3432,8 @@
       "definition": "定义",
       "versions": "版本",
       "access": "访问",
-      "activity": "活动"
+      "activity": "活动",
+      "apps": "应用"
     },
     "field": {
       "instructions": "指令",

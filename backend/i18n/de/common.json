@@ -563,6 +563,10 @@
         "title": "Fehlgeschlagene Modell-Downloads (24 Std.): {{count}}",
         "detail": "Im Modell-Marktplatz erneut versuchen."
       },
+      "agent_apps_pending": {
+        "title": "{{name}}: {{count}} Tool-Änderungen seiner Apps sind nicht aktiv",
+        "detail": "Prüfen Sie sie im Reiter Apps des Agenten. Das Gateway hält sie zurück, bis eine Version mit ihnen veröffentlicht ist."
+      },
       "gateway_error_spike": {
         "title": "Gateway-Serverfehler: {{rate}} %",
         "detail": "{{errors}} Fehler in den letzten {{minutes}} Minuten."
@@ -3304,6 +3308,87 @@
     "no_changes": "Keine Änderungen."
   },
   "agents": {
+    "apps": {
+      "none": "Bei diesem Agenten hat sich noch keine App gemeldet. Apps mit einem Fadenstack-SDK melden beim Start, welche Tools sie mitbringen; Tools, die das Gateway aus Anfragen zurückhält, erscheinen ebenfalls hier.",
+      "unrestricted": "Diese Version listet keine Host-Tools, daher erlaubt der Agent jedes Tool. Übernehmen beschränkt ihn auf die übernommenen Tools.",
+      "pending_one": "Die Apps bringen {{count}} Tool-Änderung, die Version {{version}} nicht hat.",
+      "pending_other": "Die Apps bringen {{count}} Tool-Änderungen, die Version {{version}} nicht hat.",
+      "pending_hint": "Die Klassen sind Vorschläge der Apps: Ändern Sie sie vor dem Übernehmen nach Bedarf. Das Gateway hält neue Tools zurück, bis eine Version mit ihnen veröffentlicht ist.",
+      "greeting_only": "Die neueste App schlägt eine eigene Begrüßung vor.",
+      "accept_publish": "Übernehmen und veröffentlichen",
+      "accept_draft": "Als Entwurf übernehmen",
+      "not_live_one": "Version {{version}} enthält, was die Apps mitbringen, ist aber nicht veröffentlicht: Das Gateway hält noch {{count}} Tool zurück.",
+      "not_live_other": "Version {{version}} enthält, was die Apps mitbringen, ist aber nicht veröffentlicht: Das Gateway hält noch {{count}} Tools zurück.",
+      "all_in": "Version {{version}} enthält alles, was die Apps mitbringen.",
+      "badge_one": "{{count}} Tool-Änderung nicht aktiv",
+      "badge_other": "{{count}} Tool-Änderungen nicht aktiv",
+      "tools_title": "Tools",
+      "no_tools": "Keine Tools gemeldet.",
+      "tool": "Tool",
+      "status_column": "Status",
+      "class_column": "Klasse",
+      "class_for": "Klasse für {{tool}}",
+      "class_now": "App: {{app}} · jetzt: {{contract}}",
+      "class_app": "Die App sagt: {{app}}",
+      "skip": "Weglassen",
+      "remove": "Entfernen",
+      "brought_by": "Mitgebracht von",
+      "requests": "Anfragen (zurückgehalten)",
+      "class": {
+        "read": "Lesen",
+        "write": "Schreiben",
+        "destructive": "Zerstörend",
+        "unknown": "Nicht eingestuft (fragt immer)"
+      },
+      "status": {
+        "new": {
+          "label": "Neu",
+          "detail": "Der Vertrag listet es nicht: Das Gateway hält es zurück."
+        },
+        "changed": {
+          "label": "Geändert",
+          "detail": "Seine Parameter weichen von den übernommenen ab."
+        },
+        "riskier": {
+          "label": "Riskanter",
+          "detail": "Die App stuft es jetzt riskanter ein als der Vertrag."
+        },
+        "unused": {
+          "label": "Ungenutzt",
+          "detail": "Im Vertrag, aber keine aktuelle App bringt es mit."
+        },
+        "same": {
+          "label": "Im Vertrag",
+          "detail": "Nichts zu tun."
+        }
+      },
+      "warning": {
+        "instructions": {
+          "label": "Weist das Modell an",
+          "detail": "Seine Beschreibung sagt dem Modell, was es tun soll. Modelle lesen Tool-Beschreibungen wie Anweisungen: Prüfen Sie sie vor dem Übernehmen."
+        },
+        "hidden_characters": {
+          "label": "Versteckte Zeichen",
+          "detail": "Seine Beschreibung enthält unsichtbare oder richtungsändernde Zeichen."
+        },
+        "link": {
+          "label": "Link",
+          "detail": "Seine Beschreibung enthält eine Webadresse."
+        },
+        "long": {
+          "label": "Lang",
+          "detail": "Seine Beschreibung ist ungewöhnlich lang."
+        }
+      },
+      "greeting_title": "Begrüßung, die die App vorschlägt",
+      "greeting_take": "Diese Begrüßung und Vorschläge übernehmen",
+      "apps_title": "Apps im Einsatz",
+      "app": "App",
+      "last_seen": "Zuletzt gesehen",
+      "reports": "Meldungen",
+      "reported_by": "Zuletzt gemeldet von",
+      "context": "Angebotener Kontext"
+    },
     "title": "Agenten",
     "subtitle": "Agenten, die in anderer Software laufen und von diesem Server gesteuert werden: was sie sind, wer sie nutzen darf und was sie getan haben.",
     "search": "Agenten suchen…",
@@ -3312,6 +3397,11 @@
     "create": "Neuer Agent",
     "create_title": "Neuer Agent",
     "create_hint": "Der Agent beginnt als Entwurf: Niemand kann ihn nutzen, bis er veröffentlicht und Nutzern oder Teams freigegeben ist.",
+    "create_from": "Von einer App ausgehen",
+    "create_from_hint": "Fadenstacks eigene Apps bringen ihre Definition mit: Anweisungen, Tools und Begrüßung. Oder leer beginnen bzw. unten JSON einfügen.",
+    "create_grants": "Wer ihn nutzen darf",
+    "create_publish": "Sofort veröffentlichen",
+    "create_publish_hint": "Veröffentlicht steht er den oben gewählten Benutzern und Teams sofort zur Verfügung. Was seine Apps mitbringen, zeigt der Reiter Apps.",
     "edit_title": "Agent bearbeiten",
     "name": "Name",
     "slug": "Adresse",
@@ -3342,7 +3432,8 @@
       "definition": "Definition",
       "versions": "Versionen",
       "access": "Zugriff",
-      "activity": "Aktivität"
+      "activity": "Aktivität",
+      "apps": "Apps"
     },
     "field": {
       "instructions": "Anweisungen",

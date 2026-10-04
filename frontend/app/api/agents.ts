@@ -122,6 +122,79 @@ export interface AgentSignIn {
   idle_expires_at: string;
 }
 
+/** A class an app gives a tool; `unknown` when it gives none (the tool always asks). */
+export type ToolClass = ToolRisk | "unknown";
+export type ToolReviewStatus = "new" | "changed" | "riskier" | "unused" | "same";
+
+/** An app (one version) that runs the agent, as its SDK reported it; or the requests whose tools were held back. */
+export interface AppSeen {
+  source: "app" | "request";
+  name: string;
+  version: string;
+  sdk: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  reports: number;
+  last_user_id: string;
+  last_user_label: string | null;
+  tools: string[];
+  context: { id: string; title?: string; kind?: string }[];
+}
+
+/** One tool the apps bring, or the contract lists: what each says. */
+export interface ToolReview {
+  name: string;
+  status: ToolReviewStatus;
+  /** The app's class for it: a suggestion. */
+  suggested_class: ToolClass;
+  contract_class: ToolRisk | null;
+  in_contract: boolean;
+  description: string | null;
+  schema_sha256: string | null;
+  contract_schema_sha256: string | null;
+  open_world: boolean | null;
+  /** "Chrome extension 0.2.0", or "requests" for tools held back from requests. */
+  apps: string[];
+  last_seen_at: string | null;
+  /** `instructions`, `hidden_characters`, `link`, `long`: hints about the description. */
+  warnings: string[];
+}
+
+/** What the apps bring, against the agent's latest version. */
+export interface AppsReview {
+  compared_with: number | null;
+  /** The latest version lists no host tools, so it allows any. */
+  unrestricted: boolean;
+  apps: AppSeen[];
+  tools: ToolReview[];
+  ui: { greeting?: string; suggestions?: string[] } | null;
+  /** Tools waiting for a decision against the latest version. */
+  pending: number;
+  published_version: number | null;
+  /** The same against the published version: what the gateway still holds back. */
+  live_pending: number;
+}
+
+export interface AcceptAppsPayload {
+  tools: { name: string; risk: ToolClass }[];
+  remove: string[];
+  ui: boolean;
+  publish: boolean;
+}
+
+/** An agent for one of Fadenstack's own apps, ready to create from. */
+export interface AgentTemplate {
+  id: string;
+  /** "Chrome", "Microsoft Word". */
+  app: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  tools: number;
+  /** The body `POST /api/agents` takes. */
+  definition: Record<string, unknown>;
+}
+
 export interface CreateAgentPayload {
   slug: string;
   name: string;
@@ -136,6 +209,8 @@ const at = (agent: string) => `/${segment(agent)}`;
 
 export const agentsApi = {
   list: () => request<Agent[]>(""),
+  /** Agents for Fadenstack's own apps (Chrome, Office), ready to create from. */
+  templates: () => request<AgentTemplate[]>("/templates"),
   get: (agent: string) => request<Agent>(at(agent)),
   create: (payload: CreateAgentPayload) => request<Agent>("", json("POST", payload)),
   update: (agent: string, changes: { name?: string; description?: string | null }) =>
@@ -164,6 +239,12 @@ export const agentsApi = {
   /** Whether a user may use the agent, and why. */
   explainAccess: (agent: string, userId: string) =>
     request<AccessExplanation>(`${at(agent)}/access/${segment(userId)}`),
+
+  /** The apps that run the agent and what they bring, against its latest version. */
+  apps: (agent: string) => request<AppsReview>(`${at(agent)}/apps`),
+  /** A new version with what the apps bring, as chosen; published at once if asked. */
+  acceptApps: (agent: string, payload: AcceptAppsPayload) =>
+    request<AgentVersion>(`${at(agent)}/apps/accept`, json("POST", payload)),
 
   usage: (agent: string, days: number) => request<AgentUsage>(`${at(agent)}/usage${query({ days })}`),
   events: (agent: string, filter: { type?: string; limit?: number } = {}) =>

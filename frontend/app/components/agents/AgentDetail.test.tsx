@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { agentsApi } from "~/api/agents";
-import { agentFixture, versionFixture } from "~/test/agentFixtures";
+import { agentFixture, appSeenFixture, appsReviewFixture, toolReviewFixture, versionFixture } from "~/test/agentFixtures";
 import { renderPage } from "~/test/renderPage";
 
 import { AgentDetail } from "./AgentDetail";
@@ -25,6 +25,7 @@ vi.mock("~/api/agents", async (importOriginal) => {
       publish: vi.fn(),
       retire: vi.fn(),
       remove: vi.fn(),
+      apps: vi.fn(),
     },
   };
 });
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.get.mockResolvedValue(agentFixture());
   api.versions.mockResolvedValue([versionFixture(1)]);
+  api.apps.mockResolvedValue(appsReviewFixture());
 });
 
 describe("AgentDetail", () => {
@@ -105,6 +107,22 @@ describe("AgentDetail", () => {
 
     await waitFor(() => expect(api.retire).toHaveBeenCalledWith("excel-assistant"));
     expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+  });
+
+  it("counts on the Apps tab what the gateway still holds back, and shows it there", async () => {
+    api.apps.mockResolvedValue(
+      appsReviewFixture({
+        apps: [appSeenFixture()],
+        pending: 2,
+        live_pending: 2,
+        tools: [toolReviewFixture("write_range"), toolReviewFixture("delete_sheet")],
+      }),
+    );
+    openAgent();
+    const tab = await screen.findByRole("tab", { name: /Apps/ });
+    expect(await within(tab).findByLabelText("2 tool changes not live")).toBeInTheDocument();
+    await userEvent.click(tab);
+    expect(await screen.findByText("The apps bring 2 tool changes that version 1 does not have.")).toBeInTheDocument();
   });
 
   it("deletes a retired agent for good once its address is typed, and goes back to the list", async () => {

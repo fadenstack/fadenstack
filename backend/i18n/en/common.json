@@ -563,6 +563,10 @@
         "title": "Model downloads failed (24 h): {{count}}",
         "detail": "Open the model marketplace to retry."
       },
+      "agent_apps_pending": {
+        "title": "{{name}}: {{count}} tool changes from its apps are not live",
+        "detail": "Review them on the agent's Apps tab. The gateway holds them back until a version with them is published."
+      },
       "gateway_error_spike": {
         "title": "Gateway server errors: {{rate}} %",
         "detail": "{{errors}} errors in the last {{minutes}} minutes."
@@ -3302,6 +3306,87 @@
     "no_changes": "No changes."
   },
   "agents": {
+    "apps": {
+      "none": "No app has reported to this agent yet. Apps built with a Fadenstack SDK say which tools they bring when they start; tools the gateway holds back from requests show here too.",
+      "unrestricted": "This version lists no host tools, so the agent allows any tool. Accepting restricts it to the tools you take in.",
+      "pending_one": "The apps bring {{count}} tool change that version {{version}} does not have.",
+      "pending_other": "The apps bring {{count}} tool changes that version {{version}} does not have.",
+      "pending_hint": "The classes are the apps' suggestions: change any before you accept. The gateway holds new tools back until a version with them is published.",
+      "greeting_only": "The newest app suggests a greeting of its own.",
+      "accept_publish": "Accept and publish",
+      "accept_draft": "Accept as draft",
+      "not_live_one": "Version {{version}} has what the apps bring but is not published: the gateway still holds {{count}} tool back.",
+      "not_live_other": "Version {{version}} has what the apps bring but is not published: the gateway still holds {{count}} tools back.",
+      "all_in": "Version {{version}} has everything the apps bring.",
+      "badge_one": "{{count}} tool change not live",
+      "badge_other": "{{count}} tool changes not live",
+      "tools_title": "Tools",
+      "no_tools": "No tools reported.",
+      "tool": "Tool",
+      "status_column": "Status",
+      "class_column": "Class",
+      "class_for": "Class for {{tool}}",
+      "class_now": "App: {{app}} · now: {{contract}}",
+      "class_app": "The app says: {{app}}",
+      "skip": "Leave out",
+      "remove": "Remove",
+      "brought_by": "Brought by",
+      "requests": "Requests (held back)",
+      "class": {
+        "read": "Read",
+        "write": "Write",
+        "destructive": "Destructive",
+        "unknown": "Unclassified (always asks)"
+      },
+      "status": {
+        "new": {
+          "label": "New",
+          "detail": "The contract does not list it: the gateway holds it back."
+        },
+        "changed": {
+          "label": "Changed",
+          "detail": "Its parameters differ from the ones accepted."
+        },
+        "riskier": {
+          "label": "Riskier",
+          "detail": "The app now calls it riskier than the contract does."
+        },
+        "unused": {
+          "label": "Unused",
+          "detail": "In the contract, but no current app brings it."
+        },
+        "same": {
+          "label": "In the contract",
+          "detail": "Nothing to do."
+        }
+      },
+      "warning": {
+        "instructions": {
+          "label": "Instructs the model",
+          "detail": "Its description tells the model what to do. Models read tool descriptions like instructions: check it before you accept."
+        },
+        "hidden_characters": {
+          "label": "Hidden characters",
+          "detail": "Its description holds invisible or direction-changing characters."
+        },
+        "link": {
+          "label": "Link",
+          "detail": "Its description contains a web address."
+        },
+        "long": {
+          "label": "Long",
+          "detail": "Its description is unusually long."
+        }
+      },
+      "greeting_title": "Greeting the app suggests",
+      "greeting_take": "Take this greeting and these suggestions",
+      "apps_title": "Apps in use",
+      "app": "App",
+      "last_seen": "Last seen",
+      "reports": "Reports",
+      "reported_by": "Last reported by",
+      "context": "Context it offers"
+    },
     "title": "Agents",
     "subtitle": "Agents that run in other software, governed by this server: what they are, who may use them, and what they did.",
     "search": "Search agents…",
@@ -3310,6 +3395,11 @@
     "create": "New agent",
     "create_title": "New agent",
     "create_hint": "The agent starts as a draft: nobody can use it until it is published and granted to users or teams.",
+    "create_from": "Start from an app",
+    "create_from_hint": "Fadenstack's own apps come with their definition: instructions, tools and greeting. Or start blank, or paste JSON below.",
+    "create_grants": "Who may use it",
+    "create_publish": "Publish it now",
+    "create_publish_hint": "Published, it serves the users and teams above at once. What its apps bring shows on the Apps tab.",
     "edit_title": "Edit agent",
     "name": "Name",
     "slug": "Address",
@@ -3340,7 +3430,8 @@
       "definition": "Definition",
       "versions": "Versions",
       "access": "Access",
-      "activity": "Activity"
+      "activity": "Activity",
+      "apps": "Apps"
     },
     "field": {
       "instructions": "Instructions",

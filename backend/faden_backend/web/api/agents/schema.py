@@ -184,6 +184,20 @@ class ClientEventDTO(BaseModel):
     created_at: datetime
 
 
+class AgentTemplateDTO(BaseModel):
+    """An agent for one of Fadenstack's own apps, ready to create from."""
+
+    id: str
+    #: The app it is for ("Chrome", "Microsoft Word").
+    app: str
+    slug: str
+    name: str
+    description: str | None
+    tools: int
+    #: The body ``POST /api/agents`` takes.
+    definition: dict[str, Any]
+
+
 class AppSeenDTO(BaseModel):
     """An app (one version) that runs the agent, as its SDK reported it; or requests whose tools were held."""
 
@@ -233,6 +247,9 @@ class AppsReviewDTO(BaseModel):
     ui: dict[str, Any] | None
     #: Tools waiting for a decision (new, changed, riskier).
     pending: int
+    published_version: int | None = None
+    #: The same against the published version: what is held back until a version with it is published.
+    live_pending: int = 0
 
 
 class AcceptedTool(BaseModel):

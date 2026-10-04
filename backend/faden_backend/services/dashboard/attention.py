@@ -18,13 +18,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import ProgrammingError
 
+from faden_backend.db.models.agents import Agent, AgentStatus, AgentVersion
 from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
@@ -407,6 +410,76 @@ async def mcp_servers(facts: Facts) -> list[Item]:
     ]
 
 
+async def agent_apps(facts: Facts) -> list[Item]:
+    """Agents whose apps bring tools that are not live: held back until a version with them is published.
+
+    Counted against the published version, so an accepted change left as a draft still asks.
+    """
+    if not facts.has_gateway:
+        return []
+    from faden_backend.services.agents import app_review  # noqa: PLC0415
+
+    async def manifests(session: Any) -> list[Any]:
+        since = facts.now - timedelta(days=app_review.CURRENT_DAYS)
+        try:
+            found = await session.execute(text(app_review.MANIFEST_SQL), {"agent": None, "since": since})
+        except ProgrammingError:  # a gateway not upgraded yet
+            return []
+        return list(found.mappings().all())
+
+    by_agent: dict[str, list[app_review.ManifestRow]] = {}
+    for row in await facts.on_gateway(manifests):
+        by_agent.setdefault(row["agent_id"], []).append(app_review.manifest_row(row))
+    if not by_agent:
+        return []
+
+    async def agents(session: Any) -> list[Item]:
+        ids = [uuid.UUID(a) for a in by_agent if _is_uuid(a)]
+        found = (await session.execute(
+            select(Agent).where(Agent.id.in_(ids), Agent.status != AgentStatus.RETIRED),
+        )).scalars().all()
+        versions: dict[uuid.UUID, list[AgentVersion]] = {}
+        for version in (await session.execute(
+            select(AgentVersion).where(AgentVersion.agent_id.in_([a.id for a in found])),
+        )).scalars():
+            versions.setdefault(version.agent_id, []).append(version)
+        items = []
+        for agent in found:
+            live = _live(agent, versions.get(agent.id, []))
+            review = app_review.review(by_agent[str(agent.id)], live, now=facts.now)
+            if review.pending:
+                items.append(_apps_item(agent, review))
+        return items
+
+    return await facts.on_backend(agents)
+
+
+def _live(agent: Agent, versions: list[AgentVersion]) -> AgentVersion | None:
+    """The version the agent's users get: the published one, or a draft agent's newest (its maintainers')."""
+    published = next((v for v in versions if v.id == agent.published_version_id), None)
+    return published or max(versions, key=lambda v: v.version, default=None)
+
+
+def _apps_item(agent: Agent, review: Any) -> Item:
+    return Item(
+        f"agent_apps_pending:{agent.id}",
+        "agent_apps_pending",
+        "warning",
+        "integrations",
+        {"name": agent.name, "count": review.pending},
+        max((t.last_seen_at for t in review.tools if t.last_seen_at), default=None),
+        f"/admin/agents/{agent.slug}?tab=apps",
+    )
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 #: Warned about this long before a certificate runs out; less when it renews by itself
 #: (faden tls renew runs daily and acts 30 days before), which only a failing renewal reaches.
 CERT_WARNING_DAYS = 30
@@ -507,6 +580,7 @@ RULES: list[Rule] = [
     mcp_servers,
     edge_certificate,
     model_traffic,
+    agent_apps,
 ]
 
 

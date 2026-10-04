@@ -38,13 +38,14 @@ from faden_backend.db.models.agents import (
 )
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User, current_active_user
-from faden_backend.services.agents import access, app_review, tokens
+from faden_backend.services.agents import access, app_review, app_templates, tokens
 from faden_backend.services.extensions import registry
 from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.web.api.agents.schema import (
     AcceptAppsRequest,
     AccessDTO,
     AgentDTO,
+    AgentTemplateDTO,
     AgentTokensDTO,
     AgentVersionDTO,
     AgentVersionFields,
@@ -243,6 +244,17 @@ async def list_principals(
     if not any(rights) and not await dao.maintains_any(user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not manage agents.")
     return await find_principals(dao.session, q=q, ids=ids)
+
+
+@router.get("/templates", response_model=list[AgentTemplateDTO], name="agent_templates")
+async def agent_templates(
+    user: Annotated[User, Depends(current_active_user)],
+    rbac: RbacDAO = Depends(),
+) -> list[dict[str, Any]]:
+    """Agents for Fadenstack's own apps (Chrome, Office), ready to create from, as the apps ship them."""
+    if not (await _has(rbac, user, "create") or await _has(rbac, user, "manage")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied: agents:create")
+    return app_templates.templates()
 
 
 @router.get("/{agent_ref}", response_model=AgentDTO, name="get_agent")
@@ -656,33 +668,10 @@ async def _manifests(request: Request, agent_id: uuid.UUID) -> list[app_review.M
     since = datetime.now(UTC) - timedelta(days=app_review.CURRENT_DAYS)
     async with factory() as gw:
         try:
-            rows = (
-                await gw.execute(
-                    text("""
-                    SELECT source, app_name, app_version, manifest, first_seen_at, last_seen_at, reports,
-                           last_user_id
-                    FROM agent_client_manifest
-                    WHERE agent_id = :agent AND last_seen_at >= :since
-                    ORDER BY last_seen_at DESC LIMIT 500
-                    """),
-                    {"agent": str(agent_id), "since": since},
-                )
-            ).mappings().all()
+            found = await gw.execute(text(app_review.MANIFEST_SQL), {"agent": str(agent_id), "since": since})
         except ProgrammingError:  # a gateway not upgraded yet
             return []
-    return [
-        app_review.ManifestRow(
-            source=row["source"],
-            app_name=row["app_name"],
-            app_version=row["app_version"],
-            manifest=json.loads(row["manifest"]) if isinstance(row["manifest"], str) else row["manifest"],
-            first_seen_at=row["first_seen_at"],
-            last_seen_at=row["last_seen_at"],
-            reports=row["reports"],
-            last_user_id=row["last_user_id"],
-        )
-        for row in rows
-    ]
+        return [app_review.manifest_row(row) for row in found.mappings().all()]
 
 
 async def _review(
@@ -703,7 +692,14 @@ async def agent_apps(
 ) -> AppsReviewDTO:
     """The apps that run the agent and what they bring, against its latest version (``app_review``)."""
     agent = await _inspected_agent(dao, rbac, agent_ref, user)
-    review, _ = await _review(request, dao, agent)
+    rows = await _manifests(request, agent.id)
+    now = datetime.now(UTC)
+    latest = await dao.latest_version(agent.id)
+    review = app_review.review(rows, latest, now=now)
+    published = await dao.version_by_id(agent.published_version_id)
+    live = review if published is None or latest is None or published.id == latest.id else (
+        app_review.review(rows, published, now=now)
+    )
     labels: dict[str, str | None] = {}
     for app in review.apps:
         if app.last_user_id not in labels:
@@ -719,6 +715,8 @@ async def agent_apps(
         tools=[ToolReviewDTO(**vars(tool)) for tool in review.tools],
         ui=review.ui,
         pending=review.pending,
+        published_version=published.version if published else None,
+        live_pending=live.pending,
     )
 
 

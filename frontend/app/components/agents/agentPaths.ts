@@ -5,7 +5,7 @@
  */
 import type { Agent } from "~/api/agents";
 
-export type AgentTab = "definition" | "versions" | "access" | "activity";
+export type AgentTab = "definition" | "versions" | "apps" | "access" | "activity";
 
 export const ADMIN_AGENTS_PATH = "/admin/agents";
 export const USER_AGENTS_PATH = "/agents";

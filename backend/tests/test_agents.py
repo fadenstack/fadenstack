@@ -146,6 +146,23 @@ async def test_creating_needs_the_permission(signed_in: _As, client: AsyncClient
     signed_in.user = await _user(dbsession)
     r = await client.post("/api/agents", json={"slug": "mine", "name": "Mine"})
     assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert (await client.get("/api/agents/templates")).status_code == status.HTTP_403_FORBIDDEN
+
+
+async def test_the_apps_own_agents_are_ready_to_create(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    found = {t["id"]: t for t in (await client.get("/api/agents/templates")).json()}
+    assert set(found) == {"browser-assistant", "word-assistant", "excel-assistant", "powerpoint-assistant", "outlook-assistant"}
+    chrome = found["browser-assistant"]
+    assert (chrome["app"], chrome["slug"], chrome["tools"]) == ("Chrome", "browser-assistant", 7)
+    for template in found.values():  # each one is a body POST /api/agents takes
+        r = await client.post("/api/agents", json=template["definition"])
+        assert r.status_code == status.HTTP_201_CREATED, (template["id"], r.text)
+    version = (await client.get("/api/agents/browser-assistant/versions/1")).json()
+    assert "page:document" in version["instructions"]
+    assert {t["name"] for t in version["host_tool_contract"]} >= {"read_context", "fill_field", "click_element"}
 
 
 async def test_versions_are_added_published_and_rolled_back(
@@ -478,6 +495,50 @@ async def test_what_the_apps_bring_is_reviewed_and_taken_in_with_one_click(
     assert (await client.get("/api/agents/eplan-helper/apps")).status_code == status.HTTP_200_OK
     r = await client.post("/api/agents/eplan-helper/apps/accept", json={"tools": [{"name": "export_pdf", "risk": "read"}]})
     assert r.status_code == status.HTTP_403_FORBIDDEN
+
+
+class _Facts:
+    """The dashboard's facts, with the gateway's table in the test database."""
+
+    has_gateway = True
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.now = datetime.now(UTC)
+        self._session = session
+
+    async def on_gateway(self, query: Any) -> Any:
+        return await query(self._session)
+
+    async def on_backend(self, query: Any) -> Any:
+        return await query(self._session)
+
+
+async def test_the_dashboard_asks_for_a_review_until_it_is_done(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, gateway_reports: Any,
+) -> None:
+    from faden_backend.services.dashboard import attention
+
+    signed_in.user = admin = await _user(dbsession, admin=True)
+    agent = await _agent(client, slug="browser-assistant", host_tool_contract=[{"name": "read_context", "risk": "read"}])
+    await gateway_reports(agent["id"], admin, {
+        "app": {"name": "Chrome extension", "version": "0.2.0"},
+        "tools": [{"name": "read_context", "class": "read"}, {"name": "open_page", "class": "write"}],
+    })
+
+    [item] = await attention.agent_apps(_Facts(dbsession))  # type: ignore[arg-type]
+    assert (item.code, item.severity, item.params) == ("agent_apps_pending", "warning", {"name": "Browser-Assistant", "count": 1})
+    assert item.link == "/admin/agents/browser-assistant?tab=apps"
+
+    # Accepted as a draft: the tool is still held back, so the dashboard still asks.
+    r = await client.post("/api/agents/browser-assistant/apps/accept", json={"tools": [{"name": "open_page", "risk": "write"}]})
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    assert len(await attention.agent_apps(_Facts(dbsession))) == 1  # type: ignore[arg-type]
+    review = (await client.get("/api/agents/browser-assistant/apps")).json()
+    assert (review["pending"], review["live_pending"], review["published_version"]) == (0, 1, 1)
+
+    await client.post("/api/agents/browser-assistant/versions/2/publish")
+    assert await attention.agent_apps(_Facts(dbsession)) == []  # type: ignore[arg-type]
+    assert (await client.get("/api/agents/browser-assistant/apps")).json()["live_pending"] == 0
 
 
 # -- deleting --------------------------------------------------------------------------------

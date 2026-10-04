@@ -563,6 +563,10 @@
         "title": "Descargas de modelos fallidas (24 h): {{count}}",
         "detail": "Abre el marketplace de modelos para reintentar."
       },
+      "agent_apps_pending": {
+        "title": "{{name}}: {{count}} cambios de herramientas de sus aplicaciones no están activos",
+        "detail": "Revíselos en la pestaña Aplicaciones del agente. La pasarela los retiene hasta que se publique una versión con ellos."
+      },
       "gateway_error_spike": {
         "title": "Errores de servidor del gateway: {{rate}} %",
         "detail": "{{errors}} errores en los últimos {{minutes}} minutos."
@@ -3304,6 +3308,87 @@
     "no_changes": "Sin cambios."
   },
   "agents": {
+    "apps": {
+      "none": "Ninguna aplicación ha informado todavía a este agente. Las aplicaciones creadas con un SDK de Fadenstack indican al arrancar qué herramientas traen; las herramientas que la pasarela retiene de las solicitudes también aparecen aquí.",
+      "unrestricted": "Esta versión no enumera herramientas del anfitrión, así que el agente permite cualquier herramienta. Aceptar lo limita a las herramientas que incorpore.",
+      "pending_one": "Las aplicaciones traen {{count}} cambio de herramienta que la versión {{version}} no tiene.",
+      "pending_other": "Las aplicaciones traen {{count}} cambios de herramientas que la versión {{version}} no tiene.",
+      "pending_hint": "Las clases son sugerencias de las aplicaciones: cámbielas si hace falta antes de aceptar. La pasarela retiene las herramientas nuevas hasta que se publique una versión con ellas.",
+      "greeting_only": "La aplicación más reciente sugiere su propio saludo.",
+      "accept_publish": "Aceptar y publicar",
+      "accept_draft": "Aceptar como borrador",
+      "not_live_one": "La versión {{version}} tiene lo que traen las aplicaciones, pero no está publicada: la pasarela aún retiene {{count}} herramienta.",
+      "not_live_other": "La versión {{version}} tiene lo que traen las aplicaciones, pero no está publicada: la pasarela aún retiene {{count}} herramientas.",
+      "all_in": "La versión {{version}} tiene todo lo que traen las aplicaciones.",
+      "badge_one": "{{count}} cambio de herramienta sin activar",
+      "badge_other": "{{count}} cambios de herramientas sin activar",
+      "tools_title": "Herramientas",
+      "no_tools": "No se han informado herramientas.",
+      "tool": "Herramienta",
+      "status_column": "Estado",
+      "class_column": "Clase",
+      "class_for": "Clase de {{tool}}",
+      "class_now": "Aplicación: {{app}} · ahora: {{contract}}",
+      "class_app": "La aplicación indica: {{app}}",
+      "skip": "Dejar fuera",
+      "remove": "Quitar",
+      "brought_by": "Traída por",
+      "requests": "Solicitudes (retenida)",
+      "class": {
+        "read": "Lectura",
+        "write": "Escritura",
+        "destructive": "Destructiva",
+        "unknown": "Sin clasificar (siempre pregunta)"
+      },
+      "status": {
+        "new": {
+          "label": "Nueva",
+          "detail": "El contrato no la enumera: la pasarela la retiene."
+        },
+        "changed": {
+          "label": "Cambiada",
+          "detail": "Sus parámetros difieren de los aceptados."
+        },
+        "riskier": {
+          "label": "Más arriesgada",
+          "detail": "La aplicación ahora la considera más arriesgada que el contrato."
+        },
+        "unused": {
+          "label": "Sin uso",
+          "detail": "En el contrato, pero ninguna aplicación actual la trae."
+        },
+        "same": {
+          "label": "En el contrato",
+          "detail": "Nada que hacer."
+        }
+      },
+      "warning": {
+        "instructions": {
+          "label": "Da órdenes al modelo",
+          "detail": "Su descripción le dice al modelo qué hacer. Los modelos leen las descripciones de herramientas como instrucciones: revísela antes de aceptar."
+        },
+        "hidden_characters": {
+          "label": "Caracteres ocultos",
+          "detail": "Su descripción contiene caracteres invisibles o que cambian la dirección del texto."
+        },
+        "link": {
+          "label": "Enlace",
+          "detail": "Su descripción contiene una dirección web."
+        },
+        "long": {
+          "label": "Larga",
+          "detail": "Su descripción es inusualmente larga."
+        }
+      },
+      "greeting_title": "Saludo que sugiere la aplicación",
+      "greeting_take": "Usar este saludo y estas sugerencias",
+      "apps_title": "Aplicaciones en uso",
+      "app": "Aplicación",
+      "last_seen": "Vista por última vez",
+      "reports": "Informes",
+      "reported_by": "Último informe de",
+      "context": "Contexto que ofrece"
+    },
     "title": "Agentes",
     "subtitle": "Agentes que funcionan dentro de otro software, gobernados por este servidor: qué son, quién puede usarlos y qué han hecho.",
     "search": "Buscar agentes…",
@@ -3312,6 +3397,11 @@
     "create": "Nuevo agente",
     "create_title": "Nuevo agente",
     "create_hint": "El agente empieza como borrador: nadie puede usarlo hasta que se publique y se conceda a usuarios o equipos.",
+    "create_from": "Partir de una aplicación",
+    "create_from_hint": "Las aplicaciones propias de Fadenstack traen su definición: instrucciones, herramientas y saludo. O empiece en blanco, o pegue JSON abajo.",
+    "create_grants": "Quién puede usarlo",
+    "create_publish": "Publicarlo ahora",
+    "create_publish_hint": "Una vez publicado, sirve de inmediato a los usuarios y equipos de arriba. Lo que traen sus aplicaciones aparece en la pestaña Aplicaciones.",
     "edit_title": "Editar agente",
     "name": "Nombre",
     "slug": "Dirección",
@@ -3342,7 +3432,8 @@
       "definition": "Definición",
       "versions": "Versiones",
       "access": "Acceso",
-      "activity": "Actividad"
+      "activity": "Actividad",
+      "apps": "Aplicaciones"
     },
     "field": {
       "instructions": "Instrucciones",

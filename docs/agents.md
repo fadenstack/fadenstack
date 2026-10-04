@@ -10,19 +10,54 @@ an agent's sessions stay on the device.
 
 ## Setting up an agent
 
-In the console: **Agents → Agents** (`/admin/agents`). Each agent has four tabs:
+In the console: **Agents → Agents** (`/admin/agents`). Each agent has five tabs:
 
 | Tab | What it does |
 |---|---|
 | Definition | Instructions, model, knowledge, server tools, local MCP, host tools, greeting and suggestions. Saving makes a new version; *Save and publish* serves it at once. |
 | Versions | Every version, which one is live, what changed between two, publish or roll back. |
+| Apps | The apps that run it and what they bring -- their tools with the classes their developers gave them, their greeting, which versions are in use -- against the latest version. *Accept and publish* takes it all in. |
 | Access | The users and teams who may use it, its maintainers, and "may this person use it, and why?" |
 | Activity | Requests and tokens per day, what the SDKs reported (tools run, approvals, local MCP servers), and the signed-in devices, which can be signed out. |
 
-*New agent* can start from a JSON definition, such as the Office agents'
-`contracts/*.json`. Tool rules, tool classes and the decision log are under
-**Agents → Governance** (superusers; see [governance.md](governance.md)), and
-developer mode is switched per user under **Access Control → Users**.
+*New agent* sets an agent up in one step: pick one of Fadenstack's own apps
+(Chrome, Word, Excel, PowerPoint, Outlook) and its definition -- instructions,
+host tools, greeting -- is filled in, published and granted to the users and
+teams you add; or start blank, or paste a JSON definition. Someone with
+`agents:create` can also create the agent from inside an app that finds the
+server without it (the Chrome extension offers it at sign-in). Tool rules, tool
+classes and the decision log are under **Agents → Governance** (superusers;
+see [governance.md](governance.md)), and developer mode is switched per user
+under **Access Control → Users**.
+
+### What the apps bring
+
+Nobody types host tools in. Each app built with an SDK reports, when it starts,
+what it brings (`PUT /v1/agents/{agent}/manifest`): its tools with their
+description, parameters and the class its developer gave them, the context it
+offers (`page:document`, ...), its default greeting and suggestions, and the
+app's and SDK's versions. The gateway keeps one copy per distinct manifest.
+
+When an app is updated with a tool the agent's contract does not list, the
+gateway **holds it back**: the model does not see it, the app keeps working
+with the tools it may use, `X-Faden-Held-Tools` names what was held, and the
+tool waits on the agent's **Apps** tab (requests from clients without an SDK
+show there too, as "Requests"). The tab marks each tool:
+
+| | |
+|---|---|
+| New | not in the contract: held back |
+| Changed | its parameters differ from the ones accepted (`schema_sha256`) |
+| Riskier | the app now calls it riskier than the contract does |
+| Unused | in the contract, but no app in use brings it |
+
+and flags descriptions that try to instruct the model, hide characters, link
+out or run long -- a model reads tool descriptions like instructions. The
+app's classes are suggestions: change any, or leave a tool out, then *Accept
+and publish* (or *Accept as draft*); `POST /api/agents/{slug}/apps/accept`
+does the same. Nothing is taken without that click. Until a version with the
+change is published the dashboard keeps asking ("tool changes from its apps
+are not live").
 
 Who sees what:
 
@@ -61,6 +96,9 @@ The API is under `/api/agents`:
 | Maintainers | `PUT /api/agents/{slug}/members` |
 | Why may someone use it (or not)? | `GET /api/agents/{slug}/access/{user_id}` |
 | Usage (no content) | `GET /api/agents/{slug}/usage?days=30` |
+| Templates for Fadenstack's own apps | `GET /api/agents/templates` -- each one's `definition` is a body for `POST /api/agents` |
+| What the apps bring, against the latest version | `GET /api/agents/{slug}/apps` |
+| Take it in (a new version) | `POST /api/agents/{slug}/apps/accept` `{tools: [{name, risk}], remove: [...], ui, publish}` |
 | Retire / restore | `POST /api/agents/{slug}/retire`, `POST /api/agents/{slug}/restore` |
 | Delete a retired agent (`agents:delete`) | `DELETE /api/agents/{slug}` -- 409 while it is not retired |
 
@@ -73,11 +111,13 @@ A version holds:
 - `instructions`: put before every conversation; the SDK never sees them.
 - `model_alias`: the model every request uses, whatever the client asks for.
 - `host_tool_contract`: the tools the host application may offer (`name`,
-  optionally `schema_sha256`, `risk`, `approval`). A request declaring any
-  other tool is refused -- unless the device may attach local MCP servers
-  (`local_mcp_mode: allow`, or the user's developer mode): their tools are in
-  no contract, and tool modes treat them as unclassified. Empty means no
-  restriction.
+  optionally `schema_sha256` -- the SHA-256 of the parameter schema as
+  canonical JSON, set when a tool is accepted from an app -- `risk`,
+  `approval`). Any other tool a request declares is held back and kept for
+  review (see *What the apps bring*) -- unless the device may attach local MCP
+  servers (`local_mcp_mode: allow`, or the user's developer mode): their tools
+  are in no contract, and tool modes treat them as unclassified. Empty means
+  no restriction.
 - `server_tools`: the gateway's own tools (knowledge search, MCP tools, ...)
   the model may be offered, as names or patterns (`knowledge_*`). Leave it out
   for what a chat would get; `[]` for none.

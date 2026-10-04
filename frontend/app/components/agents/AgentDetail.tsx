@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
@@ -23,7 +24,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 
-import { agentRights, agentsApi, type Agent, type AgentVersion } from "~/api/agents";
+import { agentRights, agentsApi, type Agent, type AgentVersion, type AppsReview } from "~/api/agents";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useAction } from "~/lib/useAction";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -32,13 +33,14 @@ import { useTabParam } from "~/lib/useTabParam";
 
 import { AgentAccessPanel } from "./AgentAccessPanel";
 import { AgentActivityPanel } from "./AgentActivityPanel";
+import { AgentAppsPanel } from "./AgentAppsPanel";
 import { AgentStatusChip, AgentVersionChips } from "./AgentChips";
 import { AgentDefinitionPanel } from "./AgentDefinitionPanel";
 import { AgentVersionsPanel } from "./AgentVersionsPanel";
 import { EditAgentDialog } from "./EditAgentDialog";
 import type { AgentTab } from "./agentPaths";
 
-const TABS: AgentTab[] = ["definition", "versions", "access", "activity"];
+const TABS: AgentTab[] = ["definition", "versions", "apps", "access", "activity"];
 
 export interface AgentDetailProps {
   slug: string;
@@ -54,11 +56,13 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
 
   const agentQuery = useAsyncData(() => agentsApi.get(slug), [slug], { initialValue: null as Agent | null });
   const versions = useAsyncData(() => agentsApi.versions(slug), [slug], { initialValue: [] as AgentVersion[] });
+  // What the apps bring: the tab's badge counts what the gateway still holds back.
+  const apps = useAsyncData(() => agentsApi.apps(slug), [slug], { initialValue: null as AppsReview | null });
   const agent = agentQuery.data;
 
-  /** After a change: the agent and its versions as the server has them now. */
+  /** After a change: the agent, its versions and what the apps bring, as the server has them now. */
   const reload = async () => {
-    await Promise.all([agentQuery.refresh(true), versions.refresh(true)]);
+    await Promise.all([agentQuery.refresh(true), versions.refresh(true), apps.refresh(true)]);
   };
 
   function openTab(next: AgentTab) {
@@ -102,6 +106,17 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
             onRefresh={() => void versions.refresh()}
           />
         );
+      case "apps":
+        return (
+          <AgentAppsPanel
+            agent={agent}
+            review={apps.data}
+            loading={apps.loading}
+            error={apps.error}
+            onRefresh={() => void apps.refresh()}
+            onChanged={() => void reload()}
+          />
+        );
       case "access":
         return <AgentAccessPanel agent={agent} />;
       case "activity":
@@ -121,7 +136,25 @@ export function AgentDetail({ slug, basePath }: AgentDetailProps) {
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
         {TABS.map((name) => (
-          <Tab key={name} value={name} label={t(`agents.tab.${name}`)} />
+          <Tab
+            key={name}
+            value={name}
+            label={
+              name === "apps" && apps.data && apps.data.live_pending > 0 ? (
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                  <span>{t(`agents.tab.${name}`)}</span>
+                  <Chip
+                    size="small"
+                    color="warning"
+                    label={apps.data.live_pending}
+                    aria-label={t("agents.apps.badge", { count: apps.data.live_pending })}
+                  />
+                </Stack>
+              ) : (
+                t(`agents.tab.${name}`)
+              )
+            }
+          />
         ))}
       </Tabs>
       {TABS.filter((name) => opened.has(name) || name === tab).map((name) => (

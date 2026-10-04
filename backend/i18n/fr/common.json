@@ -563,6 +563,10 @@
         "title": "Téléchargements de modèles en échec (24 h) : {{count}}",
         "detail": "Ouvrez le marketplace de modèles pour réessayer."
       },
+      "agent_apps_pending": {
+        "title": "{{name}} : {{count}} modifications d'outils de ses applications ne sont pas actives",
+        "detail": "Examinez-les dans l'onglet Applications de l'agent. La passerelle les retient jusqu'à la publication d'une version qui les contient."
+      },
       "gateway_error_spike": {
         "title": "Erreurs serveur de la passerelle : {{rate}} %",
         "detail": "{{errors}} erreurs au cours des {{minutes}} dernières minutes."
@@ -3304,6 +3308,87 @@
     "no_changes": "Aucune modification."
   },
   "agents": {
+    "apps": {
+      "none": "Aucune application ne s'est encore signalée pour cet agent. Les applications créées avec un SDK Fadenstack indiquent au démarrage les outils qu'elles apportent ; les outils que la passerelle retient des requêtes apparaissent aussi ici.",
+      "unrestricted": "Cette version ne liste aucun outil de l'hôte : l'agent autorise donc n'importe quel outil. Accepter le limite aux outils que vous reprenez.",
+      "pending_one": "Les applications apportent {{count}} modification d'outil que la version {{version}} n'a pas.",
+      "pending_other": "Les applications apportent {{count}} modifications d'outils que la version {{version}} n'a pas.",
+      "pending_hint": "Les classes sont des suggestions des applications : modifiez-les si besoin avant d'accepter. La passerelle retient les nouveaux outils jusqu'à la publication d'une version qui les contient.",
+      "greeting_only": "L'application la plus récente propose son propre message d'accueil.",
+      "accept_publish": "Accepter et publier",
+      "accept_draft": "Accepter comme brouillon",
+      "not_live_one": "La version {{version}} contient ce qu'apportent les applications mais n'est pas publiée : la passerelle retient encore {{count}} outil.",
+      "not_live_other": "La version {{version}} contient ce qu'apportent les applications mais n'est pas publiée : la passerelle retient encore {{count}} outils.",
+      "all_in": "La version {{version}} contient tout ce qu'apportent les applications.",
+      "badge_one": "{{count}} modification d'outil non active",
+      "badge_other": "{{count}} modifications d'outils non actives",
+      "tools_title": "Outils",
+      "no_tools": "Aucun outil signalé.",
+      "tool": "Outil",
+      "status_column": "Statut",
+      "class_column": "Classe",
+      "class_for": "Classe de {{tool}}",
+      "class_now": "Application : {{app}} · actuellement : {{contract}}",
+      "class_app": "L'application indique : {{app}}",
+      "skip": "Laisser de côté",
+      "remove": "Retirer",
+      "brought_by": "Apporté par",
+      "requests": "Requêtes (retenu)",
+      "class": {
+        "read": "Lecture",
+        "write": "Écriture",
+        "destructive": "Destructif",
+        "unknown": "Non classé (demande toujours)"
+      },
+      "status": {
+        "new": {
+          "label": "Nouveau",
+          "detail": "Le contrat ne le liste pas : la passerelle le retient."
+        },
+        "changed": {
+          "label": "Modifié",
+          "detail": "Ses paramètres diffèrent de ceux acceptés."
+        },
+        "riskier": {
+          "label": "Plus risqué",
+          "detail": "L'application le juge désormais plus risqué que le contrat."
+        },
+        "unused": {
+          "label": "Inutilisé",
+          "detail": "Dans le contrat, mais aucune application actuelle ne l'apporte."
+        },
+        "same": {
+          "label": "Dans le contrat",
+          "detail": "Rien à faire."
+        }
+      },
+      "warning": {
+        "instructions": {
+          "label": "Donne des ordres au modèle",
+          "detail": "Sa description dit au modèle quoi faire. Les modèles lisent les descriptions d'outils comme des instructions : vérifiez-la avant d'accepter."
+        },
+        "hidden_characters": {
+          "label": "Caractères cachés",
+          "detail": "Sa description contient des caractères invisibles ou qui changent le sens d'écriture."
+        },
+        "link": {
+          "label": "Lien",
+          "detail": "Sa description contient une adresse web."
+        },
+        "long": {
+          "label": "Longue",
+          "detail": "Sa description est inhabituellement longue."
+        }
+      },
+      "greeting_title": "Message d'accueil proposé par l'application",
+      "greeting_take": "Reprendre ce message d'accueil et ces suggestions",
+      "apps_title": "Applications utilisées",
+      "app": "Application",
+      "last_seen": "Vue pour la dernière fois",
+      "reports": "Signalements",
+      "reported_by": "Dernier signalement par",
+      "context": "Contexte proposé"
+    },
     "title": "Agents",
     "subtitle": "Les agents qui s'exécutent dans d'autres logiciels, gouvernés par ce serveur : ce qu'ils sont, qui peut les utiliser et ce qu'ils ont fait.",
     "search": "Rechercher des agents…",
@@ -3312,6 +3397,11 @@
     "create": "Nouvel agent",
     "create_title": "Nouvel agent",
     "create_hint": "L'agent commence comme brouillon : personne ne peut l'utiliser tant qu'il n'est pas publié et accordé à des utilisateurs ou des équipes.",
+    "create_from": "Partir d'une application",
+    "create_from_hint": "Les applications de Fadenstack apportent leur définition : instructions, outils et message d'accueil. Ou partez de zéro, ou collez du JSON ci-dessous.",
+    "create_grants": "Qui peut l'utiliser",
+    "create_publish": "Le publier tout de suite",
+    "create_publish_hint": "Une fois publié, il sert aussitôt les utilisateurs et équipes ci-dessus. Ce qu'apportent ses applications apparaît dans l'onglet Applications.",
     "edit_title": "Modifier l'agent",
     "name": "Nom",
     "slug": "Adresse",
@@ -3342,7 +3432,8 @@
       "definition": "Définition",
       "versions": "Versions",
       "access": "Accès",
-      "activity": "Activité"
+      "activity": "Activité",
+      "apps": "Applications"
     },
     "field": {
       "instructions": "Instructions",

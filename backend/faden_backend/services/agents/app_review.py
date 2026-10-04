@@ -17,7 +17,9 @@ Nothing is applied here, and the app's word is only a suggestion: ``accept`` mak
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -44,6 +46,31 @@ class ManifestRow:
     last_seen_at: datetime
     reports: int
     last_user_id: str
+
+
+#: The manifests of one agent (``:agent``), or of every agent (``:agent`` NULL), seen since ``:since``, newest
+#: first -- from the gateway's database.
+MANIFEST_SQL = """
+SELECT agent_id, source, app_name, app_version, manifest, first_seen_at, last_seen_at, reports, last_user_id
+FROM agent_client_manifest
+WHERE (CAST(:agent AS TEXT) IS NULL OR agent_id = :agent) AND last_seen_at >= :since
+ORDER BY last_seen_at DESC LIMIT 5000
+"""
+
+
+def manifest_row(row: Mapping[str, Any]) -> ManifestRow:
+    """A row of ``MANIFEST_SQL``."""
+    manifest = row["manifest"]
+    return ManifestRow(
+        source=row["source"],
+        app_name=row["app_name"],
+        app_version=row["app_version"],
+        manifest=json.loads(manifest) if isinstance(manifest, str) else manifest,
+        first_seen_at=row["first_seen_at"],
+        last_seen_at=row["last_seen_at"],
+        reports=row["reports"],
+        last_user_id=row["last_user_id"],
+    )
 
 
 @dataclass
