@@ -156,7 +156,7 @@ async def test_the_apps_own_agents_are_ready_to_create(
     found = {t["id"]: t for t in (await client.get("/api/agents/templates")).json()}
     assert set(found) == {"browser-assistant", "word-assistant", "excel-assistant", "powerpoint-assistant", "outlook-assistant"}
     chrome = found["browser-assistant"]
-    assert (chrome["app"], chrome["slug"], chrome["tools"]) == ("Chrome", "browser-assistant", 7)
+    assert (chrome["app"], chrome["slug"], chrome["tools"]) == ("Chrome", "browser-assistant", 9)
     for template in found.values():  # each one is a body POST /api/agents takes
         r = await client.post("/api/agents", json=template["definition"])
         assert r.status_code == status.HTTP_201_CREATED, (template["id"], r.text)
