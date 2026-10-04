@@ -11,7 +11,8 @@ updated.
 Everything below was taken on the test install (Ubuntu VM, 4 October 2026)
 with the Chrome extension and the Qwen3.8 27B model on the DGX pair. The Office
 add-ins work the same way: pick their app instead of Chrome. The reference --
-every field, the API, the rules -- is [agents.md](agents.md).
+every field, the API, the rules -- is [agents.md](agents.md). What the Chrome agent
+does for your users, with pictures: [browser-agent.md](browser-agent.md).
 
 ---
 
