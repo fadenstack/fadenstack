@@ -564,7 +564,7 @@
         "detail": "Abre el marketplace de modelos para reintentar."
       },
       "agent_apps_pending": {
-        "title": "{{name}}: {{count}} cambios de herramientas de sus aplicaciones no están activos",
+        "title": "Cambios de herramientas pendientes para {{name}}: {{count}}",
         "detail": "Revíselos en la pestaña Aplicaciones del agente. La pasarela los retiene hasta que se publique una versión con ellos."
       },
       "gateway_error_spike": {
@@ -3469,7 +3469,7 @@
       "instructions": "Instrucciones",
       "instructions_help": "Se anteponen a cada conversación. Los usuarios y el SDK nunca las ven.",
       "model": "Modelo",
-      "model_help": "Cada solicitud usa este modelo, pida lo que pida la aplicación. Vacío: el modelo predeterminado.",
+      "model_help": "Cada solicitud usa este modelo, pida lo que pida la aplicación. Sin modelo solo responde a aplicaciones que nombran uno; las aplicaciones de Fadenstack lo dejan al agente.",
       "knowledge_and_tools": "Conocimiento y herramientas",
       "knowledge": "Conocimiento",
       "knowledge_help": "Colecciones de conocimiento en las que el agente puede buscar.",

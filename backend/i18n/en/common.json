@@ -564,7 +564,7 @@
         "detail": "Open the model marketplace to retry."
       },
       "agent_apps_pending": {
-        "title": "{{name}}: {{count}} tool changes from its apps are not live",
+        "title": "Tool changes waiting for {{name}}: {{count}}",
         "detail": "Review them on the agent's Apps tab. The gateway holds them back until a version with them is published."
       },
       "gateway_error_spike": {
@@ -3467,7 +3467,7 @@
       "instructions": "Instructions",
       "instructions_help": "Put before every conversation. Users and the SDK never see them.",
       "model": "Model",
-      "model_help": "Every request uses this model, whatever the application asks for. Empty: the default model.",
+      "model_help": "Every request uses this model, whatever the application asks for. Without one, only an application that names a model is answered; Fadenstack's apps leave it to the agent.",
       "knowledge_and_tools": "Knowledge and tools",
       "knowledge": "Knowledge",
       "knowledge_help": "Knowledge collections the agent may search.",

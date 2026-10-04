@@ -564,7 +564,7 @@
         "detail": "Im Modell-Marktplatz erneut versuchen."
       },
       "agent_apps_pending": {
-        "title": "{{name}}: {{count}} Tool-Änderungen seiner Apps sind nicht aktiv",
+        "title": "Wartende Tool-Änderungen bei {{name}}: {{count}}",
         "detail": "Prüfen Sie sie im Reiter Apps des Agenten. Das Gateway hält sie zurück, bis eine Version mit ihnen veröffentlicht ist."
       },
       "gateway_error_spike": {
@@ -3469,7 +3469,7 @@
       "instructions": "Anweisungen",
       "instructions_help": "Werden jedem Gespräch vorangestellt. Nutzer und das SDK sehen sie nie.",
       "model": "Modell",
-      "model_help": "Jede Anfrage nutzt dieses Modell, egal was die Anwendung verlangt. Leer: das Standardmodell.",
+      "model_help": "Jede Anfrage nutzt dieses Modell, egal was die Anwendung verlangt. Ohne Modell antwortet der Agent nur Anwendungen, die selbst eines nennen; Fadenstacks Apps überlassen es dem Agenten.",
       "knowledge_and_tools": "Wissen und Tools",
       "knowledge": "Wissen",
       "knowledge_help": "Wissenssammlungen, die der Agent durchsuchen darf.",

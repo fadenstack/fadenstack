@@ -564,7 +564,7 @@
         "detail": "打开模型市场重试。"
       },
       "agent_apps_pending": {
-        "title": "{{name}}：其应用的 {{count}} 项工具变更未生效",
+        "title": "{{name}} 待生效的工具变更：{{count}}",
         "detail": "请在智能体的“应用”标签页中查看。在包含它们的版本发布之前，网关会扣留它们。"
       },
       "gateway_error_spike": {
@@ -3469,7 +3469,7 @@
       "instructions": "指令",
       "instructions_help": "置于每次对话之前。用户和 SDK 永远看不到。",
       "model": "模型",
-      "model_help": "无论应用请求什么，每个请求都使用此模型。留空：默认模型。",
+      "model_help": "无论应用请求什么，每个请求都使用此模型。留空时，只有自行指定模型的应用才能得到回答；Fadenstack 的应用会把模型交给智能体决定。",
       "knowledge_and_tools": "知识和工具",
       "knowledge": "知识",
       "knowledge_help": "智能体可以搜索的知识集合。",
