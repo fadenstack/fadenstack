@@ -57,6 +57,8 @@ CONVERSATION_HEADER = "x-faden-conversation-id"
 TURN_HEADER = "x-faden-turn-id"
 #: The tools held back from the request, because the agent's contract does not list them.
 HELD_TOOLS_HEADER = "x-faden-held-tools"
+#: The model the SDKs send to an agent's route: "the agent's" -- the field is required.
+SDK_MODEL_PLACEHOLDER = "agent"
 
 
 def _error(exc: GatewayError) -> JSONResponse:
@@ -200,6 +202,15 @@ def apply_agent(
     shaped = dict(payload)
     if profile.model_alias:
         shaped["model"] = profile.model_alias
+    elif shaped.get("model") in (None, "", SDK_MODEL_PLACEHOLDER):
+        # The SDKs leave the model to the agent; an agent made without one cannot answer until it has one.
+        raise GatewayError(
+            status_code=409,
+            message="The agent has no model yet: its maintainers pick one in the console "
+            "(the agent's Definition, Model).",
+            code="agent_has_no_model",
+            param="model",
+        )
     if profile.instructions:
         messages = shaped.get("messages")
         if isinstance(messages, list):

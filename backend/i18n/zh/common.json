@@ -3397,6 +3397,8 @@
     "create": "新建智能体",
     "create_title": "新建智能体",
     "create_hint": "智能体以草稿开始：在发布并授权给用户或团队之前，任何人都无法使用。",
+    "create_model_help": "应用将模型交给智能体决定：没有模型就无法回答。",
+    "create_model_none": "暂无",
     "create_from": "从应用开始",
     "create_from_hint": "Fadenstack 自己的应用自带定义：指令、工具和问候语。也可以从空白开始，或在下方粘贴 JSON。",
     "create_grants": "谁可以使用",

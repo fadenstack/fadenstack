@@ -480,6 +480,24 @@ async def test_tools_outside_the_contract_are_held_back_and_kept_for_review(
 
 
 @pytest.mark.anyio
+async def test_an_agent_without_a_model_says_so_when_the_sdk_leaves_the_model_to_it(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    backend.put(_profile(model_alias=None))
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+    r = await client.post(URL, headers=_headers(), json=_chat(model="agent"))
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "agent_has_no_model"
+    assert "pick one in the console" in r.json()["error"]["message"]
+    assert sent == []
+    # A client that names a model gets it.
+    r = await client.post(URL, headers=_headers(), json=_chat(model=ALIAS))
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(("mode", "dev", "allowed"), [
     ("disable", False, False), ("disable", True, True), ("allow", False, True),
 ])

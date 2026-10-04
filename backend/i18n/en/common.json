@@ -3395,6 +3395,8 @@
     "create": "New agent",
     "create_title": "New agent",
     "create_hint": "The agent starts as a draft: nobody can use it until it is published and granted to users or teams.",
+    "create_model_help": "The apps leave the model to the agent: without one it cannot answer.",
+    "create_model_none": "None yet",
     "create_from": "Start from an app",
     "create_from_hint": "Fadenstack's own apps come with their definition: instructions, tools and greeting. Or start blank, or paste JSON below.",
     "create_grants": "Who may use it",

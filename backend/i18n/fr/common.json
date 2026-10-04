@@ -3397,6 +3397,8 @@
     "create": "Nouvel agent",
     "create_title": "Nouvel agent",
     "create_hint": "L'agent commence comme brouillon : personne ne peut l'utiliser tant qu'il n'est pas publié et accordé à des utilisateurs ou des équipes.",
+    "create_model_help": "Les applications laissent le modèle à l'agent : sans modèle, il ne peut pas répondre.",
+    "create_model_none": "Aucun pour l'instant",
     "create_from": "Partir d'une application",
     "create_from_hint": "Les applications de Fadenstack apportent leur définition : instructions, outils et message d'accueil. Ou partez de zéro, ou collez du JSON ci-dessous.",
     "create_grants": "Qui peut l'utiliser",

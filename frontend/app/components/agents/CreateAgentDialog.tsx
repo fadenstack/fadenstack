@@ -14,12 +14,14 @@ import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import Collapse from "@mui/material/Collapse";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 
 import { agentsApi, type Agent, type AgentDefinition, type AgentTemplate } from "~/api/agents";
+import { chatApi } from "~/api/chatClient";
 import { principalKey, type PrincipalOption } from "~/api/principals";
 import { FormDialog } from "~/components/FormDialog";
 import { PrincipalList } from "~/components/PrincipalList";
@@ -52,6 +54,14 @@ export function CreateAgentDialog({ open, onClose, onCreated }: CreateAgentDialo
   const templates = useAsyncData(() => (open ? agentsApi.templates() : Promise.resolve([])), [open], {
     initialValue: [] as AgentTemplate[],
   });
+  // The apps leave the model to the agent: one published without a model cannot answer.
+  const models = useAsyncData(
+    async () =>
+      open ? (await chatApi.listModels()).filter((m) => m.enabled && (m.kind ?? "chat") === "chat").map((m) => m.alias) : [],
+    [open],
+    { initialValue: [] as string[] },
+  );
+  const modelMissing = publish && !definition.model_alias;
   const granted = useMemo(() => new Set(grants.map((g) => principalKey(g.type, g.id))), [grants]);
 
   const slugValid = SLUG_PATTERN.test(slug);
@@ -146,7 +156,7 @@ export function CreateAgentDialog({ open, onClose, onCreated }: CreateAgentDialo
       loading={create.busy}
       submitLabel={t("common.create")}
       cancelLabel={t("common.cancel")}
-      submitDisabled={!name.trim() || !slugValid}
+      submitDisabled={!name.trim() || !slugValid || modelMissing}
       onSubmit={() => void submit()}
       onClose={close}
       maxWidth="md"
@@ -193,6 +203,24 @@ export function CreateAgentDialog({ open, onClose, onCreated }: CreateAgentDialo
           minRows={2}
           onChange={(e) => setDescription(e.target.value)}
         />
+        <TextField
+          select
+          label={t("agents.definition.model")}
+          value={definition.model_alias ?? ""}
+          required={publish}
+          error={modelMissing && Boolean(template)}
+          helperText={t("agents.create_model_help")}
+          onChange={(e) => setDefinition((d) => ({ ...d, model_alias: e.target.value || null }))}
+        >
+          <MenuItem value="">
+            <em>{t("agents.create_model_none")}</em>
+          </MenuItem>
+          {models.data.map((m) => (
+            <MenuItem key={m} value={m}>
+              {m}
+            </MenuItem>
+          ))}
+        </TextField>
         <Stack spacing={1}>
           <Typography variant="subtitle2">{t("agents.create_grants")}</Typography>
           <PrincipalPicker

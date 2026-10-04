@@ -3397,6 +3397,8 @@
     "create": "Nuevo agente",
     "create_title": "Nuevo agente",
     "create_hint": "El agente empieza como borrador: nadie puede usarlo hasta que se publique y se conceda a usuarios o equipos.",
+    "create_model_help": "Las aplicaciones dejan el modelo al agente: sin modelo no puede responder.",
+    "create_model_none": "Ninguno todavía",
     "create_from": "Partir de una aplicación",
     "create_from_hint": "Las aplicaciones propias de Fadenstack traen su definición: instrucciones, herramientas y saludo. O empiece en blanco, o pegue JSON abajo.",
     "create_grants": "Quién puede usarlo",

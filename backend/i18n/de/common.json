@@ -3397,6 +3397,8 @@
     "create": "Neuer Agent",
     "create_title": "Neuer Agent",
     "create_hint": "Der Agent beginnt als Entwurf: Niemand kann ihn nutzen, bis er veröffentlicht und Nutzern oder Teams freigegeben ist.",
+    "create_model_help": "Die Apps überlassen das Modell dem Agenten: Ohne Modell kann er nicht antworten.",
+    "create_model_none": "Noch keins",
     "create_from": "Von einer App ausgehen",
     "create_from_hint": "Fadenstacks eigene Apps bringen ihre Definition mit: Anweisungen, Tools und Begrüßung. Oder leer beginnen bzw. unten JSON einfügen.",
     "create_grants": "Wer ihn nutzen darf",
