@@ -183,6 +183,10 @@ class TtlCache(Generic[K, V]):
     def invalidate(self) -> None:
         self._cache.clear()
 
+    def forget(self, key: K) -> None:
+        """Drops one key: the next ``get`` reads it again."""
+        self._cache.pop(key, None)
+
     def _remember(self, key: K, value: V) -> None:
         if len(self._cache) >= self._max and key not in self._cache:
             now = self._clock()
@@ -252,7 +256,10 @@ class AgentDirectory:
         self._users: TtlCache[str, UserFlags | None] = TtlCache(fetch_user, ttl_sec=ttl_sec)
         self._close = close
 
-    async def agent(self, tenant_id: str, ref: str) -> AgentProfile | None:
+    async def agent(self, tenant_id: str, ref: str, *, fresh: bool = False) -> AgentProfile | None:
+        """The agent, from the cache unless *fresh* (it may have changed: deleted and made again)."""
+        if fresh:
+            self._agents.forget((tenant_id, ref))
         return await self._agents.get((tenant_id, ref))
 
     async def user(self, user_id: str) -> UserFlags | None:

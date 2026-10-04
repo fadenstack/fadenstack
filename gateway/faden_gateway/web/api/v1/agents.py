@@ -102,8 +102,13 @@ async def agent_request(
             error_type="server_error",
             code="agents_unavailable",
         )
+    agent_token = claims.get("typ") == AGENT_TOKEN_TYPE
     try:
         profile = await directory.agent(auth.tenant_id, agent)
+        if agent_token and (profile is None or f"agent:{profile.id}" not in _audiences(claims)):
+            # The cache may hold an agent deleted since and made again under the same address, or miss one
+            # made within the minute: the token's agent decides, so read it once more before refusing.
+            profile = await directory.agent(auth.tenant_id, agent, fresh=True)
         user = await directory.user(auth.user_id) if profile is not None else None
     except AgentLookupError as exc:
         raise GatewayError(
@@ -115,7 +120,6 @@ async def agent_request(
     if profile is None:
         raise GatewayError(status_code=404, message=f"No agent '{agent}'.", code="agent_not_found")
 
-    agent_token = claims.get("typ") == AGENT_TOKEN_TYPE
     if agent_token and f"agent:{profile.id}" not in _audiences(claims):
         raise GatewayError(
             status_code=403,

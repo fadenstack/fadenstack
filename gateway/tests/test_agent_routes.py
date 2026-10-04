@@ -480,6 +480,30 @@ async def test_tools_outside_the_contract_are_held_back_and_kept_for_review(
 
 
 @pytest.mark.anyio
+async def test_an_agent_deleted_and_made_again_under_its_address_is_read_again_for_its_tokens(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=None)
+    _model(monkeypatch, [])
+    assert (await client.post(URL, headers=_headers(), json=_chat())).status_code == 200  # cached now
+    reads = backend.agent_reads
+
+    # Deleted and made again within the cache's minute: a new id under the same address.
+    remade = str(uuid.uuid4())
+    backend.put(_profile(id=remade))
+    r = await client.post(URL, headers=_headers(_agent_token(remade)), json=_chat())
+    assert r.status_code == 200, r.text
+    assert backend.agent_reads == reads + 1, "read once more, not on every request"
+    assert (await client.post(URL, headers=_headers(_agent_token(remade)), json=_chat())).status_code == 200
+    assert backend.agent_reads == reads + 1
+
+    # A token for another agent is still refused.
+    r = await client.post(URL, headers=_headers(_agent_token(OTHER_AGENT_ID)), json=_chat())
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "agent_mismatch"
+
+
+@pytest.mark.anyio
 async def test_an_agent_without_a_model_says_so_when_the_sdk_leaves_the_model_to_it(
     client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
