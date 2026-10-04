@@ -10,6 +10,9 @@ an agent's sessions stay on the device.
 
 ## Setting up an agent
 
+Step by step with screenshots, from creating an agent for a team to taking in
+an application's new tools: [agents-setup.md](agents-setup.md).
+
 In the console: **Agents → Agents** (`/admin/agents`). Each agent has five tabs:
 
 | Tab | What it does |
