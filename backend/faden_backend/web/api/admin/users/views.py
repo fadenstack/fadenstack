@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +17,7 @@ from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.api_tokens import API_TOKEN_TYPE, ApiToken
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
@@ -27,6 +29,7 @@ from faden_backend.web.api.admin.users.preferences import (
 )
 from faden_backend.web.api.admin.users.schema import (
     AdminUserDTO,
+    ApiTokenDTO,
     ApiTokenResponse,
     ChangePasswordRequest,
     CreateRoleRequest,
@@ -454,16 +457,115 @@ async def generate_api_token(
         )
 
     now = int(time.time())
+    record = ApiToken(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        tenant_id=payload.tenant_id,
+        name=(payload.name or "").strip() or None,
+        expires_at=(
+            datetime.fromtimestamp(now + payload.expires_in, tz=UTC)
+            if payload.expires_in is not None
+            else None
+        ),
+    )
+    session.add(record)
+    await session.flush()
+
     claims: dict = {
         "sub": str(user.id),
         "tenant_id": payload.tenant_id,
         "email": user.email,
         "iat": now,
-        # Prevent deterministic duplicate tokens if generated in the same second.
-        "jti": uuid.uuid4().hex,
+        # The gateway looks the token up by its jti, so revoking the row ends the token.
+        "jti": str(record.id),
+        "typ": API_TOKEN_TYPE,
     }
     if payload.expires_in is not None:
         claims["exp"] = now + payload.expires_in
 
     token = pyjwt.encode(claims, secret, algorithm="HS256")
-    return ApiTokenResponse(token=token, expires_in=payload.expires_in)
+    await AuditDAO(session).log(
+        action="user.api_token.create",
+        target_type="api_token",
+        target_id=str(record.id),
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        metadata_json=json.dumps({"name": record.name, "expires_in": payload.expires_in}),
+    )
+    return ApiTokenResponse(
+        token=token,
+        expires_in=payload.expires_in,
+        id=record.id,
+        name=record.name,
+        expires_at=record.expires_at,
+    )
+
+
+async def _list_api_tokens(session: AsyncSession, user_id: uuid.UUID) -> list[ApiTokenDTO]:
+    result = await session.execute(
+        select(ApiToken).where(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc()),
+    )
+    return [ApiTokenDTO.model_validate(t, from_attributes=True) for t in result.scalars()]
+
+
+async def _revoke_api_token(
+    session: AsyncSession, *, owner_id: uuid.UUID, token_id: uuid.UUID, actor: User,
+) -> None:
+    record = await session.get(ApiToken, token_id)
+    if record is None or record.user_id != owner_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API token not found")
+    if record.revoked_at is None:
+        record.revoked_at = datetime.now(UTC)
+        await AuditDAO(session).log(
+            action="user.api_token.revoke",
+            target_type="api_token",
+            target_id=str(token_id),
+            result=AuditResult.ALLOW,
+            actor_id=actor.id,
+            metadata_json=json.dumps({"owner_id": str(owner_id)}),
+        )
+        await session.flush()
+
+
+@router.get("/me/api-tokens", response_model=list[ApiTokenDTO], name="list_my_api_tokens")
+async def list_my_api_tokens(
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ApiTokenDTO]:
+    """The current user's API tokens, newest first, revoked ones included."""
+    return await _list_api_tokens(session, user.id)
+
+
+@router.delete(
+    "/me/api-tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT, name="revoke_my_api_token",
+)
+async def revoke_my_api_token(
+    token_id: uuid.UUID,
+    user: Annotated[User, Depends(current_active_user)],
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Revoke one of the current user's API tokens. The gateway refuses it within a minute."""
+    await _revoke_api_token(session, owner_id=user.id, token_id=token_id, actor=user)
+
+
+@router.get("/{user_id}/api-tokens", response_model=list[ApiTokenDTO], name="list_user_api_tokens")
+async def list_user_api_tokens(
+    user_id: uuid.UUID,
+    _admin: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ApiTokenDTO]:
+    """A user's API tokens, for an administrator."""
+    return await _list_api_tokens(session, user_id)
+
+
+@router.delete(
+    "/{user_id}/api-tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT, name="revoke_user_api_token",
+)
+async def revoke_user_api_token(
+    user_id: uuid.UUID,
+    token_id: uuid.UUID,
+    admin: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Revoke a user's API token, as an administrator."""
+    await _revoke_api_token(session, owner_id=user_id, token_id=token_id, actor=admin)

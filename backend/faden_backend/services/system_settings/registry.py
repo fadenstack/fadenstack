@@ -492,6 +492,21 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         service_targets=(),
     ),
     SettingDefinition(
+        key="users.login_lifetime_s",
+        type="int",
+        category="auth",
+        group="users",
+        label="Sign-in lifetime (s)",
+        description=(
+            "How long a sign-in to the console lasts before the person signs in again. "
+            "0 means a sign-in never expires."
+        ),
+        is_secret=False,
+        default=604800,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
         key="agents.access_token_ttl_s",
         type="int",
         category="auth",

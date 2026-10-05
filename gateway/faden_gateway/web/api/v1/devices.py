@@ -23,6 +23,7 @@ from faden_gateway.services.gateway.agents import AgentLookupError, decide
 from faden_gateway.services.gateway.auth import (
     AGENT_TOKEN_TYPE,
     _refresh_jwt_secret_if_needed,
+    check_caller,
     get_auth_context_from_claims,
     verify_token,
 )
@@ -51,6 +52,10 @@ async def authenticate_device(app: Any, token: str) -> DeviceIdentity:
     except GatewayError as exc:
         raise PermissionError(exc.code or "invalid_token", exc.message) from exc
     if not agent_token:
+        try:
+            await check_caller(app, claims)
+        except GatewayError as exc:
+            raise PermissionError(exc.code or "invalid_token", exc.message) from exc
         return DeviceIdentity(tenant_id=auth.tenant_id, user_id=auth.user_id, device_id=None, agent_id=None)
 
     agent_id = _agent_of(claims)

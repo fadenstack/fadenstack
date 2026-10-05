@@ -9,6 +9,7 @@ from faden_backend.db.models.users import (
     auth_cookie,  # type: ignore
     auth_jwt,  # type: ignore
     get_jwt_strategy,  # type: ignore
+    login_lifetime_seconds,
 )
 from faden_backend.settings import settings
 
@@ -78,7 +79,7 @@ async def dev_login(request: Request) -> Response:
         httponly=True,
         samesite="lax",
         secure=False,
-        max_age=86400 * 30,
+        max_age=login_lifetime_seconds(),
         path="/",
     )
     return response

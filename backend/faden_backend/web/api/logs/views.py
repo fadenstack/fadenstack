@@ -15,12 +15,11 @@ import httpx
 import jwt
 import websockets
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket
+from fastapi_users.db import SQLAlchemyUserDatabase
 from starlette import status
 from starlette.websockets import WebSocketDisconnect
 
-from fastapi_users.db import SQLAlchemyUserDatabase
-
-from faden_backend.db.models.users import User
+from faden_backend.db.models.users import User, is_current_sign_in
 from faden_backend.settings import settings
 from faden_backend.web.api.rbac import require_permission
 
@@ -53,6 +52,8 @@ async def _ws_authenticate(websocket: WebSocket) -> User:
         user_id = payload.get("sub")
         if not user_id:
             raise ValueError("Missing sub claim")
+        if not is_current_sign_in(payload):
+            raise ValueError("A sign-in from before sign-ins expired")
     except (jwt.PyJWTError, ValueError):
         await websocket.close(code=4401, reason="Invalid token")
         raise WebSocketDisconnect(code=4401, reason="Invalid token")

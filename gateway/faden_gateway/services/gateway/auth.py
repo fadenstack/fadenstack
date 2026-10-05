@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from faden_gateway.services.gateway.agents import AgentLookupError
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
 from faden_gateway.settings import settings
@@ -57,6 +58,11 @@ async def _refresh_jwt_secret_if_needed() -> None:
 #: The ``typ`` claim of agent tokens: bound to one agent (``aud`` is
 #: ``agent:<id>``), accepted on that agent's routes only.
 AGENT_TOKEN_TYPE = "agent"  # noqa: S105 - a claim value, not a secret
+
+
+#: The ``typ`` claim of API tokens. Each has a row in the backend (its ``jti``
+#: is the row's id), and revoking the row ends the token.
+API_TOKEN_TYPE = "api"  # noqa: S105 - a claim value, not a secret
 
 
 #: The header the backend sends a caller's right to weaken a chat's PII policy in.
@@ -157,7 +163,74 @@ def get_auth_context_from_claims(claims: dict[str, Any], token: str | None = Non
     return AuthContext(user_id=user_id, tenant_id=tenant_id, raw_claims=claims, token=token)
 
 
+#: The audience of console sign-ins (fastapi-users).
+SIGN_IN_AUDIENCE = "fastapi-users:auth"
+
+
+def _is_outdated_sign_in(claims: dict[str, Any]) -> bool:
+    """A console sign-in from before sign-ins expired: no ``iat``; the CLI's bootstrap token has one."""
+    aud = claims.get("aud")
+    audiences = aud if isinstance(aud, list) else [aud]
+    return SIGN_IN_AUDIENCE in audiences and "iat" not in claims
+
+
+def _is_unrecorded_api_token(claims: dict[str, Any]) -> bool:
+    """An API token from before API tokens had rows: a ``jti`` but no ``typ`` and no ``aud``."""
+    return claims.get("typ") is None and bool(claims.get("jti")) and "aud" not in claims
+
+
+async def check_caller(app: Any, claims: dict[str, Any]) -> None:
+    """Refuses a revoked or unrecorded API token, and a user who was deactivated or deleted.
+
+    Agent tokens are checked on their own routes. Without the backend database
+    (development, tests) only the claims are checked.
+    """
+    if _is_outdated_sign_in(claims):
+        raise GatewayError(
+            status_code=401,
+            message="This sign-in is from before sign-ins expired. Sign in again.",
+            code="sign_in_outdated",
+        )
+    if _is_unrecorded_api_token(claims):
+        raise GatewayError(
+            status_code=401,
+            message=(
+                "This API token was made before API tokens could be revoked. Create a new one in your profile."
+            ),
+            code="api_token_outdated",
+        )
+    directory = getattr(app.state, "agent_directory", None)
+    if directory is None:
+        return
+    user_id = str(claims.get("sub", "")).strip()
+    try:
+        if claims.get("typ") == API_TOKEN_TYPE and directory.checks_api_tokens:
+            record = await directory.api_token(str(claims.get("jti", "")))
+            if record is None or record.revoked or record.user_id != user_id:
+                raise GatewayError(
+                    status_code=401,
+                    message="This API token was revoked.",
+                    code="api_token_revoked",
+                )
+        user = await directory.user(user_id)
+    except AgentLookupError as exc:
+        raise GatewayError(
+            status_code=503,
+            message="Your access could not be checked; try again.",
+            error_type="server_error",
+            code="access_check_failed",
+        ) from exc
+    if user is None or not user.is_active:
+        raise GatewayError(
+            status_code=403,
+            message="The user is deactivated or unknown.",
+            error_type="permission_error",
+            code="user_inactive",
+        )
+
+
 async def get_auth_context(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> AuthContext:
     """FastAPI dependency that validates JWT bearer token.
@@ -183,7 +256,9 @@ async def get_auth_context(
             error_type="permission_error",
             code="agent_token_not_allowed",
         )
-    return get_auth_context_from_claims(claims, token)
+    auth = get_auth_context_from_claims(claims, token)
+    await check_caller(request.app, claims)
+    return auth
 
 
 async def get_agent_route_claims(

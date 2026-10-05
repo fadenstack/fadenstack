@@ -92,15 +92,33 @@ class GenerateApiTokenRequest(BaseModel):
     tenant_id: str = Field(default="default", min_length=1, max_length=128)
     expires_in: int | None = Field(
         default=None,
+        gt=0,
         description="Token lifetime in seconds. None = no expiry.",
+    )
+    name: str | None = Field(
+        default=None, max_length=200, description="What the token is for, to tell it apart.",
     )
 
 
 class ApiTokenResponse(BaseModel):
-    """Response containing the generated API token."""
+    """Response containing the generated API token. The token is shown this once."""
 
     token: str
     expires_in: int | None = None
+    id: uuid.UUID
+    name: str | None = None
+    expires_at: datetime | None = None
+
+
+class ApiTokenDTO(BaseModel):
+    """An API token as its owner and administrators see it: never the token itself."""
+
+    id: uuid.UUID
+    name: str | None = None
+    tenant_id: str
+    created_at: datetime
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
 
 
 class UpdateUserUsageGroupRequest(BaseModel):

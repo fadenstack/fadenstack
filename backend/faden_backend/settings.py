@@ -278,6 +278,10 @@ class Settings(BaseSettings):
     skills_service_url: str = "http://127.0.0.1:8008"
     skills_service_token: str = "dev-skills-service-token"
 
+    # How long a console sign-in lasts (system setting "users.login_lifetime_s"). The
+    # login token is a JWT with this lifetime; 0 or less means it never expires.
+    users_login_lifetime_s: int = 7 * 24 * 3600
+
     # Agent tokens, tenant-wide (system settings "agents.*"). Enterprise can
     # set them per agent, under a ceiling.
     agent_access_token_ttl_s: int = 600

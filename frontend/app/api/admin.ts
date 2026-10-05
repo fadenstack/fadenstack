@@ -713,19 +713,38 @@ export const adminUsers = {
       }),
     });
   },
-  generateApiToken(tenantId: string = "default", expiresIn?: number) {
-    return request<{ token: string; expires_in: number | null }>(
+  generateApiToken(tenantId: string = "default", expiresIn?: number, name?: string) {
+    return request<{ token: string; expires_in: number | null; id: string; name: string | null; expires_at: string | null }>(
       "/users/me/api-token",
       {
         method: "POST",
         body: JSON.stringify({
           tenant_id: tenantId,
           expires_in: expiresIn ?? null,
+          name: name?.trim() || null,
         }),
       },
     );
   },
+  /** The current user's API tokens, newest first; never the tokens themselves. */
+  listMyApiTokens() {
+    return request<ApiTokenInfo[]>("/users/me/api-tokens");
+  },
+  /** Revokes one of the current user's API tokens; the gateway refuses it within a minute. */
+  revokeMyApiToken(tokenId: string) {
+    return request<void>(`/users/me/api-tokens/${tokenId}`, { method: "DELETE" });
+  },
 };
+
+/** An API token as its owner sees it. */
+export interface ApiTokenInfo {
+  id: string;
+  name: string | null;
+  tenant_id: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Groups

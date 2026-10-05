@@ -39,6 +39,23 @@ as they are, unencrypted. Nothing has to be done, except to keep the `.env`
 with the backups: without that key the encrypted chats cannot be read (see
 [Back up and restore](installing.md#back-up-and-restore)).
 
+## API tokens and sign-ins from the October 2026 upgrade on
+
+- **API tokens can be revoked.** Each one now has a record: its owner sees
+  their tokens under *Profile → API token* and revokes one there, and an
+  administrator can revoke a user's tokens through the API
+  (`DELETE /api/admin/users/{user_id}/api-tokens/{token_id}`). The gateway
+  refuses a revoked token within a minute.
+- **API tokens made before the upgrade stop working.** They have no record,
+  so the gateway answers `401 api_token_outdated`. Make a new token in your
+  profile and replace the old one where your apps use it.
+- **Sign-ins to the console last seven days**, then people sign in again.
+  The system setting `users.login_lifetime_s` changes it (`0`: a sign-in
+  never expires). Sign-ins from before the upgrade had no end, so they are
+  refused: everyone signs in once more after the upgrade.
+- **Deactivated users are refused everywhere on `/v1`**, within a minute,
+  not only on the agents' routes.
+
 ## What `faden upgrade` does
 
 It upgrades the installation the CLI is configured for

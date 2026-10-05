@@ -1,9 +1,12 @@
 # type: ignore
 import logging
+import time
 import uuid
 from datetime import datetime
+from typing import Any
 from urllib.parse import urlencode
 
+import jwt
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, schemas
 from fastapi_users.authentication import (
@@ -13,6 +16,7 @@ from fastapi_users.authentication import (
     JWTStrategy,
 )
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
+from fastapi_users.jwt import generate_jwt
 from pydantic import ConfigDict
 from sqlalchemy import Boolean, DateTime, ForeignKey, false
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -163,13 +167,54 @@ async def get_user_manager(
     yield UserManager(user_db)
 
 
+def login_lifetime_seconds() -> int | None:
+    """How long a sign-in lasts (``users.login_lifetime_s``); ``None``: it never expires."""
+    lifetime = settings.users_login_lifetime_s
+    return lifetime if lifetime > 0 else None
+
+
+def is_current_sign_in(claims: dict[str, Any]) -> bool:
+    """Whether a console token was made since sign-ins expire: it carries ``iat``.
+
+    Sign-ins from before had no end and no ``iat``; they are refused, and the
+    person signs in again. The CLI's bootstrap token has an ``iat`` too.
+    """
+    return "iat" in claims
+
+
+class SignInStrategy(JWTStrategy):
+    """Console sign-ins: a JWT with ``iat``, and ``exp`` after the configured lifetime."""
+
+    async def write_token(self, user: Any) -> str:
+        """A sign-in for *user*, with ``iat``."""
+        data = {"sub": str(user.id), "aud": self.token_audience, "iat": int(time.time())}
+        return generate_jwt(data, self.encode_key, self.lifetime_seconds, algorithm=self.algorithm)
+
+    async def read_token(self, token: str | None, user_manager: Any) -> Any:
+        """The signed-in user, or ``None``; a sign-in without ``iat`` is from before and refused."""
+        if token is None:
+            return None
+        try:
+            claims = jwt.decode(token, options={"verify_signature": False})
+        except jwt.PyJWTError:
+            return None
+        if not is_current_sign_in(claims):
+            return None
+        return await super().read_token(token, user_manager)
+
+
 def get_jwt_strategy() -> JWTStrategy:
     """
     Return a JWTStrategy in order to instantiate it dynamically.
 
+    Read on every sign-in, so a changed lifetime applies to the next one.
+
     :returns: instance of JWTStrategy with provided settings.
     """
-    return JWTStrategy(secret=settings.users_secret, lifetime_seconds=None)
+    return SignInStrategy(
+        secret=settings.users_secret,
+        lifetime_seconds=login_lifetime_seconds(),
+    )
 
 
 bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
@@ -180,6 +225,8 @@ auth_jwt = AuthenticationBackend(
 )
 cookie_transport = CookieTransport(
     cookie_name="fapiauth",
+    # The cookie lasts as long as the token in it; a changed lifetime applies after a restart.
+    cookie_max_age=login_lifetime_seconds(),
     cookie_secure=settings.cookie_secure,
 )
 auth_cookie = AuthenticationBackend(name="cookie", transport=cookie_transport, get_strategy=get_jwt_strategy)

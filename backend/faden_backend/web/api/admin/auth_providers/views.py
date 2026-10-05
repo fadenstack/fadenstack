@@ -26,7 +26,7 @@ from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.oauth import OAuthAccount
-from faden_backend.db.models.users import User, get_jwt_strategy
+from faden_backend.db.models.users import User, get_jwt_strategy, login_lifetime_seconds
 from faden_backend.settings import settings
 from faden_backend.web.api.admin.auth_providers.schema import (
     AuthProviderDTO,
@@ -354,7 +354,7 @@ async def _process_oauth_login(
         httponly=True,
         samesite="lax",
         secure=request.url.scheme == "https",
-        max_age=86400 * 30,
+        max_age=login_lifetime_seconds(),
         path="/",
     )
     return response

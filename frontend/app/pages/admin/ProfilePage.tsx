@@ -32,7 +32,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import AppearanceSettings from "~/components/AppearanceSettings";
-import { adminUsers } from "~/api/admin";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { adminUsers, type ApiTokenInfo } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
 
 // ── Token expiry options ─────────────────────────────────────────────
@@ -47,7 +48,7 @@ const EXPIRY_OPTIONS: { key: string; value: number | null }[] = [
 ];
 
 export default function ProfilePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // ── User info ────────────────────────────────────────────────────
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -64,6 +65,7 @@ export default function ProfilePage() {
   const [pwLoading, setPwLoading] = useState(false);
 
   // ── Token generation ─────────────────────────────────────────────
+  const [tokenName, setTokenName] = useState("");
   const [tenantId, setTenantId] = useState("default");
   const [expiresIn, setExpiresIn] = useState<number | null>(86400);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
@@ -71,9 +73,36 @@ export default function ProfilePage() {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ── The user's tokens ────────────────────────────────────────────
+  const [tokens, setTokens] = useState<ApiTokenInfo[] | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ApiTokenInfo | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  function loadTokens() {
+    adminUsers.listMyApiTokens().then(setTokens).catch(() => setTokens([]));
+  }
+
   useEffect(() => {
     auth.me().then(setUser).catch((err) => setLoadError(err.message));
+    loadTokens();
   }, []);
+
+  async function handleRevoke() {
+    if (!revokeTarget) return;
+    setRevoking(true);
+    try {
+      await adminUsers.revokeMyApiToken(revokeTarget.id);
+      setRevokeTarget(null);
+      loadTokens();
+    } catch (err: unknown) {
+      setTokenError(err instanceof Error ? err.message : t("profile.revoke_failed"));
+      setRevokeTarget(null);
+    } finally {
+      setRevoking(false);
+    }
+  }
+
+  const formatDate = (iso: string) => new Date(iso).toLocaleDateString(i18n.language || undefined);
 
   // ── Password change handler ──────────────────────────────────────
 
@@ -113,8 +142,10 @@ export default function ProfilePage() {
     setCopied(false);
     setTokenLoading(true);
     try {
-      const result = await adminUsers.generateApiToken(tenantId, expiresIn ?? undefined);
+      const result = await adminUsers.generateApiToken(tenantId, expiresIn ?? undefined, tokenName);
       setGeneratedToken(result.token);
+      setTokenName("");
+      loadTokens();
     } catch (err: unknown) {
       setTokenError(err instanceof Error ? err.message : "Failed to generate token.");
     } finally {
@@ -294,6 +325,16 @@ export default function ProfilePage() {
             {tokenError && <Alert severity="error" onClose={() => setTokenError(null)}>{tokenError}</Alert>}
 
             <TextField
+              label={t("profile.token_name")}
+              size="small"
+              fullWidth
+              value={tokenName}
+              onChange={(e) => setTokenName(e.target.value)}
+              helperText={t("profile.token_name_help")}
+              inputProps={{ maxLength: 200 }}
+            />
+
+            <TextField
               label={t("profile.tenant_id")}
               size="small"
               fullWidth
@@ -369,9 +410,58 @@ export default function ProfilePage() {
                 </Alert>
               </Box>
             )}
+
+            <Divider />
+            <Typography variant="subtitle2">{t("profile.your_tokens")}</Typography>
+            {tokens !== null && tokens.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                {t("profile.no_tokens")}
+              </Typography>
+            )}
+            {(tokens ?? []).map((tok) => {
+              const expired = !tok.revoked_at && !!tok.expires_at && new Date(tok.expires_at).getTime() < Date.now();
+              const live = !tok.revoked_at && !expired;
+              return (
+                <Box
+                  key={tok.id}
+                  sx={{ display: "flex", alignItems: "center", gap: 1.5, opacity: live ? 1 : 0.6 }}
+                >
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap>
+                      {tok.name || t("profile.unnamed_token")}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {t("profile.token_created", { date: formatDate(tok.created_at) })}
+                      {" · "}
+                      {tok.expires_at
+                        ? t("profile.token_expires", { date: formatDate(tok.expires_at) })
+                        : t("profile.token_never_expires")}
+                    </Typography>
+                  </Box>
+                  {tok.revoked_at && <Chip size="small" label={t("profile.token_revoked")} />}
+                  {expired && <Chip size="small" label={t("profile.token_expired")} />}
+                  {live && (
+                    <Button size="small" color="error" onClick={() => setRevokeTarget(tok)}>
+                      {t("profile.revoke_token")}
+                    </Button>
+                  )}
+                </Box>
+              );
+            })}
           </Stack>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!revokeTarget}
+        title={t("profile.revoke_token")}
+        message={t("profile.revoke_token_confirm")}
+        confirmLabel={t("profile.revoke_token")}
+        cancelLabel={t("common.cancel")}
+        loading={revoking}
+        onConfirm={handleRevoke}
+        onClose={() => setRevokeTarget(null)}
+      />
     </Box>
   );
 }

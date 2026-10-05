@@ -58,6 +58,12 @@ WHERE a.tenant_id = $1 AND (a.slug = $2 OR a.id::text = $2)
 
 _USER_SQL = 'SELECT is_active, is_superuser FROM "user" WHERE id = $1::uuid'
 
+#: A query, not a secret; S105 only sees "TOKEN" in the name.
+_API_TOKEN_SQL = (
+    "SELECT user_id::text AS user_id, revoked_at IS NOT NULL AS revoked "  # noqa: S105
+    "FROM api_tokens WHERE id = $1::uuid"
+)
+
 
 def _json(value: Any, default: Any) -> Any:
     """A JSONB value as asyncpg returns it (text), decoded."""
@@ -140,6 +146,14 @@ class UserFlags:
 
     is_active: bool
     is_superuser: bool
+
+
+@dataclass(frozen=True)
+class ApiTokenRecord:
+    """An API token's row in the backend: whose it is, and whether it was revoked."""
+
+    user_id: str
+    revoked: bool
 
 
 class AgentLookupError(Exception):
@@ -236,6 +250,16 @@ class BackendAgents:
             raise AgentLookupError(str(exc)) from exc
         return UserFlags(bool(row["is_active"]), bool(row["is_superuser"])) if row is not None else None
 
+    async def api_token(self, token_id: str) -> ApiTokenRecord | None:
+        try:
+            pool = await self._get_pool()
+            row = await pool.fetchrow(_API_TOKEN_SQL, token_id, timeout=self._timeout)
+        except (ValueError, asyncpg.DataError):
+            return None  # not a token id
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
+        return ApiTokenRecord(str(row["user_id"]), bool(row["revoked"])) if row is not None else None
+
     async def close(self) -> None:
         if self._pool is not None:
             await self._pool.close()
@@ -252,19 +276,39 @@ class BackendAgents:
 
 
 class AgentDirectory:
-    """Cached agents and users, for the agent routes."""
+    """Cached agents, users and API tokens, from the backend database.
+
+    A revoked API token or a deactivated user is refused once its cache entry
+    expires, so within ``ttl_sec`` (``api_token_ttl_sec`` for tokens).
+    """
 
     def __init__(
         self,
         *,
         fetch_agent: Callable[[tuple[str, str]], Awaitable[AgentProfile | None]],
         fetch_user: Callable[[str], Awaitable[UserFlags | None]],
+        fetch_api_token: Callable[[str], Awaitable[ApiTokenRecord | None]] | None = None,
         ttl_sec: float = 60.0,
+        api_token_ttl_sec: float = 30.0,
         close: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self._agents: TtlCache[tuple[str, str], AgentProfile | None] = TtlCache(fetch_agent, ttl_sec=ttl_sec)
         self._users: TtlCache[str, UserFlags | None] = TtlCache(fetch_user, ttl_sec=ttl_sec)
+        self._api_tokens: TtlCache[str, ApiTokenRecord | None] | None = (
+            TtlCache(fetch_api_token, ttl_sec=api_token_ttl_sec) if fetch_api_token is not None else None
+        )
         self._close = close
+
+    @property
+    def checks_api_tokens(self) -> bool:
+        """Whether API tokens can be looked up here (always, over the backend database)."""
+        return self._api_tokens is not None
+
+    async def api_token(self, token_id: str) -> ApiTokenRecord | None:
+        """The API token's row; ``None`` when there is none."""
+        if self._api_tokens is None:
+            return None
+        return await self._api_tokens.get(token_id)
 
     async def agent(self, tenant_id: str, ref: str, *, fresh: bool = False) -> AgentProfile | None:
         """The agent, from the cache unless *fresh* (it may have changed: deleted and made again)."""
@@ -278,6 +322,8 @@ class AgentDirectory:
     def invalidate(self) -> None:
         self._agents.invalidate()
         self._users.invalidate()
+        if self._api_tokens is not None:
+            self._api_tokens.invalidate()
 
     async def close(self) -> None:
         if self._close is not None:
@@ -294,7 +340,12 @@ def build_agent_directory(settings: object) -> AgentDirectory | None:
         f"@{settings.db_host}:{settings.db_port}/{backend_db}"  # type: ignore[attr-defined]
     )
     backend = BackendAgents(dsn)
-    return AgentDirectory(fetch_agent=backend.agent, fetch_user=backend.user, close=backend.close)
+    return AgentDirectory(
+        fetch_agent=backend.agent,
+        fetch_user=backend.user,
+        fetch_api_token=backend.api_token,
+        close=backend.close,
+    )
 
 
 # -- the decision -------------------------------------------------------------------
