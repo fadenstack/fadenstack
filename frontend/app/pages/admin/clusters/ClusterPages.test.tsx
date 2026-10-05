@@ -373,15 +373,13 @@ describe("ClusterDetailPage", () => {
   });
 
   it("shows a drain under way and lets it be stopped", async () => {
-    vi.spyOn(inferenceApi, "getEnvironment").mockResolvedValue({
-      ...environment,
-      observed_status: {
-        ...environment.observed_status,
-        drains: {
-          [WORKER_NODE_ID]: { state: "moving", remove: false, message: "Still moving 1 copy.", left: 1, copies: [] },
-        },
-      },
-    } as never);
+    vi.spyOn(inferenceApi, "listEnvironmentNodes").mockResolvedValue(
+      environmentNodes.map((m) =>
+        m.node_id === WORKER_NODE_ID
+          ? { ...m, observed: { drain: { state: "moving", remove: false, message: "Still moving 1 copy.", left: 1, copies: [] } } }
+          : m,
+      ),
+    );
     const stop = vi.spyOn(nodesApi, "setDrain").mockResolvedValue(managedNodes[0] as never);
     await renderDetail();
 

@@ -250,8 +250,11 @@ export default function ClusterDetailPage() {
   const nodeOf = (nodeId: string) => data.nodes.find((n) => n.id === nodeId);
   const hostOf = (nodeId: string) => nodeLabel(nodeOf(nodeId), nodeId.slice(0, 8));
   const selectedMember = data.members.find((m) => m.node_id === selectedNodeId) ?? null;
-  /** Machines being drained, leaving or rejoining, as the cluster records them. */
-  const drains = Object.entries(asRecord(observed.drains)) as [string, DrainState][];
+  /** Machines being drained, leaving or rejoining: recorded on each machine's membership. */
+  const drains = data.members.flatMap((m) => {
+    const drain = asRecord(m.observed).drain as DrainState | undefined;
+    return drain ? [[m.node_id, drain] as [string, DrainState]] : [];
+  });
   const drainOf = (nodeId: string) => drains.find(([id]) => id === nodeId)?.[1] ?? null;
 
   async function run(action: () => Promise<unknown>) {

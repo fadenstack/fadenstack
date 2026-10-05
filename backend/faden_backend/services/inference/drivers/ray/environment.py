@@ -227,6 +227,7 @@ class RayEnvironmentManager:
             return
 
         head, workers, nodes = await self._resolve_members(session, environment)
+        self._restore_bindings(environment, nodes)
         if not head:
             log.warning("Environment %s has no head member; waiting for membership", environment.id)
             self._observe(
@@ -492,13 +493,12 @@ class RayEnvironmentManager:
             )
             # Machines being drained, leaving or rejoining: one step each,
             # on a cluster that is healthy enough to take it.
-            if (environment.observed_status_json or {}).get("drains"):
-                from faden_backend.services.inference import membership  # noqa: PLC0415
+            from faden_backend.services.inference import membership  # noqa: PLC0415
 
-                await membership.advance(
-                    session, gateway, environment, manager=self,
-                    ctx={"config": config, "credential_ref": credential_ref, "head_address": head_address},
-                )
+            await membership.advance(
+                session, gateway, environment, manager=self,
+                ctx={"config": config, "credential_ref": credential_ref, "head_address": head_address},
+            )
             return
 
         kind, lost = problem
@@ -1164,6 +1164,36 @@ class RayEnvironmentManager:
             recent = node.last_seen is not None and node.last_seen >= cutoff
             (reconnecting if recent else gone)[node.id] = name
         return gone, reconnecting
+
+    @staticmethod
+    def _restore_bindings(environment, nodes) -> None:
+        """Put back a binding a machine was added with, if the cluster's record lost it.
+
+        ``membership.add_members`` writes a new machine's network binding into
+        the cluster's observed state from the console's session; a pass that
+        loaded that document before and wrote it back afterwards drops it, and
+        the machine would then join on its management address. The binding is
+        also kept on the machine's membership row, which nothing rewrites.
+        """
+        observed = dict(environment.observed_status_json or {})
+        fabric = dict(observed.get("resolved_fabric") or {})
+        if not fabric:
+            return
+        bindings = dict(fabric.get("node_bindings") or {})
+        missing = {
+            str(n.node_id): (n.observed_json or {}).get("binding")
+            for n in nodes
+            if str(n.node_id) not in bindings and (getattr(n, "observed_json", None) or {}).get("binding")
+        }
+        if not missing:
+            return
+        fabric["node_bindings"] = {**bindings, **missing}
+        observed["resolved_fabric"] = fabric
+        network = dict(observed.get("network") or {})
+        network["node_bindings"] = {**dict(network.get("node_bindings") or {}), **missing}
+        observed["network"] = network
+        environment.observed_status_json = observed
+        log.info("Environment %s: restored the network binding of %s", environment.id, ", ".join(sorted(missing)))
 
     async def _resolve_members(self, session, environment):
         """Return (head, workers, all_nodes).

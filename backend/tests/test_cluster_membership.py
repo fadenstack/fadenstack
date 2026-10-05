@@ -159,6 +159,13 @@ async def _cluster(session: AsyncSession, *, status: str = "ready") -> tuple[Inf
     return env, head, worker
 
 
+async def _drain(session: AsyncSession, env: InferenceEnvironment, node: InfraNode) -> dict[str, Any] | None:
+    """The drain recorded on *node*'s membership row in *env* (None when there is none, or no row)."""
+    row = (await session.execute(select(InferenceEnvironmentNode).where(
+        InferenceEnvironmentNode.environment_id == env.id, InferenceEnvironmentNode.node_id == node.id))).scalar_one_or_none()
+    return (row.observed_json or {}).get("drain") if row is not None else None
+
+
 def _placement(*replicas: dict[str, Any], head_free: float = 0.6) -> dict[str, Any]:
     return {"nodes": [_node(HEAD, head_free, ip="10.100.0.2"), _node(WORKER, 0.0, ip="10.100.0.1")],
             "replicas": list(replicas), "serve_running": True, "drain_patch_active": True}
@@ -243,7 +250,7 @@ async def test_a_drain_that_would_stop_copies_waits_for_the_operator(dbsession: 
     assert worker.draining is False, "nothing changed"
 
     await membership.start_drain(dbsession, None, worker.id, stop_unmovable=True)
-    entry = env.observed_status_json["drains"][str(worker.id)]
+    entry = await _drain(dbsession, env, worker)
     assert entry["state"] == "starting" and entry["stop_unmovable"] is True and entry["ray_node_id"] == WORKER
     assert worker.draining is True and worker.status == "draining"
     assert env.observed_generation < env.generation, "queued for the reconciler"
@@ -261,13 +268,13 @@ async def test_a_drain_moves_the_copies_then_the_machine_leaves(dbsession: Async
     # Pass 1: Serve is told to follow drains, Ray drains the machine; one copy is still there.
     await membership.advance(dbsession, None, env, manager=manager, ctx={})
     assert ("enable", head.id) in fake.calls and ("drain", worker.id) in fake.calls
-    entry = env.observed_status_json["drains"][str(worker.id)]
+    entry = await _drain(dbsession, env, worker)
     assert entry["state"] == "moving" and entry["left"] == 1 and entry["message"] == "Still moving 1 copy."
 
     # Pass 2: Serve has moved it; the machine leaves Ray and the cluster.
     await membership.advance(dbsession, None, env, manager=manager, ctx={})
     assert manager.calls == [("leave", worker.id)]
-    assert "drains" not in env.observed_status_json
+    assert await _drain(dbsession, env, worker) is None
     assert str(worker.id) not in env.observed_status_json["resolved_fabric"]["node_bindings"]
     rows = (await dbsession.execute(select(InferenceEnvironmentNode).where(
         InferenceEnvironmentNode.environment_id == env.id))).scalars().all()
@@ -284,7 +291,7 @@ async def test_copies_that_cannot_move_are_stopped_once_agreed(dbsession: AsyncS
     await membership.start_drain(dbsession, None, worker.id, stop_unmovable=True)
     await membership.advance(dbsession, None, env, manager=_Manager(), ctx={})
     assert ("stop", ("big",)) in fake.calls
-    assert env.observed_status_json["drains"][str(worker.id)]["state"] == "drained"
+    assert (await _drain(dbsession, env, worker))["state"] == "drained"
 
 
 @pytest.mark.anyio()
@@ -292,14 +299,26 @@ async def test_stopping_a_drain_rejoins_the_machine(dbsession: AsyncSession, cli
     env, _head, worker = await _cluster(dbsession)
     await membership.start_drain(dbsession, None, worker.id)
     await membership.advance(dbsession, None, env, manager=_Manager(), ctx={})
-    assert env.observed_status_json["drains"][str(worker.id)]["state"] == "moving"
+    assert (await _drain(dbsession, env, worker))["state"] == "moving"
 
     result = await membership.stop_drain(dbsession, worker.id)
     assert result["resuming"] is True and worker.draining is False
     manager = _Manager()
     await membership.advance(dbsession, None, env, manager=manager, ctx={})
     assert manager.calls == [("rejoin", worker.id)]
-    assert "drains" not in env.observed_status_json
+    assert await _drain(dbsession, env, worker) is None
+
+
+@pytest.mark.anyio()
+async def test_a_pass_never_overwrites_a_drain_changed_while_it_ran(dbsession: AsyncSession, client: _Client) -> None:
+    env, _head, worker = await _cluster(dbsession)
+    await membership.start_drain(dbsession, None, worker.id)
+    row = (await dbsession.execute(select(InferenceEnvironmentNode).where(
+        InferenceEnvironmentNode.node_id == worker.id))).scalar_one()
+    membership._set_drain(row, {"state": "resuming", "ray_drained": True})  # the console's Stop drain, meanwhile
+    await dbsession.flush()
+    await membership._write_back(dbsession, row, "moving", {"state": "moving", "left": 0})
+    assert (await _drain(dbsession, env, worker))["state"] == "resuming"
 
 
 @pytest.mark.anyio()
@@ -307,7 +326,7 @@ async def test_stopping_a_drain_that_never_reached_ray_just_forgets_it(dbsession
     env, _head, worker = await _cluster(dbsession)
     await membership.start_drain(dbsession, None, worker.id)
     result = await membership.stop_drain(dbsession, worker.id)
-    assert result["resuming"] is False and "drains" not in env.observed_status_json
+    assert result["resuming"] is False and await _drain(dbsession, env, worker) is None
 
 
 @pytest.mark.anyio()
@@ -330,11 +349,11 @@ async def test_a_drain_that_failed_before_ray_drained_is_forgotten_not_rejoined(
     monkeypatch.setattr(membership, "_client", lambda gateway: fake)
     await membership.start_drain(dbsession, None, worker.id)
     await membership.advance(dbsession, None, env, manager=_Manager(), ctx={})
-    entry = env.observed_status_json["drains"][str(worker.id)]
+    entry = await _drain(dbsession, env, worker)
     assert entry["state"] == "failed" and "No such file" in entry["message"]
 
     result = await membership.stop_drain(dbsession, worker.id)
-    assert result["resuming"] is False and "drains" not in env.observed_status_json
+    assert result["resuming"] is False and await _drain(dbsession, env, worker) is None
 
 
 @pytest.mark.anyio()
@@ -394,6 +413,19 @@ async def test_adding_a_machine_binds_it_checks_it_reaches_the_head_and_bumps_th
     roles = {r.node_id: r.role for r in (await dbsession.execute(select(InferenceEnvironmentNode).where(
         InferenceEnvironmentNode.environment_id == env.id))).scalars()}
     assert roles[newcomer.id] == "worker"
+
+
+def test_a_binding_lost_to_a_stale_write_is_put_back_from_the_membership_row() -> None:
+    from types import SimpleNamespace
+
+    from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
+
+    env = SimpleNamespace(id="e", observed_status_json={"resolved_fabric": {"node_bindings": {"h": {"ip": "10.100.0.2"}}}})
+    nodes = [SimpleNamespace(node_id="h", observed_json={}),
+             SimpleNamespace(node_id="n", observed_json={"binding": {"node_id": "n", "ip": "10.100.0.3"}})]
+    RayEnvironmentManager._restore_bindings(env, nodes)
+    assert env.observed_status_json["resolved_fabric"]["node_bindings"]["n"]["ip"] == "10.100.0.3"
+    assert env.observed_status_json["network"]["node_bindings"]["n"]["ip"] == "10.100.0.3"
 
 
 @pytest.mark.anyio()

@@ -16,9 +16,13 @@ leaves the cluster. The work is split between Ray and Fadenstack:
   -- then, for a removal, take it out of Ray and out of the cluster.
 
 The steps run in the cluster's health check (``RayEnvironmentManager._check``),
-from the record this module keeps in the cluster's observed state:
-``observed_status_json["drains"][<machine id>]``. A drain cannot be undone in
-Ray; stopping one has the machine leave Ray and join again.
+from the record this module keeps on the machine's membership row
+(``observed_json["drain"]``). Not in the cluster's observed state: the
+reconciler rewrites that whole document from the copy it loaded when its
+pass began, and a drain recorded meanwhile by the console was lost (seen on
+the DGX pair). Nothing else writes the membership row, and the steps here
+read it again before they write. A drain cannot be undone in Ray; stopping
+one has the machine leave Ray and join again.
 
 Adding a machine to a running cluster gives it a binding on the cluster's
 network (checked by a TCP challenge to the head), and the next pass of the
@@ -390,11 +394,10 @@ async def drain_plan(session: AsyncSession, gateway: Any, node_id: uuid.UUID) ->
     }
     if found is None:
         return base
-    environment, _member = found
+    environment, member = found
     base.update({"environment_id": str(environment.id), "environment_name": environment.name})
-    drains = (environment.observed_status_json or {}).get("drains") or {}
-    if str(node.id) in drains:
-        base["drain"] = drains[str(node.id)]
+    if _drain_of(member):
+        base["drain"] = _drain_of(member)
     running = environment.desired_state == "running" and str(environment.status) in _UP
     base["cluster_running"] = running
     if environment.head_node_id == node.id and running:
@@ -434,18 +437,29 @@ async def drain_plan(session: AsyncSession, gateway: Any, node_id: uuid.UUID) ->
     return base
 
 
-def _record(environment: InferenceEnvironment, node_id: Any, entry: dict[str, Any] | None) -> None:
-    observed = dict(environment.observed_status_json or {})
-    drains = dict(observed.get("drains") or {})
+def _drain_of(member: InferenceEnvironmentNode | None) -> dict[str, Any] | None:
+    """The drain recorded on a membership row, if any."""
+    return (member.observed_json or {}).get("drain") if member is not None else None
+
+
+def _set_drain(member: InferenceEnvironmentNode, entry: dict[str, Any] | None) -> None:
+    observed = dict(member.observed_json or {})
     if entry is None:
-        drains.pop(str(node_id), None)
+        observed.pop("drain", None)
     else:
-        drains[str(node_id)] = entry
-    if drains:
-        observed["drains"] = drains
-    else:
-        observed.pop("drains", None)
-    environment.observed_status_json = observed
+        observed["drain"] = entry
+    member.observed_json = observed
+
+
+async def _write_back(session: AsyncSession, member: InferenceEnvironmentNode, began_as: Any, entry: dict[str, Any] | None) -> None:
+    """Store *entry* on *member*, unless the drain changed meanwhile (stopped from the console)."""
+    try:
+        await session.refresh(member, ["observed_json"])
+    except Exception:  # noqa: BLE001 - the row is gone: the machine left the cluster
+        return
+    if (_drain_of(member) or {}).get("state") != began_as:
+        return
+    _set_drain(member, entry)
 
 
 def _queue(session: AsyncSession, environment: InferenceEnvironment) -> None:
@@ -483,8 +497,8 @@ async def start_drain(
 
     await NodeControlDAO(session).set_node_draining(node=node, enabled=True)
     if plan.get("cluster_running") and plan.get("ray_node_id"):
-        environment = await session.get(InferenceEnvironment, uuid.UUID(plan["environment_id"]))
-        _record(environment, node_id, {
+        environment, member = await _cluster_of(session, node_id)
+        _set_drain(member, {
             "state": "starting",
             "ray_node_id": plan["ray_node_id"],
             "remove": remove,
@@ -515,16 +529,16 @@ async def stop_drain(session: AsyncSession, node_id: uuid.UUID) -> dict[str, Any
     found = await _cluster_of(session, node_id)
     resuming = False
     if found is not None:
-        environment, _member = found
-        entry = ((environment.observed_status_json or {}).get("drains") or {}).get(str(node_id))
+        environment, member = found
+        entry = _drain_of(member)
         if entry is not None:
             if not entry.get("ray_drained"):
                 # Never drained in Ray (not started yet, or it failed before):
                 # nothing to undo, and rejoining would restart its copies.
-                _record(environment, node_id, None)
+                _set_drain(member, None)
             else:
-                _record(environment, node_id, {**entry, "state": "resuming", "remove": False,
-                                               "message": "Rejoining the cluster."})
+                _set_drain(member, {**entry, "state": "resuming", "remove": False,
+                                    "message": "Rejoining the cluster."})
                 resuming = True
             _queue(session, environment)
     await session.flush()
@@ -537,17 +551,18 @@ async def advance(session: AsyncSession, gateway: Any, environment: InferenceEnv
     *manager* leaves and rejoins members (``RayEnvironmentManager``); *ctx*
     is what it needs for that (config, credential, head address).
     """
-    drains = dict((environment.observed_status_json or {}).get("drains") or {})
-    if not drains:
+    members = [m for m in await EnvironmentNodeDAO(session).list_for_environment(environment.id) if _drain_of(m)]
+    if not members:
         return
     client = _client(gateway)
     from faden_backend.services.inference.drivers.ray.client import RayCommandError  # noqa: PLC0415
 
     placement: dict[str, Any] | None = None
-    for node_key, entry in drains.items():
-        entry = dict(entry)
-        node_id = uuid.UUID(node_key)
-        state = entry.get("state")
+    for member in members:
+        entry = dict(_drain_of(member) or {})
+        node_id = member.node_id
+        node_key = str(node_id)
+        state = began_as = entry.get("state")
         tag = str(entry.get("started_at") or "")
         try:
             if state == "starting":
@@ -563,7 +578,6 @@ async def advance(session: AsyncSession, gateway: Any, environment: InferenceEnv
                 if placement is None:
                     placement = await client.describe_placement(head_node_id=environment.head_node_id, budget_sec=90)
                 if placement is None:
-                    _record(environment, node_id, entry)
                     continue
                 left = copies_on(placement, str(entry.get("ray_node_id")))
                 stuck_names = {c["actor_name"] for c in entry.get("copies") or [] if not c.get("moves")}
@@ -599,17 +613,16 @@ async def advance(session: AsyncSession, gateway: Any, environment: InferenceEnv
                     await NodeControlDAO(session).set_node_draining(node=node, enabled=False)
                 entry = None
             elif state == "resuming":
-                member = (await EnvironmentNodeDAO(session).list_for_node(node_id))
-                member = next((m for m in member if m.environment_id == environment.id), None)
-                if member is not None:
-                    await manager.rejoin_member(session, environment, member, gateway=gateway, tag=tag, **ctx)
+                await manager.rejoin_member(session, environment, member, gateway=gateway, tag=tag, **ctx)
                 entry = None
         except RayCommandError as exc:
             entry.update(state="failed" if state == "starting" else state, message=exc.detail)
         except Exception as exc:  # noqa: BLE001 - one drain must not stop the others or the health check
             log.warning("Drain of %s on %s: %s", node_key, environment.id, exc, exc_info=True)
             entry["message"] = str(exc)
-        _record(environment, node_id, entry)
+        if state == "leaving" and entry is None:
+            continue  # the membership row is gone with the machine
+        await _write_back(session, member, began_as, entry)
 
 
 async def _forget_member(session: AsyncSession, environment_id: uuid.UUID, node_id: uuid.UUID) -> None:
@@ -778,6 +791,12 @@ async def add_members(session: AsyncSession, gateway: Any, environment_id: uuid.
     service = EnvironmentService(session)
     for node_id in node_ids:
         await service.add_node(environment.id, node_id, "worker")
+        if str(node_id) in new_bindings:
+            # Kept on the membership row too: the cluster's observed state can
+            # lose it to a reconcile pass under way (``_restore_bindings``).
+            member = next(m for m in await EnvironmentNodeDAO(session).list_for_node(node_id)
+                          if m.environment_id == environment.id)
+            member.observed_json = {**dict(member.observed_json or {}), "binding": new_bindings[str(node_id)]}
     if new_bindings:
         observed = dict(environment.observed_status_json or {})
         for key in ("resolved_fabric", "network"):
