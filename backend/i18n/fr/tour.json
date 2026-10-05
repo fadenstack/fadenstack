@@ -91,7 +91,7 @@
       },
       "machines": {
         "title": "Choisissez les machines",
-        "body": "Cochez les machines qui doivent servir des modèles ; une seule machine fait déjà un bon cluster. Choisissez maintenant toutes celles que vous voulez : les machines rejoignent un cluster au moment de sa création. Cliquez ensuite sur <strong>Suivant</strong> ; la console vérifie comment les machines se joignent entre elles."
+        "body": "Cochez les machines qui doivent servir des modèles ; une seule machine fait déjà un bon cluster, et vous pourrez en ajouter d'autres plus tard depuis la page du cluster. Cliquez ensuite sur <strong>Suivant</strong> ; la console vérifie comment les machines se joignent entre elles."
       },
       "network": {
         "title": "Le réseau",
@@ -394,7 +394,7 @@
       "title": "Machine",
       "description": "Une machine : son matériel, ses journaux, ses déploiements, le vLLM qu'elle exécute, ses commandes et ses mises à jour.",
       "action_status": "Voir son matériel, ses déploiements et ses journaux récents",
-      "action_maintenance": "Maintenance et drainage : aucune nouvelle tâche n'y est placée",
+      "action_maintenance": "La drainer (ses copies sont d'abord déplacées vers les autres machines) ou la mettre en maintenance",
       "action_updates": "Rechercher et installer les mises à jour système, ou la redémarrer",
       "action_vllm": "Faire passer par Fadenstack un vLLM trouvé sur la machine"
     },
@@ -403,13 +403,14 @@
       "description": "Les ordinateurs équipés de GPU qui exécutent vos modèles. Pour rejoindre la plateforme, une machine exécute une commande, puis vous l'approuvez ici.",
       "action_add": "Ajouter une machine : exécuter la commande sur la machine, puis l'approuver ici",
       "action_status": "Voir l'état, les GPU et la version d'agent de chaque machine",
-      "action_maintenance": "La maintenance et le drainage empêchent de placer de nouvelles tâches sur une machine",
+      "action_maintenance": "Drainer une machine pour déplacer ses copies de modèles vers les autres machines ; la maintenance la signale pour une intervention",
       "action_delete": "Supprimer une machine (saisir son nom pour confirmer)"
     },
     "cluster_detail": {
       "title": "Cluster",
       "description": "Un cluster : ses machines, comment elles sont reliées, les modèles qu'il héberge et leur trafic.",
       "action_deploy": "Y déployer un modèle",
+      "action_machines": "Ajouter des machines, ou en retirer une (ses copies sont d'abord déplacées vers les autres)",
       "action_wiring": "Voir comment ses machines sont reliées, et changer de réseau",
       "action_security": "Chiffrer le trafic des modèles et le trafic entre les machines",
       "action_runtime": "Changer de version d'environnement d'exécution (cela redémarre les modèles)",

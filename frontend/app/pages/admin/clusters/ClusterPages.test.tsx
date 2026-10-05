@@ -264,10 +264,43 @@ describe("ClusterDetailPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens a machine and offers to remove it", async () => {
+  /** What the server answers for removing or draining the worker. */
+  function removalPlan(copies: Array<{ moves: boolean; reason?: string }>) {
+    return {
+      node_id: WORKER_NODE_ID,
+      machine: "gpu-01",
+      draining: false,
+      in_cluster: true,
+      environment_id: ENV_ID,
+      environment_name: "dgx-pair",
+      cluster_running: true,
+      ray_node_id: "w".repeat(56),
+      copies: copies.map((c, i) => ({
+        app: `faden-${i}`,
+        deployment_id: String(i),
+        name: `qwen-${i}`,
+        replica_id: `r${i}`,
+        actor_name: `a${i}`,
+        state: "RUNNING",
+        gpus: 0.5,
+        spans: ["gpu-01"],
+        moves: c.moves,
+        to: c.moves ? ["gpu-02"] : [],
+        reason: c.reason ?? null,
+      })),
+      moving: copies.filter((c) => c.moves).length,
+      stopping: copies.filter((c) => !c.moves).length,
+      other_parts: 0,
+      can_drain: true,
+      reason: null,
+    };
+  }
+
+  it("removes a machine only after showing where its copies go", async () => {
+    vi.spyOn(inferenceApi, "memberRemovalPlan").mockResolvedValue(removalPlan([{ moves: true }]));
     const remove = vi
-      .spyOn(inferenceApi, "removeEnvironmentNode")
-      .mockResolvedValue(undefined);
+      .spyOn(inferenceApi, "removeMember")
+      .mockResolvedValue({ removed: false, pending: true });
     await renderDetail();
 
     await userEvent.click(
@@ -275,11 +308,86 @@ describe("ClusterDetailPage", () => {
     );
     expect(await screen.findByText(/Worker · 10\.250\.10\.71/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove from cluster" }));
+    expect(await screen.findByText("Moves to gpu-02.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() =>
-      expect(remove).toHaveBeenCalledWith(ENV_ID, WORKER_NODE_ID),
+      expect(remove).toHaveBeenCalledWith(ENV_ID, WORKER_NODE_ID, false),
     );
+  });
+
+  it("says which copies would stop, and stops them only when confirmed", async () => {
+    vi.spyOn(inferenceApi, "memberRemovalPlan").mockResolvedValue(
+      removalPlan([{ moves: true }, { moves: false, reason: "It needs 1 GPU; the most another machine has free is 0 GPU." }]),
+    );
+    const remove = vi
+      .spyOn(inferenceApi, "removeMember")
+      .mockResolvedValue({ removed: false, pending: true });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: "gpu-01, worker" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove from cluster" }));
+    expect(await screen.findByText(/Stops: It needs 1 GPU/)).toBeInTheDocument();
+    expect(screen.getByText(/Copies that cannot move: 1/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove and stop 1" }));
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(ENV_ID, WORKER_NODE_ID, true));
+  });
+
+  it("does not offer to remove the head while the cluster runs", async () => {
+    vi.spyOn(inferenceApi, "memberRemovalPlan").mockResolvedValue({
+      ...removalPlan([]),
+      node_id: HEAD_NODE_ID,
+      can_drain: false,
+      reason: "gpu-02 is the cluster's head. Stop the cluster first to remove it.",
+    });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: "gpu-02, head" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove from cluster" }));
+    expect(await screen.findByText(/is the cluster's head/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  });
+
+  it("adds machines that can join and says why the others cannot", async () => {
+    vi.spyOn(inferenceApi, "listMemberCandidates").mockResolvedValue({
+      environment_id: ENV_ID,
+      cluster_running: true,
+      network: "10.100.0.0/24",
+      machines: [
+        { node_id: "n1", machine: "spark-3", host: "10.250.10.80", gpus: 1, can_add: true, reasons: [], warnings: [] },
+        { node_id: "n2", machine: "laptop", host: "10.250.10.90", gpus: 0, can_add: false,
+          reasons: ["It has no address on the cluster's network (10.100.0.0/24)."], warnings: [] },
+      ],
+    });
+    const add = vi.spyOn(inferenceApi, "addMembers").mockResolvedValue({ environment_id: ENV_ID, added: ["n1"] });
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add machines" }));
+    expect(await screen.findByText(/no address on the cluster's network/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "laptop" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: "spark-3" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add (1)" }));
+
+    await waitFor(() => expect(add).toHaveBeenCalledWith(ENV_ID, ["n1"]));
+  });
+
+  it("shows a drain under way and lets it be stopped", async () => {
+    vi.spyOn(inferenceApi, "getEnvironment").mockResolvedValue({
+      ...environment,
+      observed_status: {
+        ...environment.observed_status,
+        drains: {
+          [WORKER_NODE_ID]: { state: "moving", remove: false, message: "Still moving 1 copy.", left: 1, copies: [] },
+        },
+      },
+    } as never);
+    const stop = vi.spyOn(nodesApi, "setDrain").mockResolvedValue(managedNodes[0] as never);
+    await renderDetail();
+
+    expect(await screen.findByText(/Moving copies: Still moving 1 copy\./)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Stop drain" }));
+    await waitFor(() => expect(stop).toHaveBeenCalledWith(WORKER_NODE_ID, false));
   });
 
   it("does not claim which machine runs which copy", async () => {

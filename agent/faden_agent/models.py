@@ -38,6 +38,11 @@ class NodeCommandType(enum.StrEnum):
     #: What the cluster this machine runs is serving, read from Ray, for a
     #: server taking it over (``ray/inspect.py``).
     DESCRIBE_RAY_CLUSTER = "describe_ray_cluster"
+    # Draining a machine out of its cluster (ray/drain.py).
+    ENABLE_SERVE_DRAIN = "enable_serve_drain"
+    DRAIN_RAY_NODE = "drain_ray_node"
+    DESCRIBE_RAY_PLACEMENT = "describe_ray_placement"
+    STOP_SERVE_REPLICAS = "stop_serve_replicas"
 
     # --- Ray Serve application lifecycle (Phase 3) ---
     RUN_SERVE_APP = "run_serve_app"

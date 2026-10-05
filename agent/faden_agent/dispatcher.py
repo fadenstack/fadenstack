@@ -242,6 +242,22 @@ class CommandDispatcher:
             if not self._ray:
                 raise RuntimeManagerError("Ray manager not available")
             return await self._ray.describe_cluster(payload)
+        if command_type == NodeCommandType.ENABLE_SERVE_DRAIN.value:
+            if not self._ray:
+                raise RuntimeManagerError("Ray manager not available")
+            return await self._ray.enable_serve_drain(payload)
+        if command_type == NodeCommandType.DRAIN_RAY_NODE.value:
+            if not self._ray:
+                raise RuntimeManagerError("Ray manager not available")
+            return await self._ray.drain_ray_node(payload)
+        if command_type == NodeCommandType.DESCRIBE_RAY_PLACEMENT.value:
+            if not self._ray:
+                raise RuntimeManagerError("Ray manager not available")
+            return await self._ray.describe_placement(payload)
+        if command_type == NodeCommandType.STOP_SERVE_REPLICAS.value:
+            if not self._ray:
+                raise RuntimeManagerError("Ray manager not available")
+            return await self._ray.stop_serve_replicas(payload)
         if command_type == NodeCommandType.RUN_SERVE_APP.value:
             if not self._ray:
                 raise RuntimeManagerError("Ray manager not available")

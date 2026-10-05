@@ -280,9 +280,11 @@ class NodeMaintenanceRequest(BaseModel):
 
 
 class NodeDrainRequest(BaseModel):
-    """Enable or disable node draining mode."""
+    """Drain a machine (its model copies move to the cluster's other machines), or stop draining it."""
 
     enabled: bool
+    #: The operator saw that some copies cannot move and agreed to stop them.
+    stop_unmovable: bool = False
 
 
 class NodeCommandIssueRequest(BaseModel):

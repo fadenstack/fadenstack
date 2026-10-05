@@ -62,7 +62,7 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/clusters/",
     id: "cluster_detail",
-    actions: ["deploy", "wiring", "security", "runtime", "control"],
+    actions: ["deploy", "machines", "wiring", "security", "runtime", "control"],
   },
   { prefix: "/admin/clusters", id: "clusters", actions: ["create", "open", "found"], guide: "create_cluster" },
   {

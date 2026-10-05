@@ -202,6 +202,90 @@ async def remove_environment_node(
         raise _map_inference_error(exc)
 
 
+class MembersAdd(BaseModel):
+    """Machines to add to a running cluster."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+def _membership_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=getattr(exc, "status_code", 409), detail=str(exc))
+
+
+@router.get("/{environment_id}/candidates")
+async def list_member_candidates(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "read")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """The machines that could join this cluster, and why the others cannot."""
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+
+    try:
+        return await membership.candidates(session, environment_id)
+    except membership.MembershipError as exc:
+        raise _membership_error(exc) from exc
+
+
+@router.post("/{environment_id}/members", status_code=status.HTTP_202_ACCEPTED)
+async def add_members(
+    environment_id: uuid.UUID,
+    body: MembersAdd,
+    request: Request,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Add machines to a running cluster.
+
+    Each must reach the head on the cluster's network (a short TCP challenge,
+    seconds); the reconciler then brings it up the way the cluster came up,
+    and the models' files follow. Running copies stay as they are.
+    """
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+
+    try:
+        return await membership.add_members(session, _command_gateway(request), environment_id, body.node_ids)
+    except membership.MembershipError as exc:
+        raise _membership_error(exc) from exc
+
+
+@router.get("/{environment_id}/members/{node_id}/removal-plan")
+async def member_removal_plan(
+    environment_id: uuid.UUID,
+    node_id: uuid.UUID,
+    request: Request,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """What removing this machine from the cluster would do: which copies move, which would stop."""
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+
+    try:
+        return await membership.removal_plan(session, _command_gateway(request), environment_id, node_id)
+    except membership.MembershipError as exc:
+        raise _membership_error(exc) from exc
+
+
+@router.delete("/{environment_id}/members/{node_id}", status_code=status.HTTP_202_ACCEPTED)
+async def remove_member(
+    environment_id: uuid.UUID,
+    node_id: uuid.UUID,
+    request: Request,
+    stop_unmovable: bool = Query(default=False),
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Take a machine out of the cluster: drained first if the cluster runs, then out of Ray."""
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+
+    try:
+        return await membership.remove_member(
+            session, _command_gateway(request), environment_id, node_id, stop_unmovable=stop_unmovable,
+        )
+    except membership.MembershipError as exc:
+        raise _membership_error(exc) from exc
+
+
 @router.get("/{environment_id}/pools", response_model=list[ComputePoolDTO])
 async def list_environment_pools(
     environment_id: uuid.UUID,

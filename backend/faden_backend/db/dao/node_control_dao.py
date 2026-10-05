@@ -208,6 +208,13 @@ class NodeControlDAO:
         capabilities_json: dict[str, Any] | None = None,
         version: str | None = None,
     ) -> InfraNode:
+        # The agent knows whether it runs, not that an operator put the machine
+        # into maintenance or drained it: a heartbeat used to turn "draining"
+        # back into "healthy" within seconds, while the flag stayed set.
+        if status in ("healthy", "degraded") and node.maintenance_mode:
+            status = "maintenance"
+        elif status in ("healthy", "degraded") and node.draining:
+            status = "draining"
         node.status = status
         if capabilities_json is not None:
             node.capabilities_json = capabilities_json

@@ -673,6 +673,7 @@ class RayDeploymentManager:
         ):
             client = self._client_for(node_control)
             if not await self._gone(client, deployment, facts):
+                await self._copy_to_new_members(session, facts, node_control)
                 cached = observed_json.get("observation", {}).get(
                     "run", {"app": app_name, "deployed": True, "cached": True}
                 )
@@ -1364,6 +1365,38 @@ class RayDeploymentManager:
             facts.availability_root_path = None
 
         return facts
+
+    async def _copy_to_new_members(self, session, facts: "_DeploymentFacts", node_control) -> None:
+        """Send this serving model's files to machines that joined the cluster after it was deployed.
+
+        Without them, a copy Ray places on such a machine -- a scale-up, a
+        drain elsewhere -- fails to load: the runtime is offline. Only for a
+        model whose files are tracked (some machine holds it READY), and only
+        machines with no record of it at all: a model loading from the
+        machines' own cache, or a taken-over one, is never copied over.
+        """
+        if facts.model is None or facts.environment is None:
+            return
+        if ((facts.spec_data or {}).get("artifacts") or {}).get("source") == "local_path":
+            return
+        from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO  # noqa: PLC0415
+        from faden_backend.db.models.inference import ModelAvailabilityStatus  # noqa: PLC0415
+
+        coordinator = ModelArtifactCoordinator(session, gateway=_gateway(node_control))
+        nodes = await coordinator.eligible_nodes(facts.environment)
+        if not nodes:
+            return
+        rows = await ModelAvailabilityDAO(session).list_for_nodes(facts.model.id, [n.id for n in nodes])
+        recorded = {r.node_id for r in rows}
+        ready = any(r.status == ModelAvailabilityStatus.READY.value for r in rows)
+        if not ready or all(n.id in recorded for n in nodes):
+            return
+        if await self._members_away(session, facts.environment):
+            return
+        try:
+            await coordinator.ensure(model=facts.model, environment=facts.environment, fetch_to_server=False)
+        except Exception:  # noqa: BLE001 - a copy for later never disturbs a model that serves
+            log.warning("Could not send %s to the cluster's new machines", facts.model.id, exc_info=True)
 
     @staticmethod
     async def _members_away(session, environment) -> list[str]:

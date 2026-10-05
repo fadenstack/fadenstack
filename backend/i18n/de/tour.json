@@ -91,7 +91,7 @@
       },
       "machines": {
         "title": "Maschinen wählen",
-        "body": "Haken Sie die Maschinen an, die Modelle bereitstellen sollen; eine einzige Maschine genügt. Wählen Sie jetzt alle aus, die Sie möchten: Maschinen kommen beim Erstellen in den Cluster. Klicken Sie dann auf <strong>Weiter</strong>; die Konsole prüft, wie sich die Maschinen erreichen."
+        "body": "Haken Sie die Maschinen an, die Modelle bereitstellen sollen; eine einzige Maschine genügt, und weitere können Sie später auf der Seite des Clusters hinzufügen. Klicken Sie dann auf <strong>Weiter</strong>; die Konsole prüft, wie sich die Maschinen erreichen."
       },
       "network": {
         "title": "Das Netzwerk",
@@ -394,7 +394,7 @@
       "title": "Maschine",
       "description": "Eine Maschine: Hardware, Logs, Deployments, das darauf laufende vLLM, Befehle und Updates.",
       "action_status": "Hardware, Deployments und aktuelle Logs ansehen",
-      "action_maintenance": "Wartung und Drain: Es wird keine neue Arbeit darauf verteilt",
+      "action_maintenance": "Leeren (die Kopien ziehen zuerst auf die anderen Maschinen um) oder in Wartung setzen",
       "action_updates": "Systemupdates suchen und installieren oder neu starten",
       "action_vllm": "Ein darauf gefundenes vLLM über Fadenstack leiten"
     },
@@ -403,7 +403,7 @@
       "description": "Die Rechner mit GPUs, auf denen Ihre Modelle laufen. Eine Maschine tritt bei, indem auf ihr ein Befehl läuft und sie hier genehmigt wird.",
       "action_add": "Eine Maschine hinzufügen: den Befehl auf ihr ausführen, dann hier genehmigen",
       "action_status": "Status, GPUs und Agent-Version jeder Maschine sehen",
-      "action_maintenance": "Wartung und Drain verhindern, dass neue Arbeit auf eine Maschine verteilt wird",
+      "action_maintenance": "Eine Maschine leeren, damit ihre Modellkopien auf die anderen umziehen; Wartung markiert sie für Arbeiten daran",
       "action_delete": "Eine Maschine löschen (zur Bestätigung ihren Namen eingeben)"
     },
     "cluster_detail": {
@@ -413,7 +413,8 @@
       "action_wiring": "Sehen, wie die Maschinen verbunden sind, und das Netzwerk ändern",
       "action_security": "Den Modellverkehr und den Verkehr zwischen den Maschinen verschlüsseln",
       "action_runtime": "Die Runtime-Version wechseln (startet die Modelle neu)",
-      "action_control": "Stoppen, starten oder löschen; vorher seine Deployments löschen"
+      "action_control": "Stoppen, starten oder löschen; vorher seine Deployments löschen",
+      "action_machines": "Maschinen hinzufügen oder eine entfernen (ihre Kopien ziehen zuerst auf die anderen um)"
     },
     "clusters": {
       "title": "Cluster",

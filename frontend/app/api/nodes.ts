@@ -1,3 +1,4 @@
+import type { DrainPlan } from "~/api/inference";
 import type { HardwareInfo } from "~/api/admin";
 
 const BASE = "/api/admin/system";
@@ -222,11 +223,21 @@ export const nodesApi = {
     );
   },
 
-  setDrain(nodeId: string, enabled: boolean) {
+  /**
+   * Drain a machine (its model copies move to the cluster's other machines),
+   * or stop draining it. ``stopUnmovable``: the operator saw the plan and
+   * agreed that the copies that cannot move stop.
+   */
+  setDrain(nodeId: string, enabled: boolean, stopUnmovable = false) {
     return request<ManagedNode>(`/nodes/${encodeURIComponent(nodeId)}/drain`, {
       method: "POST",
-      body: JSON.stringify({ enabled }),
+      body: JSON.stringify({ enabled, stop_unmovable: stopUnmovable }),
     });
+  },
+
+  /** What draining this machine would do. Asks the cluster's head (seconds). */
+  drainPlan(nodeId: string) {
+    return request<DrainPlan>(`/nodes/${encodeURIComponent(nodeId)}/drain-plan`);
   },
 
   issueCommand(nodeId: string, payload: IssueNodeCommandPayload) {

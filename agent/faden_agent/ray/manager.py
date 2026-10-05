@@ -512,6 +512,17 @@ class RayManager:
                 )
             except ContainerRuntimeError as exc:
                 raise RuntimeError(f"Ray head start failed in container: {exc}") from None
+            # The Serve drain patch in place before Serve starts on this head,
+            # so its controller can move copies off draining machines from
+            # the start. Never worth failing the start over.
+            try:
+                from faden_agent.ray import drain  # noqa: PLC0415
+
+                await self._container.run_python(
+                    drain.enable_script(wait_sec=0, restart=False), bundle.name, timeout_sec=60,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Could not put the Serve drain patch in place: %s", exc)
             return {
                 "cluster_address": result.get("cluster_address"),
                 "head_address": result.get("head_address"),
@@ -850,6 +861,65 @@ class RayManager:
                 else:
                     result["token_error"] = "cluster token file is empty"
         return result
+
+    async def _drain_step(self, script: str, *, what: str, timeout_sec: float = 90) -> dict[str, Any]:
+        """Run one of ``ray/drain.py``'s scripts in the runtime container; its document, or raise."""
+        from faden_agent.ray import drain  # noqa: PLC0415
+
+        facts = await self._container.facts()
+        if facts is None or not facts.get("running"):
+            raise ContainerRuntimeError(f"{what} needs the runtime container, and it is not running here")
+        code, out, err = await self._container.run_python(script, timeout_sec=timeout_sec)
+        doc = drain.parse(out)
+        if doc is None:
+            detail = (err or out or "").strip()[-600:]
+            raise ContainerRuntimeError(f"{what} produced no result (exit {code}): {detail}")
+        if doc.get("attached") is False:
+            raise ContainerRuntimeError(f"{what}: {doc.get('error') or 'could not attach to the cluster'}")
+        return doc
+
+    async def enable_serve_drain(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Let Serve move copies off draining machines (on the head; ``ray/drain.py``).
+
+        Restarts Serve's controller once if it runs without the patch; the
+        copies keep serving meanwhile.
+        """
+        from faden_agent.ray import drain  # noqa: PLC0415
+
+        wait = int(payload.get("wait_sec") or 90)
+        doc = await self._drain_step(drain.enable_script(wait_sec=wait), what="enable_serve_drain", timeout_sec=wait + 60)
+        if not doc.get("installed") or doc.get("active") is False:
+            raise ContainerRuntimeError(doc.get("error") or "the Serve drain patch did not take")
+        if doc.get("restarted"):
+            self._events.add(event_type="ray.serve_controller_restarted", payload={"reason": "drain patch"})
+        return doc
+
+    async def drain_ray_node(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Drain this machine in Ray: no new work here; Serve moves its copies away."""
+        from faden_agent.ray import drain  # noqa: PLC0415
+
+        doc = await self._drain_step(drain.drain_script(), what="drain_ray_node")
+        if not doc.get("accepted"):
+            raise ContainerRuntimeError(doc.get("error") or "Ray did not accept the drain")
+        self._events.add(event_type="ray.node_drained", payload={"node_id": doc.get("node_id")})
+        return doc
+
+    async def describe_placement(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Machines and Serve copies, with where each copy's resources are held (on the head)."""
+        from faden_agent.ray import drain  # noqa: PLC0415
+
+        return await self._drain_step(drain.placement_script(), what="describe_ray_placement")
+
+    async def stop_serve_replicas(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Stop the Serve copies named in ``actor_names`` (on the head)."""
+        from faden_agent.ray import drain  # noqa: PLC0415
+
+        names = [str(n) for n in (payload.get("actor_names") or []) if n]
+        if not names:
+            return {"stopped": [], "missing": []}
+        doc = await self._drain_step(drain.stop_script(names), what="stop_serve_replicas")
+        self._events.add(event_type="ray.serve_replicas_stopped", payload={"stopped": doc.get("stopped")})
+        return doc
 
     async def get_serve_status(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Serve-tier status command (additive; Dashboard-independent).

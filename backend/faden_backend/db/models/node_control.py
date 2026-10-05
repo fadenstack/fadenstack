@@ -71,6 +71,13 @@ class NodeCommandType(enum.StrEnum):
     #: What the cluster a machine runs is serving, read from Ray, for taking
     #: it over (``services/inference/takeover.py``).
     DESCRIBE_RAY_CLUSTER = "describe_ray_cluster"
+    #: Draining a machine out of its cluster (``services/inference/membership.py``):
+    #: let Serve move copies off draining machines (head), drain this machine
+    #: (the one drained), where each copy's resources sit (head), stop copies (head).
+    ENABLE_SERVE_DRAIN = "enable_serve_drain"
+    DRAIN_RAY_NODE = "drain_ray_node"
+    DESCRIBE_RAY_PLACEMENT = "describe_ray_placement"
+    STOP_SERVE_REPLICAS = "stop_serve_replicas"
 
     # --- Ray Serve application lifecycle (Phase 3) ---
     RUN_SERVE_APP = "run_serve_app"

@@ -400,6 +400,17 @@ class EnvironmentService:
                 "cannot remove the head node while the environment is running; "
                 "stop it or bind a different head first"
             )
+        if (
+            environment.desired_state == EnvironmentDesiredState.RUNNING.value
+            and str(environment.status) in _RUNNING_STATUSES
+        ):
+            # Deleting the row used to be all this did: the machine stayed in
+            # Ray, serving its copies, with nothing left here to stop them.
+            raise ConflictError(
+                "the cluster runs on this machine; remove it with "
+                "DELETE /environments/{id}/members/{node_id}, which moves its "
+                "model copies to the other machines first"
+            )
         await self.node_dao.remove_node(environment_id, node_id)
 
     async def lifecycle_progress(self, environment_id: uuid.UUID) -> dict[str, Any] | None:

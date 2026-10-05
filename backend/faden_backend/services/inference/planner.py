@@ -945,7 +945,33 @@ class MultiNodeFabricPlanner:
         env.observed_status_json = obs
 
         # 5. Set Head Node & synchronize InferenceEnvironmentNode.role (Amendment 22)
+        # The head the cluster has -- the one chosen when it was created -- is
+        # kept while it can still be one. The plan's recommendation (the
+        # lowest agent id) used to replace it every time: the create wizard
+        # suggested the machine with the most accelerators and said so, and
+        # this overrode it without a word.
         head_node_id = fresh.recommended_head_node_id
+        if env.head_node_id is not None:
+            current = await self.session.get(InfraNode, env.head_node_id)
+            members = {
+                row.node_id
+                for row in (
+                    await self.session.execute(
+                        select(InferenceEnvironmentNode).where(
+                            InferenceEnvironmentNode.environment_id == environment_id,
+                        )
+                    )
+                ).scalars()
+            }
+            if (
+                current is not None
+                and current.id in members
+                and str(current.id) in selected_cand.node_bindings
+                and not current.draining
+                and not current.maintenance_mode
+                and current.scheduler_eligible
+            ):
+                head_node_id = str(current.id)
         if head_node_id:
             try:
                 head_uuid = uuid.UUID(head_node_id)

@@ -91,7 +91,7 @@
       },
       "machines": {
         "title": "Elija las máquinas",
-        "body": "Marque las máquinas que deben servir modelos; una sola máquina ya es un buen clúster. Elija ahora todas las que quiera: las máquinas se unen a un clúster cuando se crea. Después haga clic en <strong>Siguiente</strong>; la consola comprueba cómo se comunican las máquinas entre sí."
+        "body": "Marque las máquinas que deben servir modelos; una sola máquina ya es un buen clúster, y más adelante puede añadir otras desde la página del clúster. Después haga clic en <strong>Siguiente</strong>; la consola comprueba cómo se comunican las máquinas entre sí."
       },
       "network": {
         "title": "La red",
@@ -394,7 +394,7 @@
       "title": "Máquina",
       "description": "Una máquina: su hardware, logs, despliegues, el vLLM que ejecuta, sus comandos y sus actualizaciones.",
       "action_status": "Ver su hardware, sus despliegues y sus logs recientes",
-      "action_maintenance": "Mantenimiento y drain: no se le asigna trabajo nuevo",
+      "action_maintenance": "Iniciar el drain (sus copias se trasladan primero a las demás máquinas) o ponerla en mantenimiento",
       "action_updates": "Buscar e instalar actualizaciones del sistema, o reiniciarla",
       "action_vllm": "Enrutar a través de Fadenstack un vLLM encontrado en ella"
     },
@@ -403,13 +403,14 @@
       "description": "Los equipos con GPU que ejecutan sus modelos. Una máquina se une cuando se ejecuta un comando en ella y se aprueba aquí.",
       "action_add": "Añadir una máquina: ejecutar el comando en ella y aprobarla aquí",
       "action_status": "Ver el estado, las GPU y la versión del agente de cada máquina",
-      "action_maintenance": "El mantenimiento y el drain impiden que se asigne trabajo nuevo a una máquina",
+      "action_maintenance": "Iniciar el drain de una máquina para trasladar sus copias de modelos a las demás máquinas; el mantenimiento la marca para poder trabajar en ella",
       "action_delete": "Eliminar una máquina (escriba su nombre para confirmar)"
     },
     "cluster_detail": {
       "title": "Clúster",
       "description": "Un clúster: sus máquinas, cómo están conectadas, los modelos que aloja y su tráfico.",
       "action_deploy": "Desplegar un modelo en él",
+      "action_machines": "Añadir máquinas, o quitar una (sus copias se trasladan primero a las demás)",
       "action_wiring": "Ver cómo están conectadas sus máquinas, y cambiar la red",
       "action_security": "Cifrar el tráfico de los modelos y el tráfico entre las máquinas",
       "action_runtime": "Cambiar la versión del runtime (esto reinicia los modelos)",

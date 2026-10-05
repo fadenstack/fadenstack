@@ -91,7 +91,7 @@
       },
       "machines": {
         "title": "选择机器",
-        "body": "勾选要提供模型服务的机器；一台机器也能组成很好的集群。现在就选好所有需要的机器：机器在集群创建时加入。然后点击<strong>下一步</strong>；控制台会检查这些机器之间如何互相连接。"
+        "body": "勾选要提供模型服务的机器；一台机器也能组成很好的集群，之后还可以在集群页面添加更多机器。然后点击<strong>下一步</strong>；控制台会检查这些机器之间如何互相连接。"
       },
       "network": {
         "title": "网络",
@@ -394,7 +394,7 @@
       "title": "机器",
       "description": "单台机器：其硬件、日志、部署、运行的 vLLM、命令和更新。",
       "action_status": "查看其硬件、部署和最近的日志",
-      "action_maintenance": "维护和排空：不会再向其分配新任务",
+      "action_maintenance": "排空（其副本会先迁移到其他机器）或将其置于维护状态",
       "action_updates": "检查并安装系统更新，或重启机器",
       "action_vllm": "将在其上发现的 vLLM 通过 Fadenstack 路由"
     },
@@ -403,13 +403,14 @@
       "description": "运行您模型的 GPU 电脑。在机器上运行一条命令并在这里批准后，机器即可加入。",
       "action_add": "添加机器：在机器上运行命令，然后在这里批准",
       "action_status": "查看每台机器的状态、GPU 和代理版本",
-      "action_maintenance": "维护和排空可阻止向机器分配新任务",
+      "action_maintenance": "排空机器可将其模型副本迁移到其他机器；维护则将其标记为待检修",
       "action_delete": "删除机器（输入其名称以确认）"
     },
     "cluster_detail": {
       "title": "集群",
       "description": "单个集群：其机器、机器间的连接方式、上面的模型及其流量。",
       "action_deploy": "在其上部署模型",
+      "action_machines": "添加机器，或移除一台（其副本会先迁移到其他机器）",
       "action_wiring": "查看其机器的连接方式，并更改网络",
       "action_security": "加密模型流量以及机器之间的流量",
       "action_runtime": "切换运行时版本（这会重启模型）",

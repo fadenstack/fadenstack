@@ -677,6 +677,83 @@ export interface StrayTakeOverResult {
 // Transport
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Machines joining and leaving a running cluster, and draining one
+// (backend services/inference/membership.py)
+// ---------------------------------------------------------------------------
+
+/** One model copy on a machine being drained: whether it can move, and where. */
+export interface DrainCopy {
+  app: string;
+  deployment_id: string | null;
+  name: string;
+  replica_id: string | null;
+  actor_name: string | null;
+  state: string | null;
+  gpus: number;
+  /** The machines its GPUs are on now. */
+  spans: string[];
+  moves: boolean;
+  /** Where it would go. */
+  to: string[];
+  /** Why it cannot move. */
+  reason: string | null;
+}
+
+/** A drain under way, as the cluster records it (``observed_status.drains[<machine id>]``). */
+export interface DrainState {
+  state: "starting" | "moving" | "drained" | "leaving" | "resuming" | "failed";
+  ray_node_id: string;
+  /** The machine leaves the cluster once empty. */
+  remove: boolean;
+  stop_unmovable: boolean;
+  started_at: string;
+  moving_since?: string;
+  drained_at?: string;
+  copies: DrainCopy[];
+  /** Copies still on the machine. */
+  left: number;
+  message: string;
+}
+
+/** What draining (or removing) a machine would do. */
+export interface DrainPlan {
+  node_id: string;
+  machine: string;
+  draining: boolean;
+  in_cluster: boolean;
+  environment_id?: string;
+  environment_name?: string;
+  cluster_running?: boolean;
+  copies: DrainCopy[];
+  moving: number;
+  stopping: number;
+  other_parts: number;
+  can_drain: boolean;
+  reason: string | null;
+  note?: string;
+  ray_node_id?: string | null;
+  drain?: DrainState;
+}
+
+/** A machine that could join a cluster, or why it cannot. */
+export interface MemberCandidate {
+  node_id: string;
+  machine: string;
+  host: string;
+  gpus: number;
+  can_add: boolean;
+  reasons: string[];
+  warnings: string[];
+}
+
+export interface MemberCandidates {
+  environment_id: string;
+  cluster_running: boolean;
+  network: string | null;
+  machines: MemberCandidate[];
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -809,6 +886,32 @@ export const inferenceApi = {
   removeEnvironmentNode(id: string, nodeId: string) {
     return request<void>(
       `/environments/${enc(id)}/nodes/${enc(nodeId)}`,
+      { method: "DELETE" },
+    );
+  },
+
+  /** The machines that could join this cluster, and why the others cannot. */
+  listMemberCandidates(id: string) {
+    return request<MemberCandidates>(`/environments/${enc(id)}/candidates`);
+  },
+
+  /** Add machines to a running cluster: checked against the head now, joined by the reconciler. */
+  addMembers(id: string, nodeIds: string[]) {
+    return request<{ environment_id: string; added: string[] }>(`/environments/${enc(id)}/members`, {
+      method: "POST",
+      body: JSON.stringify({ node_ids: nodeIds }),
+    });
+  },
+
+  /** What removing a machine would do: which copies move, which would stop. Asks the head (seconds). */
+  memberRemovalPlan(id: string, nodeId: string) {
+    return request<DrainPlan>(`/environments/${enc(id)}/members/${enc(nodeId)}/removal-plan`);
+  },
+
+  /** Take a machine out of the cluster: drained first if the cluster runs. */
+  removeMember(id: string, nodeId: string, stopUnmovable = false) {
+    return request<{ removed: boolean; pending: boolean }>(
+      `/environments/${enc(id)}/members/${enc(nodeId)}?stop_unmovable=${stopUnmovable}`,
       { method: "DELETE" },
     );
   },

@@ -32,6 +32,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExploreOffIcon from "@mui/icons-material/ExploreOff";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { DrainPlanDialog } from "../clusters/DrainPlanDialog";
 
 function statusColor(
   status: string,
@@ -67,6 +68,7 @@ export default function NodeFleetPage() {
     [],
     { initialValue: [] as ManagedNode[] },
   );
+  const [drainTarget, setDrainTarget] = useState<ManagedNode | null>(null);
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   // ?add=1 (the dashboard's "Onboard a node") opens the drawer straight away.
@@ -265,8 +267,12 @@ export default function NodeFleetPage() {
                   aria-label={row.draining ? t("nodes.disable_drain") : t("nodes.enable_drain")}
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (!row.draining) {
+                      setDrainTarget(row);
+                      return;
+                    }
                     runAction(drainKey, async () => {
-                      await nodesApi.setDrain(row.id, !row.draining);
+                      await nodesApi.setDrain(row.id, false);
                     });
                   }}
                   disabled={actionBusyKey === drainKey}
@@ -380,6 +386,17 @@ export default function NodeFleetPage() {
         // for it — they should not have to reload to see the thing they just
         // let in.
         onJoined={() => void refresh()}
+      />
+      <DrainPlanDialog
+        open={drainTarget !== null}
+        mode="drain"
+        machine={drainTarget?.host ?? ""}
+        loadPlan={() => nodesApi.drainPlan(drainTarget!.id)}
+        onConfirm={async (stopUnmovable) => {
+          await nodesApi.setDrain(drainTarget!.id, true, stopUnmovable);
+          await refresh();
+        }}
+        onClose={() => setDrainTarget(null)}
       />
       <ConfirmDialog
         open={!!deleteTarget}

@@ -490,6 +490,15 @@ class RayEnvironmentManager:
                 address=status.cluster_address or head_address,
                 version=status.version or config.ray_version,
             )
+            # Machines being drained, leaving or rejoining: one step each,
+            # on a cluster that is healthy enough to take it.
+            if (environment.observed_status_json or {}).get("drains"):
+                from faden_backend.services.inference import membership  # noqa: PLC0415
+
+                await membership.advance(
+                    session, gateway, environment, manager=self,
+                    ctx={"config": config, "credential_ref": credential_ref, "head_address": head_address},
+                )
             return
 
         kind, lost = problem
@@ -779,6 +788,26 @@ class RayEnvironmentManager:
             await self._await_result(gateway, cmd, what=f"stopping Ray on node {node.node_id}")
         await self._join_workers(
             session, environment, lost, head_address, credential_ref, config, gateway, attempt=attempt,
+        )
+
+    async def leave_member(self, session, environment, node_id, *, gateway, tag: str) -> None:
+        """Take one member out of Ray: ``ray stop`` and its runtime container removed (``membership.py``)."""
+        cmd = await self._issue(
+            gateway,
+            node_id=node_id,
+            command_type=NodeCommandType.LEAVE_RAY_CLUSTER.value,
+            payload=await self._stop_payload(session, environment, node_id),
+            key=f"inference-env:{environment.id}:membership:{tag}:leave:{node_id}",
+        )
+        await self._await_result(gateway, cmd, what=f"stopping Ray on node {node_id}")
+
+    async def rejoin_member(
+        self, session, environment, member, *, gateway, config, credential_ref, head_address, tag: str,
+    ) -> None:
+        """Have one member leave Ray and join again: the only way out of a drain (``membership.py``)."""
+        await self.leave_member(session, environment, member.node_id, gateway=gateway, tag=f"{tag}:rejoin")
+        await self._join_workers(
+            session, environment, [member], head_address, credential_ref, config, gateway, attempt=f"drain-{tag}",
         )
 
     async def _stop_payload(self, session, environment, node_id) -> dict[str, Any]:

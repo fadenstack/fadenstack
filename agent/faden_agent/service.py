@@ -91,6 +91,9 @@ class NodeAgentService:
         # (stream_client.py): the server then leaves them alone when it sees a
         # connection close, instead of failing them as lost.
         static_capabilities["command_continuity"] = 1
+        # ... and drain a machine out of its Ray cluster, Serve moving its
+        # copies first (ray/drain.py, serve_drain_patch.py).
+        static_capabilities["ray_drain"] = 1
         log.info("Static capabilities: %s", static_capabilities)
         if not bool(static_capabilities.get("docker_available")):
             log.warning("Container runtime is not available; runtime commands will fail until daemon is reachable.")

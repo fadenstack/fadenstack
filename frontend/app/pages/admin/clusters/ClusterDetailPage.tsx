@@ -65,6 +65,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import StopIcon from "@mui/icons-material/Stop";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
 
 import {
   JsonBlock,
@@ -75,6 +76,9 @@ import {
   asText,
 } from "../inference/common";
 import { ChooseNetworkDialog } from "./ChooseNetworkDialog";
+import { AddMachinesDialog } from "./AddMachinesDialog";
+import { DrainPlanDialog } from "./DrainPlanDialog";
+import type { DrainState } from "~/api/inference";
 import InsightsIcon from "@mui/icons-material/Insights";
 
 import { ClusterTopology } from "./ClusterTopology";
@@ -215,6 +219,8 @@ export default function ClusterDetailPage() {
   const [networkOpen, setNetworkOpen] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<EnvironmentNode | null>(null);
+  const [drainTarget, setDrainTarget] = useState<EnvironmentNode | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -244,6 +250,9 @@ export default function ClusterDetailPage() {
   const nodeOf = (nodeId: string) => data.nodes.find((n) => n.id === nodeId);
   const hostOf = (nodeId: string) => nodeLabel(nodeOf(nodeId), nodeId.slice(0, 8));
   const selectedMember = data.members.find((m) => m.node_id === selectedNodeId) ?? null;
+  /** Machines being drained, leaving or rejoining, as the cluster records them. */
+  const drains = Object.entries(asRecord(observed.drains)) as [string, DrainState][];
+  const drainOf = (nodeId: string) => drains.find(([id]) => id === nodeId)?.[1] ?? null;
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -385,6 +394,15 @@ export default function ClusterDetailPage() {
           </Button>
         )}
         <Button
+          size="small"
+          startIcon={<DnsOutlinedIcon />}
+          disabled={busy}
+          onClick={() => setAddOpen(true)}
+          data-add-machines-open=""
+        >
+          {t("clusters.add_machines.open")}
+        </Button>
+        <Button
           variant="contained"
           size="small"
           startIcon={<AddIcon />}
@@ -416,6 +434,29 @@ export default function ClusterDetailPage() {
           message: m.message,
         }))}
       />
+
+      {drains.map(([nodeId, drain]) => (
+        <Alert
+          key={nodeId}
+          severity={drain.state === "failed" ? "error" : "info"}
+          data-drain-state={drain.state}
+          action={
+            <Button
+              size="small"
+              color="inherit"
+              disabled={busy || drain.state === "resuming" || drain.state === "leaving"}
+              onClick={() => void run(() => nodesApi.setDrain(nodeId, false))}
+            >
+              {drain.remove ? t("clusters.drain.cancel_removal") : t("clusters.drain.stop")}
+            </Button>
+          }
+        >
+          <strong>{hostOf(nodeId)}</strong>
+          {" — "}
+          {t(`clusters.drain.state.${drain.state}`, { defaultValue: drain.state })}
+          {drain.message ? `: ${drain.message}` : ""}
+        </Alert>
+      ))}
 
       {/* --- at a glance ------------------------------------------------ */}
       {/* Machines come from one call and the accelerator figures from
@@ -805,11 +846,27 @@ export default function ClusterDetailPage() {
               </Typography>
             </Box>
 
+            {drainOf(selectedMember.node_id) && (
+              <Alert severity="info">
+                {t(`clusters.drain.state.${drainOf(selectedMember.node_id)!.state}`)}
+                {drainOf(selectedMember.node_id)!.message ? `: ${drainOf(selectedMember.node_id)!.message}` : ""}
+              </Alert>
+            )}
+            {selectedMember.role !== "head" && !drainOf(selectedMember.node_id) && (
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={busy}
+                onClick={() => setDrainTarget(selectedMember)}
+              >
+                {t("nodes.drain")}
+              </Button>
+            )}
             <Button
               size="small"
               color="error"
               variant="outlined"
-              disabled={busy}
+              disabled={busy || Boolean(drainOf(selectedMember.node_id)?.remove)}
               onClick={() => setRemoveTarget(selectedMember)}
             >
               {t("clusters.detail.remove_machine")}
@@ -861,25 +918,40 @@ export default function ClusterDetailPage() {
         onClose={() => setDeleteOpen(false)}
       />
 
-      <ConfirmDialog
+      <DrainPlanDialog
         open={removeTarget !== null}
-        title={t("clusters.detail.remove_title")}
-        message={
-          removeTarget
-            ? t("clusters.detail.remove_message", { name: hostOf(removeTarget.node_id) })
-            : ""
-        }
-        confirmLabel={t("common.remove")}
-        loading={busy}
-        onConfirm={() => {
-          const target = removeTarget;
-          setRemoveTarget(null);
+        mode="remove"
+        machine={removeTarget ? hostOf(removeTarget.node_id) : ""}
+        loadPlan={() => inferenceApi.memberRemovalPlan(cluster.id, removeTarget!.node_id)}
+        onConfirm={async (stopUnmovable) => {
+          await inferenceApi.removeMember(cluster.id, removeTarget!.node_id, stopUnmovable);
           setSelectedNodeId(null);
-          if (target) {
-            void run(() => inferenceApi.removeEnvironmentNode(cluster.id, target.node_id));
-          }
+          await refresh();
         }}
         onClose={() => setRemoveTarget(null)}
+      />
+
+      <DrainPlanDialog
+        open={drainTarget !== null}
+        mode="drain"
+        machine={drainTarget ? hostOf(drainTarget.node_id) : ""}
+        loadPlan={() => nodesApi.drainPlan(drainTarget!.node_id)}
+        onConfirm={async (stopUnmovable) => {
+          await nodesApi.setDrain(drainTarget!.node_id, true, stopUnmovable);
+          await refresh();
+        }}
+        onClose={() => setDrainTarget(null)}
+      />
+
+      <AddMachinesDialog
+        open={addOpen}
+        clusterId={cluster.id}
+        clusterName={cluster.name}
+        onClose={() => setAddOpen(false)}
+        onAdded={() => {
+          setAddOpen(false);
+          void refresh();
+        }}
       />
     </Stack>
   );

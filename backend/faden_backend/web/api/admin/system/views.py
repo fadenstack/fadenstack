@@ -818,23 +818,65 @@ async def system_node_maintenance(
     return NodeDTO(**payload)
 
 
+def _membership_http_error(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=getattr(exc, "status_code", 409), detail=str(exc))
+
+
+@router.get("/nodes/{node_id}/drain-plan", name="system_node_drain_plan")
+async def system_node_drain_plan(
+    node_id: uuid.UUID,
+    request: Request,
+    _user: Annotated[User, Depends(require_permission("system.node_maintenance", "manage"))],
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """What draining this machine would do: which model copies move where, and which would stop.
+
+    Asks the cluster's head where every copy runs (up to a minute and a half).
+    """
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+    from faden_backend.web.api.inference.found_clusters import _gateway  # noqa: PLC0415
+
+    try:
+        return await membership.drain_plan(session, _gateway(request), node_id)
+    except membership.MembershipError as exc:
+        raise _membership_http_error(exc) from exc
+
+
 @router.post("/nodes/{node_id}/drain", response_model=NodeDTO, name="system_node_drain")
 async def system_node_drain(
     node_id: str,
     body: NodeDrainRequest,
+    request: Request,
     _user: Annotated[User, Depends(require_permission("system.node_maintenance", "manage"))],
     service: NodeControlService = Depends(get_node_control_service),
+    session: AsyncSession = Depends(get_db_session),
 ) -> NodeDTO:
-    """Toggle draining state for one node."""
+    """Drain one machine, or stop draining it.
+
+    In a running cluster, draining moves the machine's model copies to the
+    other machines first and keeps new ones off it; copies that cannot move
+    stop only with ``stop_unmovable`` (see the drain plan). Stopping a drain
+    has the machine leave Ray and join again.
+    """
+    from faden_backend.db.models.node_control import InfraNode  # noqa: PLC0415
+    from faden_backend.services.inference import membership  # noqa: PLC0415
+    from faden_backend.web.api.inference.found_clusters import _gateway  # noqa: PLC0415
+
     try:
         parsed = uuid.UUID(node_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid node id.") from exc
     try:
-        payload = await service.set_node_draining(node_id=parsed, enabled=body.enabled)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return NodeDTO(**payload)
+        if body.enabled:
+            await membership.start_drain(session, _gateway(request), parsed, stop_unmovable=body.stop_unmovable)
+        else:
+            await membership.stop_drain(session, parsed)
+    except membership.MembershipError as exc:
+        raise _membership_http_error(exc) from exc
+    node = await session.get(InfraNode, parsed)
+    if node is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node not found.")
+    return NodeDTO(**service.serialize_node(node))
 
 
 @router.post("/nodes/{node_id}/commands", response_model=NodeCommandDTO, name="system_node_command_issue")

@@ -378,6 +378,57 @@ class RayClusterClient:
             wait_budget_sec=budget_sec,
         )
 
+    async def describe_placement(
+        self, *, head_node_id: str | uuid.UUID, budget_sec: float | None = 90,
+    ) -> dict[str, Any] | None:
+        """Machines and Serve copies, with where each copy's resources are held (DESCRIBE_RAY_PLACEMENT).
+
+        ``None`` when the head did not answer in time.
+        """
+        return await self._dispatch_and_poll(
+            node_id=head_node_id,
+            command_type=NodeCommandType.DESCRIBE_RAY_PLACEMENT.value,
+            payload={},
+            idem_prefix="inference-membership:placement",
+            timeout_sec=120,
+            wait_budget_sec=budget_sec,
+        )
+
+    async def enable_serve_drain(self, *, head_node_id: str | uuid.UUID, key: str) -> dict[str, Any]:
+        """Let Serve move copies off draining machines (ENABLE_SERVE_DRAIN on the head); raises when it cannot."""
+        command = await self._dispatch_until_terminal(
+            node_id=head_node_id,
+            command_type=NodeCommandType.ENABLE_SERVE_DRAIN.value,
+            payload={"wait_sec": 90},
+            idem_prefix=key,
+            timeout_sec=180,
+        )
+        return dict(command.result_json or {})
+
+    async def drain_node(self, *, node_id: str | uuid.UUID, key: str) -> dict[str, Any]:
+        """Drain *node_id* in Ray (DRAIN_RAY_NODE on that machine); raises when it cannot."""
+        command = await self._dispatch_until_terminal(
+            node_id=node_id,
+            command_type=NodeCommandType.DRAIN_RAY_NODE.value,
+            payload={},
+            idem_prefix=key,
+            timeout_sec=120,
+        )
+        return dict(command.result_json or {})
+
+    async def stop_replicas(
+        self, *, head_node_id: str | uuid.UUID, actor_names: list[str], key: str,
+    ) -> dict[str, Any]:
+        """Stop the named Serve copies (STOP_SERVE_REPLICAS on the head); raises when it cannot."""
+        command = await self._dispatch_until_terminal(
+            node_id=head_node_id,
+            command_type=NodeCommandType.STOP_SERVE_REPLICAS.value,
+            payload={"actor_names": list(actor_names)},
+            idem_prefix=key,
+            timeout_sec=120,
+        )
+        return dict(command.result_json or {})
+
     async def model_tls_route(
         self,
         *,

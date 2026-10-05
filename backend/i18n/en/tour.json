@@ -91,7 +91,7 @@
       },
       "machines": {
         "title": "Pick the machines",
-        "body": "Tick the machines that should serve models; one machine makes a fine cluster. Pick all you want now: machines join a cluster when it is created. Then click <strong>Next</strong>; the console checks how the machines reach each other."
+        "body": "Tick the machines that should serve models; one machine makes a fine cluster, and you can add more later from the cluster's page. Then click <strong>Next</strong>; the console checks how the machines reach each other."
       },
       "network": {
         "title": "The network",
@@ -394,7 +394,7 @@
       "title": "Machine",
       "description": "One machine: its hardware, logs, deployments, the vLLM it runs, its commands and updates.",
       "action_status": "See its hardware, deployments and recent logs",
-      "action_maintenance": "Maintenance and drain: no new work is placed on it",
+      "action_maintenance": "Drain it (its copies move to the other machines first), or put it in maintenance",
       "action_updates": "Check for and install system updates, or reboot it",
       "action_vllm": "Route a vLLM found on it through Fadenstack"
     },
@@ -403,7 +403,7 @@
       "description": "The computers with GPUs that run your models. A machine joins by running one command on it and being approved here.",
       "action_add": "Add a machine: run the command on it, then approve it here",
       "action_status": "See each machine's status, GPUs and agent version",
-      "action_maintenance": "Maintenance and drain stop new work being placed on a machine",
+      "action_maintenance": "Drain a machine to move its model copies to the other machines; maintenance marks it for servicing",
       "action_delete": "Delete a machine (type its name to confirm)"
     },
     "cluster_detail": {
@@ -413,7 +413,8 @@
       "action_wiring": "See how its machines are wired, and change the network",
       "action_security": "Encrypt model traffic and the traffic between machines",
       "action_runtime": "Switch the runtime version (this restarts the models)",
-      "action_control": "Stop, start or delete it; delete its deployments first"
+      "action_control": "Stop, start or delete it; delete its deployments first",
+      "action_machines": "Add machines, or remove one (its copies move to the others first)"
     },
     "clusters": {
       "title": "Clusters",

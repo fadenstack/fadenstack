@@ -52,6 +52,7 @@ import AgentUpdateChip from "~/pages/admin/nodes/AgentUpdateChip";
 import FoundVllmCard from "~/pages/admin/nodes/FoundVllmCard";
 
 import GaugeCard from "~/components/GaugeCard";
+import { DrainPlanDialog } from "../clusters/DrainPlanDialog";
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
@@ -163,6 +164,7 @@ export default function NodeDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
+  const [drainOpen, setDrainOpen] = useState(false);
   const [node, setNode] = useState<ManagedNode | null>(null);
   const [commands, setCommands] = useState<NodeCommand[]>([]);
   const [timeline, setTimeline] = useState<NodeCommandTimeline | null>(null);
@@ -559,11 +561,15 @@ export default function NodeDetailPage() {
               color={node.draining ? "warning" : "inherit"}
               startIcon={<InvertColorsOffIcon />}
               disabled={busyKey === "drain"}
-              onClick={() =>
+              onClick={() => {
+                if (!node.draining) {
+                  setDrainOpen(true);
+                  return;
+                }
                 runAction("drain", async () => {
-                  await nodesApi.setDrain(id, !node.draining);
-                })
-              }
+                  await nodesApi.setDrain(id, false);
+                });
+              }}
             >
               {node.draining ? t("nodes.stop_drain") : t("nodes.drain")}
             </Button>
@@ -1159,6 +1165,18 @@ faden-agent run`}
           </Collapse>
         </CardContent>
       </Card>
+
+      <DrainPlanDialog
+        open={drainOpen}
+        mode="drain"
+        machine={node.host}
+        loadPlan={() => nodesApi.drainPlan(id)}
+        onConfirm={async (stopUnmovable) => {
+          await nodesApi.setDrain(id, true, stopUnmovable);
+          await load();
+        }}
+        onClose={() => setDrainOpen(false)}
+      />
 
       {/* ── System Update Dialog ──────────────────────────────── */}
       <SystemUpdateDialog
