@@ -66,6 +66,14 @@ def main() -> None:
     )
     run_app.add_argument("--route-prefix", default="/")
 
+    scale_app = subparsers.add_parser(
+        "scale-serve-app",
+        help="Change how many copies an application's model runs, without restarting the running ones",
+    )
+    scale_app.add_argument("--app-name", required=True)
+    scale_app.add_argument("--replicas", required=True, type=int)
+    scale_app.add_argument("--deployment", default=None, help="Default: the app's LLMServer deployments")
+
     delete_app = subparsers.add_parser("delete-serve-app", help="Delete a named Serve application")
     delete_app.add_argument("--app-name", required=True)
 
@@ -125,11 +133,16 @@ def main() -> None:
                 llm_serving_args,
                 http_options=http_options,
                 route_prefix=args.route_prefix,
+                external_scaler=config.get("external_scaler"),
             )
         except Exception as exc:  # noqa: BLE001 - the agent needs the reason, not a traceback
             _emit({"deployed": False, "app_name": args.app_name, "error": str(exc)}, ok=False)
             return
         _emit(result, ok=bool(result.get("deployed")))
+
+    elif args.command == "scale-serve-app":
+        result = RayServeClient().scale_app(args.app_name, args.replicas, deployment=args.deployment)
+        _emit(result, ok=bool(result.get("scaled")))
 
     elif args.command == "delete-serve-app":
         result = RayServeClient().delete_app(args.app_name)

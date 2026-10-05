@@ -174,3 +174,141 @@ async def test_a_committed_change_wakes_the_reconciler(dbsession: AsyncSession) 
 @pytest.mark.anyio()
 async def test_nothing_wakes_it_without_a_change() -> None:
     assert await wakeup.wait_for_work(0.05) is False
+
+
+# ── scaling in place (no copy restarted) ─────────────────────────────────
+#
+# Deploying the app again replaced every copy whatever changed: Serve gives
+# each versionless deploy a random version. Scaling the 27B on the DGX pair
+# from two copies to one stopped both for eight minutes. An app deployed with
+# Ray's external scaler takes the count alone (SCALE_SERVE_APP).
+
+RUN = NodeCommandType.RUN_SERVE_APP.value
+SCALE = NodeCommandType.SCALE_SERVE_APP.value
+STATUS = NodeCommandType.GET_RAY_SERVE_STATUS.value
+
+
+async def _deployed(dbsession: AsyncSession, dep: Any, *, scaler: bool = True) -> str:
+    """Deploy *dep* with one copy, as an agent that turns the external scaler on (or not) reports it."""
+    app = f"faden-{dep.id}"
+    run = {**_run_serve_result(app), **({"external_scaler": True} if scaler else {})}
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={RUN: run, STATUS: _status(app, app_status="RUNNING", ready=1, pending=0)},
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+    assert len(fake.by_type(RUN)) == 1
+    assert dep.phase == "running"
+    return app
+
+
+async def _reconcile_with(dbsession: AsyncSession, dep: Any, app: str, scale_answer: dict[str, Any]) -> Any:
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            SCALE: scale_answer,
+            RUN: _run_serve_result(app),
+            STATUS: _status(app, app_status="RUNNING", ready=1, pending=1),
+        },
+    )
+    await _ray_driver().deployment_manager.reconcile_deployment(dbsession, dep, node_control=fake)
+    return fake
+
+
+@pytest.mark.anyio()
+async def test_a_copy_count_change_leaves_the_running_copies_alone(deployment_env, dbsession: AsyncSession) -> None:
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep)
+    assert dep.observed_status_json["applied_shape_hash"]
+
+    _scale(dep, 2)
+    fake = await _reconcile_with(dbsession, dep, app, {"scaled": True, "app_name": app, "replicas": 2})
+
+    assert fake.by_type(RUN) == [], "deploying again would replace the copy that serves"
+    (scale,) = fake.by_type(SCALE)
+    assert scale["payload"]["app_name"] == app
+    assert scale["payload"]["replicas"] == 2
+    assert dep.phase == "running"
+    assert dep.phase_message == "Serving on 1 of 2 copies; 1 more starting."
+    assert dep.observed_status_json["last_scale"]["replicas"] == 2
+
+
+@pytest.mark.anyio()
+async def test_the_next_look_does_not_scale_again(deployment_env, dbsession: AsyncSession) -> None:
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep)
+    _scale(dep, 2)
+    await _reconcile_with(dbsession, dep, app, {"scaled": True})
+
+    fake = await _reconcile_with(dbsession, dep, app, {"scaled": True})
+
+    assert fake.by_type(SCALE) == [] and fake.by_type(RUN) == []
+
+
+@pytest.mark.anyio()
+async def test_an_app_deployed_without_the_scaler_is_deployed_again(deployment_env, dbsession: AsyncSession) -> None:
+    """Deployed by an older agent: one last restart, which turns the scaler on."""
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep, scaler=False)
+
+    _scale(dep, 2)
+    fake = await _reconcile_with(dbsession, dep, app, {"scaled": True})
+
+    assert fake.by_type(SCALE) == []
+    assert len(fake.by_type(RUN)) == 1
+
+
+@pytest.mark.anyio()
+async def test_a_refused_scale_is_deployed_again(deployment_env, dbsession: AsyncSession) -> None:
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep)
+
+    _scale(dep, 2)
+    fake = await _reconcile_with(
+        dbsession, dep, app, {"scaled": False, "reason": "external_scaler_disabled"},
+    )
+
+    assert len(fake.by_type(SCALE)) == 1
+    assert len(fake.by_type(RUN)) == 1
+
+
+@pytest.mark.anyio()
+async def test_any_other_change_is_deployed_again(deployment_env, dbsession: AsyncSession) -> None:
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep)
+
+    dep.spec_json = {
+        **dep.spec_json,
+        "scale": {"replicas": 2},
+        "engine": {"name": "vllm", "config": {"max_model_len": 8192}},
+    }
+    dep.generation += 1
+    fake = await _reconcile_with(dbsession, dep, app, {"scaled": True})
+
+    assert fake.by_type(SCALE) == []
+    assert len(fake.by_type(RUN)) == 1
+
+
+@pytest.mark.anyio()
+async def test_autoscaling_bounds_are_deployed_again(deployment_env, dbsession: AsyncSession) -> None:
+    """Serve refuses its external scaler next to its own autoscaling."""
+    dep, _node = deployment_env
+    app = await _deployed(dbsession, dep)
+
+    dep.spec_json = {**dep.spec_json, "scale": {"autoscale": {"min_replicas": 1, "max_replicas": 2}}}
+    dep.generation += 1
+    fake = await _reconcile_with(dbsession, dep, app, {"scaled": True})
+
+    assert fake.by_type(SCALE) == []
+    assert len(fake.by_type(RUN)) == 1
+
+
+def test_only_the_copy_count_leaves_the_shape_alone() -> None:
+    from faden_backend.services.inference.drivers.ray.deployment import shape_hash
+
+    one = {"llm_configs": [{"engine_kwargs": {"a": 1}, "deployment_config": {"num_replicas": 1}}]}
+    two = {"llm_configs": [{"engine_kwargs": {"a": 1}, "deployment_config": {"num_replicas": 2}}]}
+    other = {"llm_configs": [{"engine_kwargs": {"a": 2}, "deployment_config": {"num_replicas": 2}}]}
+    assert shape_hash(one) == shape_hash(two)
+    assert shape_hash(one) != shape_hash(other)
+    assert one["llm_configs"][0]["deployment_config"] == {"num_replicas": 1}, "the config itself is left as it is"

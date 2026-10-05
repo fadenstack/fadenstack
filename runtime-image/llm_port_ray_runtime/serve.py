@@ -13,6 +13,30 @@ from llm_port_ray_runtime.models import (
 
 log = logging.getLogger(__name__)
 
+#: Ray Serve LLM names a model's server deployment ``LLMServer:<model>``.
+_SERVER_PREFIX = "LLMServer"
+
+
+def fixed_copies(llm_serving_args: Dict[str, Any]) -> bool:
+    """Whether every model in *llm_serving_args* runs a fixed number of copies.
+
+    Only such an app can take Ray's external scaler: Serve refuses it next to
+    its own autoscaling, which is what a model without ``num_replicas`` gets.
+    """
+    configs = llm_serving_args.get("llm_configs") or []
+    if not configs:
+        return False
+    for config in configs:
+        if not isinstance(config, dict):
+            return False
+        deployment = config.get("deployment_config") or {}
+        if deployment.get("autoscaling_config") is not None:
+            return False
+        count = deployment.get("num_replicas")
+        if not isinstance(count, int) or isinstance(count, bool):
+            return False
+    return True
+
 
 class RayServeClient:
     """Probe Serve controller and applications using the Ray Serve Python SDK."""
@@ -26,6 +50,7 @@ class RayServeClient:
         llm_serving_args: Dict[str, Any],
         http_options: Optional[Dict[str, Any]] = None,
         route_prefix: str = "/",
+        external_scaler: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Deploy a named Serve LLM application.
 
@@ -58,6 +83,15 @@ class RayServeClient:
         ``run_many`` is the public API that lets us say so: the application is
         handed to the controller and convergence is read afterwards from the
         status tier, which is what the agent and backend already do.
+
+        **External scaler on for fixed copy counts** (*external_scaler*
+        ``None`` decides by :func:`fixed_copies`; ``False`` keeps it off).
+        Deploying an application again replaces every copy of its model: these
+        deploys carry no version (Ray 2.58 removed ``version`` from
+        ``@serve.deployment``), so each one gets a random code version and
+        Serve takes it for new code. Changing the copy count that way stopped
+        both copies of a 27B model on the DGX pair for eight minutes (2 -> 1).
+        With the external scaler on, :meth:`scale_app` changes the count alone.
         """
         self.core.ensure_attached()
 
@@ -80,12 +114,13 @@ class RayServeClient:
             log.info("serve.start skipped (%s)", exc)
 
         app = build_openai_app(llm_serving_args)
+        scaler = fixed_copies(llm_serving_args) and external_scaler is not False
         # ``wait_for_ingress_deployment_creation`` stays on: it is a bounded
         # controller round-trip that confirms the application was accepted, so
         # "submitted" still means something. Only the open-ended wait for it to
         # become healthy is dropped.
         serve.run_many(
-            [serve.RunTarget(app, name=app_name, route_prefix=route_prefix)],
+            [serve.RunTarget(app, name=app_name, route_prefix=route_prefix, external_scaler_enabled=scaler)],
             wait_for_applications_running=False,
         )
         return {
@@ -93,7 +128,57 @@ class RayServeClient:
             "app_name": app_name,
             "route_prefix": route_prefix,
             "http_options": start_kwargs,
+            "external_scaler": scaler,
         }
+
+    def scale_app(self, app_name: str, replicas: int, deployment: Optional[str] = None) -> Dict[str, Any]:
+        """Run *replicas* copies of an application's model, leaving the running ones be.
+
+        Asks Serve's controller for the count alone (``update_deployment_replicas``,
+        the call behind the dashboard's ``.../deployments/{name}/scale``): the
+        deployment keeps its version, so new copies start and surplus ones
+        finish their requests and stop while the rest go on serving. Only for
+        an application deployed with the external scaler on (:meth:`run_app`);
+        for any other the answer says so (``reason: external_scaler_disabled``)
+        and the caller deploys it again instead.
+
+        *deployment* defaults to the app's model server deployments
+        (``LLMServer:...``), not its ingress.
+        """
+        base: Dict[str, Any] = {"scaled": False, "app_name": app_name, "replicas": int(replicas)}
+        try:
+            self.core.ensure_attached()
+        except Exception as exc:
+            return {**base, "reason": "attach", "error": f"Cannot attach to Ray: {exc}"}
+
+        try:
+            import ray
+            from ray.serve._private.common import DeploymentID
+            from ray.serve.context import _get_global_client
+
+            client = _get_global_client(raise_if_no_controller_running=False)
+            if client is None:
+                return {**base, "reason": "app_not_found", "error": "Serve is not running"}
+            app = (client.get_serve_details().get("applications") or {}).get(app_name)
+            if app is None:
+                return {**base, "reason": "app_not_found", "error": f"no application {app_name}"}
+            if not app.get("external_scaler_enabled"):
+                return {**base, "reason": "external_scaler_disabled",
+                        "error": f"{app_name} was deployed without the external scaler"}
+            names = [deployment] if deployment else [
+                name for name in (app.get("deployments") or {}) if name.startswith(_SERVER_PREFIX)
+            ]
+            if not names:
+                return {**base, "reason": "app_not_found", "error": f"{app_name} has no model server deployment"}
+            for name in names:
+                ray.get(client._controller.update_deployment_replicas.remote(
+                    DeploymentID(name=name, app_name=app_name), int(replicas),
+                ))
+        except Exception as exc:
+            message = str(exc)
+            reason = "external_scaler_disabled" if "external_scaler_enabled" in message else "error"
+            return {**base, "reason": reason, "error": message}
+        return {**base, "scaled": True, "deployments": names}
 
     def delete_app(self, app_name: str) -> Dict[str, Any]:
         """Delete a named Serve application.

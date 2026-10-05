@@ -203,6 +203,31 @@ def _reported_run(deployment: Any) -> dict[str, Any]:
     return run if isinstance(run, dict) else {}
 
 
+def shape_hash(llm_serving_args: dict[str, Any]) -> str:
+    """The compiled config's hash with each model's copy count left out.
+
+    Two configs of the same shape differ in how many copies run and nothing
+    else -- a change Serve can make without restarting a copy (``_scale``).
+    """
+    shape = json.loads(json.dumps(llm_serving_args))
+    for config in shape.get("llm_configs") or []:
+        if isinstance(config, dict) and isinstance(config.get("deployment_config"), dict):
+            config["deployment_config"].pop("num_replicas", None)
+    return hashlib.sha256(json.dumps(shape, sort_keys=True).encode()).hexdigest()
+
+
+def _fixed_count(llm_serving_args: dict[str, Any]) -> int | None:
+    """The one model's fixed copy count, or ``None`` (autoscaled, or not one model)."""
+    configs = llm_serving_args.get("llm_configs") or []
+    if len(configs) != 1 or not isinstance(configs[0], dict):
+        return None
+    deployment = configs[0].get("deployment_config") or {}
+    count = deployment.get("num_replicas")
+    if deployment.get("autoscaling_config") is not None:
+        return None
+    return count if isinstance(count, int) and not isinstance(count, bool) else None
+
+
 def _reported_route_prefix(deployment: Any) -> str | None:
     """The route prefix the agent said it mounted the app on, if it said.
 
@@ -975,14 +1000,29 @@ class RayDeploymentManager:
         # restarted every replica for nothing.
         current_head = _cluster_head(facts.environment)
         applied_head = (deployment.observed_status_json or {}).get("applied_head")
+        head_moved = bool(applied_head and current_head and applied_head != current_head)
         need_apply = (
             (applied_hash != config_hash)
             or (deployment.phase == DeploymentPhase.FAILED.value)
             # The cluster's head was started again since this was applied --
             # re-formed after it died, or its machine rebooted -- and a new
             # head starts with no Serve applications at all.
-            or bool(applied_head and current_head and applied_head != current_head)
+            or head_moved
         )
+        config_shape = shape_hash(llm_serving_args)
+        if (
+            need_apply
+            and applied_hash
+            and not head_moved
+            and deployment.phase != DeploymentPhase.FAILED.value
+            and (deployment.observed_status_json or {}).get("applied_shape_hash") == config_shape
+        ):
+            # Only the copy count changed. Deploying again would replace every
+            # copy (see ``_scale``); Serve changes the count alone.
+            scaled = await self._scale(deployment, facts, client, _fixed_count(llm_serving_args))
+            if scaled is None:
+                return
+            need_apply = not scaled
         if not need_apply:
             serve_status = await self._probe_serve(
                 client, facts.head_node_id, app_name, facts.runtime_bundle_payload
@@ -1030,6 +1070,9 @@ class RayDeploymentManager:
             # the copies replace: publishing reads it (route prefix, model TLS).
             observed_now = dict(deployment.observed_status_json or {})
             observed_now["last_run"] = run_result
+            # What a later change is compared with: one that differs from it
+            # only in the copy count is made without a deploy (``_scale``).
+            observed_now["applied_shape_hash"] = config_shape
             # From here on the engine's output is this run's: an earlier
             # run's failure is never taken for it (``engine_root_cause``).
             observed_now["applied_at"] = datetime.now(tz=UTC).isoformat()
@@ -1069,6 +1112,62 @@ class RayDeploymentManager:
             session, deployment, facts, client,
             config_hash=config_hash, run_result=run_result,
         )
+
+    async def _scale(
+        self,
+        deployment: InferenceDeployment,
+        facts: "_DeploymentFacts",
+        client: RayClusterClient,
+        count: int | None,
+    ) -> bool | None:
+        """Change only how many copies run, the running ones left alone: ``True`` if it did.
+
+        Deploying the app again replaces every copy of its model, whatever
+        changed: the runtime deploys with ``serve.run_many``, which carries no
+        version, so Serve gives each deploy a random one and takes it for new
+        code. Scaling the 27B on the DGX pair from two copies to one stopped
+        both for eight minutes; from one to two replaced both. An app deployed
+        with Ray's external scaler (``external_scaler`` in the agent's report;
+        fixed copy counts only) takes the count alone (SCALE_SERVE_APP).
+
+        ``False`` when this cannot be done in place -- autoscaled, deployed
+        without the scaler, an agent that does not know the command, the app
+        gone: the caller deploys it again. ``None`` when the outcome is
+        unknown (the command timed out): the next pass resumes it.
+        """
+        if count is None or count < 1 or not _reported_run(deployment).get("external_scaler"):
+            return False
+        try:
+            result = await client.scale_serve_app(
+                head_node_id=facts.head_node_id,
+                app_name=facts.app_name,
+                replicas=count,
+                idem_prefix=f"inference-dep:scale:{deployment.id}:{deployment.generation}",
+                runtime_bundle=facts.runtime_bundle_payload,
+            )
+        except RayCommandError as exc:
+            if exc.error_code == "command_timeout":
+                self._observe(
+                    deployment, DeploymentPhase(deployment.phase),
+                    f"Asked for {_plural(count, 'copy')}; the answer has not come back yet.", False,
+                    observed={"reconciled": False, "reason": "scale-unobserved"},
+                    mark_observed=False,
+                )
+                return None
+            log.info("Deployment %s: scaling in place failed (%s); deploying again",
+                     deployment.id, exc.detail)
+            return False
+        if not result.get("scaled"):
+            log.info(
+                "Deployment %s: cannot scale in place (%s); deploying again",
+                deployment.id, result.get("reason") or result.get("error"),
+            )
+            return False
+        observed_now = dict(deployment.observed_status_json or {})
+        observed_now["last_scale"] = {"replicas": count, "at": datetime.now(tz=UTC).isoformat()}
+        deployment.observed_status_json = observed_now
+        log.info("Deployment %s scaled in place to %d copies", deployment.id, count)
+        return True
 
     async def _observe_serving(
         self,
@@ -1944,4 +2043,5 @@ class RayDeploymentManager:
 __all__ = [
     "RayDeploymentManager",
     "app_name_for",
+    "shape_hash",
 ]

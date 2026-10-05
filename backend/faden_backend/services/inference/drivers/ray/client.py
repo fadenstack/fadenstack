@@ -544,6 +544,34 @@ class RayClusterClient:
         )
         return dict(row.result_json or {})
 
+    async def scale_serve_app(
+        self,
+        *,
+        head_node_id: str | uuid.UUID,
+        app_name: str,
+        replicas: int,
+        idem_prefix: str,
+        runtime_bundle: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Run *replicas* copies of *app_name*'s model without restarting the running ones.
+
+        SCALE_SERVE_APP on the head. The answer says ``scaled``, or why not
+        (``reason``: the app was deployed without Ray's external scaler, or is
+        gone) -- then it has to be deployed again. Raises when the command
+        fails (an agent that does not know it, among others).
+        """
+        payload: dict[str, Any] = {"app_name": app_name, "replicas": int(replicas)}
+        if runtime_bundle is not None:
+            payload["runtime_bundle"] = runtime_bundle
+        row = await self._dispatch_until_terminal(
+            node_id=head_node_id,
+            command_type=NodeCommandType.SCALE_SERVE_APP.value,
+            payload=payload,
+            idem_prefix=idem_prefix,
+            timeout_sec=120,
+        )
+        return dict(row.result_json or {})
+
     async def delete_serve_app(
         self,
         *,

@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from faden_agent.ray import scale
 from faden_agent.ray.container import (
     DEFAULT_CONTAINER_NAME,
     RayContainerRuntime,
@@ -21,11 +22,20 @@ from faden_agent.runtimes import ContainerRuntimeError
 
 
 class _HelperRuntime:
-    """Container handler that answers helper verbs from a script."""
+    """Container handler that answers helper verbs from a script.
 
-    def __init__(self, responses: dict[str, Any], *, running: bool = True) -> None:
+    Python fed on stdin (``python3 -``) is answered too: the helper's
+    features (*features*, ``None`` for a 0.1 helper), and ``scale.py``'s
+    deploy and scale scripts from ``responses["script:deploy"]`` /
+    ``responses["script:scale"]``.
+    """
+
+    def __init__(
+        self, responses: dict[str, Any], *, running: bool = True, features: list[str] | None = None,
+    ) -> None:
         self._responses = responses
         self._running = running
+        self._features = features
         self.calls: list[dict[str, Any]] = []
 
     @property
@@ -36,7 +46,7 @@ class _HelperRuntime:
         return self._running
 
     async def inspect(self, name: str, *, format_: str | None = None, timeout_sec: float = 10):
-        return {"State": {"Running": self._running}}
+        return {"State": {"Running": self._running}, "Image": "sha256:img"}
 
     async def exec_(
         self,
@@ -50,6 +60,17 @@ class _HelperRuntime:
         raise_on_error: bool = True,
     ) -> tuple[int, str, str]:
         self.calls.append({"name": name, "command": command, "stdin": stdin})
+        if command == ["python3", "-"]:
+            if stdin == scale.FEATURES_SCRIPT:
+                doc: Any = {"version": "0.2.0" if self._features is not None else "0.1.0",
+                            "features": self._features or []}
+            elif "with_scaler" in (stdin or ""):
+                doc = self._responses.get("script:deploy")
+            else:
+                doc = self._responses.get("script:scale")
+            if doc is None:
+                return 1, "", "no scripted response"
+            return 0, "noise\n" + scale.BEGIN + json.dumps(doc) + scale.END, ""
         verb = command[1] if len(command) > 1 else ""
         payload = self._responses.get(verb)
         if payload is None:
@@ -60,6 +81,10 @@ class _HelperRuntime:
 
 def _runtime(responses: dict[str, Any], **kw: Any) -> RayContainerRuntime:
     return RayContainerRuntime(runtime=_HelperRuntime(responses, **kw))
+
+
+#: A helper that deploys with Ray's external scaler and scales in place itself.
+SCALES = [scale.FEATURE]
 
 
 @pytest.mark.anyio()
@@ -142,8 +167,8 @@ async def test_run_serve_app_goes_through_the_helper_on_stdin() -> None:
     happened to have.
     """
     container = _runtime({
-        "run-serve-app": {"deployed": True, "app_name": "app-1", "route_prefix": "/"}
-    })
+        "run-serve-app": {"deployed": True, "app_name": "app-1", "route_prefix": "/", "external_scaler": True}
+    }, features=SCALES)
     args = {"llm_configs": [{"model_id": "qwen"}]}
 
     result = await container.run_serve_app(
@@ -166,7 +191,7 @@ async def test_run_serve_app_surfaces_the_helper_error() -> None:
     """A deploy failure must name the cause, not a generic exit code."""
     container = _runtime({
         "run-serve-app": {"deployed": False, "app_name": "app-1", "error": "bad engine args"}
-    })
+    }, features=SCALES)
 
     with pytest.raises(ContainerRuntimeError) as exc:
         await container.run_serve_app(DEFAULT_CONTAINER_NAME, "app-1", {})
@@ -344,3 +369,68 @@ def test_session_mismatch_counts_as_already_running() -> None:
     assert _means_already_running(detail)
     # Still a failure when the head genuinely could not start.
     assert not _means_already_running("ray start failed: port 6379 unreachable")
+
+
+# --------------------------------------------------------------------------
+# Copy counts that change without restarting copies (scale.py)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.anyio()
+async def test_an_older_helper_deploys_through_the_scale_script() -> None:
+    """The images on the machines have the 0.1 helper: the deploy turns the external scaler on from outside."""
+    container = _runtime({
+        "script:deploy": {"deployed": True, "app_name": "app-1", "route_prefix": "/app-1", "external_scaler": True},
+    })
+    args = {"llm_configs": [{"deployment_config": {"num_replicas": 2}}]}
+
+    result = await container.run_serve_app(DEFAULT_CONTAINER_NAME, "app-1", args, route_prefix="/app-1")
+
+    assert result["external_scaler"] is True
+    deploy = container._runtime.calls[-1]
+    assert deploy["command"] == ["python3", "-"], "fed on stdin, never on a command line"
+    assert "RayServeClient().run_app" in deploy["stdin"], "the image's own helper code makes the deploy"
+    assert '"num_replicas": 2' in deploy["stdin"], "the compiled document goes with the script"
+
+
+@pytest.mark.anyio()
+async def test_a_failed_script_deploy_names_the_cause() -> None:
+    container = _runtime({"script:deploy": {"deployed": False, "app_name": "app-1", "error": "bad engine args"}})
+
+    with pytest.raises(ContainerRuntimeError) as exc:
+        await container.run_serve_app(DEFAULT_CONTAINER_NAME, "app-1", {})
+    assert "bad engine args" in str(exc.value)
+
+
+@pytest.mark.anyio()
+async def test_the_helpers_features_are_asked_once_per_image() -> None:
+    container = _runtime({"script:deploy": {"deployed": True, "app_name": "a"}})
+
+    await container.run_serve_app(DEFAULT_CONTAINER_NAME, "a", {})
+    await container.run_serve_app(DEFAULT_CONTAINER_NAME, "a", {})
+
+    probes = [c for c in container._runtime.calls if c["stdin"] == scale.FEATURES_SCRIPT]
+    assert len(probes) == 1
+
+
+@pytest.mark.anyio()
+async def test_scaling_goes_through_the_helper_that_can() -> None:
+    container = _runtime({"scale-serve-app": {"scaled": True, "app_name": "app-1", "replicas": 3}}, features=SCALES)
+
+    result = await container.scale_serve_app(DEFAULT_CONTAINER_NAME, "app-1", 3)
+
+    assert result["scaled"] is True
+    assert container._runtime.calls[-1]["command"] == [
+        "llm-port-ray-runtime", "scale-serve-app", "--app-name", "app-1", "--replicas", "3",
+    ]
+
+
+@pytest.mark.anyio()
+async def test_scaling_with_an_older_helper_runs_the_script() -> None:
+    container = _runtime({"script:scale": {"scaled": False, "reason": "external_scaler_disabled"}})
+
+    result = await container.scale_serve_app(DEFAULT_CONTAINER_NAME, "app-1", 1)
+
+    assert result == {"scaled": False, "reason": "external_scaler_disabled"}, "the caller deploys again on this"
+    assert container._runtime.calls[-1]["command"] == ["python3", "-"]
+    assert "update_deployment_replicas" in container._runtime.calls[-1]["stdin"]

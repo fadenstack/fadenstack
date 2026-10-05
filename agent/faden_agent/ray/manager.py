@@ -747,6 +747,26 @@ class RayManager:
             http_options=spec.http_options,
         )
 
+    async def scale_serve_app(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Change how many copies an app's model runs, the running ones left alone (``ray/scale.py``).
+
+        Answers ``scaled: false`` with a ``reason`` when the app cannot be
+        scaled in place (deployed without Ray's external scaler, or gone): the
+        server deploys it again instead.
+        """
+        app_name = str(payload.get("app_name") or "")
+        replicas = payload.get("replicas")
+        if not app_name or not isinstance(replicas, int) or isinstance(replicas, bool) or replicas < 0:
+            raise ValueError("scale_serve_app needs app_name and a replica count")
+        if not await self._use_container(payload):
+            return {"scaled": False, "app_name": app_name, "replicas": replicas, "reason": "no_container",
+                    "error": "scaling in place needs the runtime container"}
+        bundle = self._bundle_spec(payload)
+        result = await self._container.scale_serve_app(bundle.name, app_name, replicas)
+        if result.get("scaled"):
+            self._events.add(event_type="ray.serve_app_scaled", payload={"app": app_name, "replicas": replicas})
+        return result
+
     async def _serve_http(self, container: str) -> dict[str, Any]:
         """What Serve's proxy binds on this cluster: ``{"running": bool, "host", "port"}``."""
         from faden_agent.ray import serve_http  # noqa: PLC0415

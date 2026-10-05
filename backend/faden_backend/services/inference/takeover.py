@@ -756,12 +756,21 @@ async def _record_deployments(
         DeploymentPhase,
         InferenceDeployment,
     )
+    from faden_backend.services.inference.drivers.ray.deployment import shape_hash  # noqa: PLC0415
 
     taken = []
     names = set((await session.execute(select(InferenceDeployment.name))).scalars())
     for recovered, model, args, alias, app in plans:
         deployment_name = alias if alias not in names else f"{alias}-{recovered.deployment_id[:8]}"
         names.add(deployment_name)
+        run = {
+            "app": recovered.app_name, "deployed": True, "cached": True,
+            # Where Ray mounted it: the endpoint is published there.
+            **({"route_prefix": app["route_prefix"]} if app.get("route_prefix") else {}),
+            # Deployed with Ray's external scaler: its copy count changes
+            # without restarting copies, here as on the server that deployed it.
+            **({"external_scaler": True} if app.get("external_scaler") else {}),
+        }
         session.add(InferenceDeployment(
             id=_uuid.UUID(recovered.deployment_id),
             environment_id=environment_id,
@@ -777,12 +786,10 @@ async def _record_deployments(
             total_replicas=_replicas(recovered.spec),
             observed_status_json={
                 "applied_config_hash": config_hash(args),
+                "applied_shape_hash": shape_hash(args),
                 "applied_head": head_ray_id,
-                # Where Ray mounted it: the endpoint is published there.
-                "observation": {"run": {
-                    "app": recovered.app_name, "deployed": True, "cached": True,
-                    **({"route_prefix": app["route_prefix"]} if app.get("route_prefix") else {}),
-                }},
+                "last_run": run,
+                "observation": {"run": run},
                 "takeover": {"at": now.isoformat(), "notes": recovered.notes},
             },
         ))

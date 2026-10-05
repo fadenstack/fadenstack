@@ -59,6 +59,7 @@ _FAKE_RAY = {
             pass
     """,
     "ray/serve/context.py": """
+        import os
         from ray.serve.llm import _Internal
         CONFIG = __CONFIG__
         class Handle:  # like DeploymentHandle: any attribute is a method
@@ -71,14 +72,20 @@ _FAKE_RAY = {
             def __init__(self, rc): self.replica_config = rc
         class _Client:
             def get_serve_details(self):
-                return {"http_options": {"host": "0.0.0.0", "port": 8000}, "applications": {
+                details = {"http_options": {"host": "0.0.0.0", "port": 8000}, "applications": {
                     "__APP__": {"route_prefix": "/__APP__", "status": "RUNNING", "deployments": {
                         "LLMServer:Qwen": {"status": "HEALTHY", "replicas": [{"state": "RUNNING"}],
-                                           "deployment_config": {"num_replicas": 1}},
+                                           "deployment_config": {"num_replicas": 1}, "target_num_replicas": 1},
                         "OpenAiIngress": {"status": "HEALTHY", "replicas": [{"state": "RUNNING"}]},
                     }},
                     "someone-elses-app": {"route_prefix": "/x", "status": "RUNNING", "deployments": {}},
                 }}
+                if os.environ.get("FAKE_SCALED") == "1":
+                    # Deployed with one copy and the external scaler, scaled to two since.
+                    app = details["applications"]["__APP__"]
+                    app["external_scaler_enabled"] = True
+                    app["deployments"]["LLMServer:Qwen"]["target_num_replicas"] = 2
+                return details
             def get_deployment_info(self, name, app):
                 if name.startswith("LLMServer"):
                     return _Info(_RC((), {"llm_config": _Internal(**CONFIG)})), None
@@ -99,10 +106,10 @@ def fake_ray(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(fake_ray: Path, verify: dict[str, Any] | None = None) -> dict[str, Any]:
+def _run(fake_ray: Path, verify: dict[str, Any] | None = None, **env: str) -> dict[str, Any]:
     proc = subprocess.run(  # noqa: S603
         [sys.executable, "-"], input=inspect.script(verify), capture_output=True, text=True,
-        env={"PYTHONPATH": str(fake_ray), "SYSTEMROOT": "C:\\Windows", "PATH": ""}, check=False, timeout=60,
+        env={"PYTHONPATH": str(fake_ray), "SYSTEMROOT": "C:\\Windows", "PATH": "", **env}, check=False, timeout=60,
     )
     doc = inspect.parse(proc.stdout)
     assert doc is not None, proc.stdout + proc.stderr
@@ -253,3 +260,19 @@ async def test_the_token_goes_back_on_the_reply_and_nowhere_else(tmp_path: Path)
         {"id": "cmd-1", "command_type": "describe_ray_cluster", "payload": {"hand_over_token": True}}, AsyncMock(),
     )
     assert "cluster_token" not in replayed["result"], "a replay does not have it"
+
+
+def test_an_app_scaled_in_place_reads_with_the_count_it_runs(fake_ray: Path) -> None:
+    """Its LLMConfig keeps the count it was deployed with; Serve's target is what runs (scale.py)."""
+    doc = _run(fake_ray, {APP: {"llm_configs": [{**LLM_CONFIG, "deployment_config": {"num_replicas": 2}}]}},
+               FAKE_SCALED="1")
+    ours = next(a for a in doc["apps"] if a["name"] == APP)
+    assert ours["external_scaler"] is True
+    assert ours["llm_configs"][0]["deployment_config"]["num_replicas"] == 2
+    assert ours["verify"] == {"equal": True, "diff": []}, "a takeover asking for two copies restarts nothing"
+
+
+def test_an_app_without_the_scaler_reads_as_deployed(fake_ray: Path) -> None:
+    ours = next(a for a in _run(fake_ray)["apps"] if a["name"] == APP)
+    assert ours["external_scaler"] is False
+    assert ours["llm_configs"][0]["deployment_config"]["num_replicas"] == 1

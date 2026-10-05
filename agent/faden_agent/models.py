@@ -46,6 +46,7 @@ class NodeCommandType(enum.StrEnum):
 
     # --- Ray Serve application lifecycle (Phase 3) ---
     RUN_SERVE_APP = "run_serve_app"
+    SCALE_SERVE_APP = "scale_serve_app"
     DELETE_SERVE_APP = "delete_serve_app"
     SHUTDOWN_SERVE = "shutdown_serve"
     MODEL_TLS_ROUTE = "model_tls_route"

@@ -129,6 +129,17 @@ try:
                     d["error"] = "deployment info: %s" % exc
             entry["deployments"].append(d)
         entry["llm_configs"] = [dump(c) for c in running]
+        entry["external_scaler"] = bool(app.get("external_scaler_enabled"))
+        if entry["external_scaler"]:
+            # Scaled in place since it was deployed (scale.py): the LLMConfig
+            # it was deployed with keeps the first count, Serve's target is
+            # the count it runs.
+            targets = [d.get("target_num_replicas") for name, d in (app.get("deployments") or {}).items()
+                       if name.startswith("LLMServer")]
+            if len(entry["llm_configs"]) == 1 and len(targets) == 1 and isinstance(targets[0], int):
+                dc = entry["llm_configs"][0].get("deployment_config")
+                if isinstance(dc, dict) and dc.get("autoscaling_config") is None:
+                    dc["num_replicas"] = targets[0]
         candidate = (VERIFY or {}).get(app_name)
         if candidate is not None:
             try:

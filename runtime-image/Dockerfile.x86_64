@@ -75,7 +75,7 @@ RUN pip install --no-cache-dir /opt/llm-port/runtime && \
 # a verb would leave the agent unable to deploy or tear down a Serve
 # application, so the surface is asserted here rather than discovered on a
 # node at deploy time.
-RUN for verb in versions probe cluster-status serve-status run-serve-app delete-serve-app; do \
+RUN for verb in versions probe cluster-status serve-status run-serve-app scale-serve-app delete-serve-app; do \
         llm-port-ray-runtime "$verb" --help > /dev/null 2>&1 || \
             { echo "helper is missing verb: $verb"; exit 1; }; \
     done && echo 'helper control contract OK'

@@ -229,6 +229,8 @@ class RayContainerRuntime:
         # container (status/Serve), where no bundle is in hand to read it from.
         self._handler_hint = handler_hint
         self.last_error: str | None = None
+        # What each image's helper can do (``scale.FEATURES_SCRIPT``), by image id.
+        self._helper_features: dict[str, frozenset[str]] = {}
 
     def _handler(self, spec: RuntimeBundleSpec) -> ContainerRuntime:
         if spec.runtime_handler and spec.runtime_handler != "-":
@@ -1126,6 +1128,27 @@ class RayContainerRuntime:
                 })
         return targets
 
+    async def helper_features(self, container_name: str) -> frozenset[str]:
+        """What the image's helper can do beyond its first contract (``llm_port_ray_runtime.FEATURES``).
+
+        Asked once per image: a helper changes only with its image.
+        """
+        from faden_agent.ray import scale  # noqa: PLC0415
+
+        facts = await self.facts(container_name)
+        image = str((facts or {}).get("image_id") or "")
+        if image and image in self._helper_features:
+            return self._helper_features[image]
+        _code, out, _err = await self.run_python(scale.FEATURES_SCRIPT, container_name, timeout_sec=60)
+        doc = scale.parse(out)
+        if doc is None:
+            # Unknown is not "none": ask again next time.
+            return frozenset()
+        features = frozenset(str(f) for f in doc.get("features") or [])
+        if image:
+            self._helper_features[image] = features
+        return features
+
     async def run_serve_app(
         self,
         container_name: str,
@@ -1140,7 +1163,30 @@ class RayContainerRuntime:
         The document goes in on **stdin**: a compiled ``LLMServingArgs`` is far
         larger than an argv-safe string, and passing it as an argument would
         also put the model configuration into the container's process list.
+
+        A model with a fixed number of copies is deployed with Ray's external
+        scaler on, so its count can later change without restarting the
+        copies that run (``scale.py``): by the helper itself from 0.2.0 on,
+        through ``scale.deploy_script`` for an older one. ``external_scaler``
+        in the result says which.
         """
+        from faden_agent.ray import scale  # noqa: PLC0415
+
+        if scale.FEATURE not in await self.helper_features(container_name):
+            code, out, err = await self.run_python(
+                scale.deploy_script(
+                    app_name, llm_serving_args, http_options=http_options, route_prefix=route_prefix,
+                ),
+                container_name,
+                timeout_sec=timeout_sec,
+            )
+            res = scale.parse(out)
+            if isinstance(res, dict) and res.get("deployed"):
+                return res
+            detail = (res or {}).get("error") or (err or out or "").strip()[-400:]
+            raise ContainerRuntimeError(
+                f"run_serve_app failed in container (exit {code}): {detail or 'no result from helper'}"
+            )
         document = json.dumps({
             "llm_serving_args": llm_serving_args,
             "http_options": http_options or {},
@@ -1157,6 +1203,38 @@ class RayContainerRuntime:
         raise ContainerRuntimeError(
             f"run_serve_app failed in container (exit {code}): {detail or 'no result from helper'}"
         )
+
+    async def scale_serve_app(
+        self,
+        container_name: str,
+        app_name: str,
+        replicas: int,
+        timeout_sec: float = 90,
+    ) -> dict[str, Any]:
+        """Run *replicas* copies of *app_name*'s model, leaving the running ones be.
+
+        The answer says ``scaled``, or why not (``reason``:
+        ``external_scaler_disabled`` for an app deployed without it,
+        ``app_not_found``): the caller then deploys it again instead.
+        """
+        from faden_agent.ray import scale  # noqa: PLC0415
+
+        if scale.FEATURE in await self.helper_features(container_name):
+            code, res = await self._helper(
+                container_name,
+                ["scale-serve-app", "--app-name", app_name, "--replicas", str(int(replicas))],
+                timeout_sec=timeout_sec,
+            )
+            err = out = ""
+        else:
+            code, out, err = await self.run_python(
+                scale.scale_script(app_name, replicas), container_name, timeout_sec=timeout_sec,
+            )
+            res = scale.parse(out)
+        if isinstance(res, dict):
+            return res
+        detail = (err or out or "").strip()[-400:]
+        raise ContainerRuntimeError(f"scale_serve_app produced no result (exit {code}): {detail}")
 
     async def delete_serve_app(
         self,

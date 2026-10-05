@@ -81,6 +81,7 @@ class NodeCommandType(enum.StrEnum):
 
     # --- Ray Serve application lifecycle (Phase 3) ---
     RUN_SERVE_APP = "run_serve_app"
+    SCALE_SERVE_APP = "scale_serve_app"
     DELETE_SERVE_APP = "delete_serve_app"
     #: Stop Serve on a cluster, applications and proxy alike, so the next
     #: application starts it with other HTTP options (moving it behind the

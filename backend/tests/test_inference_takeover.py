@@ -258,6 +258,8 @@ async def test_the_cluster_and_its_model_are_recorded_as_they_run(
     assert dep.phase == DeploymentPhase.RUNNING.value
     assert dep.spec_json["service"]["alias"] == "qwen2.5-0.5b-instruct"
     assert dep.observed_status_json["applied_head"] == "ray-head"
+    assert dep.observed_status_json["applied_shape_hash"], "a later copy-count change is compared with it"
+    assert "external_scaler" not in dep.observed_status_json["last_run"], "deployed without it: scaling redeploys"
     plane = await dbsession.get(InferenceControlPlane, env.control_plane_id)
     assert await retrieve_cluster_token(dbsession, plane.credential_ref) == "cluster-tok3n"
     assert machine.asked[-1]["hand_over_token"] is True and APP in machine.asked[-1]["verify"]
@@ -449,3 +451,19 @@ async def test_only_a_stray_model_of_fadenstacks_can_be_taken(
     with pytest.raises(takeover.TakeoverError, match="already has its deployment"):
         await takeover.take_over_models(dbsession, None, environment_id=env.id, app_names=[APP])
 
+
+
+@pytest.mark.anyio
+async def test_a_model_deployed_with_the_external_scaler_keeps_scaling_in_place(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _worker = pair
+    doc = _doc()
+    doc["apps"][0]["external_scaler"] = True
+    _answering(monkeypatch, _Machine(doc))
+
+    await takeover.take_over(dbsession, None, node_id=head.id, name="dgx-pair", aliases={APP: "qwen2.5-0.5b-instruct"})
+
+    dep = await dbsession.get(InferenceDeployment, uuid.UUID("e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"))
+    assert dep.observed_status_json["last_run"]["external_scaler"] is True
+    assert dep.observed_status_json["observation"]["run"]["route_prefix"] == f"/{APP}"
