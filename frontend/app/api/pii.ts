@@ -80,6 +80,11 @@ export interface PIITenantPolicyPayload {
   override_policy: PIIPolicyConfig | null;
   default_policy: PIIPolicyConfig | null;
   effective_policy: PIIPolicyConfig | null;
+  /**
+   * Whether chats (and agents that follow the tenant) may change the PII mode.
+   * Absent from an older backend: off.
+   */
+  allow_mode_override?: boolean;
 }
 
 export interface PIITenantListResponse {
@@ -263,6 +268,20 @@ export function upsertPIITenantPolicy(
   );
 }
 
+/** Lets chats and agents change the PII mode, or not; the tenant's policy override stays as it is. */
+export function setPIITenantModeSwitch(
+  tenantId: string,
+  allowModeOverride: boolean,
+): Promise<PIITenantPolicyPayload> {
+  return request<PIITenantPolicyPayload>(
+    `/policies/tenants/${encodeURIComponent(tenantId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ allow_mode_override: allowModeOverride }),
+    },
+  );
+}
+
 export function clearPIITenantPolicy(
   tenantId: string,
 ): Promise<PIITenantPolicyPayload> {
@@ -295,7 +314,14 @@ export interface SessionPIIPolicy {
   has_override: boolean;
   override: SessionPIIOverride | null;
   floor: PIIPolicyConfig | null;
+  /** What the chat's requests get -- not what the override asks for. */
   effective: PIIPolicyConfig | null;
+  /** A mode the chat chooses is applied (the tenant allows it, or an admin saved it). */
+  mode_switch_allowed?: boolean;
+  /** The user may choose the mode now. */
+  can_switch_mode?: boolean;
+  /** False when the override asks for a mode its requests do not get. */
+  mode_applied?: boolean;
 }
 
 async function chatRequest<T>(

@@ -79,6 +79,7 @@ export function versionFixture(version: number, overrides: Partial<AgentVersion>
     host_tool_contract: [{ name: "read_range", risk: "read" }],
     local_mcp_mode: "disable",
     ui: {},
+    pii: { allow_mode_override: null },
     extensions: {},
     created_at: "2026-09-30T10:00:00Z",
     published_at: version === 1 ? "2026-09-30T10:05:00Z" : null,

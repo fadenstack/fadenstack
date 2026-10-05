@@ -21,7 +21,8 @@ from starlette.background import BackgroundTask
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.users import User
-from faden_backend.services.chat.gateway_client import GatewayChatClient, shared_client
+from faden_backend.services.chat.gateway_client import GatewayChatClient, pii_weaken_grant, shared_client
+from faden_backend.settings import settings
 from faden_backend.web.api.rbac import require_permission
 
 logger = logging.getLogger(__name__)
@@ -475,16 +476,31 @@ async def answer_approval(approval_id: str, request: Request) -> JSONResponse:
         return await _proxy_error(exc)
 
 
+async def _pii_weaken_grant(user: User, rbac_dao: RbacDAO, session_id: str | None) -> str | None:
+    """A signed grant that *user* may weaken the chat's PII policy, when they may; else ``None``.
+
+    Only this check decides: the gateway accepts the right only as a grant
+    signed with the users' secret, so a caller who reaches the gateway
+    directly cannot claim it.
+    """
+    allowed = user.is_superuser or await rbac_dao.has_permission(user.id, "pii.session", "weaken")
+    if not allowed or not settings.users_secret:
+        return None
+    return pii_weaken_grant(str(user.id), session_id, secret=settings.users_secret)
+
+
 @router.get("/pii-defaults")
 async def get_pii_defaults(
     request: Request,
     _user: User = Depends(require_permission("pii.session", "read")),
+    rbac_dao: RbacDAO = Depends(),
 ) -> JSONResponse:
     """Proxy ``GET /v1/pii-defaults`` — tenant PII floor (no session required)."""
     jwt = _jwt_from_cookie(request)
     client = _client()
     try:
-        data = await client.get_pii_defaults(jwt)
+        grant = await _pii_weaken_grant(_user, rbac_dao, None)
+        data = await client.get_pii_defaults(jwt, weaken_grant=grant)
         return JSONResponse(content=data)
     except Exception as exc:
         return await _proxy_error(exc)
@@ -495,12 +511,18 @@ async def get_session_pii_policy(
     session_id: str,
     request: Request,
     _user: User = Depends(require_permission("pii.session", "read")),
+    rbac_dao: RbacDAO = Depends(),
 ) -> JSONResponse:
-    """Proxy ``GET /v1/sessions/{session_id}/pii-policy`` to the API gateway."""
+    """Proxy ``GET /v1/sessions/{session_id}/pii-policy`` to the API gateway.
+
+    The weaken right goes along so the panel knows whether the caller may
+    switch the mode; the gateway stores nothing on a read.
+    """
     jwt = _jwt_from_cookie(request)
     client = _client()
     try:
-        data = await client.get_session_pii_policy(session_id, jwt)
+        grant = await _pii_weaken_grant(_user, rbac_dao, session_id)
+        data = await client.get_session_pii_policy(session_id, jwt, weaken_grant=grant)
         return JSONResponse(content=data)
     except Exception as exc:
         return await _proxy_error(exc)
@@ -513,19 +535,20 @@ async def patch_session_pii_policy(
     _user: User = Depends(require_permission("pii.session", "strengthen")),
     rbac_dao: RbacDAO = Depends(),
 ) -> JSONResponse:
-    """Proxy ``PATCH /v1/sessions/{session_id}/pii-policy`` to the API gateway."""
+    """Proxy ``PATCH /v1/sessions/{session_id}/pii-policy`` to the API gateway.
+
+    A caller with ``pii.session:weaken`` (or a superuser) sends the signed
+    grant: the gateway stores the right with the override, and the chat's
+    requests keep it.
+    """
     jwt = _jwt_from_cookie(request)
     body = await request.json()
 
-    # Soft-check: does the caller also have the 'weaken' privilege?
-    allow_weaken = _user.is_superuser or await rbac_dao.has_permission(
-        _user.id, "pii.session", "weaken",
-    )
-
     client = _client()
     try:
+        grant = await _pii_weaken_grant(_user, rbac_dao, session_id)
         data = await client.patch_session_pii_policy(
-            session_id, body, jwt, allow_weaken=allow_weaken,
+            session_id, body, jwt, weaken_grant=grant,
         )
         return JSONResponse(content=data)
     except Exception as exc:

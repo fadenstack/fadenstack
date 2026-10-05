@@ -30,6 +30,7 @@ from faden_gateway.db.models.gateway import (
     ChatSession,
     LLMGatewayRequestLog,
     ProviderType,
+    TenantLLMPolicy,
 )
 from faden_gateway.services.extensions import registry
 from faden_gateway.services.gateway import agent_manifests
@@ -44,7 +45,16 @@ from faden_gateway.services.gateway.agents import (
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.service import GatewayService, _agent_tools, _Prepared
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
-from tests.test_gateway_pipeline_combined import ALIAS, TEST_JWT_SECRET, _chunk, _Observability, _seed
+from faden_gateway.services.registry import service_registry
+from tests.test_gateway_pipeline_combined import (
+    ALIAS,
+    TEST_JWT_SECRET,
+    _chunk,
+    _install_pii,
+    _Observability,
+    _pii,
+    _seed,
+)
 
 AGENT_ID = str(uuid.uuid4())
 OTHER_AGENT_ID = str(uuid.uuid4())
@@ -413,6 +423,68 @@ async def test_unknown_agents_and_a_lost_backend_are_told_apart(client: AsyncCli
 @pytest.mark.anyio
 async def test_a_bad_conversation_id_is_refused(client: AsyncClient, backend: _Backend) -> None:
     r = await client.post(URL, headers=_headers(**{"X-Faden-Conversation-Id": "bad id!"}), json=_chat())
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_header"
+
+
+# -- the PII mode a conversation asks for -------------------------------------------------
+
+
+@pytest.fixture
+def pii_service(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """The PII service, faked: it records the mode of each scan. Switched off again after the test."""
+    yield _install_pii(monkeypatch)
+    service_registry.configure("pii", enabled=False, url=None)
+
+
+async def _tenant_switch(db_session: AsyncSession, on: bool) -> None:
+    policy = await db_session.get(TenantLLMPolicy, "tenant-a")
+    assert policy is not None
+    policy.allow_mode_override = on
+    await db_session.commit()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tenant", [False, True], ids=["tenant-off", "tenant-on"])
+@pytest.mark.parametrize("agent", [None, True, False], ids=["agent-follows", "agent-allows", "agent-refuses"])
+async def test_the_agents_pii_setting_decides_over_the_tenants(
+    tenant: bool, agent: bool | None,
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    pii_service: Any,
+) -> None:
+    """The conversation asks for tokenize (``X-Faden-PII-Mode``); the floor redacts."""
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=_pii("redact"))
+    await _tenant_switch(db_session, tenant)
+    backend.put(_profile(pii_allow_mode_override=agent))
+    fake = pii_service
+    sent: list[dict[str, Any]] = []
+    _model(monkeypatch, sent)
+
+    chat = {**_chat(), "messages": [{"role": "user", "content": "I am Alice"}]}
+    r = await client.post(URL, headers=_headers(**{"X-Faden-PII-Mode": "tokenize_reversible"}), json=chat)
+    assert r.status_code == 200, r.text
+    applied = agent if agent is not None else tenant
+    assert fake.modes == ["tokenize" if applied else "redact"]
+
+    profile = (await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())).json()
+    assert profile["pii"] == {"allow_mode_override": agent, "mode_switch_allowed": applied}, "the SDK can know"
+
+
+@pytest.mark.anyio
+async def test_without_a_mode_a_conversation_gets_the_tenants_and_a_bad_one_is_refused(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend, monkeypatch: pytest.MonkeyPatch,
+    pii_service: Any,
+) -> None:
+    await _seed(db_session, provider=ProviderType.REMOTE_OPENAI, pii=_pii("redact"))
+    backend.put(_profile(pii_allow_mode_override=True))
+    fake = pii_service
+    _model(monkeypatch, [])
+
+    r = await client.post(URL, headers=_headers(), json=_chat())
+    assert r.status_code == 200, r.text
+    assert fake.modes == ["redact"]
+
+    r = await client.post(URL, headers=_headers(**{"X-Faden-PII-Mode": "plaintext"}), json=_chat())
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "invalid_header"
 

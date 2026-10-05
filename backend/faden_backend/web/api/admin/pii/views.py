@@ -13,7 +13,7 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 from sqlalchemy import text
 from starlette import status
 
@@ -97,9 +97,52 @@ async def _system_default_policy(
 
 
 class TenantPolicyUpdateRequest(BaseModel):
-    """Request body for tenant PII policy override updates."""
+    """Request body for tenant PII policy override updates.
+
+    Each field is optional: a field left out keeps what the tenant has, so the
+    page can save its switch without writing a policy override.
+    """
 
     pii_config: dict[str, Any] = Field(default_factory=dict)
+    #: Whether a chat's (or an agent's conversation's) own choice of PII mode
+    #: -- redact or tokenize -- is applied. An agent's own setting overrides it.
+    allow_mode_override: StrictBool | None = None
+
+
+async def _tenant_row(gateway_session: Any, tenant_id: str) -> tuple[dict[str, Any] | None, bool]:
+    """The tenant's policy override and its mode switch (``False`` without a row)."""
+    row = (
+        await gateway_session.execute(
+            text(
+                """
+                SELECT pii_config, allow_mode_override
+                FROM tenant_llm_policy
+                WHERE tenant_id = :tenant_id
+                """,
+            ),
+            {"tenant_id": tenant_id},
+        )
+    ).first()
+    if row is None:
+        return None, False
+    override = row[0] if isinstance(row[0], dict) else None
+    return override, bool(row[1])
+
+
+def _tenant_payload(
+    tenant_id: str,
+    override_policy: dict[str, Any] | None,
+    default_policy: dict[str, Any] | None,
+    allow_mode_override: bool,
+) -> dict[str, Any]:
+    return {
+        "tenant_id": tenant_id,
+        "has_override": override_policy is not None,
+        "override_policy": override_policy,
+        "default_policy": default_policy,
+        "effective_policy": override_policy or default_policy,
+        "allow_mode_override": allow_mode_override,
+    }
 
 
 @router.get("/config/options", name="pii_config_options")
@@ -179,6 +222,16 @@ async def list_policy_tenants(
     return {"items": items}
 
 
+def _gateway_sessions(request: Request) -> Any:
+    session_factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
+    if session_factory is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gateway trace DB is not configured.",
+        )
+    return session_factory
+
+
 @router.get("/policies/tenants/{tenant_id}", name="pii_policy_tenant_get")
 async def get_tenant_policy(
     tenant_id: str,
@@ -186,37 +239,12 @@ async def get_tenant_policy(
     settings_dao: SystemSettingsDAO = Depends(),
     _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
-    """Return tenant override policy and effective resolved policy."""
-    session_factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
-    if session_factory is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gateway trace DB is not configured.",
-        )
-
-    async with session_factory() as gateway_session:
-        row = await gateway_session.execute(
-            text(
-                """
-                SELECT pii_config
-                FROM tenant_llm_policy
-                WHERE tenant_id = :tenant_id
-                """,
-            ),
-            {"tenant_id": tenant_id},
-        )
-        override = row.scalar_one_or_none()
+    """Return tenant override policy, effective resolved policy and the mode switch."""
+    async with _gateway_sessions(request)() as gateway_session:
+        override_policy, allow_mode_override = await _tenant_row(gateway_session, tenant_id)
 
     default_policy = await _system_default_policy(settings_dao)
-    override_policy = override if isinstance(override, dict) else None
-    effective_policy = override_policy or default_policy
-    return {
-        "tenant_id": tenant_id,
-        "has_override": override_policy is not None,
-        "override_policy": override_policy,
-        "default_policy": default_policy,
-        "effective_policy": effective_policy,
-    }
+    return _tenant_payload(tenant_id, override_policy, default_policy, allow_mode_override)
 
 
 @router.put("/policies/tenants/{tenant_id}", name="pii_policy_tenant_upsert")
@@ -227,40 +255,40 @@ async def upsert_tenant_policy(
     settings_dao: SystemSettingsDAO = Depends(),
     _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
-    """Create or update tenant PII policy override (pii_config)."""
-    session_factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
-    if session_factory is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gateway trace DB is not configured.",
-        )
+    """Create or update the tenant's PII policy override and its mode switch: what the body sends."""
+    write_config = "pii_config" in body.model_fields_set
+    write_switch = body.allow_mode_override is not None
 
-    async with session_factory() as gateway_session:
-        await gateway_session.execute(
-            text(
-                """
-                INSERT INTO tenant_llm_policy (tenant_id, pii_config, created_at, updated_at)
-                VALUES (:tenant_id, :pii_config::json, NOW(), NOW())
-                ON CONFLICT (tenant_id) DO UPDATE
-                SET pii_config = EXCLUDED.pii_config,
-                    updated_at = NOW()
-                """,
-            ),
-            {
-                "tenant_id": tenant_id,
-                "pii_config": json.dumps(body.pii_config) if body.pii_config else None,
-            },
-        )
-        await gateway_session.commit()
+    async with _gateway_sessions(request)() as gateway_session:
+        if write_config or write_switch:
+            # Only the columns sent change on an existing row; a new row starts from the defaults.
+            await gateway_session.execute(
+                text(
+                    """
+                    INSERT INTO tenant_llm_policy
+                        (tenant_id, pii_config, allow_mode_override, created_at, updated_at)
+                    VALUES (:tenant_id, CAST(:pii_config AS json), :allow_mode_override, NOW(), NOW())
+                    ON CONFLICT (tenant_id) DO UPDATE
+                    SET pii_config = CASE WHEN :write_config THEN EXCLUDED.pii_config
+                                          ELSE tenant_llm_policy.pii_config END,
+                        allow_mode_override = CASE WHEN :write_switch THEN EXCLUDED.allow_mode_override
+                                                   ELSE tenant_llm_policy.allow_mode_override END,
+                        updated_at = NOW()
+                    """,
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "pii_config": json.dumps(body.pii_config) if write_config and body.pii_config else None,
+                    "allow_mode_override": bool(body.allow_mode_override),
+                    "write_config": write_config,
+                    "write_switch": write_switch,
+                },
+            )
+            await gateway_session.commit()
+        override_policy, allow_mode_override = await _tenant_row(gateway_session, tenant_id)
 
     default_policy = await _system_default_policy(settings_dao)
-    return {
-        "tenant_id": tenant_id,
-        "has_override": True,
-        "override_policy": body.pii_config,
-        "default_policy": default_policy,
-        "effective_policy": body.pii_config or default_policy,
-    }
+    return _tenant_payload(tenant_id, override_policy, default_policy, allow_mode_override)
 
 
 @router.delete("/policies/tenants/{tenant_id}", name="pii_policy_tenant_delete")
@@ -270,15 +298,8 @@ async def clear_tenant_policy(
     settings_dao: SystemSettingsDAO = Depends(),
     _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
-    """Clear tenant PII policy override (set pii_config to NULL)."""
-    session_factory = getattr(request.app.state, "llm_graph_trace_session_factory", None)
-    if session_factory is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gateway trace DB is not configured.",
-        )
-
-    async with session_factory() as gateway_session:
+    """Clear tenant PII policy override (set pii_config to NULL); the mode switch stays as it is."""
+    async with _gateway_sessions(request)() as gateway_session:
         await gateway_session.execute(
             text(
                 """
@@ -291,15 +312,10 @@ async def clear_tenant_policy(
             {"tenant_id": tenant_id},
         )
         await gateway_session.commit()
+        _, allow_mode_override = await _tenant_row(gateway_session, tenant_id)
 
     default_policy = await _system_default_policy(settings_dao)
-    return {
-        "tenant_id": tenant_id,
-        "has_override": False,
-        "override_policy": None,
-        "default_policy": default_policy,
-        "effective_policy": default_policy,
-    }
+    return _tenant_payload(tenant_id, None, default_policy, allow_mode_override)
 
 
 @router.get("/stats", name="pii_stats")

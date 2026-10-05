@@ -1582,6 +1582,11 @@
     "precedence_hint": "Priorité : remplacement du locataire > défaut système > aucun.",
     "save_override_success": "Remplacement du locataire enregistré.",
     "clear_override_success": "Remplacement du locataire effacé.",
+    "mode_switch_title": "Chats et agents",
+    "mode_switch": "Autoriser les chats et les agents à changer le mode PII",
+    "mode_switch_help": "Activé : le panneau Confidentialité d'un chat peut passer de masquer à tokeniser, tout comme les conversations d'un agent, sauf si le réglage propre de l'agent en décide autrement. Désactivé : les requêtes utilisent le mode de cette politique ; seuls les administrateurs peuvent le changer, dans leurs propres chats.",
+    "mode_switch_saved": "Enregistré : si les chats et les agents peuvent changer le mode PII.",
+    "mode_switch_failed": "Échec de l'enregistrement : si les chats et les agents peuvent changer le mode PII.",
     "form": {
       "telemetry": "Télémétrie",
       "telemetry_enable": "Retirer les données personnelles de la télémétrie",
@@ -3445,6 +3450,7 @@
       "host_tool_contract": "Outils de l'hôte",
       "local_mcp_mode": "Serveurs MCP locaux",
       "ui": "Apparence",
+      "pii": "Confidentialité",
       "extensions": "Paramètres Enterprise"
     },
     "import": {
@@ -3491,6 +3497,14 @@
       "greeting": "Message d'accueil",
       "suggestions": "Suggestions",
       "suggestions_help": "Appuyez sur Entrée après chacune.",
+      "privacy": "Confidentialité",
+      "pii_mode": "Changer le mode PII",
+      "pii_mode_tenant": "Selon la politique PII du locataire",
+      "pii_mode_allow": "Autorisé",
+      "pii_mode_refuse": "Non autorisé",
+      "pii_mode_tenant_help": "Suit « Autoriser les chats et les agents à changer le mode PII » sur la page de la politique PII.",
+      "pii_mode_allow_help": "Une conversation peut passer de masquer à tokeniser (le SDK envoie X-Faden-PII-Mode), quel que soit le réglage du locataire.",
+      "pii_mode_refuse_help": "Les conversations reçoivent toujours le mode de la politique PII du locataire.",
       "extensions": "Paramètres Enterprise",
       "extensions_help": "Conservés tels quels. Modifiez-les par l'API."
     },

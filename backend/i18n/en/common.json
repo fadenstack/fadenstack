@@ -1580,6 +1580,11 @@
     "precedence_hint": "Precedence: tenant override > system default > none.",
     "save_override_success": "Tenant override saved.",
     "clear_override_success": "Tenant override cleared.",
+    "mode_switch_title": "Chats and agents",
+    "mode_switch": "Let chats and agents change the PII mode",
+    "mode_switch_help": "On: a chat's Privacy panel can switch between redact and tokenize, and so can an agent's conversations, unless the agent's own setting says otherwise. Off: requests use this policy's mode; only administrators can change it, in their own chats.",
+    "mode_switch_saved": "Saved: whether chats and agents may change the PII mode.",
+    "mode_switch_failed": "Failed to save whether chats and agents may change the PII mode.",
     "form": {
       "telemetry": "Telemetry",
       "telemetry_enable": "Remove personal data from telemetry",
@@ -3443,6 +3448,7 @@
       "host_tool_contract": "Host tools",
       "local_mcp_mode": "Local MCP servers",
       "ui": "Appearance",
+      "pii": "Privacy",
       "extensions": "Enterprise settings"
     },
     "import": {
@@ -3489,6 +3495,14 @@
       "greeting": "Greeting",
       "suggestions": "Suggested prompts",
       "suggestions_help": "Press Enter after each one.",
+      "privacy": "Privacy",
+      "pii_mode": "Changing the PII mode",
+      "pii_mode_tenant": "As the tenant's PII policy says",
+      "pii_mode_allow": "Allowed",
+      "pii_mode_refuse": "Not allowed",
+      "pii_mode_tenant_help": "Follows \"Let chats and agents change the PII mode\" on the PII policy page.",
+      "pii_mode_allow_help": "A conversation may switch between redact and tokenize (the SDK sends X-Faden-PII-Mode), whatever the tenant's setting.",
+      "pii_mode_refuse_help": "Conversations always get the mode of the tenant's PII policy.",
       "extensions": "Enterprise settings",
       "extensions_help": "Kept as they are. Change them through the API."
     },

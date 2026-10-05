@@ -6,8 +6,10 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
@@ -21,6 +23,7 @@ import {
   type PIIPolicyConfig,
   type PIIPolicyOptionsResponse,
   type PIITenantPolicyPayload,
+  setPIITenantModeSwitch,
   upsertPIITenantPolicy,
 } from "~/api/pii";
 
@@ -146,6 +149,23 @@ export default function PIITenantPoliciesPage() {
     }
   }
 
+  async function saveModeSwitch(allowed: boolean) {
+    const tenantId = tenantData?.tenant_id ?? tenantQuery.trim();
+    if (!tenantId) return;
+    setSaving(true);
+    setTenantError(null);
+    setStatusMessage(null);
+    try {
+      const saved = await setPIITenantModeSwitch(tenantId, allowed);
+      setTenantData(saved);
+      setStatusMessage(t("pii_policy.mode_switch_saved"));
+    } catch (error: unknown) {
+      setTenantError(error instanceof Error ? error.message : t("pii_policy.mode_switch_failed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function clearOverride() {
     const tenantId = tenantData?.tenant_id ?? tenantQuery.trim();
     if (!tenantId) return;
@@ -251,6 +271,25 @@ export default function PIITenantPoliciesPage() {
                 {saving ? t("common.loading") : t("common.save")}
               </Button>
             </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+              {t("pii_policy.mode_switch_title")}
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={tenantData.allow_mode_override ?? false}
+                  disabled={saving}
+                  onChange={(event) => void saveModeSwitch(event.target.checked)}
+                />
+              }
+              label={t("pii_policy.mode_switch")}
+            />
+            <Typography variant="body2" color="text.secondary">
+              {t("pii_policy.mode_switch_help")}
+            </Typography>
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 2 }}>

@@ -76,17 +76,22 @@ async def test_a_draft_serves_its_newest_version_a_published_agent_its_published
         assert draft.grant_users == {rows["user"]} and draft.grant_groups == {rows["group"]}
         assert draft.knowledge == ("kb-1",) and draft.server_tools == ("knowledge_*",)
         assert draft.host_tools == {"read_page"} and draft.ui == {"greeting": "Hi"}
+        assert draft.pii_allow_mode_override is None, "a version without PII settings follows the tenant"
 
         conn = await asyncpg.connect(rows["dsn"])
         await conn.execute(
             "UPDATE agents SET status = 'published', published_version_id = $1::uuid WHERE id = $2::uuid",
             rows["v1"], rows["agent"],
         )
+        await conn.execute(
+            """UPDATE agent_versions SET pii = '{"allow_mode_override": false}' WHERE id = $1::uuid""", rows["v1"],
+        )
         await conn.close()
         published = await backend.agent(("default", rows["agent"]))  # by id this time
         assert published is not None
         assert (published.published, published.version, published.instructions) == (True, 1, "First.")
         assert published.status == "published"
+        assert published.pii_allow_mode_override is False
 
         assert await backend.agent(("other-tenant", rows["slug"])) is None
         flags = await backend.user(rows["user"])

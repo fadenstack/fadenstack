@@ -22,16 +22,20 @@ import { useAsyncData } from "~/lib/useAsyncData";
 
 import {
   greetingOf,
+  piiModeSwitch,
   serverToolsMode,
   suggestionsOf,
+  withPiiModeSwitch,
   withServerToolsMode,
   withUi,
+  type PiiModeSwitch,
   type ServerToolsMode,
 } from "./agentDefinition";
 import { HostToolContractEditor } from "./HostToolContractEditor";
 
 const SERVER_TOOLS_MODES: ServerToolsMode[] = ["default", "listed", "none"];
 const LOCAL_MCP_MODES: LocalMcpMode[] = ["disable", "allow"];
+const PII_MODE_SWITCHES: PiiModeSwitch[] = ["tenant", "allow", "refuse"];
 
 export interface AgentDefinitionEditorProps {
   value: AgentDefinition;
@@ -48,6 +52,7 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
   );
   const set = <K extends keyof AgentDefinition>(key: K, next: AgentDefinition[K]) => onChange({ ...value, [key]: next });
   const toolsMode = serverToolsMode(value);
+  const piiSwitch = piiModeSwitch(value);
 
   return (
     <Stack spacing={2.5}>
@@ -120,6 +125,25 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
           {LOCAL_MCP_MODES.map((mode) => (
             <MenuItem key={mode} value={mode}>
               {t(`agents.definition.local_mcp_${mode}`)}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Section>
+
+      <Section title={t("agents.definition.privacy")}>
+        <TextField
+          select
+          size="small"
+          label={t("agents.definition.pii_mode")}
+          helperText={t(`agents.definition.pii_mode_${piiSwitch}_help`)}
+          value={piiSwitch}
+          disabled={readOnly}
+          onChange={(e) => onChange(withPiiModeSwitch(value, e.target.value as PiiModeSwitch))}
+          sx={{ maxWidth: 360 }}
+        >
+          {PII_MODE_SWITCHES.map((mode) => (
+            <MenuItem key={mode} value={mode}>
+              {t(`agents.definition.pii_mode_${mode}`)}
             </MenuItem>
           ))}
         </TextField>

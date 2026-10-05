@@ -603,6 +603,12 @@ class SessionPIIOverrideRow(Base):
     telemetry_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     presidio_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     presidio_entities_add: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    #: The override was last saved by someone who may weaken the tenant's policy
+    #: (an admin or superuser: the backend's signed grant, ``X-PII-Allow-Weaken``).
+    #: The chat's requests keep that right. Never set from the request body.
+    allow_weaken: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false",
+    )
     updated_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),

@@ -17,11 +17,14 @@ from __future__ import annotations
 
 import logging
 import json
+import time
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
+import jwt as pyjwt
 
 from faden_backend.settings import settings
 from faden_backend.services.tls import default_httpx_verify
@@ -35,6 +38,30 @@ _READ_TIMEOUT = 300.0  # 5 min for long generation
 #: trace id a reply's info button opens the debug panel with, and the reply's
 #: row in the chat (its turn), which the page tries again.
 FORWARDED_STREAM_HEADERS = ("x-langfuse-trace-id", "x-faden-turn-id")
+
+#: The header that carries a caller's right to weaken a chat's PII policy below
+#: the tenant's (``pii.session:weaken``, or a superuser). Its value is a grant
+#: only the backend can sign -- a short JWT with the users' secret, for one user
+#: and one chat -- so a caller who reaches the gateway directly cannot claim the
+#: right. The gateway stores it with the chat's override.
+PII_WEAKEN_HEADER = "X-PII-Allow-Weaken"
+#: The ``typ`` of the grant; the gateway accepts no other token in that header.
+PII_WEAKEN_TOKEN_TYPE = "pii_weaken"  # noqa: S105 - a claim value, not a secret
+PII_WEAKEN_TTL_SEC = 60
+
+
+def pii_weaken_grant(user_id: str, session_id: str | None, *, secret: str) -> str:
+    """The signed grant that *user_id* may weaken the PII policy of *session_id* ("" before a chat exists)."""
+    now = int(time.time())
+    claims = {
+        "typ": PII_WEAKEN_TOKEN_TYPE,
+        "sub": user_id,
+        "sid": session_id or "",
+        "jti": uuid.uuid4().hex,
+        "iat": now,
+        "exp": now + PII_WEAKEN_TTL_SEC,
+    }
+    return pyjwt.encode(claims, secret, algorithm="HS256")
 
 
 async def _nothing() -> None:
@@ -534,38 +561,43 @@ class GatewayChatClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def get_pii_defaults(self, jwt: str) -> Any:
+    @staticmethod
+    def _pii_headers(jwt: str, weaken_grant: str | None) -> dict[str, str]:
+        headers = GatewayChatClient._headers(jwt)
+        if weaken_grant:
+            headers[PII_WEAKEN_HEADER] = weaken_grant
+        return headers
+
+    async def get_pii_defaults(self, jwt: str, *, weaken_grant: str | None = None) -> Any:
         client = self._ensure_client()
         resp = await client.get(
             "/v1/pii-defaults",
-            headers=self._headers(jwt),
+            headers=self._pii_headers(jwt, weaken_grant),
         )
         resp.raise_for_status()
         return resp.json()
 
     async def get_session_pii_policy(
-        self, session_id: str, jwt: str,
+        self, session_id: str, jwt: str, *, weaken_grant: str | None = None,
     ) -> Any:
         client = self._ensure_client()
         resp = await client.get(
             f"/v1/sessions/{session_id}/pii-policy",
-            headers=self._headers(jwt),
+            headers=self._pii_headers(jwt, weaken_grant),
         )
         resp.raise_for_status()
         return resp.json()
 
     async def patch_session_pii_policy(
         self, session_id: str, body: dict[str, Any], jwt: str,
-        *, allow_weaken: bool = False,
+        *, weaken_grant: str | None = None,
     ) -> Any:
+        """Save the chat's override; *weaken_grant* (``pii_weaken_grant``) is stored with it as the weaken right."""
         client = self._ensure_client()
-        headers = self._headers(jwt)
-        if allow_weaken:
-            headers["X-PII-Allow-Weaken"] = "true"
         resp = await client.patch(
             f"/v1/sessions/{session_id}/pii-policy",
             json=body,
-            headers=headers,
+            headers=self._pii_headers(jwt, weaken_grant),
         )
         resp.raise_for_status()
         return resp.json()

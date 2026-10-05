@@ -46,6 +46,7 @@ from faden_gateway.services.gateway.auth import (
     get_auth_context_from_claims,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
+from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions
 
@@ -57,6 +58,10 @@ CONVERSATION_HEADER = "x-faden-conversation-id"
 TURN_HEADER = "x-faden-turn-id"
 #: The tools held back from the request, because the agent's contract does not list them.
 HELD_TOOLS_HEADER = "x-faden-held-tools"
+#: The PII egress mode the conversation asks for (``redact``, ``tokenize_reversible``). Applied when
+#: the agent (``pii.allow_mode_override``), or with none set the tenant, lets conversations switch it;
+#: otherwise the request gets the tenant's mode.
+PII_MODE_HEADER = "x-faden-pii-mode"
 #: The model the SDKs send to an agent's route: "the agent's" -- the field is required.
 SDK_MODEL_PLACEHOLDER = "agent"
 
@@ -75,6 +80,20 @@ def _header_id(request: Request, name: str) -> str | None:
             message=f"{name} must be 1-128 characters of letters, digits and . _ : -",
             code="invalid_header",
             param=name,
+        )
+    return value
+
+
+def _pii_mode(request: Request) -> str | None:
+    value = request.headers.get(PII_MODE_HEADER, "").strip()
+    if not value:
+        return None
+    if value not in VALID_EGRESS_MODES:
+        raise GatewayError(
+            status_code=400,
+            message=f"{PII_MODE_HEADER} must be one of: " + ", ".join(sorted(VALID_EGRESS_MODES)),
+            code="invalid_header",
+            param=PII_MODE_HEADER,
         )
     return value
 
@@ -151,6 +170,7 @@ async def agent_request(
         turn_id=_header_id(request, TURN_HEADER),
         developer_mode=bool(claims.get("dev")),
         maintainer=decision.maintainer,
+        pii_mode=_pii_mode(request),
     )
 
 
@@ -272,10 +292,13 @@ async def agent_chat_completions(
 async def agent_profile(
     request: Request,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    dao: Annotated[GatewayDAO, Depends()],
 ) -> dict[str, Any]:
     """What the SDK caches about the agent: never its instructions, only their hash."""
     auth, agent = caller
     profile = agent.agent
+    tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
+    tenant_allows = bool(getattr(tenant_policy, "allow_mode_override", False)) if tenant_policy else False
     groups: tuple[str, ...] = ()
     resolver = getattr(request.app.state, "group_membership_resolver", None)
     if registry.tool_mode_ceilings and resolver is not None:
@@ -307,6 +330,14 @@ async def agent_profile(
             "default": tool_classes.DEFAULT_MODE,
             "ceiling": top.value if top else None,
             "open_world_enforced": tool_classes.OPEN_WORLD_ENFORCED,
+        },
+        # Whether the conversation's own PII mode (X-Faden-PII-Mode) is applied: the agent's
+        # setting, or the tenant's when the agent has none.
+        "pii": {
+            "allow_mode_override": profile.pii_allow_mode_override,
+            "mode_switch_allowed": mode_switch_allowed(
+                tenant_default=tenant_allows, agent_setting=profile.pii_allow_mode_override,
+            ),
         },
         "ui": profile.ui,
         "extensions": profile.extensions,

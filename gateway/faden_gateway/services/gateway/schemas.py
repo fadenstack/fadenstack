@@ -160,7 +160,15 @@ class SessionPIIPolicyDTO(BaseModel):
     has_override: bool
     override: SessionPIIOverrideDTO | None = None
     floor: dict[str, Any] | None = None
+    #: What the chat's requests get (``resolve_session_pii``), not what the override asks for.
     effective: dict[str, Any] | None = None
+    #: A mode the chat chooses is applied: the tenant allows it, or the override
+    #: was saved with the right to weaken.
+    mode_switch_allowed: bool = False
+    #: The caller may choose the mode now: it is allowed, or the caller may weaken.
+    can_switch_mode: bool = False
+    #: False when the override asks for a mode its requests do not get.
+    mode_applied: bool = True
 
 
 class SessionPIIPolicyPatchDTO(BaseModel):

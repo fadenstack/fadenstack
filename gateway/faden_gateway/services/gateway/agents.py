@@ -38,7 +38,7 @@ _AGENT_SQL = """
 SELECT a.id::text AS id, a.tenant_id, a.slug, a.name, a.status::text AS status,
        (a.published_version_id IS NOT NULL) AS published,
        v.version, v.instructions, v.model_alias, v.knowledge, v.server_tools,
-       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.extensions,
+       v.host_tool_contract, v.local_mcp_mode::text AS local_mcp_mode, v.ui, v.pii, v.extensions,
        ARRAY(SELECT m.user_id::text FROM agent_members m
              WHERE m.agent_id = a.id AND m.role = 'maintainer') AS maintainers,
        ARRAY(SELECT g.principal_id::text FROM agent_grants g
@@ -68,6 +68,12 @@ def _json(value: Any, default: Any) -> Any:
     return value
 
 
+def _tri_state(settings: Any, key: str) -> bool | None:
+    """``settings[key]`` when it is a boolean; anything else is unset (``None``)."""
+    value = settings.get(key) if isinstance(settings, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 @dataclass(frozen=True)
 class AgentProfile:
     """An agent and the version it serves."""
@@ -91,6 +97,9 @@ class AgentProfile:
     grant_users: frozenset[str]
     grant_groups: frozenset[str]
     instructions_sha256: str = ""
+    #: Whether the agent's conversations may switch the PII mode (``pii.allow_mode_override``
+    #: of the version); ``None`` follows the tenant's setting.
+    pii_allow_mode_override: bool | None = None
 
     @property
     def host_tools(self) -> frozenset[str]:
@@ -121,6 +130,7 @@ class AgentProfile:
             grant_users=frozenset(row["grant_users"] or ()),
             grant_groups=frozenset(row["grant_groups"] or ()),
             instructions_sha256=hashlib.sha256(instructions.encode()).hexdigest(),
+            pii_allow_mode_override=_tri_state(_json(row["pii"], {}), "allow_mode_override"),
         )
 
 
@@ -364,6 +374,9 @@ class AgentRequest:
     turn_id: str | None = None
     developer_mode: bool = False
     maintainer: bool = False
+    #: The PII egress mode the conversation asks for (``X-Faden-PII-Mode``); applied only when the
+    #: agent's setting, or the tenant's, lets conversations switch it.
+    pii_mode: str | None = None
 
     @property
     def id(self) -> str:

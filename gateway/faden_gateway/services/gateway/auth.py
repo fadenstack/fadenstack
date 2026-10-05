@@ -59,6 +59,40 @@ async def _refresh_jwt_secret_if_needed() -> None:
 AGENT_TOKEN_TYPE = "agent"  # noqa: S105 - a claim value, not a secret
 
 
+#: The header the backend sends a caller's right to weaken a chat's PII policy in.
+PII_WEAKEN_HEADER = "X-PII-Allow-Weaken"
+#: The ``typ`` of the grant it carries: a short JWT the backend signs with the shared
+#: secret after its own check (``pii.session:weaken``, or a superuser).
+PII_WEAKEN_TOKEN_TYPE = "pii_weaken"  # noqa: S105 - a claim value, not a secret
+
+
+def pii_weaken_granted(value: str | None, auth: AuthContext, session_id: str = "") -> bool:
+    """Whether *value* (the ``X-PII-Allow-Weaken`` header) is the backend's grant for this caller and chat.
+
+    Anything else -- the old ``true``, the caller's own token, a grant for
+    another user or chat, an expired one -- is no right: a caller who reaches
+    the gateway directly cannot claim it. *session_id* is ``""`` before a chat
+    exists (``/v1/pii-defaults``).
+    """
+    token = (value or "").strip()
+    if not token or not settings.jwt_secret:
+        return False
+    try:
+        claims = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False, "require": ["exp", "sub", "typ"]},
+        )
+    except jwt.PyJWTError:
+        return False
+    return (
+        claims.get("typ") == PII_WEAKEN_TOKEN_TYPE
+        and str(claims.get("sub")) == auth.user_id
+        and str(claims.get("sid", "")) == session_id
+    )
+
+
 def verify_token(token: str, *, check_audience: bool = True) -> dict[str, Any]:
     """Verify JWT token and return claims.
 
@@ -95,6 +129,14 @@ def verify_token(token: str, *, check_audience: bool = True) -> dict[str, Any]:
             message="Invalid JWT token.",
             code="invalid_token",
         ) from exc
+    if claims.get("typ") == PII_WEAKEN_TOKEN_TYPE:
+        # A weaken grant is a claim about one chat, never a sign-in: without a
+        # configured audience nothing else would tell it from a user's token.
+        raise GatewayError(
+            status_code=401,
+            message="Invalid JWT token.",
+            code="invalid_token",
+        )
     return claims
 
 

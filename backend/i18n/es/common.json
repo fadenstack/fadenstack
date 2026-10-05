@@ -1448,6 +1448,11 @@
     "precedence_hint": "Precedencia: override de inquilino > predeterminado del sistema > ninguno.",
     "save_override_success": "Override del inquilino guardado.",
     "clear_override_success": "Override del inquilino eliminado.",
+    "mode_switch_title": "Chats y agentes",
+    "mode_switch": "Permitir que los chats y los agentes cambien el modo PII",
+    "mode_switch_help": "Activado: el panel de privacidad de un chat puede cambiar entre redactar y tokenizar, y también las conversaciones de un agente, salvo que el propio ajuste del agente diga otra cosa. Desactivado: las solicitudes usan el modo de esta política; solo los administradores pueden cambiarlo, en sus propios chats.",
+    "mode_switch_saved": "Guardado: si los chats y los agentes pueden cambiar el modo PII.",
+    "mode_switch_failed": "No se pudo guardar si los chats y los agentes pueden cambiar el modo PII.",
     "form": {
       "telemetry": "Telemetría",
       "telemetry_enable": "Eliminar datos personales de la telemetría",
@@ -3445,6 +3450,7 @@
       "host_tool_contract": "Herramientas del anfitrión",
       "local_mcp_mode": "Servidores MCP locales",
       "ui": "Apariencia",
+      "pii": "Privacidad",
       "extensions": "Ajustes Enterprise"
     },
     "import": {
@@ -3491,6 +3497,14 @@
       "greeting": "Saludo",
       "suggestions": "Sugerencias",
       "suggestions_help": "Pulse Intro después de cada una.",
+      "privacy": "Privacidad",
+      "pii_mode": "Cambiar el modo PII",
+      "pii_mode_tenant": "Según la política PII del inquilino",
+      "pii_mode_allow": "Permitido",
+      "pii_mode_refuse": "No permitido",
+      "pii_mode_tenant_help": "Sigue «Permitir que los chats y los agentes cambien el modo PII» en la página de la política PII.",
+      "pii_mode_allow_help": "Una conversación puede cambiar entre redactar y tokenizar (el SDK envía X-Faden-PII-Mode), sea cual sea el ajuste del inquilino.",
+      "pii_mode_refuse_help": "Las conversaciones siempre usan el modo de la política PII del inquilino.",
       "extensions": "Ajustes Enterprise",
       "extensions_help": "Se mantienen tal cual. Cámbielos mediante la API."
     },

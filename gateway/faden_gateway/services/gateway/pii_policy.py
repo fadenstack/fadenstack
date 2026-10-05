@@ -270,3 +270,128 @@ def clamp_and_merge(
         )
 
     return PIIPolicy(egress=egress, telemetry=telemetry, presidio=presidio)
+
+
+# ── A session's effective policy: the one place it is computed ───
+
+
+def mode_switch_allowed(
+    *,
+    tenant_default: bool,
+    agent_setting: bool | None = None,
+    weaken: bool = False,
+) -> bool:
+    """Whether a session's own choice of egress mode (redact, tokenize) is applied.
+
+    It is when the override was saved by someone who may weaken the tenant's
+    policy (*weaken*: weakening implies switching the mode), or the agent the
+    session runs under allows it (*agent_setting* true), or the agent leaves it
+    to the tenant (``None``, as every console chat does) and the tenant allows
+    it (*tenant_default*: ``tenant_llm_policy.allow_mode_override``). An agent
+    set to false refuses it whatever the tenant says.
+    """
+    if weaken:
+        return True
+    if agent_setting is not None:
+        return agent_setting
+    return tenant_default
+
+
+@dataclass(frozen=True, slots=True)
+class SessionPIIResolution:
+    """A session's PII policy as its requests get it, and what decided its mode."""
+
+    #: The tenant's policy, or the system default: what an override is clamped to.
+    floor: PIIPolicy | None
+    #: What the session's requests get; ``None`` when no PII policy applies.
+    effective: PIIPolicy | None
+    #: A mode the session's override asks for is applied (``mode_switch_allowed``).
+    mode_switch_allowed: bool
+    #: The valid egress mode the override asks for, if any.
+    requested_mode: str | None = None
+    #: The override was saved with the right to weaken.
+    weaken: bool = False
+
+    @property
+    def mode_applied(self) -> bool:
+        """False when the override asks for a mode its requests do not get."""
+        if self.requested_mode is None or self.effective is None:
+            return True
+        return self.effective.egress.mode == self.requested_mode
+
+
+def resolve_floor(
+    tenant_policy: Any | None, default_policy: dict[str, Any] | None = None,
+) -> PIIPolicy | None:
+    """The PII floor: the tenant's ``pii_config``, else the system default, else none."""
+    raw = getattr(tenant_policy, "pii_config", None) if tenant_policy is not None else None
+    floor = parse_pii_policy(raw) if raw else None
+    if floor is None and default_policy:
+        floor = parse_pii_policy(default_policy)
+    return floor
+
+
+def _override_of(row: Any) -> SessionPIIOverride:
+    if isinstance(row, SessionPIIOverride):
+        return row
+    return SessionPIIOverride(
+        pii_enabled=row.pii_enabled,
+        egress_enabled_for_cloud=row.egress_enabled_for_cloud,
+        egress_enabled_for_local=row.egress_enabled_for_local,
+        egress_mode=row.egress_mode,
+        egress_fail_action=row.egress_fail_action,
+        telemetry_enabled=row.telemetry_enabled,
+        telemetry_mode=row.telemetry_mode,
+        presidio_threshold=row.presidio_threshold,
+        presidio_entities_add=row.presidio_entities_add,
+    )
+
+
+#: ``resolve_session_pii``'s default: the system default policy from the settings.
+_SYSTEM_DEFAULT: Any = object()
+
+
+def resolve_session_pii(
+    tenant_policy: Any | None,
+    override: Any | None = None,
+    *,
+    agent_allow_mode_override: bool | None = None,
+    default_policy: dict[str, Any] | None = _SYSTEM_DEFAULT,
+) -> SessionPIIResolution:
+    """A session's effective PII policy: the panel shows it, and its requests get it.
+
+    *tenant_policy* is the ``TenantLLMPolicy`` row (its ``pii_config`` and its
+    ``allow_mode_override``, the tenant default); *override* the session's
+    ``SessionPIIOverrideRow`` -- with ``allow_weaken``, the right it was saved
+    with -- or a ``SessionPIIOverride`` (an agent's conversation, which has no
+    stored override and no weaken right); *agent_allow_mode_override* the
+    setting of the agent the session runs under (``None`` for a console chat).
+    *default_policy* is the system default, used when the tenant has none
+    (``settings.pii_default_policy`` unless given).
+    """
+    if default_policy is _SYSTEM_DEFAULT:
+        from faden_gateway.settings import settings  # noqa: PLC0415
+
+        default_policy = getattr(settings, "pii_default_policy", None)
+    floor = resolve_floor(tenant_policy, default_policy)
+    # Only a real ``true`` counts: a missing column or a stand-in object never switches the mode.
+    tenant_default = getattr(tenant_policy, "allow_mode_override", False) is True
+    weaken = getattr(override, "allow_weaken", False) is True
+    allowed = mode_switch_allowed(
+        tenant_default=tenant_default, agent_setting=agent_allow_mode_override, weaken=weaken,
+    )
+    if override is None:
+        return SessionPIIResolution(floor=floor, effective=floor, mode_switch_allowed=allowed)
+    merged = _override_of(override)
+    requested = merged.egress_mode if merged.egress_mode in VALID_EGRESS_MODES else None
+    effective = (
+        clamp_and_merge(floor, merged, allow_mode_override=allowed, allow_weaken=weaken)
+        if floor is not None else None
+    )
+    return SessionPIIResolution(
+        floor=floor,
+        effective=effective,
+        mode_switch_allowed=allowed,
+        requested_mode=requested,
+        weaken=weaken,
+    )

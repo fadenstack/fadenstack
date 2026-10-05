@@ -85,6 +85,28 @@ describe("AgentDetail", () => {
     expect(screen.getByRole("textbox", { name: "Instructions" })).toHaveValue("Instructions v1 More.");
   });
 
+  it("saves whether conversations may change the PII mode as part of a new version", async () => {
+    api.addVersion.mockResolvedValue(versionFixture(2, { pii: { allow_mode_override: false } }));
+    openAgent();
+
+    const select = await screen.findByRole("combobox", { name: "Changing the PII mode" });
+    expect(select).toHaveTextContent("As the tenant's PII policy says");
+    expect(screen.getByText(/Follows "Let chats and agents change the PII mode"/)).toBeInTheDocument();
+
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByRole("option", { name: "Not allowed" }));
+    expect(screen.getByText("Unsaved changes: Privacy")).toBeInTheDocument();
+    expect(screen.getByText("Conversations always get the mode of the tenant's PII policy.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save as new version" }));
+    await waitFor(() =>
+      expect(api.addVersion).toHaveBeenCalledWith(
+        "excel-assistant",
+        expect.objectContaining({ pii: { allow_mode_override: false } }),
+      ),
+    );
+  });
+
   it("is read-only for someone who does not manage the agent", async () => {
     api.get.mockResolvedValue(agentFixture({ can_manage: false }));
     openAgent();

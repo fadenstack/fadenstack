@@ -192,6 +192,42 @@ async def test_host_tool_names_are_unique(signed_in: _As, client: AsyncClient, d
     assert r.status_code == status.HTTP_400_BAD_REQUEST
 
 
+async def test_the_pii_mode_setting_is_versioned_and_follows_the_tenant_unless_set(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    agent = await _agent(client, slug="pii-helper")
+    first = (await client.get("/api/agents/pii-helper/versions/1")).json()
+    assert first["pii"] == {"allow_mode_override": None}, "unset: the tenant's setting applies"
+
+    r = await client.post("/api/agents/pii-helper/versions", json={"pii": {"allow_mode_override": True}})
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    assert r.json()["pii"] == {"allow_mode_override": True}
+    r = await client.post("/api/agents/pii-helper/versions", json={"pii": {"allow_mode_override": False}})
+    assert r.json()["pii"] == {"allow_mode_override": False}
+    assert (await client.get("/api/agents/pii-helper/versions/2")).json()["pii"] == {"allow_mode_override": True}
+
+    row = (await dbsession.execute(
+        select(AgentVersion).where(AgentVersion.agent_id == uuid.UUID(agent["id"]), AgentVersion.version == 3),
+    )).scalar_one()
+    assert row.pii == {"allow_mode_override": False}, "as the gateway reads it"
+
+
+@pytest.mark.parametrize("pii", [
+    {"allow_mode_override": "yes"},
+    {"allow_mode_override": 1},
+    {"allow_mode_override": "true"},
+    {"allow_mode_override": True, "mode": "tokenize_reversible"},
+    "allow",
+])
+async def test_the_pii_mode_setting_is_true_false_or_null_only(
+    pii: Any, signed_in: _As, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    signed_in.user = await _user(dbsession, admin=True)
+    r = await client.post("/api/agents", json={"slug": "bad-pii", "name": "x", "version": {"pii": pii}})
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT, r.text
+
+
 async def test_enterprise_settings_are_refused_without_an_extension_to_enforce_them(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession, clean_registry: None,
 ) -> None:
@@ -433,7 +469,7 @@ async def test_what_the_apps_bring_is_reviewed_and_taken_in_with_one_click(
     signed_in: _As, client: AsyncClient, dbsession: AsyncSession, gateway_reports: Any,
 ) -> None:
     signed_in.user = admin = await _user(dbsession, admin=True)
-    agent = await _agent(client, slug="eplan-helper", host_tool_contract=[
+    agent = await _agent(client, slug="eplan-helper", pii={"allow_mode_override": True}, host_tool_contract=[
         {"name": "read_page", "risk": "read"}, {"name": "write_page", "risk": "write", "schema_sha256": "old"},
     ])
     await gateway_reports(agent["id"], admin, {
@@ -477,6 +513,7 @@ async def test_what_the_apps_bring_is_reviewed_and_taken_in_with_one_click(
         {"name": "delete_page", "risk": "destructive", "schema_sha256": "d"},
     ]
     assert version["ui"] == {"greeting": "Ask about your project."}
+    assert version["pii"] == {"allow_mode_override": True}, "the rest of the definition is kept"
     assert (await client.get("/api/agents/eplan-helper")).json()["published_version"] == 2
     after = (await client.get("/api/agents/eplan-helper/apps")).json()
     assert after["pending"] == 1 and after["ui"] is None, "only the held-back export_pdf is left"

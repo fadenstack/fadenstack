@@ -9,9 +9,11 @@ import {
   definitionOf,
   definitionProblems,
   parseAgentImport,
+  piiModeSwitch,
   serverToolsMode,
   slugFromName,
   suggestionsOf,
+  withPiiModeSwitch,
   withServerToolsMode,
   withUi,
 } from "./agentDefinition";
@@ -72,6 +74,32 @@ describe("agent definitions", () => {
     expect(withServerToolsMode({ ...EMPTY_DEFINITION, server_tools: ["knowledge_*"] }, "listed").server_tools).toEqual([
       "knowledge_*",
     ]);
+  });
+});
+
+describe("the PII mode setting", () => {
+  it("is null (the tenant decides), true or false", () => {
+    expect(EMPTY_DEFINITION.pii).toEqual({ allow_mode_override: null });
+    expect(piiModeSwitch(EMPTY_DEFINITION)).toBe("tenant");
+    const allowed = withPiiModeSwitch(EMPTY_DEFINITION, "allow");
+    expect(allowed.pii).toEqual({ allow_mode_override: true });
+    expect(piiModeSwitch(withPiiModeSwitch(allowed, "refuse"))).toBe("refuse");
+    expect(withPiiModeSwitch(allowed, "tenant").pii).toEqual({ allow_mode_override: null });
+  });
+
+  it("is a field of the definition, compared and versioned like the others", () => {
+    const before = definitionOf(VERSION);
+    expect(changedFields(before, withPiiModeSwitch(before, "allow"))).toEqual(["pii"]);
+    expect(changedFields(before, withPiiModeSwitch(before, "tenant"))).toEqual([]);
+  });
+
+  it("reads anything but true or false as following the tenant", () => {
+    const odd = { ...VERSION, pii: { allow_mode_override: "yes" } } as unknown as AgentVersion;
+    expect(definitionOf(odd).pii).toEqual({ allow_mode_override: null });
+    const missing = { ...VERSION, pii: undefined } as unknown as AgentVersion;
+    expect(definitionOf(missing).pii).toEqual({ allow_mode_override: null });
+    const imported = parseAgentImport(JSON.stringify({ version: { pii: { allow_mode_override: false, x: 1 } } }));
+    expect(imported.definition.pii).toEqual({ allow_mode_override: false });
   });
 });
 

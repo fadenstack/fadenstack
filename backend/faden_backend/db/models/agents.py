@@ -140,6 +140,10 @@ class AgentVersion(Base):
     )
     #: Greeting, starter prompts, icon.
     ui: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    #: PII settings of the agent's conversations: ``{allow_mode_override: true | false | null}``.
+    #: ``allow_mode_override`` lets a conversation switch the egress mode (redact, tokenize);
+    #: null (or absent) follows the tenant's setting on the PII policy page. The gateway reads it.
+    pii: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     #: One key per Enterprise extension, validated by that extension.
     extensions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_by: Mapped[uuid.UUID | None] = mapped_column(

@@ -29,6 +29,12 @@ export interface HostTool {
 }
 
 /** What a version defines. Versions never change: a change is a new version. */
+/** What the agent's conversations may change about PII. */
+export interface AgentPii {
+  /** Whether a conversation may switch the PII mode (redact, tokenize); null follows the tenant's setting. */
+  allow_mode_override: boolean | null;
+}
+
 export interface AgentDefinition {
   instructions: string;
   model_alias: string | null;
@@ -39,6 +45,7 @@ export interface AgentDefinition {
   local_mcp_mode: LocalMcpMode;
   /** What the SDKs show: `greeting`, `suggestions`. */
   ui: Record<string, unknown>;
+  pii: AgentPii;
   /** Enterprise settings; kept as they are. */
   extensions: Record<string, unknown>;
 }

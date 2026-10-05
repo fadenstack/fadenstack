@@ -548,11 +548,15 @@ class GatewayDAO:
         user_id: str,
         *,
         updated_by: str | None = None,
+        allow_weaken: bool = False,
         **fields: object,
     ) -> SessionPIIOverrideRow:
         """Create or update a session PII override (ownership-scoped).
 
         Only columns present in *fields* are updated; ``None`` means inherit.
+        *allow_weaken* is whether this save is made with the right to weaken
+        the tenant's policy; every save records it, so the override keeps the
+        right of whoever saved it last. It is never taken from *fields*.
         Raises ValueError if no matching owned session exists.
         """
         # Verify ownership
@@ -567,11 +571,12 @@ class GatewayDAO:
             self.session.add(row)
 
         allowed = {c.key for c in SessionPIIOverrideRow.__table__.columns} - {
-            "session_id", "created_at", "updated_at",
+            "session_id", "created_at", "updated_at", "allow_weaken",
         }
         for key, value in fields.items():
             if key in allowed:
                 setattr(row, key, value)
+        row.allow_weaken = bool(allow_weaken)
         if updated_by is not None:
             row.updated_by = updated_by  # type: ignore[assignment]
 

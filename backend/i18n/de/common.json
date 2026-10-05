@@ -1448,6 +1448,11 @@
     "precedence_hint": "Prioritaet: Mandanten-Override > Systemstandard > keine.",
     "save_override_success": "Mandanten-Override gespeichert.",
     "clear_override_success": "Mandanten-Override geloescht.",
+    "mode_switch_title": "Chats und Agenten",
+    "mode_switch": "Chats und Agenten dürfen den PII-Modus ändern",
+    "mode_switch_help": "An: Im Datenschutz-Bereich eines Chats lässt sich zwischen Schwärzen und Tokenisieren wechseln, ebenso in den Unterhaltungen eines Agenten, sofern dessen eigene Einstellung nichts anderes sagt. Aus: Anfragen nutzen den Modus dieser Richtlinie; nur Administratoren können ihn ändern, in ihren eigenen Chats.",
+    "mode_switch_saved": "Gespeichert: ob Chats und Agenten den PII-Modus ändern dürfen.",
+    "mode_switch_failed": "Speichern fehlgeschlagen: ob Chats und Agenten den PII-Modus ändern dürfen.",
     "form": {
       "telemetry": "Telemetrie",
       "telemetry_enable": "Personenbezogene Daten aus der Telemetrie entfernen",
@@ -3445,6 +3450,7 @@
       "host_tool_contract": "Host-Tools",
       "local_mcp_mode": "Lokale MCP-Server",
       "ui": "Darstellung",
+      "pii": "Datenschutz",
       "extensions": "Enterprise-Einstellungen"
     },
     "import": {
@@ -3491,6 +3497,14 @@
       "greeting": "Begrüßung",
       "suggestions": "Vorgeschlagene Eingaben",
       "suggestions_help": "Nach jeder Eingabe Enter drücken.",
+      "privacy": "Datenschutz",
+      "pii_mode": "PII-Modus ändern",
+      "pii_mode_tenant": "Wie die PII-Richtlinie des Mandanten sagt",
+      "pii_mode_allow": "Erlaubt",
+      "pii_mode_refuse": "Nicht erlaubt",
+      "pii_mode_tenant_help": "Folgt „Chats und Agenten dürfen den PII-Modus ändern“ auf der Seite der PII-Richtlinie.",
+      "pii_mode_allow_help": "Eine Unterhaltung darf zwischen Schwärzen und Tokenisieren wechseln (das SDK sendet X-Faden-PII-Mode), unabhängig von der Einstellung des Mandanten.",
+      "pii_mode_refuse_help": "Unterhaltungen bekommen immer den Modus der PII-Richtlinie des Mandanten.",
       "extensions": "Enterprise-Einstellungen",
       "extensions_help": "Bleiben unverändert. Änderungen über die API."
     },

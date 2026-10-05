@@ -46,7 +46,7 @@ from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from faden_gateway.services.gateway.pii_client import PIIClient
 from faden_gateway.services.gateway.session_titles import title_from_message
-from faden_gateway.services.gateway.pii_policy import PIIPolicy, parse_pii_policy
+from faden_gateway.services.gateway.pii_policy import PIIPolicy, SessionPIIOverride, resolve_session_pii
 from faden_gateway.services.gateway.pii_restore import (
     redact_tokens,
     restore_payload,
@@ -840,6 +840,18 @@ def _agent_log_fields(req: _Prepared) -> _AgentLogFields:
         "conversation_id": agent.conversation_id,
         "turn_id": agent.turn_id,
     }
+
+
+def _agent_pii_override(req: _Prepared) -> SessionPIIOverride | None:
+    """The PII mode an agent's conversation asks for (``X-Faden-PII-Mode``), as its override.
+
+    An agent's conversation has no server session, so no stored override: the
+    SDK sends the mode with each request, as it sends its tool mode. It is
+    applied when the agent's setting (or, with none, the tenant's) allows it.
+    """
+    if req.agent is None or req.agent.pii_mode is None:
+        return None
+    return SessionPIIOverride(egress_mode=req.agent.pii_mode)
 
 
 def _agent_tools(payload: dict[str, Any], req: _Prepared) -> dict[str, Any]:
@@ -1976,7 +1988,13 @@ class GatewayService:
         req.mcp_pii_allowed = _allowing_personal_data(req.mcp_findable)
 
         req.pii_policy = _resolve_pii_policy(
-            policy, session_override=await self._session_pii_override(req.session_id, auth),
+            policy,
+            session_override=(
+                await self._session_pii_override(req.session_id, auth) or _agent_pii_override(req)
+            ),
+            agent_allow_mode_override=(
+                req.agent.agent.pii_allow_mode_override if req.agent is not None else None
+            ),
         )
         scanned, candidates = await self._scan_egress(req, candidates=candidates, request_id=request_id)
         telemetry_payload = None
@@ -3533,47 +3551,21 @@ def _accumulate_stream_content(chunk: bytes, acc: list[str]) -> None:
 def _resolve_pii_policy(
     policy: Any | None,
     session_override: Any | None = None,
+    *,
+    agent_allow_mode_override: bool | None = None,
 ) -> PIIPolicy | None:
-    """Resolve effective PII policy: tenant-specific → system default → None.
+    """The PII policy a request gets: tenant-specific → system default → None.
 
-    When *session_override* (a ``SessionPIIOverrideRow``) is provided,
-    ``clamp_and_merge`` is applied on top of the floor policy.
+    With *session_override* (a ``SessionPIIOverrideRow``, or the
+    ``SessionPIIOverride`` an agent's conversation asks for) it is merged on
+    top by ``resolve_session_pii``, the same helper the chat's Privacy panel
+    uses, so what the panel says is what the request gets: the mode switches
+    when the agent's setting, the tenant's, or the override's stored weaken
+    right allows it.
     """
-    from faden_gateway.settings import settings as _settings
-
-    raw = policy.pii_config if policy and getattr(policy, "pii_config", None) else None
-    floor: PIIPolicy | None = None
-    if raw:
-        floor = parse_pii_policy(raw)
-    if floor is None:
-        # Fallback to the system-wide default policy loaded from system settings DB.
-        default = getattr(_settings, "pii_default_policy", None)
-        if default:
-            floor = parse_pii_policy(default)
-    if floor is None:
-        return None
-
-    if session_override is not None:
-        from faden_gateway.services.gateway.pii_policy import (  # noqa: PLC0415
-            SessionPIIOverride,
-            clamp_and_merge,
-        )
-
-        override = SessionPIIOverride(
-            pii_enabled=session_override.pii_enabled,
-            egress_enabled_for_cloud=session_override.egress_enabled_for_cloud,
-            egress_enabled_for_local=session_override.egress_enabled_for_local,
-            egress_mode=session_override.egress_mode,
-            egress_fail_action=session_override.egress_fail_action,
-            telemetry_enabled=session_override.telemetry_enabled,
-            telemetry_mode=session_override.telemetry_mode,
-            presidio_threshold=session_override.presidio_threshold,
-            presidio_entities_add=session_override.presidio_entities_add,
-        )
-        allow_mode = bool(getattr(policy, "allow_mode_override", False))
-        return clamp_and_merge(floor, override, allow_mode_override=allow_mode)
-
-    return floor
+    return resolve_session_pii(
+        policy, session_override, agent_allow_mode_override=agent_allow_mode_override,
+    ).effective
 
 
 def _require_model(payload: dict[str, Any]) -> str:

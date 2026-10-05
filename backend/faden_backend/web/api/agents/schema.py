@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from faden_backend.db.models.agents import AgentStatus, LocalMcpMode, PrincipalType
 
@@ -22,6 +22,16 @@ class HostTool(BaseModel):
     approval: str | None = Field(default=None, pattern=r"^(never|ask|always)$")
 
 
+class AgentPii(BaseModel):
+    """What the agent's conversations may change about PII."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Whether a conversation may switch the egress mode (redact, tokenize). Null follows the
+    #: tenant's setting on the PII policy page; true or false decides for this agent.
+    allow_mode_override: StrictBool | None = None
+
+
 class AgentVersionFields(BaseModel):
     """What a version defines. A new version starts from the fields sent."""
 
@@ -32,6 +42,7 @@ class AgentVersionFields(BaseModel):
     host_tool_contract: list[HostTool] = Field(default_factory=list)
     local_mcp_mode: LocalMcpMode = LocalMcpMode.DISABLE
     ui: dict[str, Any] = Field(default_factory=dict)
+    pii: AgentPii = Field(default_factory=AgentPii)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 

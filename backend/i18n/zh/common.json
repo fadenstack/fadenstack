@@ -1448,6 +1448,11 @@
     "precedence_hint": "优先级：租户覆盖 > 系统默认 > 无。",
     "save_override_success": "租户覆盖策略已保存。",
     "clear_override_success": "租户覆盖策略已清除。",
+    "mode_switch_title": "聊天和智能体",
+    "mode_switch": "允许聊天和智能体更改 PII 模式",
+    "mode_switch_help": "开启：聊天的隐私面板可以在脱敏和令牌化之间切换，智能体的对话也可以，除非智能体自己的设置另有规定。关闭：请求使用此策略的模式；只有管理员可以在自己的聊天中更改。",
+    "mode_switch_saved": "已保存：聊天和智能体是否可以更改 PII 模式。",
+    "mode_switch_failed": "保存失败：聊天和智能体是否可以更改 PII 模式。",
     "form": {
       "telemetry": "遥测",
       "telemetry_enable": "从遥测中移除个人数据",
@@ -3445,6 +3450,7 @@
       "host_tool_contract": "宿主工具",
       "local_mcp_mode": "本地 MCP 服务器",
       "ui": "外观",
+      "pii": "隐私",
       "extensions": "企业版设置"
     },
     "import": {
@@ -3491,6 +3497,14 @@
       "greeting": "问候语",
       "suggestions": "建议的提示",
       "suggestions_help": "每条之后按 Enter。",
+      "privacy": "隐私",
+      "pii_mode": "更改 PII 模式",
+      "pii_mode_tenant": "遵循租户的 PII 策略",
+      "pii_mode_allow": "允许",
+      "pii_mode_refuse": "不允许",
+      "pii_mode_tenant_help": "遵循 PII 策略页面上的“允许聊天和智能体更改 PII 模式”。",
+      "pii_mode_allow_help": "对话可以在脱敏和令牌化之间切换（SDK 发送 X-Faden-PII-Mode），不受租户设置影响。",
+      "pii_mode_refuse_help": "对话始终使用租户 PII 策略的模式。",
       "extensions": "企业版设置",
       "extensions_help": "保持原样。请通过 API 更改。"
     },

@@ -19,7 +19,12 @@ from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnSt
 from faden_gateway.services.gateway import faden_events, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
-from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.auth import (
+    PII_WEAKEN_HEADER,
+    AuthContext,
+    get_auth_context,
+    pii_weaken_granted,
+)
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.lease import LeaseManager
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
@@ -472,19 +477,23 @@ def _override_row_to_dto(row: Any) -> SessionPIIOverrideDTO:
     )
 
 
-def _row_to_session_override(row: Any) -> "SessionPIIOverride":
-    from faden_gateway.services.gateway.pii_policy import SessionPIIOverride  # noqa: PLC0415
-
-    return SessionPIIOverride(
-        pii_enabled=row.pii_enabled,
-        egress_enabled_for_cloud=row.egress_enabled_for_cloud,
-        egress_enabled_for_local=row.egress_enabled_for_local,
-        egress_mode=row.egress_mode,
-        egress_fail_action=row.egress_fail_action,
-        telemetry_enabled=row.telemetry_enabled,
-        telemetry_mode=row.telemetry_mode,
-        presidio_threshold=row.presidio_threshold,
-        presidio_entities_add=row.presidio_entities_add,
+def _pii_policy_dto(
+    session_id: str,
+    resolved: Any,
+    *,
+    override_row: Any | None,
+    caller_may_weaken: bool,
+) -> SessionPIIPolicyDTO:
+    """The panel's view of a chat's PII policy: the floor, the override, and what requests get."""
+    return SessionPIIPolicyDTO(
+        session_id=session_id,
+        has_override=override_row is not None,
+        override=_override_row_to_dto(override_row) if override_row is not None else None,
+        floor=_pii_policy_to_dict(resolved.floor) if resolved.floor else None,
+        effective=_pii_policy_to_dict(resolved.effective) if resolved.effective else None,
+        mode_switch_allowed=resolved.mode_switch_allowed,
+        can_switch_mode=resolved.mode_switch_allowed or caller_may_weaken,
+        mode_applied=resolved.mode_applied,
     )
 
 
@@ -493,6 +502,7 @@ def _row_to_session_override(row: Any) -> "SessionPIIOverride":
     response_model=SessionPIIPolicyDTO,
 )
 async def get_pii_defaults(
+    request: Request,
     auth: AuthContext = Depends(get_auth_context),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
@@ -501,18 +511,12 @@ async def get_pii_defaults(
     This lets the frontend show PII controls before a session exists,
     mirroring the pre-session tool-catalog pattern.
     """
-    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    from faden_gateway.services.gateway.pii_policy import resolve_session_pii  # noqa: PLC0415
 
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
-    floor = _resolve_pii_policy(tenant_policy)
-
-    dto = SessionPIIPolicyDTO(
-        session_id="",
-        has_override=False,
-        override=None,
-        floor=_pii_policy_to_dict(floor) if floor else None,
-        effective=_pii_policy_to_dict(floor) if floor else None,
-    )
+    resolved = resolve_session_pii(tenant_policy)
+    may_weaken = pii_weaken_granted(request.headers.get(PII_WEAKEN_HEADER), auth, "")
+    dto = _pii_policy_dto("", resolved, override_row=None, caller_may_weaken=may_weaken)
     return JSONResponse(status_code=200, content=dto.model_dump(mode="json"))
 
 
@@ -522,42 +526,21 @@ async def get_pii_defaults(
 )
 async def get_session_pii_policy(
     session_id: str,
+    request: Request,
     auth: AuthContext = Depends(get_auth_context),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
-    """Return the session PII policy: floor, override, and effective."""
-    from faden_gateway.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
-    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    """Return the session PII policy: floor, override, and effective -- as its requests get it."""
+    from faden_gateway.services.gateway.pii_policy import resolve_session_pii  # noqa: PLC0415
 
     sid = _parse_session_id(session_id)
     await _require_session_owner(sid, auth, dao)
 
-    # Floor policy from tenant
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
-    floor = _resolve_pii_policy(tenant_policy)
-    allow_mode = bool(getattr(tenant_policy, "allow_mode_override", False)) if tenant_policy else False
-
-    # Session override
     override_row = await dao.get_session_pii_override(sid, auth.tenant_id, auth.user_id)
-    has_override = override_row is not None
-
-    effective = floor
-    override_dto = None
-    if override_row is not None:
-        override_dto = _override_row_to_dto(override_row)
-        if floor is not None:
-            effective = clamp_and_merge(
-                floor, _row_to_session_override(override_row),
-                allow_mode_override=allow_mode,
-            )
-
-    dto = SessionPIIPolicyDTO(
-        session_id=session_id,
-        has_override=has_override,
-        override=override_dto,
-        floor=_pii_policy_to_dict(floor) if floor else None,
-        effective=_pii_policy_to_dict(effective) if effective else None,
-    )
+    resolved = resolve_session_pii(tenant_policy, override_row)
+    may_weaken = pii_weaken_granted(request.headers.get(PII_WEAKEN_HEADER), auth, session_id)
+    dto = _pii_policy_dto(session_id, resolved, override_row=override_row, caller_may_weaken=may_weaken)
     return JSONResponse(status_code=200, content=dto.model_dump(mode="json"))
 
 
@@ -571,49 +554,35 @@ async def patch_session_pii_policy(
     auth: AuthContext = Depends(get_auth_context),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
-    """Create or update a session PII override."""
-    from faden_gateway.services.gateway.pii_policy import clamp_and_merge  # noqa: PLC0415
-    from faden_gateway.services.gateway.service import _resolve_pii_policy  # noqa: PLC0415
+    """Create or update a session PII override.
+
+    The right to weaken is stored with it -- whether this save carries the
+    backend's grant (``X-PII-Allow-Weaken``) -- and the chat's requests keep it.
+    The body cannot set it.
+    """
+    from faden_gateway.services.gateway.pii_policy import resolve_session_pii  # noqa: PLC0415
 
     sid = _parse_session_id(session_id)
     await _require_session_owner(sid, auth, dao)
     body = await _get_json_payload(request)
     patch = SessionPIIPolicyPatchDTO.model_validate(body)
 
-    # The backend proxy sets this header when the caller has pii.session:weaken
-    allow_weaken = request.headers.get("X-PII-Allow-Weaken", "").lower() == "true"
+    # Only the backend can sign the grant, after its own check (pii.session:weaken or a superuser).
+    allow_weaken = pii_weaken_granted(request.headers.get(PII_WEAKEN_HEADER), auth, session_id)
 
     fields = patch.model_dump(exclude_unset=True)
     await dao.upsert_session_pii_override(
         sid, auth.tenant_id, auth.user_id,
         updated_by=auth.user_id,
+        allow_weaken=allow_weaken,
         **fields,
     )
 
     # Re-read to build response
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
-    floor = _resolve_pii_policy(tenant_policy)
-    allow_mode = bool(getattr(tenant_policy, "allow_mode_override", False)) if tenant_policy else False
     override_row = await dao.get_session_pii_override(sid, auth.tenant_id, auth.user_id)
-
-    effective = floor
-    override_dto = None
-    if override_row is not None:
-        override_dto = _override_row_to_dto(override_row)
-        if floor is not None:
-            effective = clamp_and_merge(
-                floor, _row_to_session_override(override_row),
-                allow_mode_override=allow_mode,
-                allow_weaken=allow_weaken,
-            )
-
-    dto = SessionPIIPolicyDTO(
-        session_id=session_id,
-        has_override=True,
-        override=override_dto,
-        floor=_pii_policy_to_dict(floor) if floor else None,
-        effective=_pii_policy_to_dict(effective) if effective else None,
-    )
+    resolved = resolve_session_pii(tenant_policy, override_row)
+    dto = _pii_policy_dto(session_id, resolved, override_row=override_row, caller_may_weaken=allow_weaken)
     return JSONResponse(status_code=200, content=dto.model_dump(mode="json"))
 
 

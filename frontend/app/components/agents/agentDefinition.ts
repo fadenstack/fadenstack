@@ -3,7 +3,7 @@
  * without the version's own metadata. Pure functions, so the editor, the
  * create dialog and the version comparison agree on what a definition is.
  */
-import type { Agent, AgentDefinition, AgentVersion, HostTool } from "~/api/agents";
+import type { Agent, AgentDefinition, AgentPii, AgentVersion, HostTool } from "~/api/agents";
 
 export const EMPTY_DEFINITION: AgentDefinition = {
   instructions: "",
@@ -13,6 +13,7 @@ export const EMPTY_DEFINITION: AgentDefinition = {
   host_tool_contract: [],
   local_mcp_mode: "disable",
   ui: {},
+  pii: { allow_mode_override: null },
   extensions: {},
 };
 
@@ -25,6 +26,7 @@ export const DEFINITION_FIELDS = [
   "host_tool_contract",
   "local_mcp_mode",
   "ui",
+  "pii",
   "extensions",
 ] as const satisfies readonly (keyof AgentDefinition)[];
 
@@ -41,8 +43,15 @@ export function definitionOf(version: AgentVersion | null | undefined): AgentDef
     host_tool_contract: version.host_tool_contract ?? [],
     local_mcp_mode: version.local_mcp_mode ?? "disable",
     ui: version.ui ?? {},
+    pii: piiOf(version.pii),
     extensions: version.extensions ?? {},
   };
+}
+
+/** The PII settings as the console keeps them: anything but true or false follows the tenant. */
+function piiOf(value: unknown): AgentPii {
+  const allow = value && typeof value === "object" ? (value as Partial<AgentPii>).allow_mode_override : null;
+  return { allow_mode_override: typeof allow === "boolean" ? allow : null };
 }
 
 /** A definition as it is saved: trimmed, empty values dropped, tools without a name left out. */
@@ -55,6 +64,7 @@ export function cleanDefinition(definition: AgentDefinition): AgentDefinition {
       .map(cleanTool)
       .filter((tool) => tool.name !== ""),
     ui: cleanUi(definition.ui),
+    pii: piiOf(definition.pii),
   };
 }
 
@@ -117,6 +127,21 @@ export function withUi(
   changes: { greeting?: string; suggestions?: string[] },
 ): AgentDefinition {
   return { ...definition, ui: { ...definition.ui, ...changes } };
+}
+
+// ── PII ───────────────────────────────────────────────────────────────────
+
+/** `pii.allow_mode_override`: null follows the tenant's setting, true allows, false refuses. */
+export type PiiModeSwitch = "tenant" | "allow" | "refuse";
+
+export function piiModeSwitch(definition: AgentDefinition): PiiModeSwitch {
+  const allow = definition.pii?.allow_mode_override ?? null;
+  return allow === null ? "tenant" : allow ? "allow" : "refuse";
+}
+
+export function withPiiModeSwitch(definition: AgentDefinition, mode: PiiModeSwitch): AgentDefinition {
+  const allow = mode === "tenant" ? null : mode === "allow";
+  return { ...definition, pii: { ...definition.pii, allow_mode_override: allow } };
 }
 
 // ── Gateway tools ─────────────────────────────────────────────────────────
@@ -188,6 +213,7 @@ export function parseAgentImport(text: string): ImportedAgent {
   if (known.length === 0) throw new Error("agents.import.not_definition");
   const definition = { ...EMPTY_DEFINITION, ...Object.fromEntries(known.map((f) => [f, fields[f]])) } as AgentDefinition;
   definition.host_tool_contract = (definition.host_tool_contract ?? []).map(toolFrom);
+  definition.pii = piiOf(definition.pii);
   return {
     slug: typeof record.slug === "string" ? record.slug : undefined,
     name: typeof record.name === "string" ? record.name : undefined,

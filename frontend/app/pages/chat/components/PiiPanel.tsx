@@ -80,6 +80,11 @@ export default function PiiPanel({
   const egressMode = effective?.egress?.mode ?? "redact";
   const failAction = effective?.egress?.fail_action ?? "block";
   const telemetryEnabled = effective?.telemetry?.enabled ?? false;
+  // The mode is chosen only where the user may change it; an older gateway
+  // that sends no can_switch_mode leaves it selectable, as before.
+  const canSwitchMode = policy?.can_switch_mode !== false;
+  const requestedMode = policy?.override?.egress_mode ?? null;
+  const modeNotApplied = policy?.mode_applied === false && requestedMode !== null;
   const threshold = effective?.presidio?.threshold ?? 0;
   const allEntities: string[] = useMemo(
     () => effective?.presidio?.entities ?? [],
@@ -244,8 +249,9 @@ export default function PiiPanel({
             </Tooltip>
             <Stack direction="row" spacing={1}>
               <FormControl size="small" fullWidth>
-                <InputLabel>{t("common:common.mode")}</InputLabel>
+                <InputLabel id="pii-egress-mode-label">{t("common:common.mode")}</InputLabel>
                 <Select
+                  labelId="pii-egress-mode-label"
                   label={t("common:common.mode")}
                   value={egressMode}
                   onChange={(e) =>
@@ -255,7 +261,7 @@ export default function PiiPanel({
                         | "tokenize_reversible",
                     })
                   }
-                  disabled={saving}
+                  disabled={saving || !canSwitchMode}
                 >
                   <MenuItem value="redact">
                     {t("pii_panel.redact", "redact")}
@@ -294,6 +300,25 @@ export default function PiiPanel({
                 </Select>
               </FormControl>
             </Stack>
+            {modeNotApplied ? (
+              <Alert severity="warning" variant="outlined" sx={{ py: 0 }} data-testid="pii-mode-not-applied">
+                {t("pii_panel.mode_not_applied", {
+                  mode: t(`pii_panel.${requestedMode}`),
+                })}{" "}
+                {canSwitchMode
+                  ? t("pii_panel.mode_choose_again")
+                  : t("pii_panel.mode_locked")}
+              </Alert>
+            ) : (
+              !canSwitchMode && (
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <LockIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+                  <Typography variant="caption" color="text.secondary">
+                    {t("pii_panel.mode_locked")}
+                  </Typography>
+                </Stack>
+              )
+            )}
           </Stack>
         </Paper>
 

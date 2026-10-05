@@ -40,11 +40,13 @@ export interface UseSessionPiiPolicyResult {
 /**
  * Merge a flat SessionPIIOverride onto a PIIPolicyConfig floor to produce
  * an effective config.  Mirrors the server-side clamp_and_merge logic
- * (the UI controls already prevent weakening below floor).
+ * (the UI controls already prevent weakening below floor). The mode changes
+ * only when the user may change it (*canSwitchMode*), as on the server.
  */
-function applyOverride(
+export function applyOverride(
   floor: PIIPolicyConfig,
   ov: SessionPIIOverride,
+  canSwitchMode = true,
 ): PIIPolicyConfig {
   return {
     telemetry: {
@@ -60,7 +62,7 @@ function applyOverride(
       ...(ov.egress_enabled_for_local != null && {
         enabled_for_local: ov.egress_enabled_for_local,
       }),
-      ...(ov.egress_mode != null && { mode: ov.egress_mode }),
+      ...(ov.egress_mode != null && canSwitchMode && { mode: ov.egress_mode }),
       ...(ov.egress_fail_action != null && {
         fail_action: ov.egress_fail_action,
       }),
@@ -152,11 +154,15 @@ export function useSessionPiiPolicy(
     if (sessionId || !defaults?.floor) return;
     const hasOverride = Object.values(localOverrides).some((v) => v != null);
     if (hasOverride) {
+      const canSwitchMode = defaults.can_switch_mode !== false;
+      const effective = applyOverride(defaults.floor, localOverrides, canSwitchMode);
       setPolicy({
         ...defaults,
         has_override: true,
         override: localOverrides,
-        effective: applyOverride(defaults.floor, localOverrides),
+        effective,
+        mode_applied:
+          localOverrides.egress_mode == null || effective.egress.mode === localOverrides.egress_mode,
       });
     } else {
       setPolicy(defaults);

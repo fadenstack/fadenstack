@@ -166,6 +166,52 @@ scanned again on every turn: only the new message is.
 The model's own time is not in these figures. Of the 100 ms, about half is
 the RAG search itself: embedding the question and searching the vectors.
 
+### A chat's own PII settings
+
+A chat's Privacy panel can make the tenant's PII policy stricter for that
+chat: more entities, a higher threshold, local models scanned too. Switching
+the mode between redact and tokenize is not just stricter, so it is applied
+only when one of these allows it:
+
+| Setting | Where | What it covers |
+|---|---|---|
+| "Let chats and agents change the PII mode" | PII policy page, per tenant (`tenant_llm_policy.allow_mode_override`, off by default) | Console chats, and agents that follow the tenant |
+| "Changing the PII mode" | The agent's Definition, Privacy: `pii.allow_mode_override` of the version, `null` (follow the tenant), `true` or `false` | That agent's conversations. When set, it overrides the tenant's switch |
+| The weaken right | Saved with the chat's override by someone with `pii.session:weaken` (or a superuser) | That chat |
+
+How they combine: a chat's mode is applied when its override was saved with
+the weaken right, or when the agent's setting is `true`, or when the agent's
+setting is `null` and the tenant's switch is on. Console chats have no agent,
+so for them the tenant's switch decides. An agent set to `false` refuses the
+switch whatever the tenant says. The weaken right also lets an admin turn
+protection off below the tenant's policy; the tenant's switch never does.
+
+**The weaken right is stored with the override.** The backend checks the
+right and sends it to the gateway in `X-PII-Allow-Weaken` as a grant only it
+can sign: a JWT that lasts 60 seconds, signed with the shared secret, for one
+user and one chat. The gateway stores it with the override
+(`session_pii_override.allow_weaken`), and the chat's requests use it. The
+request body cannot set it. The old header value `true`, the caller's own
+token, or a grant for another user or chat count as no right. A later save
+without the right clears it. Overrides saved before this change count as
+saved without it.
+
+**Agents.** An agent's conversation stays on the device and has no saved
+override. The SDK sends the mode it wants with each request
+(`X-Faden-PII-Mode: redact` or `tokenize_reversible`). The gateway applies it
+when the agent's setting, or the tenant's switch if the agent has no setting,
+allows it. The agent's profile says whether it will
+(`pii.mode_switch_allowed`).
+
+**What the panel shows is what a request gets.** The panel's endpoints and
+each request compute the policy with the same function
+(`resolve_session_pii` in `services/gateway/pii_policy.py`). If a chat asks
+for a mode it does not get, the panel shows the mode it does get. It marks
+the chosen mode as not applied and says why: "Your admin hasn't allowed
+changing the PII mode for this chat." Until 5 October the panel used the
+admin's right and the requests did not. The panel said tokenize, and the turn
+was redacted ("Hello <PERSON>").
+
 ## Found and fixed
 
 | What | Effect | Fix |
