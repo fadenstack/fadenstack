@@ -37,7 +37,8 @@ import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import DescriptionIcon from "@mui/icons-material/Description";
 import LlmIcon from "~/components/LlmIcon";
-import SettingsRemoteIcon from "@mui/icons-material/SettingsRemote";
+import AgentAvatar from "~/components/AgentAvatar";
+import MemoryIcon from "@mui/icons-material/Memory";
 import DownloadIcon from "@mui/icons-material/Download";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -47,7 +48,10 @@ import SourceIcon from "@mui/icons-material/Source";
 import ShieldIcon from "@mui/icons-material/Shield";
 import PrivacyTipIcon from "@mui/icons-material/PrivacyTip";
 import EventNoteIcon from "@mui/icons-material/EventNote";
-import PolicyOutlinedIcon from "@mui/icons-material/PolicyOutlined";
+import PolicyIcon from "@mui/icons-material/Policy";
+import WebhookIcon from "@mui/icons-material/Webhook";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
+import FindInPageIcon from "@mui/icons-material/FindInPage";
 import PeopleIcon from "@mui/icons-material/People";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import GroupWorkIcon from "@mui/icons-material/GroupWork";
@@ -60,11 +64,10 @@ import ChatIcon from "@mui/icons-material/Chat";
 import FolderIcon from "@mui/icons-material/Folder";
 import ForumIcon from "@mui/icons-material/Forum";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
-import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import PsychologyIcon from "@mui/icons-material/Psychology";
 import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
-import SmartToyIcon from "@mui/icons-material/SmartToy";
 import GavelIcon from "@mui/icons-material/Gavel";
 import { AGENTS_PAGE_KEYS } from "~/api/agents";
 
@@ -296,7 +299,7 @@ export const NAV: NavEntry[] = [
       {
         to: "/admin/nodes",
         labelKey: "nav.nodes",
-        icon: <SettingsRemoteIcon />,
+        icon: <MemoryIcon />,
         permission: "system.nodes:read",
         badge: "pendingJoins",
       },
@@ -387,7 +390,7 @@ export const NAV: NavEntry[] = [
       {
         to: "/admin/pii/policies",
         labelKey: "nav.pii_policies",
-        icon: <PolicyOutlinedIcon />,
+        icon: <PolicyIcon />,
       },
     ],
   },
@@ -401,7 +404,7 @@ export const NAV: NavEntry[] = [
       {
         to: "/admin/rag/knowledge-base",
         labelKey: "nav.rag_knowledge_base",
-        icon: <AccountTreeIcon />,
+        icon: <LibraryBooksIcon />,
         permission: "rag.search:read",
         ragMode: "lite",
       },
@@ -415,7 +418,7 @@ export const NAV: NavEntry[] = [
       {
         to: "/admin/rag/explorer",
         labelKey: "nav.rag_explorer",
-        icon: <StorageIcon />,
+        icon: <FindInPageIcon />,
         permission: "rag.containers:read",
         ragMode: "pro",
       },
@@ -468,12 +471,12 @@ export const NAV: NavEntry[] = [
     id: "agents",
     kind: "group",
     labelKey: "nav.agents_group",
-    icon: <SmartToyIcon />,
+    icon: <AgentAvatar size={24} variant="mono" />,
     children: [
       {
         to: "/admin/agents",
         labelKey: "nav.agents",
-        icon: <SmartToyIcon />,
+        icon: <AgentAvatar size={24} variant="mono" />,
         permission: AGENTS_PAGE_KEYS,
       },
       {
@@ -494,13 +497,13 @@ export const NAV: NavEntry[] = [
       {
         to: "/admin/mcp/servers",
         labelKey: "nav.mcp_hub",
-        icon: <DnsIcon />,
+        icon: <WebhookIcon />,
         module: "mcp",
       },
       {
         to: "/admin/skills",
         labelKey: "nav.skills_hub",
-        icon: <AutoFixHighIcon />,
+        icon: <PsychologyIcon />,
         module: "skills",
         // Everyone has their own skills page (/skills); this one is all of them.
         permission: "skills:manage",
