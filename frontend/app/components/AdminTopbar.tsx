@@ -24,7 +24,7 @@ import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import ExploreIcon from "@mui/icons-material/Explore";
+import ChecklistIcon from "@mui/icons-material/Checklist";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
@@ -50,8 +50,8 @@ export interface AdminTopbarProps {
   onLanguageMenuOpen: (event: React.MouseEvent<HTMLElement>) => void;
   onLanguageMenuClose: () => void;
   onLanguageChange: (code: string) => void;
-  onProductTourOpen: () => void;
-  onGuidedSetupOpen: () => void;
+  onGettingStartedOpen: () => void;
+  onConsoleTourOpen: () => void;
   onHowToGuidesOpen: () => void;
   onResetGuides: () => void;
   onPageHelp: () => void;
@@ -74,8 +74,8 @@ export function AdminTopbar({
   onLanguageMenuOpen,
   onLanguageMenuClose,
   onLanguageChange,
-  onProductTourOpen,
-  onGuidedSetupOpen,
+  onGettingStartedOpen,
+  onConsoleTourOpen,
   onHowToGuidesOpen,
   onResetGuides,
   onPageHelp,
@@ -92,6 +92,12 @@ export function AdminTopbar({
   const [helpMenuAnchor, setHelpMenuAnchor] = useState<HTMLElement | null>(
     null,
   );
+  const helpItems = [
+    { key: "getting_started", icon: ChecklistIcon, onClick: onGettingStartedOpen },
+    { key: "console_tour", icon: TourIcon, onClick: onConsoleTourOpen },
+    { key: "how_to_guides", icon: SchoolIcon, onClick: onHowToGuidesOpen, divider: true },
+    { key: "reset_guides", icon: ReplayIcon, onClick: onResetGuides },
+  ];
 
   return (
     <AppBar position="static" elevation={0}>
@@ -136,9 +142,10 @@ export function AdminTopbar({
           onClose={() => setHelpMenuAnchor(null)}
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
           transformOrigin={{ vertical: "top", horizontal: "right" }}
-          slotProps={{ paper: { sx: { minWidth: 200 } } }}
+          slotProps={{ paper: { sx: { minWidth: 220 } } }}
         >
           <MenuItem
+            data-help-item="about_page"
             onClick={() => {
               setHelpMenuAnchor(null);
               onPageHelp();
@@ -147,12 +154,7 @@ export function AdminTopbar({
             <ListItemIcon>
               <InfoOutlinedIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>
-              {t("help.about_page", {
-                ns: "tour",
-                defaultValue: "About This Page",
-              })}
-            </ListItemText>
+            <ListItemText>{t("help.about_page", { ns: "tour" })}</ListItemText>
             <Chip
               label="F1"
               size="small"
@@ -160,70 +162,22 @@ export function AdminTopbar({
               sx={{ ml: 1, height: 20, fontSize: "0.7rem" }}
             />
           </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setHelpMenuAnchor(null);
-              onProductTourOpen();
-            }}
-          >
-            <ListItemIcon>
-              <TourIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>
-              {t("help.product_tour", {
-                ns: "tour",
-                defaultValue: "Product Tour",
-              })}
-            </ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setHelpMenuAnchor(null);
-              onGuidedSetupOpen();
-            }}
-          >
-            <ListItemIcon>
-              <ExploreIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>
-              {t("help.guided_setup", {
-                ns: "tour",
-                defaultValue: "Guided Setup",
-              })}
-            </ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setHelpMenuAnchor(null);
-              onHowToGuidesOpen();
-            }}
-          >
-            <ListItemIcon>
-              <SchoolIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>
-              {t("help.how_to_guides", {
-                ns: "tour",
-                defaultValue: "How-To Guides",
-              })}
-            </ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setHelpMenuAnchor(null);
-              onResetGuides();
-            }}
-          >
-            <ListItemIcon>
-              <ReplayIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>
-              {t("help.reset_guides", {
-                ns: "tour",
-                defaultValue: "Reset Guides",
-              })}
-            </ListItemText>
-          </MenuItem>
+          {helpItems.map(({ key, icon: Icon, onClick, divider }) => (
+            <MenuItem
+              key={key}
+              divider={divider}
+              data-help-item={key}
+              onClick={() => {
+                setHelpMenuAnchor(null);
+                onClick();
+              }}
+            >
+              <ListItemIcon>
+                <Icon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>{t(`help.${key}`, { ns: "tour" })}</ListItemText>
+            </MenuItem>
+          ))}
         </Menu>
         <Tooltip title={t("language.label")} arrow>
           <IconButton

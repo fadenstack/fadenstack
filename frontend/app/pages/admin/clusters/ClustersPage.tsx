@@ -144,6 +144,7 @@ export default function ClustersPage() {
           startIcon={<AddIcon />}
           disabled={data.nodes.length === 0}
           onClick={() => setWizardOpen(true)}
+          data-tour-id="clusters.create"
         >
           {t("clusters.list.create")}
         </Button>

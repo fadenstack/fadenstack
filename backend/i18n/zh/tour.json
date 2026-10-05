@@ -1,513 +1,630 @@
 {
-  "orientation": {
-    "dashboard": {
-      "title": "仪表板",
-      "content": "您的中央概览。一目了然地查看系统健康状况、容器状态和关键指标。"
-    },
-    "observability": {
-      "title": "可观测性",
-      "content": "监控所有 LLM 供应商的请求日志、延迟、Token 使用量和错误率。"
-    },
-    "containers": {
-      "title": "容器",
-      "content": "管理 Fadenstack 部署中的 Docker 容器。启动、停止和查看日志。"
-    },
-    "llm": {
-      "title": "LLM 供应商",
-      "content": "配置上游 LLM 端点——本地 Ollama、OpenAI、Azure 或任何 OpenAI 兼容 API。"
-    },
-    "utilities": {
-      "title": "实用工具",
-      "content": "节点集群管理、调度器和多节点配置的系统工具。"
-    },
-    "access_control": {
-      "title": "访问控制",
-      "content": "管理用户、API 密钥、角色和身份验证提供程序。"
-    },
-    "pii": {
-      "title": "PII 防护",
-      "content": "在提示词和回复到达 LLM 之前，扫描并脱敏个人身份信息。"
-    },
-    "rag": {
-      "title": "RAG（知识库）",
-      "content": "上传文档并构建检索增强生成管道，获取有据可查的回复。"
-    },
-    "chat": {
-      "title": "聊天工作区",
-      "content": "管理聊天项目、对话历史和模型分配。要开始聊天，请使用顶部栏的聊天按钮。"
-    },
-    "extensions": {
-      "title": "扩展",
-      "content": "浏览和管理 MCP 服务器、技能插件和其他扩展。"
-    },
-    "settings": {
-      "title": "设置",
-      "content": "系统级配置，包括网络、存储、安全策略和功能开关。"
-    },
-    "help": {
-      "title": "帮助与指南",
-      "content": "随时访问产品导览、引导设置和文档。"
-    }
-  },
-  "private": {
-    "providers": {
-      "title": "添加供应商",
-      "content": "首先添加至少一个 LLM 供应商。指向本地 Ollama 实例或粘贴云端 API 密钥。"
-    },
-    "chat": {
-      "title": "创建聊天项目",
-      "content": "在此创建和管理聊天项目、会话和历史记录。要开始聊天，请点击顶部栏的聊天按钮。"
-    },
-    "pii": {
-      "title": "检查 PII 设置",
-      "content": "PII 防护默认启用。查看仪表板了解检测统计数据，并配置需要脱敏的实体类型。"
-    },
-    "rag": {
-      "title": "上传文档",
-      "content": "前往知识库上传您的第一个文档，用于检索增强生成回复。"
-    }
-  },
-  "team": {
-    "providers": {
-      "title": "配置供应商",
-      "content": "为团队设置共享 LLM 端点——本地服务器、云端 API 或混合配置。"
-    },
-    "nodes": {
-      "title": "注册节点",
-      "content": "添加团队的 GPU 节点，以便调度器分配推理工作负载。"
-    },
-    "access": {
-      "title": "设置用户",
-      "content": "创建团队账户或连接身份提供程序。分配角色以控制资源访问权限。"
-    },
-    "mcp": {
-      "title": "MCP 服务器",
-      "content": "注册 MCP 工具服务器，使团队成员可以在聊天中调用外部功能。"
-    },
-    "chat": {
-      "title": "创建共享项目",
-      "content": "设置团队协作聊天项目。按项目控制模型访问权限。"
-    },
-    "pii": {
-      "title": "配置 PII 策略",
-      "content": "定义适用于所有团队成员的 PII 脱敏规则。"
-    },
-    "rag": {
-      "title": "构建知识库",
-      "content": "将团队文档上传到共享知识库，所有成员都可以查询获取有据回复。"
-    }
-  },
-  "enterprise": {
-    "access": {
-      "title": "访问控制与 SSO",
-      "content": "从访问控制开始。连接身份提供程序，定义角色，设置 API 密钥策略。"
-    },
-    "providers": {
-      "title": "供应商集群",
-      "content": "注册已批准的 LLM 端点。设置速率限制、成本预算和故障转移路由。"
-    },
-    "nodes": {
-      "title": "节点集群",
-      "content": "注册 GPU 节点并配置调度策略以分配工作负载。"
-    },
-    "pii": {
-      "title": "PII 合规",
-      "content": "配置企业级 PII 策略——实体类型、脱敏模式、审计日志和合规报告。"
-    },
-    "observability": {
-      "title": "可观测性与审计",
-      "content": "设置监控仪表板、审计追踪和告警，实现合规和运营可见性。"
-    },
-    "mcp": {
-      "title": "扩展治理",
-      "content": "审批和管理 MCP 工具服务器。控制每个角色可用的扩展。"
-    },
-    "rag": {
-      "title": "企业知识库",
-      "content": "上传带有访问控制的企业文档。配置索引管道和检索策略。"
-    },
-    "chat": {
-      "title": "受控聊天工作区",
-      "content": "创建带有策略护栏、模型白名单和每工作区 PII 执行的项目模板。"
-    }
-  },
-  "ui": {
-    "step_counter": "第 {{current}} 步，共 {{total}} 步",
-    "skip": "跳过导览",
-    "back": "上一步",
-    "next": "下一步",
-    "finish": "完成"
-  },
   "help": {
-    "product_tour": "产品导览",
-    "guided_setup": "引导设置",
-    "how_to_guides": "操作指南",
-    "reset_guides": "重置引导",
     "about_page": "关于此页面",
-    "how_to_guides_subtitle": "常见任务的分步操作指南",
+    "getting_started": "快速入门",
+    "console_tour": "控制台导览",
+    "how_to_guides": "操作指南",
+    "how_to_guides_subtitle": "每个指南都在真实页面上带您完成一项任务。由您亲自点击，指南为您指路。",
     "start_guide": "开始",
-    "no_guides_available": "没有适用于您当前配置的指南。"
+    "no_guides_available": "此配置下没有可用的指南。",
+    "reset_guides": "重置指南"
+  },
+  "guides": {
+    "ui": {
+      "step_counter": "第 {{current}} 步，共 {{total}} 步",
+      "next": "下一步",
+      "back": "上一步",
+      "finish": "完成",
+      "close": "关闭指南",
+      "your_turn": "轮到您了：完成这一步后，指南会继续。"
+    },
+    "console_tour": {
+      "title": "控制台导览",
+      "description": "花一分钟了解各项功能在哪里。",
+      "dashboard": {
+        "title": "仪表盘",
+        "body": "您的起点：哪些事项需要处理、哪些正在运行、使用量有多少。<strong>快速入门</strong>清单会一直显示在这里，直到您将其隐藏。"
+      },
+      "infrastructure": {
+        "title": "AI 基础设施",
+        "body": "您自己的硬件以及运行在上面的模型。<strong>机器</strong>是配有 GPU 的电脑，<strong>集群</strong>将多台机器组合起来共同提供模型服务，在<strong>模型市场</strong>中挑选要托管的模型，<strong>部署</strong>显示哪些模型在哪里运行。"
+      },
+      "llm": {
+        "title": "LLM",
+        "body": "<strong>提供商</strong>用于在您自己的模型之外，接入在别处运行的模型，例如 OpenAI 或 Azure。<strong>端点</strong>是一个兼容 OpenAI 的统一地址，应用程序通过它使用所有这些模型。"
+      },
+      "chat": {
+        "title": "聊天",
+        "body": "打开聊天，大家可以在这里与您托管或接入的模型对话。所有拥有账户的人都可以使用。"
+      },
+      "agents": {
+        "title": "智能体",
+        "body": "智能体在其他软件中工作，例如 Word、Outlook 或浏览器，并使用您在这里设置的模型和规则。<strong>治理</strong>决定聊天和智能体可以使用哪些工具。"
+      },
+      "privacy": {
+        "title": "隐私",
+        "body": "在用户发送的内容中查找个人数据，例如姓名、电子邮件地址或账号，并在其到达模型之前进行脱敏。策略决定识别哪些数据以及如何处理。"
+      },
+      "access": {
+        "title": "访问控制",
+        "body": "谁可以做什么：<strong>用户</strong>、带有权限的<strong>角色</strong>，以及<strong>组</strong>。启用登录模块后，大家可以使用公司账户登录。"
+      },
+      "extensions": {
+        "title": "扩展",
+        "body": "<strong>MCP 服务器</strong>为聊天和智能体提供工具，例如搜索、工单或文件。<strong>技能</strong>是保存一次、可在聊天中反复使用的指令。"
+      },
+      "help": {
+        "title": "帮助",
+        "body": "随时可以打开此菜单。<strong>关于此页面</strong>（或按 <kbd>F1</kbd>）介绍您当前所在的页面，<strong>快速入门</strong>可重新显示设置清单，<strong>操作指南</strong>会在真实页面上带您完成各项任务。"
+      }
+    },
+    "add_machine": {
+      "title": "添加机器",
+      "description": "接入一台带 GPU 的电脑，让它可以运行模型。",
+      "open": {
+        "title": "添加机器",
+        "body": "点击<strong>添加机器</strong>。任何能访问此服务器、配有 NVIDIA GPU 的 Linux 电脑都可以。"
+      },
+      "command": {
+        "title": "在机器上运行此命令",
+        "body": "复制该命令，在要添加的机器的终端中运行。它会安装一个小型代理，显示一个短代码，然后等待您的操作。"
+      },
+      "approve": {
+        "title": "在这里批准",
+        "body": "片刻之后，该机器会出现在这里。确认它的代码与其终端中显示的一致，然后点击<strong>批准</strong>。"
+      },
+      "unattended": {
+        "title": "要添加很多机器？",
+        "body": "<strong>跳过批准步骤</strong>会在命令中加入一次性令牌，让机器自行加入：适用于脚本、Ansible 或镜像。完成后关闭此面板。"
+      }
+    },
+    "create_cluster": {
+      "title": "创建集群",
+      "description": "将您的机器组合起来，共同提供模型服务。",
+      "open": {
+        "title": "创建集群",
+        "body": "点击<strong>创建集群</strong>。至少需要一台机器。"
+      },
+      "name": {
+        "title": "命名",
+        "body": "为集群取一个简短的名称，例如 <code>gpu-room</code>，然后点击<strong>下一步</strong>。"
+      },
+      "machines": {
+        "title": "选择机器",
+        "body": "勾选要提供模型服务的机器；一台机器也能组成很好的集群。现在就选好所有需要的机器：机器在集群创建时加入。然后点击<strong>下一步</strong>；控制台会检查这些机器之间如何互相连接。"
+      },
+      "network": {
+        "title": "网络",
+        "body": "控制台会推荐这些机器共有的最快网络。除非您有充分的理由，否则保留推荐即可。"
+      },
+      "start": {
+        "title": "创建",
+        "body": "点击<strong>创建集群</strong>。机器会在后台启动集群，集群页面会显示进度。下一步：在上面托管一个模型。"
+      }
+    },
+    "host_model": {
+      "title": "托管模型",
+      "description": "从模型市场挑选一个模型，在您的集群上运行。",
+      "fit": {
+        "title": "适配集群",
+        "body": "每个模型都会根据此集群的 GPU 和显存进行检查。如果有多个集群，请选择要托管到的那个。"
+      },
+      "tabs": {
+        "title": "查找模型",
+        "body": "<strong>推荐</strong>列出已知运行良好的模型，<strong>搜索 Hugging Face</strong>可查找其他任何模型，<strong>本服务器上</strong>显示已下载的模型。"
+      },
+      "card": {
+        "title": "模型卡片",
+        "body": "每张卡片说明模型的用途以及是否适配。点击卡片可查看详情。"
+      },
+      "host": {
+        "title": "托管",
+        "body": "在您想要的模型上点击<strong>托管</strong>。"
+      },
+      "where": {
+        "title": "运行位置",
+        "body": "选择集群、每个副本使用几块 GPU，以及运行几个副本。是否放得下，您会立即看到。然后点击<strong>下一步</strong>。"
+      },
+      "settings": {
+        "title": "引擎设置",
+        "body": "推荐的设置适合大多数用途。如果需要更长的对话，请在这里修改上下文长度。然后点击<strong>下一步</strong>。"
+      },
+      "review": {
+        "title": "确认并托管",
+        "body": "检查两个名称：部署的名称，以及大家在聊天中选择的名称。然后点击<strong>托管</strong>。服务器会下载模型、将其复制到各台机器并启动；<strong>部署</strong>会显示进度。"
+      }
+    },
+    "connect_provider": {
+      "title": "接入云端模型",
+      "description": "在您自己的模型之外，使用 OpenAI、Azure、Anthropic 或其他提供商的模型。",
+      "open": {
+        "title": "添加提供商",
+        "body": "点击<strong>新增提供商</strong>。"
+      },
+      "name": {
+        "title": "命名",
+        "body": "起一个大家都能认出的名称，例如 <em>OpenAI</em>。"
+      },
+      "target": {
+        "title": "模型在哪里运行",
+        "body": "对于互联网上的提供商，请选择<strong>远程端点</strong>。"
+      },
+      "kind": {
+        "title": "提供商",
+        "body": "选择提供商，其地址会自动填写。对于其他任何兼容 OpenAI 的服务，请选择“其他（兼容 OpenAI）”并输入其地址。"
+      },
+      "key": {
+        "title": "API 密钥和模型",
+        "body": "粘贴从提供商控制台获取的 API 密钥，然后选择模型。密钥保存在此服务器上；使用聊天的人永远看不到它。"
+      },
+      "test": {
+        "title": "测试",
+        "body": "<strong>测试连接</strong>会发送一个很小的请求，检查密钥和地址。然后点击<strong>下一步</strong>。"
+      },
+      "pricing": {
+        "title": "价格",
+        "body": "可选：提供商每百万 Token 的价格，以便控制台显示使用费用。可以留空。"
+      },
+      "create": {
+        "title": "创建",
+        "body": "点击<strong>创建</strong>。之后即可在聊天中以及通过 API 使用该模型。"
+      }
+    },
+    "invite_people": {
+      "title": "添加人员",
+      "description": "创建账户，让您的同事可以使用聊天。",
+      "open": {
+        "title": "创建用户",
+        "body": "点击<strong>创建用户</strong>。"
+      },
+      "account": {
+        "title": "登录信息",
+        "body": "对方的电子邮件地址，以及至少 6 个字符的初始密码。请当面或通过电话将密码告知对方。"
+      },
+      "roles": {
+        "title": "可以做什么",
+        "body": "对于只使用聊天的人，角色留空即可：他们会获得标准用户角色。勾选的角色会替代标准角色，因此如果某人还要协助运维系统，请同时勾选 <strong>default_user</strong>。然后点击<strong>创建用户</strong>。"
+      }
+    },
+    "create_api_token": {
+      "title": "创建 API 令牌",
+      "description": "有了令牌，脚本和应用程序就可以通过 API 使用模型。",
+      "name": {
+        "title": "名称",
+        "body": "按使用它的对象为令牌命名，例如 <em>构建服务器</em>，以便日后知道该撤销哪一个。"
+      },
+      "lifetime": {
+        "title": "有效期",
+        "body": "令牌的有效时长。越短越安全；您随时可以再创建一个新的。"
+      },
+      "create": {
+        "title": "生成",
+        "body": "点击<strong>生成令牌</strong>。"
+      },
+      "value": {
+        "title": "立即复制",
+        "body": "令牌只显示这一次。请复制并妥善保存。"
+      },
+      "list": {
+        "title": "您的令牌",
+        "body": "这里列出您的所有令牌。某个令牌一旦不再需要或可能已泄露，请立即撤销。"
+      }
+    }
+  },
+  "checklist": {
+    "title": "快速入门",
+    "subtitle": "从全新安装到大家投入使用。每完成一步都会自动勾选。",
+    "done_title": "设置完成",
+    "done_body": "机器、集群、模型和人员：一切就绪。您可以隐藏此清单；它仍保留在“帮助”菜单中。",
+    "hide": "隐藏",
+    "progress": "已完成 {{done}}/{{total}}",
+    "more": "按需使用",
+    "show_me": "演示给我看",
+    "open": "打开",
+    "open_chat": "打开聊天",
+    "show_on_dashboard": "在仪表盘上显示",
+    "machine": {
+      "title": "添加机器",
+      "body": "接入一台带 GPU 的电脑。"
+    },
+    "cluster": {
+      "title": "创建集群",
+      "body": "将机器组合起来，共同提供模型服务。"
+    },
+    "model": {
+      "title": "托管模型",
+      "body": "从模型市场挑选一个模型，在集群上启动。"
+    },
+    "chat": {
+      "title": "在聊天中试用",
+      "body": "像您的同事那样与模型对话。"
+    },
+    "people": {
+      "title": "添加人员",
+      "body": "为您的同事创建账户。"
+    },
+    "provider": {
+      "title": "接入云端模型",
+      "body": "在自己的模型之外，使用 OpenAI、Azure 等。"
+    },
+    "privacy": {
+      "title": "设置隐私策略",
+      "body": "决定哪些个人数据在到达模型之前进行脱敏。"
+    },
+    "tools": {
+      "title": "接入工具",
+      "body": "添加 MCP 服务器，让聊天和智能体可以搜索、创建工单等。"
+    },
+    "skills": {
+      "title": "添加技能",
+      "body": "保存大家在聊天中反复使用的指令。"
+    },
+    "agents": {
+      "title": "设置智能体",
+      "body": "让 Office、浏览器或您自己的应用程序按照您的规则使用模型。"
+    },
+    "token": {
+      "title": "创建 API 令牌",
+      "body": "供调用 API 的脚本和应用程序使用。"
+    },
+    "tour": {
+      "title": "浏览控制台导览",
+      "body": "花一分钟了解各项功能在哪里。"
+    }
   },
   "page_help": {
     "actions_heading": "您可以在此执行的操作",
     "close": "知道了",
+    "show_me": "演示操作",
     "unknown": {
       "title": "关于此页面",
-      "description": "此页面暂时没有特定帮助内容。"
+      "description": "此页面暂无帮助。“帮助”菜单中有快速入门清单和操作指南。"
     },
     "dashboard": {
-      "title": "仪表板",
-      "description": "Fadenstack 部署的中央概览。查看系统健康状况、容器状态、资源使用情况和关键指标。",
-      "action_health": "检查系统健康状况和服务可用性",
-      "action_containers": "查看运行中的容器数量和状态",
-      "action_metrics": "监控资源使用和性能指标"
+      "title": "仪表盘",
+      "description": "平台概览：需要处理的事项、流量、容量和健康状况。每张卡片独立加载。",
+      "action_getting_started": "按照快速入门清单操作，直到全部设置完成",
+      "action_attention": "查看需要处理的事项，并将已知的事项静音",
+      "action_customize": "自定义：拖动卡片、调整大小、显示或隐藏卡片；您的布局会同步到其他设备",
+      "action_status": "顶部的状态标识汇总了平台的健康状况"
     },
     "containers": {
       "title": "容器",
-      "description": "列出和管理所有 Docker 容器。启动、停止、重启或检查单个容器。",
-      "action_list": "使用状态筛选器浏览容器",
-      "action_start_stop": "启动、停止或重启容器",
-      "action_create": "从镜像创建新容器"
+      "description": "Docker 在此服务器上运行的所有内容。您能对容器执行哪些操作取决于其类别：系统容器需要 Root 模式才能停止或删除，不受信任的容器则完全无法停止。",
+      "action_filter": "点击磁贴或选择类别来筛选列表",
+      "action_control": "在容器所在行启动、停止、暂停、重启或删除容器",
+      "action_class": "更改容器的类别（SYSTEM_CORE 保持锁定）",
+      "action_create": "使用此服务器上已有的镜像创建容器"
     },
     "create_container": {
       "title": "创建容器",
-      "description": "通过选择镜像并配置端口、卷和环境变量来启动新的 Docker 容器。",
-      "action_image": "选择基础镜像",
-      "action_config": "配置端口、卷和环境变量"
+      "description": "使用此服务器上已有的镜像运行新容器。请先在“镜像”中拉取镜像。",
+      "action_image": "选择镜像、名称，如有需要还可指定命令",
+      "action_config": "添加端口、环境变量和卷",
+      "action_class": "设置类别、策略和网络；立即启动或稍后启动"
+    },
+    "edit_container": {
+      "title": "编辑容器",
+      "description": "编辑会替换容器：以新设置启动一个新容器，卷之外的文件将会丢失。",
+      "action_change": "更改镜像、端口、变量或卷",
+      "action_save": "准备就绪后保存并替换"
     },
     "container_detail": {
-      "title": "容器详情",
-      "description": "检查特定容器——查看日志、资源使用、环境变量和网络设置。",
-      "action_logs": "查看实时容器日志",
-      "action_restart": "重启或停止容器",
-      "action_env": "检查环境变量和挂载"
+      "title": "容器",
+      "description": "单个容器：其状态、镜像、网络和日志。",
+      "action_logs": "查看最近 300 行日志，刷新或下载",
+      "action_edit": "编辑容器（这会替换该容器）",
+      "action_exec": "为 websocket 客户端启动 Exec 会话；租户应用之外的容器需要 Root 模式"
     },
     "images": {
       "title": "镜像",
-      "description": "管理可用的 Docker 镜像。拉取新镜像或删除未使用的镜像。",
-      "action_pull": "从注册表拉取新镜像",
-      "action_remove": "删除未使用的镜像"
+      "description": "此服务器上的 Docker 镜像。",
+      "action_pull": "拉取镜像，实时显示进度",
+      "action_prune": "清理悬空镜像；请先试运行（需要 Root 模式）"
     },
     "networks": {
       "title": "网络",
-      "description": "查看和管理 Docker 网络。检查连接的容器并创建自定义网络。",
-      "action_inspect": "检查网络配置",
-      "action_create": "创建新的 Docker 网络"
+      "description": "此服务器上的 Docker 网络。系统网络为只读。",
+      "action_create": "创建网络，可设为内部网络（无出站访问）",
+      "action_inspect": "查看网络及其中的容器",
+      "action_delete": "删除您创建的网络"
     },
     "stacks": {
-      "title": "Stacks",
-      "description": "管理 Docker Compose stacks——一组相关容器的集合部署。",
-      "action_manage": "查看和管理现有 stacks",
-      "action_deploy": "部署或更新 stack"
+      "title": "堆栈",
+      "description": "从这里部署的 Docker Compose 堆栈，每个修订版本都会保留。",
+      "action_deploy": "从 compose 文件部署堆栈；使用相同 ID 会生成新的修订版本",
+      "action_diff": "比较两个修订版本",
+      "action_rollback": "回滚到较早的修订版本"
     },
     "observability": {
-      "title": "成本可观测性",
-      "description": "监控 LLM 使用成本、请求延迟、Token 消耗和所有供应商的错误率。",
-      "action_cost": "按供应商和模型跟踪成本",
-      "action_latency": "分析请求延迟百分位",
-      "action_tokens": "监控 Token 使用趋势"
+      "title": "成本仪表板",
+      "description": "网关所处理请求的成本、用量和速度。成本是根据您设置的价格估算的，不影响计费。",
+      "action_overview": "7 到 90 天内的支出、请求、Token、延迟和错误",
+      "action_requests": "浏览请求，按模型或用户筛选，并打开某个请求查看其处理流程",
+      "action_pricing": "设置每百万 Token 的价格",
+      "action_export": "将数据导出为 CSV"
     },
     "logs": {
       "title": "日志与审计",
-      "description": "浏览系统日志和审计追踪。按严重性、来源或时间范围筛选。",
-      "action_filter": "按级别、来源或关键词筛选日志",
-      "action_audit": "切换到安全事件审计追踪"
+      "description": "来自每台机器和每个容器的日志，以及记录谁更改了什么的审计跟踪。",
+      "action_filter": "按机器或来源、时间和文本筛选；实时跟踪新的日志行",
+      "action_audit": "切换到“审计”，查看操作、目标、结果及执行者"
     },
     "security_map": {
-      "title": "安全地图",
-      "description": "可视化数据驻留和安全边界。查看数据在供应商和区域之间的流向。",
-      "action_residency": "查看按供应商的数据驻留地图",
-      "action_providers": "检查供应商安全配置"
-    },
-    "providers": {
-      "title": "LLM 供应商",
-      "description": "配置上游 LLM 端点——本地 Ollama、OpenAI、Azure 或兼容 API。测试连接和凭据。",
-      "action_add": "添加新的 LLM 供应商端点",
-      "action_test": "测试供应商连接和凭据",
-      "action_route": "配置请求路由和故障转移规则"
-    },
-    "models": {
-      "title": "模型",
-      "description": "浏览所有供应商的可用模型。拉取模型到本地运行时或分配给项目。",
-      "action_browse": "按供应商浏览可用模型",
-      "action_pull": "将模型拉取到本地 Ollama 运行时",
-      "action_assign": "将模型分配给聊天项目或端点"
-    },
-    "model_detail": {
-      "title": "模型详情",
-      "description": "查看特定模型的详细信息——参数、功能和使用统计。",
-      "action_params": "检查模型参数和量化",
-      "action_test": "向此模型发送测试提示"
-    },
-    "runtimes": {
-      "title": "运行时",
-      "description": "查看本地 LLM 运行时及其加载的模型。检查健康状况和 GPU 利用率。",
-      "action_list": "列出所有已注册的运行时",
-      "action_health": "检查运行时健康和加载的模型"
-    },
-    "runtime_detail": {
-      "title": "运行时详情",
-      "description": "检查特定运行时——配置、加载的模型和资源使用。",
-      "action_config": "查看或编辑运行时配置",
-      "action_models": "查看此运行时上加载的模型"
+      "title": "数据驻留",
+      "description": "您的提示词在哪里处理：在您的机器上、在您的网络内，还是在网络之外。",
+      "action_residency": "查看哪些提供商是本地、外部或未知的",
+      "action_where": "无法自动检测时，说明提供商将提示词发送到哪里",
+      "action_volume": "查看有多少数据流向何处"
     },
     "agent_trace": {
-      "title": "代理追踪",
-      "description": "检查 LLM 调用追踪——完整的请求/响应链,包括工具调用、推理步骤和 Token 使用。",
-      "action_inspect": "深入查看单个调用追踪",
-      "action_replay": "重放追踪进行调试"
+      "title": "LLM 调用",
+      "description": "提供商、运行时和模型之间的连接关系，以及正在经过它们的实时调用。",
+      "action_graph": "搜索和筛选关系图；点击节点查看详情",
+      "action_live": "实时查看调用；暂停和恢复数据流"
     },
     "endpoint": {
       "title": "API 端点",
-      "description": "OpenAI 兼容端点的交互式 API 文档。直接从浏览器测试 API 调用。",
-      "action_docs": "浏览 OpenAPI 文档",
-      "action_test": "发送测试请求到端点"
+      "description": "网关兼容 OpenAI 的 API 文档：应用程序访问所有模型所用的统一地址。",
+      "action_docs": "浏览 API 文档，或在新标签页中打开",
+      "action_container": "启动、停止或重启网关容器"
     },
-    "nodes": {
-      "title": "节点集群",
-      "description": "管理 GPU 推理节点集群。注册新节点、监控健康状况和配置调度优先级。",
-      "action_enroll": "注册新的 GPU 节点",
-      "action_monitor": "监控节点健康和 GPU 利用率",
-      "action_schedule": "配置调度策略和优先级"
+    "runtime_detail": {
+      "title": "运行时",
+      "description": "单容器模型运行时，即本地 Docker 提供商背后的运行时。",
+      "action_control": "启动、停止或重启",
+      "action_config": "编辑其配置，然后保存并重启",
+      "action_logs": "查看其容器日志"
     },
-    "node_detail": {
-      "title": "节点详情",
-      "description": "检查特定节点——硬件信息、加载的模型、运行中的作业和健康历史。",
-      "action_status": "查看节点状态和硬件详情",
-      "action_drain": "排空或隔离节点进行维护"
+    "providers": {
+      "title": "LLM 提供商",
+      "description": "网关可以访问的所有模型：在您的集群上、在本地容器中，或在云提供商处。部署在集群上的模型会自动显示在这里。",
+      "action_add": "添加提供商：带密钥的云 API，或本地容器",
+      "action_test": "测试连接；同时会列出该提供商的模型",
+      "action_price": "设置价格，使成本显示在成本仪表板中",
+      "action_manage": "编辑、启动、停止或删除提供商；集群部署在各自的页面上管理"
     },
     "node_profiles": {
-      "title": "节点配置文件",
-      "description": "定义可重用的节点配置文件,指定资源需求和调度约束。",
-      "action_create": "创建新的节点配置文件",
-      "action_assign": "将配置文件分配给节点或工作负载"
+      "title": "机器配置文件",
+      "description": "可复用的机器设置：运行时、GPU、存储、网络、日志、安全和更新。",
+      "action_create": "通过 JSON 设置创建配置文件",
+      "action_assign": "在机器的页面上为其分配配置文件"
+    },
+    "node_detail": {
+      "title": "机器",
+      "description": "单台机器：其硬件、日志、部署、运行的 vLLM、命令和更新。",
+      "action_status": "查看其硬件、部署和最近的日志",
+      "action_maintenance": "维护和排空：不会再向其分配新任务",
+      "action_updates": "检查并安装系统更新，或重启机器",
+      "action_vllm": "将在其上发现的 vLLM 通过 Fadenstack 路由"
+    },
+    "nodes": {
+      "title": "机器",
+      "description": "运行您模型的 GPU 电脑。在机器上运行一条命令并在这里批准后，机器即可加入。",
+      "action_add": "添加机器：在机器上运行命令，然后在这里批准",
+      "action_status": "查看每台机器的状态、GPU 和代理版本",
+      "action_maintenance": "维护和排空可阻止向机器分配新任务",
+      "action_delete": "删除机器（输入其名称以确认）"
+    },
+    "cluster_detail": {
+      "title": "集群",
+      "description": "单个集群：其机器、机器间的连接方式、上面的模型及其流量。",
+      "action_deploy": "在其上部署模型",
+      "action_wiring": "查看其机器的连接方式，并更改网络",
+      "action_security": "加密模型流量以及机器之间的流量",
+      "action_runtime": "切换运行时版本（这会重启模型）",
+      "action_control": "停止、启动或删除集群；删除前需先删除其部署"
+    },
+    "clusters": {
+      "title": "集群",
+      "description": "集群将多台机器组合起来，共同提供模型服务。接入一台机器后即可创建集群。",
+      "action_create": "创建集群：命名、选择机器、确认网络",
+      "action_open": "打开集群，查看其机器和模型",
+      "action_found": "接管您的机器仍在运行、但此服务器已丢失的集群"
+    },
+    "marketplace": {
+      "title": "模型市场",
+      "description": "查找模型，查看它是否适配您的集群，然后托管它。",
+      "action_find": "浏览推荐模型，或搜索 Hugging Face",
+      "action_fit": "选择集群，查看哪些模型可以放入",
+      "action_host": "托管模型：运行位置、引擎设置、确认",
+      "action_local": "查看和管理此服务器上已有的模型",
+      "action_token": "受限模型需要 Hugging Face 令牌（顶部的按钮）"
+    },
+    "deployment_detail": {
+      "title": "部署",
+      "description": "在集群上运行的单个模型：其健康状况、副本、机器、速度和日志。",
+      "action_scale": "扩缩容：增加副本，或更改每块加速器的占用份额（会重启）",
+      "action_change": "更改其在聊天中的名称、回复等待时间或引擎设置",
+      "action_logs": "查看其日志和错误",
+      "action_control": "停止或启动"
+    },
+    "deployments": {
+      "title": "部署",
+      "description": "在您的集群上运行的所有模型。",
+      "action_deploy": "部署模型（与模型市场中的“托管”相同）",
+      "action_control": "停止、启动或删除部署",
+      "action_open": "打开某个部署，查看其健康状况、速度和设置"
     },
     "scheduler": {
       "title": "调度器",
-      "description": "查看和管理推理作业队列。设置调度策略并监控作业分配。",
-      "action_queue": "浏览作业队列和历史",
-      "action_policies": "配置调度策略"
+      "description": "后台任务：模型下载和文档导入。",
+      "action_watch": "跟踪任务进度；任务运行期间列表会自动刷新",
+      "action_retry": "重试失败的任务，或取消正在运行的任务"
     },
     "users": {
       "title": "用户",
-      "description": "管理用户账户、分配角色和生成 API 密钥。控制系统访问权限。",
-      "action_create": "创建新用户账户",
-      "action_roles": "分配或更改用户角色",
-      "action_keys": "生成或撤销 API 密钥"
+      "description": "可以登录的账户。只使用聊天的人不需要角色：新账户会获得标准用户角色。",
+      "action_create": "使用电子邮件地址和初始密码创建用户",
+      "action_roles": "编辑某人的角色，以及其用量计入的用量归属组",
+      "action_developer": "开发者模式：智能体可以使用该用户电脑上的本地 MCP 服务器",
+      "action_delete": "删除用户"
     },
     "roles": {
       "title": "角色",
-      "description": "定义具有细粒度权限的角色。角色控制对资源和操作的访问。",
-      "action_create": "创建新角色",
-      "action_permissions": "编辑角色权限"
+      "description": "角色是一组权限。内置角色为只读。",
+      "action_create": "创建角色并选择其权限",
+      "action_edit": "编辑或删除您创建的角色"
     },
     "groups": {
       "title": "组",
-      "description": "将用户组织到组中,以便批量角色分配和访问管理。",
-      "action_create": "创建新组",
-      "action_members": "添加或移除组成员"
+      "description": "组为其成员授予角色，并在报告中汇总其用量。",
+      "action_create": "创建组并指定其角色",
+      "action_members": "添加或移除成员"
     },
     "auth_providers": {
       "title": "认证提供商",
-      "description": "配置外部认证提供商——OIDC、SAML 或 LDAP——用于单点登录 (SSO)。",
-      "action_add": "添加认证提供商",
-      "action_test": "测试提供商连接"
+      "description": "让大家通过 OpenID Connect 或 OAuth2 使用公司账户登录。",
+      "action_add": "添加提供商，填写其客户端 ID、密钥和发现 URL",
+      "action_auto": "选择用户首次登录时是否自动获得账户"
     },
     "pii_dashboard": {
-      "title": "PII 仪表板",
-      "description": "PII 扫描活动概览——按实体类型的检测计数、脱敏率和合规状况。",
-      "action_stats": "查看检测统计和趋势",
-      "action_entities": "浏览检测到的实体类型"
+      "title": "PII 仪表盘",
+      "description": "PII 过滤器在请求中发现的内容，仅显示计数。",
+      "action_stats": "扫描次数、检测次数和检测率",
+      "action_breakdown": "按操作和来源划分的个人数据类型"
     },
     "pii_activity": {
       "title": "PII 活动日志",
-      "description": "PII 检测和脱敏的详细日志。按实体类型、用户或时间范围筛选。",
-      "action_filter": "按实体类型或用户筛选活动",
-      "action_export": "导出活动日志用于合规"
+      "description": "每一次扫描和脱敏，不含文本本身。",
+      "action_filter": "按操作、来源筛选，或只显示含个人数据的事件"
     },
     "pii_policies": {
-      "title": "PII 策略",
-      "description": "定义租户级 PII 策略——检测哪些实体类型、脱敏模式和执行规则。",
-      "action_create": "创建新的 PII 策略",
-      "action_assign": "将策略分配给租户"
+      "title": "租户 PII 策略",
+      "description": "为某个租户覆盖默认 PII 策略。默认策略位于“设置”的“模块”中。",
+      "action_load": "选择租户并加载其策略",
+      "action_edit": "分别选择对云端模型和本地模型保护哪些内容，以及检测失败时如何处理",
+      "action_preview": "保存前查看生效的策略"
     },
     "rag_knowledge_base": {
       "title": "知识库",
-      "description": "上传和管理用于检索增强生成的文档。文档将被索引以进行语义搜索。",
-      "action_upload": "上传新文档到知识库",
-      "action_search": "测试搜索查询"
+      "description": "聊天可以引用的文档，按嵌套集合组织。",
+      "action_upload": "创建集合并上传文档；拖动即可移动",
+      "action_describe": "为集合添加描述，或让 AI 撰写描述",
+      "action_retry": "重试或删除处理失败的文档"
     },
     "rag_documents": {
       "title": "文档",
-      "description": "浏览和管理 RAG 管道中的单个文档。查看索引状态和元数据。",
-      "action_browse": "使用状态筛选器浏览文档",
-      "action_delete": "删除文档及其分块"
+      "description": "所有已上传的文档，集中在一个列表中。",
+      "action_upload": "上传文档",
+      "action_manage": "重试或删除文档"
     },
     "rag_collections": {
       "title": "集合",
-      "description": "将文档组织到集合中进行范围检索。每个集合有自己的嵌入索引。",
-      "action_create": "创建新集合",
-      "action_manage": "管理集合成员和设置"
+      "description": "存放文档的集合。",
+      "action_create": "创建集合",
+      "action_delete": "删除集合"
     },
     "rag_runtime": {
-      "title": "RAG 运行时",
-      "description": "配置 RAG 管道运行时——嵌入模型、分块大小、检索参数和向量存储设置。",
-      "action_config": "编辑运行时配置",
-      "action_status": "检查索引管道健康"
+      "title": "RAG 运行时配置",
+      "description": "文档搜索所用的嵌入和分块设置。",
+      "action_view": "查看嵌入模型和分块大小",
+      "action_edit": "使用完整 RAG 引擎时可在此编辑；RAG Lite 的设置位于“设置”中"
     },
     "rag_collectors": {
-      "title": "收集器",
-      "description": "配置自动从外部源按计划导入文档的数据收集器。",
-      "action_add": "添加新的数据收集器",
-      "action_schedule": "配置收集计划"
+      "title": "采集器",
+      "description": "自动导入文档的来源，以及它们的导入任务。",
+      "action_run": "立即运行采集器",
+      "action_jobs": "跟踪导入任务"
     },
     "rag_explorer": {
-      "title": "RAG 探索器",
-      "description": "交互式探索 RAG 索引——查询分块、检查嵌入和调试检索质量。",
-      "action_query": "运行语义搜索查询",
-      "action_chunks": "检查单个分块及其得分"
+      "title": "RAG 浏览器",
+      "description": "在草稿中准备文档更改，然后立即发布或在指定时间发布。",
+      "action_container": "选择或创建容器",
+      "action_upload": "将文件上传到草稿",
+      "action_publish": "立即发布，或安排发布时间"
     },
     "rag_publishes": {
       "title": "发布",
-      "description": "管理已发布的 RAG 快照。发布会冻结集合版本以确保稳定检索。",
-      "action_publish": "创建新的发布快照",
-      "action_status": "监控发布管道状态"
+      "description": "发布请求及其启动的导入任务。发布操作在 RAG 浏览器中进行。",
+      "action_watch": "跟踪发布进度；有发布正在进行时列表会自动刷新"
     },
     "rag_search": {
       "title": "RAG 搜索",
-      "description": "针对已发布的集合测试检索查询。跨集合和参数比较结果。",
-      "action_query": "运行测试搜索查询",
-      "action_compare": "跨集合比较结果"
+      "description": "针对已索引的文档测试检索查询，并应用访问控制。",
+      "action_query": "运行查询并查看找到的片段",
+      "action_pro": "使用完整引擎时：以某个用户或组的身份搜索、筛选并选择模式"
     },
     "chat_projects": {
       "title": "聊天项目",
-      "description": "创建和管理聊天项目。每个项目限定模型访问、系统提示和用户权限。",
-      "action_create": "创建新的聊天项目",
-      "action_models": "按项目配置模型访问"
+      "description": "大家在聊天中创建的项目。",
+      "action_browse": "查看各项目的所有者",
+      "action_delete": "删除项目及其所有聊天和文件"
     },
     "chat_sessions": {
       "title": "聊天会话",
-      "description": "浏览所有项目的聊天会话。查看对话历史和使用统计。",
-      "action_browse": "使用筛选器浏览会话",
-      "action_export": "导出会话记录"
+      "description": "按用户和项目列出的聊天。标题和消息属于各自的用户，不会在此显示。",
+      "action_browse": "按用户、状态和项目查看聊天",
+      "action_delete": "删除聊天"
     },
     "chat_attachments": {
       "title": "聊天附件",
-      "description": "管理聊天会话中上传的文件附件。查看存储使用情况并清理旧文件。",
-      "action_browse": "浏览已上传的附件",
-      "action_clean": "清理孤立或过期的文件"
+      "description": "大家在聊天中附加的文件，以及它们占用的存储空间。",
+      "action_browse": "按用户、大小和类型查看文件",
+      "action_delete": "删除文件"
+    },
+    "mcp_detail": {
+      "title": "MCP 服务器",
+      "description": "单个 MCP 服务器：其连接和提供的工具。",
+      "action_tools": "逐个开启或关闭工具",
+      "action_test": "测试连接并统计其工具数量",
+      "action_edit": "编辑服务器；保存后会重新连接并重新发现其工具"
     },
     "mcp_servers": {
       "title": "MCP 服务器",
-      "description": "注册和管理 MCP 工具服务器。每个服务器公开 LLM 可以调用的工具。",
-      "action_register": "注册新的 MCP 服务器",
-      "action_health": "检查服务器健康和可用工具"
+      "description": "聊天和智能体可以使用的工具服务器：搜索、工单、文件等。",
+      "action_register": "通过 URL 或命令注册服务器，并设置其请求头或变量",
+      "action_pii": "选择如何处理发送给其工具的个人数据",
+      "action_scan": "扫描网络中的 MCP 服务器"
     },
-    "mcp_detail": {
-      "title": "MCP 服务器详情",
-      "description": "检查特定 MCP 服务器——可用工具、配置、连接状态和使用日志。",
-      "action_tools": "浏览可用工具及其模式",
-      "action_config": "编辑服务器连接设置"
+    "skill_detail": {
+      "title": "技能",
+      "description": "单个技能：其指令、使用时机、可见范围及版本。",
+      "action_edit": "编辑指令和设置，并发布新版本",
+      "action_share": "共享技能，或将其分配给项目",
+      "action_export": "导出为 SKILL.md 或文件夹"
     },
     "skills": {
       "title": "技能",
-      "description": "浏览和管理技能插件——可重用的提示链和工具组合,扩展 LLM 功能。",
-      "action_browse": "浏览可用技能",
-      "action_create": "创建新技能"
-    },
-    "skills_create": {
-      "title": "创建技能",
-      "description": "定义新技能——指定提示模板、所需工具和输入/输出模式。",
-      "action_define": "定义技能提示和参数",
-      "action_test": "使用示例输入测试"
-    },
-    "skill_detail": {
-      "title": "技能详情",
-      "description": "检查和编辑特定技能——提示模板、工具绑定和执行历史。",
-      "action_edit": "编辑技能定义",
-      "action_test": "使用测试输入运行"
-    },
-    "settings": {
-      "title": "设置",
-      "description": "系统级配置——网络、存储后端、安全策略、功能开关和服务参数。",
-      "action_general": "配置通用系统设置",
-      "action_security": "管理安全和认证策略",
-      "action_features": "启用或禁用功能开关"
-    },
-    "profile": {
-      "title": "个人资料",
-      "description": "查看和编辑您的账户信息——显示名称、邮箱、密码和个人偏好。",
-      "action_info": "更新显示名称和邮箱",
-      "action_password": "更改密码"
+      "description": "保存一次即可反复使用的指令。在聊天中，用 $ 选择技能。",
+      "action_create": "创建技能，或导入 SKILL.md 或压缩的技能文件夹",
+      "action_publish": "发布、归档或删除技能",
+      "action_views": "查看组织的技能、您自己的技能，或与您共享的技能"
     },
     "agents": {
       "title": "智能体",
-      "description": "在其他软件（Office、EPLAN、任何桌面应用）中运行、由本服务器管控的智能体。",
-      "action_create": "创建智能体，或从 JSON 定义开始",
-      "action_open": "打开智能体进行修改、发布并决定谁可以使用"
+      "description": "在其他软件（Office、浏览器或任何应用程序）中运行、并由此服务器管控的智能体。新智能体是草稿：在发布并授权之前，任何人都无法使用。",
+      "action_create": "创建智能体，或从某个应用开始",
+      "action_open": "打开智能体进行修改、发布，并决定谁可以使用"
     },
     "agent_detail": {
       "title": "智能体",
-      "description": "一个智能体：它的定义、版本、谁可以使用以及它做了什么。",
-      "action_definition": "修改指令、模型、知识和工具；保存会创建新版本",
+      "description": "单个智能体：其定义、版本、谁可以使用，以及它做过什么。",
+      "action_definition": "更改指令、模型、知识和工具；保存后会生成新版本",
       "action_publish": "发布某个版本，或回滚到较早的版本",
-      "action_access": "授权给用户和团队，并选择维护者",
-      "action_activity": "查看使用情况、应用上报的内容和已登录的设备"
+      "action_access": "授权给用户和团队，并指定其维护者",
+      "action_activity": "查看其使用情况、应用上报的内容以及已登录的设备"
     },
     "governance": {
       "title": "治理",
-      "description": "每个聊天和智能体请求都须遵守的规则，以及检查做出的决定。",
-      "action_rules": "按名称禁止、先询问或允许工具",
-      "action_classes": "说明工具做什么，供工具模式使用",
-      "action_decisions": "查看检查做出的决定，不含文本"
-    }
-  },
-  "taskflows": {
-    "remote_endpoint": {
-      "title": "注册远程端点",
-      "description": "将云端 LLM 提供商（OpenAI、Anthropic 等）作为远程端点连接。",
-      "step1_title": "添加提供商",
-      "step1_content": "点击 <strong>添加提供商</strong> 打开注册向导。",
-      "step2_title": "提供商向导",
-      "step2_content": "向导将引导您完成注册。请按顺序填写每个部分。",
-      "step3_title": "命名提供商",
-      "step3_content": "为此端点输入一个描述性名称，例如 <em>OpenAI 生产环境</em>。",
-      "step4_title": "选择目标",
-      "step4_content": "选择 <strong>远程端点</strong> 以连接到外部 API。",
-      "step5_title": "提供商类型",
-      "step5_content": "从下拉列表中选择 LLM 提供商（例如 openai、anthropic、azure）。",
-      "step6_title": "输入 API 密钥",
-      "step6_content": "粘贴您的 API 密钥。密钥将加密存储，永远不会以明文显示。",
-      "step7_title": "测试连接",
-      "step7_content": "点击 <strong>测试连接</strong> 验证端点是否可达以及凭据是否有效。",
-      "step8_title": "创建提供商",
-      "step8_content": "一切就绪！点击 <strong>创建</strong> 注册提供商。"
+      "description": "每个聊天和智能体请求都须遵守的规则，以及检查做出的决定。更改会在 30 秒内生效。",
+      "action_rules": "按名称拒绝、先询问或允许工具",
+      "action_classes": "说明工具的作用（读取、写入、破坏性），供工具模式使用",
+      "action_decisions": "查看检查做出的决定，不含文本内容"
     },
-    "remote_node": {
-      "title": "设置远程节点",
-      "description": "将远程 GPU 机器注册为节点加入您的节点群。",
-      "step1_title": "添加节点",
-      "step1_content": "点击 <strong>添加节点</strong> 开始注册流程。",
-      "step2_title": "节点注册",
-      "step2_content": "此侧边栏将引导您完成新节点的注册。您将获得一个注册令牌，可在远程服务器上安装。",
-      "step3_title": "添加备注",
-      "step3_content": "添加可选备注以标识此节点（例如 <em>GPU 服务器 数据中心 2</em>）。",
-      "step4_title": "创建令牌",
-      "step4_content": "点击 <strong>创建令牌</strong>。复制生成的令牌并在远程服务器上执行安装命令。"
+    "settings": {
+      "title": "设置",
+      "description": "整个系统的设置，分为三个标签页。",
+      "action_general": "通用：所有系统设置（可搜索）以及 Hugging Face 令牌",
+      "action_modules": "模块：开启或关闭可选模块及其设置",
+      "action_appearance": "外观：强调色"
     },
-    "local_model": {
-      "title": "运行本地模型",
-      "description": "通过 Docker 在本服务器上本地部署 LLM。",
-      "step1_title": "添加提供商",
-      "step1_content": "点击 <strong>添加提供商</strong> 打开注册向导。",
-      "step2_title": "提供商向导",
-      "step2_content": "向导将引导您完成配置。这次我们将设置一个本地运行的模型。",
-      "step3_title": "命名提供商",
-      "step3_content": "输入一个名称，例如 <em>本地 Llama</em> 或 <em>本地 Mistral</em>。",
-      "step4_title": "选择目标",
-      "step4_content": "选择 <strong>Docker — 本服务器</strong> 以容器形式本地运行模型。",
-      "step5_title": "创建并部署",
-      "step5_content": "点击 <strong>创建</strong>。Fadenstack 将下载模型镜像并自动启动容器。"
+    "profile": {
+      "title": "我的资料",
+      "description": "您的账户、密码和 API 令牌。",
+      "action_password": "修改密码",
+      "action_tokens": "为脚本和应用程序创建 API 令牌；每个令牌只显示一次",
+      "action_revoke": "撤销令牌；使用该令牌的应用程序会在一分钟内停止工作"
     }
   }
 }

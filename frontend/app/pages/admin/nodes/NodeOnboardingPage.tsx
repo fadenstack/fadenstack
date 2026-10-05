@@ -331,7 +331,9 @@ export default function NodeOnboardingDrawer({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t("nodes.onboard.run_this")}
       </Typography>
-      <CopyLine command={installLine} />
+      <Box data-tour-id="nodes.onboard.command">
+        <CopyLine command={installLine} />
+      </Box>
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
         {t("nodes.onboard.what_happens")}
       </Typography>
@@ -378,7 +380,7 @@ export default function NodeOnboardingDrawer({
 
       <Divider sx={{ my: 3 }} />
 
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }} data-tour-id="nodes.onboard.waiting">
         <Typography variant="subtitle2">{t("nodes.onboard.waiting")}</Typography>
         {waiting.loading && <CircularProgress size={14} />}
       </Stack>
@@ -417,7 +419,7 @@ export default function NodeOnboardingDrawer({
           to a narrower question — unattended provisioning — and putting it
           first would make the common case look harder than it is. */}
       {!showToken ? (
-        <Button size="small" color="inherit" onClick={() => setShowToken(true)}>
+        <Button size="small" color="inherit" onClick={() => setShowToken(true)} data-tour-id="nodes.onboard.skip">
           {t("nodes.onboard.skip_approval")}
         </Button>
       ) : (

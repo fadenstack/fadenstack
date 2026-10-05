@@ -57,9 +57,9 @@
     "block": "Blockieren",
     "allow": "Erlauben",
     "fallback_to_local": "Fallback auf Lokal",
-    "mode_locked": "Dein Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.",
+    "mode_locked": "Ihr Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.",
     "mode_not_applied": "{{mode}} wird nicht angewendet.",
-    "mode_choose_again": "Wähle den Modus erneut, um ihn anzuwenden.",
+    "mode_choose_again": "Wählen Sie den Modus erneut, um ihn anzuwenden.",
     "telemetry": "Telemetrie",
     "sanitize_telemetry": "Telemetrie bereinigen",
     "detection_settings": "Erkennungseinstellungen",
@@ -87,5 +87,12 @@
   "approval_approve": "Zulassen",
   "turn_interrupted": "Der Server wurde neu gestartet, während diese Antwort geschrieben wurde.",
   "turn_stopped": "Angehalten",
-  "jump_to_latest": "Zur neuesten Nachricht"
+  "jump_to_latest": "Zur neuesten Nachricht",
+  "tips": {
+    "title": "Tipps",
+    "dismiss": "Verstanden",
+    "files": "Hängen Sie Dateien mit der Büroklammer an: Das Modell liest sie zusammen mit Ihrer Frage.",
+    "skills": "Mit <kbd>$</kbd> nutzen Sie einen Skill, also gespeicherte Anweisungen für wiederkehrende Aufgaben. <kbd>/skill</kbd> speichert, was Sie gerade getan haben, als neuen Skill.",
+    "projects": "Fassen Sie Chats in der Seitenleiste zu Projekten zusammen. Die Anweisungen eines Projekts gelten für alle seine Chats."
+  }
 }

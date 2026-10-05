@@ -1,0 +1,31 @@
+{
+  "id": "invite_people",
+  "kind": "howto",
+  "version": 1,
+  "icon": "PersonAdd",
+  "route": "/admin/users",
+  "requires": {
+    "superuser": true
+  },
+  "steps": [
+    {
+      "id": "open",
+      "target": "[data-tour-id='users.create']",
+      "placement": "bottom",
+      "action": true
+    },
+    {
+      "id": "account",
+      "target": "[data-tour-id='users.new.account']",
+      "placement": "right",
+      "dialog": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "roles",
+      "target": "[data-tour-id='users.new.roles']",
+      "placement": "right",
+      "dialog": true
+    }
+  ]
+}

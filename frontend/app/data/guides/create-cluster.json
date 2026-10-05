@@ -1,0 +1,47 @@
+{
+  "id": "create_cluster",
+  "kind": "howto",
+  "version": 1,
+  "icon": "Hub",
+  "route": "/admin/clusters",
+  "requires": {
+    "superuser": true
+  },
+  "steps": [
+    {
+      "id": "open",
+      "target": "[data-tour-id='clusters.create']",
+      "placement": "bottom",
+      "action": true
+    },
+    {
+      "id": "name",
+      "target": "[data-tour-id='clusters.wizard.name']",
+      "placement": "bottom",
+      "dialog": true,
+      "action": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "machines",
+      "target": "[data-tour-id='clusters.wizard.machines']",
+      "placement": "right",
+      "dialog": true,
+      "action": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "network",
+      "target": "[data-tour-id='clusters.wizard.network']",
+      "placement": "right",
+      "dialog": true,
+      "waitMs": 60000
+    },
+    {
+      "id": "start",
+      "target": "[data-tour-id='clusters.wizard.start']",
+      "placement": "top",
+      "dialog": true
+    }
+  ]
+}

@@ -332,6 +332,7 @@ export default function ProfilePage() {
               onChange={(e) => setTokenName(e.target.value)}
               helperText={t("profile.token_name_help")}
               inputProps={{ maxLength: 200 }}
+              data-tour-id="profile.token.name"
             />
 
             <TextField
@@ -343,7 +344,7 @@ export default function ProfilePage() {
               helperText={t("profile.tenant_id_help")}
             />
 
-            <FormControl size="small" fullWidth>
+            <FormControl size="small" fullWidth data-tour-id="profile.token.lifetime">
               <InputLabel>{t("profile.token_expiry")}</InputLabel>
               <Select
                 value={expiresIn === null ? "none" : String(expiresIn)}
@@ -368,12 +369,13 @@ export default function ProfilePage() {
               onClick={handleGenerateToken}
               disabled={tokenLoading || !tenantId.trim()}
               sx={{ alignSelf: "flex-start" }}
+              data-tour-id="profile.token.create"
             >
               {t("profile.generate_token")}
             </Button>
 
             {generatedToken && (
-              <Box sx={{ mt: 1 }}>
+              <Box sx={{ mt: 1 }} data-tour-id="profile.token.value">
                 <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                   {t("profile.generated_token_label")}
                 </Typography>
@@ -412,7 +414,9 @@ export default function ProfilePage() {
             )}
 
             <Divider />
-            <Typography variant="subtitle2">{t("profile.your_tokens")}</Typography>
+            <Typography variant="subtitle2" data-tour-id="profile.token.list">
+              {t("profile.your_tokens")}
+            </Typography>
             {tokens !== null && tokens.length === 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t("profile.no_tokens")}

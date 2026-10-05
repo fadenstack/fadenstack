@@ -87,5 +87,12 @@
   "approval_approve": "批准",
   "turn_interrupted": "编写此回复时服务器重新启动了。",
   "turn_stopped": "已停止",
-  "jump_to_latest": "跳到最新消息"
+  "jump_to_latest": "跳到最新消息",
+  "tips": {
+    "title": "提示",
+    "dismiss": "知道了",
+    "files": "用回形针附加文件：模型会连同您的问题一起阅读这些文件。",
+    "skills": "输入 <kbd>$</kbd> 使用技能，即为重复任务保存的指令。<kbd>/skill</kbd> 会将您刚才完成的操作保存为新技能。",
+    "projects": "在侧边栏中将聊天归入项目。项目的指令适用于其中的所有聊天。"
+  }
 }

@@ -1,9 +1,10 @@
 /**
- * pageHelp — route-to-help-content registry for the "About This Page" drawer.
+ * pageHelp — what the "About this page" drawer (F1) says on each admin page.
  *
- * Each entry maps a route prefix to i18n keys in the "tour" namespace
- * under the `page_help.*` subtree. The first matching prefix wins,
- * so more-specific routes must come before their parents.
+ * Each entry maps a route prefix (or pattern) to texts in the "tour" namespace:
+ * `page_help.<id>.title`, `.description` and `.action_<action>` for each
+ * action. The first matching prefix wins, so more specific routes come before
+ * their parents. `guide` names a how-to guide the drawer offers to start.
  */
 
 export interface PageHelpEntry {
@@ -13,590 +14,134 @@ export interface PageHelpEntry {
   descriptionKey: string;
   /** i18n keys for bullet-point actions (tour namespace) */
   actionKeys: string[];
+  /** A how-to guide for the page's main task. */
+  guide?: string;
 }
 
-interface RouteMapping {
-  prefix: string;
-  entry: PageHelpEntry;
+interface PageHelpDef {
+  /** A path prefix, or a pattern for a page a prefix cannot single out. */
+  prefix: string | RegExp;
+  id: string;
+  actions: string[];
+  guide?: string;
 }
 
-/**
- * Ordered list — most-specific prefixes first.
- */
-const ROUTE_MAP: RouteMapping[] = [
-  // ── Dashboard ────────────────────────────────────────────────────
-  {
-    prefix: "/admin/dashboard",
-    entry: {
-      titleKey: "page_help.dashboard.title",
-      descriptionKey: "page_help.dashboard.description",
-      actionKeys: [
-        "page_help.dashboard.action_health",
-        "page_help.dashboard.action_containers",
-        "page_help.dashboard.action_metrics",
-      ],
-    },
-  },
+/** Ordered list: most specific prefixes first. */
+const PAGES: PageHelpDef[] = [
+  { prefix: "/admin/dashboard", id: "dashboard", actions: ["getting_started", "attention", "customize", "status"] },
 
-  // ── Containers ───────────────────────────────────────────────────
-  {
-    prefix: "/admin/containers/new",
-    entry: {
-      titleKey: "page_help.create_container.title",
-      descriptionKey: "page_help.create_container.description",
-      actionKeys: [
-        "page_help.create_container.action_image",
-        "page_help.create_container.action_config",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/containers/",
-    entry: {
-      titleKey: "page_help.container_detail.title",
-      descriptionKey: "page_help.container_detail.description",
-      actionKeys: [
-        "page_help.container_detail.action_logs",
-        "page_help.container_detail.action_restart",
-        "page_help.container_detail.action_env",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/containers",
-    entry: {
-      titleKey: "page_help.containers.title",
-      descriptionKey: "page_help.containers.description",
-      actionKeys: [
-        "page_help.containers.action_list",
-        "page_help.containers.action_start_stop",
-        "page_help.containers.action_create",
-      ],
-    },
-  },
+  // Containers, images, networks, stacks
+  { prefix: "/admin/containers/new", id: "create_container", actions: ["image", "config", "class"] },
+  { prefix: /^\/admin\/containers\/[^/]+\/edit/, id: "edit_container", actions: ["change", "save"] },
+  { prefix: "/admin/containers/", id: "container_detail", actions: ["logs", "edit", "exec"] },
+  { prefix: "/admin/containers", id: "containers", actions: ["filter", "control", "class", "create"] },
+  { prefix: "/admin/images", id: "images", actions: ["pull", "prune"] },
+  { prefix: "/admin/networks", id: "networks", actions: ["create", "inspect", "delete"] },
+  { prefix: "/admin/stacks", id: "stacks", actions: ["deploy", "diff", "rollback"] },
 
-  // ── Images / Networks / Stacks ───────────────────────────────────
-  {
-    prefix: "/admin/images",
-    entry: {
-      titleKey: "page_help.images.title",
-      descriptionKey: "page_help.images.description",
-      actionKeys: [
-        "page_help.images.action_pull",
-        "page_help.images.action_remove",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/networks",
-    entry: {
-      titleKey: "page_help.networks.title",
-      descriptionKey: "page_help.networks.description",
-      actionKeys: [
-        "page_help.networks.action_inspect",
-        "page_help.networks.action_create",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/stacks",
-    entry: {
-      titleKey: "page_help.stacks.title",
-      descriptionKey: "page_help.stacks.description",
-      actionKeys: [
-        "page_help.stacks.action_manage",
-        "page_help.stacks.action_deploy",
-      ],
-    },
-  },
+  // Observability, logs, data residency
+  { prefix: "/admin/observability", id: "observability", actions: ["overview", "requests", "pricing", "export"] },
+  { prefix: "/admin/logs", id: "logs", actions: ["filter", "audit"] },
+  { prefix: "/admin/security-map", id: "security_map", actions: ["residency", "where", "volume"] },
 
-  // ── Observability ────────────────────────────────────────────────
-  {
-    prefix: "/admin/observability",
-    entry: {
-      titleKey: "page_help.observability.title",
-      descriptionKey: "page_help.observability.description",
-      actionKeys: [
-        "page_help.observability.action_cost",
-        "page_help.observability.action_latency",
-        "page_help.observability.action_tokens",
-      ],
-    },
-  },
-
-  // ── Logs / Audit ─────────────────────────────────────────────────
-  {
-    prefix: "/admin/logs",
-    entry: {
-      titleKey: "page_help.logs.title",
-      descriptionKey: "page_help.logs.description",
-      actionKeys: [
-        "page_help.logs.action_filter",
-        "page_help.logs.action_audit",
-      ],
-    },
-  },
-
-  // ── Security Map ─────────────────────────────────────────────────
-  {
-    prefix: "/admin/security-map",
-    entry: {
-      titleKey: "page_help.security_map.title",
-      descriptionKey: "page_help.security_map.description",
-      actionKeys: [
-        "page_help.security_map.action_residency",
-        "page_help.security_map.action_providers",
-      ],
-    },
-  },
-
-  // ── LLM ──────────────────────────────────────────────────────────
-  {
-    prefix: "/admin/llm/agent-trace",
-    entry: {
-      titleKey: "page_help.agent_trace.title",
-      descriptionKey: "page_help.agent_trace.description",
-      actionKeys: [
-        "page_help.agent_trace.action_inspect",
-        "page_help.agent_trace.action_replay",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/llm/endpoint",
-    entry: {
-      titleKey: "page_help.endpoint.title",
-      descriptionKey: "page_help.endpoint.description",
-      actionKeys: [
-        "page_help.endpoint.action_docs",
-        "page_help.endpoint.action_test",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/marketplace",
-    entry: {
-      titleKey: "page_help.marketplace.title",
-      descriptionKey: "page_help.marketplace.description",
-      actionKeys: [
-        "page_help.marketplace.action_find",
-        "page_help.marketplace.action_fit",
-        "page_help.marketplace.action_host",
-        "page_help.marketplace.action_manage",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/llm/runtimes/",
-    entry: {
-      titleKey: "page_help.runtime_detail.title",
-      descriptionKey: "page_help.runtime_detail.description",
-      actionKeys: [
-        "page_help.runtime_detail.action_config",
-        "page_help.runtime_detail.action_models",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/llm/runtimes",
-    entry: {
-      titleKey: "page_help.runtimes.title",
-      descriptionKey: "page_help.runtimes.description",
-      actionKeys: [
-        "page_help.runtimes.action_list",
-        "page_help.runtimes.action_health",
-      ],
-    },
-  },
+  // LLM
+  { prefix: "/admin/llm/agent-trace", id: "agent_trace", actions: ["graph", "live"] },
+  { prefix: "/admin/llm/endpoint", id: "endpoint", actions: ["docs", "container"] },
+  { prefix: "/admin/llm/runtimes/", id: "runtime_detail", actions: ["control", "config", "logs"] },
   {
     prefix: "/admin/llm/providers",
-    entry: {
-      titleKey: "page_help.providers.title",
-      descriptionKey: "page_help.providers.description",
-      actionKeys: [
-        "page_help.providers.action_add",
-        "page_help.providers.action_test",
-        "page_help.providers.action_route",
-      ],
-    },
+    id: "providers",
+    actions: ["add", "test", "price", "manage"],
+    guide: "connect_provider",
   },
 
-  // ── Nodes ────────────────────────────────────────────────────────
+  // AI infrastructure
+  { prefix: "/admin/nodes/profiles", id: "node_profiles", actions: ["create", "assign"] },
+  { prefix: "/admin/nodes/", id: "node_detail", actions: ["status", "maintenance", "updates", "vllm"] },
+  { prefix: "/admin/nodes", id: "nodes", actions: ["add", "status", "maintenance", "delete"], guide: "add_machine" },
   {
-    prefix: "/admin/nodes/profiles",
-    entry: {
-      titleKey: "page_help.node_profiles.title",
-      descriptionKey: "page_help.node_profiles.description",
-      actionKeys: [
-        "page_help.node_profiles.action_create",
-        "page_help.node_profiles.action_assign",
-      ],
-    },
+    prefix: "/admin/clusters/",
+    id: "cluster_detail",
+    actions: ["deploy", "wiring", "security", "runtime", "control"],
   },
+  { prefix: "/admin/clusters", id: "clusters", actions: ["create", "open", "found"], guide: "create_cluster" },
   {
-    prefix: "/admin/nodes/",
-    entry: {
-      titleKey: "page_help.node_detail.title",
-      descriptionKey: "page_help.node_detail.description",
-      actionKeys: [
-        "page_help.node_detail.action_status",
-        "page_help.node_detail.action_drain",
-      ],
-    },
+    prefix: "/admin/marketplace",
+    id: "marketplace",
+    actions: ["find", "fit", "host", "local", "token"],
+    guide: "host_model",
   },
-  {
-    prefix: "/admin/nodes",
-    entry: {
-      titleKey: "page_help.nodes.title",
-      descriptionKey: "page_help.nodes.description",
-      actionKeys: [
-        "page_help.nodes.action_enroll",
-        "page_help.nodes.action_monitor",
-        "page_help.nodes.action_schedule",
-      ],
-    },
-  },
+  { prefix: "/admin/deployments/", id: "deployment_detail", actions: ["scale", "change", "logs", "control"] },
+  { prefix: "/admin/deployments", id: "deployments", actions: ["deploy", "control", "open"], guide: "host_model" },
+  { prefix: "/admin/scheduler", id: "scheduler", actions: ["watch", "retry"] },
 
-  // ── Scheduler ────────────────────────────────────────────────────
-  {
-    prefix: "/admin/scheduler",
-    entry: {
-      titleKey: "page_help.scheduler.title",
-      descriptionKey: "page_help.scheduler.description",
-      actionKeys: [
-        "page_help.scheduler.action_queue",
-        "page_help.scheduler.action_policies",
-      ],
-    },
-  },
-
-  // ── Access Control ───────────────────────────────────────────────
+  // Access control
   {
     prefix: "/admin/users",
-    entry: {
-      titleKey: "page_help.users.title",
-      descriptionKey: "page_help.users.description",
-      actionKeys: [
-        "page_help.users.action_create",
-        "page_help.users.action_roles",
-        "page_help.users.action_keys",
-      ],
-    },
+    id: "users",
+    actions: ["create", "roles", "developer", "delete"],
+    guide: "invite_people",
   },
-  {
-    prefix: "/admin/roles",
-    entry: {
-      titleKey: "page_help.roles.title",
-      descriptionKey: "page_help.roles.description",
-      actionKeys: [
-        "page_help.roles.action_create",
-        "page_help.roles.action_permissions",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/groups",
-    entry: {
-      titleKey: "page_help.groups.title",
-      descriptionKey: "page_help.groups.description",
-      actionKeys: [
-        "page_help.groups.action_create",
-        "page_help.groups.action_members",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/auth-providers",
-    entry: {
-      titleKey: "page_help.auth_providers.title",
-      descriptionKey: "page_help.auth_providers.description",
-      actionKeys: [
-        "page_help.auth_providers.action_add",
-        "page_help.auth_providers.action_test",
-      ],
-    },
-  },
+  { prefix: "/admin/roles", id: "roles", actions: ["create", "edit"] },
+  { prefix: "/admin/groups", id: "groups", actions: ["create", "members"] },
+  { prefix: "/admin/auth-providers", id: "auth_providers", actions: ["add", "auto"] },
 
-  // ── PII ──────────────────────────────────────────────────────────
-  {
-    prefix: "/admin/pii/dashboard",
-    entry: {
-      titleKey: "page_help.pii_dashboard.title",
-      descriptionKey: "page_help.pii_dashboard.description",
-      actionKeys: [
-        "page_help.pii_dashboard.action_stats",
-        "page_help.pii_dashboard.action_entities",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/pii/activity",
-    entry: {
-      titleKey: "page_help.pii_activity.title",
-      descriptionKey: "page_help.pii_activity.description",
-      actionKeys: [
-        "page_help.pii_activity.action_filter",
-        "page_help.pii_activity.action_export",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/pii/policies",
-    entry: {
-      titleKey: "page_help.pii_policies.title",
-      descriptionKey: "page_help.pii_policies.description",
-      actionKeys: [
-        "page_help.pii_policies.action_create",
-        "page_help.pii_policies.action_assign",
-      ],
-    },
-  },
+  // Privacy
+  { prefix: "/admin/pii/dashboard", id: "pii_dashboard", actions: ["stats", "breakdown"] },
+  { prefix: "/admin/pii/activity", id: "pii_activity", actions: ["filter"] },
+  { prefix: "/admin/pii/policies", id: "pii_policies", actions: ["load", "edit", "preview"] },
 
-  // ── RAG ──────────────────────────────────────────────────────────
-  {
-    prefix: "/admin/rag/knowledge-base",
-    entry: {
-      titleKey: "page_help.rag_knowledge_base.title",
-      descriptionKey: "page_help.rag_knowledge_base.description",
-      actionKeys: [
-        "page_help.rag_knowledge_base.action_upload",
-        "page_help.rag_knowledge_base.action_search",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/documents",
-    entry: {
-      titleKey: "page_help.rag_documents.title",
-      descriptionKey: "page_help.rag_documents.description",
-      actionKeys: [
-        "page_help.rag_documents.action_browse",
-        "page_help.rag_documents.action_delete",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/collections",
-    entry: {
-      titleKey: "page_help.rag_collections.title",
-      descriptionKey: "page_help.rag_collections.description",
-      actionKeys: [
-        "page_help.rag_collections.action_create",
-        "page_help.rag_collections.action_manage",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/runtime",
-    entry: {
-      titleKey: "page_help.rag_runtime.title",
-      descriptionKey: "page_help.rag_runtime.description",
-      actionKeys: [
-        "page_help.rag_runtime.action_config",
-        "page_help.rag_runtime.action_status",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/collectors",
-    entry: {
-      titleKey: "page_help.rag_collectors.title",
-      descriptionKey: "page_help.rag_collectors.description",
-      actionKeys: [
-        "page_help.rag_collectors.action_add",
-        "page_help.rag_collectors.action_schedule",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/explorer",
-    entry: {
-      titleKey: "page_help.rag_explorer.title",
-      descriptionKey: "page_help.rag_explorer.description",
-      actionKeys: [
-        "page_help.rag_explorer.action_query",
-        "page_help.rag_explorer.action_chunks",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/publishes",
-    entry: {
-      titleKey: "page_help.rag_publishes.title",
-      descriptionKey: "page_help.rag_publishes.description",
-      actionKeys: [
-        "page_help.rag_publishes.action_publish",
-        "page_help.rag_publishes.action_status",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/rag/search",
-    entry: {
-      titleKey: "page_help.rag_search.title",
-      descriptionKey: "page_help.rag_search.description",
-      actionKeys: [
-        "page_help.rag_search.action_query",
-        "page_help.rag_search.action_compare",
-      ],
-    },
-  },
+  // Knowledge (RAG)
+  { prefix: "/admin/rag/knowledge-base", id: "rag_knowledge_base", actions: ["upload", "describe", "retry"] },
+  { prefix: "/admin/rag/documents", id: "rag_documents", actions: ["upload", "manage"] },
+  { prefix: "/admin/rag/collections", id: "rag_collections", actions: ["create", "delete"] },
+  { prefix: "/admin/rag/runtime", id: "rag_runtime", actions: ["view", "edit"] },
+  { prefix: "/admin/rag/collectors", id: "rag_collectors", actions: ["run", "jobs"] },
+  { prefix: "/admin/rag/explorer", id: "rag_explorer", actions: ["container", "upload", "publish"] },
+  { prefix: "/admin/rag/publishes", id: "rag_publishes", actions: ["watch"] },
+  { prefix: "/admin/rag/search", id: "rag_search", actions: ["query", "pro"] },
 
-  // ── Chat ─────────────────────────────────────────────────────────
-  {
-    prefix: "/admin/chat/projects",
-    entry: {
-      titleKey: "page_help.chat_projects.title",
-      descriptionKey: "page_help.chat_projects.description",
-      actionKeys: [
-        "page_help.chat_projects.action_create",
-        "page_help.chat_projects.action_models",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/chat/sessions",
-    entry: {
-      titleKey: "page_help.chat_sessions.title",
-      descriptionKey: "page_help.chat_sessions.description",
-      actionKeys: [
-        "page_help.chat_sessions.action_browse",
-        "page_help.chat_sessions.action_export",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/chat/attachments",
-    entry: {
-      titleKey: "page_help.chat_attachments.title",
-      descriptionKey: "page_help.chat_attachments.description",
-      actionKeys: [
-        "page_help.chat_attachments.action_browse",
-        "page_help.chat_attachments.action_clean",
-      ],
-    },
-  },
+  // Chat workspace
+  { prefix: "/admin/chat/projects", id: "chat_projects", actions: ["browse", "delete"] },
+  { prefix: "/admin/chat/sessions", id: "chat_sessions", actions: ["browse", "delete"] },
+  { prefix: "/admin/chat/attachments", id: "chat_attachments", actions: ["browse", "delete"] },
 
-  // ── MCP ──────────────────────────────────────────────────────────
-  {
-    prefix: "/admin/mcp/servers/",
-    entry: {
-      titleKey: "page_help.mcp_detail.title",
-      descriptionKey: "page_help.mcp_detail.description",
-      actionKeys: [
-        "page_help.mcp_detail.action_tools",
-        "page_help.mcp_detail.action_config",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/mcp/servers",
-    entry: {
-      titleKey: "page_help.mcp_servers.title",
-      descriptionKey: "page_help.mcp_servers.description",
-      actionKeys: [
-        "page_help.mcp_servers.action_register",
-        "page_help.mcp_servers.action_health",
-      ],
-    },
-  },
+  // Extensions
+  { prefix: "/admin/mcp/servers/", id: "mcp_detail", actions: ["tools", "test", "edit"] },
+  { prefix: "/admin/mcp/servers", id: "mcp_servers", actions: ["register", "pii", "scan"] },
+  { prefix: "/admin/skills/", id: "skill_detail", actions: ["edit", "share", "export"] },
+  { prefix: "/admin/skills", id: "skills", actions: ["create", "publish", "views"] },
 
-  // ── Agents and governance ────────────────────────────────────────
-  {
-    prefix: "/admin/agents/",
-    entry: {
-      titleKey: "page_help.agent_detail.title",
-      descriptionKey: "page_help.agent_detail.description",
-      actionKeys: [
-        "page_help.agent_detail.action_definition",
-        "page_help.agent_detail.action_publish",
-        "page_help.agent_detail.action_access",
-        "page_help.agent_detail.action_activity",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/agents",
-    entry: {
-      titleKey: "page_help.agents.title",
-      descriptionKey: "page_help.agents.description",
-      actionKeys: ["page_help.agents.action_create", "page_help.agents.action_open"],
-    },
-  },
-  {
-    prefix: "/admin/governance",
-    entry: {
-      titleKey: "page_help.governance.title",
-      descriptionKey: "page_help.governance.description",
-      actionKeys: [
-        "page_help.governance.action_rules",
-        "page_help.governance.action_classes",
-        "page_help.governance.action_decisions",
-      ],
-    },
-  },
+  // Agents and governance
+  { prefix: "/admin/agents/", id: "agent_detail", actions: ["definition", "publish", "access", "activity"] },
+  { prefix: "/admin/agents", id: "agents", actions: ["create", "open"] },
+  { prefix: "/admin/governance", id: "governance", actions: ["rules", "classes", "decisions"] },
 
-  // ── Skills ───────────────────────────────────────────────────────
-  {
-    prefix: "/admin/skills/",
-    entry: {
-      titleKey: "page_help.skill_detail.title",
-      descriptionKey: "page_help.skill_detail.description",
-      actionKeys: [
-        "page_help.skill_detail.action_edit",
-        "page_help.skill_detail.action_test",
-      ],
-    },
-  },
-  {
-    prefix: "/admin/skills",
-    entry: {
-      titleKey: "page_help.skills.title",
-      descriptionKey: "page_help.skills.description",
-      actionKeys: [
-        "page_help.skills.action_browse",
-        "page_help.skills.action_create",
-      ],
-    },
-  },
-
-  // ── Settings ─────────────────────────────────────────────────────
-  {
-    prefix: "/admin/settings",
-    entry: {
-      titleKey: "page_help.settings.title",
-      descriptionKey: "page_help.settings.description",
-      actionKeys: [
-        "page_help.settings.action_general",
-        "page_help.settings.action_security",
-        "page_help.settings.action_features",
-      ],
-    },
-  },
-
-  // ── Profile ──────────────────────────────────────────────────────
-  {
-    prefix: "/admin/profile",
-    entry: {
-      titleKey: "page_help.profile.title",
-      descriptionKey: "page_help.profile.description",
-      actionKeys: [
-        "page_help.profile.action_info",
-        "page_help.profile.action_password",
-      ],
-    },
-  },
+  { prefix: "/admin/settings", id: "settings", actions: ["general", "modules", "appearance"] },
+  { prefix: "/admin/profile", id: "profile", actions: ["password", "tokens", "revoke"], guide: "create_api_token" },
 ];
+
+function toEntry(def: PageHelpDef): PageHelpEntry {
+  return {
+    titleKey: `page_help.${def.id}.title`,
+    descriptionKey: `page_help.${def.id}.description`,
+    actionKeys: def.actions.map((a) => `page_help.${def.id}.action_${a}`),
+    guide: def.guide,
+  };
+}
 
 /**
  * Resolve the best-matching page help entry for the current pathname.
- * Returns `null` if no match is found (shouldn't happen for /admin/* routes).
+ * Returns `null` if no match is found.
  */
 export function resolvePageHelp(pathname: string): PageHelpEntry | null {
-  for (const mapping of ROUTE_MAP) {
-    if (pathname.startsWith(mapping.prefix)) {
-      return mapping.entry;
-    }
-  }
-  return null;
+  const def = PAGES.find((p) =>
+    typeof p.prefix === "string" ? pathname.startsWith(p.prefix) : p.prefix.test(pathname),
+  );
+  return def ? toEntry(def) : null;
+}
+
+/** Every page's entry, for tests. */
+export function allPageHelp(): (PageHelpEntry & { prefix: string })[] {
+  return PAGES.map((p) => ({ prefix: String(p.prefix), ...toEntry(p) }));
 }

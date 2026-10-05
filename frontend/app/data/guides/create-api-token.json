@@ -1,0 +1,37 @@
+{
+  "id": "create_api_token",
+  "kind": "howto",
+  "version": 1,
+  "icon": "Key",
+  "route": "/admin/profile",
+  "steps": [
+    {
+      "id": "name",
+      "target": "[data-tour-id='profile.token.name']",
+      "placement": "bottom",
+      "waitMs": 5000
+    },
+    {
+      "id": "lifetime",
+      "target": "[data-tour-id='profile.token.lifetime']",
+      "placement": "bottom"
+    },
+    {
+      "id": "create",
+      "target": "[data-tour-id='profile.token.create']",
+      "placement": "top",
+      "action": true
+    },
+    {
+      "id": "value",
+      "target": "[data-tour-id='profile.token.value']",
+      "placement": "top",
+      "waitMs": 10000
+    },
+    {
+      "id": "list",
+      "target": "[data-tour-id='profile.token.list']",
+      "placement": "top"
+    }
+  ]
+}

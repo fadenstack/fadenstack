@@ -38,18 +38,13 @@ import { AdminTopbar } from "~/components/AdminTopbar";
 import { ADMIN_NAV_ID, AdminSidebar } from "~/components/AdminSidebar";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { RootModeDialog } from "~/components/RootModeDialog";
-import { ProductTourDialog } from "~/components/ProductTourDialog";
-import {
-  ProfileSelectionDialog,
-  type OnboardingProfile,
-} from "~/components/ProfileSelectionDialog";
-import { ModuleRecommendationDialog } from "~/components/ModuleRecommendationDialog";
-import { GuidedSetupTour } from "~/components/GuidedSetupTour";
-import { TaskFlowTour } from "~/components/TaskFlowTour";
-import { TaskFlowDialog } from "~/components/TaskFlowDialog";
 import { PageHelpDrawer } from "~/components/PageHelpDrawer";
+import { GuideRunner } from "~/components/guides/GuideRunner";
+import { HowToDialog } from "~/components/guides/HowToDialog";
+import { GettingStartedDialog } from "~/components/guides/GettingStarted";
+import { GuidesContext, announceGuidesChanged, type GuidesControl } from "~/lib/guidesContext";
+import { guideProgressKeys } from "~/lib/guides";
 import { preferences as preferencesApi } from "~/api/preferences";
-import { servicesApi } from "~/api/services";
 
 let meAccessInFlight: ReturnType<typeof adminUsers.meAccess> | null = null;
 
@@ -82,7 +77,6 @@ function AdminLayoutInner() {
     useState<HTMLElement | null>(null);
   const [rootStatus, setRootStatus] = useState<RootModeStatus | null>(null);
   const [showRootForm, setShowRootForm] = useState(false);
-  const [showInfoWizard, setShowInfoWizard] = useState(false);
   const [reason, setReason] = useState("");
   const [duration, setDuration] = useState(600);
   const [error, setError] = useState<string | null>(null);
@@ -91,20 +85,20 @@ function AdminLayoutInner() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(new Set());
 
-  /* ── Onboarding profile flow ──────────────────────────────────── */
-  const [showProfileSelect, setShowProfileSelect] = useState(false);
-  const [showModuleRecommend, setShowModuleRecommend] = useState(false);
-  const [selectedProfile, setSelectedProfile] =
-    useState<OnboardingProfile>("private");
-  const [profileConfirmed, setProfileConfirmed] = useState(false);
-  const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const [guidedSetupActive, setGuidedSetupActive] = useState(false);
-  const [guidedSetupInitialStep, setGuidedSetupInitialStep] = useState(0);
-
-  /* Task-flow sub-process guides */
-  const [showTaskFlowDialog, setShowTaskFlowDialog] = useState(false);
-  const [taskFlowId, setTaskFlowId] = useState<string | null>(null);
-  const [taskFlowActive, setTaskFlowActive] = useState(false);
+  /* Guides: the running one, the how-to list, the getting-started list */
+  const [activeGuide, setActiveGuide] = useState<string | null>(null);
+  const [guideRun, setGuideRun] = useState(0);
+  const [showHowTos, setShowHowTos] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(false);
+  const guides: GuidesControl = {
+    startGuide: (id) => {
+      setPageHelpOpen(false);
+      setActiveGuide(id);
+      // A guide started again while it runs starts over.
+      setGuideRun((n) => n + 1);
+    },
+    openGettingStarted: () => setShowGettingStarted(true),
+  };
 
   /* Page-help drawer (F1 / "About This Page") */
   const [pageHelpOpen, setPageHelpOpen] = useState(false);
@@ -234,87 +228,21 @@ function AdminLayoutInner() {
     return () => clearInterval(interval);
   }, [authReady, isSuperuser]);
 
-  /* ── Load user preferences & trigger profile selection ─────────── */
-  useEffect(() => {
-    if (!authReady) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await preferencesApi.get();
-        if (cancelled) return;
-        const profile = res.preferences?.profile;
-        if (profile) {
-          setSelectedProfile(profile as OnboardingProfile);
-          setProfileConfirmed(true);
-        } else {
-          // No profile yet — show selection dialog
-          setShowProfileSelect(true);
-        }
-      } catch {
-        // Preferences API unavailable — skip silently
-      } finally {
-        if (!cancelled) setPrefsLoaded(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authReady]);
-
-  /* ── Onboarding handlers ───────────────────────────────────────── */
-  async function handleProfileSelect(profile: OnboardingProfile) {
-    setSelectedProfile(profile);
-    setProfileConfirmed(true);
-    setShowProfileSelect(false);
-    try {
-      await preferencesApi.update({ profile });
-    } catch {
-      // best-effort persist
-    }
-    setShowModuleRecommend(true);
-  }
-
-  function handleProfileSkip() {
-    setSelectedProfile("private");
-    setProfileConfirmed(true);
-    setShowProfileSelect(false);
-    void preferencesApi.update({ profile: "private" }).catch(() => {});
-  }
-
-  async function handleModuleApply(modules: Record<string, boolean>) {
-    const promises: Promise<unknown>[] = [];
-    for (const [name, enabled] of Object.entries(modules)) {
-      promises.push(
-        enabled
-          ? servicesApi.enable(name).catch(() => {})
-          : servicesApi.disable(name).catch(() => {}),
-      );
-    }
-    await Promise.allSettled(promises);
-    setShowModuleRecommend(false);
-    // Auto-launch guided setup after module selection
-    setGuidedSetupInitialStep(0);
-    setGuidedSetupActive(true);
-  }
-
-  function handleModuleSkip() {
-    setShowModuleRecommend(false);
-    // Auto-launch guided setup after skipping modules
-    setGuidedSetupInitialStep(0);
-    setGuidedSetupActive(true);
-  }
-
+  /** Forgets which guides were done and brings the getting-started list back. */
   async function handleResetGuides() {
+    setActiveGuide(null);
+    const progress = await preferencesApi.get().catch(() => null);
+    // A key set to null is removed; an empty object would merge into nothing.
+    const cleared = Object.fromEntries(
+      [...guideProgressKeys(), ...Object.keys(progress?.preferences?.tour_progress ?? {})].map((k) => [k, null]),
+    );
     try {
-      await preferencesApi.update({ tour_progress: {}, profile: null });
+      await preferencesApi.update({ tour_progress: cleared, getting_started: null });
     } catch {
       // best-effort
     }
-    // Reset local state so next guided-setup launch starts from profile selection
-    setSelectedProfile("private");
-    setProfileConfirmed(false);
-    setShowProfileSelect(false);
-    setGuidedSetupActive(false);
+    announceGuidesChanged();
+    if (location.pathname !== "/admin/dashboard") setShowGettingStarted(true);
   }
 
   async function handleLogout() {
@@ -402,6 +330,7 @@ function AdminLayoutInner() {
   }
 
   return (
+    <GuidesContext.Provider value={guides}>
     <Box
       sx={{
         display: "flex",
@@ -459,16 +388,9 @@ function AdminLayoutInner() {
           onLanguageMenuOpen={(e) => setLanguageMenuAnchor(e.currentTarget)}
           onLanguageMenuClose={() => setLanguageMenuAnchor(null)}
           onLanguageChange={setLanguage}
-          onProductTourOpen={() => setShowInfoWizard(true)}
-          onGuidedSetupOpen={() => {
-            if (!profileConfirmed) {
-              setShowProfileSelect(true);
-            } else {
-              setGuidedSetupInitialStep(0);
-              setGuidedSetupActive(true);
-            }
-          }}
-          onHowToGuidesOpen={() => setShowTaskFlowDialog(true)}
+          onGettingStartedOpen={() => setShowGettingStarted(true)}
+          onConsoleTourOpen={() => guides.startGuide("console_tour")}
+          onHowToGuidesOpen={() => setShowHowTos(true)}
           onResetGuides={handleResetGuides}
           onPageHelp={() => setPageHelpOpen(true)}
           onRootFormOpen={() => setShowRootForm(true)}
@@ -491,50 +413,24 @@ function AdminLayoutInner() {
           }}
         />
 
-        <ProductTourDialog
-          open={showInfoWizard}
-          onClose={() => setShowInfoWizard(false)}
+        <GettingStartedDialog
+          open={showGettingStarted}
+          onClose={() => setShowGettingStarted(false)}
         />
 
-        <ProfileSelectionDialog
-          open={showProfileSelect}
-          onSelect={handleProfileSelect}
-          onSkip={handleProfileSkip}
-        />
-
-        <ModuleRecommendationDialog
-          open={showModuleRecommend}
-          profile={selectedProfile}
-          onApply={handleModuleApply}
-          onSkip={handleModuleSkip}
-        />
-
-        <GuidedSetupTour
-          run={guidedSetupActive}
-          profile={selectedProfile}
+        <HowToDialog
+          open={showHowTos}
           isSuperuser={isSuperuser}
-          onFinish={() => setGuidedSetupActive(false)}
-          initialStep={guidedSetupInitialStep}
+          onClose={() => setShowHowTos(false)}
+          onStart={guides.startGuide}
         />
 
-        <TaskFlowDialog
-          open={showTaskFlowDialog}
-          isSuperuser={isSuperuser}
-          onClose={() => setShowTaskFlowDialog(false)}
-          onStart={(flowId) => {
-            setTaskFlowId(flowId);
-            setTaskFlowActive(true);
-          }}
-        />
-
-        {taskFlowId && (
-          <TaskFlowTour
-            run={taskFlowActive}
-            flowId={taskFlowId}
-            onFinish={() => {
-              setTaskFlowActive(false);
-              setTaskFlowId(null);
-            }}
+        {activeGuide && (
+          <GuideRunner
+            key={`${activeGuide}-${guideRun}`}
+            guideId={activeGuide}
+            isSuperuser={isSuperuser}
+            onEnd={() => setActiveGuide(null)}
           />
         )}
 
@@ -571,5 +467,6 @@ function AdminLayoutInner() {
         </Box>
       </Box>
     </Box>
+    </GuidesContext.Provider>
   );
 }

@@ -1,449 +1,600 @@
 {
-  "orientation": {
-    "dashboard": {
-      "title": "Dashboard",
-      "content": "Your central overview. View system health, container status, and key metrics at a glance."
-    },
-    "observability": {
-      "title": "Observability",
-      "content": "Monitor request logs, latency, token usage, and error rates across all LLM providers."
-    },
-    "containers": {
-      "title": "Containers",
-      "content": "Manage the Docker containers that make up your Fadenstack deployment. Start, stop, and view logs."
-    },
-    "llm": {
-      "title": "LLM Providers",
-      "content": "Configure upstream LLM endpoints — local Ollama, OpenAI, Azure, or any OpenAI-compatible API."
-    },
-    "utilities": {
-      "title": "Utilities",
-      "content": "Node fleet management, scheduler, and system utilities for multi-node setups."
-    },
-    "access_control": {
-      "title": "Access Control",
-      "content": "Manage users, API keys, roles, and authentication providers for your deployment."
-    },
-    "pii": {
-      "title": "PII Guard",
-      "content": "Scan and redact personally identifiable information from prompts and responses before they reach LLMs."
-    },
-    "rag": {
-      "title": "RAG (Knowledge Base)",
-      "content": "Upload documents and build a retrieval-augmented generation pipeline for grounded responses."
-    },
-    "chat": {
-      "title": "Chat Workspace",
-      "content": "Manage chat projects, conversation history, and model assignments. To start chatting, use the Chat button in the top bar."
-    },
-    "extensions": {
-      "title": "Extensions",
-      "content": "Browse and manage MCP servers, skill plugins, and other extensions that enhance Fadenstack."
-    },
-    "settings": {
-      "title": "Settings",
-      "content": "System-wide configuration including networking, storage, security policies, and feature flags."
-    },
-    "help": {
-      "title": "Help & Guides",
-      "content": "Access this product tour, guided setup, and documentation whenever you need a refresher."
-    }
-  },
-  "private": {
-    "providers": {
-      "title": "Add a Provider",
-      "content": "Start by adding at least one LLM provider. Point to a local Ollama instance or paste an API key for a cloud provider."
-    },
-    "chat": {
-      "title": "Create a Chat Project",
-      "content": "Create and manage chat projects, sessions, and history here. To start chatting, click the Chat button in the top bar."
-    },
-    "pii": {
-      "title": "Review PII Settings",
-      "content": "PII Guard is enabled by default. Review the dashboard to see detection stats and configure which entity types to redact."
-    },
-    "rag": {
-      "title": "Upload Documents",
-      "content": "Go to the Knowledge Base and upload your first document. RAG will index it for retrieval-augmented answers."
-    }
-  },
-  "team": {
-    "providers": {
-      "title": "Configure Providers",
-      "content": "Set up shared LLM endpoints for your team — local servers, cloud APIs, or a mix of both."
-    },
-    "nodes": {
-      "title": "Register Nodes",
-      "content": "Add your team's GPU nodes so the scheduler can distribute inference workloads."
-    },
-    "access": {
-      "title": "Set Up Users",
-      "content": "Create team accounts or connect your identity provider. Assign roles to control who can manage resources."
-    },
-    "mcp": {
-      "title": "MCP Servers",
-      "content": "Register MCP tool servers so team members can invoke external capabilities from their chat sessions."
-    },
-    "chat": {
-      "title": "Create Shared Projects",
-      "content": "Set up chat projects that your team can collaborate in. Control model access per project."
-    },
-    "pii": {
-      "title": "Configure PII Policies",
-      "content": "Define PII redaction rules that apply to all team members to protect sensitive data."
-    },
-    "rag": {
-      "title": "Build a Knowledge Base",
-      "content": "Upload team documents to the shared knowledge base. All members can query them for grounded answers."
-    }
-  },
-  "enterprise": {
-    "access": {
-      "title": "Access Control & SSO",
-      "content": "Start with access control. Connect your identity provider, define roles, and set up API key policies."
-    },
-    "providers": {
-      "title": "Provider Fleet",
-      "content": "Register your approved LLM endpoints. Set rate limits, cost budgets, and failover routing."
-    },
-    "nodes": {
-      "title": "Node Fleet",
-      "content": "Register GPU nodes and configure scheduling policies for workload distribution."
-    },
-    "pii": {
-      "title": "PII Compliance",
-      "content": "Configure enterprise PII policies — entity types, redaction modes, audit logging, and compliance reporting."
-    },
-    "observability": {
-      "title": "Observability & Audit",
-      "content": "Set up monitoring dashboards, audit trails, and alerting for compliance and operational visibility."
-    },
-    "mcp": {
-      "title": "Extension Governance",
-      "content": "Approve and manage MCP tool servers. Control which extensions are available to each role."
-    },
-    "rag": {
-      "title": "Enterprise Knowledge Base",
-      "content": "Upload corporate documents with access controls. Configure indexing pipelines and retrieval policies."
-    },
-    "chat": {
-      "title": "Governed Chat Workspace",
-      "content": "Create project templates with policy guardrails, model allowlists, and PII enforcement per workspace."
-    }
-  },
-  "ui": {
-    "step_counter": "Step {{current}} of {{total}}",
-    "skip": "Skip tour",
-    "back": "Back",
-    "next": "Next",
-    "finish": "Finish"
-  },
   "help": {
-    "product_tour": "Product Tour",
-    "guided_setup": "Guided Setup",
-    "how_to_guides": "How-To Guides",
-    "how_to_guides_subtitle": "Step-by-step walkthroughs for common tasks. Each guide highlights the relevant controls and walks you through the process.",
+    "about_page": "About this page",
+    "getting_started": "Getting started",
+    "console_tour": "Tour of the console",
+    "how_to_guides": "How-to guides",
+    "how_to_guides_subtitle": "Each guide walks you through one task on the real pages. You do the clicks; the guide shows the way.",
     "start_guide": "Start",
-    "no_guides_available": "No guides available for the current setup.",
-    "reset_guides": "Reset Guides",
-    "about_page": "About This Page"
+    "no_guides_available": "No guides for this setup.",
+    "reset_guides": "Reset guides"
+  },
+  "guides": {
+    "ui": {
+      "step_counter": "{{current}} of {{total}}",
+      "next": "Next",
+      "back": "Back",
+      "finish": "Finish",
+      "close": "Close guide",
+      "your_turn": "Your turn: the guide moves on when you have done this."
+    },
+    "console_tour": {
+      "title": "Tour of the console",
+      "description": "A minute's look at where things are.",
+      "dashboard": {
+        "title": "Dashboard",
+        "body": "Your starting point: what needs attention, what is running and how much it is used. The <strong>Getting started</strong> list stays here until you hide it."
+      },
+      "infrastructure": {
+        "title": "AI Infrastructure",
+        "body": "Your own hardware and the models on it. <strong>Machines</strong> are the computers with GPUs, a <strong>cluster</strong> groups machines that serve models together, the <strong>Model marketplace</strong> is where you pick a model to host, and <strong>Deployments</strong> shows what runs where."
+      },
+      "llm": {
+        "title": "LLM",
+        "body": "<strong>Providers</strong> connects models that run elsewhere, such as OpenAI or Azure, next to your own. The <strong>API endpoint</strong> is the one OpenAI-compatible address that applications use for all of them."
+      },
+      "chat": {
+        "title": "Chat",
+        "body": "Opens the chat, where people talk to the models you host or connect. Everyone with an account can use it."
+      },
+      "agents": {
+        "title": "Agents",
+        "body": "Agents work inside other software, such as Word, Outlook or the browser, with the models and rules you set here. <strong>Governance</strong> decides which tools chats and agents may use."
+      },
+      "privacy": {
+        "title": "Privacy",
+        "body": "Finds personal data, such as names, email addresses or account numbers, in what people send, and masks it before it reaches a model. The policies decide what is found and what happens to it."
+      },
+      "access": {
+        "title": "Access Control",
+        "body": "Who may do what: <strong>users</strong>, <strong>roles</strong> with their permissions, and <strong>groups</strong>. With the sign-in module, people sign in with their company account."
+      },
+      "extensions": {
+        "title": "Extensions",
+        "body": "<strong>MCP servers</strong> give chats and agents tools, such as search, tickets or files. <strong>Skills</strong> are instructions people save once and reuse in the chat."
+      },
+      "help": {
+        "title": "Help",
+        "body": "Open this menu any time. <strong>About this page</strong> (or <kbd>F1</kbd>) explains the page you are on, <strong>Getting started</strong> brings back the setup list, and the <strong>how-to guides</strong> walk you through tasks on the real pages."
+      }
+    },
+    "add_machine": {
+      "title": "Add a machine",
+      "description": "Connect a computer with a GPU so it can run models.",
+      "open": {
+        "title": "Add a machine",
+        "body": "Click <strong>Add a machine</strong>. Any Linux computer with an NVIDIA GPU that can reach this server will do."
+      },
+      "command": {
+        "title": "Run this on the machine",
+        "body": "Copy the command and run it in a terminal on the machine you are adding. It installs a small agent, shows a short code and waits for you."
+      },
+      "approve": {
+        "title": "Approve it here",
+        "body": "The machine shows up here a moment later. Check that its code matches the one in its terminal, then click <strong>Approve</strong>."
+      },
+      "unattended": {
+        "title": "Adding many machines?",
+        "body": "<strong>Skip the approval step</strong> puts a single-use token into the command, so a machine joins on its own: for scripts, Ansible or images. Close this panel when you are done."
+      }
+    },
+    "create_cluster": {
+      "title": "Create a cluster",
+      "description": "Group your machines so they can serve models together.",
+      "open": {
+        "title": "Create a cluster",
+        "body": "Click <strong>Create a cluster</strong>. It needs at least one machine."
+      },
+      "name": {
+        "title": "Name it",
+        "body": "Give the cluster a short name, such as <code>gpu-room</code>, then click <strong>Next</strong>."
+      },
+      "machines": {
+        "title": "Pick the machines",
+        "body": "Tick the machines that should serve models; one machine makes a fine cluster. Pick all you want now: machines join a cluster when it is created. Then click <strong>Next</strong>; the console checks how the machines reach each other."
+      },
+      "network": {
+        "title": "The network",
+        "body": "The console suggests the fastest network the machines share. Keep the suggestion unless you know better."
+      },
+      "start": {
+        "title": "Create it",
+        "body": "Click <strong>Create cluster</strong>. The machines start it in the background, and the cluster's page shows how far it got. Next step: host a model on it."
+      }
+    },
+    "host_model": {
+      "title": "Host a model",
+      "description": "Pick a model from the marketplace and run it on your cluster.",
+      "fit": {
+        "title": "Fit for cluster",
+        "body": "Every model is checked against this cluster's GPUs and memory. With several clusters, pick the one you want to host on."
+      },
+      "tabs": {
+        "title": "Find a model",
+        "body": "<strong>Recommended</strong> lists models known to work well, <strong>Search Hugging Face</strong> finds any other, and <strong>On this server</strong> shows the ones already downloaded."
+      },
+      "card": {
+        "title": "A model",
+        "body": "Each card says what the model is for and whether it fits. Click the card for the details."
+      },
+      "host": {
+        "title": "Host it",
+        "body": "Click <strong>Host</strong> on the model you want."
+      },
+      "where": {
+        "title": "Where it runs",
+        "body": "Pick the cluster, how many GPUs each copy uses and how many copies run. You see right away whether it fits. Then click <strong>Next</strong>."
+      },
+      "settings": {
+        "title": "Engine settings",
+        "body": "The suggested settings suit most uses. Change the context length here if people need longer conversations. Then click <strong>Next</strong>."
+      },
+      "review": {
+        "title": "Review and host",
+        "body": "Check the two names: the deployment's, and the one people pick in the chat. Then click <strong>Host</strong>. The server downloads the model, copies it to the machines and starts it; <strong>Deployments</strong> shows how far it got."
+      }
+    },
+    "connect_provider": {
+      "title": "Connect a cloud model",
+      "description": "Use models from OpenAI, Azure, Anthropic or another provider next to your own.",
+      "open": {
+        "title": "Add a provider",
+        "body": "Click <strong>Add Provider</strong>."
+      },
+      "name": {
+        "title": "Name it",
+        "body": "A name people will recognize, such as <em>OpenAI</em>."
+      },
+      "target": {
+        "title": "Where the model runs",
+        "body": "Choose <strong>Remote Endpoint</strong> for a provider on the internet."
+      },
+      "kind": {
+        "title": "The provider",
+        "body": "Pick the provider. Its address is filled in for you. For any other OpenAI-compatible service, choose OpenAI-compatible and enter its address."
+      },
+      "key": {
+        "title": "API key and model",
+        "body": "Paste the API key from the provider's console, then pick the model. The key stays on this server; people using the chat never see it."
+      },
+      "test": {
+        "title": "Test it",
+        "body": "<strong>Test Connection</strong> sends a tiny request to check the key and the address. Then click <strong>Next</strong>."
+      },
+      "pricing": {
+        "title": "Prices",
+        "body": "Optional: the provider's prices per million tokens, so the console can show what usage costs. You can leave them empty."
+      },
+      "create": {
+        "title": "Create it",
+        "body": "Click <strong>Create</strong>. The model is then available in the chat and through the API."
+      }
+    },
+    "invite_people": {
+      "title": "Add people",
+      "description": "Create accounts so your colleagues can use the chat.",
+      "open": {
+        "title": "Create a user",
+        "body": "Click <strong>Create User</strong>."
+      },
+      "account": {
+        "title": "Their sign-in",
+        "body": "Their email address and a first password of at least 6 characters. Pass the password on to them in person or by phone."
+      },
+      "roles": {
+        "title": "What they may do",
+        "body": "Leave the roles empty for people who only chat: they get the standard user role. Roles you tick replace it, so for someone who also helps run the system, tick <strong>default_user</strong> as well. Then click <strong>Create User</strong>."
+      }
+    },
+    "create_api_token": {
+      "title": "Create an API token",
+      "description": "A token lets scripts and applications use the models through the API.",
+      "name": {
+        "title": "Name",
+        "body": "Name the token after what will use it, such as <em>build server</em>, so you know which one to revoke later."
+      },
+      "lifetime": {
+        "title": "Lifetime",
+        "body": "How long the token works. Shorter is safer; you can always create a new one."
+      },
+      "create": {
+        "title": "Generate",
+        "body": "Click <strong>Generate Token</strong>."
+      },
+      "value": {
+        "title": "Copy it now",
+        "body": "The token is shown only this once. Copy it and keep it somewhere safe."
+      },
+      "list": {
+        "title": "Your tokens",
+        "body": "All your tokens are listed here. Revoke one as soon as it is no longer needed or may have leaked."
+      }
+    }
+  },
+  "checklist": {
+    "title": "Getting started",
+    "subtitle": "From a fresh install to people using it. Each step ticks itself when it is done.",
+    "done_title": "You are set up",
+    "done_body": "Machines, a cluster, a model and people: everything is in place. You can hide this list; it stays under Help.",
+    "hide": "Hide",
+    "progress": "{{done}} of {{total}} done",
+    "more": "When you need them",
+    "show_me": "Show me",
+    "open": "Open",
+    "open_chat": "Open chat",
+    "show_on_dashboard": "Show on dashboard",
+    "machine": {
+      "title": "Add a machine",
+      "body": "Connect a computer with a GPU."
+    },
+    "cluster": {
+      "title": "Create a cluster",
+      "body": "Group your machines so they can serve models."
+    },
+    "model": {
+      "title": "Host a model",
+      "body": "Pick a model from the marketplace and start it on your cluster."
+    },
+    "chat": {
+      "title": "Try it in the chat",
+      "body": "Talk to your model the way your colleagues will."
+    },
+    "people": {
+      "title": "Add people",
+      "body": "Create accounts for your colleagues."
+    },
+    "provider": {
+      "title": "Connect a cloud model",
+      "body": "Use OpenAI, Azure and others next to your own models."
+    },
+    "privacy": {
+      "title": "Set a privacy policy",
+      "body": "Decide which personal data is masked before it reaches a model."
+    },
+    "tools": {
+      "title": "Connect tools",
+      "body": "Add an MCP server so chats and agents can search, open tickets and more."
+    },
+    "skills": {
+      "title": "Add a skill",
+      "body": "Save instructions people reuse in the chat."
+    },
+    "agents": {
+      "title": "Set up an agent",
+      "body": "Let Office, the browser or your own applications use the models, under your rules."
+    },
+    "token": {
+      "title": "Create an API token",
+      "body": "For scripts and applications that call the API."
+    },
+    "tour": {
+      "title": "Take the console tour",
+      "body": "A minute's look at where things are."
+    }
   },
   "page_help": {
     "actions_heading": "What you can do here",
     "close": "Got it",
+    "show_me": "Show me how",
     "unknown": {
-      "title": "About This Page",
-      "description": "No specific help is available for this page yet."
+      "title": "About this page",
+      "description": "There is no help for this page yet. The Help menu has the Getting started list and the how-to guides."
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Your central overview of the Fadenstack deployment. See system health, container status, resource usage, and key metrics at a glance.",
-      "action_health": "Check system health and service availability",
-      "action_containers": "View running container counts and statuses",
-      "action_metrics": "Monitor resource usage and performance metrics"
+      "description": "Your platform at a glance: what needs attention, traffic, capacity and health. Each card loads on its own.",
+      "action_getting_started": "Follow the Getting started list until everything is set up",
+      "action_attention": "See what needs attention, and mute what you already know about",
+      "action_customize": "Customize: drag, resize, show or hide cards; your layout follows you to other devices",
+      "action_status": "The status pill at the top sums up the platform's health"
     },
     "containers": {
       "title": "Containers",
-      "description": "List and manage all Docker containers in your deployment. Start, stop, restart, or inspect individual containers.",
-      "action_list": "Browse all containers with status filters",
-      "action_start_stop": "Start, stop, or restart containers",
-      "action_create": "Create a new container from an image"
+      "description": "Everything Docker runs on this server. What you may do with a container depends on its class: system containers need Root Mode to stop or delete, untrusted ones cannot be stopped at all.",
+      "action_filter": "Click a tile or pick a class to filter the list",
+      "action_control": "Start, stop, pause, restart or delete a container from its row",
+      "action_class": "Change a container's class (SYSTEM_CORE stays locked)",
+      "action_create": "Create a container from an image already on this server"
     },
     "create_container": {
-      "title": "Create Container",
-      "description": "Launch a new Docker container by selecting an image and configuring ports, volumes, and environment variables.",
-      "action_image": "Choose a base image for the new container",
-      "action_config": "Configure ports, volumes, and environment"
+      "title": "Create container",
+      "description": "Run a new container from an image that is already on this server. Pull the image under Images first.",
+      "action_image": "Pick the image, a name and, if needed, a command",
+      "action_config": "Add ports, environment variables and volumes",
+      "action_class": "Set the class, policy and network; start it right away or later"
+    },
+    "edit_container": {
+      "title": "Edit container",
+      "description": "Editing replaces the container: a new one starts with the new settings, and files outside its volumes are lost.",
+      "action_change": "Change the image, ports, variables or volumes",
+      "action_save": "Save and replace when you are ready"
     },
     "container_detail": {
-      "title": "Container Detail",
-      "description": "Inspect a specific container — view its logs, resource usage, environment variables, and network settings.",
-      "action_logs": "View real-time container logs",
-      "action_restart": "Restart or stop the container",
-      "action_env": "Inspect environment variables and mounts"
+      "title": "Container",
+      "description": "One container: its state, image, networks and logs.",
+      "action_logs": "Read the last 300 log lines, refresh or download them",
+      "action_edit": "Edit it (this replaces the container)",
+      "action_exec": "Start an exec session for a websocket client; outside tenant apps this needs Root Mode"
     },
     "images": {
       "title": "Images",
-      "description": "Manage Docker images available for container creation. Pull new images or remove unused ones.",
-      "action_pull": "Pull new images from a registry",
-      "action_remove": "Remove unused or outdated images"
+      "description": "The Docker images on this server.",
+      "action_pull": "Pull an image, with live progress",
+      "action_prune": "Prune dangling images; try a dry run first (needs Root Mode)"
     },
     "networks": {
       "title": "Networks",
-      "description": "View and manage Docker networks. Inspect connected containers and create custom networks.",
-      "action_inspect": "Inspect network configuration and connected containers",
-      "action_create": "Create a new Docker network"
+      "description": "The Docker networks on this server. System networks are read-only.",
+      "action_create": "Create a network, optionally internal (no outbound access)",
+      "action_inspect": "Inspect a network and the containers on it",
+      "action_delete": "Delete a network you created"
     },
     "stacks": {
       "title": "Stacks",
-      "description": "Manage Docker Compose stacks — groups of related containers deployed together.",
-      "action_manage": "View and manage existing stacks",
-      "action_deploy": "Deploy or update a stack"
+      "description": "Docker Compose stacks deployed from here, with every revision kept.",
+      "action_deploy": "Deploy a stack from a compose file; the same ID makes a new revision",
+      "action_diff": "Compare two revisions",
+      "action_rollback": "Roll back to an earlier revision"
     },
     "observability": {
       "title": "Cost Observability",
-      "description": "Monitor LLM usage costs, request latency, token consumption, and error rates across all providers.",
-      "action_cost": "Track cost per provider and model",
-      "action_latency": "Analyze request latency percentiles",
-      "action_tokens": "Monitor token usage trends over time"
+      "description": "Cost, usage and speed of the requests the gateway served. Costs are estimates from the prices you set; they do not affect billing.",
+      "action_overview": "Spend, requests, tokens, latency and errors over 7 to 90 days",
+      "action_requests": "Browse requests, filter by model or user, and open one to see its pipeline",
+      "action_pricing": "Set the prices per million tokens",
+      "action_export": "Export the data as CSV"
     },
     "logs": {
       "title": "Logs & Audit",
-      "description": "Browse system logs and audit trails. Filter by severity, source, or time range.",
-      "action_filter": "Filter logs by level, source, or keyword",
-      "action_audit": "Switch to the audit trail for security events"
+      "description": "Logs from every machine and container, and the audit trail of who changed what.",
+      "action_filter": "Filter by machine or source, time and text; follow new lines live",
+      "action_audit": "Switch to Audit for actions, targets, results and who did them"
     },
     "security_map": {
-      "title": "Security Map",
-      "description": "Visualize data residency and security boundaries. See where your data flows across providers and regions.",
-      "action_residency": "View data residency map by provider",
-      "action_providers": "Inspect provider security configurations"
-    },
-    "providers": {
-      "title": "LLM Providers",
-      "description": "Configure upstream LLM endpoints — local Ollama servers, OpenAI, Azure, or any OpenAI-compatible API. Test connectivity and manage credentials.",
-      "action_add": "Add a new LLM provider endpoint",
-      "action_test": "Test provider connectivity and credentials",
-      "action_route": "Configure request routing and failover rules"
-    },
-    "models": {
-      "title": "Models",
-      "description": "Browse models available across all configured providers. Pull new models to local runtimes or assign models to projects.",
-      "action_browse": "Browse available models by provider",
-      "action_pull": "Pull a model to a local Ollama runtime",
-      "action_assign": "Assign models to chat projects or endpoints"
-    },
-    "model_detail": {
-      "title": "Model Detail",
-      "description": "View detailed information about a specific model — parameters, capabilities, and usage statistics.",
-      "action_params": "Inspect model parameters and quantization",
-      "action_test": "Send a test prompt to this model"
-    },
-    "runtimes": {
-      "title": "Runtimes",
-      "description": "View local LLM runtimes (e.g., Ollama instances) and their loaded models. Check health and GPU utilization.",
-      "action_list": "List all registered runtimes",
-      "action_health": "Check runtime health and loaded models"
-    },
-    "runtime_detail": {
-      "title": "Runtime Detail",
-      "description": "Inspect a specific runtime — its configuration, loaded models, and resource usage.",
-      "action_config": "View or edit runtime configuration",
-      "action_models": "See which models are loaded on this runtime"
+      "title": "Data Residency",
+      "description": "Where your prompts are processed: on your machines, in your network, or outside it.",
+      "action_residency": "See which providers are local, external or unknown",
+      "action_where": "Say where a provider sends prompts when it cannot be detected",
+      "action_volume": "See how much data goes where"
     },
     "agent_trace": {
-      "title": "Agent Trace",
-      "description": "Inspect LLM call traces — see the full request/response chain including tool calls, reasoning steps, and token usage.",
-      "action_inspect": "Drill into individual call traces",
-      "action_replay": "Replay a trace for debugging"
+      "title": "LLM Calls",
+      "description": "How providers, runtimes and models connect, and the calls going through them as they happen.",
+      "action_graph": "Search and filter the graph; click a node for its details",
+      "action_live": "Watch calls arrive; pause and resume the stream"
     },
     "endpoint": {
       "title": "API Endpoint",
-      "description": "Interactive API documentation for the Fadenstack OpenAI-compatible endpoint. Test API calls directly from the browser.",
-      "action_docs": "Browse the OpenAPI documentation",
-      "action_test": "Send test requests to the endpoint"
+      "description": "The documentation of the gateway's OpenAI-compatible API: the one address applications use for every model.",
+      "action_docs": "Browse the API documentation, or open it in a new tab",
+      "action_container": "Start, stop or restart the gateway container"
     },
-    "nodes": {
-      "title": "Node Fleet",
-      "description": "Manage your fleet of GPU inference nodes. Enroll new nodes, monitor health, and configure scheduling priorities.",
-      "action_enroll": "Enroll a new GPU node",
-      "action_monitor": "Monitor node health and GPU utilization",
-      "action_schedule": "Configure scheduling policies and priorities"
+    "runtime_detail": {
+      "title": "Runtime",
+      "description": "A single-container model runtime, the one behind a Local Docker provider.",
+      "action_control": "Start, stop or restart it",
+      "action_config": "Edit its configuration, then save and restart",
+      "action_logs": "Read its container logs"
     },
-    "node_detail": {
-      "title": "Node Detail",
-      "description": "Inspect a specific node — hardware info, loaded models, running jobs, and health history.",
-      "action_status": "View node status and hardware details",
-      "action_drain": "Drain or cordon the node for maintenance"
+    "providers": {
+      "title": "LLM Providers",
+      "description": "Every model the gateway can reach: on your clusters, in a local container, or at a cloud provider. Models deployed on a cluster appear here by themselves.",
+      "action_add": "Add a provider: a cloud API with its key, or a local container",
+      "action_test": "Test the connection; it also lists the provider's models",
+      "action_price": "Set a price, so costs show up under Cost Observability",
+      "action_manage": "Edit, start, stop or delete a provider; cluster deployments are managed on their own page"
     },
     "node_profiles": {
-      "title": "Node Profiles",
-      "description": "Define reusable node profiles that specify resource requirements and scheduling constraints for workloads.",
-      "action_create": "Create a new node profile",
-      "action_assign": "Assign profiles to nodes or workloads"
+      "title": "Machine Profiles",
+      "description": "Reusable settings for machines: runtime, GPU, storage, network, logging, security and updates.",
+      "action_create": "Create a profile from JSON settings",
+      "action_assign": "Assign a profile to a machine on that machine's page"
+    },
+    "node_detail": {
+      "title": "Machine",
+      "description": "One machine: its hardware, logs, deployments, the vLLM it runs, its commands and updates.",
+      "action_status": "See its hardware, deployments and recent logs",
+      "action_maintenance": "Maintenance and drain: no new work is placed on it",
+      "action_updates": "Check for and install system updates, or reboot it",
+      "action_vllm": "Route a vLLM found on it through Fadenstack"
+    },
+    "nodes": {
+      "title": "Machines",
+      "description": "The computers with GPUs that run your models. A machine joins by running one command on it and being approved here.",
+      "action_add": "Add a machine: run the command on it, then approve it here",
+      "action_status": "See each machine's status, GPUs and agent version",
+      "action_maintenance": "Maintenance and drain stop new work being placed on a machine",
+      "action_delete": "Delete a machine (type its name to confirm)"
+    },
+    "cluster_detail": {
+      "title": "Cluster",
+      "description": "One cluster: its machines, how they are wired, the models on it and their traffic.",
+      "action_deploy": "Deploy a model on it",
+      "action_wiring": "See how its machines are wired, and change the network",
+      "action_security": "Encrypt model traffic and the traffic between machines",
+      "action_runtime": "Switch the runtime version (this restarts the models)",
+      "action_control": "Stop, start or delete it; delete its deployments first"
+    },
+    "clusters": {
+      "title": "Clusters",
+      "description": "A cluster groups machines so they can serve models together. You can create one once a machine is connected.",
+      "action_create": "Create a cluster: name it, pick its machines, confirm the network",
+      "action_open": "Open a cluster to see its machines and models",
+      "action_found": "Take over a cluster your machines still run but this server lost"
+    },
+    "marketplace": {
+      "title": "Model marketplace",
+      "description": "Find a model, see whether it fits your clusters, and host it.",
+      "action_find": "Browse recommended models, or search Hugging Face",
+      "action_fit": "Pick a cluster to see which models fit on it",
+      "action_host": "Host a model: where it runs, engine settings, review",
+      "action_local": "See and manage the models already on this server",
+      "action_token": "Gated models need a Hugging Face token (the button at the top)"
+    },
+    "deployment_detail": {
+      "title": "Deployment",
+      "description": "One model running on a cluster: its health, copies, machines, speed and logs.",
+      "action_scale": "Scale it: more copies, or a different share of each accelerator (restarts it)",
+      "action_change": "Change its name in the chat, the reply wait or the engine settings",
+      "action_logs": "Read its logs and see its errors",
+      "action_control": "Stop or start it"
+    },
+    "deployments": {
+      "title": "Deployments",
+      "description": "Every model running on your clusters.",
+      "action_deploy": "Deploy a model (the same as Host in the marketplace)",
+      "action_control": "Stop, start or delete a deployment",
+      "action_open": "Open one for its health, speed and settings"
     },
     "scheduler": {
       "title": "Scheduler",
-      "description": "View and manage the inference job queue. Set scheduling policies and monitor job distribution across nodes.",
-      "action_queue": "Browse the job queue and job history",
-      "action_policies": "Configure scheduling policies"
+      "description": "Background jobs: model downloads and document ingestion.",
+      "action_watch": "Follow their progress; the list refreshes while jobs run",
+      "action_retry": "Retry a failed job, or cancel a running one"
     },
     "users": {
       "title": "Users",
-      "description": "Manage user accounts, assign roles, and generate API keys. Control who can access the system and what they can do.",
-      "action_create": "Create a new user account",
-      "action_roles": "Assign or change user roles",
-      "action_keys": "Generate or revoke API keys"
+      "description": "The accounts that can sign in. People who only chat need no roles: a new account gets the standard user role.",
+      "action_create": "Create a user with an email address and a first password",
+      "action_roles": "Edit someone's roles and the usage group their usage counts towards",
+      "action_developer": "Developer mode: agents may use local MCP servers on that person's machines",
+      "action_delete": "Delete a user"
     },
     "roles": {
       "title": "Roles",
-      "description": "Define roles with granular permissions. Roles control access to resources, actions, and API endpoints.",
-      "action_create": "Create a new role",
-      "action_permissions": "Edit role permissions"
+      "description": "A role is a set of permissions. The built-in roles are read-only.",
+      "action_create": "Create a role and pick its permissions",
+      "action_edit": "Edit or delete the roles you created"
     },
     "groups": {
       "title": "Groups",
-      "description": "Organize users into groups for bulk role assignment and access management.",
-      "action_create": "Create a new group",
-      "action_members": "Add or remove group members"
+      "description": "A group gives its members roles, and groups their usage in reports.",
+      "action_create": "Create a group with its roles",
+      "action_members": "Add or remove members"
     },
     "auth_providers": {
-      "title": "Auth Providers",
-      "description": "Configure external authentication providers — OIDC, SAML, or LDAP — for single sign-on (SSO).",
-      "action_add": "Add an authentication provider",
-      "action_test": "Test provider connectivity"
+      "title": "Sign-in providers",
+      "description": "Let people sign in with their company account, through OpenID Connect or OAuth2.",
+      "action_add": "Add a provider with its client ID, secret and discovery URL",
+      "action_auto": "Choose whether people get an account the first time they sign in"
     },
     "pii_dashboard": {
       "title": "PII Dashboard",
-      "description": "Overview of PII scanning activity — detection counts by entity type, redaction rates, and policy compliance.",
-      "action_stats": "View detection statistics and trends",
-      "action_entities": "Browse detected entity types"
+      "description": "What the PII filter found in requests, as counts only.",
+      "action_stats": "Scans, detections and the detection rate",
+      "action_breakdown": "Which kinds of personal data, by operation and source"
     },
     "pii_activity": {
-      "title": "PII Activity Log",
-      "description": "Detailed log of PII detections and redactions. Filter by entity type, user, or time range.",
-      "action_filter": "Filter activity by entity type or user",
-      "action_export": "Export activity logs for compliance"
+      "title": "PII Activity",
+      "description": "Every scan and redaction, without the text itself.",
+      "action_filter": "Filter by operation, by source, or for events with personal data only"
     },
     "pii_policies": {
-      "title": "PII Policies",
-      "description": "Define tenant-level PII policies — which entity types to detect, redaction modes, and enforcement rules.",
-      "action_create": "Create a new PII policy",
-      "action_assign": "Assign policies to tenants"
+      "title": "Tenant PII Policies",
+      "description": "Override the default PII policy for one tenant. The default policy is under Settings, Modules.",
+      "action_load": "Pick a tenant and load its policy",
+      "action_edit": "Choose what is protected for cloud and for local models, and what happens if detection fails",
+      "action_preview": "See the effective policy before you save"
     },
     "rag_knowledge_base": {
       "title": "Knowledge Base",
-      "description": "Upload and manage documents for retrieval-augmented generation. Documents are indexed for semantic search.",
-      "action_upload": "Upload new documents to the knowledge base",
-      "action_search": "Test search queries against the index"
+      "description": "Documents the chat can draw on, in nested collections.",
+      "action_upload": "Create collections and upload documents; drag to move them",
+      "action_describe": "Describe a collection, or let AI write the description",
+      "action_retry": "Retry or delete a document that failed"
     },
     "rag_documents": {
       "title": "Documents",
-      "description": "Browse and manage individual documents in the RAG pipeline. View indexing status and metadata.",
-      "action_browse": "Browse documents with status filters",
-      "action_delete": "Remove documents and their chunks"
+      "description": "Every uploaded document, in one flat list.",
+      "action_upload": "Upload a document",
+      "action_manage": "Retry or delete documents"
     },
     "rag_collections": {
       "title": "Collections",
-      "description": "Organize documents into collections for scoped retrieval. Each collection has its own embedding index.",
-      "action_create": "Create a new collection",
-      "action_manage": "Manage collection membership and settings"
+      "description": "The collections documents are kept in.",
+      "action_create": "Create a collection",
+      "action_delete": "Delete a collection"
     },
     "rag_runtime": {
       "title": "RAG Runtime",
-      "description": "Configure the RAG pipeline runtime — embedding models, chunk sizes, retrieval parameters, and vector store settings.",
-      "action_config": "Edit runtime configuration",
-      "action_status": "Check indexing pipeline health"
+      "description": "The embedding and chunking settings that document search uses.",
+      "action_view": "See the embedding model and chunk sizes",
+      "action_edit": "Edit them with the full RAG engine; RAG Lite's are under Settings"
     },
     "rag_collectors": {
       "title": "Collectors",
-      "description": "Configure data collectors that automatically ingest documents from external sources on a schedule.",
-      "action_add": "Add a new data collector",
-      "action_schedule": "Configure collection schedules"
+      "description": "Sources that feed documents in automatically, and their ingestion jobs.",
+      "action_run": "Run a collector now",
+      "action_jobs": "Follow the ingestion jobs"
     },
     "rag_explorer": {
       "title": "RAG Explorer",
-      "description": "Interactively explore the RAG index — query chunks, inspect embeddings, and debug retrieval quality.",
-      "action_query": "Run semantic search queries",
-      "action_chunks": "Inspect individual chunks and their scores"
+      "description": "Prepare document changes in a draft, then publish them now or at a set time.",
+      "action_container": "Pick or create a container",
+      "action_upload": "Upload files into a draft",
+      "action_publish": "Publish now, or schedule it"
     },
     "rag_publishes": {
       "title": "Publishes",
-      "description": "Manage published RAG snapshots. Publishing freezes a collection version for stable retrieval.",
-      "action_publish": "Create a new publish snapshot",
-      "action_status": "Monitor publish pipeline status"
+      "description": "Publish requests and the ingestion jobs they started. You publish from the Explorer.",
+      "action_watch": "Follow publishes; the list refreshes while one runs"
     },
     "rag_search": {
       "title": "RAG Search",
-      "description": "Test retrieval queries against published collections. Compare results across collections and parameters.",
-      "action_query": "Run test search queries",
-      "action_compare": "Compare results across collections"
+      "description": "Try retrieval queries against the indexed documents, with access control applied.",
+      "action_query": "Run a query and see the chunks it finds",
+      "action_pro": "With the full engine: search as a user or group, filter, and choose the mode"
     },
     "chat_projects": {
       "title": "Chat Projects",
-      "description": "Create and manage chat projects. Each project scopes model access, system prompts, and user permissions.",
-      "action_create": "Create a new chat project",
-      "action_models": "Configure model access per project"
+      "description": "The projects people created in the chat.",
+      "action_browse": "See who owns which project",
+      "action_delete": "Delete a project with all its chats and files"
     },
     "chat_sessions": {
       "title": "Chat Sessions",
-      "description": "Browse chat sessions across all projects. View conversation history and usage statistics.",
-      "action_browse": "Browse sessions with filters",
-      "action_export": "Export session transcripts"
+      "description": "Chats by user and project. Titles and messages belong to their users and are not shown here.",
+      "action_browse": "See chats by user, status and project",
+      "action_delete": "Delete a chat"
     },
     "chat_attachments": {
       "title": "Chat Attachments",
-      "description": "Manage file attachments uploaded during chat sessions. Review storage usage and clean up old files.",
-      "action_browse": "Browse uploaded attachments",
-      "action_clean": "Clean up orphaned or expired files"
+      "description": "Files people attached in the chat, and the storage they use.",
+      "action_browse": "See files by user, size and type",
+      "action_delete": "Delete a file"
+    },
+    "mcp_detail": {
+      "title": "MCP Server",
+      "description": "One MCP server: its connection and the tools it offers.",
+      "action_tools": "Turn single tools on or off",
+      "action_test": "Test the connection and count its tools",
+      "action_edit": "Edit it; saving reconnects and finds its tools again"
     },
     "mcp_servers": {
       "title": "MCP Servers",
-      "description": "Register and manage MCP (Model Context Protocol) tool servers. Each server exposes tools that LLMs can invoke.",
-      "action_register": "Register a new MCP server",
-      "action_health": "Check server health and available tools"
+      "description": "Tool servers that chats and agents can use: search, tickets, files and more.",
+      "action_register": "Register a server by URL or command, with its headers or variables",
+      "action_pii": "Choose what happens to personal data sent to its tools",
+      "action_scan": "Scan the network for MCP servers"
     },
-    "mcp_detail": {
-      "title": "MCP Server Detail",
-      "description": "Inspect a specific MCP server — available tools, configuration, connection status, and usage logs.",
-      "action_tools": "Browse available tools and their schemas",
-      "action_config": "Edit server connection settings"
+    "skill_detail": {
+      "title": "Skill",
+      "description": "One skill: its instructions, when it is used, who sees it, and its versions.",
+      "action_edit": "Edit the instructions and settings, and publish a new version",
+      "action_share": "Share it, or assign it to a project",
+      "action_export": "Export it as a SKILL.md or a folder"
     },
     "skills": {
       "title": "Skills",
-      "description": "Browse and manage skill plugins — reusable prompt chains and tool compositions that extend LLM capabilities.",
-      "action_browse": "Browse available skills",
-      "action_create": "Create a new skill"
-    },
-    "skills_create": {
-      "title": "Create Skill",
-      "description": "Define a new skill by specifying its prompt template, required tools, and input/output schema.",
-      "action_define": "Define the skill prompt and parameters",
-      "action_test": "Test the skill with sample inputs"
-    },
-    "skill_detail": {
-      "title": "Skill Detail",
-      "description": "Inspect and edit a specific skill — its prompt template, tool bindings, and execution history.",
-      "action_edit": "Edit the skill definition",
-      "action_test": "Run the skill with test inputs"
-    },
-    "settings": {
-      "title": "Settings",
-      "description": "System-wide configuration — networking, storage backends, security policies, feature flags, and service parameters.",
-      "action_general": "Configure general system settings",
-      "action_security": "Manage security and authentication policies",
-      "action_features": "Enable or disable feature flags"
-    },
-    "profile": {
-      "title": "Profile",
-      "description": "View and edit your account information — display name, email, password, and personal preferences.",
-      "action_info": "Update your display name and email",
-      "action_password": "Change your password"
+      "description": "Instructions people save once and reuse. In the chat, $ picks one.",
+      "action_create": "Create a skill, or import a SKILL.md or a zipped skill folder",
+      "action_publish": "Publish, archive or delete skills",
+      "action_views": "See the organization's skills, yours, or the ones shared with you"
     },
     "agents": {
       "title": "Agents",
-      "description": "Agents that run inside other software (Office, EPLAN, any desktop application) and are governed by this server.",
-      "action_create": "Create an agent, or start from a definition in JSON",
+      "description": "Agents that run inside other software (Office, the browser, any application) and are governed by this server. A new agent is a draft: nobody can use it until it is published and granted.",
+      "action_create": "Create an agent, or start from an app",
       "action_open": "Open an agent to change it, publish it and decide who may use it"
     },
     "agent_detail": {
@@ -456,58 +607,24 @@
     },
     "governance": {
       "title": "Governance",
-      "description": "The rules every chat and agent request is held to, and what the checks decided.",
-      "action_rules": "Deny, ask before or allow tools by name",
-      "action_classes": "Say what tools do, for the tool modes",
+      "description": "The rules every chat and agent request is held to, and what the checks decided. Changes apply within 30 seconds.",
+      "action_rules": "Deny, ask first or allow tools by name",
+      "action_classes": "Say what tools do (read, write, destructive), for the tool modes",
       "action_decisions": "Review what the checks decided, without the text"
-    }
-  },
-  "taskflows": {
-    "remote_endpoint": {
-      "title": "Register a Remote Endpoint",
-      "description": "Connect a cloud LLM provider (OpenAI, Anthropic, Azure, etc.) by adding a remote API endpoint.",
-      "step1_title": "Add a Provider",
-      "step1_content": "Click the 'Add Provider' button to open the provider wizard.",
-      "step2_title": "Provider Wizard",
-      "step2_content": "The wizard will guide you through registering a new LLM endpoint. Let's walk through each field.",
-      "step3_title": "Provider Name",
-      "step3_content": "Enter a descriptive name for this provider — e.g., 'OpenAI Production' or 'Anthropic Claude'.",
-      "step4_title": "Select Target",
-      "step4_content": "Choose 'Remote Endpoint' to connect to a cloud API. (Choose 'Local Docker' for self-hosted models.)",
-      "step5_title": "Pick a Provider",
-      "step5_content": "Select the LLM provider type from the dropdown — OpenAI, Anthropic, Gemini, Azure, etc. For custom endpoints, choose 'Other (OpenAI-compatible)'.",
-      "step6_title": "API Key",
-      "step6_content": "Paste the API key from your provider's dashboard. It is stored encrypted at rest.",
-      "step7_title": "Test Connection",
-      "step7_content": "Click 'Test Connection' to verify the endpoint is reachable and the API key is valid. If successful, available models will be populated automatically.",
-      "step8_title": "Create Provider",
-      "step8_content": "Review your settings and click 'Create' to finalize the registration. The provider will appear in the list and be available for chat routing."
     },
-    "remote_node": {
-      "title": "Set Up a Remote Node",
-      "description": "Register a GPU inference node so the scheduler can distribute workloads to it.",
-      "step1_title": "Add a Node",
-      "step1_content": "Click 'Add Node' to open the onboarding panel.",
-      "step2_title": "Node Onboarding",
-      "step2_content": "This panel lets you generate a single-use enrollment token that the node agent will exchange for permanent credentials.",
-      "step3_title": "Node Note",
-      "step3_content": "Optionally add a note for this node — e.g., host name, rack location, or role. This helps identify the node later.",
-      "step4_title": "Generate Token",
-      "step4_content": "Click 'Create Token' to generate the enrollment token. Copy it and pass it to the node agent installer on the target machine."
+    "settings": {
+      "title": "Settings",
+      "description": "Settings for the whole system, in three tabs.",
+      "action_general": "General: every system setting, searchable, and the Hugging Face token",
+      "action_modules": "Modules: turn optional modules on or off, with their settings",
+      "action_appearance": "Appearance: the accent color"
     },
-    "local_model": {
-      "title": "Run a Model Locally",
-      "description": "Deploy a self-hosted LLM model on this server or a registered GPU node.",
-      "step1_title": "Add a Provider",
-      "step1_content": "Click 'Add Provider' to open the wizard. We'll set up a local Docker provider.",
-      "step2_title": "Provider Wizard",
-      "step2_content": "The wizard will walk you through deploying a model with a local inference engine.",
-      "step3_title": "Provider Name",
-      "step3_content": "Enter a name for this provider — e.g., 'Local Llama 3' or 'vLLM Dev'.",
-      "step4_title": "Select Target",
-      "step4_content": "Keep 'Local Docker' selected to run the model on this server, or choose a registered node for remote deployment.",
-      "step5_title": "Create & Deploy",
-      "step5_content": "Select your model, confirm the container image, then click 'Create'. The system will pull the image (if needed) and start the inference container."
+    "profile": {
+      "title": "My Profile",
+      "description": "Your account, your password and your API tokens.",
+      "action_password": "Change your password",
+      "action_tokens": "Create API tokens for scripts and applications; each is shown once",
+      "action_revoke": "Revoke a token; applications using it stop within a minute"
     }
   }
 }

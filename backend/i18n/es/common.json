@@ -14,7 +14,7 @@
     "dashboard": "Panel",
     "containers_group": "Contenedores",
     "containers": "Contenedores",
-    "images": "Imagenes",
+    "images": "Imágenes",
     "networks": "Redes",
     "stacks": "Stacks",
     "llm_group": "LLM",
@@ -38,7 +38,7 @@
     "rag_collections": "Colecciones",
     "rag_knowledge_base": "Base de conocimiento",
     "logs": "Logs",
-    "settings": "Configuracion",
+    "settings": "Configuración",
     "pii_group": "Privacidad (PII)",
     "pii_dashboard": "Panel",
     "pii_activity": "Registro de actividad",
@@ -124,7 +124,7 @@
   "logs": {
     "title": "Logs",
     "tab_logs": "Registros del Sistema",
-    "tab_audit": "Auditoria",
+    "tab_audit": "Auditoría",
     "live": "En vivo",
     "apply": "Aplicar",
     "time_range": "Rango de tiempo",
@@ -646,7 +646,7 @@
     "value": "Value",
     "creating": "Creating...",
     "cancel": "Cancel",
-    "create": "Create",
+    "create": "Crear",
     "create_failed": "Create failed.",
     "update_failed": "Update failed.",
     "delete_failed": "Delete failed.",
@@ -1096,7 +1096,7 @@
     "empty": "No providers configured yet.",
     "failed_load": "Failed to load providers.",
     "target": "Target",
-    "add_provider": "Add Provider",
+    "add_provider": "Añadir proveedor",
     "new_provider": "New Provider",
     "edit_provider": "Edit Provider",
     "search_placeholder": "Search providers...",
@@ -1310,43 +1310,7 @@
     "note": "Si falla el embed, revisa X-Frame-Options/CSP en el endpoint de docs."
   },
   "help": {
-    "title": "Recorrido del Producto",
-    "next": "Siguiente",
-    "back": "Atras",
-    "slides": {
-      "welcome": {
-        "title": "Bienvenido a Fadenstack",
-        "description": "Su plataforma de IA autoalojada. Gestione modelos, converse con LLMs, cree bases de conocimiento y opere toda su infraestructura de IA desde un unico panel de control."
-      },
-      "chat": {
-        "title": "Consola de Chat IA",
-        "description": "Cree proyectos y sesiones para chatear con cualquier modelo registrado. Adjunte archivos, defina memorias y cambie entre proveedores sin alterar su flujo de trabajo."
-      },
-      "llm_server": {
-        "title": "Gestion de Modelos y Proveedores",
-        "description": "Registre runtimes locales (vLLM, Ollama, llama.cpp) y proveedores remotos (OpenAI, Azure). Inicie, detenga y monitoree cargas GPU en toda su flota desde un solo panel."
-      },
-      "endpoint": {
-        "title": "Gateway API Unificado",
-        "description": "Exponga un unico endpoint compatible con OpenAI /v1. Las solicitudes se enrutan al proveedor correcto con limitacion de tasa, redaccion de PII y seguimiento de tokens integrados."
-      },
-      "rag": {
-        "title": "Bases de Conocimiento y RAG",
-        "description": "Suba documentos, elija una estrategia de fragmentacion y embedding, y busque con consultas vectoriales, por palabra clave o hibridas. Fundamente las respuestas de su LLM en conocimiento organizacional."
-      },
-      "mcp": {
-        "title": "Registro de Herramientas MCP",
-        "description": "Registre cualquier servidor de herramientas compatible con MCP, ya sean sidecars locales o endpoints remotos. Fadenstack descubre herramientas automaticamente, aplica politicas de PII antes de cada llamada y las expone como un catalogo unico y gobernado."
-      },
-      "skills": {
-        "title": "Registro de Skills",
-        "description": "Defina playbooks de tareas reutilizables que determinan como la IA razona y actua. Los Skills combinan pasos de flujo de trabajo, preferencias de herramientas y fuentes de conocimiento en una capa de instrucciones determinista."
-      },
-      "observability": {
-        "title": "Observabilidad y Seguridad",
-        "description": "Rastree cada solicitud LLM de extremo a extremo, monitoree uso y costo de tokens, revise logs de auditoria y aplique control de acceso basado en roles en todo su despliegue."
-      }
-    }
+    "title": "Ayuda"
   },
   "modules": {
     "disabled_message": "El módulo {{module}} no está habilitado en esta instalación.",
@@ -1437,7 +1401,7 @@
     "pii_service_url": "URL del Servicio PII",
     "pii_service_url_help": "URL interna de faden_pii (por ejemplo http://faden-pii:8000/api).",
     "hidden_when_disabled": "La configuracion PII esta oculta porque el modulo PII esta deshabilitado.",
-    "tenants_title": "Politicas PII por Inquilino",
+    "tenants_title": "Políticas PII por inquilino",
     "tenants_description": "Sobrescribe la politica PII predeterminada para un inquilino especifico.",
     "tenant_id": "ID de Inquilino",
     "tenant_id_placeholder": "tenant-123",
@@ -2218,15 +2182,6 @@
     "rename_cancel": "Cancelar",
     "title_label": "Título del chat",
     "writing": "Se está escribiendo una respuesta"
-  },
-  "module_recommend": {
-    "apply": "Aplicar",
-    "subtitle": "Estos módulos se ajustan a su perfil. Activar uno puede iniciar más contenedores.",
-    "title": "Módulos recomendados"
-  },
-  "profile_select": {
-    "subtitle": "Esto decide qué pasos de configuración se sugieren. Puede cambiarlo más tarde y todas las funciones siguen disponibles elija lo que elija.",
-    "title": "Elija su perfil de configuración"
   },
   "tools": {
     "executionMode": "Ejecución",

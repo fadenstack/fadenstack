@@ -132,6 +132,8 @@ export function ModelCard({ model, onOpen, onHost, canHost }: ModelCardProps) {
       variant="outlined"
       sx={{ height: "100%", display: "flex", flexDirection: "column", opacity: model.runnable ? 1 : 0.7 }}
       data-testid={`model-card-${model.repo_id}`}
+      data-tour-id="marketplace.card"
+      data-hostable={canHost && !hostBlocked ? "true" : undefined}
     >
       <CardActionArea
         onClick={() => onOpen(model.repo_id)}
@@ -230,6 +232,7 @@ export function ModelCard({ model, onOpen, onHost, canHost }: ModelCardProps) {
             disabled={hostBlocked}
             onClick={() => onHost(model.repo_id)}
             data-testid={`host-${model.repo_id}`}
+            data-tour-id="marketplace.host"
           >
             {t("marketplace.host")}
           </Button>

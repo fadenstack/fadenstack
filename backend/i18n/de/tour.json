@@ -1,513 +1,630 @@
 {
-  "orientation": {
-    "dashboard": {
-      "title": "Dashboard",
-      "content": "Ihre zentrale Übersicht. Systemzustand, Container-Status und wichtige Metriken auf einen Blick."
-    },
-    "observability": {
-      "title": "Observability",
-      "content": "Überwachen Sie Anfragen, Latenz, Token-Nutzung und Fehlerraten über alle LLM-Anbieter hinweg."
-    },
-    "containers": {
-      "title": "Container",
-      "content": "Verwalten Sie die Docker-Container Ihrer Fadenstack-Installation. Starten, stoppen und Logs anzeigen."
-    },
-    "llm": {
-      "title": "LLM-Anbieter",
-      "content": "Konfigurieren Sie LLM-Endpunkte — lokales Ollama, OpenAI, Azure oder jede OpenAI-kompatible API."
-    },
-    "utilities": {
-      "title": "Dienstprogramme",
-      "content": "Knotenflotten-Verwaltung, Scheduler und Systemwerkzeuge für Multi-Node-Setups."
-    },
-    "access_control": {
-      "title": "Zugriffskontrolle",
-      "content": "Verwalten Sie Benutzer, API-Schlüssel, Rollen und Authentifizierungsanbieter."
-    },
-    "pii": {
-      "title": "PII-Schutz",
-      "content": "Scannen und schwärzen Sie personenbezogene Daten in Prompts und Antworten, bevor sie LLMs erreichen."
-    },
-    "rag": {
-      "title": "RAG (Wissensdatenbank)",
-      "content": "Laden Sie Dokumente hoch und erstellen Sie eine Retrieval-Augmented-Generation-Pipeline für fundierte Antworten."
-    },
-    "chat": {
-      "title": "Chat-Arbeitsbereich",
-      "content": "Verwalten Sie Chat-Projekte, Gesprächsverlauf und Modellzuweisungen. Zum Chatten verwenden Sie die Chat-Schaltfläche in der oberen Leiste."
-    },
-    "extensions": {
-      "title": "Erweiterungen",
-      "content": "Durchsuchen und verwalten Sie MCP-Server, Skill-Plugins und andere Erweiterungen."
-    },
-    "settings": {
-      "title": "Einstellungen",
-      "content": "Systemweite Konfiguration einschließlich Netzwerk, Speicher, Sicherheitsrichtlinien und Feature-Flags."
-    },
-    "help": {
-      "title": "Hilfe & Anleitungen",
-      "content": "Greifen Sie auf diese Produkttour, die geführte Einrichtung und Dokumentation zu, wann immer Sie möchten."
-    }
-  },
-  "private": {
-    "providers": {
-      "title": "Anbieter hinzufügen",
-      "content": "Fügen Sie zunächst mindestens einen LLM-Anbieter hinzu. Verweisen Sie auf eine lokale Ollama-Instanz oder fügen Sie einen API-Schlüssel ein."
-    },
-    "chat": {
-      "title": "Chat-Projekt erstellen",
-      "content": "Erstellen und verwalten Sie Chat-Projekte, Sitzungen und Verlauf hier. Zum Chatten klicken Sie auf die Chat-Schaltfläche in der oberen Leiste."
-    },
-    "pii": {
-      "title": "PII-Einstellungen prüfen",
-      "content": "PII-Schutz ist standardmäßig aktiviert. Überprüfen Sie das Dashboard für Erkennungsstatistiken und konfigurieren Sie, welche Entitätstypen geschwärzt werden sollen."
-    },
-    "rag": {
-      "title": "Dokumente hochladen",
-      "content": "Gehen Sie zur Wissensdatenbank und laden Sie Ihr erstes Dokument hoch für abrufgestützte Antworten."
-    }
-  },
-  "team": {
-    "providers": {
-      "title": "Anbieter konfigurieren",
-      "content": "Richten Sie gemeinsame LLM-Endpunkte für Ihr Team ein — lokale Server, Cloud-APIs oder eine Mischung."
-    },
-    "nodes": {
-      "title": "Knoten registrieren",
-      "content": "Fügen Sie die GPU-Knoten Ihres Teams hinzu, damit der Scheduler Inferenz-Workloads verteilen kann."
-    },
-    "access": {
-      "title": "Benutzer einrichten",
-      "content": "Erstellen Sie Team-Konten oder verbinden Sie Ihren Identitätsanbieter. Weisen Sie Rollen zu."
-    },
-    "mcp": {
-      "title": "MCP-Server",
-      "content": "Registrieren Sie MCP-Tool-Server, damit Teammitglieder externe Funktionen aufrufen können."
-    },
-    "chat": {
-      "title": "Gemeinsame Projekte erstellen",
-      "content": "Richten Sie Chat-Projekte ein, in denen Ihr Team zusammenarbeiten kann. Steuern Sie den Modellzugriff pro Projekt."
-    },
-    "pii": {
-      "title": "PII-Richtlinien konfigurieren",
-      "content": "Definieren Sie PII-Schwärzungsregeln, die für alle Teammitglieder gelten."
-    },
-    "rag": {
-      "title": "Wissensdatenbank aufbauen",
-      "content": "Laden Sie Team-Dokumente in die gemeinsame Wissensdatenbank hoch für fundierte Antworten."
-    }
-  },
-  "enterprise": {
-    "access": {
-      "title": "Zugriffskontrolle & SSO",
-      "content": "Beginnen Sie mit der Zugriffskontrolle. Verbinden Sie Ihren Identitätsanbieter, definieren Sie Rollen und API-Schlüssel-Richtlinien."
-    },
-    "providers": {
-      "title": "Anbieter-Flotte",
-      "content": "Registrieren Sie Ihre genehmigten LLM-Endpunkte. Legen Sie Ratenlimits, Kostenbudgets und Failover-Routing fest."
-    },
-    "nodes": {
-      "title": "Knoten-Flotte",
-      "content": "Registrieren Sie GPU-Knoten und konfigurieren Sie Scheduling-Richtlinien für die Workload-Verteilung."
-    },
-    "pii": {
-      "title": "PII-Compliance",
-      "content": "Konfigurieren Sie unternehmensweite PII-Richtlinien — Entitätstypen, Schwärzungsmodi, Audit-Logging und Compliance-Berichte."
-    },
-    "observability": {
-      "title": "Observability & Audit",
-      "content": "Richten Sie Monitoring-Dashboards, Audit-Trails und Alerting für Compliance und operative Sichtbarkeit ein."
-    },
-    "mcp": {
-      "title": "Erweiterungs-Governance",
-      "content": "Genehmigen und verwalten Sie MCP-Tool-Server. Steuern Sie, welche Erweiterungen für jede Rolle verfügbar sind."
-    },
-    "rag": {
-      "title": "Unternehmens-Wissensdatenbank",
-      "content": "Laden Sie Unternehmensdokumente mit Zugriffskontrollen hoch. Konfigurieren Sie Indexierungs- und Abrufrichtlinien."
-    },
-    "chat": {
-      "title": "Gesteuerter Chat-Arbeitsbereich",
-      "content": "Erstellen Sie Projektvorlagen mit Leitplanken, Modell-Allowlists und PII-Durchsetzung pro Arbeitsbereich."
-    }
-  },
-  "ui": {
-    "step_counter": "Schritt {{current}} von {{total}}",
-    "skip": "Tour überspringen",
-    "back": "Zurück",
-    "next": "Weiter",
-    "finish": "Fertig"
-  },
   "help": {
-    "product_tour": "Produkttour",
-    "guided_setup": "Geführte Einrichtung",
-    "how_to_guides": "How-To-Anleitungen",
-    "reset_guides": "Anleitungen zurücksetzen",
     "about_page": "Über diese Seite",
-    "how_to_guides_subtitle": "Schritt-für-Schritt-Anleitungen für häufige Aufgaben",
+    "getting_started": "Erste Schritte",
+    "console_tour": "Rundgang durch die Konsole",
+    "how_to_guides": "Anleitungen",
+    "how_to_guides_subtitle": "Jede Anleitung führt Sie durch eine Aufgabe auf den echten Seiten. Sie klicken selbst; die Anleitung zeigt den Weg.",
     "start_guide": "Starten",
-    "no_guides_available": "Keine Anleitungen für Ihre aktuelle Konfiguration verfügbar."
+    "no_guides_available": "Für diese Einrichtung gibt es keine Anleitungen.",
+    "reset_guides": "Anleitungen zurücksetzen"
+  },
+  "guides": {
+    "ui": {
+      "step_counter": "{{current}} von {{total}}",
+      "next": "Weiter",
+      "back": "Zurück",
+      "finish": "Fertig",
+      "close": "Anleitung schließen",
+      "your_turn": "Jetzt Sie: Die Anleitung geht weiter, sobald Sie das erledigt haben."
+    },
+    "console_tour": {
+      "title": "Rundgang durch die Konsole",
+      "description": "In einer Minute sehen, wo was ist.",
+      "dashboard": {
+        "title": "Dashboard",
+        "body": "Ihr Ausgangspunkt: was Aufmerksamkeit braucht, was läuft und wie stark es genutzt wird. Die Liste <strong>Erste Schritte</strong> bleibt hier, bis Sie sie ausblenden."
+      },
+      "infrastructure": {
+        "title": "KI-Infrastruktur",
+        "body": "Ihre eigene Hardware und die Modelle darauf. <strong>Maschinen</strong> sind die Rechner mit GPUs, ein <strong>Cluster</strong> fasst Maschinen zusammen, die gemeinsam Modelle bereitstellen, im <strong>Modell-Marktplatz</strong> wählen Sie ein Modell aus, und <strong>Deployments</strong> zeigt, was wo läuft."
+      },
+      "llm": {
+        "title": "LLM",
+        "body": "Unter <strong>Provider</strong> binden Sie Modelle an, die anderswo laufen, etwa bei OpenAI oder Azure, neben Ihren eigenen. Der <strong>Endpunkt</strong> ist die eine OpenAI-kompatible Adresse, über die Anwendungen alle Modelle nutzen."
+      },
+      "chat": {
+        "title": "Chat",
+        "body": "Öffnet den Chat, in dem Ihre Kolleginnen und Kollegen mit den Modellen sprechen, die Sie bereitstellen oder anbinden. Jede Person mit einem Konto kann ihn nutzen."
+      },
+      "agents": {
+        "title": "Agenten",
+        "body": "Agenten arbeiten in anderer Software, etwa in Word, Outlook oder im Browser, mit den Modellen und Regeln, die Sie hier festlegen. Unter <strong>Governance</strong> bestimmen Sie, welche Werkzeuge Chats und Agenten verwenden dürfen."
+      },
+      "privacy": {
+        "title": "Datenschutz",
+        "body": "Findet personenbezogene Daten wie Namen, E-Mail-Adressen oder Kontonummern in Anfragen und maskiert sie, bevor sie ein Modell erreichen. Die Richtlinien legen fest, was erkannt wird und was damit geschieht."
+      },
+      "access": {
+        "title": "Zugriffskontrolle",
+        "body": "Wer was darf: <strong>Benutzer</strong>, <strong>Rollen</strong> mit ihren Berechtigungen und <strong>Gruppen</strong>. Mit dem Anmeldemodul melden sich alle mit ihrem Firmenkonto an."
+      },
+      "extensions": {
+        "title": "Erweiterungen",
+        "body": "<strong>MCP-Server</strong> geben Chats und Agenten Werkzeuge, etwa für Suche, Tickets oder Dateien. <strong>Skills</strong> sind Anweisungen, die man einmal speichert und im Chat wiederverwendet."
+      },
+      "help": {
+        "title": "Hilfe",
+        "body": "Dieses Menü öffnen Sie jederzeit. <strong>Über diese Seite</strong> (oder <kbd>F1</kbd>) erklärt die aktuelle Seite, <strong>Erste Schritte</strong> holt die Einrichtungsliste zurück, und die <strong>Anleitungen</strong> führen Sie durch Aufgaben auf den echten Seiten."
+      }
+    },
+    "add_machine": {
+      "title": "Maschine hinzufügen",
+      "description": "Einen Rechner mit GPU anbinden, damit er Modelle ausführen kann.",
+      "open": {
+        "title": "Maschine hinzufügen",
+        "body": "Klicken Sie auf <strong>Maschine hinzufügen</strong>. Jeder Linux-Rechner mit NVIDIA-GPU, der diesen Server erreicht, ist geeignet."
+      },
+      "command": {
+        "title": "Diesen Befehl auf der Maschine ausführen",
+        "body": "Kopieren Sie den Befehl und führen Sie ihn in einem Terminal auf der neuen Maschine aus. Er installiert einen kleinen Agenten, zeigt einen kurzen Code an und wartet auf Sie."
+      },
+      "approve": {
+        "title": "Hier genehmigen",
+        "body": "Kurz darauf erscheint die Maschine hier. Prüfen Sie, ob ihr Code mit dem im Terminal übereinstimmt, und klicken Sie dann auf <strong>Genehmigen</strong>."
+      },
+      "unattended": {
+        "title": "Viele Maschinen auf einmal?",
+        "body": "<strong>Genehmigungsschritt überspringen</strong> fügt dem Befehl ein Einmal-Token hinzu, sodass eine Maschine von selbst beitritt: für Skripte, Ansible oder Images. Schließen Sie dieses Fenster, wenn Sie fertig sind."
+      }
+    },
+    "create_cluster": {
+      "title": "Cluster erstellen",
+      "description": "Maschinen zusammenfassen, damit sie gemeinsam Modelle bereitstellen.",
+      "open": {
+        "title": "Cluster erstellen",
+        "body": "Klicken Sie auf <strong>Cluster erstellen</strong>. Dafür ist mindestens eine Maschine nötig."
+      },
+      "name": {
+        "title": "Name",
+        "body": "Geben Sie dem Cluster einen kurzen Namen, etwa <code>gpu-raum</code>, und klicken Sie auf <strong>Weiter</strong>."
+      },
+      "machines": {
+        "title": "Maschinen wählen",
+        "body": "Haken Sie die Maschinen an, die Modelle bereitstellen sollen; eine einzige Maschine genügt. Wählen Sie jetzt alle aus, die Sie möchten: Maschinen kommen beim Erstellen in den Cluster. Klicken Sie dann auf <strong>Weiter</strong>; die Konsole prüft, wie sich die Maschinen erreichen."
+      },
+      "network": {
+        "title": "Das Netzwerk",
+        "body": "Die Konsole schlägt das schnellste Netzwerk vor, das die Maschinen gemeinsam haben. Behalten Sie den Vorschlag, wenn Sie keinen Grund für ein anderes haben."
+      },
+      "start": {
+        "title": "Erstellen",
+        "body": "Klicken Sie auf <strong>Cluster erstellen</strong>. Die Maschinen starten ihn im Hintergrund, und die Seite des Clusters zeigt den Fortschritt. Als Nächstes: ein Modell darauf bereitstellen."
+      }
+    },
+    "host_model": {
+      "title": "Modell bereitstellen",
+      "description": "Ein Modell aus dem Marktplatz wählen und auf Ihrem Cluster starten.",
+      "fit": {
+        "title": "Passend für Cluster",
+        "body": "Jedes Modell wird mit den GPUs und dem Speicher dieses Clusters abgeglichen. Bei mehreren Clustern wählen Sie den, auf dem es laufen soll."
+      },
+      "tabs": {
+        "title": "Ein Modell finden",
+        "body": "<strong>Empfohlen</strong> listet Modelle, die nachweislich gut laufen, <strong>Hugging Face durchsuchen</strong> findet jedes andere, und <strong>Auf diesem Server</strong> zeigt die bereits heruntergeladenen."
+      },
+      "card": {
+        "title": "Ein Modell",
+        "body": "Jede Karte sagt, wofür das Modell gedacht ist und ob es passt. Ein Klick auf die Karte zeigt die Details."
+      },
+      "host": {
+        "title": "Bereitstellen",
+        "body": "Klicken Sie beim gewünschten Modell auf <strong>Bereitstellen</strong>."
+      },
+      "where": {
+        "title": "Wo es läuft",
+        "body": "Wählen Sie den Cluster, wie viele GPUs jede Kopie nutzt und wie viele Kopien laufen. Sie sehen sofort, ob es passt. Klicken Sie dann auf <strong>Weiter</strong>."
+      },
+      "settings": {
+        "title": "Engine-Einstellungen",
+        "body": "Die vorgeschlagenen Einstellungen passen für die meisten Zwecke. Ändern Sie hier die Kontextlänge, wenn längere Unterhaltungen nötig sind. Klicken Sie dann auf <strong>Weiter</strong>."
+      },
+      "review": {
+        "title": "Prüfen und bereitstellen",
+        "body": "Prüfen Sie die beiden Namen: den des Deployments und den, unter dem es im Chat angeboten wird. Klicken Sie dann auf <strong>Bereitstellen</strong>. Der Server lädt das Modell herunter, kopiert es auf die Maschinen und startet es; unter <strong>Deployments</strong> sehen Sie den Fortschritt."
+      }
+    },
+    "connect_provider": {
+      "title": "Cloud-Modell anbinden",
+      "description": "Modelle von OpenAI, Azure, Anthropic oder anderen Anbietern neben Ihren eigenen nutzen.",
+      "open": {
+        "title": "Provider hinzufügen",
+        "body": "Klicken Sie auf <strong>Provider hinzufügen</strong>."
+      },
+      "name": {
+        "title": "Name",
+        "body": "Ein Name, den alle wiedererkennen, etwa <em>OpenAI</em>."
+      },
+      "target": {
+        "title": "Wo das Modell läuft",
+        "body": "Wählen Sie <strong>Remote-Endpunkt</strong> für einen Anbieter im Internet."
+      },
+      "kind": {
+        "title": "Der Anbieter",
+        "body": "Wählen Sie den Anbieter; seine Adresse wird eingetragen. Für jeden anderen OpenAI-kompatiblen Dienst wählen Sie OpenAI-kompatibel und geben seine Adresse ein."
+      },
+      "key": {
+        "title": "API-Schlüssel und Modell",
+        "body": "Fügen Sie den API-Schlüssel aus der Konsole des Anbieters ein und wählen Sie das Modell. Der Schlüssel bleibt auf diesem Server; wer den Chat nutzt, sieht ihn nie."
+      },
+      "test": {
+        "title": "Testen",
+        "body": "<strong>Verbindung testen</strong> sendet eine kleine Anfrage, um Schlüssel und Adresse zu prüfen. Klicken Sie dann auf <strong>Weiter</strong>."
+      },
+      "pricing": {
+        "title": "Preise",
+        "body": "Optional: die Preise des Anbieters pro Million Tokens, damit die Konsole zeigen kann, was die Nutzung kostet. Sie können die Felder leer lassen."
+      },
+      "create": {
+        "title": "Erstellen",
+        "body": "Klicken Sie auf <strong>Erstellen</strong>. Das Modell steht dann im Chat und über die API bereit."
+      }
+    },
+    "invite_people": {
+      "title": "Personen hinzufügen",
+      "description": "Konten anlegen, damit Ihre Kolleginnen und Kollegen den Chat nutzen können.",
+      "open": {
+        "title": "Benutzer anlegen",
+        "body": "Klicken Sie auf <strong>Benutzer erstellen</strong>."
+      },
+      "account": {
+        "title": "Die Anmeldung",
+        "body": "Die E-Mail-Adresse und ein erstes Passwort mit mindestens 6 Zeichen. Geben Sie das Passwort persönlich oder telefonisch weiter."
+      },
+      "roles": {
+        "title": "Was die Person darf",
+        "body": "Lassen Sie die Rollen leer für Personen, die nur chatten: Sie erhalten die Standardrolle. Angehakte Rollen ersetzen diese; haken Sie für jemanden, der auch beim Betrieb hilft, zusätzlich <strong>default_user</strong> an. Klicken Sie dann auf <strong>Benutzer erstellen</strong>."
+      }
+    },
+    "create_api_token": {
+      "title": "API-Token erstellen",
+      "description": "Mit einem Token nutzen Skripte und Anwendungen die Modelle über die API.",
+      "name": {
+        "title": "Name",
+        "body": "Benennen Sie das Token nach seinem Verwender, etwa <em>Build-Server</em>, damit Sie später wissen, welches Sie widerrufen."
+      },
+      "lifetime": {
+        "title": "Gültigkeit",
+        "body": "Wie lange das Token gilt. Kürzer ist sicherer; Sie können jederzeit ein neues erstellen."
+      },
+      "create": {
+        "title": "Erzeugen",
+        "body": "Klicken Sie auf <strong>Token erzeugen</strong>."
+      },
+      "value": {
+        "title": "Jetzt kopieren",
+        "body": "Das Token wird nur dieses eine Mal angezeigt. Kopieren Sie es und bewahren Sie es sicher auf."
+      },
+      "list": {
+        "title": "Ihre Tokens",
+        "body": "Hier stehen alle Ihre Tokens. Widerrufen Sie eines, sobald es nicht mehr gebraucht wird oder in falsche Hände geraten sein könnte."
+      }
+    }
+  },
+  "checklist": {
+    "title": "Erste Schritte",
+    "subtitle": "Von der frischen Installation bis zur Nutzung durch Ihr Team. Jeder Schritt hakt sich selbst ab, sobald er erledigt ist.",
+    "done_title": "Alles eingerichtet",
+    "done_body": "Maschinen, ein Cluster, ein Modell und Personen: Alles ist da. Sie können diese Liste ausblenden; sie bleibt unter Hilfe erreichbar.",
+    "hide": "Ausblenden",
+    "progress": "{{done}} von {{total}} erledigt",
+    "more": "Bei Bedarf",
+    "show_me": "Zeig mir wie",
+    "open": "Öffnen",
+    "open_chat": "Chat öffnen",
+    "show_on_dashboard": "Auf dem Dashboard zeigen",
+    "machine": {
+      "title": "Maschine hinzufügen",
+      "body": "Einen Rechner mit GPU anbinden."
+    },
+    "cluster": {
+      "title": "Cluster erstellen",
+      "body": "Maschinen zusammenfassen, damit sie Modelle bereitstellen."
+    },
+    "model": {
+      "title": "Modell bereitstellen",
+      "body": "Ein Modell aus dem Marktplatz wählen und auf dem Cluster starten."
+    },
+    "chat": {
+      "title": "Im Chat ausprobieren",
+      "body": "Mit Ihrem Modell sprechen, so wie es Ihr Team tun wird."
+    },
+    "people": {
+      "title": "Personen hinzufügen",
+      "body": "Konten für Ihre Kolleginnen und Kollegen anlegen."
+    },
+    "provider": {
+      "title": "Cloud-Modell anbinden",
+      "body": "OpenAI, Azure und andere neben Ihren eigenen Modellen nutzen."
+    },
+    "privacy": {
+      "title": "Datenschutzrichtlinie festlegen",
+      "body": "Bestimmen, welche personenbezogenen Daten maskiert werden, bevor sie ein Modell erreichen."
+    },
+    "tools": {
+      "title": "Werkzeuge anbinden",
+      "body": "Einen MCP-Server hinzufügen, damit Chats und Agenten suchen, Tickets anlegen und mehr können."
+    },
+    "skills": {
+      "title": "Skill anlegen",
+      "body": "Anweisungen speichern, die im Chat wiederverwendet werden."
+    },
+    "agents": {
+      "title": "Agenten einrichten",
+      "body": "Office, den Browser oder eigene Anwendungen die Modelle nutzen lassen, nach Ihren Regeln."
+    },
+    "token": {
+      "title": "API-Token erstellen",
+      "body": "Für Skripte und Anwendungen, die die API aufrufen."
+    },
+    "tour": {
+      "title": "Rundgang durch die Konsole",
+      "body": "In einer Minute sehen, wo was ist."
+    }
   },
   "page_help": {
-    "actions_heading": "Was Sie hier tun können",
+    "actions_heading": "Das können Sie hier tun",
     "close": "Verstanden",
+    "show_me": "Zeig mir wie",
     "unknown": {
       "title": "Über diese Seite",
-      "description": "Für diese Seite ist noch keine spezifische Hilfe verfügbar."
+      "description": "Für diese Seite gibt es noch keine Hilfe. Im Hilfe-Menü finden Sie die Erste-Schritte-Liste und die Anleitungen."
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Ihre zentrale Übersicht der Fadenstack-Installation. Systemzustand, Container-Status, Ressourcennutzung und Metriken.",
-      "action_health": "Systemzustand und Verfügbarkeit prüfen",
-      "action_containers": "Container-Anzahl und Status anzeigen",
-      "action_metrics": "Ressourcennutzung und Leistung überwachen"
+      "description": "Ihre Plattform auf einen Blick: was Aufmerksamkeit braucht, Datenverkehr, Kapazität und Zustand. Jede Karte lädt für sich.",
+      "action_getting_started": "Der Liste Erste Schritte folgen, bis alles eingerichtet ist",
+      "action_attention": "Sehen, was Aufmerksamkeit braucht, und Bekanntes stummschalten",
+      "action_customize": "Anpassen: Karten verschieben, in der Größe ändern, ein- oder ausblenden; Ihr Layout folgt Ihnen auf andere Geräte",
+      "action_status": "Die Statusanzeige oben fasst den Zustand der Plattform zusammen"
     },
     "containers": {
       "title": "Container",
-      "description": "Alle Docker-Container auflisten und verwalten. Starten, stoppen, neu starten oder inspizieren.",
-      "action_list": "Container mit Statusfiltern durchsuchen",
-      "action_start_stop": "Container starten, stoppen oder neu starten",
-      "action_create": "Neuen Container aus einem Image erstellen"
+      "description": "Alles, was Docker auf diesem Server ausführt. Was Sie mit einem Container tun dürfen, hängt von seiner Klasse ab: Systemcontainer brauchen den Root-Modus zum Stoppen oder Löschen, nicht vertrauenswürdige lassen sich gar nicht stoppen.",
+      "action_filter": "Eine Kachel anklicken oder eine Klasse wählen, um die Liste zu filtern",
+      "action_control": "Einen Container in seiner Zeile starten, stoppen, pausieren, neu starten oder löschen",
+      "action_class": "Die Klasse eines Containers ändern (SYSTEM_CORE bleibt gesperrt)",
+      "action_create": "Einen Container aus einem Image erstellen, das bereits auf diesem Server liegt"
     },
     "create_container": {
       "title": "Container erstellen",
-      "description": "Neuen Docker-Container starten — Image wählen und Ports, Volumes und Umgebungsvariablen konfigurieren.",
-      "action_image": "Basis-Image auswählen",
-      "action_config": "Ports, Volumes und Umgebung konfigurieren"
+      "description": "Einen neuen Container aus einem Image starten, das bereits auf diesem Server liegt. Laden Sie das Image vorher unter Images herunter.",
+      "action_image": "Image, Namen und bei Bedarf einen Befehl wählen",
+      "action_config": "Ports, Umgebungsvariablen und Volumes hinzufügen",
+      "action_class": "Klasse, Richtlinie und Netzwerk festlegen; sofort oder später starten"
+    },
+    "edit_container": {
+      "title": "Container bearbeiten",
+      "description": "Bearbeiten ersetzt den Container: Ein neuer startet mit den neuen Einstellungen, und Dateien außerhalb seiner Volumes gehen verloren.",
+      "action_change": "Image, Ports, Variablen oder Volumes ändern",
+      "action_save": "Speichern und ersetzen, wenn Sie bereit sind"
     },
     "container_detail": {
-      "title": "Container-Details",
-      "description": "Container inspizieren — Logs, Ressourcennutzung, Umgebungsvariablen und Netzwerkeinstellungen.",
-      "action_logs": "Container-Logs in Echtzeit anzeigen",
-      "action_restart": "Container neu starten oder stoppen",
-      "action_env": "Umgebungsvariablen und Mounts inspizieren"
+      "title": "Container",
+      "description": "Ein Container: sein Zustand, Image, Netzwerke und Logs.",
+      "action_logs": "Die letzten 300 Logzeilen lesen, aktualisieren oder herunterladen",
+      "action_edit": "Bearbeiten (ersetzt den Container)",
+      "action_exec": "Eine Exec-Sitzung für einen Websocket-Client starten; außer bei Mandanten-Apps braucht das den Root-Modus"
     },
     "images": {
       "title": "Images",
-      "description": "Docker-Images verwalten. Neue Images herunterladen oder unbenutzte entfernen.",
-      "action_pull": "Neue Images von einer Registry herunterladen",
-      "action_remove": "Unbenutzte Images entfernen"
+      "description": "Die Docker-Images auf diesem Server.",
+      "action_pull": "Ein Image herunterladen, mit Live-Fortschritt",
+      "action_prune": "Verwaiste Images bereinigen; vorher einen Probelauf machen (braucht den Root-Modus)"
     },
     "networks": {
       "title": "Netzwerke",
-      "description": "Docker-Netzwerke anzeigen und verwalten. Verbundene Container inspizieren und benutzerdefinierte Netzwerke erstellen.",
-      "action_inspect": "Netzwerkkonfiguration inspizieren",
-      "action_create": "Neues Docker-Netzwerk erstellen"
+      "description": "Die Docker-Netzwerke auf diesem Server. Systemnetzwerke sind schreibgeschützt.",
+      "action_create": "Ein Netzwerk erstellen, auf Wunsch intern (ohne Zugang nach außen)",
+      "action_inspect": "Ein Netzwerk und die Container darin ansehen",
+      "action_delete": "Ein selbst erstelltes Netzwerk löschen"
     },
     "stacks": {
       "title": "Stacks",
-      "description": "Docker-Compose-Stacks verwalten — zusammengehörige Container-Gruppen.",
-      "action_manage": "Bestehende Stacks anzeigen und verwalten",
-      "action_deploy": "Stack bereitstellen oder aktualisieren"
+      "description": "Von hier bereitgestellte Docker-Compose-Stacks, jede Revision bleibt erhalten.",
+      "action_deploy": "Einen Stack aus einer Compose-Datei bereitstellen; dieselbe ID ergibt eine neue Revision",
+      "action_diff": "Zwei Revisionen vergleichen",
+      "action_rollback": "Auf eine frühere Revision zurückgehen"
     },
     "observability": {
-      "title": "Kosten-Observability",
-      "description": "LLM-Nutzungskosten, Latenz, Token-Verbrauch und Fehlerraten überwachen.",
-      "action_cost": "Kosten pro Anbieter und Modell verfolgen",
-      "action_latency": "Latenz-Perzentile analysieren",
-      "action_tokens": "Token-Nutzungstrends überwachen"
+      "title": "Kosten-Dashboard",
+      "description": "Kosten, Nutzung und Geschwindigkeit der Anfragen, die das Gateway bedient hat. Die Kosten sind Schätzungen aus den von Ihnen gesetzten Preisen; sie wirken sich nicht auf Abrechnungen aus.",
+      "action_overview": "Ausgaben, Anfragen, Tokens, Latenz und Fehler über 7 bis 90 Tage",
+      "action_requests": "Anfragen durchsehen, nach Modell oder Person filtern und eine öffnen, um ihre Pipeline zu sehen",
+      "action_pricing": "Die Preise pro Million Tokens festlegen",
+      "action_export": "Die Daten als CSV exportieren"
     },
     "logs": {
       "title": "Logs & Audit",
-      "description": "System-Logs und Audit-Trails durchsuchen. Nach Schweregrad, Quelle oder Zeitraum filtern.",
-      "action_filter": "Logs nach Level, Quelle oder Stichwort filtern",
-      "action_audit": "Zum Audit-Trail für Sicherheitsereignisse wechseln"
+      "description": "Logs aller Maschinen und Container und das Audit-Protokoll, wer was geändert hat.",
+      "action_filter": "Nach Maschine oder Quelle, Zeit und Text filtern; neue Zeilen live verfolgen",
+      "action_audit": "Zu Audit wechseln für Aktionen, Ziele, Ergebnisse und wer sie ausgeführt hat"
     },
     "security_map": {
-      "title": "Sicherheitskarte",
-      "description": "Datenresidenz und Sicherheitsgrenzen visualisieren. Datenflüsse über Anbieter und Regionen hinweg.",
-      "action_residency": "Datenresidenz-Karte anzeigen",
-      "action_providers": "Sicherheitskonfigurationen inspizieren"
-    },
-    "providers": {
-      "title": "LLM-Anbieter",
-      "description": "LLM-Endpunkte konfigurieren — Ollama, OpenAI, Azure oder kompatible APIs. Konnektivität und Anmeldedaten testen.",
-      "action_add": "Neuen LLM-Anbieter-Endpunkt hinzufügen",
-      "action_test": "Konnektivität und Anmeldedaten testen",
-      "action_route": "Request-Routing und Failover konfigurieren"
-    },
-    "models": {
-      "title": "Modelle",
-      "description": "Verfügbare Modelle aller Anbieter durchsuchen. Modelle herunterladen oder Projekten zuweisen.",
-      "action_browse": "Modelle nach Anbieter durchsuchen",
-      "action_pull": "Modell auf lokale Runtime herunterladen",
-      "action_assign": "Modelle Projekten oder Endpunkten zuweisen"
-    },
-    "model_detail": {
-      "title": "Modell-Details",
-      "description": "Detaillierte Modellinformationen — Parameter, Fähigkeiten und Nutzungsstatistiken.",
-      "action_params": "Parameter und Quantisierung inspizieren",
-      "action_test": "Test-Prompt an das Modell senden"
-    },
-    "runtimes": {
-      "title": "Runtimes",
-      "description": "Lokale LLM-Runtimes und geladene Modelle anzeigen. Zustand und GPU-Auslastung prüfen.",
-      "action_list": "Alle registrierten Runtimes auflisten",
-      "action_health": "Runtime-Zustand und geladene Modelle prüfen"
-    },
-    "runtime_detail": {
-      "title": "Runtime-Details",
-      "description": "Runtime inspizieren — Konfiguration, geladene Modelle und Ressourcennutzung.",
-      "action_config": "Runtime-Konfiguration anzeigen oder bearbeiten",
-      "action_models": "Geladene Modelle dieser Runtime anzeigen"
+      "title": "Datenresidenz",
+      "description": "Wo Ihre Prompts verarbeitet werden: auf Ihren Maschinen, in Ihrem Netzwerk oder außerhalb.",
+      "action_residency": "Sehen, welche Provider lokal, extern oder unbekannt sind",
+      "action_where": "Angeben, wohin ein Provider Prompts sendet, wenn es sich nicht erkennen lässt",
+      "action_volume": "Sehen, wie viele Daten wohin gehen"
     },
     "agent_trace": {
-      "title": "Agent-Trace",
-      "description": "LLM-Aufruf-Traces inspizieren — vollständige Request/Response-Kette mit Tool-Aufrufen und Token-Nutzung.",
-      "action_inspect": "Einzelne Traces untersuchen",
-      "action_replay": "Trace zur Fehlersuche wiederholen"
+      "title": "LLM-Aufrufe",
+      "description": "Wie Provider, Runtimes und Modelle zusammenhängen, und die Aufrufe, die gerade durchlaufen.",
+      "action_graph": "Den Graphen durchsuchen und filtern; ein Klick auf einen Knoten zeigt Details",
+      "action_live": "Aufrufe live verfolgen; den Datenstrom anhalten und fortsetzen"
     },
     "endpoint": {
       "title": "API-Endpunkt",
-      "description": "Interaktive API-Dokumentation für den OpenAI-kompatiblen Endpunkt. API-Aufrufe direkt testen.",
-      "action_docs": "OpenAPI-Dokumentation durchsuchen",
-      "action_test": "Test-Anfragen senden"
+      "description": "Die Dokumentation der OpenAI-kompatiblen API des Gateways: die eine Adresse, über die Anwendungen jedes Modell nutzen.",
+      "action_docs": "Die API-Dokumentation lesen oder in einem neuen Tab öffnen",
+      "action_container": "Den Gateway-Container starten, stoppen oder neu starten"
     },
-    "nodes": {
-      "title": "Knoten-Flotte",
-      "description": "GPU-Inferenzknoten verwalten. Neue Knoten einrichten, Zustand überwachen und Scheduling-Prioritäten konfigurieren.",
-      "action_enroll": "Neuen GPU-Knoten einrichten",
-      "action_monitor": "Knotenzustand und GPU-Auslastung überwachen",
-      "action_schedule": "Scheduling-Richtlinien konfigurieren"
+    "runtime_detail": {
+      "title": "Runtime",
+      "description": "Eine Modell-Runtime in einem einzelnen Container, wie sie hinter einem Provider vom Typ Lokaler Docker steht.",
+      "action_control": "Starten, stoppen oder neu starten",
+      "action_config": "Die Konfiguration bearbeiten, dann speichern und neu starten",
+      "action_logs": "Die Container-Logs lesen"
     },
-    "node_detail": {
-      "title": "Knoten-Details",
-      "description": "Knoten inspizieren — Hardware, geladene Modelle, aktive Jobs und Zustandsverlauf.",
-      "action_status": "Knotenstatus und Hardware-Details anzeigen",
-      "action_drain": "Knoten für Wartung drainieren oder sperren"
+    "providers": {
+      "title": "LLM-Provider",
+      "description": "Jedes Modell, das das Gateway erreicht: auf Ihren Clustern, in einem lokalen Container oder bei einem Cloud-Anbieter. Auf einem Cluster bereitgestellte Modelle erscheinen hier von selbst.",
+      "action_add": "Einen Provider hinzufügen: eine Cloud-API mit Schlüssel oder einen lokalen Container",
+      "action_test": "Die Verbindung testen; dabei werden auch die Modelle des Anbieters aufgelistet",
+      "action_price": "Einen Preis setzen, damit die Kosten im Kosten-Dashboard erscheinen",
+      "action_manage": "Provider bearbeiten, starten, stoppen oder löschen; Cluster-Deployments verwalten Sie auf ihrer eigenen Seite"
     },
     "node_profiles": {
-      "title": "Knoten-Profile",
-      "description": "Wiederverwendbare Knotenprofile mit Ressourcenanforderungen und Scheduling-Einschränkungen definieren.",
-      "action_create": "Neues Knotenprofil erstellen",
-      "action_assign": "Profile Knoten oder Workloads zuweisen"
+      "title": "Maschinenprofile",
+      "description": "Wiederverwendbare Einstellungen für Maschinen: Runtime, GPU, Speicher, Netzwerk, Logging, Sicherheit und Updates.",
+      "action_create": "Ein Profil aus JSON-Einstellungen erstellen",
+      "action_assign": "Ein Profil auf der Seite einer Maschine zuweisen"
+    },
+    "node_detail": {
+      "title": "Maschine",
+      "description": "Eine Maschine: Hardware, Logs, Deployments, das darauf laufende vLLM, Befehle und Updates.",
+      "action_status": "Hardware, Deployments und aktuelle Logs ansehen",
+      "action_maintenance": "Wartung und Drain: Es wird keine neue Arbeit darauf verteilt",
+      "action_updates": "Systemupdates suchen und installieren oder neu starten",
+      "action_vllm": "Ein darauf gefundenes vLLM über Fadenstack leiten"
+    },
+    "nodes": {
+      "title": "Maschinen",
+      "description": "Die Rechner mit GPUs, auf denen Ihre Modelle laufen. Eine Maschine tritt bei, indem auf ihr ein Befehl läuft und sie hier genehmigt wird.",
+      "action_add": "Eine Maschine hinzufügen: den Befehl auf ihr ausführen, dann hier genehmigen",
+      "action_status": "Status, GPUs und Agent-Version jeder Maschine sehen",
+      "action_maintenance": "Wartung und Drain verhindern, dass neue Arbeit auf eine Maschine verteilt wird",
+      "action_delete": "Eine Maschine löschen (zur Bestätigung ihren Namen eingeben)"
+    },
+    "cluster_detail": {
+      "title": "Cluster",
+      "description": "Ein Cluster: seine Maschinen, ihre Verbindungen, die Modelle darauf und ihr Datenverkehr.",
+      "action_deploy": "Ein Modell darauf bereitstellen",
+      "action_wiring": "Sehen, wie die Maschinen verbunden sind, und das Netzwerk ändern",
+      "action_security": "Den Modellverkehr und den Verkehr zwischen den Maschinen verschlüsseln",
+      "action_runtime": "Die Runtime-Version wechseln (startet die Modelle neu)",
+      "action_control": "Stoppen, starten oder löschen; vorher seine Deployments löschen"
+    },
+    "clusters": {
+      "title": "Cluster",
+      "description": "Ein Cluster fasst Maschinen zusammen, damit sie gemeinsam Modelle bereitstellen. Sie können einen erstellen, sobald eine Maschine angebunden ist.",
+      "action_create": "Einen Cluster erstellen: benennen, Maschinen wählen, Netzwerk bestätigen",
+      "action_open": "Einen Cluster öffnen, um seine Maschinen und Modelle zu sehen",
+      "action_found": "Einen Cluster übernehmen, den Ihre Maschinen noch ausführen, den dieser Server aber verloren hat"
+    },
+    "marketplace": {
+      "title": "Modell-Marktplatz",
+      "description": "Ein Modell finden, sehen, ob es auf Ihre Cluster passt, und es bereitstellen.",
+      "action_find": "Empfohlene Modelle ansehen oder Hugging Face durchsuchen",
+      "action_fit": "Einen Cluster wählen, um zu sehen, welche Modelle darauf passen",
+      "action_host": "Ein Modell bereitstellen: wo es läuft, Engine-Einstellungen, prüfen",
+      "action_local": "Die Modelle sehen und verwalten, die bereits auf diesem Server liegen",
+      "action_token": "Zugangsbeschränkte Modelle brauchen ein Hugging-Face-Token (Schaltfläche oben)"
+    },
+    "deployment_detail": {
+      "title": "Deployment",
+      "description": "Ein Modell, das auf einem Cluster läuft: Zustand, Kopien, Maschinen, Geschwindigkeit und Logs.",
+      "action_scale": "Skalieren: mehr Kopien oder ein anderer Anteil je Beschleuniger (startet es neu)",
+      "action_change": "Den Namen im Chat, die Wartezeit auf Antworten oder die Engine-Einstellungen ändern",
+      "action_logs": "Die Logs lesen und die Fehler sehen",
+      "action_control": "Stoppen oder starten"
+    },
+    "deployments": {
+      "title": "Deployments",
+      "description": "Alle Modelle, die auf Ihren Clustern laufen.",
+      "action_deploy": "Ein Modell bereitstellen (wie Bereitstellen im Marktplatz)",
+      "action_control": "Ein Deployment stoppen, starten oder löschen",
+      "action_open": "Eines öffnen für Zustand, Geschwindigkeit und Einstellungen"
     },
     "scheduler": {
       "title": "Scheduler",
-      "description": "Inferenz-Job-Warteschlange anzeigen und verwalten. Scheduling-Richtlinien konfigurieren.",
-      "action_queue": "Job-Warteschlange und -Verlauf durchsuchen",
-      "action_policies": "Scheduling-Richtlinien konfigurieren"
+      "description": "Hintergrundaufgaben: Modell-Downloads und das Einlesen von Dokumenten.",
+      "action_watch": "Den Fortschritt verfolgen; die Liste aktualisiert sich, solange Aufgaben laufen",
+      "action_retry": "Eine fehlgeschlagene Aufgabe wiederholen oder eine laufende abbrechen"
     },
     "users": {
       "title": "Benutzer",
-      "description": "Benutzerkonten verwalten, Rollen zuweisen und API-Schlüssel generieren.",
-      "action_create": "Neues Benutzerkonto erstellen",
-      "action_roles": "Benutzerrollen zuweisen oder ändern",
-      "action_keys": "API-Schlüssel generieren oder widerrufen"
+      "description": "Die Konten, die sich anmelden können. Wer nur chattet, braucht keine Rollen: Ein neues Konto erhält die Standardrolle.",
+      "action_create": "Einen Benutzer mit E-Mail-Adresse und erstem Passwort anlegen",
+      "action_roles": "Die Rollen einer Person ändern und die Nutzungsgruppe, der ihre Nutzung zugerechnet wird",
+      "action_developer": "Entwicklermodus: Agenten dürfen lokale MCP-Server auf den Rechnern dieser Person nutzen",
+      "action_delete": "Einen Benutzer löschen"
     },
     "roles": {
       "title": "Rollen",
-      "description": "Rollen mit granularen Berechtigungen definieren. Zugriff auf Ressourcen und Aktionen steuern.",
-      "action_create": "Neue Rolle erstellen",
-      "action_permissions": "Rollenberechtigungen bearbeiten"
+      "description": "Eine Rolle ist eine Sammlung von Berechtigungen. Die eingebauten Rollen sind schreibgeschützt.",
+      "action_create": "Eine Rolle anlegen und ihre Berechtigungen wählen",
+      "action_edit": "Selbst angelegte Rollen bearbeiten oder löschen"
     },
     "groups": {
       "title": "Gruppen",
-      "description": "Benutzer in Gruppen organisieren für Massen-Rollenzuweisung und Zugriffsverwaltung.",
-      "action_create": "Neue Gruppe erstellen",
-      "action_members": "Gruppenmitglieder hinzufügen oder entfernen"
+      "description": "Eine Gruppe gibt ihren Mitgliedern Rollen und fasst ihre Nutzung in Berichten zusammen.",
+      "action_create": "Eine Gruppe mit ihren Rollen anlegen",
+      "action_members": "Mitglieder hinzufügen oder entfernen"
     },
     "auth_providers": {
-      "title": "Auth-Anbieter",
-      "description": "Externe Authentifizierungsanbieter konfigurieren — OIDC, SAML oder LDAP — für Single Sign-On (SSO).",
-      "action_add": "Authentifizierungsanbieter hinzufügen",
-      "action_test": "Anbieter-Konnektivität testen"
+      "title": "Anmeldeanbieter",
+      "description": "Anmeldung mit dem Firmenkonto über OpenID Connect oder OAuth2.",
+      "action_add": "Einen Anbieter mit Client-ID, Secret und Discovery-URL hinzufügen",
+      "action_auto": "Festlegen, ob Personen bei der ersten Anmeldung automatisch ein Konto erhalten"
     },
     "pii_dashboard": {
       "title": "PII-Dashboard",
-      "description": "Übersicht der PII-Scan-Aktivität. Erkennungen nach Entitätstyp, Schwärzungsraten und Compliance.",
-      "action_stats": "Statistiken und Trends anzeigen",
-      "action_entities": "Erkannte Entitätstypen durchsuchen"
+      "description": "Was der PII-Filter in Anfragen gefunden hat, nur als Zahlen.",
+      "action_stats": "Scans, Funde und Erkennungsrate",
+      "action_breakdown": "Welche Arten personenbezogener Daten, nach Vorgang und Quelle"
     },
     "pii_activity": {
-      "title": "PII-Aktivitätsprotokoll",
-      "description": "Detailliertes Protokoll der PII-Erkennungen und -Schwärzungen. Nach Typ, Benutzer oder Zeitraum filtern.",
-      "action_filter": "Aktivität nach Typ oder Benutzer filtern",
-      "action_export": "Protokolle für Compliance exportieren"
+      "title": "PII-Aktivität",
+      "description": "Jeder Scan und jede Schwärzung, ohne den Text selbst.",
+      "action_filter": "Nach Vorgang, nach Quelle oder nur nach Ereignissen mit personenbezogenen Daten filtern"
     },
     "pii_policies": {
-      "title": "PII-Richtlinien",
-      "description": "PII-Richtlinien pro Mandant definieren — Entitätstypen, Schwärzungsmodi und Durchsetzungsregeln.",
-      "action_create": "Neue PII-Richtlinie erstellen",
-      "action_assign": "Richtlinien Mandanten zuweisen"
+      "title": "PII-Richtlinien je Mandant",
+      "description": "Die Standard-PII-Richtlinie für einen Mandanten überschreiben. Die Standardrichtlinie finden Sie unter Einstellungen, Module.",
+      "action_load": "Einen Mandanten wählen und seine Richtlinie laden",
+      "action_edit": "Festlegen, was bei Cloud- und bei lokalen Modellen geschützt wird und was geschieht, wenn die Erkennung fehlschlägt",
+      "action_preview": "Die wirksame Richtlinie vor dem Speichern sehen"
     },
     "rag_knowledge_base": {
       "title": "Wissensdatenbank",
-      "description": "Dokumente für RAG hochladen und verwalten. Dokumente werden für semantische Suche indexiert.",
-      "action_upload": "Neue Dokumente hochladen",
-      "action_search": "Suchabfragen gegen den Index testen"
+      "description": "Dokumente, auf die der Chat zurückgreifen kann, in verschachtelten Sammlungen.",
+      "action_upload": "Sammlungen anlegen und Dokumente hochladen; zum Verschieben ziehen",
+      "action_describe": "Eine Sammlung beschreiben oder die Beschreibung von KI schreiben lassen",
+      "action_retry": "Ein fehlgeschlagenes Dokument erneut verarbeiten oder löschen"
     },
     "rag_documents": {
       "title": "Dokumente",
-      "description": "Einzelne Dokumente im RAG-Pipeline durchsuchen und verwalten. Indexierungsstatus und Metadaten anzeigen.",
-      "action_browse": "Dokumente mit Filtern durchsuchen",
-      "action_delete": "Dokumente und ihre Chunks entfernen"
+      "description": "Alle hochgeladenen Dokumente in einer Liste.",
+      "action_upload": "Ein Dokument hochladen",
+      "action_manage": "Dokumente erneut verarbeiten oder löschen"
     },
     "rag_collections": {
       "title": "Sammlungen",
-      "description": "Dokumente in Sammlungen organisieren. Jede Sammlung hat einen eigenen Embedding-Index.",
-      "action_create": "Neue Sammlung erstellen",
-      "action_manage": "Mitgliedschaft und Einstellungen verwalten"
+      "description": "Die Sammlungen, in denen Dokumente liegen.",
+      "action_create": "Eine Sammlung anlegen",
+      "action_delete": "Eine Sammlung löschen"
     },
     "rag_runtime": {
-      "title": "RAG-Runtime",
-      "description": "RAG-Pipeline konfigurieren — Embedding-Modelle, Chunk-Größen, Retrieval-Parameter und Vektorspeicher.",
-      "action_config": "Runtime-Konfiguration bearbeiten",
-      "action_status": "Indexierungs-Pipeline-Zustand prüfen"
+      "title": "RAG-Laufzeit",
+      "description": "Die Embedding- und Chunking-Einstellungen der Dokumentsuche.",
+      "action_view": "Embedding-Modell und Chunk-Größen ansehen",
+      "action_edit": "Mit der vollen RAG-Engine bearbeiten; die von RAG Lite stehen unter Einstellungen"
     },
     "rag_collectors": {
       "title": "Kollektoren",
-      "description": "Datenkollektoren konfigurieren, die automatisch Dokumente aus externen Quellen importieren.",
-      "action_add": "Neuen Kollektor hinzufügen",
-      "action_schedule": "Sammelzeitpläne konfigurieren"
+      "description": "Quellen, die Dokumente automatisch einspeisen, und ihre Einleseaufträge.",
+      "action_run": "Einen Kollektor jetzt ausführen",
+      "action_jobs": "Die Einleseaufträge verfolgen"
     },
     "rag_explorer": {
       "title": "RAG-Explorer",
-      "description": "RAG-Index interaktiv erkunden — Chunks abfragen, Embeddings inspizieren und Retrieval-Qualität debuggen.",
-      "action_query": "Semantische Suchabfragen ausführen",
-      "action_chunks": "Einzelne Chunks und Scores inspizieren"
+      "description": "Dokumentänderungen in einem Entwurf vorbereiten und sie sofort oder zu einem festen Zeitpunkt veröffentlichen.",
+      "action_container": "Einen Container wählen oder anlegen",
+      "action_upload": "Dateien in einen Entwurf hochladen",
+      "action_publish": "Sofort veröffentlichen oder einplanen"
     },
     "rag_publishes": {
       "title": "Veröffentlichungen",
-      "description": "Veröffentlichte RAG-Snapshots verwalten. Veröffentlichung friert eine Sammlungsversion ein.",
-      "action_publish": "Neuen Snapshot veröffentlichen",
-      "action_status": "Pipeline-Status überwachen"
+      "description": "Veröffentlichungsanfragen und die Einleseaufträge, die sie gestartet haben. Veröffentlicht wird im Explorer.",
+      "action_watch": "Veröffentlichungen verfolgen; die Liste aktualisiert sich, solange eine läuft"
     },
     "rag_search": {
       "title": "RAG-Suche",
-      "description": "Retrieval-Abfragen gegen veröffentlichte Sammlungen testen. Ergebnisse vergleichen.",
-      "action_query": "Test-Suchabfragen ausführen",
-      "action_compare": "Ergebnisse zwischen Sammlungen vergleichen"
+      "description": "Suchanfragen gegen die indizierten Dokumente testen, mit angewandter Zugriffskontrolle.",
+      "action_query": "Eine Anfrage ausführen und die gefundenen Abschnitte sehen",
+      "action_pro": "Mit der vollen Engine: als Person oder Gruppe suchen, filtern und den Modus wählen"
     },
     "chat_projects": {
       "title": "Chat-Projekte",
-      "description": "Chat-Projekte erstellen und verwalten. Jedes Projekt begrenzt Modellzugriff und Berechtigungen.",
-      "action_create": "Neues Chat-Projekt erstellen",
-      "action_models": "Modellzugriff pro Projekt konfigurieren"
+      "description": "Die Projekte, die im Chat angelegt wurden.",
+      "action_browse": "Sehen, wem welches Projekt gehört",
+      "action_delete": "Ein Projekt mit allen Chats und Dateien löschen"
     },
     "chat_sessions": {
       "title": "Chat-Sitzungen",
-      "description": "Chat-Sitzungen aller Projekte durchsuchen. Konversationsverlauf und Nutzung anzeigen.",
-      "action_browse": "Sitzungen mit Filtern durchsuchen",
-      "action_export": "Sitzungstranskripte exportieren"
+      "description": "Chats nach Person und Projekt. Titel und Nachrichten gehören den jeweiligen Personen und werden hier nicht angezeigt.",
+      "action_browse": "Chats nach Person, Status und Projekt sehen",
+      "action_delete": "Einen Chat löschen"
     },
     "chat_attachments": {
       "title": "Chat-Anhänge",
-      "description": "Hochgeladene Dateianhänge verwalten. Speichernutzung überprüfen und alte Dateien aufräumen.",
-      "action_browse": "Hochgeladene Anhänge durchsuchen",
-      "action_clean": "Verwaiste oder abgelaufene Dateien aufräumen"
+      "description": "Dateien, die im Chat angehängt wurden, und der Speicher, den sie belegen.",
+      "action_browse": "Dateien nach Person, Größe und Typ sehen",
+      "action_delete": "Eine Datei löschen"
+    },
+    "mcp_detail": {
+      "title": "MCP-Server",
+      "description": "Ein MCP-Server: seine Verbindung und die Werkzeuge, die er anbietet.",
+      "action_tools": "Einzelne Werkzeuge ein- oder ausschalten",
+      "action_test": "Die Verbindung testen und seine Werkzeuge zählen",
+      "action_edit": "Bearbeiten; beim Speichern verbindet er sich neu und findet seine Werkzeuge erneut"
     },
     "mcp_servers": {
       "title": "MCP-Server",
-      "description": "MCP-Tool-Server registrieren und verwalten. Jeder Server stellt Tools bereit, die LLMs aufrufen können.",
-      "action_register": "Neuen MCP-Server registrieren",
-      "action_health": "Serverzustand und verfügbare Tools prüfen"
+      "description": "Werkzeugserver, die Chats und Agenten nutzen können: Suche, Tickets, Dateien und mehr.",
+      "action_register": "Einen Server per URL oder Befehl registrieren, mit Headern oder Variablen",
+      "action_pii": "Festlegen, was mit personenbezogenen Daten geschieht, die an seine Werkzeuge gehen",
+      "action_scan": "Das Netzwerk nach MCP-Servern durchsuchen"
     },
-    "mcp_detail": {
-      "title": "MCP-Server-Details",
-      "description": "MCP-Server inspizieren — verfügbare Tools, Konfiguration, Verbindungsstatus und Nutzungsprotokolle.",
-      "action_tools": "Verfügbare Tools und ihre Schemas durchsuchen",
-      "action_config": "Verbindungseinstellungen bearbeiten"
+    "skill_detail": {
+      "title": "Skill",
+      "description": "Ein Skill: seine Anweisungen, wann er verwendet wird, wer ihn sieht, und seine Versionen.",
+      "action_edit": "Anweisungen und Einstellungen bearbeiten und eine neue Version veröffentlichen",
+      "action_share": "Ihn teilen oder einem Projekt zuweisen",
+      "action_export": "Als SKILL.md oder Ordner exportieren"
     },
     "skills": {
       "title": "Skills",
-      "description": "Skill-Plugins durchsuchen und verwalten — wiederverwendbare Prompt-Ketten und Tool-Kompositionen.",
-      "action_browse": "Verfügbare Skills durchsuchen",
-      "action_create": "Neuen Skill erstellen"
-    },
-    "skills_create": {
-      "title": "Skill erstellen",
-      "description": "Neuen Skill definieren — Prompt-Vorlage, benötigte Tools und Ein-/Ausgabe-Schema festlegen.",
-      "action_define": "Prompt und Parameter definieren",
-      "action_test": "Mit Beispiel-Eingaben testen"
-    },
-    "skill_detail": {
-      "title": "Skill-Details",
-      "description": "Skill inspizieren und bearbeiten — Prompt-Vorlage, Tool-Bindungen und Ausführungsverlauf.",
-      "action_edit": "Skill-Definition bearbeiten",
-      "action_test": "Mit Test-Eingaben ausführen"
-    },
-    "settings": {
-      "title": "Einstellungen",
-      "description": "Systemweite Konfiguration — Netzwerk, Speicher, Sicherheitsrichtlinien, Feature-Flags und Dienstparameter.",
-      "action_general": "Allgemeine Einstellungen konfigurieren",
-      "action_security": "Sicherheitsrichtlinien verwalten",
-      "action_features": "Feature-Flags aktivieren oder deaktivieren"
-    },
-    "profile": {
-      "title": "Profil",
-      "description": "Kontoinformationen anzeigen und bearbeiten — Name, E-Mail, Passwort und persönliche Einstellungen.",
-      "action_info": "Anzeigename und E-Mail aktualisieren",
-      "action_password": "Passwort ändern"
+      "description": "Anweisungen, die man einmal speichert und wiederverwendet. Im Chat wählt $ einen aus.",
+      "action_create": "Einen Skill anlegen oder eine SKILL.md bzw. einen gezippten Skill-Ordner importieren",
+      "action_publish": "Skills veröffentlichen, archivieren oder löschen",
+      "action_views": "Die Skills der Organisation sehen, Ihre eigenen oder die mit Ihnen geteilten"
     },
     "agents": {
       "title": "Agenten",
-      "description": "Agenten, die in anderer Software laufen (Office, EPLAN, jede Desktop-Anwendung) und von diesem Server gesteuert werden.",
-      "action_create": "Einen Agenten anlegen oder mit einer JSON-Definition beginnen",
+      "description": "Agenten, die in anderer Software laufen (Office, Browser, beliebige Anwendungen) und von diesem Server gesteuert werden. Ein neuer Agent ist ein Entwurf: Niemand kann ihn nutzen, bis er veröffentlicht und freigegeben ist.",
+      "action_create": "Einen Agenten anlegen oder von einer App ausgehen",
       "action_open": "Einen Agenten öffnen, um ihn zu ändern, zu veröffentlichen und festzulegen, wer ihn nutzen darf"
     },
     "agent_detail": {
       "title": "Agent",
       "description": "Ein Agent: seine Definition, seine Versionen, wer ihn nutzen darf und was er getan hat.",
-      "action_definition": "Anweisungen, Modell, Wissen und Tools ändern; Speichern legt eine neue Version an",
+      "action_definition": "Anweisungen, Modell, Wissen und Werkzeuge ändern; Speichern erzeugt eine neue Version",
       "action_publish": "Eine Version veröffentlichen oder zu einer früheren zurückkehren",
-      "action_access": "Nutzern und Teams freigeben und Betreuer wählen",
-      "action_activity": "Nutzung, Meldungen der Anwendungen und angemeldete Geräte ansehen"
+      "action_access": "Ihn Personen und Teams freigeben und seine Verantwortlichen festlegen",
+      "action_activity": "Seine Nutzung sehen, was die Anwendungen gemeldet haben, und die angemeldeten Geräte"
     },
     "governance": {
       "title": "Governance",
-      "description": "Die Regeln, an die sich jeder Chat und jede Agentenanfrage hält, und was die Prüfungen entschieden haben.",
-      "action_rules": "Tools nach Namen sperren, erst nachfragen oder erlauben",
-      "action_classes": "Festlegen, was Tools tun, für die Tool-Modi",
-      "action_decisions": "Prüfen, was die Prüfungen entschieden haben, ohne den Text"
-    }
-  },
-  "taskflows": {
-    "remote_endpoint": {
-      "title": "Remote-Endpunkt registrieren",
-      "description": "Verbinden Sie einen Cloud-LLM-Anbieter (OpenAI, Anthropic usw.) als Remote-Endpunkt.",
-      "step1_title": "Anbieter hinzufügen",
-      "step1_content": "Klicken Sie auf <strong>Anbieter hinzufügen</strong>, um den Registrierungsassistenten zu öffnen.",
-      "step2_title": "Anbieter-Assistent",
-      "step2_content": "Der Anbieter-Assistent führt Sie durch die Registrierung. Füllen Sie jeden Abschnitt der Reihe nach aus.",
-      "step3_title": "Anbieter benennen",
-      "step3_content": "Geben Sie einen aussagekräftigen Namen für diesen Endpunkt ein, z.B. <em>OpenAI Produktion</em>.",
-      "step4_title": "Ziel auswählen",
-      "step4_content": "Wählen Sie <strong>Remote-Endpunkt</strong>, um eine Verbindung zu einer externen API herzustellen.",
-      "step5_title": "Anbietertyp wählen",
-      "step5_content": "Wählen Sie den LLM-Anbieter aus der Dropdown-Liste (z.B. openai, anthropic, azure).",
-      "step6_title": "API-Schlüssel eingeben",
-      "step6_content": "Fügen Sie Ihren API-Schlüssel ein. Er wird verschlüsselt gespeichert und nie im Klartext angezeigt.",
-      "step7_title": "Verbindung testen",
-      "step7_content": "Klicken Sie auf <strong>Verbindung testen</strong>, um zu prüfen, ob der Endpunkt erreichbar ist und Ihre Zugangsdaten gültig sind.",
-      "step8_title": "Anbieter erstellen",
-      "step8_content": "Alles sieht gut aus! Klicken Sie auf <strong>Erstellen</strong>, um den Anbieter zu registrieren."
+      "description": "Die Regeln, denen jede Chat- und Agentenanfrage unterliegt, und was die Prüfungen entschieden haben. Änderungen gelten innerhalb von 30 Sekunden.",
+      "action_rules": "Werkzeuge nach Namen verbieten, nachfragen lassen oder erlauben",
+      "action_classes": "Angeben, was Werkzeuge tun (lesen, schreiben, zerstörerisch), für die Werkzeugmodi",
+      "action_decisions": "Die Entscheidungen der Prüfungen ansehen, ohne den Text"
     },
-    "remote_node": {
-      "title": "Remote-Knoten einrichten",
-      "description": "Registrieren Sie eine remote GPU-Maschine als Knoten in Ihrer Flotte.",
-      "step1_title": "Knoten hinzufügen",
-      "step1_content": "Klicken Sie auf <strong>Knoten hinzufügen</strong>, um den Registrierungsprozess zu starten.",
-      "step2_title": "Knoten-Registrierung",
-      "step2_content": "Diese Seitenleiste führt Sie durch die Registrierung eines neuen Knotens. Sie erhalten ein Registrierungstoken, das Sie auf Ihrem Remote-Server installieren.",
-      "step3_title": "Notiz hinzufügen",
-      "step3_content": "Fügen Sie eine optionale Notiz hinzu, um diesen Knoten zu identifizieren (z.B. <em>GPU-Server Rechenzentrum 2</em>).",
-      "step4_title": "Token erstellen",
-      "step4_content": "Klicken Sie auf <strong>Token erstellen</strong>. Kopieren Sie das generierte Token und führen Sie den Installationsbefehl auf Ihrem Remote-Server aus."
+    "settings": {
+      "title": "Einstellungen",
+      "description": "Einstellungen für das ganze System, in drei Reitern.",
+      "action_general": "Allgemein: jede Systemeinstellung, durchsuchbar, und das Hugging-Face-Token",
+      "action_modules": "Module: optionale Module ein- oder ausschalten, mit ihren Einstellungen",
+      "action_appearance": "Darstellung: die Akzentfarbe"
     },
-    "local_model": {
-      "title": "Lokales Modell ausführen",
-      "description": "Stellen Sie ein LLM lokal per Docker auf diesem Server bereit.",
-      "step1_title": "Anbieter hinzufügen",
-      "step1_content": "Klicken Sie auf <strong>Anbieter hinzufügen</strong>, um den Registrierungsassistenten zu öffnen.",
-      "step2_title": "Anbieter-Assistent",
-      "step2_content": "Der Assistent führt Sie durch die Konfiguration. Diesmal richten wir ein lokal ausgeführtes Modell ein.",
-      "step3_title": "Anbieter benennen",
-      "step3_content": "Geben Sie einen Namen ein, z.B. <em>Lokales Llama</em> oder <em>Mistral Lokal</em>.",
-      "step4_title": "Ziel auswählen",
-      "step4_content": "Wählen Sie <strong>Docker — diesen Server</strong>, um das Modell lokal als Container auszuführen.",
-      "step5_title": "Erstellen & Bereitstellen",
-      "step5_content": "Klicken Sie auf <strong>Erstellen</strong>. Fadenstack wird das Modellimage herunterladen und den Container automatisch starten."
+    "profile": {
+      "title": "Mein Profil",
+      "description": "Ihr Konto, Ihr Passwort und Ihre API-Tokens.",
+      "action_password": "Ihr Passwort ändern",
+      "action_tokens": "API-Tokens für Skripte und Anwendungen erstellen; jedes wird nur einmal angezeigt",
+      "action_revoke": "Ein Token widerrufen; Anwendungen, die es nutzen, hören innerhalb einer Minute auf"
     }
   }
 }

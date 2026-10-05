@@ -537,7 +537,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/security-map"))
     return t("nav.data_residency");
   if (pathname.startsWith("/admin/observability"))
-    return "Cost Observability";
+    return t("nav.cost_dashboard");
   if (pathname.startsWith("/admin/profile")) return t("profile.title");
   if (pathname.startsWith("/admin/containers/new"))
     return t("create_container.title");

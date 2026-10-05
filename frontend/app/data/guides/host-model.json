@@ -1,0 +1,57 @@
+{
+  "id": "host_model",
+  "kind": "howto",
+  "version": 1,
+  "icon": "Storefront",
+  "route": "/admin/marketplace",
+  "requires": {
+    "superuser": true
+  },
+  "steps": [
+    {
+      "id": "fit",
+      "target": "[data-tour-id='marketplace.fit']",
+      "placement": "bottom"
+    },
+    {
+      "id": "tabs",
+      "target": "[data-tour-id='marketplace.tabs']",
+      "placement": "bottom"
+    },
+    {
+      "id": "card",
+      "target": "[data-tour-id='marketplace.card'][data-hostable='true']",
+      "placement": "right",
+      "waitMs": 8000
+    },
+    {
+      "id": "host",
+      "target": "[data-tour-id='marketplace.host']:not(.Mui-disabled)",
+      "placement": "top",
+      "action": true
+    },
+    {
+      "id": "where",
+      "target": "[data-tour-id='hosting.where']",
+      "placement": "auto",
+      "dialog": true,
+      "action": true,
+      "waitMs": 8000
+    },
+    {
+      "id": "settings",
+      "target": "[data-tour-id='hosting.settings']",
+      "placement": "auto",
+      "dialog": true,
+      "action": true,
+      "waitMs": 15000
+    },
+    {
+      "id": "review",
+      "target": "[data-tour-id='hosting.review']",
+      "placement": "auto",
+      "dialog": true,
+      "waitMs": 15000
+    }
+  ]
+}

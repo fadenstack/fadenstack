@@ -17,6 +17,7 @@ import { chatApi } from "~/api/chatClient";
 import { useChatSkills } from "../hooks/useChatSkills";
 import AgentAvatar from "~/components/AgentAvatar";
 import ChatInput from "./ChatInput";
+import ChatTips from "./ChatTips";
 import ChatTopbar from "./ChatTopbar";
 
 interface Props {
@@ -186,6 +187,8 @@ export default function ChatWelcome({
             />
           ))}
         </Box>
+
+        <ChatTips skills={skills.enabled} />
       </Box>
 
       {/* Bottom-anchored input */}

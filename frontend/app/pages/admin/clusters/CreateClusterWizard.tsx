@@ -306,12 +306,13 @@ export function CreateClusterWizard({
               fullWidth
               placeholder="dgx-pair"
               onChange={(e) => setName(e.target.value)}
+              data-tour-id="clusters.wizard.name"
             />
           </Stack>
         )}
 
         {step === 1 && (
-          <Stack spacing={1}>
+          <Stack spacing={1} data-tour-id="clusters.wizard.machines">
             <Typography variant="body2" color="text.secondary">
               {t("clusters.create.pick_intro")}
             </Typography>
@@ -431,11 +432,13 @@ export function CreateClusterWizard({
                 <CircularProgress />
               </Box>
             ) : (
-              <NetworkPicker
-                plan={plan}
-                selectedId={candidateId}
-                onSelect={setCandidateId}
-              />
+              <Box data-tour-id="clusters.wizard.network">
+                <NetworkPicker
+                  plan={plan}
+                  selectedId={candidateId}
+                  onSelect={setCandidateId}
+                />
+              </Box>
             )}
           </Stack>
         )}
@@ -469,6 +472,7 @@ export function CreateClusterWizard({
             disabled={busy || !plan || blocked || !candidateId}
             onClick={() => void applyAndStart()}
             data-testid="create-cluster"
+            data-tour-id="clusters.wizard.start"
           >
             {t("clusters.create.submit")}
           </Button>

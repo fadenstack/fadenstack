@@ -1,5 +1,6 @@
 /**
- * User preferences API client — profile selection and tour progress.
+ * User preferences API client — the dashboard's default profile, guide progress
+ * and the getting-started list.
  *
  * Endpoints:
  *   GET   /api/admin/users/me/preferences
@@ -46,7 +47,11 @@ export interface TourProgress {
 
 export interface UserPreferences {
   profile?: "private" | "team" | "enterprise" | null;
-  tour_progress?: Record<string, TourProgress> | null;
+  /** A null value removes the entry (the server deletes keys set to null). */
+  tour_progress?: Record<string, TourProgress | null> | null;
+  getting_started?: { dismissed?: boolean; chat_opened?: boolean } | null;
+  /** The chat's first-run tips. */
+  chat_tips?: { dismissed?: boolean } | null;
 }
 
 export interface UserPreferencesResponse {
@@ -61,7 +66,7 @@ export const preferences = {
     return request<UserPreferencesResponse>("/me/preferences");
   },
 
-  /** Merge-update the current user's preferences. */
+  /** Merge-update the current user's preferences; a null value removes the key. */
   update(patch: Partial<UserPreferences>) {
     return request<UserPreferencesResponse>("/me/preferences", {
       method: "PATCH",

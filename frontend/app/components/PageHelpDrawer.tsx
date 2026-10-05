@@ -20,7 +20,10 @@ import Typography from "@mui/material/Typography";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardIcon from "@mui/icons-material/Keyboard";
+import SchoolIcon from "@mui/icons-material/School";
 
+import { useGuides } from "~/lib/guidesContext";
+import { guideTitleKey } from "~/lib/guides";
 import { resolvePageHelp } from "~/lib/pageHelp";
 
 export interface PageHelpDrawerProps {
@@ -31,6 +34,7 @@ export interface PageHelpDrawerProps {
 export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
   const { t } = useTranslation();
   const location = useLocation();
+  const { startGuide } = useGuides();
 
   const entry = resolvePageHelp(location.pathname);
 
@@ -59,10 +63,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
           <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>
             {entry
               ? t(entry.titleKey, { ns: "tour" })
-              : t("page_help.unknown.title", {
-                  ns: "tour",
-                  defaultValue: "About This Page",
-                })}
+              : t("page_help.unknown.title", { ns: "tour" })}
           </Typography>
         </Box>
 
@@ -70,11 +71,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {entry
             ? t(entry.descriptionKey, { ns: "tour" })
-            : t("page_help.unknown.description", {
-                ns: "tour",
-                defaultValue:
-                  "No specific help is available for this page yet.",
-              })}
+            : t("page_help.unknown.description", { ns: "tour" })}
         </Typography>
 
         {/* Actions */}
@@ -86,10 +83,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
               color="text.secondary"
               sx={{ mb: 0.5 }}
             >
-              {t("page_help.actions_heading", {
-                ns: "tour",
-                defaultValue: "What you can do here",
-              })}
+              {t("page_help.actions_heading", { ns: "tour" })}
             </Typography>
             <List dense disablePadding>
               {entry.actionKeys.map((key) => (
@@ -105,6 +99,25 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
               ))}
             </List>
           </>
+        )}
+
+        {entry?.guide && (
+          <Box sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<SchoolIcon />}
+              onClick={() => {
+                onClose();
+                startGuide(entry.guide!);
+              }}
+              data-page-help-guide={entry.guide}
+            >
+              {t("page_help.show_me", { ns: "tour" })}
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              {t(guideTitleKey(entry.guide), { ns: "tour" })}
+            </Typography>
+          </Box>
         )}
 
         {/* Spacer */}
@@ -126,10 +139,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
             variant="outlined"
           />
           <Button variant="text" onClick={onClose}>
-            {t("page_help.close", {
-              ns: "tour",
-              defaultValue: "Got it",
-            })}
+            {t("page_help.close", { ns: "tour" })}
           </Button>
         </Box>
       </Box>

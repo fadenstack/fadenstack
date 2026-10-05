@@ -1,0 +1,37 @@
+{
+  "id": "add_machine",
+  "kind": "howto",
+  "version": 2,
+  "icon": "Dns",
+  "route": "/admin/nodes",
+  "requires": {
+    "superuser": true
+  },
+  "steps": [
+    {
+      "id": "open",
+      "target": "[data-tour-id='nodes.add']",
+      "placement": "bottom",
+      "action": true
+    },
+    {
+      "id": "command",
+      "target": "[data-tour-id='nodes.onboard.command']",
+      "placement": "left",
+      "dialog": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "approve",
+      "target": "[data-tour-id='nodes.onboard.waiting']",
+      "placement": "left",
+      "dialog": true
+    },
+    {
+      "id": "unattended",
+      "target": "[data-tour-id='nodes.onboard.skip']",
+      "placement": "left",
+      "dialog": true
+    }
+  ]
+}

@@ -289,7 +289,13 @@ export default function UsersPage() {
         emptyMessage={t("users.empty")}
         searchPlaceholder={t("users.search_placeholder")}
         toolbarActions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate} size="small">
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openCreate}
+            size="small"
+            data-tour-id="users.create"
+          >
             {t("users.create")}
           </Button>
         }
@@ -372,25 +378,27 @@ export default function UsersPage() {
         onClose={() => setCreateOpen(false)}
       >
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label={t("auth.email")}
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              fullWidth
-              required
-              disabled={creating}
-            />
-            <TextField
-              label={t("auth.password")}
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              fullWidth
-              required
-              disabled={creating}
-              inputProps={{ minLength: 6 }}
-            />
+            <Stack spacing={2} data-tour-id="users.new.account">
+              <TextField
+                label={t("auth.email")}
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                fullWidth
+                required
+                disabled={creating}
+              />
+              <TextField
+                label={t("auth.password")}
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                fullWidth
+                required
+                disabled={creating}
+                inputProps={{ minLength: 6 }}
+              />
+            </Stack>
             <FormControlLabel
               control={
                 <Switch
@@ -401,23 +409,25 @@ export default function UsersPage() {
               }
               label={t("users.superuser")}
             />
-            <Typography variant="subtitle2">{t("users.assign_roles")}</Typography>
-            <FormGroup>
-              {roles.map((role) => (
-                <FormControlLabel
-                  key={role.id}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={newRoleIds.includes(role.id)}
-                      onChange={() => toggleNewRole(role.id)}
-                      disabled={creating}
-                    />
-                  }
-                  label={role.name}
-                />
-              ))}
-            </FormGroup>
+            <Stack spacing={1} data-tour-id="users.new.roles">
+              <Typography variant="subtitle2">{t("users.assign_roles")}</Typography>
+              <FormGroup>
+                {roles.map((role) => (
+                  <FormControlLabel
+                    key={role.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={newRoleIds.includes(role.id)}
+                        onChange={() => toggleNewRole(role.id)}
+                        disabled={creating}
+                      />
+                    }
+                    label={role.name}
+                  />
+                ))}
+              </FormGroup>
+            </Stack>
           </Stack>
       </FormDialog>
 

@@ -1,0 +1,58 @@
+{
+  "id": "console_tour",
+  "kind": "tour",
+  "version": 2,
+  "icon": "Explore",
+  "route": "/admin/dashboard",
+  "steps": [
+    {
+      "id": "dashboard",
+      "target": "[data-tour-id='sidebar.dashboard']",
+      "placement": "right",
+      "route": "/admin/dashboard"
+    },
+    {
+      "id": "infrastructure",
+      "target": "[data-tour-id='sidebar.inference']",
+      "placement": "right"
+    },
+    {
+      "id": "llm",
+      "target": "[data-tour-id='sidebar.llm']",
+      "placement": "right"
+    },
+    {
+      "id": "chat",
+      "target": "[data-tour-id='topbar.chat']",
+      "placement": "bottom"
+    },
+    {
+      "id": "agents",
+      "target": "[data-tour-id='sidebar.agents']",
+      "placement": "right"
+    },
+    {
+      "id": "privacy",
+      "target": "[data-tour-id='sidebar.pii']",
+      "placement": "right",
+      "requires": {
+        "module": "pii"
+      }
+    },
+    {
+      "id": "access",
+      "target": "[data-tour-id='sidebar.access-control']",
+      "placement": "right"
+    },
+    {
+      "id": "extensions",
+      "target": "[data-tour-id='sidebar.extensions']",
+      "placement": "right"
+    },
+    {
+      "id": "help",
+      "target": "[data-tour-id='topbar.help']",
+      "placement": "bottom"
+    }
+  ]
+}

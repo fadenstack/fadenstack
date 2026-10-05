@@ -38,6 +38,7 @@ import {
   toggleHidden,
   type Profile,
 } from "~/lib/dashboardLayoutModel";
+import { GettingStartedCard } from "~/components/guides/GettingStarted";
 import { setDashboardQueryOwner } from "~/lib/dashboardQuery";
 import { useServices } from "~/lib/ServicesContext";
 import { useRagMode } from "~/lib/useRagMode";
@@ -69,7 +70,10 @@ export default function DashboardPage() {
   return <Dashboard userKey={userKey} profile={profile} />;
 }
 
-/** The onboarding profile, which picks the default layout; "team" when unknown. */
+/**
+ * The profile that picks the default layout; "team" when unknown. Only users
+ * who chose one in the former onboarding dialog have another.
+ */
 function useProfile(): Profile | null {
   const [profile, setProfile] = useState<Profile | null>(null);
   useEffect(() => {
@@ -180,6 +184,8 @@ function Dashboard({ userKey, profile }: { userKey: string; profile: Profile }) 
           </>
         }
       />
+
+      {!editMode && <GettingStartedCard />}
 
       {layout === null ? (
         <GridSkeleton />

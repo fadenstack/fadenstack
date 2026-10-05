@@ -87,5 +87,12 @@
   "approval_approve": "Approve",
   "turn_interrupted": "The server restarted while this reply was being written.",
   "turn_stopped": "Stopped",
-  "jump_to_latest": "Jump to the latest message"
+  "jump_to_latest": "Jump to the latest message",
+  "tips": {
+    "title": "Tips",
+    "dismiss": "Got it",
+    "files": "Attach files with the paperclip: the model reads them along with your question.",
+    "skills": "Type <kbd>$</kbd> to use a skill, saved instructions for tasks you repeat. <kbd>/skill</kbd> saves what you just did as a new one.",
+    "projects": "Group chats into projects from the sidebar. A project's instructions apply to all its chats."
+  }
 }

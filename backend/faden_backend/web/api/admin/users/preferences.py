@@ -35,9 +35,16 @@ async def _get_or_create(session: AsyncSession, user_id) -> UserPreference:
 
 
 def _deep_merge(base: dict, patch: dict) -> dict:
-    """Recursively merge *patch* into *base*, returning a new dict."""
+    """Recursively merge *patch* into *base*, returning a new dict.
+
+    A ``None`` in *patch* removes the key: an empty dict would merge into the
+    stored one and leave it as it was, so "Reset guides" never reset anything.
+    """
     merged = copy.deepcopy(base)
     for key, value in patch.items():
+        if value is None:
+            merged.pop(key, None)
+            continue
         if (
             key in merged
             and isinstance(merged[key], dict)

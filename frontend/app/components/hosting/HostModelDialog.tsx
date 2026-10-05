@@ -361,67 +361,70 @@ export function HostModelDialog({
           )}
 
           {step === "where" && (
-            <WhereStep
-              clusters={clusters}
-              cluster={cluster}
-              onCluster={setCluster}
-              lockCluster={lockCluster}
-              detail={detail}
-              detailState={detailState}
-              detailError={detailError}
-              hasRepo={Boolean(repo)}
-              gpus={gpus}
-              choices={choices}
-              onGpus={changeSize}
-              copies={copies}
-              maxCopies={maxCopies}
-              onCopies={setCopies}
-              fit={fit}
-              chosen={chosen}
-            />
-          )}
-
-          {step === "settings" && detail?.recipe && (
-            <RecipeNotice
-              recipe={detail.recipe}
-              value={config}
-              onChange={(v) => {
-                setEdited(true);
-                setConfig(v);
-              }}
-            />
+            <Box data-tour-id="hosting.where">
+              <WhereStep
+                clusters={clusters}
+                cluster={cluster}
+                onCluster={setCluster}
+                lockCluster={lockCluster}
+                detail={detail}
+                detailState={detailState}
+                detailError={detailError}
+                hasRepo={Boolean(repo)}
+                gpus={gpus}
+                choices={choices}
+                onGpus={changeSize}
+                copies={copies}
+                maxCopies={maxCopies}
+                onCopies={setCopies}
+                fit={fit}
+                chosen={chosen}
+              />
+            </Box>
           )}
 
           {step === "settings" && (
-            <EngineSettingsEditor
-              value={config}
-              extra={extra}
-              target="cluster"
-              onChange={(v, e) => {
-                setEdited(true);
-                setConfig(v);
-                setExtra(e);
-              }}
-              model={{
-                repoId: repo ?? kept?.display_name ?? null,
-                maxContext: model?.max_context ?? null,
-                capabilities: model?.capabilities ?? [],
-                weightsBytes: model?.weights_bytes ?? null,
-                kvBytesPerToken: model?.kv_bytes_per_token ?? null,
-                needsRemoteCode: model?.needs_remote_code ?? false,
-                architecture: model?.architecture ?? null,
-              }}
-              hardware={{
-                gpuBytes: chosen?.gpu_bytes ?? null,
-                tensorParallel: gpus >= 1 ? gpus : 1,
-                maxContextThatFits: fit?.max_context ?? null,
-              }}
-              suggested={detail?.suggested}
-            />
+            <Stack spacing={2} data-tour-id="hosting.settings">
+              {detail?.recipe && (
+                <RecipeNotice
+                  recipe={detail.recipe}
+                  value={config}
+                  onChange={(v) => {
+                    setEdited(true);
+                    setConfig(v);
+                  }}
+                />
+              )}
+              <EngineSettingsEditor
+                value={config}
+                extra={extra}
+                target="cluster"
+                onChange={(v, e) => {
+                  setEdited(true);
+                  setConfig(v);
+                  setExtra(e);
+                }}
+                model={{
+                  repoId: repo ?? kept?.display_name ?? null,
+                  maxContext: model?.max_context ?? null,
+                  capabilities: model?.capabilities ?? [],
+                  weightsBytes: model?.weights_bytes ?? null,
+                  kvBytesPerToken: model?.kv_bytes_per_token ?? null,
+                  needsRemoteCode: model?.needs_remote_code ?? false,
+                  architecture: model?.architecture ?? null,
+                }}
+                hardware={{
+                  gpuBytes: chosen?.gpu_bytes ?? null,
+                  tensorParallel: gpus >= 1 ? gpus : 1,
+                  maxContextThatFits: fit?.max_context ?? null,
+                }}
+                suggested={detail?.suggested}
+              />
+            </Stack>
           )}
 
           {step === "review" && (
-            <Stack spacing={2}>
+            <Stack spacing={2} data-tour-id="hosting.review">
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   label={t("hosting.name_label")}

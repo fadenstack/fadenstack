@@ -1057,7 +1057,7 @@ export function ProviderWizardDialog({
         {/* ── Step 2: Pricing (remote endpoint only) ────────── */}
         {step === 1 && target === "remote_endpoint" && (
           <>
-            <Typography variant="h6">
+            <Typography variant="h6" data-tour-id="providers.wizard.pricing">
               {t("observability.wizard_pricing_heading")}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -1437,6 +1437,7 @@ export function ProviderWizardDialog({
                 !endpointUrl.trim())
             }
             onClick={() => setStep((s) => s + 1)}
+            data-tour-id="providers.wizard.next"
           >
             {t("common.next")}
           </Button>

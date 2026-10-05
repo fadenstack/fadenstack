@@ -248,6 +248,7 @@ export default function MarketplacePage() {
               onChange={(e) => chooseCluster(e.target.value)}
               sx={{ minWidth: 260 }}
               slotProps={{ htmlInput: { "data-testid": "market-cluster" } }}
+              data-tour-id="marketplace.fit"
             >
               {clusters.data.map((c) => (
                 <MenuItem key={c.environment_id} value={c.environment_id}>
@@ -305,6 +306,7 @@ export default function MarketplacePage() {
         variant="scrollable"
         allowScrollButtonsMobile
         sx={{ borderBottom: 1, borderColor: "divider" }}
+        data-tour-id="marketplace.tabs"
       >
         {TABS.map((id) => (
           <Tab key={id} value={id} label={t(`marketplace.tab.${id}`)} data-testid={`market-tab-${id}`} />

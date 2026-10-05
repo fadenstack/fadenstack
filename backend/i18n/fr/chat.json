@@ -87,5 +87,12 @@
   "approval_approve": "Approuver",
   "turn_interrupted": "Le serveur a redémarré pendant la rédaction de cette réponse.",
   "turn_stopped": "Arrêtée",
-  "jump_to_latest": "Aller au dernier message"
+  "jump_to_latest": "Aller au dernier message",
+  "tips": {
+    "title": "Astuces",
+    "dismiss": "Compris",
+    "files": "Joignez des fichiers avec le trombone : le modèle les lit en même temps que votre question.",
+    "skills": "Tapez <kbd>$</kbd> pour utiliser une compétence, des instructions enregistrées pour les tâches que vous répétez. <kbd>/skill</kbd> enregistre ce que vous venez de faire comme nouvelle compétence.",
+    "projects": "Regroupez vos conversations en projets depuis la barre latérale. Les instructions d'un projet s'appliquent à toutes ses conversations."
+  }
 }

@@ -1444,43 +1444,7 @@
     "not_found": "La page demandée est introuvable."
   },
   "help": {
-    "title": "Visite guidée du produit",
-    "next": "Suivant",
-    "back": "Retour",
-    "slides": {
-      "welcome": {
-        "title": "Bienvenue sur Fadenstack",
-        "description": "Votre plateforme IA auto-hébergée. Gérez les modèles, discutez avec des LLM, créez des bases de connaissances et exploitez l'ensemble de votre infrastructure IA depuis un plan de contrôle unique."
-      },
-      "chat": {
-        "title": "Console de chat IA",
-        "description": "Créez des projets et des sessions pour discuter avec n'importe quel modèle enregistré. Joignez des fichiers, définissez des mémoires et changez de fournisseur sans modifier votre flux de travail."
-      },
-      "llm_server": {
-        "title": "Gestion des modèles et fournisseurs",
-        "description": "Enregistrez des runtimes locaux (vLLM, Ollama, llama.cpp) et des fournisseurs distants (OpenAI, Azure). Démarrez, arrêtez et surveillez les charges GPU à travers votre flotte depuis un seul tableau de bord."
-      },
-      "endpoint": {
-        "title": "Passerelle API unifiée",
-        "description": "Exposez un point d'accès unique compatible OpenAI /v1. Les requêtes sont routées vers le bon fournisseur avec limitation de débit, masquage PII et suivi des tokens intégrés."
-      },
-      "rag": {
-        "title": "Bases de connaissances et RAG",
-        "description": "Téléchargez des documents, choisissez une stratégie de découpage et d'embedding, et recherchez par vecteur, mot-clé ou requête hybride. Ancrez les réponses de votre LLM dans le savoir organisationnel."
-      },
-      "mcp": {
-        "title": "Registre d'outils MCP",
-        "description": "Enregistrez n'importe quel serveur d'outils compatible MCP — sidecars locaux ou endpoints distants. Fadenstack découvre les outils automatiquement, applique les politiques PII avant chaque appel et les expose dans un catalogue unique et gouverné."
-      },
-      "skills": {
-        "title": "Registre de compétences",
-        "description": "Définissez des playbooks de tâches réutilisables qui façonnent le raisonnement et les actions de l'IA. Les compétences combinent étapes de workflow, préférences d'outils et sources de connaissances en une couche d'instructions déterministe."
-      },
-      "observability": {
-        "title": "Observabilité et sécurité",
-        "description": "Tracez chaque requête LLM de bout en bout, surveillez l'utilisation et le coût des tokens, consultez les journaux d'audit et appliquez un contrôle d'accès basé sur les rôles dans l'ensemble de votre déploiement."
-      }
-    }
+    "title": "Aide"
   },
   "modules": {
     "disabled_message": "Le module {{module}} n'est pas activé dans ce déploiement.",
@@ -2313,15 +2277,6 @@
     "route_explain": "Les requêtes pour ce nom vont au conteneur tel qu'il tourne maintenant. Rien ne change sur la machine, et vous pouvez arrêter le routage à tout moment.",
     "name": "Nom utilisé par les clients",
     "confirm_release": "Arrêter le routage de {{alias}} ? Le conteneur continue de tourner."
-  },
-  "module_recommend": {
-    "apply": "Appliquer",
-    "subtitle": "Ces modules conviennent à votre profil. En activer un peut démarrer d'autres conteneurs.",
-    "title": "Modules recommandés"
-  },
-  "profile_select": {
-    "subtitle": "Cela détermine les étapes de configuration proposées. Vous pourrez le changer plus tard, et toutes les fonctions restent disponibles quel que soit votre choix.",
-    "title": "Choisissez votre profil de configuration"
   },
   "tools": {
     "executionMode": "Exécution",

@@ -87,5 +87,12 @@
   "approval_approve": "Aprobar",
   "turn_interrupted": "El servidor se reinició mientras se escribía esta respuesta.",
   "turn_stopped": "Detenida",
-  "jump_to_latest": "Ir al último mensaje"
+  "jump_to_latest": "Ir al último mensaje",
+  "tips": {
+    "title": "Consejos",
+    "dismiss": "Entendido",
+    "files": "Adjunte archivos con el clip: el modelo los lee junto con su pregunta.",
+    "skills": "Escriba <kbd>$</kbd> para usar una habilidad, instrucciones guardadas para tareas que repite. <kbd>/skill</kbd> guarda lo que acaba de hacer como una nueva.",
+    "projects": "Agrupe los chats en proyectos desde la barra lateral. Las instrucciones de un proyecto se aplican a todos sus chats."
+  }
 }

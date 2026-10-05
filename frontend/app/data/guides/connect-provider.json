@@ -1,0 +1,65 @@
+{
+  "id": "connect_provider",
+  "kind": "howto",
+  "version": 3,
+  "icon": "Cloud",
+  "route": "/admin/llm/providers",
+  "requires": {
+    "superuser": true
+  },
+  "steps": [
+    {
+      "id": "open",
+      "target": "[data-tour-id='providers.add']",
+      "placement": "bottom",
+      "action": true
+    },
+    {
+      "id": "name",
+      "target": "[data-tour-id='providers.wizard.name']",
+      "placement": "bottom",
+      "dialog": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "target",
+      "target": "[data-tour-id='providers.wizard.target']",
+      "placement": "bottom",
+      "dialog": true,
+      "action": true
+    },
+    {
+      "id": "kind",
+      "target": "[data-tour-id='providers.wizard.litellm']",
+      "placement": "bottom",
+      "dialog": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "key",
+      "target": "[data-tour-id='providers.wizard.apikey']",
+      "placement": "bottom",
+      "dialog": true
+    },
+    {
+      "id": "test",
+      "target": "[data-tour-id='providers.wizard.test']",
+      "placement": "top",
+      "dialog": true,
+      "action": true
+    },
+    {
+      "id": "pricing",
+      "target": "[data-tour-id='providers.wizard.pricing']",
+      "placement": "bottom",
+      "dialog": true,
+      "waitMs": 5000
+    },
+    {
+      "id": "create",
+      "target": "[data-tour-id='providers.wizard.create']",
+      "placement": "top",
+      "dialog": true
+    }
+  ]
+}
