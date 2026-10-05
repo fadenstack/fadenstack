@@ -114,6 +114,33 @@ def test_draining_and_dead_machines_take_nothing_and_small_parts_are_only_counte
     assert plan["other_parts"] == 1 and len(plan["copies"]) == 1
 
 
+def test_a_copy_needs_the_memory_its_engine_asks_for_not_only_the_gpu_share() -> None:
+    # The DGX pair, 5 October: the 27B's copy (0.7 GPU, 70 % of the GB10's
+    # memory) fitted the share left on the head (0.8 GPU) but vLLM refused to
+    # start it there: 69 of the 85 GiB it asks for were free.
+    total = 130_663_055_360.0
+    placement = {"nodes": [_node(HEAD, 0.8), _node(WORKER, 0.3)], "replicas": [_copy("faden-27b", [(WORKER, 0.7)])]}
+    deployments = {"faden-27b": {"name": "qwen3-8-27b-fp8", "memory_fraction": 0.7}}
+    short = plan_drain(placement, WORKER, deployments=deployments,
+                       memory={HEAD: {"free": 74_380_000_000.0, "total": total}})
+    (copy,) = short["copies"]
+    assert copy["moves"] is False
+    assert copy["reason"] == "It needs about 91 GB of GPU memory; the most another machine has free is 74 GB."
+    room = plan_drain(placement, WORKER, deployments=deployments,
+                      memory={HEAD: {"free": 100_000_000_000.0, "total": total}})
+    assert room["copies"][0]["moves"] is True
+
+
+def test_the_memory_share_follows_the_compiler() -> None:
+    from faden_backend.services.inference.membership import memory_fraction
+
+    assert memory_fraction({"resources": {"replica": {"gpus": 0.7}}, "engine": {"config": {"gpu_memory_utilization": 0.7}}}) == 0.7
+    assert memory_fraction({"resources": {"replica": {"gpus": 0.2}}}) == 0.2, "a shared GPU: its share"
+    assert memory_fraction({"resources": {"replica": {"gpus": 0.5}}, "engine": {"config": {"gpu_memory_utilization": 0.9}}}) == 0.5
+    assert memory_fraction({"resources": {"replica": {"gpus": 1}}}) == 0.8, "a whole GPU: the compiler's default"
+    assert memory_fraction({"resources": {"replica": {"gpus": 1}}, "engine": {"config": {"gpu_memory_utilization": 0.6}}}) == 0.6
+
+
 def test_copies_on_lists_the_gpu_copies_still_holding_the_machine() -> None:
     placement = {"replicas": [_copy("faden-a", [(HEAD, 0.5)]), _copy("faden-b", [(HEAD, 1.0), (WORKER, 1.0)]),
                               _copy("faden-c", [(WORKER, 0.0)])]}

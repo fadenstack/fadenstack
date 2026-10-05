@@ -11,7 +11,9 @@ leaves the cluster. The work is split between Ray and Fadenstack:
 - Fadenstack: say beforehand which copies can move and which cannot
   (:func:`plan_drain`: a copy needs room for all of its GPU bundles on the
   other machines, and a copy spread over two machines needs room for both
-  halves), ask before anything would stop, stop the copies that cannot move
+  halves -- in Ray's GPU shares and in the memory vLLM asks for, which on a
+  GB10's unified memory is what the share does not cover), ask before
+  anything would stop, stop the copies that cannot move
   when the operator agreed, and follow the drain until the machine is empty
   -- then, for a removal, take it out of Ray and out of the cluster.
 
@@ -63,6 +65,8 @@ _SCHEDULABLE = frozenset({"RUNNING", "IDLE"})
 #: After this long a copy that should have moved is reported as stuck.
 _STUCK_AFTER = timedelta(minutes=30)
 _EPS = 1e-6
+#: The resource name memory goes by in a plan's fit (bytes).
+_VRAM = "_vram_bytes"
 
 
 class MembershipError(Exception):
@@ -162,27 +166,65 @@ def _gpus(text: float) -> str:
     return f"{text:g}"
 
 
+def _gb(value: float) -> str:
+    return f"{value / 1e9:.0f} GB"
+
+
+def memory_fraction(spec: dict[str, Any] | None) -> float:
+    """The share of a GPU's memory each of a copy's engines asks for, as the compiler sets it.
+
+    A copy sharing a GPU uses at most its share; a whole one what the spec
+    asks, or the compiler's default (``compiler._engine_kwargs``).
+    """
+    from faden_backend.services.inference.drivers.ray.compiler import (  # noqa: PLC0415
+        DEFAULT_GPU_MEMORY_UTILIZATION,
+    )
+
+    spec = spec or {}
+    try:
+        gpus = float(((spec.get("resources") or {}).get("replica") or {}).get("gpus") or 1)
+    except (TypeError, ValueError):
+        gpus = 1.0
+    asked = ((spec.get("engine") or {}).get("config") or {}).get("gpu_memory_utilization")
+    asked = float(asked) if isinstance(asked, (int, float)) and not isinstance(asked, bool) and asked > 0 else None
+    if 0 < gpus < 1:
+        return min(asked, round(gpus, 2)) if asked else round(gpus, 2)
+    return asked or DEFAULT_GPU_MEMORY_UTILIZATION
+
+
 def plan_drain(
     placement: dict[str, Any],
     target: str,
     *,
     deployments: dict[str, dict[str, Any]] | None = None,
     names: dict[str, str] | None = None,
+    memory: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
     """Which copies on Ray node *target* can move to the other machines, from DESCRIBE_RAY_PLACEMENT.
 
     *deployments* -- by Serve app name -- gives each copy its deployment's id
-    and name, and optionally ``ready_nodes``: the Ray nodes holding its
-    model's files (a copy moved anywhere else could not load). *names* gives
-    Ray node ids readable names.
+    and name, optionally ``ready_nodes`` (the Ray nodes holding its model's
+    files: a copy moved anywhere else could not load) and ``memory_fraction``
+    (what each of its engines asks of a GPU's memory). *memory* -- by Ray node
+    id -- gives each machine's ``free`` and ``total`` GPU memory in bytes, as
+    its agent last reported: Ray's GPU share does not account for it, and on
+    the DGX pair a copy that fitted the share failed to start for memory
+    ("Free memory on device ... less than desired"). *names* gives Ray node
+    ids readable names.
     """
     deployments = deployments or {}
     names = names or {}
+    memory = memory or {}
     free = {
         str(n.get("node_id")): {k: float(v) for k, v in (n.get("available") or {}).items()}
         for n in placement.get("nodes") or []
         if n.get("node_id") and n.get("node_id") != target and n.get("status") in _SCHEDULABLE
     }
+    for node_id, available in free.items():
+        if (memory.get(node_id) or {}).get("free") is not None:
+            available[_VRAM] = float(memory[node_id]["free"])
+    totals = [float(m["total"]) for m in memory.values() if m.get("total")]
+    device_total = max(totals) if totals else None
     affected = []
     others = 0
     for replica in placement.get("replicas") or []:
@@ -206,7 +248,19 @@ def plan_drain(
         app = str(replica.get("app") or "")
         info = deployments.get(app) or {}
         ready = info.get("ready_nodes")
+        fraction = info.get("memory_fraction")
+        wanted = None
+        if fraction and device_total and any(_VRAM in a for a in free.values()):
+            # Each engine (one per GPU bundle) asks for this much of the
+            # device's memory, wherever it starts.
+            wanted = float(fraction) * device_total
+            needs = [{**need, _VRAM: wanted} if need.get("GPU") else need for need in needs]
         pool = free if ready is None else {n: a for n, a in free.items() if n in ready}
+        gpu_only = None
+        if wanted is not None and pool:
+            gpu_only = _fit([{k: v for k, v in n.items() if k != _VRAM} for n in needs],
+                            {n: {k: v for k, v in a.items() if k != _VRAM} for n, a in pool.items()},
+                            replica.get("strategy"))
         placed = _fit(needs, pool, replica.get("strategy")) if pool else None
         if placed is not None and pool is not free:
             for node, available in pool.items():  # what the copy took, taken from everyone's view
@@ -229,6 +283,11 @@ def plan_drain(
                 entry["reason"] = "The cluster has no other machine that can take it."
             elif ready is not None and not pool:
                 entry["reason"] = "No other machine holds this model's files yet."
+            elif gpu_only is not None:
+                most = max((a.get(_VRAM, 0.0) for a in pool.values()), default=0.0)
+                entry["reason"] = (
+                    f"It needs about {_gb(wanted)} of GPU memory; the most another machine has free is {_gb(most)}."
+                )
             else:
                 most = max((a.get("GPU", 0.0) for a in (pool or free).values()), default=0.0)
                 entry["reason"] = (
@@ -316,7 +375,12 @@ async def _deployments_by_app(session: AsyncSession, environment: InferenceEnvir
     )
     out: dict[str, dict[str, Any]] = {}
     for row in rows:
-        out[f"{APP_PREFIX}{row.id}"] = {"deployment_id": str(row.id), "name": row.name, "model_id": row.model_id}
+        out[f"{APP_PREFIX}{row.id}"] = {
+            "deployment_id": str(row.id),
+            "name": row.name,
+            "model_id": row.model_id,
+            "memory_fraction": memory_fraction(row.spec_json if isinstance(row.spec_json, dict) else None),
+        }
     # Which machines hold each model: a copy moved anywhere else could not
     # load (the runtime is offline). Only for models with availability
     # records -- one loading from the machines' own cache has none.
@@ -351,6 +415,23 @@ async def _ray_names(session: AsyncSession, environment: InferenceEnvironment, p
             names[ray_id] = _name(machine)
             ray_of[machine.id] = ray_id
     return names, ray_of
+
+
+async def _gpu_memory(session: AsyncSession, ray_of: dict[Any, str]) -> dict[str, dict[str, float]]:
+    """Free and total GPU memory per Ray node, from each machine's last utilization report."""
+    if not ray_of:
+        return {}
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+
+    snapshots = await NodeControlDAO(session).latest_inventory_snapshots(node_ids=list(ray_of))
+    out: dict[str, dict[str, float]] = {}
+    for machine_id, ray_id in ray_of.items():
+        snap = snapshots.get(machine_id)
+        gpu = ((getattr(snap, "utilization_json", None) or {}).get("gpu") or {}) if snap is not None else {}
+        free, total = gpu.get("free_vram_bytes"), gpu.get("total_vram_bytes")
+        if isinstance(free, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            out[ray_id] = {"free": float(free), "total": float(total)}
+    return out
 
 
 def _client(gateway: Any) -> Any:
@@ -430,7 +511,8 @@ async def drain_plan(session: AsyncSession, gateway: Any, node_id: uuid.UUID) ->
         uuids = info.pop("ready_node_uuids", None)
         if uuids is not None:
             info["ready_nodes"] = {ray_of[n] for n in uuids if n in ray_of}
-    base.update(plan_drain(placement, target, deployments=deployments, names=names))
+    memory = await _gpu_memory(session, ray_of)
+    base.update(plan_drain(placement, target, deployments=deployments, names=names, memory=memory))
     base["ray_node_id"] = target
     if not placement.get("drain_patch_active") and placement.get("serve_running"):
         base["note"] = "Serve on this cluster restarts its controller once to follow drains; the models keep serving."
