@@ -159,7 +159,7 @@ export function DrainPlanDialog({ open, mode, machine, loadPlan, onConfirm, onCl
               )}
               {running && mode === "drain" && (
                 <Typography variant="caption" color="text.secondary">
-                  {t("clusters.drain.how_to_undo")}
+                  {t("clusters.drain.how_to_undo", { name: plan.machine })}
                 </Typography>
               )}
               {plan.note && (
