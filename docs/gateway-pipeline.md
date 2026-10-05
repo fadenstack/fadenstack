@@ -186,6 +186,10 @@ so for them the tenant's switch decides. An agent set to `false` refuses the
 switch whatever the tenant says. The weaken right also lets an admin turn
 protection off below the tenant's policy; the tenant's switch never does.
 
+![The tenant's switch on the PII policy page, off by default](images/pipeline/pii-mode-tenant-switch.png)
+
+![An agent's Privacy setting in its Definition, following the tenant](images/pipeline/pii-mode-agent-setting.png)
+
 **The weaken right is stored with the override.** The backend checks the
 right and sends it to the gateway in `X-PII-Allow-Weaken` as a grant only it
 can sign: a JWT that lasts 60 seconds, signed with the shared secret, for one
