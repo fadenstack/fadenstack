@@ -23,7 +23,6 @@ import MenuItem from "@mui/material/MenuItem";
 import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ExploreIcon from "@mui/icons-material/Explore";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -35,6 +34,7 @@ import TranslateIcon from "@mui/icons-material/Translate";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SchoolIcon from "@mui/icons-material/School";
 
+import AgentAvatar from "~/components/AgentAvatar";
 import { NavLogoButton } from "~/components/NavLogoButton";
 import { UserMenuButton } from "~/components/UserMenuButton";
 
@@ -117,7 +117,7 @@ export function AdminTopbar({
             }}
             sx={{ color: "text.primary" }}
           >
-            <AutoAwesomeIcon />
+            <AgentAvatar size={24} variant="mono" />
           </IconButton>
         </Tooltip>
         <Tooltip title={t("help.title", { defaultValue: "Help" })} arrow>

@@ -9,13 +9,13 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Chip from "@mui/material/Chip";
 import { useTheme } from "@mui/material/styles";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useTranslation } from "react-i18next";
 
 import type { ChatSession } from "~/api/chatTypes";
 import type { UiLanguage } from "~/api/i18n";
 import { chatApi } from "~/api/chatClient";
 import { useChatSkills } from "../hooks/useChatSkills";
+import AgentAvatar from "~/components/AgentAvatar";
 import ChatInput from "./ChatInput";
 import ChatTopbar from "./ChatTopbar";
 
@@ -134,9 +134,9 @@ export default function ChatWelcome({
           pb: { xs: 4, sm: 10 },
         }}
       >
-        <AutoAwesomeIcon
-          sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 2 }}
-        />
+        <Box sx={{ mb: 2 }}>
+          <AgentAvatar size={64} />
+        </Box>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           {t("welcome_title", {
             ns: "chat",

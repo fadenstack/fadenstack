@@ -10,10 +10,10 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonIcon from "@mui/icons-material/Person";
 import ReplayIcon from "@mui/icons-material/Replay";
+import AgentAvatar from "~/components/AgentAvatar";
 import Markdown, { markdownSx } from "~/components/markdown/Markdown";
 import { useTranslation } from "react-i18next";
 
@@ -85,26 +85,24 @@ export default function MessageBubble({
         px: { xs: 0.5, sm: 1 },
       }}
     >
-      {/* Avatar */}
-      <Avatar
-        sx={{
-          display: { xs: "none", sm: "flex" },
-          width: 32,
-          height: 32,
-          mt: 0.5,
-          bgcolor: isUser
-            ? theme.palette.primary.main
-            : theme.palette.mode === "dark"
-              ? theme.palette.grey[800]
-              : theme.palette.grey[400],
-        }}
-      >
-        {isUser ? (
+      {/* Avatar: a circle for the user, the agent's own face for replies */}
+      {isUser ? (
+        <Avatar
+          sx={{
+            display: { xs: "none", sm: "flex" },
+            width: 32,
+            height: 32,
+            mt: 0.5,
+            bgcolor: theme.palette.primary.main,
+          }}
+        >
           <PersonIcon sx={{ fontSize: 18 }} />
-        ) : (
-          <AutoAwesomeIcon sx={{ fontSize: 18 }} />
-        )}
-      </Avatar>
+        </Avatar>
+      ) : (
+        <Box sx={{ display: { xs: "none", sm: "block" }, mt: 0.5 }}>
+          <AgentAvatar size={32} />
+        </Box>
+      )}
 
       <Box
         sx={{
