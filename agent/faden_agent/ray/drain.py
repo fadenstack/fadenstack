@@ -267,8 +267,13 @@ done()
 
 
 def patch_source() -> str:
-    """The patch module's text, as it is copied into the container."""
-    return Path(serve_drain_patch.__file__).read_text(encoding="utf-8")
+    """The patch module's text, as it is copied into the container.
+
+    Read from beside the module: in the one-file binary the module itself is
+    bytecode, and ``node_agent.spec`` ships the source file next to it.
+    """
+    path = Path(serve_drain_patch.__file__).with_name("serve_drain_patch.py")
+    return path.read_text(encoding="utf-8")
 
 
 def enable_script(*, wait_sec: int = 90, restart: bool = True) -> str:

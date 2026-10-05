@@ -256,6 +256,14 @@ def test_the_import_hook_patches_serves_cache_when_it_is_imported(fake_ray: Path
 # --------------------------------------------------------------------------
 
 
+def test_the_binary_carries_the_patch_source() -> None:
+    # A one-file build holds bytecode only; without the source shipped as
+    # data, enabling the drain failed on the DGX pair with "No such file".
+    spec = (Path(__file__).parents[1] / "node_agent.spec").read_text(encoding="utf-8")
+    assert '"serve_drain_patch.py"), "faden_agent/ray")' in spec
+    assert "_SOURCE_DATAS" in spec.split("datas=")[1].splitlines()[0]
+
+
 def test_every_script_is_python() -> None:
     for script in (drain.enable_script(), drain.enable_script(restart=False), drain.drain_script(),
                    drain.placement_script(), drain.stop_script(["a", "b"])):

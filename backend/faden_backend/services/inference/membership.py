@@ -518,8 +518,10 @@ async def stop_drain(session: AsyncSession, node_id: uuid.UUID) -> dict[str, Any
         environment, _member = found
         entry = ((environment.observed_status_json or {}).get("drains") or {}).get(str(node_id))
         if entry is not None:
-            if entry.get("state") == "starting":
-                _record(environment, node_id, None)  # never drained in Ray: nothing to undo
+            if not entry.get("ray_drained"):
+                # Never drained in Ray (not started yet, or it failed before):
+                # nothing to undo, and rejoining would restart its copies.
+                _record(environment, node_id, None)
             else:
                 _record(environment, node_id, {**entry, "state": "resuming", "remove": False,
                                                "message": "Rejoining the cluster."})
@@ -553,7 +555,8 @@ async def advance(session: AsyncSession, gateway: Any, environment: InferenceEnv
                     head_node_id=environment.head_node_id, key=f"membership:{environment.id}:{node_key}:{tag}:enable",
                 )
                 await client.drain_node(node_id=node_id, key=f"membership:{environment.id}:{node_key}:{tag}:drain")
-                entry.update(state="moving", moving_since=_now().isoformat(),
+                # From here Ray has drained it: only leaving and joining again undoes that.
+                entry.update(state="moving", ray_drained=True, moving_since=_now().isoformat(),
                              message="Moving the copies to the other machines.")
                 state = "moving"
             if state == "moving":

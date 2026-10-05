@@ -311,6 +311,33 @@ async def test_stopping_a_drain_that_never_reached_ray_just_forgets_it(dbsession
 
 
 @pytest.mark.anyio()
+async def test_a_drain_that_failed_before_ray_drained_is_forgotten_not_rejoined(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Live on the DGX pair: the agent could not enable Serve's drain, so Ray
+    # never drained the machine. Rejoining it would have restarted the only
+    # copy of the 27B, which was running on it.
+    from faden_backend.services.inference.drivers.ray.client import RayCommandError
+
+    env, _head, worker = await _cluster(dbsession)
+    fake = _Client(_placement(_copy("faden-a", [(WORKER, 0.5)], name="a1")))
+
+    async def refuse(**_: Any) -> dict[str, Any]:
+        raise RayCommandError(command_type="enable_serve_drain", node_id=None, error_code="runtime_error",
+                              error_message="No such file or directory")
+
+    fake.enable_serve_drain = refuse  # type: ignore[method-assign]
+    monkeypatch.setattr(membership, "_client", lambda gateway: fake)
+    await membership.start_drain(dbsession, None, worker.id)
+    await membership.advance(dbsession, None, env, manager=_Manager(), ctx={})
+    entry = env.observed_status_json["drains"][str(worker.id)]
+    assert entry["state"] == "failed" and "No such file" in entry["message"]
+
+    result = await membership.stop_drain(dbsession, worker.id)
+    assert result["resuming"] is False and "drains" not in env.observed_status_json
+
+
+@pytest.mark.anyio()
 async def test_removing_a_machine_from_a_stopped_cluster_is_just_the_record(dbsession: AsyncSession, client: _Client) -> None:
     env, head, worker = await _cluster(dbsession, status="stopped")
     env.desired_state = "stopped"

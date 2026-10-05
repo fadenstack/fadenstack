@@ -57,11 +57,16 @@ except Exception:  # a platform hf-xet has no wheel for: plain HTTP it is
     _HF_IMPORTS = []
 _HF_IMPORTS += collect_submodules("huggingface_hub")
 
+# The Serve drain patch is copied into the runtime container as source
+# (ray/drain.py reads it beside its module): a one-file binary holds only
+# bytecode, so the file travels as data, where its module expects it.
+_SOURCE_DATAS = [(str(HERE / "faden_agent" / "ray" / "serve_drain_patch.py"), "faden_agent/ray")]
+
 a = Analysis(
     ["faden_agent/__main__.py"],
     pathex=["."],
     binaries=[],
-    datas=_LICENCE_FILES + _HF_DATAS,
+    datas=_LICENCE_FILES + _HF_DATAS + _SOURCE_DATAS,
     hiddenimports=_HF_IMPORTS + [
         # psutil platform backends — PyInstaller misses these on cross-collect
         "psutil._pslinux",
