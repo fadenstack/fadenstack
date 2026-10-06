@@ -1,7 +1,7 @@
 /** Global setup for component tests. */
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { afterEach, vi } from "vitest";
@@ -26,6 +26,12 @@ void i18n.use(initReactI18next).init({
 afterEach(() => {
   cleanup();
 });
+
+// findBy* and waitFor give up after one second by default. With the whole
+// suite running in parallel a render can take longer than that: the muting
+// test of the attention widget failed so under load and passed alone. The
+// test timeout itself (vitest.config.ts) stays the limit for a real hang.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom implements neither of these, and MUI reads both during layout.
 if (!window.matchMedia) {
