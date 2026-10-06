@@ -48,7 +48,7 @@
       },
       "access": {
         "title": "访问控制",
-        "body": "谁可以做什么：<strong>用户</strong>、带有权限的<strong>角色</strong>，以及<strong>组</strong>。启用登录模块后，大家可以使用公司账户登录。"
+        "body": "谁可以做什么：<strong>用户</strong>、带权限的<strong>角色</strong>以及<strong>组</strong>。角色在聊天中和通过 API 生效；控制台仅供超级用户使用。启用登录模块后，用户可使用公司账户登录。"
       },
       "extensions": {
         "title": "扩展",
@@ -184,7 +184,7 @@
       },
       "roles": {
         "title": "可以做什么",
-        "body": "对于只使用聊天的人，角色留空即可：他们会获得标准用户角色。勾选的角色会替代标准角色，因此如果某人还要协助运维系统，请同时勾选 <strong>default_user</strong>。然后点击<strong>创建用户</strong>。"
+        "body": "只聊天的人无需选择角色：他们会获得标准用户角色。勾选的角色会替换它；若此人也要聊天，请同时勾选 <strong>default_user</strong>。角色决定一个人在聊天中和通过 API 能做什么；控制台本身仅供超级用户使用。然后点击<strong>创建用户</strong>。"
       }
     },
     "create_api_token": {
@@ -460,7 +460,9 @@
       "action_create": "使用电子邮件地址和初始密码创建用户",
       "action_roles": "编辑某人的角色，以及其用量计入的用量归属组",
       "action_developer": "开发者模式：智能体可以使用该用户电脑上的本地 MCP 服务器",
-      "action_delete": "删除用户"
+      "action_delete": "删除用户",
+      "action_suspend": "停用账户或重新启用",
+      "action_tokens": "查看并撤销某人的 API 令牌"
     },
     "roles": {
       "title": "角色",

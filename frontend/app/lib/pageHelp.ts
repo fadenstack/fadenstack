@@ -187,7 +187,7 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/users",
     id: "users",
-    actions: ["create", "roles", "developer", "delete"],
+    actions: ["create", "roles", "developer", "suspend", "tokens", "delete"],
     guide: "invite_people",
     doc: "administer/users",
   },

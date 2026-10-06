@@ -55,6 +55,10 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "system.node_commands": ["read", "manage"],
         "system.node_maintenance": ["read", "manage"],
         "system.node_hostops": ["read", "manage"],
+        # Asked for by their endpoints (machine profiles, cost and usage) and given by no role: no custom
+        # role could grant them either, since a permission exists once a built-in role has it.
+        "system.node_profiles": ["read", "manage"],
+        "observability": ["read", "write"],
         "rag.runtime": ["read", "update"],
         "rag.containers": ["create", "read", "update", "delete"],
         "rag.assets": ["create", "read", "update", "delete"],

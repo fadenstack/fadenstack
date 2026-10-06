@@ -48,7 +48,7 @@
       },
       "access": {
         "title": "Control de acceso",
-        "body": "Quién puede hacer qué: <strong>usuarios</strong>, <strong>roles</strong> con sus permisos, y <strong>grupos</strong>. Con el módulo de inicio de sesión, las personas entran con su cuenta de empresa."
+        "body": "Quién puede hacer qué: <strong>usuarios</strong>, <strong>roles</strong> con sus permisos y <strong>grupos</strong>. Los roles cuentan en el chat y a través de la API; la consola es para superusuarios. Con el módulo de inicio de sesión, cada uno entra con su cuenta de empresa."
       },
       "extensions": {
         "title": "Extensiones",
@@ -184,7 +184,7 @@
       },
       "roles": {
         "title": "Qué puede hacer",
-        "body": "Deje los roles vacíos para quienes solo usan el chat: reciben el rol de usuario estándar. Los roles que marque lo sustituyen, así que para alguien que también ayuda a administrar el sistema, marque también <strong>default_user</strong>. Después haga clic en <strong>Crear usuario</strong>."
+        "body": "Deje los roles vacíos para quienes solo chatean: reciben el rol de usuario estándar. Los roles que marque lo sustituyen: para quien también deba chatear, marque además <strong>default_user</strong>. Los roles deciden qué puede hacer cada uno en el chat y a través de la API; la consola es solo para superusuarios. Después haga clic en <strong>Crear usuario</strong>."
       }
     },
     "create_api_token": {
@@ -460,7 +460,9 @@
       "action_create": "Crear un usuario con una dirección de correo electrónico y una primera contraseña",
       "action_roles": "Editar los roles de alguien y el grupo de uso al que se atribuye su uso",
       "action_developer": "Modo desarrollador: los agentes pueden usar servidores MCP locales en los equipos de esa persona",
-      "action_delete": "Eliminar un usuario"
+      "action_delete": "Eliminar un usuario",
+      "action_suspend": "Suspender una cuenta o reactivarla",
+      "action_tokens": "Ver y revocar los tokens de API de alguien"
     },
     "roles": {
       "title": "Roles",

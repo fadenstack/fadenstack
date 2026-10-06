@@ -48,7 +48,7 @@
       },
       "access": {
         "title": "Access Control",
-        "body": "Who may do what: <strong>users</strong>, <strong>roles</strong> with their permissions, and <strong>groups</strong>. With the sign-in module, people sign in with their company account."
+        "body": "Who may do what: <strong>users</strong>, <strong>roles</strong> with their permissions, and <strong>groups</strong>. Roles count in the chat and through the API; the console is for superusers. With the sign-in module, people sign in with their company account."
       },
       "extensions": {
         "title": "Extensions",
@@ -184,7 +184,7 @@
       },
       "roles": {
         "title": "What they may do",
-        "body": "Leave the roles empty for people who only chat: they get the standard user role. Roles you tick replace it, so for someone who also helps run the system, tick <strong>default_user</strong> as well. Then click <strong>Create User</strong>."
+        "body": "Leave the roles empty for people who only chat: they get the standard user role. Roles you tick replace it, so for someone who should also chat, tick <strong>default_user</strong> as well. Roles decide what people may do in the chat and through the API; the console itself is for superusers. Then click <strong>Create User</strong>."
       }
     },
     "create_api_token": {
@@ -460,7 +460,9 @@
       "action_create": "Create a user with an email address and a first password",
       "action_roles": "Edit someone's roles and the usage group their usage counts towards",
       "action_developer": "Developer mode: agents may use local MCP servers on that person's machines",
-      "action_delete": "Delete a user"
+      "action_delete": "Delete a user",
+      "action_suspend": "Suspend an account, or let it back in",
+      "action_tokens": "See and revoke someone's API tokens"
     },
     "roles": {
       "title": "Roles",

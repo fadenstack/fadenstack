@@ -48,7 +48,7 @@
       },
       "access": {
         "title": "Zugriffskontrolle",
-        "body": "Wer was darf: <strong>Benutzer</strong>, <strong>Rollen</strong> mit ihren Berechtigungen und <strong>Gruppen</strong>. Mit dem Anmeldemodul melden sich alle mit ihrem Firmenkonto an."
+        "body": "Wer was darf: <strong>Benutzer</strong>, <strong>Rollen</strong> mit ihren Berechtigungen und <strong>Gruppen</strong>. Rollen gelten im Chat und über die API; die Konsole ist für Superuser. Mit dem Anmeldemodul melden sich Personen mit ihrem Firmenkonto an."
       },
       "extensions": {
         "title": "Erweiterungen",
@@ -184,7 +184,7 @@
       },
       "roles": {
         "title": "Was die Person darf",
-        "body": "Lassen Sie die Rollen leer für Personen, die nur chatten: Sie erhalten die Standardrolle. Angehakte Rollen ersetzen diese; haken Sie für jemanden, der auch beim Betrieb hilft, zusätzlich <strong>default_user</strong> an. Klicken Sie dann auf <strong>Benutzer erstellen</strong>."
+        "body": "Lassen Sie die Rollen leer für Personen, die nur chatten: Sie erhalten die Standardrolle. Angekreuzte Rollen ersetzen sie; wer auch chatten soll, bekommt zusätzlich <strong>default_user</strong>. Rollen bestimmen, was jemand im Chat und über die API darf; die Konsole selbst ist für Superuser. Klicken Sie dann auf <strong>Benutzer erstellen</strong>."
       }
     },
     "create_api_token": {
@@ -460,7 +460,9 @@
       "action_create": "Einen Benutzer mit E-Mail-Adresse und erstem Passwort anlegen",
       "action_roles": "Die Rollen einer Person ändern und die Nutzungsgruppe, der ihre Nutzung zugerechnet wird",
       "action_developer": "Entwicklermodus: Agenten dürfen lokale MCP-Server auf den Rechnern dieser Person nutzen",
-      "action_delete": "Einen Benutzer löschen"
+      "action_delete": "Einen Benutzer löschen",
+      "action_suspend": "Ein Konto sperren oder wieder freigeben",
+      "action_tokens": "Die API-Tokens einer Person sehen und widerrufen"
     },
     "roles": {
       "title": "Rollen",

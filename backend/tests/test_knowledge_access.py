@@ -335,3 +335,4 @@ async def test_managers_find_people_and_groups_to_open_a_collection_to(
     assert {"type": "user", "id": str(world.bob.id), "label": world.bob.email} in found.json()
     _as(fastapi_app, world.bob)
     assert (await client.get(f"{API}/principals", params={"q": "hr"})).status_code == 403
+

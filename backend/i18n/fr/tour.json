@@ -48,7 +48,7 @@
       },
       "access": {
         "title": "Contrôle d'accès",
-        "body": "Qui peut faire quoi : les <strong>utilisateurs</strong>, les <strong>rôles</strong> avec leurs autorisations, et les <strong>groupes</strong>. Avec le module de connexion, chacun se connecte avec son compte d'entreprise."
+        "body": "Qui peut faire quoi : <strong>utilisateurs</strong>, <strong>rôles</strong> avec leurs permissions et <strong>groupes</strong>. Les rôles comptent dans le chat et via l'API ; la console est réservée aux superutilisateurs. Avec le module de connexion, chacun se connecte avec son compte d'entreprise."
       },
       "extensions": {
         "title": "Extensions",
@@ -184,7 +184,7 @@
       },
       "roles": {
         "title": "Ce que la personne peut faire",
-        "body": "Laissez les rôles vides pour les personnes qui ne font qu'utiliser le chat : elles reçoivent le rôle d'utilisateur standard. Les rôles que vous cochez le remplacent ; pour quelqu'un qui aide aussi à gérer le système, cochez donc aussi <strong>default_user</strong>. Cliquez ensuite sur <strong>Créer un utilisateur</strong>."
+        "body": "Laissez les rôles vides pour les personnes qui ne font que discuter : elles reçoivent le rôle utilisateur standard. Les rôles cochés le remplacent : pour quelqu'un qui doit aussi discuter, cochez aussi <strong>default_user</strong>. Les rôles déterminent ce que chacun peut faire dans le chat et via l'API ; la console elle-même est réservée aux superutilisateurs. Cliquez ensuite sur <strong>Créer l'utilisateur</strong>."
       }
     },
     "create_api_token": {
@@ -460,7 +460,9 @@
       "action_create": "Créer un utilisateur avec une adresse e-mail et un premier mot de passe",
       "action_roles": "Modifier les rôles d'une personne et le groupe d'usage auquel son usage est imputé",
       "action_developer": "Mode développeur : les agents peuvent utiliser des serveurs MCP locaux sur les machines de cette personne",
-      "action_delete": "Supprimer un utilisateur"
+      "action_delete": "Supprimer un utilisateur",
+      "action_suspend": "Suspendre un compte ou le réactiver",
+      "action_tokens": "Voir et révoquer les jetons d'API de quelqu'un"
     },
     "roles": {
       "title": "Rôles",
