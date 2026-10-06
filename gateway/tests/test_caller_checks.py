@@ -90,6 +90,14 @@ async def test_a_revoked_unknown_or_borrowed_api_token_is_refused() -> None:
 
 
 @pytest.mark.anyio
+async def test_an_api_token_past_its_rows_end_is_refused() -> None:
+    """A token made to last for ever carries no exp claim: the row's expires_at ends it."""
+    app = _app({USER: ACTIVE}, {TOKEN_ID: ApiTokenRecord(USER, revoked=False, expired=True)})
+    err = await _refused(app, _api())
+    assert (err.status_code, err.code) == (401, "api_token_expired")
+
+
+@pytest.mark.anyio
 async def test_an_api_token_of_a_deactivated_user_is_refused() -> None:
     app = _app({USER: UserFlags(is_active=False, is_superuser=False)}, {TOKEN_ID: ApiTokenRecord(USER, revoked=False)})
     err = await _refused(app, _api())
@@ -115,7 +123,7 @@ async def test_a_sign_in_from_before_sign_ins_expired_is_refused() -> None:
 
 @pytest.mark.anyio
 async def test_the_bootstrap_token_is_no_api_token() -> None:
-    # The CLI's bootstrap token has a jti and the console's audience, and no expiry.
+    # The CLI's setup token has a jti and the console's audience (and an hour's exp, checked with the signature).
     claims = {"sub": USER, "aud": "fastapi-users:auth", "tenant_id": "default", "iat": 1, "jti": "ab12"}
     await check_caller(_app({USER: ACTIVE}), claims)
 

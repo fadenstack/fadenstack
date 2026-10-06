@@ -282,6 +282,11 @@ class Settings(BaseSettings):
     # login token is a JWT with this lifetime; 0 or less means it never expires.
     users_login_lifetime_s: int = 7 * 24 * 3600
 
+    # API tokens (system settings "users.api_token_*"): every one expires -- after the
+    # default when its maker names no lifetime, and after the maximum at the latest.
+    api_token_default_lifetime_s: int = 90 * 24 * 3600
+    api_token_max_lifetime_s: int = 365 * 24 * 3600
+
     # Agent tokens, tenant-wide (system settings "agents.*"). Enterprise can
     # set them per agent, under a ceiling.
     agent_access_token_ttl_s: int = 600

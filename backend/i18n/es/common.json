@@ -1625,7 +1625,8 @@
     "expiry_90d": "90 días",
     "expiry_never": "Sin caducidad",
     "logged_in_as": "Sesión iniciada como {{email}}",
-    "logged_in_label": "Sesión iniciada como"
+    "logged_in_label": "Sesión iniciada como",
+    "expiry_1y": "1 año"
   },
   "scheduler": {
     "title": "Planificador",

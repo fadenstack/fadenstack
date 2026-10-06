@@ -1766,7 +1766,8 @@
     "expiry_90d": "90 days",
     "expiry_never": "No expiry",
     "logged_in_as": "Logged in as {{email}}",
-    "logged_in_label": "Logged in as"
+    "logged_in_label": "Logged in as",
+    "expiry_1y": "1 year"
   },
   "scheduler": {
     "title": "Scheduler",

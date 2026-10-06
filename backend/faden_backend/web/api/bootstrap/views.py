@@ -23,6 +23,9 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 
+#: How long the setup token lasts: the CLI finishes setting up with it, and never needs it again.
+BOOTSTRAP_TOKEN_TTL_S = 3600
+
 
 # ── Schemas ────────────────────────────────────────────────────────
 
@@ -168,12 +171,15 @@ async def bootstrap(
 
         if secret:
             now = int(time.time())
+            # A sign-in for the CLI to finish setting up with (an enrollment token for the local machine),
+            # good for an hour. It had no end: a superuser's sign-in for good, which nothing could revoke.
             claims = {
                 "sub": str(admin_user.id),
                 "aud": "fastapi-users:auth",
                 "tenant_id": payload.tenant_id,
                 "email": admin_user.email,
                 "iat": now,
+                "exp": now + BOOTSTRAP_TOKEN_TTL_S,
                 "jti": uuid.uuid4().hex,
             }
             api_token = pyjwt.encode(claims, secret, algorithm="HS256")

@@ -155,3 +155,26 @@ async def test_a_console_sign_in_expires_after_the_setting(dbsession: AsyncSessi
         assert "exp" not in claims
     finally:
         object.__setattr__(settings, "users_login_lifetime_s", saved)
+
+
+@pytest.mark.anyio
+async def test_every_token_expires(signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str) -> None:
+    """One made without a lifetime gets the default: a token that never expired was a key for good."""
+    signed_in.user = await _user(dbsession)
+    made = await _make(client, name="no lifetime given")
+    claims = jwt.decode(made["token"], secret, algorithms=["HS256"])
+    assert claims["exp"] - claims["iat"] == settings.api_token_default_lifetime_s
+    assert made["expires_in"] == settings.api_token_default_lifetime_s
+    row = await dbsession.get(ApiToken, uuid.UUID(made["id"]))
+    assert row is not None and row.expires_at is not None
+
+
+@pytest.mark.anyio
+async def test_a_lifetime_past_the_longest_is_refused(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    signed_in.user = await _user(dbsession)
+    longest = settings.api_token_max_lifetime_s
+    r = await client.post("/api/admin/users/me/api-token", json={"expires_in": longest + 1})
+    assert r.status_code == 422 and "at most" in r.text
+    assert (await client.post("/api/admin/users/me/api-token", json={"expires_in": longest})).status_code == 200

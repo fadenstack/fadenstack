@@ -31,6 +31,8 @@ _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
     "rag_lite.rerank_candidates": "rag_lite_rerank_candidates",
     "llm.residency.internal_networks": "residency_internal_networks",
     "users.login_lifetime_s": "users_login_lifetime_s",
+    "users.api_token_default_lifetime_s": "api_token_default_lifetime_s",
+    "users.api_token_max_lifetime_s": "api_token_max_lifetime_s",
     "agents.access_token_ttl_s": "agent_access_token_ttl_s",
     "agents.refresh_token_ttl_s": "agent_refresh_token_ttl_s",
     "agents.refresh_idle_s": "agent_refresh_idle_s",

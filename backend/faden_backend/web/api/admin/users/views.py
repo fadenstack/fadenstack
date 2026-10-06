@@ -449,6 +449,11 @@ async def generate_api_token(
 
     import jwt as pyjwt  # noqa: PLC0415
 
+    from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
+
+    # The lifetimes as they are now: with several workers, a change reaches only the one that took it.
+    await refresh_runtime_values(session, prefix="users.api_token_")
     secret = await _resolve_users_secret(session)
     if not secret:
         raise HTTPException(
@@ -456,17 +461,21 @@ async def generate_api_token(
             detail="JWT secret is not configured. Set 'Backend Users JWT Secret' in System Settings.",
         )
 
+    # Every token expires: one that never did was a key for good to whoever found it.
+    longest = max(settings.api_token_max_lifetime_s, 1)
+    lifetime = payload.expires_in or min(settings.api_token_default_lifetime_s, longest)
+    if lifetime > longest:
+        raise HTTPException(
+            status_code=422,
+            detail=f"An API token lasts at most {longest // 86400} days ({longest} s).",
+        )
     now = int(time.time())
     record = ApiToken(
         id=uuid.uuid4(),
         user_id=user.id,
         tenant_id=payload.tenant_id,
         name=(payload.name or "").strip() or None,
-        expires_at=(
-            datetime.fromtimestamp(now + payload.expires_in, tz=UTC)
-            if payload.expires_in is not None
-            else None
-        ),
+        expires_at=datetime.fromtimestamp(now + lifetime, tz=UTC),
     )
     session.add(record)
     await session.flush()
@@ -479,9 +488,8 @@ async def generate_api_token(
         # The gateway looks the token up by its jti, so revoking the row ends the token.
         "jti": str(record.id),
         "typ": API_TOKEN_TYPE,
+        "exp": now + lifetime,
     }
-    if payload.expires_in is not None:
-        claims["exp"] = now + payload.expires_in
 
     token = pyjwt.encode(claims, secret, algorithm="HS256")
     await AuditDAO(session).log(
@@ -490,11 +498,11 @@ async def generate_api_token(
         target_id=str(record.id),
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        metadata_json=json.dumps({"name": record.name, "expires_in": payload.expires_in}),
+        metadata_json=json.dumps({"name": record.name, "expires_in": lifetime}),
     )
     return ApiTokenResponse(
         token=token,
-        expires_in=payload.expires_in,
+        expires_in=lifetime,
         id=record.id,
         name=record.name,
         expires_at=record.expires_at,

@@ -214,6 +214,12 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
                     message="This API token was revoked.",
                     code="api_token_revoked",
                 )
+            if record.expired:
+                raise GatewayError(
+                    status_code=401,
+                    message="This API token has expired. Create a new one in your profile.",
+                    code="api_token_expired",
+                )
         user = await directory.user(user_id)
     except AgentLookupError as exc:
         raise GatewayError(

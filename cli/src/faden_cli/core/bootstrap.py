@@ -93,17 +93,11 @@ def display_credentials(creds: dict) -> None:
     lines.append(creds["email"], style="cyan")
     lines.append("\n  Admin password:  ", style="bold")
     lines.append(creds["password"], style="cyan")
-    if creds.get("api_token"):
-        lines.append("\n  API token:       ", style="bold")
-        # Show first 40 chars + ellipsis for readability
-        token = creds["api_token"]
-        display_token = token[:40] + "…" if len(token) > 40 else token
-        lines.append(display_token, style="cyan")
     lines.append("\n")
     lines.append(
         "\n  Store these in a password manager or secure vault.\n"
-        "  The password is hashed and the token is stateless —\n"
-        "  neither can be retrieved from the system after this point.",
+        "  The password is hashed and cannot be retrieved from the system after this point.\n"
+        "  Make API tokens in your profile in the console.",
         style="dim",
     )
 
@@ -118,16 +112,44 @@ def display_credentials(creds: dict) -> None:
     )
 
 
+def sign_in_with_saved_credentials(backend_url: str, directory: Path) -> str | None:
+    """A sign-in for the administrator saved in *directory*'s ``.bootstrap-credentials``, or ``None``."""
+    creds_path = directory / ".bootstrap-credentials"
+    try:
+        saved = dict(
+            line.split("=", 1) for line in creds_path.read_text(encoding="utf-8").splitlines()
+            if "=" in line and not line.startswith("#")
+        )
+    except OSError:
+        return None
+    email, password = saved.get("ADMIN_EMAIL", "").strip(), saved.get("ADMIN_PASSWORD", "").strip()
+    if not email or not password:
+        return None
+    try:
+        resp = httpx.post(
+            f"{backend_url.rstrip('/')}/api/auth/jwt/login",
+            data={"username": email, "password": password},
+            timeout=15,
+            verify=verify_for(backend_url),
+        )
+    except httpx.HTTPError as exc:
+        warning(f"Could not sign in with the saved credentials: {exc}")
+        return None
+    if resp.status_code != 200:  # noqa: PLR2004
+        warning(f"Signing in with the saved credentials failed (HTTP {resp.status_code}).")
+        return None
+    return resp.json().get("access_token") or None
+
+
 def save_credentials_file(creds: dict, directory: Path) -> Path | None:
     """Write credentials to a restricted file (chmod 600). Returns the path."""
     creds_path = directory / ".bootstrap-credentials"
+    # Not the setup token: it lasts an hour, the time it takes to finish setting up.
     content_lines = [
         f"# Fadenstack bootstrap credentials — generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"ADMIN_EMAIL={creds['email']}",
         f"ADMIN_PASSWORD={creds['password']}",
     ]
-    if creds.get("api_token"):
-        content_lines.append(f"API_TOKEN={creds['api_token']}")
     content_lines.append(
         "\n# DELETE THIS FILE after storing the credentials in a secure vault."
     )

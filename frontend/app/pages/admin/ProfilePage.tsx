@@ -44,7 +44,8 @@ const EXPIRY_OPTIONS: { key: string; value: number | null }[] = [
   { key: "profile.expiry_7d", value: 604800 },
   { key: "profile.expiry_30d", value: 2592000 },
   { key: "profile.expiry_90d", value: 7776000 },
-  { key: "profile.expiry_never", value: null },
+  // Every token expires: a year is the longest the server allows (users.api_token_max_lifetime_s).
+  { key: "profile.expiry_1y", value: 31536000 },
 ];
 
 export default function ProfilePage() {

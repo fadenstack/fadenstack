@@ -93,7 +93,10 @@ class GenerateApiTokenRequest(BaseModel):
     expires_in: int | None = Field(
         default=None,
         gt=0,
-        description="Token lifetime in seconds. None = no expiry.",
+        description=(
+            "Token lifetime in seconds: by default users.api_token_default_lifetime_s, "
+            "at most users.api_token_max_lifetime_s. Every API token expires."
+        ),
     )
     name: str | None = Field(
         default=None, max_length=200, description="What the token is for, to tell it apart.",

@@ -14,6 +14,7 @@ Runs the complete production flow:
 
 from __future__ import annotations
 
+import secrets
 import sys
 from pathlib import Path
 
@@ -667,8 +668,10 @@ def deploy_cmd(
             env_vars["LANGFUSE_INIT_USER_PASSWORD"] = creds["password"]
             env_vars["LANGFUSE_INIT_USER_NAME"] = "Admin"
             env_vars["LANGFUSE_INIT_PROJECT_NAME"] = "fadenstack"
-            if creds.get("api_token"):
-                env_vars["LANGFUSE_INIT_PROJECT_SECRET_KEY"] = creds["api_token"][:40]
+            # Langfuse's first project gets a secret of its own. It was the setup token's first 40
+            # characters -- the JWT header, the same on every install.
+            if not env_vars.get("LANGFUSE_INIT_PROJECT_SECRET_KEY"):
+                env_vars["LANGFUSE_INIT_PROJECT_SECRET_KEY"] = f"sk-lf-{secrets.token_hex(20)}"
                 env_vars["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"] = "pk-lf-faden"
 
             write_env_file(env_path, env_vars)

@@ -1225,6 +1225,7 @@ def dev_up(
         if not enrollment_token.strip():
             from faden_cli.core.bootstrap import (  # noqa: PLC0415
                 bootstrap_interactive,
+                sign_in_with_saved_credentials,
                 wait_for_backend,
             )
 
@@ -1243,16 +1244,12 @@ def dev_up(
                     info("No enrollment token provided — creating one automatically…")
                     enrollment_token = create_enrollment_token(dev_backend_url, creds["api_token"]) or ""
                 elif not creds:
-                    # Already bootstrapped — try reading saved credentials
-                    creds_file = shared_dir / ".bootstrap-credentials"
-                    if creds_file.exists():
-                        for line in creds_file.read_text(encoding="utf-8").splitlines():
-                            if line.startswith("API_TOKEN="):
-                                api_token = line.split("=", 1)[1].strip()
-                                if api_token:
-                                    info("Using saved API token to create enrollment token…")
-                                    enrollment_token = create_enrollment_token(dev_backend_url, api_token) or ""
-                                break
+                    # Already bootstrapped: sign in as the administrator saved then (the setup token
+                    # it saved too lasted an hour).
+                    api_token = sign_in_with_saved_credentials(dev_backend_url, shared_dir)
+                    if api_token:
+                        info("Signed in with the saved credentials — creating an enrollment token…")
+                        enrollment_token = create_enrollment_token(dev_backend_url, api_token) or ""
             else:
                 warning("Backend not healthy — cannot auto-create enrollment token.")
 
