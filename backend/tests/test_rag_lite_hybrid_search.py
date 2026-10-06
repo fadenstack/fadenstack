@@ -20,7 +20,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.dao.rag_lite_dao import RagLiteChunkDAO
+from faden_backend.db.dao.rag_lite_dao import CollectionScope, RagLiteChunkDAO
 from faden_backend.db.models.rag_lite import RagLiteChunk, RagLiteCollection, RagLiteDocument
 from faden_backend.services.rag_lite.rerank import NONE, QWEN3, RerankClient, fuse, template_for
 from faden_backend.services.rag_lite.service import RagLiteService
@@ -88,11 +88,11 @@ class _Chunks:
         self.dense, self.keyword = dense, keyword
         self.asked: list[tuple[str, int]] = []
 
-    async def search_similar(self, *, query_vector: list[float], top_k: int, collection_ids: Any) -> list[dict[str, Any]]:
+    async def search_similar(self, *, query_vector: list[float], top_k: int, collection_ids: Any, scope: Any = None) -> list[dict[str, Any]]:
         self.asked.append(("dense", top_k))
         return self.dense[:top_k]
 
-    async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any) -> list[dict[str, Any]]:
+    async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any, scope: Any = None) -> list[dict[str, Any]]:
         self.asked.append(("keyword", top_k))
         return self.keyword[:top_k]
 
@@ -134,6 +134,29 @@ async def test_vector_alone_asks_for_no_more_than_it_returns() -> None:
     out = await _service().search("q", chunk_dao=chunks, embedding_client=_Embed(), top_k=3)  # type: ignore[arg-type]
     assert [h["chunk_id"] for h in out] == ["a", "b", "c"]
     assert chunks.asked == [("dense", 3)]
+
+
+async def test_what_the_searcher_may_read_reaches_both_searches() -> None:
+    """The scope (services/knowledge_access.py) is handed to the keyword and the vector search alike."""
+    seen: list[tuple[str, Any]] = []
+
+    class _Scoped(_Chunks):
+        async def search_similar(self, *, query_vector: list[float], top_k: int, collection_ids: Any,
+                                 scope: Any = None) -> list[dict[str, Any]]:
+            seen.append(("dense", scope))
+            return await super().search_similar(query_vector=query_vector, top_k=top_k, collection_ids=collection_ids)
+
+        async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any,
+                                 scope: Any = None) -> list[dict[str, Any]]:
+            seen.append(("keyword", scope))
+            return await super().search_lexical(query, top_k=top_k, collection_ids=collection_ids)
+
+    scope = CollectionScope(frozenset({uuid.uuid4()}), unfiled=True)
+    await _service().search(
+        "q", chunk_dao=_Scoped([_hit("a")], [_hit("a")]), embedding_client=_Embed(),  # type: ignore[arg-type]
+        top_k=1, hybrid=True, scope=scope,
+    )
+    assert sorted(seen) == [("dense", scope), ("keyword", scope)]
 
 
 async def test_bm25_ranks_a_rare_word_above_common_ones(dbsession: AsyncSession) -> None:
@@ -244,7 +267,7 @@ async def test_the_keyword_search_runs_while_the_query_is_embedded() -> None:
             return await super().embed_texts(texts)
 
     class _Logged(_Chunks):
-        async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any) -> list[dict[str, Any]]:
+        async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any, scope: Any = None) -> list[dict[str, Any]]:
             order.append("keyword")
             return await super().search_lexical(query, top_k=top_k, collection_ids=collection_ids)
 
@@ -255,7 +278,7 @@ async def test_the_keyword_search_runs_while_the_query_is_embedded() -> None:
 
 async def test_a_failed_keyword_search_does_not_leave_the_embedding_running() -> None:
     class _Broken(_Chunks):
-        async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any) -> list[dict[str, Any]]:
+        async def search_lexical(self, query: str, *, top_k: int, collection_ids: Any, scope: Any = None) -> list[dict[str, Any]]:
             raise RuntimeError("db down")
 
     finished = asyncio.Event()
