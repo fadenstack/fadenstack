@@ -40,7 +40,7 @@
       },
       "agents": {
         "title": "Agenten",
-        "body": "Agenten arbeiten in anderer Software, etwa in Word, Outlook oder im Browser, mit den Modellen und Regeln, die Sie hier festlegen. Unter <strong>Governance</strong> bestimmen Sie, welche Werkzeuge Chats und Agenten verwenden dürfen."
+        "body": "Agenten arbeiten in anderer Software, etwa in Word, Outlook oder im Browser, mit den Modellen und Regeln, die Sie hier festlegen. Unter <strong>Governance</strong> bestimmen Sie, welche Tools Chats und Agenten verwenden dürfen."
       },
       "privacy": {
         "title": "Datenschutz",
@@ -52,7 +52,7 @@
       },
       "extensions": {
         "title": "Erweiterungen",
-        "body": "<strong>MCP-Server</strong> geben Chats und Agenten Werkzeuge, etwa für Suche, Tickets oder Dateien. <strong>Skills</strong> sind Anweisungen, die man einmal speichert und im Chat wiederverwendet."
+        "body": "<strong>MCP-Server</strong> geben Chats und Agenten Tools, etwa für Suche, Tickets oder Dateien. <strong>Skills</strong> sind Anweisungen, die man einmal speichert und im Chat wiederverwendet."
       },
       "help": {
         "title": "Hilfe",
@@ -253,7 +253,7 @@
       "body": "Bestimmen, welche personenbezogenen Daten maskiert werden, bevor sie ein Modell erreichen."
     },
     "tools": {
-      "title": "Werkzeuge anbinden",
+      "title": "Tools anbinden",
       "body": "Einen MCP-Server hinzufügen, damit Chats und Agenten suchen, Tickets anlegen und mehr können."
     },
     "skills": {
@@ -569,16 +569,16 @@
     },
     "mcp_detail": {
       "title": "MCP-Server",
-      "description": "Ein MCP-Server: seine Verbindung und die Werkzeuge, die er anbietet.",
-      "action_tools": "Einzelne Werkzeuge ein- oder ausschalten",
-      "action_test": "Die Verbindung testen und seine Werkzeuge zählen",
-      "action_edit": "Bearbeiten; beim Speichern verbindet er sich neu und findet seine Werkzeuge erneut"
+      "description": "Ein MCP-Server: seine Verbindung und die Tools, die er anbietet.",
+      "action_tools": "Einzelne Tools ein- oder ausschalten",
+      "action_test": "Die Verbindung testen und seine Tools zählen",
+      "action_edit": "Bearbeiten; beim Speichern verbindet er sich neu und findet seine Tools erneut"
     },
     "mcp_servers": {
       "title": "MCP-Server",
-      "description": "Werkzeugserver, die Chats und Agenten nutzen können: Suche, Tickets, Dateien und mehr.",
+      "description": "Tool-Server, die Chats und Agenten nutzen können: Suche, Tickets, Dateien und mehr.",
       "action_register": "Einen Server per URL oder Befehl registrieren, mit Headern oder Variablen",
-      "action_pii": "Festlegen, was mit personenbezogenen Daten geschieht, die an seine Werkzeuge gehen",
+      "action_pii": "Festlegen, was mit personenbezogenen Daten geschieht, die an seine Tools gehen",
       "action_scan": "Das Netzwerk nach MCP-Servern durchsuchen"
     },
     "skill_detail": {
@@ -604,7 +604,7 @@
     "agent_detail": {
       "title": "Agent",
       "description": "Ein Agent: seine Definition, seine Versionen, wer ihn nutzen darf und was er getan hat.",
-      "action_definition": "Anweisungen, Modell, Wissen und Werkzeuge ändern; Speichern erzeugt eine neue Version",
+      "action_definition": "Anweisungen, Modell, Wissen und Tools ändern; Speichern erzeugt eine neue Version",
       "action_publish": "Eine Version veröffentlichen oder zu einer früheren zurückkehren",
       "action_access": "Ihn Personen und Teams freigeben und seine Verantwortlichen festlegen",
       "action_activity": "Seine Nutzung sehen, was die Anwendungen gemeldet haben, und die angemeldeten Geräte"
@@ -612,8 +612,8 @@
     "governance": {
       "title": "Governance",
       "description": "Die Regeln, denen jede Chat- und Agentenanfrage unterliegt, und was die Prüfungen entschieden haben. Änderungen gelten innerhalb von 30 Sekunden.",
-      "action_rules": "Werkzeuge nach Namen verbieten, nachfragen lassen oder erlauben",
-      "action_classes": "Angeben, was Werkzeuge tun (lesen, schreiben, zerstörerisch), für die Werkzeugmodi",
+      "action_rules": "Tools nach Namen verbieten, nachfragen lassen oder erlauben",
+      "action_classes": "Angeben, was Tools tun (lesen, schreiben, zerstörerisch), für die Tool-Modi",
       "action_decisions": "Die Entscheidungen der Prüfungen ansehen, ohne den Text"
     },
     "settings": {
