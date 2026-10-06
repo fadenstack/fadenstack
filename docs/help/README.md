@@ -33,5 +33,23 @@ the docs hub: `python scripts/assemble.py help` there takes `docs/help/pages/` a
 
 ## Screenshots
 
-In `pages/images/<section>/`. Taken from a running install with every lab name, address and person replaced
-by the neutral examples of STYLE.md before the picture is taken; never a raw capture of a real install.
+In `pages/images/<section>/`. Taken from a running install with `scripts/shots.mjs`, which replaces every lab
+name, address and person by the neutral examples of STYLE.md before the picture is taken. An older screenshot
+may be used only when it shows none of them (checked by eye; text recognition helps on many pictures).
+
+### Pictures still to take
+
+With `scripts/shots.mjs` (add the screen to its list), or on a demo install where a screen needs a state:
+
+- **Use**: the tools panel with **Tool mode** and a realistic service, an approval card, a reply being written,
+  a failed reply with **Retry**, an attached file, a knowledge answer naming its source; the Office ribbon's
+  **Agent** button, its sign-in and **Context** menu, a changed Excel sheet; an Outlook draft with neutral people;
+  the chat list and the profile as a regular user, without test chats.
+- **Administer**: the Create User, Edit Roles and Developer mode dialogs, Groups; a skill's Versions and Sharing;
+  an agent's Access, Apps, Activity and Versions tabs without test agents; Add Provider and Set price; a model
+  card, **On this server**, the token dialog and the hosting dialog's steps; a deployment's logs; Add rule, Tool
+  classes and Decisions; the request view and Pricing of the cost dashboard, without load figures.
+- **Operate**: **Add a machine** with the install line and a machine waiting for approval; the Create a cluster
+  steps; **Add machines** with a machine to pick and one refused; a selected machine with **Drain** and
+  **Remove from cluster**; the Runtime, Model traffic and Health checks cards; a cluster starting, failed with
+  **Try again**; routing a found vLLM; the container screens (images, create, a container, edit).
