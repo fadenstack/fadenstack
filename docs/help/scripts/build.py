@@ -29,12 +29,14 @@ from pathlib import Path
 HELP = Path(__file__).resolve().parent.parent          # docs/help
 THEME = HELP.parent / "theme"                           # docs/theme
 
-#: Each language: its pages, its nav, where it is served below the site's root, and its words.
+#: Each language: its pages, its nav, where it is served below the site's root, its page on the website, and its
+#: words.
 LANGS: dict[str, dict[str, str]] = {
     "en": {
         "pages": "pages",
         "nav": "zensical.toml",
         "prefix": "",
+        "website_path": "",
         "name": "English",
         "site_name": "Fadenstack Help",
         "description": "Using, administering and running Fadenstack: the chat, the console, the server and the GPU machines.",
@@ -49,6 +51,7 @@ LANGS: dict[str, dict[str, str]] = {
         "pages": "pages-de",
         "nav": "nav-de.toml",
         "prefix": "de/",
+        "website_path": "de/",
         "name": "Deutsch",
         "site_name": "Fadenstack-Hilfe",
         "description": "Fadenstack nutzen, verwalten und betreiben: der Chat, die Konsole, der Server und die GPU-Maschinen.",
@@ -118,7 +121,7 @@ def _sites(target: str, lang: str) -> list[dict[str, str]]:
     t, words = TARGETS[target], LANGS[lang]
     help_url = f"{t['base']}{words['prefix']}"
     first = (
-        {"name": words["website"], "url": str(t["home"])}
+        {"name": words["website"], "url": f"{t['home']}{words['website_path']}"}
         if target == "public"
         else {"name": words["console"], "url": str(t["home"])}
     )
