@@ -11,6 +11,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from sqlalchemy import func, select
 from starlette import status
 
 from faden_backend.db.dao.llm_dao import ModelDAO, ProviderDAO, RuntimeDAO
@@ -20,13 +21,30 @@ from faden_backend.db.dao.rag_lite_dao import (
     RagLiteDocumentDAO,
     RagLiteIngestJobDAO,
 )
-from faden_backend.db.models.rag_lite import RagLiteDocumentStatus, RagLiteIngestJob
+from faden_backend.db.models.groups import Group
+from faden_backend.db.models.rag_lite import (
+    RagLiteCollection,
+    RagLiteCollectionAccess,
+    RagLiteDocument,
+    RagLiteDocumentStatus,
+    RagLiteIngestJob,
+)
 from faden_backend.db.models.users import User
+from faden_backend.services.knowledge_access import (
+    KnowledgeReader,
+    knowledge_reader,
+    may_read,
+    search_scope,
+    visible_collections,
+)
+from faden_backend.services.principals import PrincipalOption, find_principals
 from faden_backend.services.rag_lite.tasks import rag_lite_ingest_task
 from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values
 from faden_backend.web.api.admin.rag_lite.schema import (
     RagLiteCollectionCreate,
     RagLiteCollectionDTO,
+    RagLiteCollectionGrantDTO,
+    RagLiteCollectionGrantIn,
     RagLiteCollectionUpdate,
     RagLiteConfigDTO,
     RagLiteDocumentDTO,
@@ -49,6 +67,15 @@ from faden_backend.web.api.admin.rag_lite.schema import (
 from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
+
+#: Who reads: a sign-in with rag.search:read, or the gateway's knowledge token (services/knowledge_access.py).
+Reader = Annotated[KnowledgeReader, Depends(knowledge_reader)]
+
+
+async def _hidden_404(session: Any, reader: KnowledgeReader, collection_id: uuid.UUID | None, what: str) -> None:
+    """A thing in a collection *reader* may not read is not there, as far as they can tell."""
+    if not await may_read(session, reader, collection_id):
+        raise HTTPException(status_code=404, detail=f"{what} not found")
 
 # -----------------------------------------------------------------------
 # Health
@@ -174,16 +201,20 @@ async def upload_file(
 
 @router.get("/documents", response_model=list[RagLiteDocumentDTO])
 async def list_documents(
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     document_dao: RagLiteDocumentDAO = Depends(),
     collection_id: uuid.UUID | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[RagLiteDocumentDTO]:
+    session = document_dao.session
+    if collection_id is not None:
+        await _hidden_404(session, reader, collection_id, "Collection")
     docs = await document_dao.list_by_collection(
         collection_id,
         limit=limit,
         offset=offset,
+        scope=await search_scope(session, reader),
     )
     return [
         RagLiteDocumentDTO(
@@ -203,13 +234,14 @@ async def list_documents(
 
 @router.get("/documents/all", response_model=list[RagLiteDocumentDTO])
 async def list_all_documents(
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     document_dao: RagLiteDocumentDAO = Depends(),
     limit: int = 500,
     offset: int = 0,
 ) -> list[RagLiteDocumentDTO]:
-    """List all documents regardless of collection — used for tree view."""
-    docs = await document_dao.list_all(limit=limit, offset=offset)
+    """List all documents the reader may read, regardless of collection — used for tree view."""
+    scope = await search_scope(document_dao.session, reader)
+    docs = await document_dao.list_all(limit=limit, offset=offset, scope=scope)
     return [
         RagLiteDocumentDTO(
             id=d.id,
@@ -229,12 +261,13 @@ async def list_all_documents(
 @router.get("/documents/{document_id}", response_model=RagLiteDocumentDetailDTO)
 async def get_document(
     document_id: uuid.UUID,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     document_dao: RagLiteDocumentDAO = Depends(),
 ) -> RagLiteDocumentDetailDTO:
     doc = await document_dao.get(document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await _hidden_404(document_dao.session, reader, doc.collection_id, "Document")
     return RagLiteDocumentDetailDTO(
         id=doc.id,
         filename=doc.filename,
@@ -258,7 +291,7 @@ _PASSAGE_MAX_AROUND = 5
 @router.get("/documents/{document_id}/passage", response_model=RagLitePassageResponse)
 async def get_passage(
     document_id: uuid.UUID,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     chunk: int = 0,
     around: int = 2,
     document_dao: RagLiteDocumentDAO = Depends(),
@@ -272,6 +305,7 @@ async def get_passage(
     doc = await document_dao.get(document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await _hidden_404(document_dao.session, reader, doc.collection_id, "Document")
     around = max(0, min(around, _PASSAGE_MAX_AROUND))
     chunks = await chunk_dao.passage(document_id, first=max(0, chunk - around), last=chunk + around)
     return RagLitePassageResponse(
@@ -344,7 +378,7 @@ async def retry_document(
 @router.post("/search", response_model=RagLiteSearchResponse)
 async def search(
     body: RagLiteSearchRequest,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     chunk_dao: RagLiteChunkDAO = Depends(),
     request: Request = None,  # type: ignore[assignment]
 ) -> RagLiteSearchResponse:
@@ -391,6 +425,7 @@ async def search(
         hybrid=hybrid,
         reranker=reranker,
         candidates=settings.rag_lite_rerank_candidates,
+        scope=await search_scope(session, reader),
     )
     return RagLiteSearchResponse(
         query=body.query,
@@ -418,36 +453,28 @@ async def create_collection(
     _user: Annotated[User, Depends(require_permission("rag.search", "write"))],
     collection_dao: RagLiteCollectionDAO = Depends(),
 ) -> RagLiteCollectionDTO:
+    grants = await _checked_grants(collection_dao.session, body.access, body.grants)
     col = await collection_dao.create(
         body.name, body.description, parent_id=body.parent_id,
     )
-    return RagLiteCollectionDTO(
-        id=col.id,
-        name=col.name,
-        description=col.description,
-        parent_id=col.parent_id,
-        document_count=0,
-        created_at=col.created_at,
-        updated_at=col.updated_at,
-    )
+    await collection_dao.set_access(col, body.access, grants)
+    return await _collection_dto(collection_dao, col, 0, manager=True)
 
 
 @router.get("/collections", response_model=list[RagLiteCollectionDTO])
 async def list_collections(
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     collection_dao: RagLiteCollectionDAO = Depends(),
 ) -> list[RagLiteCollectionDTO]:
     rows = await collection_dao.list_with_doc_counts()
+    manager = reader.sees_all and reader.only is None
+    if not manager:
+        visible, _total = await visible_collections(collection_dao.session, reader)
+        rows = [(c, count) for c, count in rows if c.id in visible]
+    grants = await collection_dao.grants_of([c.id for c, _ in rows]) if manager else {}
+    labels = await _labels(collection_dao.session, [g for gs in grants.values() for g in gs])
     return [
-        RagLiteCollectionDTO(
-            id=c.id,
-            name=c.name,
-            description=c.description,
-            parent_id=c.parent_id,
-            document_count=count,
-            created_at=c.created_at,
-            updated_at=c.updated_at,
-        )
+        _dto(c, count, grants.get(c.id, []), labels)
         for c, count in rows
     ]
 
@@ -459,22 +486,100 @@ async def update_collection(
     _user: Annotated[User, Depends(require_permission("rag.search", "write"))],
     collection_dao: RagLiteCollectionDAO = Depends(),
 ) -> RagLiteCollectionDTO:
+    access = body.access
+    grants = None
+    if access is not None or body.grants is not None:
+        current = await collection_dao.get(collection_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Collection not found")
+        access = access or current.access
+        grants = await _checked_grants(collection_dao.session, access, body.grants)
+    # Only what was sent: a summary edit sent no parent and was refused, and a rename cleared the summary.
+    sent = body.model_fields_set
     col = await collection_dao.update(
         collection_id,
         name=body.name,
-        description=body.description,
-        parent_id=body.parent_id,
+        description=body.description if "description" in sent else ...,
+        parent_id=body.parent_id if "parent_id" in sent else ...,
     )
     if col is None:
         raise HTTPException(status_code=404, detail="Collection not found")
+    if access is not None:
+        await collection_dao.set_access(col, access, grants)
+    else:
+        await collection_dao.session.flush()
+        await collection_dao.session.refresh(col)  # what the database set (updated_at), read now
+    count = await collection_dao.session.scalar(
+        select(func.count(RagLiteDocument.id)).where(RagLiteDocument.collection_id == col.id),
+    )
+    return await _collection_dto(collection_dao, col, int(count or 0), manager=True)
+
+
+async def _checked_grants(
+    session: Any, access: str, grants: list[RagLiteCollectionGrantIn] | None,
+) -> list[tuple[str, uuid.UUID]] | None:
+    """The grants as ``(type, id)``, every one a person or group that exists; none for an open collection."""
+    if access == RagLiteCollectionAccess.EVERYONE.value:
+        return []  # open to everyone: nobody needs a grant, and old ones would only confuse
+    if grants is None:
+        return None
+    pairs = [(g.principal_type, g.principal_id) for g in grants]
+    users = {i for t, i in pairs if t == "user"}
+    groups = {i for t, i in pairs if t == "group"}
+    found_users = set((await session.execute(select(User.id).where(User.id.in_(users)))).scalars()) if users else set()
+    found_groups = (
+        set((await session.execute(select(Group.id).where(Group.id.in_(groups)))).scalars()) if groups else set()
+    )
+    missing = (users - found_users) | (groups - found_groups)
+    if missing:
+        raise HTTPException(
+            status_code=422, detail=f"No such person or group: {', '.join(sorted(str(m) for m in missing))}",
+        )
+    return pairs
+
+
+async def _labels(session: Any, grants: list[Any]) -> dict[tuple[str, uuid.UUID], str]:
+    """The e-mail address of each person and the name of each group in *grants*."""
+    users = {g.principal_id for g in grants if g.principal_type == "user"}
+    groups = {g.principal_id for g in grants if g.principal_type == "group"}
+    labels: dict[tuple[str, uuid.UUID], str] = {}
+    if users:
+        for uid, email in (await session.execute(select(User.id, User.email).where(User.id.in_(users)))).all():
+            labels[("user", uid)] = email
+    if groups:
+        for gid, name in (await session.execute(select(Group.id, Group.name).where(Group.id.in_(groups)))).all():
+            labels[("group", gid)] = name
+    return labels
+
+
+def _dto(
+    col: RagLiteCollection, count: int, grants: list[Any], labels: dict[tuple[str, uuid.UUID], str],
+) -> RagLiteCollectionDTO:
     return RagLiteCollectionDTO(
         id=col.id,
         name=col.name,
         description=col.description,
         parent_id=col.parent_id,
+        document_count=count,
+        access=col.access,
+        grants=[
+            RagLiteCollectionGrantDTO(
+                principal_type=g.principal_type,
+                principal_id=g.principal_id,
+                label=labels.get((g.principal_type, g.principal_id)),
+            )
+            for g in grants
+        ],
         created_at=col.created_at,
         updated_at=col.updated_at,
     )
+
+
+async def _collection_dto(
+    collection_dao: RagLiteCollectionDAO, col: RagLiteCollection, count: int, *, manager: bool,
+) -> RagLiteCollectionDTO:
+    grants = (await collection_dao.grants_of([col.id])).get(col.id, []) if manager else []
+    return _dto(col, count, grants, await _labels(collection_dao.session, grants))
 
 
 @router.delete("/collections/{collection_id}", status_code=204)
@@ -486,6 +591,17 @@ async def delete_collection(
     deleted = await collection_dao.delete(collection_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Collection not found")
+
+
+@router.get("/principals", response_model=list[PrincipalOption])
+async def find_collection_principals(
+    _user: Annotated[User, Depends(require_permission("rag.search", "write"))],
+    collection_dao: RagLiteCollectionDAO = Depends(),
+    q: str | None = None,
+    ids: str | None = None,
+) -> list[PrincipalOption]:
+    """The people and groups a collection can be opened to (as for skills and agents)."""
+    return await find_principals(collection_dao.session, q=q, ids=ids)
 
 
 # -----------------------------------------------------------------------
@@ -517,23 +633,37 @@ def _job_to_dto(job: RagLiteIngestJob) -> RagLiteJobDTO:
 
 @router.get("/jobs", response_model=list[RagLiteJobDTO])
 async def list_jobs(
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     job_dao: RagLiteIngestJobDAO = Depends(),
     limit: int = 50,
 ) -> list[RagLiteJobDTO]:
     jobs = await job_dao.list_recent(limit=limit)
+    scope = await search_scope(job_dao.session, reader)
+    if scope is not None and jobs:
+        readable = set(
+            (
+                await job_dao.session.execute(
+                    select(RagLiteDocument.id).where(
+                        RagLiteDocument.id.in_({j.document_id for j in jobs}), scope.documents(),
+                    ),
+                )
+            ).scalars(),
+        )
+        jobs = [j for j in jobs if j.document_id in readable]
     return [_job_to_dto(j) for j in jobs]
 
 
 @router.get("/jobs/{job_id}", response_model=RagLiteJobDTO)
 async def get_job(
     job_id: uuid.UUID,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     job_dao: RagLiteIngestJobDAO = Depends(),
 ) -> RagLiteJobDTO:
     job = await job_dao.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    doc = await job_dao.session.get(RagLiteDocument, job.document_id)
+    await _hidden_404(job_dao.session, reader, doc.collection_id if doc else None, "Job")
     return _job_to_dto(job)
 
 
@@ -662,7 +792,7 @@ async def generate_document_summary(
 @router.post("/search/graph", response_model=RagLiteGraphSearchResponse)
 async def graph_search(
     body: RagLiteGraphSearchRequest,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    reader: Reader,
     collection_dao: RagLiteCollectionDAO = Depends(),
     chunk_dao: RagLiteChunkDAO = Depends(),
     request: Request = None,  # type: ignore[assignment]
@@ -694,8 +824,11 @@ async def graph_search(
         crypto=crypto,
     )
 
-    # Level 1: Find best collections by embedding summaries
+    # Level 1: Find best collections by embedding summaries -- of those the reader may read
+    scope = await search_scope(session, reader)
     rows = await collection_dao.list_with_doc_counts()
+    if scope is not None:
+        rows = [(c, count) for c, count in rows if c.id in scope.collections]
     cols_with_desc = [
         (c, count) for c, count in rows if c.description and c.description.strip()
     ]
@@ -735,6 +868,7 @@ async def graph_search(
             query_vector=query_vec,
             top_k=body.top_k_chunks,
             collection_ids=target_collection_ids,
+            scope=scope,
         )
     else:
         # No collections matched — search all
@@ -742,6 +876,7 @@ async def graph_search(
         results = await chunk_dao.search_similar(
             query_vector=query_vecs[0],
             top_k=body.top_k_chunks,
+            scope=scope,
         )
 
     return RagLiteGraphSearchResponse(

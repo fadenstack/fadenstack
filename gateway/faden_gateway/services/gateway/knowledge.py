@@ -4,8 +4,14 @@ Retrieval used to run before the model on every request that asked for it:
 the last user message searched RAG Lite and the results went in as a system
 message, needed or not. Now the model decides. It gets two tools --
 ``knowledge_search`` to find passages, ``knowledge_open`` to read around one --
-and the gateway runs them, as the user who asked: RAG Lite checks the user's
-own permission to search.
+and the gateway runs them, as the user who asked: RAG Lite searches what that
+person may read, and an agent's searches stay within its collections.
+
+The backend takes console sign-ins only, so the caller's own token -- an API
+token, an agent's -- was refused there and the tools failed for every SDK and
+add-in caller. The gateway, which has checked the caller, hands the backend a
+token of a minute instead (:func:`reader_token`), good for the knowledge
+endpoints alone.
 
 They are offered only to a route whose model answers with tool calls
 (``node_metadata["tools"]``); vLLM refuses a request that offers tools
@@ -17,13 +23,38 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+import jwt
 
 from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
+from faden_gateway.settings import settings
+
+if TYPE_CHECKING:
+    from faden_gateway.services.gateway.auth import AuthContext
 
 SEARCH = "knowledge_search"
 OPEN = "knowledge_open"
 NAMES = frozenset({SEARCH, OPEN})
+
+#: The audience the backend's knowledge endpoints take from the gateway (its services/knowledge_access.py).
+AUDIENCE = "faden:knowledge"
+#: How long a knowledge token lasts: one search or one passage.
+TOKEN_TTL_S = 60
+
+
+def reader_token(auth: AuthContext) -> str | None:
+    """A minute's token naming *auth*'s person, and an agent's collections, for the knowledge endpoints.
+
+    Without the shared secret (a gateway that only reads claims) the caller's own token goes instead.
+    """
+    if not settings.jwt_secret or not auth.user_id:
+        return auth.token
+    now = int(time.time())
+    claims: dict[str, Any] = {"sub": str(auth.user_id), "aud": AUDIENCE, "iat": now, "exp": now + TOKEN_TTL_S}
+    if auth.knowledge is not None:
+        claims["collections"] = list(auth.knowledge)
+    return jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm or "HS256")
 
 #: Passages a search returns at most, whatever the model asks for.
 _MAX_RESULTS = 10

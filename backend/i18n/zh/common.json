@@ -2079,7 +2079,16 @@
     "upload_here": "上传到此处",
     "new_collection": "新建集合",
     "empty_explorer": "暂无集合或文档。创建集合或上传文件以开始。",
-    "create_collection": "新建集合"
+    "create_collection": "新建集合",
+    "access": {
+      "title": "谁可以阅读",
+      "everyone": "所有使用聊天的人",
+      "restricted": "仅限这些人员和组",
+      "add": "添加人员或组",
+      "nobody": "暂无：只有知识库管理员可以看到。",
+      "hint": "受限集合也会隐藏其中的集合。知识库管理员可以看到所有集合。",
+      "restricted_tooltip": "仅对开放给的人员和组可见"
+    }
   },
   "node_profiles": {
     "page_title": "机器配置文件",
@@ -3494,7 +3503,7 @@
       "model_help": "无论应用请求什么，每个请求都使用此模型。留空时，只有自行指定模型的应用才能得到回答；Fadenstack 的应用会把模型交给智能体决定。",
       "knowledge_and_tools": "知识和工具",
       "knowledge": "知识",
-      "knowledge_help": "智能体可以搜索的知识集合。",
+      "knowledge_help": "智能体搜索的集合及其中的集合。不选：其用户可读的全部内容。",
       "server_tools": "服务器工具",
       "server_tools_default": "与聊天相同",
       "server_tools_listed": "仅限以下",

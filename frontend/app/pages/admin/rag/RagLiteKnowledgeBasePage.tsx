@@ -36,6 +36,8 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditIcon from "@mui/icons-material/Edit";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FolderIcon from "@mui/icons-material/Folder";
+import LockIcon from "@mui/icons-material/Lock";
+import LockPersonIcon from "@mui/icons-material/LockPerson";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import ReplayIcon from "@mui/icons-material/Replay";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -65,9 +67,18 @@ import {
 
 import {
   ragLite,
+  type RagLiteCollectionAccess,
   type RagLiteCollectionDTO,
+  type RagLiteCollectionGrant,
   type RagLiteDocumentDTO,
 } from "~/api/rag";
+
+import {
+  accessPayloadOf,
+  accessValueOf,
+  CollectionAccessFields,
+  type CollectionAccessValue,
+} from "./CollectionAccessFields";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +86,9 @@ interface TreeNode {
   id: string;
   nodeType: "collection" | "document";
   name: string;
+  /** A collection's: who may read it. */
+  access?: RagLiteCollectionAccess;
+  grants?: RagLiteCollectionGrant[];
   description: string | null;
   parentId: string | null;
   documentCount?: number;
@@ -125,6 +139,8 @@ function buildTree(
       description: c.description,
       parentId: c.parent_id,
       documentCount: c.document_count,
+      access: c.access,
+      grants: c.grants,
       createdAt: c.created_at,
       subRows: [],
     });
@@ -315,6 +331,7 @@ function TreeRow({
   onRetry,
   onAddSub,
   onUploadTo,
+  onAccess,
   dragActiveId,
 }: {
   row: Row<TreeNode>;
@@ -324,6 +341,7 @@ function TreeRow({
   onRetry: (id: string) => void;
   onAddSub: (parentId: string) => void;
   onUploadTo: (colId: string) => void;
+  onAccess: (node: TreeNode) => void;
   dragActiveId: string | null;
 }) {
   const { t } = useTranslation();
@@ -420,6 +438,15 @@ function TreeRow({
                     <UploadFileIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
+                <Tooltip title={t("rag_lite.access.title")}>
+                  <IconButton
+                    size="small"
+                    data-collection-access-open={node.id}
+                    onClick={() => onAccess(node)}
+                  >
+                    <LockPersonIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </>
             )}
             {!isColl && node.status === "error" && (
@@ -471,7 +498,12 @@ export default function RagLiteKnowledgeBasePage() {
   const [dlgParentId, setDlgParentId] = useState<string | null>(null);
   const [dlgName, setDlgName] = useState("");
   const [dlgDesc, setDlgDesc] = useState("");
+  const [dlgAccess, setDlgAccess] = useState<CollectionAccessValue>(accessValueOf());
   const [creating, setCreating] = useState(false);
+  // The collection whose access is being changed, and the form's value.
+  const [accessFor, setAccessFor] = useState<TreeNode | null>(null);
+  const [accessDraft, setAccessDraft] = useState<CollectionAccessValue>(accessValueOf());
+  const [savingAccess, setSavingAccess] = useState(false);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -611,16 +643,37 @@ export default function RagLiteKnowledgeBasePage() {
         dlgName.trim(),
         dlgDesc.trim() || null,
         dlgParentId,
+        accessPayloadOf(dlgAccess),
       );
       setDlgOpen(false);
       setDlgName("");
       setDlgDesc("");
+      setDlgAccess(accessValueOf());
       setDlgParentId(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("common.create_failed"));
     } finally {
       setCreating(false);
+    }
+  }
+
+  function openAccess(node: TreeNode) {
+    setAccessFor(node);
+    setAccessDraft(accessValueOf(node));
+  }
+
+  async function saveAccess() {
+    if (!accessFor) return;
+    setSavingAccess(true);
+    try {
+      await ragLite.updateCollection(accessFor.id, accessPayloadOf(accessDraft));
+      setAccessFor(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error_unexpected"));
+    } finally {
+      setSavingAccess(false);
     }
   }
 
@@ -705,6 +758,14 @@ export default function RagLiteKnowledgeBasePage() {
             >
               {n.name}
             </Typography>
+            {isColl && n.access === "restricted" && (
+              <Tooltip title={t("rag_lite.access.restricted_tooltip")}>
+                <LockIcon
+                  data-collection-restricted={n.id}
+                  sx={{ fontSize: 14, color: "text.secondary", ml: 0.5 }}
+                />
+              </Tooltip>
+            )}
           </Box>
         );
       },
@@ -891,6 +952,7 @@ export default function RagLiteKnowledgeBasePage() {
                     onRetry={handleRetry}
                     onAddSub={openCreateDlg}
                     onUploadTo={triggerUpload}
+                    onAccess={openAccess}
                     dragActiveId={dragActiveId}
                   />
                 ))
@@ -953,6 +1015,9 @@ export default function RagLiteKnowledgeBasePage() {
             value={dlgDesc}
             onChange={(e) => setDlgDesc(e.target.value)}
           />
+          <Box sx={{ mt: 2 }}>
+            <CollectionAccessFields value={dlgAccess} onChange={setDlgAccess} disabled={creating} />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button
@@ -973,6 +1038,20 @@ export default function RagLiteKnowledgeBasePage() {
             ) : (
               t("common.create", "Create")
             )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Who can read a collection ── */}
+      <Dialog open={accessFor !== null} onClose={() => setAccessFor(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>{accessFor?.name}</DialogTitle>
+        <DialogContent>
+          <CollectionAccessFields value={accessDraft} onChange={setAccessDraft} disabled={savingAccess} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAccessFor(null)}>{t("common.cancel", "Cancel")}</Button>
+          <Button variant="contained" onClick={saveAccess} disabled={savingAccess} data-collection-access-save="">
+            {savingAccess ? <CircularProgress size={18} /> : t("common.save", "Save")}
           </Button>
         </DialogActions>
       </Dialog>

@@ -2079,7 +2079,16 @@
     "upload_here": "Hier hochladen",
     "new_collection": "Neue Sammlung",
     "empty_explorer": "Noch keine Sammlungen oder Dokumente. Erstellen Sie eine Sammlung oder laden Sie eine Datei hoch, um loszulegen.",
-    "create_collection": "Neue Sammlung"
+    "create_collection": "Neue Sammlung",
+    "access": {
+      "title": "Wer darf es lesen",
+      "everyone": "Alle, die den Chat nutzen",
+      "restricted": "Nur diese Personen und Gruppen",
+      "add": "Person oder Gruppe hinzufügen",
+      "nobody": "Noch niemand: Nur die Verwalter der Wissensbasis sehen sie.",
+      "hint": "Eine eingeschränkte Sammlung verbirgt auch die Sammlungen darin. Die Verwalter der Wissensbasis sehen jede Sammlung.",
+      "restricted_tooltip": "Nur für die Personen und Gruppen, für die sie freigegeben ist"
+    }
   },
   "node_profiles": {
     "page_title": "Maschinenprofile",
@@ -3494,7 +3503,7 @@
       "model_help": "Jede Anfrage nutzt dieses Modell, egal was die Anwendung verlangt. Ohne Modell antwortet der Agent nur Anwendungen, die selbst eines nennen; Fadenstacks Apps überlassen es dem Agenten.",
       "knowledge_and_tools": "Wissen und Tools",
       "knowledge": "Wissen",
-      "knowledge_help": "Wissenssammlungen, die der Agent durchsuchen darf.",
+      "knowledge_help": "Die Sammlungen, die der Agent durchsucht, samt den Sammlungen darin. Keine: alles, was seine Nutzer lesen dürfen.",
       "server_tools": "Server-Tools",
       "server_tools_default": "Wie im Chat",
       "server_tools_listed": "Nur diese",

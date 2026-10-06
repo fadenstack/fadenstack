@@ -14,12 +14,15 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
+import jwt as pyjwt
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import ProviderType
+from faden_gateway.services.gateway import knowledge as knowledge_mod
+from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
 from faden_gateway.settings import settings
@@ -202,6 +205,21 @@ async def test_not_offered_when_rag_lite_is_off_or_tools_are_ruled_out(
 # ── Run by the gateway ────────────────────────────────────────────
 
 
+def _reads_as_user_1(token: str, collections: list[str] | None = None) -> bool:
+    """A minute's knowledge token for the caller -- not the caller's own token, which the backend refuses."""
+    claims = pyjwt.decode(token, settings.jwt_secret, algorithms=["HS256"], audience=knowledge_mod.AUDIENCE)
+    return (
+        claims["sub"] == "user-1"
+        and claims["exp"] - claims["iat"] == knowledge_mod.TOKEN_TTL_S
+        and claims.get("collections") == collections
+    )
+
+
+def test_an_agents_searches_carry_its_collections() -> None:
+    auth = AuthContext(user_id="user-1", tenant_id="tenant-a", raw_claims={}, knowledge=("c-1", "c-2"))
+    assert _reads_as_user_1(knowledge_mod.reader_token(auth), ["c-1", "c-2"])
+
+
 @pytest.mark.anyio
 async def test_a_search_runs_as_the_user_and_its_results_go_back_to_the_model(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
@@ -214,7 +232,7 @@ async def test_a_search_runs_as_the_user_and_its_results_go_back_to_the_model(
     r = await _ask(client)
     assert r.status_code == 200
     assert r.json()["choices"][0]["message"]["content"] == "On 5 May [handbook.pdf]."
-    assert knowledge.searches[0]["api_token"] == _token()
+    assert _reads_as_user_1(knowledge.searches[0]["api_token"])
     assert knowledge.searches[0]["query"] == "launch date"
 
     second = model.sent[1]["messages"]
@@ -235,7 +253,9 @@ async def test_a_hit_is_read_further_with_knowledge_open(
     model = _Model(monkeypatch, _call("knowledge_open", {"document_id": "d1", "chunk": 3}), _say("Two gates."))
 
     await _ask(client)
-    assert knowledge.passages == [{"document_id": "d1", "chunk": 3, "around": 2, "api_token": _token()}]
+    (passage,) = knowledge.passages
+    assert {k: v for k, v in passage.items() if k != "api_token"} == {"document_id": "d1", "chunk": 3, "around": 2}
+    assert _reads_as_user_1(passage["api_token"])
     opened = json.loads(model.sent[1]["messages"][-1]["content"])
     assert opened["source"] == "handbook.pdf"
     assert opened["text"] == "Gates: security, load.\n\nAlice leads the launch on 5 May."

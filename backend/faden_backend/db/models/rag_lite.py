@@ -16,6 +16,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy import Enum as SAEnum
@@ -53,6 +54,13 @@ class RagLiteJobStatus(enum.StrEnum):
     FAILED = "failed"
 
 
+class RagLiteCollectionAccess(enum.StrEnum):
+    """Who may read a collection (services/knowledge_access.py)."""
+
+    EVERYONE = "everyone"
+    RESTRICTED = "restricted"
+
+
 class RagLiteEventType(enum.StrEnum):
     """Severities for ingest job events."""
 
@@ -84,6 +92,14 @@ class RagLiteCollection(Base):
     )
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Everyone, or only the people and groups in ``grants``; a restricted
+    # collection hides everything below it too.
+    access: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default=RagLiteCollectionAccess.EVERYONE.value,
+        server_default=RagLiteCollectionAccess.EVERYONE.value,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -97,6 +113,11 @@ class RagLiteCollection(Base):
     )
 
     # relationships
+    grants: Mapped[list[RagLiteCollectionGrant]] = relationship(
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     parent: Mapped[RagLiteCollection | None] = relationship(
         remote_side="RagLiteCollection.id",
         back_populates="children",
@@ -111,6 +132,39 @@ class RagLiteCollection(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+
+class RagLiteCollectionGrant(Base):
+    """A person or group a restricted collection is open to."""
+
+    __tablename__ = "rag_lite_collection_grants"
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_id", "principal_type", "principal_id", name="uq_rag_lite_collection_grant",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("rag_lite_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    #: ``user`` or ``group``.
+    principal_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    principal_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    collection: Mapped[RagLiteCollection] = relationship(back_populates="grants")
 
 
 class RagLiteDocument(Base):

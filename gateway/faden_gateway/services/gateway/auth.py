@@ -22,9 +22,11 @@ class AuthContext:
     user_id: str
     tenant_id: str
     raw_claims: dict[str, Any]
-    #: The bearer token the caller sent, for calls made on their behalf --
-    #: RAG Lite search on the backend checks the user's own permission.
+    #: The bearer token the caller sent, for calls made on their behalf.
     token: str | None = None
+    #: An agent's knowledge collections: its knowledge searches stay within them
+    #: (``None``: whatever the person may read).
+    knowledge: tuple[str, ...] | None = None
 
 
 # auto_error=False so we can return our own structured error response

@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.groups import UserGroup
 from faden_backend.db.models.users import User
 from faden_backend.services.rag.client import RagServiceClient, get_rag_client
 from faden_backend.web.api.admin.rag.schema import (
@@ -75,11 +79,21 @@ async def update_runtime_config(
 @router.post("/knowledge/search", response_model=RagKnowledgeSearchResponseDTO)
 async def search_knowledge(
     body: RagKnowledgeSearchRequestDTO,
-    _user: Annotated[User, Depends(require_permission("rag.search", "read"))],
+    user: Annotated[User, Depends(require_permission("rag.search", "read"))],
     rag_client: RagServiceClient = Depends(get_rag_client),
+    session: AsyncSession = Depends(get_db_session),
 ) -> RagKnowledgeSearchResponseDTO:
-    """Proxy ACL-aware knowledge search."""
-    payload = await rag_client.search_knowledge(body.model_dump(mode="json"))
+    """Proxy ACL-aware knowledge search, as the person who asks.
+
+    The RAG service filters by the principals in the request, and they came from the caller: anyone
+    could search as anyone. They are the signed-in person's now -- except for a superuser, who may
+    look at the knowledge base as someone else to check its access lists.
+    """
+    request = body.model_dump(mode="json")
+    if not user.is_superuser:
+        groups = (await session.execute(select(UserGroup.group_id).where(UserGroup.user_id == user.id))).scalars()
+        request["principals"] = {"user_id": str(user.id), "group_ids": sorted(str(g) for g in groups)}
+    payload = await rag_client.search_knowledge(request)
     return RagKnowledgeSearchResponseDTO.model_validate(payload)
 
 

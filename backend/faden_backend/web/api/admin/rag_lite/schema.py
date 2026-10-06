@@ -95,16 +95,36 @@ class RagLitePassageResponse(BaseModel):
 # -----------------------------------------------------------------------
 
 
+class RagLiteCollectionGrantIn(BaseModel):
+    """A person or group a restricted collection is open to."""
+
+    principal_type: Literal["user", "group"]
+    principal_id: uuid.UUID
+
+
+class RagLiteCollectionGrantDTO(RagLiteCollectionGrantIn):
+    #: The person's e-mail address or the group's name.
+    label: str | None = None
+
+
 class RagLiteCollectionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     description: str | None = None
     parent_id: uuid.UUID | None = None
+    #: Everyone, or only the people and groups in ``grants`` (a restricted collection hides what is below it).
+    access: Literal["everyone", "restricted"] = "everyone"
+    grants: list[RagLiteCollectionGrantIn] = Field(default_factory=list)
 
 
 class RagLiteCollectionUpdate(BaseModel):
+    """What changes: only the fields sent (``None`` for ``parent_id`` moves it to the top)."""
+
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | None = None
-    parent_id: uuid.UUID | None = ...
+    parent_id: uuid.UUID | None = None
+    access: Literal["everyone", "restricted"] | None = None
+    #: Replaces the grants when given.
+    grants: list[RagLiteCollectionGrantIn] | None = None
 
 
 class RagLiteCollectionDTO(BaseModel):
@@ -113,6 +133,9 @@ class RagLiteCollectionDTO(BaseModel):
     description: str | None
     parent_id: uuid.UUID | None = None
     document_count: int = 0
+    access: Literal["everyone", "restricted"] = "everyone"
+    #: Who a restricted collection is open to; listed for the knowledge base's managers only.
+    grants: list[RagLiteCollectionGrantDTO] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

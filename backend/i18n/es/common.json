@@ -2079,7 +2079,16 @@
     "upload_here": "Subir aquí",
     "new_collection": "Nueva colección",
     "empty_explorer": "Aún no hay colecciones ni documentos. Cree una colección o suba un archivo para empezar.",
-    "create_collection": "Nueva colección"
+    "create_collection": "Nueva colección",
+    "access": {
+      "title": "Quién puede leerla",
+      "everyone": "Todos los que usan el chat",
+      "restricted": "Solo estas personas y grupos",
+      "add": "Añadir una persona o un grupo",
+      "nobody": "Nadie todavía: solo la ven los gestores de la base de conocimiento.",
+      "hint": "Una colección restringida también oculta las colecciones que contiene. Los gestores de la base de conocimiento ven todas las colecciones.",
+      "restricted_tooltip": "Solo para las personas y grupos a los que está abierta"
+    }
   },
   "node_profiles": {
     "page_title": "Perfiles de máquina",
@@ -3494,7 +3503,7 @@
       "model_help": "Cada solicitud usa este modelo, pida lo que pida la aplicación. Sin modelo solo responde a aplicaciones que nombran uno; las aplicaciones de Fadenstack lo dejan al agente.",
       "knowledge_and_tools": "Conocimiento y herramientas",
       "knowledge": "Conocimiento",
-      "knowledge_help": "Colecciones de conocimiento en las que el agente puede buscar.",
+      "knowledge_help": "Las colecciones que consulta el agente, con las que contienen. Ninguna: todo lo que su usuario puede leer.",
       "server_tools": "Herramientas del servidor",
       "server_tools_default": "Las de un chat",
       "server_tools_listed": "Solo estas",

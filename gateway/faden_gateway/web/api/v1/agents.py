@@ -19,6 +19,7 @@ Responses are exactly the OpenAI shapes, streamed or whole.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 from datetime import datetime
@@ -274,6 +275,8 @@ async def agent_chat_completions(
     Tools the agent's contract does not list are held back: ``X-Faden-Held-Tools`` names them.
     """
     auth, agent = caller
+    # Its knowledge searches stay within the collections it was given; with none, what its person may read.
+    auth = dataclasses.replace(auth, knowledge=tuple(agent.agent.knowledge) or None)
     held: list[dict[str, Any]] = []
 
     def prepare(payload: dict[str, Any]) -> dict[str, Any]:

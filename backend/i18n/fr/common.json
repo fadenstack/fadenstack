@@ -1421,7 +1421,16 @@
     "upload_here": "Téléverser ici",
     "new_collection": "Nouvelle collection",
     "empty_explorer": "Aucune collection ou document pour le moment. Créez une collection ou téléversez un fichier pour commencer.",
-    "create_collection": "Nouvelle collection"
+    "create_collection": "Nouvelle collection",
+    "access": {
+      "title": "Qui peut la lire",
+      "everyone": "Tous ceux qui utilisent le chat",
+      "restricted": "Seulement ces personnes et groupes",
+      "add": "Ajouter une personne ou un groupe",
+      "nobody": "Personne pour l'instant : seuls les gestionnaires de la base de connaissances la voient.",
+      "hint": "Une collection restreinte masque aussi les collections qu'elle contient. Les gestionnaires de la base de connaissances voient toutes les collections.",
+      "restricted_tooltip": "Seulement pour les personnes et groupes auxquels elle est ouverte"
+    }
   },
   "agents_api_docs": {
     "title": "Point d'accès",
@@ -3494,7 +3503,7 @@
       "model_help": "Chaque requête utilise ce modèle, quoi que demande l'application. Sans modèle, seule une application qui en nomme un obtient une réponse ; les applications de Fadenstack le laissent à l'agent.",
       "knowledge_and_tools": "Connaissances et outils",
       "knowledge": "Connaissances",
-      "knowledge_help": "Les collections de connaissances que l'agent peut interroger.",
+      "knowledge_help": "Les collections que l'agent consulte, avec celles qu'elles contiennent. Aucune : tout ce que son utilisateur peut lire.",
       "server_tools": "Outils du serveur",
       "server_tools_default": "Comme un chat",
       "server_tools_listed": "Seulement ceux-ci",

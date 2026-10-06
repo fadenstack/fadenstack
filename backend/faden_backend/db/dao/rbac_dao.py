@@ -176,12 +176,16 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         # Everyone can make skills of their own from a chat and share them;
         # making one the whole organization sees is skills:publish.
         "skills": ["read", "create", "share"],
+        # The knowledge base is read here, and changed by its managers (admin,
+        # rag_manager, rag_editor); what a collection shows whom is its access
+        # setting (services/knowledge_access.py). The write rights this role
+        # used to have are taken from existing installs by kn0wacc3ss.
         "rag.runtime": ["read"],
-        "rag.containers": ["create", "read", "update", "delete"],
-        "rag.assets": ["create", "read", "update", "delete"],
-        "rag.publish": ["execute", "read"],
+        "rag.containers": ["read"],
+        "rag.assets": ["read"],
+        "rag.publish": ["read"],
         "rag.jobs": ["read"],
-        "rag.search": ["read", "write"],
+        "rag.search": ["read"],
     },
 }
 

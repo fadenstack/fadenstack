@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import Depends
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import func, select, text, update
+from sqlalchemy import false, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.rag_lite import (
     RagLiteChunk,
     RagLiteCollection,
+    RagLiteCollectionGrant,
     RagLiteDocument,
     RagLiteDocumentStatus,
     RagLiteEventType,
@@ -22,6 +24,57 @@ from faden_backend.db.models.rag_lite import (
     RagLiteIngestJob,
     RagLiteJobStatus,
 )
+
+
+@dataclass(frozen=True)
+class CollectionScope:
+    """Which chunks a search may see: those of ``collections``, and with ``unfiled`` those in no collection.
+
+    Built from who is searching (services/knowledge_access.py); ``None`` in its place means everything.
+    An empty scope matches nothing -- unlike an empty ``collection_ids``, which has always meant "all".
+    """
+
+    collections: frozenset[uuid.UUID]
+    unfiled: bool = False
+
+    def narrowed(self, collection_ids: list[uuid.UUID] | None) -> CollectionScope:
+        """This scope within the collections a search asked for (those alone, nothing unfiled)."""
+        if not collection_ids:
+            return self
+        return CollectionScope(self.collections & frozenset(collection_ids), unfiled=False)
+
+    def where(self) -> tuple[str, dict[str, Any], tuple[str, ...]]:
+        """The SQL condition on ``c.collection_id``, its parameters, and a key for cached statistics."""
+        cids = sorted(str(c) for c in self.collections)
+        parts: list[str] = []
+        params: dict[str, Any] = {}
+        if cids:
+            parts.append("c.collection_id = ANY(CAST(:cids AS uuid[]))")
+            params["cids"] = cids
+        if self.unfiled:
+            parts.append("c.collection_id IS NULL")
+        sql = f"AND ({' OR '.join(parts)})" if parts else "AND FALSE"
+        return sql, params, (*cids, *(("<unfiled>",) if self.unfiled else ()))
+
+    def documents(self) -> Any:
+        """The same, as a condition on documents."""
+        parts: list[Any] = []
+        if self.collections:
+            parts.append(RagLiteDocument.collection_id.in_(self.collections))
+        if self.unfiled:
+            parts.append(RagLiteDocument.collection_id.is_(None))
+        return or_(*parts) if parts else false()
+
+
+def _scope_of(
+    collection_ids: list[uuid.UUID] | None, scope: CollectionScope | None,
+) -> CollectionScope | None:
+    """The scope a search runs in: what may be seen, within what was asked for."""
+    if scope is not None:
+        return scope.narrowed(collection_ids)
+    if collection_ids:
+        return CollectionScope(frozenset(collection_ids))
+    return None
 
 
 # -----------------------------------------------------------------------
@@ -81,6 +134,40 @@ class RagLiteCollectionDAO:
         if parent_id is not ...:
             col.parent_id = parent_id
         return col
+
+    async def grants_of(self, collection_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[RagLiteCollectionGrant]]:
+        """The grants of each of *collection_ids*."""
+        if not collection_ids:
+            return {}
+        rows = await self.session.execute(
+            select(RagLiteCollectionGrant).where(RagLiteCollectionGrant.collection_id.in_(collection_ids)),
+        )
+        out: dict[uuid.UUID, list[RagLiteCollectionGrant]] = {}
+        for grant in rows.scalars():
+            out.setdefault(grant.collection_id, []).append(grant)
+        return out
+
+    async def set_access(
+        self, collection: RagLiteCollection, access: str, grants: list[tuple[str, uuid.UUID]] | None,
+    ) -> None:
+        """Set *collection*'s access, and with *grants* replace who it is open to."""
+        collection.access = access
+        if grants is not None:
+            await self.session.execute(
+                sa_delete(RagLiteCollectionGrant).where(RagLiteCollectionGrant.collection_id == collection.id),
+            )
+            for principal_type, principal_id in dict.fromkeys(grants):
+                self.session.add(
+                    RagLiteCollectionGrant(
+                        id=uuid.uuid4(),
+                        collection_id=collection.id,
+                        principal_type=principal_type,
+                        principal_id=principal_id,
+                    ),
+                )
+        await self.session.flush()
+        # The flush expired what the database sets (updated_at); read it back here, not lazily later.
+        await self.session.refresh(collection)
 
     async def list_with_doc_counts(self) -> list[tuple[RagLiteCollection, int]]:
         """Return all collections with their direct document counts."""
@@ -161,10 +248,13 @@ class RagLiteDocumentDAO:
         *,
         limit: int = 100,
         offset: int = 0,
+        scope: CollectionScope | None = None,
     ) -> list[RagLiteDocument]:
         query = select(RagLiteDocument).order_by(RagLiteDocument.created_at.desc())
         if collection_id is not None:
             query = query.where(RagLiteDocument.collection_id == collection_id)
+        if scope is not None:
+            query = query.where(scope.documents())
         query = query.limit(limit).offset(offset)
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -232,14 +322,13 @@ class RagLiteDocumentDAO:
         *,
         limit: int = 500,
         offset: int = 0,
+        scope: CollectionScope | None = None,
     ) -> list[RagLiteDocument]:
-        """Return all documents regardless of collection."""
-        query = (
-            select(RagLiteDocument)
-            .order_by(RagLiteDocument.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        """Return all documents regardless of collection (within *scope*)."""
+        query = select(RagLiteDocument).order_by(RagLiteDocument.created_at.desc())
+        if scope is not None:
+            query = query.where(scope.documents())
+        query = query.limit(limit).offset(offset)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -305,6 +394,7 @@ class RagLiteChunkDAO:
         query_vector: list[float],
         top_k: int = 5,
         collection_ids: list[uuid.UUID] | None = None,
+        scope: CollectionScope | None = None,
     ) -> list[dict[str, Any]]:
         """Cosine-similarity search via pgvector ``<=>`` operator.
 
@@ -318,9 +408,10 @@ class RagLiteChunkDAO:
             "query": str(query_vector),
             "top_k": top_k,
         }
-        if collection_ids:
-            filters = "AND c.collection_id = ANY(CAST(:cids AS uuid[]))"
-            params["cids"] = [str(cid) for cid in collection_ids]
+        searched = _scope_of(collection_ids, scope)
+        if searched is not None:
+            filters, where_params, _key = searched.where()
+            params.update(where_params)
             # When Postgres uses the HNSW index here, it finds the nearest
             # chunks of all collections and the filter then drops the others'
             # -- with a small collection among large ones, fewer results than
@@ -368,6 +459,7 @@ class RagLiteChunkDAO:
         query: str,
         top_k: int = 5,
         collection_ids: list[uuid.UUID] | None = None,
+        scope: CollectionScope | None = None,
     ) -> list[dict[str, Any]]:
         """Keyword search over ``content_tsv``, ranked by BM25.
 
@@ -400,21 +492,21 @@ class RagLiteChunkDAO:
         taken apart into a few words, not all of its hundred.
         """
         filters = ""
-        scope: dict[str, Any] = {}
-        if collection_ids:
-            filters = "AND c.collection_id = ANY(CAST(:cids AS uuid[]))"
-            scope["cids"] = [str(cid) for cid in collection_ids]
-        key = tuple(sorted(scope.get("cids", ["*"])))
+        where: dict[str, Any] = {}
+        key: tuple[str, ...] = ("*",)
+        searched = _scope_of(collection_ids, scope)
+        if searched is not None:
+            filters, where, key = searched.where()
 
         lexemes: list[str] = (await self.session.execute(
             text("SELECT tsvector_to_array(to_tsvector('english', :query))"), {"query": query},
         )).scalar_one() or []
         if not lexemes:
             return []
-        n, avgdl = await self._collection_stats(key, filters, scope)
+        n, avgdl = await self._collection_stats(key, filters, where)
         if not n:
             return []
-        df = await self._document_counts(key, lexemes, n, filters, scope)
+        df = await self._document_counts(key, lexemes, n, filters, where)
         known = sorted((t for t in lexemes if df[t] > 0), key=lambda t: df[t])
         candidates: list[str] = []
         matched = 0.0
@@ -463,7 +555,7 @@ class RagLiteChunkDAO:
             """,
         )
         params = {
-            **scope, "lexemes": known, "dfs": [df[t] for t in known], "candidates": candidates,
+            **where, "lexemes": known, "dfs": [df[t] for t in known], "candidates": candidates,
             "n": float(n), "avgdl": avgdl, "top_k": top_k,
         }
         rows = (await self.session.execute(sql, params)).mappings().all()

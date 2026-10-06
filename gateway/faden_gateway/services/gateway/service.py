@@ -2968,7 +2968,7 @@ class GatewayService:
                 if req.token_mapping:
                     arguments = _restored(arguments, req.token_mapping)
                 assert self.rag_lite_client is not None  # noqa: S101
-                tools = knowledge.KnowledgeTools(self.rag_lite_client, token=auth.token)
+                tools = knowledge.KnowledgeTools(self.rag_lite_client, token=knowledge.reader_token(auth))
                 ran = await tools.run(name, arguments)
                 content, is_error = ran.content, ran.is_error
             elif name == attachment_search.NAME:

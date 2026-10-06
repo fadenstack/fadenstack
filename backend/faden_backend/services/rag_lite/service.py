@@ -13,6 +13,7 @@ import uuid
 from typing import Any
 
 from faden_backend.db.dao.rag_lite_dao import (
+    CollectionScope,
     RagLiteChunkDAO,
     RagLiteCollectionDAO,
     RagLiteDocumentDAO,
@@ -268,8 +269,9 @@ class RagLiteService:
         hybrid: bool = False,
         reranker: RerankClient | None = None,
         candidates: int = 10,
+        scope: CollectionScope | None = None,
     ) -> list[dict[str, Any]]:
-        """The *top_k* chunks for *query*.
+        """The *top_k* chunks for *query*, within *scope* (what the searcher may read; ``None``: all).
 
         By vector alone, or -- *hybrid* -- by vector and by keyword, the two
         rankings fused by rank. With a *reranker*, the best *candidates* of
@@ -285,7 +287,7 @@ class RagLiteService:
         embedding = asyncio.ensure_future(embedding_client.embed_texts([query]))
         try:
             lexical = (
-                await chunk_dao.search_lexical(query, top_k=depth, collection_ids=collection_ids)
+                await chunk_dao.search_lexical(query, top_k=depth, collection_ids=collection_ids, scope=scope)
                 if hybrid else []
             )
             vectors = await embedding
@@ -295,6 +297,7 @@ class RagLiteService:
             query_vector=vectors[0],
             top_k=depth,
             collection_ids=collection_ids,
+            scope=scope,
         )
         if hybrid:
             ranked = fuse(ranked, lexical)

@@ -1419,7 +1419,16 @@
     "upload_here": "Upload Here",
     "new_collection": "New Collection",
     "empty_explorer": "No collections or documents yet. Create a collection or upload a file to get started.",
-    "create_collection": "New Collection"
+    "create_collection": "New Collection",
+    "access": {
+      "title": "Who can read it",
+      "everyone": "Everyone who uses the chat",
+      "restricted": "Only these people and groups",
+      "add": "Add a person or group",
+      "nobody": "Nobody yet: only the knowledge base's managers see it.",
+      "hint": "A restricted collection also hides the collections inside it. The knowledge base's managers see every collection.",
+      "restricted_tooltip": "Only for the people and groups it is open to"
+    }
   },
   "agents_api_docs": {
     "title": "Endpoint",
@@ -3492,7 +3501,7 @@
       "model_help": "Every request uses this model, whatever the application asks for. Without one, only an application that names a model is answered; Fadenstack's apps leave it to the agent.",
       "knowledge_and_tools": "Knowledge and tools",
       "knowledge": "Knowledge",
-      "knowledge_help": "Knowledge collections the agent may search.",
+      "knowledge_help": "The collections the agent searches, and those inside them. None: whatever its user may read.",
       "server_tools": "Server tools",
       "server_tools_default": "What a chat gets",
       "server_tools_listed": "Only these",

@@ -16,6 +16,7 @@ import Typography from "@mui/material/Typography";
 
 import type { AgentDefinition, LocalMcpMode } from "~/api/agents";
 import { chatApi } from "~/api/chatClient";
+import { ragLite } from "~/api/rag";
 import { ChipListField } from "~/components/ChipListField";
 import { SectionCard as Section } from "~/components/SectionCard";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -50,6 +51,13 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
     [],
     { initialValue: [] as string[] },
   );
+  // Picked from the collections there are: the field took typed text, and a name typed for an id matched nothing.
+  const { data: collections } = useAsyncData(
+    async () => (await ragLite.listCollections().catch(() => [])).map((c) => ({ id: c.id, name: c.name })),
+    [],
+    { initialValue: [] as { id: string; name: string }[] },
+  );
+  const collectionName = new Map(collections.map((c) => [c.id, c.name]));
   const set = <K extends keyof AgentDefinition>(key: K, next: AgentDefinition[K]) => onChange({ ...value, [key]: next });
   const toolsMode = serverToolsMode(value);
   const piiSwitch = piiModeSwitch(value);
@@ -81,12 +89,22 @@ export function AgentDefinitionEditor({ value, onChange, readOnly = false }: Age
       </Section>
 
       <Section title={t("agents.definition.knowledge_and_tools")}>
-        <ChipListField
-          label={t("agents.definition.knowledge")}
-          helperText={t("agents.definition.knowledge_help")}
+        <Autocomplete<string, true, false, false>
+          multiple
+          options={collections.map((c) => c.id)}
           value={value.knowledge}
           disabled={readOnly}
-          onChange={(next) => set("knowledge", next)}
+          getOptionLabel={(id) => collectionName.get(id) ?? id}
+          onChange={(_, next) => set("knowledge", next)}
+          data-agent-knowledge=""
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              size="small"
+              label={t("agents.definition.knowledge")}
+              helperText={t("agents.definition.knowledge_help")}
+            />
+          )}
         />
         <Stack spacing={0.5}>
           <Typography variant="subtitle2">{t("agents.definition.server_tools")}</Typography>

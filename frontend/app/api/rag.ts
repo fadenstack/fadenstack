@@ -2,6 +2,8 @@
  * Admin RAG API client — typed wrappers for /api/admin/rag endpoints.
  */
 
+import type { PrincipalOption, PrincipalType } from "./principals";
+
 const BASE = "/api/admin/rag";
 
 export type RagEmbeddingProvider = "openai_compat" | "local" | "huggingface";
@@ -449,12 +451,25 @@ export interface RagLiteSearchResponse {
   query: string;
 }
 
+/** Who may read a collection: everyone, or only the people and groups in its grants. */
+export type RagLiteCollectionAccess = "everyone" | "restricted";
+
+export interface RagLiteCollectionGrant {
+  principal_type: PrincipalType;
+  principal_id: string;
+  /** The person's e-mail address or the group's name. */
+  label?: string | null;
+}
+
 export interface RagLiteCollectionDTO {
   id: string;
   name: string;
   description: string | null;
   parent_id: string | null;
   document_count: number;
+  access?: RagLiteCollectionAccess;
+  /** Listed for the knowledge base's managers only. */
+  grants?: RagLiteCollectionGrant[];
   created_at: string;
   updated_at: string;
 }
@@ -537,10 +552,11 @@ export const ragLite = {
     name: string,
     description?: string | null,
     parentId?: string | null,
+    access?: { access: RagLiteCollectionAccess; grants: RagLiteCollectionGrant[] },
   ) {
     return request<RagLiteCollectionDTO>("/collections", {
       method: "POST",
-      body: JSON.stringify({ name, description, parent_id: parentId ?? null }),
+      body: JSON.stringify({ name, description, parent_id: parentId ?? null, ...access }),
     });
   },
   updateCollection(
@@ -549,6 +565,8 @@ export const ragLite = {
       name?: string;
       description?: string | null;
       parent_id?: string | null;
+      access?: RagLiteCollectionAccess;
+      grants?: RagLiteCollectionGrant[];
     },
   ) {
     return request<RagLiteCollectionDTO>(`/collections/${collectionId}`, {
@@ -558,6 +576,10 @@ export const ragLite = {
   },
   deleteCollection(collectionId: string) {
     return request<void>(`/collections/${collectionId}`, { method: "DELETE" });
+  },
+  /** People and groups a collection can be opened to. */
+  findPrincipals(q: string) {
+    return request<PrincipalOption[]>(`/principals?q=${encodeURIComponent(q)}`);
   },
   listAllDocuments(limit = 500, offset = 0) {
     const params = new URLSearchParams({
