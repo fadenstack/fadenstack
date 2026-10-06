@@ -65,3 +65,14 @@ def test_only_the_front_door_is_on_the_network_by_default() -> None:
         if port and port[0] not in ("127.0.0.1", "::1")
     )
     assert public == [("nginx", ("0.0.0.0", "443")), ("nginx", ("0.0.0.0", "80"))]
+
+
+def test_the_backend_and_its_worker_share_the_knowledge_file_store() -> None:
+    """The backend stores an upload and the worker ingests it: each had its own store, so no ingest worked."""
+    services = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]
+    store = "/data/faden/rag-lite"
+    mounts = {
+        name: next((v.split(":")[0] for v in services[name].get("volumes", []) if v.split(":")[1:2] == [store]), None)
+        for name in ("faden-backend", "faden-backend-worker")
+    }
+    assert mounts["faden-backend"] is not None and mounts["faden-backend"] == mounts["faden-backend-worker"], mounts

@@ -518,6 +518,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - faden_models:/srv/faden/models
+      # Knowledge base uploads (rag_lite.file_store_root): written here, read by faden-backend-worker,
+      # which ingests them. Each container had its own: the worker found no file, every ingest failed,
+      # and the uploads went with the container.
+      - faden_rag_lite:/data/faden/rag-lite
       # Runtime monitoring — shared with the prometheus + grafana
       # services (see their mounts). The backend generates
       # prometheus/targets.json and dashboards/*.json here; grafana
@@ -606,6 +610,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - faden_models:/srv/faden/models
+      - faden_rag_lite:/data/faden/rag-lite
 
   # -----------------------------
   # frontend (React admin console)
@@ -926,3 +931,4 @@ volumes:
   grafana_data:
   prom_data:
   faden_models:
+  faden_rag_lite:

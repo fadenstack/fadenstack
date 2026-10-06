@@ -28,6 +28,10 @@ from faden_backend.db.models.rag_lite import (
     RagLiteCollectionGrant,
     RagLiteDocument,
     RagLiteDocumentStatus,
+    RagLiteEventType,
+    RagLiteIngestEvent,
+    RagLiteIngestJob,
+    RagLiteJobStatus,
 )
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services import knowledge_access
@@ -336,3 +340,31 @@ async def test_managers_find_people_and_groups_to_open_a_collection_to(
     _as(fastapi_app, world.bob)
     assert (await client.get(f"{API}/principals", params={"q": "hr"})).status_code == 403
 
+
+
+async def test_ingest_jobs_load_with_their_events_and_keep_to_the_reader(
+    world: World, fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession,
+) -> None:
+    """A job's page answered 500 for every job (its events loaded lazily); a hidden document's job is not there."""
+    jobs = {}
+    for doc in (world.handbook_doc, world.hr_doc):
+        job = RagLiteIngestJob(id=uuid.uuid4(), document_id=doc.id, status=RagLiteJobStatus.COMPLETED)
+        dbsession.add(job)
+        await dbsession.flush()
+        dbsession.add(RagLiteIngestEvent(id=uuid.uuid4(), job_id=job.id, event_type=RagLiteEventType.INFO,
+                                         message=f"ingested {doc.filename}"))
+        jobs[doc.filename] = job
+    await dbsession.flush()  # the jobs' events are not loaded in this session: the endpoint has to load them
+
+    _as(fastapi_app, world.manager)
+    one = await client.get(f"{API}/jobs/{jobs['hr.txt'].id}")
+    assert one.status_code == 200, one.text
+    assert one.json()["events"][0]["message"] == "ingested hr.txt"
+    listed = await client.get(f"{API}/jobs")
+    assert listed.status_code == 200, listed.text
+    assert {j["id"] for j in listed.json()} >= {str(j.id) for j in jobs.values()}
+
+    _as(fastapi_app, world.bob)
+    assert (await client.get(f"{API}/jobs/{jobs['hr.txt'].id}")).status_code == 404
+    seen = {j["id"] for j in (await client.get(f"{API}/jobs")).json()}
+    assert str(jobs["handbook.txt"].id) in seen and str(jobs["hr.txt"].id) not in seen

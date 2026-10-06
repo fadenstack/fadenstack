@@ -11,6 +11,7 @@ from fastapi import Depends
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import false, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.rag_lite import (
@@ -729,8 +730,12 @@ class RagLiteIngestJobDAO:
         return job
 
     async def get(self, job_id: uuid.UUID) -> RagLiteIngestJob | None:
+        # With its events: they load lazily otherwise, which an async session cannot -- the job's page
+        # answered 500 for every job.
         result = await self.session.execute(
-            select(RagLiteIngestJob).where(RagLiteIngestJob.id == job_id),
+            select(RagLiteIngestJob)
+            .where(RagLiteIngestJob.id == job_id)
+            .options(selectinload(RagLiteIngestJob.events)),
         )
         return result.scalar_one_or_none()
 
@@ -769,7 +774,7 @@ class RagLiteIngestJobDAO:
         limit: int = 50,
         status_filter: RagLiteJobStatus | None = None,
     ) -> list[RagLiteIngestJob]:
-        query = select(RagLiteIngestJob).order_by(
+        query = select(RagLiteIngestJob).options(selectinload(RagLiteIngestJob.events)).order_by(
             RagLiteIngestJob.created_at.desc(),
         )
         if status_filter:
