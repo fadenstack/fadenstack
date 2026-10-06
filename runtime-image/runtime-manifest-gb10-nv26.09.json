@@ -3,7 +3,7 @@
   "runtime_id": "faden-ray-vllm-gb10-ray2.58-nv26.09",
   "flavor": "gb10",
   "release_tag": "faden/ray-vllm-gb10:ray2.58-nv26.09",
-  "image_id": "sha256:33071d56add0f450b093a45e0b99f89d66b31c663451a086b2c78bf4f941e803",
+  "image_id": "sha256:c67050bf260933cccf03de0eb6aa40b846daf871d5b94c3cde468fb364f118f0",
   "rootfs_layers": [
     "sha256:01c818468a75d080ea22eed90a9fa08caeb68931c680c3023b01a0b0427a8641",
     "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
@@ -52,19 +52,19 @@
     "sha256:e2da3846d19fdb9b9604ba8f271d65dc2eefb347ebb8a4862f482ba3fe7548ff",
     "sha256:98f0bd5ece19ed83f2b2bcda49dd33337c9f1a52f8f6bf850bea53f4628ae701",
     "sha256:6a8949a3a0cd3fcd86f4005d5d09f7f78620c4f370cf667c9daa7e8a1167a7fb",
-    "sha256:37a933b1cd9f0b92b825705f7ebb9c8a63d55dffd7db278d33009617af1b05e5",
-    "sha256:4b969e5a94436f9206c61525bb777f1d40d8f4f45c038c6b2f6935bb1ba6887c",
-    "sha256:bd10e93922bb1723d705bd546e50542fea6a2486eed547d4efc323e14209ec51",
-    "sha256:addc41700f05424d9fd3c8a88fc6fa3678cfac14295edcdd80cbab51156979ed",
-    "sha256:bc49630d615d1208cd22c453e5ac31ce2c727c6786544a887f521420b387271c",
-    "sha256:ce60126c8d6092e9d1929ac6085c8f0974b30fbed23c3c5dc9879394100c5734",
-    "sha256:bd0b0c549cc1c07022dd7bbf9cc3f1cb1210b5c6ee0a0e19a624fdfda5bc8ec6",
-    "sha256:9e78bacea15b20150305834b4ceebd5930899d359423efedb6b64f16a59dd6cf",
-    "sha256:8d6206f8dde48c557f851d5c61bea7a4f73ba09d9b2d0de5beafe91fed673c97",
+    "sha256:6cae9b3c200fea6c05d3e63fd6fe988839563311b7ef1556c77ca99b8065f211",
+    "sha256:f7d2f89da02165c7499669e1e85296200d31155822b7f26e310d4dcd0bf3dc9c",
+    "sha256:2a4c303626fc6ca53cd87e99c633f8e8f71507da8d9abd8d0a54024db8deaefb",
+    "sha256:b16d4cd90c87bc991331302f7857bb072ab50049452071ab2ddb1209dc9d23da",
+    "sha256:d4d3c12bf4e4da3bdcb0182da5c1ac50f28f2ac2712014668688655024d343e5",
+    "sha256:2ae006a253246b4cdb8ee4fd3036d6052ca8b84f99b28650e32b840724c05f1d",
+    "sha256:abe5af71ce9feb1e2a8ee63be29461c3a88c431b2b6e69032c7dae9e81f8964a",
+    "sha256:dfb4e37f30927e2ab992846c3a0ec1eeebe2f40799a3edd6771f23f98ca1886f",
+    "sha256:bd773309d4169dae8a9865cc9b4dc30f8c50ba3ed1d83c87700f47a30a9680ce",
     "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
     "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
   ],
-  "repo_digest": "sha256:33071d56add0f450b093a45e0b99f89d66b31c663451a086b2c78bf4f941e803",
+  "repo_digest": "sha256:c67050bf260933cccf03de0eb6aa40b846daf871d5b94c3cde468fb364f118f0",
   "base_image": {
     "repository": "nvcr.io/nvidia/vllm",
     "tag": "26.09-py3",
@@ -1238,7 +1238,7 @@
       {
         "name": "Head GPU Detection",
         "status": "PASS",
-        "detail": "NVIDIA GB10 | Compute Cap: 12.1 | 10.4GB free / 121.7GB total"
+        "detail": "NVIDIA GB10 | Compute Cap: 12.1 | 97.2GB free / 121.7GB total"
       },
       {
         "name": "Direct NIC enp1s0f1np1",
@@ -1263,7 +1263,7 @@
       {
         "name": "Cross-Node Distributed GPU Tasks",
         "status": "PASS",
-        "detail": "Tasks completed across: [{'task_id': 0, 'hostname': 'gpu-02', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92594.3}, {'task_id': 1, 'hostname': 'gpu-01', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92625.59}]"
+        "detail": "Tasks completed across: [{'task_id': 0, 'hostname': 'gpu-02', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92629.05}, {'task_id': 1, 'hostname': 'gpu-01', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92746.51}]"
       },
       {
         "name": "Distributed Ray Serve Health (TP=2)",
@@ -1293,7 +1293,7 @@
     ],
     "checks_passed": 11,
     "checks_total": 11,
-    "timestamp": "2026-09-29T20:36:52Z",
+    "timestamp": "2026-10-06T17:00:12Z",
     "detail": "NVIDIA DGX Spark Two-Node Pair (GB10): head, worker"
   }
 }

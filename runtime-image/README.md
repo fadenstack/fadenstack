@@ -62,7 +62,7 @@ Today:
 | Manifest | Base | vLLM | Certified | Channel |
 |---|---|---|---|---|
 | `runtime-manifest-gb10-nv26.08.json` | NVIDIA vLLM 26.08 | 0.27.1 | passed 11/11, 2026-09-29 | stable |
-| `runtime-manifest-gb10-nv26.09.json` | NVIDIA vLLM 26.09 | 0.29.0 (+ `vllm_compat.py`) | passed 11/11, 2026-09-29 | preview |
+| `runtime-manifest-gb10-nv26.09.json` | NVIDIA vLLM 26.09 | 0.29.0 (+ `vllm_compat.py`) | passed 11/11, 2026-10-06 | preview |
 | `runtime-manifest-x86_64.json` | python:3.12 slim | 0.26.0 | no | stable |
 
 ## The manifests are minted, not written
