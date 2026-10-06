@@ -1,5 +1,5 @@
 /**
- * Steps 2-4 of `docs/onboarding-a-node.md`, walked in the console.
+ * Steps 2-4 of `docs/help/pages/operate/clusters.md`, walked in the console.
  *
  * One machine, which is what the guide describes for a first cluster. Every
  * screen is captured into `docs/images/onboarding/`.

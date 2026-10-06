@@ -160,7 +160,7 @@ jobs:
           body: |
             Fadenstack-authored source and deployment files in this release are
             licensed under Apache-2.0. Third-party packages and images retain
-            their own terms; see LICENSE, NOTICE, and docs/third-party-components.md.
+            their own terms; see LICENSE, NOTICE, and docs/help/pages/operate/third-party.md.
 
             The wheel and standalone binaries are attached to this release.
             PyPI publication runs when `PYPI_API_TOKEN` is configured.

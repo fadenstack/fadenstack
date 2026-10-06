@@ -1,7 +1,7 @@
 /**
  * Agents API (`/api/agents`): agents, their immutable versions, who may use
  * them (grants) and who looks after them (maintainers), and what they did
- * (usage, the SDKs' events, device sign-ins). See docs/agents.md.
+ * (usage, the SDKs' events, device sign-ins). See docs/help/pages/administer/agents.md.
  *
  * Every route answers for the caller's rights: maintainers manage their own
  * agents, `agents:manage` manages all of them, `agents:delete` deletes retired

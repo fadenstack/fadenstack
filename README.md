@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="#quick-start"><b>Quick start</b></a> ·
-  <a href="docs/installing.md">Install guide</a> ·
+  <a href="docs/help/pages/operate/installing.md">Install guide</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="#moving-from-llmport">Moving from LLM.Port</a> ·
   <a href="https://github.com/fadenstack">All repositories</a>
@@ -42,7 +42,7 @@ This repository is the Fadenstack server and everything that installs and runs i
 Fadenstack was called LLM.Port up to release 0.3.
 
 <p align="center">
-  <img src="docs/images/readme/dashboard.png" width="100%" alt="The admin dashboard: all requests served in-house on the dgx-pair cluster, nothing needing attention, and the key metrics for today.">
+  <img src="docs/images/readme/dashboard.png" width="100%" alt="The admin dashboard: all requests served in-house on the organisation's own cluster, nothing needing attention, and the key metrics for today.">
 </p>
 
 ## What it does
@@ -62,7 +62,7 @@ Fadenstack was called LLM.Port up to release 0.3.
 ### For developers: one endpoint for apps and agents
 
 - An OpenAI-compatible `/v1` for chat completions (streamed or whole), embeddings and the model list. Any OpenAI SDK works: change the base URL and the key.
-- Every request goes through the same steps as the chat: limits, routing, skills, PII, tools and the audit log. See [what the gateway does with a request](docs/gateway-pipeline.md).
+- Every request goes through the same steps as the chat: limits, routing, skills, PII, tools and the audit log. See [what happens to a request](docs/help/pages/administer/requests.md).
 - **Tools on the server and on the user's side.** MCP servers are registered once on the server. Agents can also connect over a WebSocket and offer local tools, such as the open document or files on the user's machine. Each session's policy decides where its tools run: on the server, locally or both.
 - SDKs for Python (`faden`) and .NET (`Faden.Client`) add sessions, memory, tools and attachments to the OpenAI SDKs. They live in their own repositories.
 
@@ -117,11 +117,11 @@ flowchart TB
   style gw stroke:#FF4D6D,stroke-width:3px
 ```
 
-Every connection, and whether it is encrypted, is in [Connections and TLS](docs/connections-and-tls.md).
+Every connection, and whether it is encrypted, is in [Network and ports](docs/help/pages/operate/network.md).
 
 ## Quick start
 
-**The server** is one Linux machine (x86_64) with Docker Engine 24 or later and Compose v2, Python 3.12 or later, and ports 80 and 443 free. It needs no GPU: at least 4 cores, 6 GB of memory and 60 GB of disk ([system requirements](docs/system-requirements.md)).
+**The server** is one Linux machine (x86_64) with Docker Engine 24 or later and Compose v2, Python 3.12 or later, and ports 80 and 443 free. It needs no GPU: at least 4 cores, 6 GB of memory and 60 GB of disk ([system requirements](docs/help/pages/operate/requirements.md)).
 
 ```bash
 pipx install fadenstack        # or: uv tool install fadenstack
@@ -130,7 +130,7 @@ faden deploy
 
 `faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator. Then open `https://<server>` and sign in.
 
-**The GPU machines** run Linux (x86_64 or aarch64) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is [Adding a machine and serving a model on it](docs/onboarding-a-node.md).
+**The GPU machines** run Linux (x86_64 or aarch64) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is in [GPU machines](docs/help/pages/operate/machines.md) and [Clusters](docs/help/pages/operate/clusters.md).
 
 **Your apps** use any OpenAI client:
 
@@ -147,14 +147,13 @@ print(reply.choices[0].message.content)
 
 ## Documentation
 
+The Help pages are in [docs/help](docs/help/README.md); they become `help.fadenstack.com`. Building on Fadenstack (the API, the SDKs, MCP servers) is on the Developers site.
+
 | | |
 | --- | --- |
-| Setting up | [Installing](docs/installing.md) · [Upgrading](docs/upgrading.md) · [System requirements](docs/system-requirements.md) · [HTTPS and trust](docs/https-and-trust.md) |
-| Using it | [The chat](docs/chat.md) · [Skills](docs/skills.md) · [The admin dashboard](docs/dashboard.md) |
-| GPU machines and models | [Adding a machine](docs/onboarding-a-node.md) · [Hosting a model from the marketplace](docs/model-marketplace.md) · [vLLM you already run](docs/found-vllm.md) · [Taking over clusters](docs/taking-over-clusters.md) · [When something fails](docs/resilience.md) · [FAQ](docs/faq.md) |
-| The server | [Containers](docs/containers.md) · [MCP servers](docs/mcp-servers.md) |
-| How it works | [The gateway's chat pipeline](docs/gateway-pipeline.md) · [RAG Lite search](docs/rag-lite-search.md) · [Connections and TLS](docs/connections-and-tls.md) |
-| Maintainers | [Releasing](docs/releasing.md) · [Onboarding friction](docs/onboarding-friction.md) |
+| Use | [The chat](docs/help/pages/use/chat.md) · [Tools](docs/help/pages/use/tools.md) · [Skills](docs/help/pages/use/skills.md) · [Knowledge](docs/help/pages/use/knowledge.md) · [The browser agent](docs/help/pages/use/browser-agent.md) · [Office add-ins](docs/help/pages/use/office-add-ins.md) · [Your data and privacy](docs/help/pages/use/privacy.md) |
+| Administer | [Users and roles](docs/help/pages/administer/users.md) · [Models](docs/help/pages/administer/models.md) · [Deployments](docs/help/pages/administer/deployments.md) · [Remote providers](docs/help/pages/administer/providers.md) · [MCP servers](docs/help/pages/administer/mcp-servers.md) · [Policies and personal data](docs/help/pages/administer/policies.md) · [The dashboard](docs/help/pages/administer/dashboard.md) |
+| Operate | [Installing](docs/help/pages/operate/installing.md) · [Upgrading](docs/help/pages/operate/upgrading.md) · [Backups](docs/help/pages/operate/backups.md) · [System requirements](docs/help/pages/operate/requirements.md) · [HTTPS and trust](docs/help/pages/operate/https.md) · [GPU machines](docs/help/pages/operate/machines.md) · [Clusters](docs/help/pages/operate/clusters.md) · [When something fails](docs/help/pages/operate/failures.md) · [Troubleshooting](docs/help/pages/operate/troubleshooting.md) |
 
 ## Repository layout
 
@@ -186,7 +185,7 @@ pipx install ./cli
 faden deploy --build
 ```
 
-For working on Fadenstack itself, `faden dev init` and `faden dev up` run the services from source against a local stack, and `faden dev doctor` checks the tools they need. How a release is made is in [Releasing](docs/releasing.md).
+For working on Fadenstack itself, `faden dev init` and `faden dev up` run the services from source against a local stack, and `faden dev doctor` checks the tools they need.
 
 The agent is published as standalone binaries for Linux x86_64 and aarch64 (no Python needed on the machine); see [agent/README.md](agent/README.md).
 
@@ -202,7 +201,7 @@ Release 0.4.0 renamed everything an install carries: the compose project and its
 
 Fadenstack-authored code and deployment files in this repository are licensed under the [Apache License 2.0](LICENSE), including the server, optional services, machine agent, runtime helper and CLI. The CLI's installed package includes deployment files from `shared/`.
 
-Container images also contain third-party software, including NVIDIA's runtime base image, Ray and vLLM. Those components retain their own licence terms. Release SBOMs identify the components present in each published artifact; see [Releasing](docs/releasing.md).
+Container images also contain third-party software, including NVIDIA's runtime base image, Ray and vLLM. Those components retain their own licence terms. Release SBOMs identify the components present in each published artifact; see [Third-party components](docs/help/pages/operate/third-party.md).
 
 Apache-2.0 grants no general right to use the Fadenstack name or logo for a modified product. See [Brand and Official Releases](backend/OFFICIAL.md) for the current branding guidance.
 

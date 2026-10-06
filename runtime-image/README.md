@@ -54,7 +54,7 @@ Certification records a **channel** in the manifest:
 - `preview`: only a cluster whose operator chose it.
 
 A cluster keeps the runtime it was started with until an operator switches
-it (`docs/upgrading.md`), so shipping a new manifest never moves a running
+it (`docs/help/pages/operate/upgrading.md`), so shipping a new manifest never moves a running
 cluster.
 
 Today:

@@ -17,7 +17,7 @@ faden deploy                 # installs Fadenstack into ~/fadenstack and starts 
 The CLI carries the deployment files of its release and runs that release's
 published images: `fadenstack 0.3.0` deploys Fadenstack 0.3.0. To upgrade,
 upgrade the CLI and run `faden upgrade`. See
-[Installing Fadenstack](https://github.com/fadenstack/fadenstack/blob/main/docs/installing.md).
+[Installing Fadenstack](https://github.com/fadenstack/fadenstack/blob/main/docs/help/pages/operate/installing.md).
 
 ---
 
@@ -181,7 +181,7 @@ faden dev doctor --install --yes
 the backend, and points the gateway and backend at them. Without it, the
 modules switched on with `faden module enable` run; the others are switched
 off in the gateway and backend. See
-[What the gateway does with a chat request](../docs/gateway-pipeline.md).
+[What happens to a request](../docs/help/pages/administer/requests.md).
 
 `--local-node` installs a systemd unit by default and requires sudo on Linux.
 Use `--local-node-no-sudo` to skip privileged systemd setup.

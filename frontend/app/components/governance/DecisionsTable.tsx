@@ -18,7 +18,7 @@ import { useAsyncData } from "~/lib/useAsyncData";
 import { usePrincipalNames } from "~/lib/usePrincipalNames";
 
 const STAGES: DecisionStage[] = ["input", "output", "tool"];
-/** The outcomes the gateway records (docs/governance.md). */
+/** The outcomes the gateway records (docs/help/pages/administer/policies.md). */
 const OUTCOMES = ["prompt_blocked", "response_blocked", "block", "approval_required", "approved", "rejected", "expired"];
 
 const OUTCOME_COLOR: Record<string, ChipProps["color"]> = {

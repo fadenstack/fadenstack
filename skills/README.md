@@ -9,7 +9,7 @@ a chat request gets.
 - **RAG** = what the system knows (document retrieval)
 - **Skills** = how the system should solve a task (reasoning playbooks)
 
-What users see: [docs/skills.md](../docs/skills.md).
+What users see: [Skills](../docs/help/pages/use/skills.md); what administrators manage: [Skills for the organisation](../docs/help/pages/administer/skills.md).
 
 ## Model
 
@@ -63,7 +63,7 @@ pytest
 | `FADEN_SKILLS_SERVICE_TOKEN` | ``           | Internal service auth token   |
 | `FADEN_SKILLS_JWT_SECRET`    | ``           | Lets a user's own JWT in (read-only, no capabilities) |
 
-Limits: see `settings.py` and [docs/skills.md](../docs/skills.md#limits).
+Limits: see `settings.py` and [Skills for the organisation](../docs/help/pages/administer/skills.md#limits).
 
 ## API
 

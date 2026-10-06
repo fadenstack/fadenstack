@@ -1,0 +1,54 @@
+name: Help docs
+
+# Checks the Help pages (docs/help) whenever they change: the docs hub's scrub (what a public page must not
+# contain) and the links between pages. On main, asks the docs hub to rebuild help.fadenstack.com.
+on:
+  pull_request:
+    paths: ["docs/help/**"]
+  push:
+    branches: [main]
+    paths: ["docs/help/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: docs/help
+
+      # The hub keeps the scrub rules; it may be private: DOCS_READ_TOKEN reads its contents.
+      - uses: actions/checkout@v5
+        with:
+          repository: fadenstack/docs
+          path: _hub
+          token: ${{ secrets.DOCS_READ_TOKEN }}
+          sparse-checkout: scripts
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python docs/help/scripts/check.py
+        env:
+          FADEN_DOCS_HUB: _hub
+          SCRUB_EXTRA: ${{ secrets.SCRUB_EXTRA }}
+
+  rebuild:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      # A token that may send repository dispatches to fadenstack/docs; without it this step is skipped.
+      DISPATCH_TOKEN: ${{ secrets.DOCS_DISPATCH_TOKEN }}
+    steps:
+      - if: env.DISPATCH_TOKEN != ''
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/fadenstack/docs/dispatches \
+            -d '{"event_type": "docs-changed", "client_payload": {"source": "fadenstack/fadenstack"}}'

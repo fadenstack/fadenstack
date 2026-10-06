@@ -1,7 +1,7 @@
 /**
  * The onboarding guide, walked as a new operator would walk it.
  *
- * Follows `docs/onboarding-a-node.md` step by step through the console only,
+ * Follows `docs/help/pages/operate/machines.md` and `clusters.md` step by step through the console only,
  * and captures each screen into `docs/images/onboarding/` so the guide can
  * show what the operator is looking at.
  *

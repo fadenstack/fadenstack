@@ -147,7 +147,7 @@ def print_trust_hints(install_dir: Path, ca_public: Path) -> None:
         "  Machines with agent 0.1.14 or later learnt it from this server and follow it to HTTPS\n"
         "  by themselves. Older agents stay on plain HTTP, which now only redirects: point each at\n"
         f"  {example} and give it the file (faden-agent configure --set BACKEND_URL=...\n"
-        '  --set TLS_CA_BUNDLE=...; docs/installing.md, "Enabling HTTPS").[/dim]'
+        '  --set TLS_CA_BUNDLE=...; Help: Operate, "HTTPS and trust", "The machines").[/dim]'
     )
 
 

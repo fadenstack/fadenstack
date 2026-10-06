@@ -5,7 +5,7 @@ deployment never again once it read "running". A Ray head that died left both
 as they were -- with every request failing -- until someone changed
 something. These tests pin the recovery behaviour down scenario by scenario,
 with the node side scripted; the hardware runs are in
-``docs/resilience.md``.
+``docs/help/pages/operate/failures.md``.
 """
 
 from __future__ import annotations

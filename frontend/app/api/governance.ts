@@ -2,7 +2,7 @@
  * Governance for administrators (`/api/admin/governance`): tool rules (deny,
  * ask, allow by tool name), tool classes (what a tool does, which the tool
  * modes act on), and the decisions the checks made. The gateway reads rules
- * at most 30 s old. See docs/governance.md.
+ * at most 30 s old. See docs/help/pages/administer/policies.md.
  */
 import { json, query, requester, segment } from "./http";
 

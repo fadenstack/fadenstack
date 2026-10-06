@@ -21,7 +21,7 @@ faden tls off                   # back to plain HTTP
 
 or upload them through the console's TLS admin API, which writes them here
 and restarts the proxy itself. Copied in by hand, they are served after
-`docker restart faden-nginx`. See `docs/installing.md`, "Enabling HTTPS".
+`docker restart faden-nginx`. See `docs/help/pages/operate/https.md`, "Switch HTTPS on".
 
 The authority's key is kept in `../tls-ca/`, outside every container, with the
 authority before a rotation, an operator's private issuer and where an
