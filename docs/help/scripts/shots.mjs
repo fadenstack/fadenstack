@@ -10,7 +10,7 @@
 //   PLAYWRIGHT=path                             Playwright's index.mjs (default: frontend/node_modules)
 //   node docs/help/scripts/shots.mjs [name ...]  -> docs/help/pages/images/<name>.png
 //
-// Any private IPv4 address the map does not name becomes a 192.0.2.x one. Check every picture before you commit
+// Any private (or 100.64/10) IPv4 address the map does not name becomes a 192.0.2.x one. Check every picture before you commit
 // it: the swap covers text, not pictures inside pictures.
 
 import { mkdirSync, readFileSync } from "node:fs";
@@ -33,7 +33,8 @@ const pw = await import(pathToFileURL(process.env.PLAYWRIGHT ?? resolve(REPO, "f
 
 /** Runs in the page: swap text in place, now and whenever React writes it again. */
 function neutral(map) {
-  const ip = /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/g;
+  // Private ranges, and 100.64/10 (carrier-grade NAT, which VPN overlays such as Tailscale use).
+  const ip = /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})\b/g;
   const seen = new Map();
   const fix = (s) => {
     if (!s) return s;
@@ -103,12 +104,15 @@ const settle = async (page, ms = 1500) => {
 };
 
 // name: the file under pages/images/; path: where to go; act: what to open first (never a confirm button);
-// clip: a locator to picture instead of the whole window.
+// clip: a locator to picture instead of the whole window; region: a fixed part of the window.
 const SHOTS = [
   // Use
   { name: "use/chat", path: "/chat" },
   { name: "use/chat-model", path: "/chat", act: async (p) => p.getByRole("combobox").first().click(), clip: (p) => p.getByRole("listbox") },
-  { name: "use/chat-skills", path: "/chat", act: async (p) => p.getByRole("button", { name: "Skills" }).first().click() },
+  {
+    name: "use/chat-skills", path: "/chat", act: async (p) => p.getByRole("button", { name: "Skills" }).first().click(),
+    region: { x: 460, y: 420, width: 800, height: 480 },
+  },
   { name: "use/skills-page", path: "/skills" },
   { name: "use/profile", path: "/admin/profile" },
   // Administer
@@ -151,6 +155,100 @@ const SHOTS = [
   { name: "operate/containers", path: "/admin/containers" },
   { name: "operate/logs", path: "/admin/logs" },
   { name: "operate/settings", path: "/admin/settings" },
+
+  // More of the same screens: dialogs opened and steps walked, never confirmed.
+  {
+    name: "use/chat-tools-panel", path: "/chat",
+    act: async (p) => {
+      await p.getByRole("button", { name: "Tools" }).first().click();
+      // The tool list loads after the panel opens; placeholders stand in meanwhile.
+      await p.locator(".MuiSkeleton-root").first().waitFor({ state: "hidden", timeout: 45000 }).catch(() => {});
+    },
+    region: { x: 1120, y: 56, width: 320, height: 844 },
+  },
+  {
+    name: "use/chat-privacy-tab", path: "/chat",
+    act: async (p) => {
+      await p.getByRole("button", { name: "Tools" }).first().click();
+      await p.getByRole("tab", { name: "Privacy" }).click();
+    },
+    region: { x: 1120, y: 56, width: 320, height: 844 },
+  },
+  { name: "administer/users-create", path: "/admin/users", act: async (p) => p.getByRole("button", { name: "Create User" }).click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/users-edit-roles", path: "/admin/users", act: async (p) => p.getByRole("button", { name: "Edit Roles" }).first().click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/users-developer-mode", path: "/admin/users", act: async (p) => p.getByRole("button", { name: "Developer mode" }).first().click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/skill-sharing", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: "Sharing" }).click() },
+  { name: "administer/skill-versions", path: () => `/admin/skills/${IDS.skill}`, act: async (p) => p.getByRole("tab", { name: "Versions" }).click() },
+  {
+    name: "administer/agents-list", path: "/admin/agents",
+    act: async (p) => p.getByText("Word assistant").first().waitFor({ timeout: 45000 }),
+  },
+  ...["Definition", "Versions", "Apps", "Access", "Activity"].map((tab) => ({
+    name: `administer/agent-${tab.toLowerCase()}`, path: () => `/admin/agents/${IDS.agent}`,
+    act: async (p) => p.getByRole("tab", { name: tab }).click(),
+  })),
+  {
+    name: "administer/provider-add", path: "/admin/llm/providers", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: "Add Provider" }).click();
+      await p.getByRole("dialog").getByRole("combobox").first().click({ force: true });
+      await p.getByRole("option", { name: /remote/i }).first().click({ force: true });
+    },
+  },
+  { name: "administer/provider-set-price", path: "/admin/llm/providers", act: async (p) => p.getByRole("button", { name: "Set price" }).first().click({ force: true }), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/marketplace-model", path: "/admin/marketplace", act: async (p) => p.getByRole("button", { name: /Qwen3\.8-27B-FP8/ }).first().click({ force: true }) },
+  { name: "administer/marketplace-on-server", path: "/admin/marketplace", act: async (p) => p.getByRole("tab", { name: "On this server" }).click() },
+  { name: "administer/marketplace-hf-token", path: "/admin/marketplace", act: async (p) => p.getByText(/^Hugging Face:/).first().click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/host-where", path: "/admin/marketplace", act: async (p) => p.getByRole("button", { name: "Host", exact: true }).first().click(), clip: (p) => p.getByRole("dialog") },
+  {
+    name: "administer/host-engine", path: "/admin/marketplace", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: "Host", exact: true }).first().click();
+      await settle(p, 1500);
+      await p.getByRole("dialog").getByRole("button", { name: "Next" }).click();
+    },
+  },
+  {
+    name: "administer/host-review", path: "/admin/marketplace", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: "Host", exact: true }).first().click();
+      await settle(p, 1500);
+      await p.getByRole("dialog").getByRole("button", { name: "Next" }).click();
+      await settle(p, 1000);
+      await p.getByRole("dialog").getByRole("button", { name: "Next" }).click();
+    },
+  },
+  { name: "administer/deployment-logs", path: () => `/admin/deployments/${IDS.deployment}`, act: async (p) => p.getByText("Logs", { exact: true }).last().scrollIntoViewIfNeeded() },
+  { name: "administer/governance-add-rule", path: "/admin/governance", act: async (p) => p.getByRole("button", { name: "Add rule" }).click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/governance-classes", path: "/admin/governance", act: async (p) => p.getByRole("tab", { name: "Tool classes" }).click() },
+  { name: "administer/governance-decisions", path: "/admin/governance", act: async (p) => p.getByRole("tab", { name: "Decisions" }).click() },
+  { name: "administer/cost-pricing", path: "/admin/observability", act: async (p) => p.getByRole("tab", { name: "Pricing" }).click() },
+  { name: "operate/add-machine", path: "/admin/nodes?add=1", clip: (p) => p.getByRole("dialog") },
+  { name: "operate/cluster-create-name", path: "/admin/clusters", act: async (p) => p.getByText("Create a cluster", { exact: true }).first().click(), clip: (p) => p.getByRole("dialog") },
+  {
+    name: "operate/cluster-create-machines", path: "/admin/clusters", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByText("Create a cluster", { exact: true }).first().click();
+      await p.getByRole("dialog").locator("input").first().fill("gpu-room");
+      await p.getByRole("dialog").getByRole("button", { name: "Next" }).click({ force: true });
+    },
+  },
+  {
+    name: "operate/cluster-machine-selected", path: () => `/admin/clusters/${IDS.cluster}`,
+    act: async (p) => p.getByRole("button", { name: new RegExp(`${IDS.worker}, worker`) }).click(),
+  },
+  { name: "operate/cluster-runtime", path: () => `/admin/clusters/${IDS.cluster}`, act: async (p) => p.getByRole("button", { name: "Switch", exact: true }).scrollIntoViewIfNeeded() },
+  {
+    name: "operate/cluster-advanced", path: () => `/admin/clusters/${IDS.cluster}`,
+    act: async (p) => {
+      await p.getByRole("button", { name: "Advanced" }).click();
+      await p.getByRole("button", { name: "Advanced" }).scrollIntoViewIfNeeded();
+    },
+  },
+  { name: "operate/images", path: "/admin/images", region: { x: 240, y: 0, width: 1200, height: 560 } },
+  { name: "operate/container-new", path: "/admin/containers/new" },
+  { name: "operate/container", path: () => `/admin/containers/${IDS.container}` },
+  { name: "operate/container-edit", path: () => `/admin/containers/${IDS.container}/edit` },
 ];
 
 const only = new Set(process.argv.slice(2));
@@ -180,6 +278,7 @@ for (const shot of SHOTS) {
     const file = resolve(OUT, `${shot.name}.png`);
     mkdirSync(dirname(file), { recursive: true });
     if (shot.clip) await shot.clip(page).first().screenshot({ path: file });
+    else if (shot.region) await page.screenshot({ path: file, clip: shot.region });
     else await page.screenshot({ path: file });
     console.log("ok", shot.name);
   } catch (err) {

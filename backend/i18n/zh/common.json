@@ -3493,7 +3493,7 @@
       "server_tools_listed": "仅限以下",
       "server_tools_none": "无",
       "server_tools_list": "工具",
-      "server_tools_help": "名称或模式，例如 knowledge_* 或 mcp_github__*。",
+      "server_tools_help": "名称或模式，例如 knowledge_* 或 mcp.github.*。",
       "local_mcp": "本地 MCP 服务器",
       "local_mcp_disable": "不允许",
       "local_mcp_allow": "允许",
@@ -3626,7 +3626,7 @@
       "decisions": "决定"
     },
     "pattern": "工具模式",
-    "pattern_help": "工具名称，或带 * 的模式：mcp_github__*、knowledge_search、*。",
+    "pattern_help": "工具名称，或带 * 的模式：mcp.github.*、knowledge_search、*。",
     "priority": "优先级",
     "priority_help": "数值越低越先尝试；第一条匹配的规则生效。",
     "rules": {

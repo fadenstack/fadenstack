@@ -39,6 +39,8 @@ and groups give people, and how to end someone's access.
    roles for anyone who needs more, and tick `default_user` too if they also chat.
 5. Select **Create User**.
 
+![Create New User: Email and Password, the Superuser switch, and Assign Roles with the built-in roles to tick](../images/administer/users-create.png)
+
 The account is active at once. Pass the first password on in person or by phone, not in the same e-mail as
 the address. They sign in at `https://ai.example.internal`, land in the chat, and can change the password
 under **Manage Profile** (see [Your account](../use/account.md)).
@@ -68,8 +70,6 @@ When no built-in role fits, make one:
 3. Tick its **Permissions**, for example `agents:create` for people who may set up a browser agent for
    their team, or `skills:publish` for people who may share skills with the whole organisation.
 4. Save it, and give it to people or to a group.
-
-![Create New Role with the name Agent cleanup and, under Permissions, the agents group opened with delete ticked](../images/administer/create-role.png)
 
 Deleting a role takes it from everyone who has it; the dialog says how many people that is.
 

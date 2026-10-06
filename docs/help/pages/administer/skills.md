@@ -32,6 +32,8 @@ A private skill can be shared with people and groups on its **Sharing** tab, at 
 | **Can use** | Seeing the published version and using it in chats. |
 | **Can edit** | Also saving new versions and publishing them. |
 
+![A skill's Sharing tab: Who sees it with Private, Organization (chosen) and Everyone (all tenants), and Shared with, where people and groups are added](../images/administer/skill-sharing.png)
+
 The same rules decide what reaches a chat: a private skill never reaches the chat of anyone it is not
 shared with. When someone leaves a group, the skills shared with that group stop reaching their chats within
 a minute.
@@ -72,6 +74,8 @@ Every save is a new version; no version is ever changed or deleted. A skill poin
 changes what chats get. On the **Versions** tab, **Changes** compares two versions and **Roll back to this**
 publishes an older one, with its triggers and tool lists. The skill's status says what is live, for example
 "Live v3 · v4 draft".
+
+![A skill's Versions tab: version 1, live, with its date and fingerprint](../images/administer/skill-versions.png)
 
 Each version has a fingerprint of its content. The audit log records the skill, the version and that
 fingerprint for every request that used it, so what the model was told can always be looked up.

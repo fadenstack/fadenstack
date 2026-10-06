@@ -3493,7 +3493,7 @@
       "server_tools_listed": "Solo estas",
       "server_tools_none": "Ninguna",
       "server_tools_list": "Herramientas",
-      "server_tools_help": "Nombres o patrones, como knowledge_* o mcp_github__*.",
+      "server_tools_help": "Nombres o patrones, como knowledge_* o mcp.github.*.",
       "local_mcp": "Servidores MCP locales",
       "local_mcp_disable": "No permitidos",
       "local_mcp_allow": "Permitidos",
@@ -3626,7 +3626,7 @@
       "decisions": "Decisiones"
     },
     "pattern": "Patrón de herramienta",
-    "pattern_help": "Un nombre de herramienta, o un patrón con *: mcp_github__*, knowledge_search, *.",
+    "pattern_help": "Un nombre de herramienta, o un patrón con *: mcp.github.*, knowledge_search, *.",
     "priority": "Prioridad",
     "priority_help": "La más baja se prueba primero; decide la primera regla que coincida.",
     "rules": {

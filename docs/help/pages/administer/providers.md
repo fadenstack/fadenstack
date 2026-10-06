@@ -26,6 +26,9 @@ offered in the chat and at the API next to your own models, under the same rules
 6. Select **Test Connection**. It sends a small request to check the address and the key, and lists the
    provider's models: "Connection successful — 214 model(s) available."
 7. Under **Model**, pick the model to offer, or type its name as the provider spells it.
+
+    ![The New Provider dialog with Target set to Remote Endpoint: Provider, Endpoint URL, API Key, Model and Test Connection, and Pricing (Optional) as the next step](../images/administer/provider-add.png)
+
 8. Select **Next**. Under **Pricing (Optional)**, enter what a million input and output tokens cost, so that
    the console can estimate what usage costs (see [Usage and costs](usage.md)). Leave both empty to skip.
 9. Select **Create**.

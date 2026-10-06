@@ -3493,7 +3493,7 @@
       "server_tools_listed": "Seulement ceux-ci",
       "server_tools_none": "Aucun",
       "server_tools_list": "Outils",
-      "server_tools_help": "Des noms ou des motifs, comme knowledge_* ou mcp_github__*.",
+      "server_tools_help": "Des noms ou des motifs, comme knowledge_* ou mcp.github.*.",
       "local_mcp": "Serveurs MCP locaux",
       "local_mcp_disable": "Non autorisés",
       "local_mcp_allow": "Autorisés",
@@ -3626,7 +3626,7 @@
       "decisions": "Décisions"
     },
     "pattern": "Motif d'outil",
-    "pattern_help": "Un nom d'outil, ou un motif avec * : mcp_github__*, knowledge_search, *.",
+    "pattern_help": "Un nom d'outil, ou un motif avec * : mcp.github.*, knowledge_search, *.",
     "priority": "Priorité",
     "priority_help": "La plus basse est essayée en premier ; la première règle qui correspond décide.",
     "rules": {

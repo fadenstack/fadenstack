@@ -58,6 +58,8 @@ A container starts from an image on the server; creating one does not pull it.
 1. Open **Containers → Images**.
 2. Enter the image name and tag, and select **Pull Image**. The progress shows while it downloads.
 
+![The Images page: Image and Tag with Pull Image, Prune dangling images with Dry Run, and the images on the server](../images/operate/images.png)
+
 **Prune dangling images** removes images no tag points to. It needs Root Mode; try **Dry Run** first.
 
 ## Create a container
@@ -72,7 +74,8 @@ A container starts from an image on the server; creating one does not pull it.
 5. Add **Environment Variables** and **Volume Mounts** as needed.
 6. Under **Networks**, choose `fadenstack_default` so the gateway, the console API and the MCP service can reach
    it by its name (for example `http://my-service:8080`). Without one it joins Docker's default bridge.
-7. Select **Create & Start**, or clear **Start immediately after creation** to create it stopped.
+7. Turn on **Start immediately after creation** and select **Create & Start**, or leave it off and select **Create Container** to
+   create it stopped.
 
 !!! note
     Environment variables are visible to anyone who can see the container. Do not put secrets there that those
@@ -108,13 +111,13 @@ Fadenstack's own containers can be edited too, for a test or a quick fix, but th
 console API's own container cannot be edited from the console: change its settings in `~/fadenstack/.env` and run
 `faden upgrade` (or `faden up`).
 
+![The edit form of one of Fadenstack's own containers, with its notice that the next faden deploy or upgrade makes it again without these changes](../images/operate/container-edit-notice.png)
+
 ## Networks and stacks
 
 **Containers → Networks** lists Docker's networks. `fadenstack_default` is Fadenstack's own; system networks are
 read-only. You can create a network (optionally internal, without outbound access), inspect one, and delete the
 ones you created.
-
-![The Networks page: Docker's system networks and fadenstack_default, each marked System, and the Create Network button](../images/operate/containers-networks.png)
 
 **Containers → Stacks** deploys a Docker Compose stack from a compose file. Deploying again under the same ID
 makes a new revision; every revision is kept, two can be compared, and you can roll back to an earlier one.

@@ -18,7 +18,7 @@ and stop or start it. Models are deployed onto a cluster by an administrator (se
 
 1. Open **AI Infrastructure → Clusters** and select **Create a cluster**.
 
-    ![The Clusters page with one running cluster and the Create a cluster button](../images/operate/clusters.png)
+    ![The Create a cluster wizard on its first step, Name it, followed by Pick machines and Confirm the network](../images/operate/cluster-create-name.png)
 
 2. **Name it**: enter a **Cluster name**, such as `gpu-room`, and select **Next**.
 3. **Pick machines**: tick the machines that will serve models. One machine makes a fine cluster; you can add more

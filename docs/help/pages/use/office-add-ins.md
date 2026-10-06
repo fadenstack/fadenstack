@@ -39,6 +39,8 @@ One sign-in covers Word, Excel, PowerPoint and Outlook on this computer. Each do
 !!! note "The agent never sends"
     In Outlook the agent writes drafts and opens them for you; you send them. An appointment it creates waits in its window for you to send or save.
 
+![The agent's pane in Outlook after it drafted a reply: what the draft says, and that it has sent nothing](../images/use/office-outlook-draft-reply.png)
+
 ## What it asks first
 
 Every chat starts in the **Ask** tool mode: the agent reads without asking, and asks before it changes anything. When it asks, a card shows **Run …?** with what it will do. Select **Allow**, **Allow for this chat**, or **Deny**. Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even in **Auto**, the agent asks before anything that cannot be undone. More on tool modes: [Tools in the chat](tools.md#choose-the-tool-mode).

@@ -20,6 +20,8 @@ Every tool has a class that says what it does:
 
 Select the wrench beside the message box. The panel that opens has two tabs: **Tools** for the tools and **Privacy** for the protection of personal data in this chat (see [Your data and privacy](privacy.md)).
 
+![The tools panel: the Tools and Privacy tabs, Execution set to Server Only, and the Tool mode buttons Off, Read only, Ask and Auto, with Ask chosen](../images/use/chat-tools-panel.png)
+
 ## Switch tools on
 
 The services' tools start off in every chat.

@@ -23,7 +23,7 @@ export interface Stored {
 
 export interface ToolRuleFields {
   name: string;
-  /** A glob over tool names: `mcp_github__*`, `knowledge_search`, `*`. */
+  /** A glob over tool names: `mcp.github.*`, `knowledge_search`, `*`. */
   tool_pattern: string;
   action: ToolRuleAction;
   /** What the user is told. */

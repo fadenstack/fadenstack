@@ -27,7 +27,7 @@ const RULE: ToolRule = {
   id: "r-1",
   tenant_id: "default",
   name: "No GitHub deletes",
-  tool_pattern: "mcp_github__delete_*",
+  tool_pattern: "mcp.github.delete_*",
   action: "deny",
   message: "Deleting on GitHub is not allowed here.",
   category: "tool_rule",
@@ -52,7 +52,7 @@ describe("GovernancePage", () => {
     api.toolRules.create.mockResolvedValue({ ...RULE, id: "r-2" });
     open("rules");
 
-    expect(await screen.findByText("mcp_github__delete_*")).toBeInTheDocument();
+    expect(await screen.findByText("mcp.github.delete_*")).toBeInTheDocument();
     expect(screen.getByText("Deny")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Add rule" }));

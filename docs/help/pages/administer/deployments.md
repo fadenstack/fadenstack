@@ -23,6 +23,9 @@ Then:
 1. **Where.** Pick the **Cluster** and the **Size of each copy**: a share of one accelerator, one
    accelerator, or several (the copy is then split across them). Set how many **Copies** run. The fit check
    picks a size and says how many copies the cluster has room for. Select **Next**.
+
+    ![The Where step of the hosting dialog: the cluster with its fit and how many copies it has room for, the Size of each copy (a share of one accelerator, 1 GPU or 2 GPUs), and Copies](../images/administer/host-where.png)
+
 2. **Engine settings.** The suggested settings suit most uses (see [Engine settings](#engine-settings)).
    Change the longest conversation here if people need longer ones. Select **Next**.
 3. **Review.** Check the **Deployment name** (lowercase letters, digits and dashes, shown in lists and logs)
@@ -89,8 +92,6 @@ more patience: more copies, or more memory per copy.
 
 Select **Apply**.
 
-![The Scale dialog: 2 copies at 0.7 accelerators each, the share of memory the engine takes, how many copies fit on the cluster, and Apply](../images/administer/deployment-scale.png)
-
 | You change | What happens |
 |---|---|
 | The number of copies | The copies that run keep serving. New copies start beside them; surplus copies finish their requests and stop. The deployment stays **Serving**, and **Last message** says what is left, for example "Serving on 1 of 2 copies; 1 more starting." |
@@ -136,7 +137,7 @@ as the hosting dialog:
   flags, as text** for anything else. Anything that could escape the command is refused.
 - A preview of the settings, shown as vLLM flags.
 
-![The Engine settings step of the hosting dialog: Tuned for with its four presets, Context and memory, and Throughput, with suggested values marked](../images/administer/host-engine-settings.png)
+![The Engine settings step of the hosting dialog: Tuned for with its four presets, Context and memory, Throughput, What it can do and Compatibility, with suggested values marked](../images/administer/host-engine.png)
 
 Warnings appear before a setting that will not start: a conversation longer than the model supports or than
 fits in memory, a memory share above 95 %, a tool format with tool calling off, or the model's own code.

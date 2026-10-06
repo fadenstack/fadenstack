@@ -52,6 +52,8 @@ Detection finds most personal data, not all of it. Do not paste anything you are
 3. To protect more in this chat: switch on **Cloud egress** (for models at outside providers) or **Local egress** (for your organisation's own models), choose **Fail Action**, or add a kind of personal data under **Detection Settings** with **Add entity**. If your organisation allows it, **Mode** switches between `redact` and `tokenize_reversible`.
 4. **Clear Session Override** goes back to your organisation's settings.
 
+![The Privacy tab saying Using tenant defaults, with Cloud egress, Local egress, Mode and Fail Action, and the kinds of personal data looked for, each with a lock, above Add entity](../images/use/chat-privacy-tab.png)
+
 You can only make the protection stricter than your organisation's policy, never looser. Settings the policy enforces show a lock.
 
 In the browser agent and the Office add-ins, a note **Personal data protected** says how many values were kept from the model, and of which kinds.

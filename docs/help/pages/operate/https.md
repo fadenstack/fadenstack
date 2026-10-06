@@ -146,6 +146,8 @@ only the gateway's certificate, and the models themselves listen only on the mac
 It looks after itself: the certificates are made, renewed and rotated by the server, and the machines fetch theirs
 over their authenticated connection.
 
+![The Model traffic card of a cluster, reading Encrypted](../images/operate/cluster-model-traffic.png)
+
 - A cluster started before this protection existed shows **Model traffic** with "not encrypted" on its page, and
   the dashboard lists it. **Encrypt model traffic**, then **Restart and encrypt**, moves its models behind the
   proxy; they are unavailable while they load again.

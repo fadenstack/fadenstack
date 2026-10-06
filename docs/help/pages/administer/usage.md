@@ -47,16 +47,18 @@ Open **Observability → Cost Dashboard** (the page is titled **Cost Observabili
 Costs are estimates from prices you set per model. They do not change what a provider bills you.
 
 1. Open **LLM → Providers** and select **Set price** in the model's row (in the **Price $/1M** column).
-
-    ![LLM Providers with Set price in the Price $/1M column of a model's row](../images/administer/providers-list-top.png)
-
 2. Enter what a million input tokens and a million output tokens cost.
+
+    ![The price dialog for a model: Input price and Output price in USD per million tokens, and Save](../images/administer/provider-set-price.png)
+
 3. Save. Requests are priced with it within a minute.
 
 You can also set prices when you connect a provider, or under **Pricing** on the cost pages, where each
 model's price history is kept. Use the provider's list prices for a cloud model. For your own models, a price
 of your own (for example what the hardware costs you per million tokens) lets you compare and charge back
 internal use; leave it empty if you do not need that.
+
+![The Pricing tab of the cost pages: each model's input and output price per million tokens, whether it is a default or set by an administrator, since when it applies, and Add Price](../images/administer/cost-pricing-list.png)
 
 Requests to an external model without a price are still counted. **Spend this month** on the dashboard says
 how many there were ("Requests without a price"), so you know the estimate is short.

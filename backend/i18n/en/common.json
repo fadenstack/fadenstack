@@ -3491,7 +3491,7 @@
       "server_tools_listed": "Only these",
       "server_tools_none": "None",
       "server_tools_list": "Tools",
-      "server_tools_help": "Names or patterns, such as knowledge_* or mcp_github__*.",
+      "server_tools_help": "Names or patterns, such as knowledge_* or mcp.github.*.",
       "local_mcp": "Local MCP servers",
       "local_mcp_disable": "Not allowed",
       "local_mcp_allow": "Allowed",
@@ -3624,7 +3624,7 @@
       "decisions": "Decisions"
     },
     "pattern": "Tool pattern",
-    "pattern_help": "A tool name, or a pattern with *: mcp_github__*, knowledge_search, *.",
+    "pattern_help": "A tool name, or a pattern with *: mcp.github.*, knowledge_search, *.",
     "priority": "Priority",
     "priority_help": "Lower is tried first; the first rule that matches decides.",
     "rules": {

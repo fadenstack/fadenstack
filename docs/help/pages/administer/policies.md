@@ -122,6 +122,8 @@ Fadenstack's own tools (the knowledge base search, the time, the tool search) ar
 stored: only a keyed fingerprint, so the same text refused twice shows the same value, and nobody can read it
 back.
 
+![Agents → Governance on the Decisions tab: filters for Stage, Outcome and Agent, and three tool decisions, one Expired and two Approved, each with what the user was told](../images/administer/governance-decisions-top.png)
+
 ## What people see when something is stopped
 
 | What happened | In the chat |

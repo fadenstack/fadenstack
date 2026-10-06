@@ -138,6 +138,9 @@ so. Nothing changes until you switch.
 
 1. Open **Clusters**, then the cluster.
 2. On the **Runtime** card, choose the runtime under **Switch to** and select **Switch**.
+
+    ![The Runtime card on a cluster's page: the runtime it runs, and Switch to with Switch](../images/operate/cluster-runtime-card.png)
+
 3. Read the warning and select **Restart on this runtime**.
 
 Each machine's container is made again from the new image (a machine that does not hold it yet fetches it first),

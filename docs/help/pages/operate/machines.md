@@ -17,6 +17,9 @@ The console calls them **Machines**. The agent, the API and some messages still 
 ## Add a machine
 
 1. In the console, open **AI Infrastructure → Machines** and select **Add a machine**.
+
+    ![The Add a machine panel: the install line to copy, the list of machines waiting for approval, and Skip the approval step](../images/operate/add-machine-panel.png)
+
 2. If the panel says the server has more than one address, pick the one the machine can reach. Each address is
    listed with its network interface; the command changes with your choice.
 3. Select **Copy command**.

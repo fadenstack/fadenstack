@@ -58,10 +58,10 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
 change. Publishing a version reaches everyone who uses the agent from their next request.
 
+![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
+
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
-
-![An agent's Access tab: Who may use it with the group Maintenance, Maintainers with one administrator, and Check someone's access, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-access.png)
 
 **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
 application's own. **Allowed** lets it attach MCP servers on the person's computer; their tools are

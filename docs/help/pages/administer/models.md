@@ -79,6 +79,8 @@ a Hugging Face account that has accepted the model's licence. A token also raise
 
 The chip then shows the account, for example **Hugging Face: alex-example**.
 
+![Hugging Face access: signed in as alex-example with a stored token, a field to replace it, Check and save, and Remove token](../images/administer/marketplace-hf-token.png)
+
 - The server checks the token with Hugging Face before saving it, and refuses one Hugging Face rejects. If
   Hugging Face cannot be reached, the token is saved and marked as unchecked.
 - The token is stored encrypted on the server and never shown again, not even to administrators. If it can
@@ -109,6 +111,8 @@ The engine settings themselves are described under [Deployments](deployments.md#
 ## On this server
 
 The **On this server** tab lists the models this server keeps.
+
+![On this server: how many models the server keeps and their size, Look for models already on this server and Add from a path, and two models marked Ready with Used by, Details, Delete and Host](../images/administer/marketplace-on-server-top.png)
 
 - **Downloads** run on the server, not in the page: leave the page or close the browser and they carry on.
   Each shows its progress and can be cancelled (**Cancel**) or tried again (**Try again**). While anything
