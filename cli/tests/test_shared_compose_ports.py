@@ -76,3 +76,9 @@ def test_the_backend_and_its_worker_share_the_knowledge_file_store() -> None:
         for name in ("faden-backend", "faden-backend-worker")
     }
     assert mounts["faden-backend"] is not None and mounts["faden-backend"] == mounts["faden-backend-worker"], mounts
+
+
+def test_the_gateway_searches_the_knowledge_base_in_the_backend() -> None:
+    """Its default, 127.0.0.1:8000, is the gateway's own port in its container: every search got a 404."""
+    env = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]["faden-gateway"]["environment"]
+    assert "http://faden-backend:8000" in env["FADEN_GATEWAY_RAG_LITE_BACKEND_URL"]
