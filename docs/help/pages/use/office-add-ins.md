@@ -23,6 +23,8 @@ One sign-in covers Word, Excel, PowerPoint and Outlook on this computer. Each do
 - **Ask about selection** on the ribbon, or **Ask the agent about this** and **Add to agent chat** when you right-click, add the selection to the chat. In Outlook, a message opened in its own window has **Ask about this message**.
 - The agent can also read the document by itself when your question needs it. A long document is read in parts.
 
+![The agent's pane in Excel: suggested requests, the selected cells offered as a chip in the message box, and the Context button below it](../images/use/office-excel-pane.png)
+
 ## What it can do in each application
 
 | Application | It reads | It can change (asks first in **Ask**) | It asks every time before it | Taking a change back |
@@ -32,12 +34,16 @@ One sign-in covers Word, Excel, PowerPoint and Outlook on this computer. Each do
 | **PowerPoint** | The presentation, slides, shapes and their text, tables, alt text of pictures, speaker notes | Add slides, set slide text and speaker notes, add text boxes, move slides | Deletes a slide | PowerPoint's own Undo, one change at a time |
 | **Outlook** | The selected messages or the open one, their conversation, the folder in view, your calendar's coming days, the draft you are writing | Draft a reply or a new mail, insert text into a draft, create an appointment, set categories, flag or move a message | Deletes a message (to Deleted Items) | **Undo agent change** on the ribbon: a draft or appointment is deleted, a move or delete goes back, categories and flags are restored |
 
+![A Word document with two review comments by the Fadenstack agent, and the agent's pane beside it saying what it added](../images/use/office-word-comments.png)
+
 !!! note "The agent never sends"
     In Outlook the agent writes drafts and opens them for you; you send them. An appointment it creates waits in its window for you to send or save.
 
 ## What it asks first
 
 Every chat starts in the **Ask** tool mode: the agent reads without asking, and asks before it changes anything. When it asks, a card shows **Run …?** with what it will do. Select **Allow**, **Allow for this chat**, or **Deny**. Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even in **Auto**, the agent asks before anything that cannot be undone. More on tool modes: [Tools in the chat](tools.md#choose-the-tool-mode).
+
+![A Run add_comment? card in Word showing the comment the agent wants to add, with Allow, Allow for this chat and Deny](../images/use/office-word-approval.png)
 
 ## Where your data goes
 

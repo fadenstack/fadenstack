@@ -81,6 +81,8 @@ errors.
   **Level**. The filters only offer what the chosen time range contains;
 - search the text.
 
+![The Logs page on the System Logs tab: the time range, the search, the Machine, Source, Container and Level filters, and Live](../images/operate/logs.png)
+
 | Source | What it is |
 |---|---|
 | **System log** | A machine's own system journal: every service on it, the agent included |

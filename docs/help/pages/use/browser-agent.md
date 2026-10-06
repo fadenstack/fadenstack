@@ -20,6 +20,8 @@ If your IT department set the server and agent, you only sign in.
 
 Type your question in the panel, for example "Summarise this page" or "What does this contract say about notice periods?". The bar above the message box names the page the agent works with.
 
+![The browser agent's panel: suggested questions, the bar naming the open page, and the message box with its four buttons below](../images/use/browser-agent-panel.png)
+
 The agent reads the page itself when you ask about it: its text, headings, lists and tables, the visible part, without menus, ads or hidden text. A long page is read in parts.
 
 The buttons under the message box add something to your next message:
@@ -30,6 +32,8 @@ The buttons under the message box add something to your next message:
 | **Add the selection** | What you selected on the page |
 | **Add tabs** | Tabs of this window you pick, to compare them (**All readable tabs** takes all of them) |
 | **Add a PDF from this computer** | A PDF file; you can also drop it on the panel |
+
+![Add tabs opened: All readable tabs and the window's two tabs to tick, with Cancel and Add](../images/use/browser-agent-add-tabs.png)
 
 You can also right-click a selection and choose **Ask Fadenstack about "…"**, or right-click a page and choose **Ask Fadenstack about this page**.
 
@@ -53,6 +57,8 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 | Press a button or follow a link | no | no | asks | asks |
 
 When it asks, a card shows **Run …?** with what it will do and where. Select **Allow**, **Allow for this chat**, or **Deny**.
+
+![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
 
 ## What it never does
 

@@ -52,6 +52,8 @@ Open **AI Infrastructure → Deployments** and select a deployment. The page sho
   getting ready, stopping) and **Engine (vLLM)** (what the engine printed, including why a start failed).
   Filter by level, stream and machine, or search; copy or download the lines the filters show.
 
+![A deployment's page: Health Serving with 2 of 2 copies, Last message, In chat and the reply wait with Change, Engine settings, Machines and Model files, and Scale, Check now and Stop at the top](../images/administer/deployment.png)
+
 ## Offer it in the chat
 
 A deployment is offered in the chat only under a name someone chose. The hosting dialog proposes one. To set
@@ -86,6 +88,8 @@ more patience: more copies, or more memory per copy.
   share of the accelerator's memory (a whole one: 80 %), and the dialog shows how much that is.
 
 Select **Apply**.
+
+![The Scale dialog: 2 copies at 0.7 accelerators each, the share of memory the engine takes, how many copies fit on the cluster, and Apply](../images/administer/deployment-scale.png)
 
 | You change | What happens |
 |---|---|
@@ -131,6 +135,8 @@ as the hosting dialog:
 - **All vLLM settings**: every setting of the engine version the cluster runs, searchable, and **Other
   flags, as text** for anything else. Anything that could escape the command is refused.
 - A preview of the settings, shown as vLLM flags.
+
+![The Engine settings step of the hosting dialog: Tuned for with its four presets, Context and memory, and Throughput, with suggested values marked](../images/administer/host-engine-settings.png)
 
 Warnings appear before a setting that will not start: a conversation longer than the model supports or than
 fits in memory, a memory share above 95 %, a tool format with tool calling off, or the model's own code.

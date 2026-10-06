@@ -19,6 +19,8 @@ Either way works, also before your first message:
 - **Type `$`** in the message box, then part of the skill's name, for example `$incident`. Matching skills are listed as you type. Use the arrow keys and press Enter or Tab to pick one.
 - **Select the puzzle piece** beside the message box. **Skills for this chat** lists the skills you can use; tick the ones you want.
 
+![Skills for this chat, opened from the puzzle piece: skills to tick, then Create a skill from this chat… and Manage skills](../images/use/chat-skills.png)
+
 A picked skill shows as a chip above the message box. It is used for every message in this chat until you take it off with the × on its chip. Each chat has its own picks, remembered in this browser: on another computer, pick them again.
 
 ## Skills that come in on their own
@@ -40,6 +42,8 @@ Nothing is saved before you select **Save skill**. New skills are private: only 
 ## Your skills
 
 Select your avatar in the top bar, then **Skills**. The page lists the skills you can use, in **Mine**, **Shared with me** and **Organization**. Open one to read its instructions or change one of your own. Each save is kept as a version.
+
+![The Skills page with its tabs Mine, Shared with me, Organization and All, the search, and the Import and Create Skill buttons](../images/use/skills-page.png)
 
 Who can see a skill, how sharing works and how versions are published is on [Skills for the organisation](../administer/skills.md). The skill format, for writing or importing skills by hand, is on the Developers site: [Skills](https://developers.fadenstack.com/skills/).
 

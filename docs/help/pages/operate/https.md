@@ -169,6 +169,8 @@ Every machine of the cluster restarts its container, and every model on the clus
 **Encrypted** once all machines run with it. Each cluster has its own certificate authority; each machine's key
 stays on the machine. Every machine needs a recent agent; the card names the ones to update.
 
+![The Traffic between machines card of a cluster, reading Encrypted](../images/operate/cluster-traffic-encrypted.png)
+
 Encryption between machines slows down moving large amounts of data between them; serving and chat are not slowed.
 GPU-to-GPU traffic is not Ray's and cannot be encrypted: keep the cluster's network to its machines, on a cable or
 a network of its own.

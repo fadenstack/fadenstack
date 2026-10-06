@@ -17,6 +17,8 @@ server Fadenstack runs on. This page says what each part shows and what to do ab
   refresh is late or failed; the figures shown are then the previous ones.
 - **Getting started** sits above the cards until you hide it (see [Administering Fadenstack](index.md)).
 
+![The dashboard: the Critical issues pill, Customize and the refresh ring at the top, Getting started, then the AI traffic and Needs attention cards](../images/administer/dashboard.png)
+
 ## What each card shows
 
 Each card loads and refreshes on its own. A card that cannot load says "This widget could not load." with
@@ -83,6 +85,8 @@ in-house share is green. Times follow your browser's time zone.
 | An **MCP server** is in error | Its tools are not available to chats. Open it and select **Test** (see [MCP servers](mcp-servers.md)). |
 | An HTTPS or model certificate runs out soon, or ran out | See [HTTPS and trust](../operate/https.md). |
 | **Model traffic to** a cluster **is not encrypted** | Turn on encryption on the cluster's page; its models load again (see [Clusters](../operate/clusters.md)). |
+
+![The Needs attention card with a failed deployment and tool changes waiting for an agent, each with the bell to mute it](../images/administer/needs-attention.png)
 
 **Mute** (the bell beside a problem) mutes it for every administrator. A muted problem moves under **N
 muted** at the end of the list, and leaves the header's count; the list says who muted it and when. **Show

@@ -32,6 +32,8 @@ counted: the chat, the agents, and applications using API tokens.
 
 Open **Observability → Cost Dashboard** (the page is titled **Cost Observability**) and pick a time range.
 
+![Cost Observability, opened from Observability → Cost Dashboard: the tabs Overview, Requests and Pricing, and the time ranges 7d to 90d with refresh and download at the top right](../images/administer/cost-dashboard-top.png)
+
 - **Overview**: **Estimated Spend**, **Total Requests**, **Total Tokens**, **Avg Latency** and **Error Rate**,
   with **Cost Over Time**, **Request Throughput**, **Latency Percentiles**, **Spend by Model** and **Top
   Users**.
@@ -45,6 +47,9 @@ Open **Observability → Cost Dashboard** (the page is titled **Cost Observabili
 Costs are estimates from prices you set per model. They do not change what a provider bills you.
 
 1. Open **LLM → Providers** and select **Set price** in the model's row (in the **Price $/1M** column).
+
+    ![LLM Providers with Set price in the Price $/1M column of a model's row](../images/administer/providers-list-top.png)
+
 2. Enter what a million input tokens and a million output tokens cost.
 3. Save. Requests are priced with it within a minute.
 

@@ -6,7 +6,7 @@ Two checks:
   - the docs hub's scrub patterns (private addresses, lab names, internal wording, timings, e-mail addresses,
     secrets): the same rules the hub applies when it builds help.fadenstack.com. Read from the hub, so they are
     kept in one place: FADEN_DOCS_HUB, or the hub checked out next to this repo (../docs);
-  - every relative link to a Markdown page points at a page that exists.
+  - every relative link to a Markdown page, and every picture, points at a file that exists.
 
 A reviewed line passes the scrub when it ends with `<!-- scrub: ok -->`, as in the hub.
 """
@@ -23,7 +23,7 @@ HELP = Path(__file__).resolve().parent.parent          # docs/help
 REPO = HELP.parent.parent                               # the core repo
 HUB = Path(os.environ.get("FADEN_DOCS_HUB") or REPO.parent / "docs")
 HUB_SCRUB = HUB / "scripts" / "scrub.py"
-LINK = re.compile(r"\]\(([^)\s]+?\.md)(?:#[^)\s]*)?\)")
+LINK = re.compile(r"\]\(([^)\s]+?\.(?:md|png|jpe?g|svg|webp))(?:#[^)\s]*)?\)")
 
 
 def scrub_rules() -> dict[str, re.Pattern[str]]:
@@ -60,7 +60,7 @@ def main() -> int:
                 if "://" in target:
                     continue
                 if not (page.parent / target).resolve().is_file():
-                    hits.append(f"{where}: link to a page that does not exist: {target}")
+                    hits.append(f"{where}: link to a file that does not exist: {target}")
     if hits:
         print("\n".join(hits))
         print(f"\n{len(hits)} line(s) need a look.")

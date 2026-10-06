@@ -26,6 +26,8 @@ above the list count them, and each is also a filter (select it again to list al
 | **Scope** | The team or unit that owns it |
 | Actions | Start, stop, pause, restart, delete, details: only those its class allows |
 
+![The Containers list: the Running, Not running, Unhealthy and Restarting tiles above Fadenstack's own containers with their class](../images/operate/containers.png)
+
 The dashboard's **Needs attention** list reports containers that keep restarting.
 
 ### Classes
@@ -60,7 +62,7 @@ A container starts from an image on the server; creating one does not pull it.
 
 ## Create a container
 
-1. Open **Containers → Create** (or **Create** on the list).
+1. On **Containers → Containers**, select **Create**.
 2. Fill in **Image** (suggestions come from the images on the server), a **Container Name**, and optionally a
    **Command Override** written as in a shell.
 3. Choose the **Class**: `TENANT_APP` for a container of your own, `MCP` for an MCP server. Set **Policy** and
@@ -111,6 +113,8 @@ console API's own container cannot be edited from the console: change its settin
 **Containers → Networks** lists Docker's networks. `fadenstack_default` is Fadenstack's own; system networks are
 read-only. You can create a network (optionally internal, without outbound access), inspect one, and delete the
 ones you created.
+
+![The Networks page: Docker's system networks and fadenstack_default, each marked System, and the Create Network button](../images/operate/containers-networks.png)
 
 **Containers → Stacks** deploys a Docker Compose stack from a compose file. Deploying again under the same ID
 makes a new revision; every revision is kept, two can be compared, and you can roll back to an earlier one.

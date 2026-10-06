@@ -29,6 +29,8 @@ Each card says what the model is for (**Tools**, **Reasoning**, **Vision**, **Co
 it fits. Select a card for the details: parameters, context length, precision, licence, its files, and how it
 fits each of your clusters. **Open on Hugging Face** shows the full model card.
 
+![The Model marketplace on Recommended: Fit for cluster with a cluster of two GPUs, the Hugging Face chip, Only show models that fit, and model cards with their badges and Host](../images/administer/marketplace.png)
+
 Models the engine cannot serve are hidden, with a button to show them and the reason: GGUF files (for
 llama.cpp and Ollama), MLX weights (Apple silicon only), repositories with no weights, and models that are
 neither chat, vision nor embedding models.

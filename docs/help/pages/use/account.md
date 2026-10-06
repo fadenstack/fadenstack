@@ -11,6 +11,8 @@ Select your avatar in the top bar, then **Manage Profile**. **My Profile** opens
 - **Appearance**: the **Accent** colour (**Frost**, **Graphite** or **Aurora**) and the **Theme** (**Light** or **Dark**). They are saved in this browser.
 - **API Token**: your personal API tokens (below).
 
+![My Profile with Account Information, Change Password and the start of Appearance](../images/use/profile.png)
+
 Your e-mail address and what you may do are set by your administrator. See [Users, groups and roles](../administer/users.md).
 
 ## Change your password

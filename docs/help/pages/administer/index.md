@@ -25,6 +25,8 @@ The **Help** menu (the question mark in the top bar) has:
   for adding a machine, creating a cluster, hosting a model, connecting a cloud model, adding people and
   creating an API token.
 
+![The Getting started list on the dashboard: five steps, four of them ticked, each with Open, and Hide at the top right](../images/administer/getting-started.png)
+
 ## First steps, in order
 
 1. **Connect your GPU machines and group them into a cluster.** A machine joins by running one command on it

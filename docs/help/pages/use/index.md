@@ -30,6 +30,8 @@ You land in the chat. A sign-in lasts seven days unless your organisation set an
 | The bar at the top | The chat's title (the pencil renames it), **Language**, the light or dark theme, and your avatar with **Manage Profile**, **Skills** and **Logout** |
 | The box at the bottom | Where you type. Beside it: the tools button (a wrench), the skills button (a puzzle piece), the paper clip for files, the **Model** picker and the send button |
 
+![A new chat: the sidebar with New chat, the search, projects and chats on the left, the buttons for language, theme and your avatar at the top right, and the message box at the bottom](../images/use/chat.png)
+
 Administrators also see a shield in the top bar, which opens the admin console. Everything about the console is in [Administer](../administer/index.md).
 
 ## Your data

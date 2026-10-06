@@ -25,6 +25,8 @@ and groups give people, and how to end someone's access.
 | `admin` | Every permission, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), and creating and deleting agents (`agents:create`, `agents:delete`). |
 | `rag_manager`, `rag_editor`, `rag_viewer` | Managing, editing or reading the knowledge base's collections and documents. |
 
+![Access Control → Roles: the built-in roles, each with its number of permissions and people, marked Read-only, and Create Role at the top](../images/administer/roles.png)
+
 !!! note
     Roles you tick replace `default_user`. For someone who should also chat, tick `default_user` as well.
 
@@ -55,6 +57,8 @@ already have, and get a Fadenstack account the first time they do.
 The table shows each person's flags (**Superuser**, **Active**, **Verified**), roles, usage group and how many
 permissions they have in all. The search box finds people by e-mail, role or permission.
 
+![Access Control → Users: each person's flags, roles, usage group and number of permissions, with Edit Roles, the code icon and the bin in each row, and Create User at the top](../images/administer/users.png)
+
 ## Roles of your own
 
 When no built-in role fits, make one:
@@ -64,6 +68,8 @@ When no built-in role fits, make one:
 3. Tick its **Permissions**, for example `agents:create` for people who may set up a browser agent for
    their team, or `skills:publish` for people who may share skills with the whole organisation.
 4. Save it, and give it to people or to a group.
+
+![Create New Role with the name Agent cleanup and, under Permissions, the agents group opened with delete ticked](../images/administer/create-role.png)
 
 Deleting a role takes it from everyone who has it; the dialog says how many people that is.
 

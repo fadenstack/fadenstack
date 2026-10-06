@@ -47,6 +47,8 @@ your installation uses others):
 2. Change the fields under **Tenant Override**. **Effective Policy Preview** shows what requests will get.
 3. Select **Save**. **Clear Override** goes back to the default policy.
 
+![A tenant policy: Detection (Presidio) with the language, the score threshold and the entities, Clear Override and Save, the switch Let chats and agents change the PII mode, and the Effective Policy Preview](../images/administer/pii-tenant-policy.png)
+
 The fields are the same in both places:
 
 | Field | What it does |
@@ -90,6 +92,8 @@ the text itself.
 6. Save it. Rules apply within 30 seconds.
 
 Without rules, tools run as the tool mode says.
+
+![Agents → Governance on the Tool rules tab, beside Tool classes and Decisions: no rules yet, and Add rule](../images/administer/governance.png)
 
 ### Tool classes and tool modes
 

@@ -54,7 +54,12 @@ e-mail addresses, secrets) and on links to pages that do not exist.
   page the first time it matters, not every time.
 - **Examples** use `https://ai.example.internal` for the server, `gpu-01`, `gpu-02` for machines,
   `192.0.2.x` for addresses, `alex@example.com` for people.
-- **No screenshots yet.** They will be taken from a demo installation; the lab's do not belong here.
+- **Screenshots** show a screen the reader is about to use, or what they should see when it worked: one to
+  three on a page, next to the step they belong to, never instead of the text. They live in
+  `pages/images/<section>/` and are taken with `scripts/shots.mjs`, which swaps every name, address and person
+  for the neutral examples above before the picture is taken. Look at every picture before you add it: no
+  real machine, cluster or person names, no private addresses, no error that the page does not explain.
+  Alt text says what the picture shows: `![The cluster page with two machines](../images/operate/cluster.png)`.
 
 ## Page template
 

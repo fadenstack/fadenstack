@@ -75,6 +75,8 @@ the console once it is back. The API (`/api`) and the gateway (`/v1`) answer `50
 scripts and SDKs can wait and retry. A console page left open notices the new version and offers **Reload**; a page
 with text typed and not sent is never reloaded by itself.
 
+![The maintenance page: Fadenstack is being updated, and it reloads by itself when it is back](../images/operate/maintenance-page.png)
+
 The models on the clusters keep running throughout: a cluster runs on its machines, not on the server.
 
 ### Maintenance by hand

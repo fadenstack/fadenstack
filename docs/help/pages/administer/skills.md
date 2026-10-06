@@ -40,6 +40,9 @@ a minute.
 
 1. Open **Extensions → Skills Hub** and select **Create Skill** (or **Import** a `SKILL.md` or a zipped skill
    folder).
+
+    ![The top of Skills Hub: the search, the All filter, Import and Create Skill, above the columns Owner, Who sees it, When it is used and Status](../images/administer/skills-hub-toolbar.png)
+
 2. Enter the **Skill Name** and the **Short name**, which people type after `$` in the chat to pick it.
 3. Write the **Description** (what the skill does and when to use it: the model reads it) and the
    instructions.

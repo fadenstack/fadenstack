@@ -30,12 +30,16 @@ rules you set.
     | **PII Mode** | What the server may see of personal data (see [Personal data](#personal-data-pii-mode)). |
     | **Timeout (seconds)** | How long connecting and each tool call may take: 5 to 600 seconds. |
 
+    ![The Register Server dialog: Server Name, Transport set to Streamable HTTP, Server URL, Tool Prefix, PII Mode, Timeout (seconds), and Headers with Add header](../images/administer/mcp-register-server.png)
+
 3. Under **Headers** (HTTP) or **Environment variables** (stdio), add what the server needs to let you in,
    such as `Authorization: Bearer <token>`.
 4. Select **Register**.
 
 Fadenstack connects to the server and lists its tools. The server then shows as active, with its number of
 tools.
+
+![MCP Servers with two servers, both active, with their transport, number of tools and PII mode, and Scan Network and Register Server at the top](../images/administer/mcp-servers.png)
 
 !!! warning "Everyone uses these credentials"
     Headers and variables are stored encrypted and never shown again; the console lists their names only.
@@ -59,6 +63,8 @@ reason.
   header is replaced or removed on its own, without entering the others again. Saving reconnects the server
   and lists its tools again.
 - **Delete Server** removes it and all its tools.
+
+![Editing a server: its Server URL, Timeout (seconds) and PII Mode, and the stored Authorization header marked set, with Replace and Remove](../images/administer/mcp-edit-server.png)
 
 ## Who can use the tools
 

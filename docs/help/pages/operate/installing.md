@@ -91,6 +91,8 @@ faden runtime-images --check    # what the server holds, and what is missing
 The console opens on the **Dashboard**, with a **Getting started** list: add a machine, create a cluster, host a
 model, try it in the chat, add people. Each step ticks itself when it is done.
 
+![The Getting started list on the Dashboard, here with four of its five steps ticked](../images/operate/getting-started.png)
+
 Next: [add the GPU machines](machines.md).
 
 ## Where things are

@@ -13,6 +13,9 @@ offered in the chat and at the API next to your own models, under the same rules
 ## Connect a provider
 
 1. Open **LLM → Providers** and select **Add Provider**.
+
+    ![LLM Providers with the search, Add Provider and refresh at the top, and a model your cluster serves in the list](../images/administer/providers-list-top.png)
+
 2. Enter a **Name** people will recognise, such as `OpenRouter`.
 3. Under **Target**, choose **Remote Endpoint**.
 4. Under **Provider**, pick the provider. For OpenAI, Mistral, Groq, DeepSeek and OpenRouter the
@@ -93,6 +96,8 @@ Each provider says why it was placed where it is, for example "Cloud API: openro
 gpu-01". The page also shows how much data went each way, estimated from the tokens, and a badge for the
 whole setup: **Air-Gapped ✓**, **Hybrid** or **Cloud Only**. Until every unknown provider is placed, the
 setup is not counted as air-gapped.
+
+![Observability → Data Residency: the Hybrid badge, the number of local and external providers, the data volume, and one provider on your machines and one external, each with Where prompts go](../images/administer/data-residency.png)
 
 When Fadenstack cannot tell, or tells wrongly, set **Where prompts go** on the provider: **On your
 machines**, **Your network** or **External**. **Detect automatically** goes back to detection. Networks of

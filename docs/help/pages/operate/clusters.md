@@ -7,7 +7,7 @@ and stop or start it. Models are deployed onto a cluster by an administrator (se
 
 ## Before you start
 
-- The machines are added and **Healthy** (see [GPU machines](machines.md)).
+- The machines are added and **healthy** (see [GPU machines](machines.md)).
 - Machines that should share a cluster can reach each other on one network. See
   [Network and ports](network.md#between-the-machines-of-a-cluster).
 - A model runs on one kind of GPU at a time. Machines of different kinds can share a cluster, but no copy of a
@@ -17,6 +17,9 @@ and stop or start it. Models are deployed onto a cluster by an administrator (se
 ## Create a cluster
 
 1. Open **AI Infrastructure → Clusters** and select **Create a cluster**.
+
+    ![The Clusters page with one running cluster and the Create a cluster button](../images/operate/clusters.png)
+
 2. **Name it**: enter a **Cluster name**, such as `gpu-room`, and select **Next**.
 3. **Pick machines**: tick the machines that will serve models. One machine makes a fine cluster; you can add more
    later. For each machine the wizard names the runtime it will run. With more than one machine, choose
@@ -47,6 +50,8 @@ cabling and addresses, then try again.
 ## The cluster's page
 
 Open **Clusters** and select the cluster.
+
+![A running cluster's page: its state and actions at the top, the summary, and how its two machines are wired](../images/operate/cluster-page.png)
 
 - At the top: its state, **Check now** (look at the cluster at once instead of waiting for the next check),
   **Stop** or **Start**, **Add machines**, **Deploy a model** and **Delete**.
@@ -115,6 +120,8 @@ maintenance, a reboot, or taking it out of the cluster. You see a plan first, an
    the reason.
 3. Select **Drain**. If copies would stop, the button says **Drain and stop** with their number: you are agreeing
    to that.
+
+![The drain plan for gpu-02: one copy stops because no other machine has enough free GPU, and the button reads Drain and stop 1](../images/operate/cluster-drain-plan.png)
 
 A copy moves only when another machine of the cluster holds the model's files and has both the accelerator share
 and the GPU memory the copy needs free. Each moving copy keeps serving until its replacement on the other machine

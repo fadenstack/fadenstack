@@ -41,6 +41,8 @@ What people do with the agents is described in [The browser agent](../use/browse
    that only its maintainers can use.
 7. Select **Create**.
 
+![New agent with Chrome picked under Start from an app: the name, the address browser-assistant, a model, the group Maintenance under Who may use it, and Publish it now ticked](../images/administer/new-agent.png)
+
 The agent's page opens. Its list status is **Draft**, **Published** or **Retired**.
 
 ## The agent's page
@@ -58,6 +60,8 @@ change. Publishing a version reaches everyone who uses the agent from their next
 
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
+
+![An agent's Access tab: Who may use it with the group Maintenance, Maintainers with one administrator, and Check someone's access, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-access.png)
 
 **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
 application's own. **Allowed** lets it attach MCP servers on the person's computer; their tools are
@@ -139,6 +143,8 @@ is held back (the model does not see it), and the application keeps working with
    characters**, **Link** or **Long**. Models read tool descriptions like instructions.
 3. Keep or change the class the application suggests, or choose **Leave out**.
 4. Select **Accept and publish**, or **Accept as draft** to publish later from **Versions**.
+
+![An agent's Apps tab with one tool change: the new tool open_page marked New, its class Write to keep or change, and Accept and publish and Accept as draft at the top](../images/administer/agent-apps-review.png)
 
 Nothing is taken in without that click. **Apps in use** lists each application and version that runs the
 agent, who last reported it and the context it offers.

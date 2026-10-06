@@ -16,6 +16,8 @@ To add a file, select the paper clip before you send. The model reads the file a
 
 The **Model** picker lists the models your administrator offers. You can switch models in the middle of a chat: the next reply comes from the model now picked, and it sees the conversation so far.
 
+![The Model picker opened, listing three models to choose from](../images/use/chat-model.png)
+
 Some models run on your organisation's own machines, others at an outside provider. The name in the list does not always say which; ask your administrator if it matters for what you write. See [Your data and privacy](privacy.md).
 
 ## While a reply is written
@@ -55,6 +57,8 @@ To use an answer elsewhere, select its text and copy it.
 - **Search chats** finds chats by their title as you type. It does not search what was said in them.
 - The sidebar lists your most recent chats by when you used them (**Today**, **Yesterday**, **Previous 7 days**, **Previous 30 days**, **Older**). **Show more** loads older ones.
 - The arrow at the bottom of the sidebar (**Collapse**) folds it into a narrow strip; the logo opens it again.
+
+![Search chats with a word typed: the sidebar lists the three chats whose title matches, and the open chat's title has the pencil beside it](../images/use/chat-search.png)
 
 Chats are yours: there is no way to share a chat with a colleague from the chat.
 

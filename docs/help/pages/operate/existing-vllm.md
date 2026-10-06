@@ -23,6 +23,8 @@ page lists them under **vLLM on this machine**:
 | **Port** | The port it is published on at the machine |
 | **Routing** | Whether it is routed through Fadenstack, and under which name |
 
+![vLLM on this machine, on a machine's page: a stopped vLLM container, with Route through Fadenstack disabled because it is not running](../images/operate/machine-vllm-found.png)
+
 What the model is for comes from the container's vLLM flags. When the flags say nothing, it is guessed from the
 model's name and marked "guessed from the model's name".
 

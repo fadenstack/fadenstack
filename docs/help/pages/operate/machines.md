@@ -25,7 +25,9 @@ The console calls them **Machines**. The agent, the API and some messages still 
    **Machines** page shows how many machines are waiting, with **Review**.
 6. Check that the code matches the one on the machine, and select **Approve**. **Not this one** refuses it.
 
-The machine is listed as **Healthy**, and its page shows its GPUs. Next: put it in a [cluster](clusters.md).
+The machine is listed as **healthy**, and its page shows its GPUs. Next: put it in a [cluster](clusters.md).
+
+![The Machines page with two healthy machines, gpu-01 and gpu-02, and the Add a machine button](../images/operate/machines.png)
 
 ### The install line
 
@@ -81,7 +83,9 @@ With that copy, every download, from either source, is checked against it. Witho
 
 Open **Machines** and select a machine.
 
-- **Status**: **Healthy**, **Degraded**, **Unhealthy** or **Offline**, with chips for **Maintenance**, **draining**,
+![A machine's page: its status and agent version, the Maintenance, Drain and other actions, its hardware, and the vLLM containers found on it](../images/operate/machine.png)
+
+- **Status**: **healthy**, **degraded**, **unhealthy** or **offline**, with chips for **maintenance**, **draining**,
   and **Agent *version* available** when the server expects a newer agent. The agent's own version is shown under
   the name. **Live** refreshes the page by itself.
 - **Hardware**: **CPU**, **Memory**, **Disk**, **GPU** and **Network** use, the **GPU Devices** and **System**
