@@ -21,6 +21,9 @@ from faden_cli.core.bundle import installed_release
 #: Written into the install directory when its images are built from a checkout.
 BUILD_RECORD = ".faden-build"
 
+#: Tracked files the running install rewrites itself: a change to them is not a local change to the code.
+GENERATED = frozenset({"shared/prometheus/targets.json", "shared/rabbitmq/definitions.json"})
+
 _AGENT_VERSION = re.compile(r'^AGENT_VERSION\s*=\s*"([^"]+)"', re.MULTILINE)
 
 
@@ -47,13 +50,18 @@ def _git(repo: Path, *args: str) -> str | None:
 
 
 def checkout_state(repo: Path) -> dict[str, str | bool | None]:
-    """The checkout's commit, a readable name for it, and whether it has local changes."""
-    status = _git(repo, "status", "--porcelain", "--untracked-files=no") or ""
+    """The checkout's commit, a readable name for it, and whether it has local changes.
+
+    The name is the release the commit follows (``v0.4.1-3-gabc1234``), or the commit when no release tag is
+    reachable; the repository's other tags (the agent's, older ones) say nothing about the server.
+    """
+    changed = (_git(repo, "diff", "--name-only", "HEAD") or "").splitlines()
+    commit = _git(repo, "rev-parse", "--short=8", "HEAD")
     return {
-        "commit": _git(repo, "rev-parse", "--short=8", "HEAD"),
-        "describe": _git(repo, "describe", "--tags", "--always"),
+        "commit": commit,
+        "describe": _git(repo, "describe", "--tags", "--match", "v[0-9]*") or commit,
         "branch": _git(repo, "symbolic-ref", "--short", "-q", "HEAD"),
-        "modified": bool(status),
+        "modified": any(path not in GENERATED for path in changed),
     }
 
 

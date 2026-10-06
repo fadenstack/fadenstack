@@ -88,6 +88,27 @@ def test_local_changes_and_failed_builds_are_shown(checkout: Path) -> None:
     assert "some images failed to build" in rows["Images built from"]
 
 
+def test_files_the_install_rewrites_and_other_tags_do_not_count(checkout: Path) -> None:
+    targets = checkout / "shared" / "prometheus" / "targets.json"
+    targets.parent.mkdir()
+    targets.write_text("[]\n", encoding="utf-8")
+    _git(checkout, "add", ".")
+    _git(checkout, "commit", "-q", "-m", "targets")
+    _git(checkout, "tag", "node-agent-v0.2.7")
+    targets.write_text('[{"targets": ["a:1"]}]\n', encoding="utf-8")  # what the backend writes
+
+    installed = _rows(checkout / "shared")["Installed"]
+    assert installed.startswith("source checkout at v0.4.1-1-g")
+    assert installed.endswith(" on main")  # no "with local changes"
+
+
+def test_a_checkout_without_a_release_tag_is_named_by_its_commit(checkout: Path) -> None:
+    _git(checkout, "tag", "-d", "v0.4.1")
+    _git(checkout, "tag", "cli-v0.3.0")
+    installed = _rows(checkout / "shared")["Installed"]
+    assert installed.startswith("source checkout at ") and "cli-v" not in installed
+
+
 def test_a_checkout_without_a_record_asks_for_the_next_upgrade(checkout: Path) -> None:
     assert _rows(checkout / "shared")["Images built from"].startswith("not recorded")
 
