@@ -18,3 +18,5 @@ logs/
 # Put down by faden upgrade / faden maintenance on while the platform is down
 # for maintenance; nginx answers with maintenance.html while it exists.
 nginx/maintenance.flag
+# faden upgrade / deploy note which commit this checkout's images were built from (faden version).
+.faden-build
