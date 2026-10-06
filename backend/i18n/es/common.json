@@ -918,6 +918,18 @@
       "until": "Termina",
       "until_help": "Opcional. Vacío: hasta que se desactive.",
       "until_past": "Elija un momento en el futuro."
+    },
+    "suspend": {
+      "action": "Suspender",
+      "title": "Suspender cuenta",
+      "reactivate": "Reactivar",
+      "confirm": "¿Suspender a {{email}}? Ya no podrá iniciar sesión, y sus sesiones, tokens de API y agentes dejarán de funcionar en un minuto. No se borra nada suyo y puede reactivar la cuenta.",
+      "failed": "No se pudo cambiar la cuenta"
+    },
+    "tokens": {
+      "action": "Tokens de API",
+      "title": "Tokens de API de {{email}}",
+      "none": "No hay tokens de API."
     }
   },
   "container_detail": {

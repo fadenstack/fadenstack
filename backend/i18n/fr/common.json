@@ -913,6 +913,18 @@
       "until": "Fin",
       "until_help": "Facultatif. Vide : jusqu'à ce qu'il soit désactivé.",
       "until_past": "Choisissez un moment dans le futur."
+    },
+    "suspend": {
+      "action": "Suspendre",
+      "title": "Suspendre le compte",
+      "reactivate": "Réactiver",
+      "confirm": "Suspendre {{email}} ? La personne ne peut plus se connecter, et ses connexions, jetons d'API et agents cessent de fonctionner en une minute. Rien de ce qui lui appartient n'est supprimé, et vous pouvez la réactiver.",
+      "failed": "Impossible de modifier le compte"
+    },
+    "tokens": {
+      "action": "Jetons d'API",
+      "title": "Jetons d'API de {{email}}",
+      "none": "Aucun jeton d'API."
     }
   },
   "container_detail": {

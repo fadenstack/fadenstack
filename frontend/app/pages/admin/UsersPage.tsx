@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { adminGroups, adminUsers, hasDeveloperMode, type AdminUser, type Group, type RbacRole } from "~/api/admin";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { UserApiTokensDialog } from "./UserApiTokensDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
 import { formatDateTime } from "~/lib/dates";
@@ -26,6 +27,9 @@ import Typography from "@mui/material/Typography";
 import AddIcon from "@mui/icons-material/Add";
 import CodeIcon from "@mui/icons-material/Code";
 import DeleteIcon from "@mui/icons-material/Delete";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
+import KeyIcon from "@mui/icons-material/Key";
+import PersonOffIcon from "@mui/icons-material/PersonOff";
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -52,6 +56,9 @@ export default function UsersPage() {
 
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [developerModeOf, setDeveloperModeOf] = useState<AdminUser | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<AdminUser | null>(null);
+  const [tokensOf, setTokensOf] = useState<AdminUser | null>(null);
+  const [suspending, setSuspending] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedUsageGroupId, setSelectedUsageGroupId] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -134,6 +141,20 @@ export default function UsersPage() {
       setError(err instanceof Error ? err.message : t("users.failed_create"));
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function setActive(target: AdminUser, active: boolean) {
+    setSuspending(true);
+    setError(null);
+    try {
+      await adminUsers.setActive(target.id, active);
+      setSuspendTarget(null);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("users.suspend.failed"));
+    } finally {
+      setSuspending(false);
     }
   }
 
@@ -262,6 +283,30 @@ export default function UsersPage() {
               <CodeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title={t("users.tokens.action")}>
+            <IconButton size="small" data-user-tokens={u.id} onClick={() => setTokensOf(u)}>
+              <KeyIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {u.is_active ? (
+            <Tooltip title={t("users.suspend.action")}>
+              <IconButton size="small" data-user-suspend={u.id} onClick={() => setSuspendTarget(u)}>
+                <PersonOffIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title={t("users.suspend.reactivate")}>
+              <IconButton
+                size="small"
+                color="success"
+                data-user-reactivate={u.id}
+                disabled={suspending}
+                onClick={() => void setActive(u, true)}
+              >
+                <HowToRegIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           <IconButton size="small" color="error" onClick={() => setDeleteTarget(u)} title={t("common.delete")}>
             <DeleteIcon fontSize="small" />
           </IconButton>
@@ -430,6 +475,20 @@ export default function UsersPage() {
             </Stack>
           </Stack>
       </FormDialog>
+
+      <UserApiTokensDialog user={tokensOf} onClose={() => setTokensOf(null)} />
+
+      {/* ── Suspend user dialog ── */}
+      <ConfirmDialog
+        open={!!suspendTarget}
+        title={t("users.suspend.title")}
+        message={t("users.suspend.confirm", { email: suspendTarget?.email ?? "" })}
+        confirmLabel={t("users.suspend.action")}
+        cancelLabel={t("common.cancel")}
+        loading={suspending}
+        onConfirm={() => suspendTarget && void setActive(suspendTarget, false)}
+        onClose={() => setSuspendTarget(null)}
+      />
 
       {/* ── Delete user dialog ── */}
       <ConfirmDialog

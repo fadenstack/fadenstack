@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -38,6 +38,7 @@ from faden_backend.web.api.admin.users.schema import (
     MeAccessDTO,
     PermissionDTO,
     RoleDTO,
+    SetUserActiveRequest,
     UpdateRoleRequest,
     UpdateUserRolesRequest,
     UpdateUserUsageGroupRequest,
@@ -407,6 +408,50 @@ async def delete_user(
     await session.delete(target)
     await session.flush()
     await forget_principal("user", str(user_id))
+
+
+@router.put("/{user_id}/active", response_model=AdminUserDTO, name="set_user_active")
+async def set_user_active(
+    user_id: uuid.UUID,
+    payload: SetUserActiveRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminUserDTO:
+    """Suspend an account, or let it back in.
+
+    A suspended person cannot sign in, and their sign-ins, API tokens and agents stop working: the
+    backend checks the flag on every request, the gateway within a minute, and the device channel
+    when it next checks the caller. Nothing of theirs is deleted.
+    """
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not payload.active:
+        if target.id == admin.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot suspend yourself.")
+        if target.is_superuser:
+            others = await session.scalar(
+                select(func.count()).select_from(User).where(
+                    User.is_superuser.is_(True), User.is_active.is_(True), User.id != target.id,
+                ),
+            )
+            if not others:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This is the last active superuser; nobody could administer the system.",
+                )
+    if target.is_active != payload.active:
+        target.is_active = payload.active
+        await session.flush()
+        await AuditDAO(session).log(
+            action="user.reactivate" if payload.active else "user.suspend",
+            target_type="user",
+            target_id=str(target.id),
+            result=AuditResult.ALLOW,
+            actor_id=admin.id,
+            metadata_json=json.dumps({"email": target.email}),
+        )
+    return await _build_admin_user_dto(target, RbacDAO(session))
 
 
 # ── Self-service profile endpoints ────────────────────────────────────

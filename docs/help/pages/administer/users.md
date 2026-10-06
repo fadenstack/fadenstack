@@ -19,16 +19,31 @@ and groups give people, and how to end someone's access.
 
 | Role | Gives |
 |---|---|
-| `default_user` | The chat: chats, projects and attachments, their own skills (create and share), and the knowledge base. Every new account gets it unless you pick other roles. |
+| `default_user` | The chat: chats, projects and attachments, their own skills (create and share), and reading the knowledge base's collections that are open to them. Every new account gets it unless you pick other roles. |
 | `viewer` | Reading the state of models, clusters, machines, containers and logs, through the API. |
-| `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments, and starting and stopping containers. Not deleting. |
+| `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments. Not deleting. |
 | `admin` | Every permission, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), and creating and deleting agents (`agents:create`, `agents:delete`). |
-| `rag_manager`, `rag_editor`, `rag_viewer` | Managing, editing or reading the knowledge base's collections and documents. |
+| `rag_manager`, `rag_editor`, `rag_viewer` | Managing or editing the knowledge base (`rag_manager`, `rag_editor`: they see every collection and set who reads each), or reading it (`rag_viewer`). |
 
 ![Access Control → Roles: the built-in roles, each with its number of permissions and people, marked Read-only, and Create Role at the top](../images/administer/roles.png)
 
 !!! note
     Roles you tick replace `default_user`. For someone who should also chat, tick `default_user` as well.
+
+## Who reads which collection
+
+Each collection of the knowledge base is open to **everyone who uses the chat**, or **only to the people and
+groups** you choose. A collection that is not open to someone hides everything inside it from them too, even
+a sub-collection that is open to everyone. Their searches do not find its documents, and its documents are not
+there for them.
+
+1. Open **RAG → Knowledge Base** and point at the collection.
+2. Select **Who can read it** (the lock icon).
+3. Choose **Only these people and groups**, add people or groups, and **Save**.
+
+A restricted collection shows a lock beside its name. Superusers and the knowledge base's managers
+(`admin`, `rag_manager`, `rag_editor`) see every collection. An agent searches only the collections chosen
+under **Knowledge** in its definition, and only those its user may read.
 
 ## Add a person
 
@@ -106,22 +121,27 @@ reaches the person's agents the next time their sign-in is refreshed, and can en
 - **API tokens** let scripts and applications use the models through the API. Each person creates their own
   under **Manage Profile** in the chat (or **My Profile** in the console), gives it a name and a lifetime,
   and can revoke it there. Applications using a revoked token stop working within a minute.
-- **An administrator can revoke someone else's token** through the admin API: list them with
-  `GET /api/admin/users/{user_id}/api-tokens` and revoke one with
-  `DELETE /api/admin/users/{user_id}/api-tokens/{token_id}`. The console has no page for this.
+- **Every API token expires**: after 90 days unless its maker picks another lifetime, and after a year at
+  most. Change these under **Settings → General**: **API token lifetime (s)** and **Longest API token
+  lifetime (s)**.
+- **An administrator can revoke someone else's token**: in **Access Control → Users**, select **API tokens**
+  (the key icon) in their row, then **Revoke**.
 - **Agents** (the browser agent, the Office add-ins) have their own sign-ins on each device. You can see and
   sign out devices on an agent's **Activity** tab (see [Agents and add-ins](agents.md)).
 
 ## End someone's access
 
-There is no switch to suspend an account. To end someone's access:
+To stop someone using Fadenstack, for a while or for good:
 
-1. Open **Access Control → Users** and select **Delete** (the bin icon) in their row.
-2. Confirm. This cannot be undone.
+1. Open **Access Control → Users** and select **Suspend** (the person icon with a line through it) in
+   their row.
+2. Confirm.
 
-They can no longer sign in, and their API tokens stop working within a minute. Agents signed in on their
-devices lose access within the **Agent access token lifetime** (**Settings → General**, ten minutes unless
-changed).
+They can no longer sign in, and their sign-ins, API tokens and agents stop working within a minute. Nothing
+of theirs is deleted: **Let back in** in the same place gives them their access back. You cannot suspend
+yourself, nor the last superuser.
+
+**Delete** (the bin icon) removes the account and cannot be undone.
 
 ## When it does not work
 

@@ -1,0 +1,74 @@
+/**
+ * An administrator suspends an account (after saying so) and lets it back in.
+ * It could only be deleted from the console, with everything it owned.
+ */
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import * as admin from "~/api/admin";
+import type { AdminUser } from "~/api/admin";
+import { renderPage } from "~/test/renderPage";
+
+import UsersPage from "./UsersPage";
+
+vi.mock("~/api/admin", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/api/admin")>();
+  return {
+    ...actual,
+    adminUsers: {
+      ...actual.adminUsers,
+      list: vi.fn(),
+      listRoles: vi.fn().mockResolvedValue([]),
+      setActive: vi.fn(),
+    },
+    adminGroups: { ...actual.adminGroups, list: vi.fn().mockResolvedValue([]) },
+  };
+});
+
+const users = vi.mocked(admin.adminUsers);
+
+function person(overrides: Partial<AdminUser> = {}): AdminUser {
+  return {
+    id: "u-1",
+    email: "pat@example.com",
+    is_active: true,
+    is_superuser: false,
+    is_verified: true,
+    usage_group_id: null,
+    usage_group_name: null,
+    developer_mode: false,
+    developer_mode_until: null,
+    roles: [],
+    permissions: [],
+    ...overrides,
+  } as AdminUser;
+}
+
+describe("suspending an account", () => {
+  beforeEach(() => {
+    users.setActive.mockReset().mockResolvedValue(person({ is_active: false }));
+  });
+
+  it("asks first, then suspends", async () => {
+    users.list.mockResolvedValue([person()]);
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+
+    await userEvent.click(container.querySelector("[data-user-suspend='u-1']") as HTMLElement);
+    expect(users.setActive).not.toHaveBeenCalled();
+    expect(screen.getByText(/Nothing of theirs is deleted/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Suspend" }));
+    await waitFor(() => expect(users.setActive).toHaveBeenCalledWith("u-1", false));
+  });
+
+  it("lets a suspended account back in", async () => {
+    users.list.mockResolvedValue([person({ is_active: false })]);
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+
+    await userEvent.click(container.querySelector("[data-user-reactivate='u-1']") as HTMLElement);
+    await waitFor(() => expect(users.setActive).toHaveBeenCalledWith("u-1", true));
+  });
+});

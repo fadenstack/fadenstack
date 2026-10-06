@@ -7,7 +7,7 @@ A model knows what it learned in training, not your organisation's documents. Th
 | | Files you attach | The knowledge base |
 |---|---|---|
 | Who adds documents | You, in a chat | Your administrator |
-| Who can use them | Only you, in that chat | Everyone whose chats may search it, usually everyone in your organisation |
+| Who can use them | Only you, in that chat | Everyone the collection is open to: everyone in your organisation, or only the people and groups your administrator chose |
 | What the model gets | The file's text, or the picture | Passages that match the question, with the document's name |
 
 ## Attach a file
@@ -48,8 +48,8 @@ What to expect:
 - With the tool mode **Off** (see [Tools in the chat](tools.md)), the model cannot search.
 - The search does not look in your chats, in other people's attached files, or on the internet.
 
-!!! note "The knowledge base is shared"
-    Everything in the knowledge base can come up in the chats of everyone who may search it. Documents meant for a few people only do not belong in it. Your own files go in your chat instead.
+!!! note "Who sees what"
+    Your administrator decides who reads each collection of the knowledge base: everyone, or only some people and groups. Your searches find only the documents you may read. Your own files go in your chat instead.
 
 ## When it does not work
 

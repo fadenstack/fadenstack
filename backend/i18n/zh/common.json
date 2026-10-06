@@ -918,6 +918,18 @@
       "until": "结束时间",
       "until_help": "可选。留空：直到关闭为止。",
       "until_past": "请选择将来的时间。"
+    },
+    "suspend": {
+      "action": "停用",
+      "title": "停用账户",
+      "reactivate": "重新启用",
+      "confirm": "停用 {{email}}？此人将无法登录，其登录会话、API 令牌和智能体将在一分钟内失效。不会删除其任何内容，您可以重新启用该账户。",
+      "failed": "无法更改该账户"
+    },
+    "tokens": {
+      "action": "API 令牌",
+      "title": "{{email}} 的 API 令牌",
+      "none": "没有 API 令牌。"
     }
   },
   "container_detail": {

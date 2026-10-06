@@ -704,6 +704,10 @@ export const adminUsers = {
   deleteUser(userId: string) {
     return request<void>(`/users/${userId}`, { method: "DELETE" });
   },
+  /** Suspend an account (`false`) or let it back in (`true`); nothing of the person's is deleted. */
+  setActive(userId: string, active: boolean) {
+    return request<AdminUser>(`/users/${userId}/active`, { method: "PUT", body: JSON.stringify({ active }) });
+  },
   changePassword(currentPassword: string, newPassword: string) {
     return request<void>("/users/me/change-password", {
       method: "POST",
@@ -733,6 +737,14 @@ export const adminUsers = {
   /** Revokes one of the current user's API tokens; the gateway refuses it within a minute. */
   revokeMyApiToken(tokenId: string) {
     return request<void>(`/users/me/api-tokens/${tokenId}`, { method: "DELETE" });
+  },
+  /** Someone's API tokens (administrators). */
+  listUserApiTokens(userId: string) {
+    return request<ApiTokenInfo[]>(`/users/${userId}/api-tokens`);
+  },
+  /** Revokes someone's API token (administrators). */
+  revokeUserApiToken(userId: string, tokenId: string) {
+    return request<void>(`/users/${userId}/api-tokens/${tokenId}`, { method: "DELETE" });
   },
 };
 

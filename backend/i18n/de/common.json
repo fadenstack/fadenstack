@@ -918,6 +918,18 @@
       "until": "Endet",
       "until_help": "Optional. Leer: bis er ausgeschaltet wird.",
       "until_past": "Wählen Sie einen Zeitpunkt in der Zukunft."
+    },
+    "suspend": {
+      "action": "Sperren",
+      "title": "Konto sperren",
+      "reactivate": "Wieder freigeben",
+      "confirm": "{{email}} sperren? Die Person kann sich nicht mehr anmelden, und ihre Anmeldungen, API-Tokens und Agenten funktionieren binnen einer Minute nicht mehr. Nichts von ihr wird gelöscht, und Sie können das Konto wieder freigeben.",
+      "failed": "Das Konto konnte nicht geändert werden"
+    },
+    "tokens": {
+      "action": "API-Tokens",
+      "title": "API-Tokens von {{email}}",
+      "none": "Keine API-Tokens."
     }
   },
   "container_detail": {

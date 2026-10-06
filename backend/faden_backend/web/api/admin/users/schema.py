@@ -44,6 +44,12 @@ class UpdateRoleRequest(BaseModel):
     permission_ids: list[uuid.UUID] | None = None
 
 
+class SetUserActiveRequest(BaseModel):
+    """Suspend an account (``false``) or let it back in (``true``)."""
+
+    active: bool
+
+
 class AdminUserDTO(BaseModel):
     """User profile including roles and effective permissions."""
 

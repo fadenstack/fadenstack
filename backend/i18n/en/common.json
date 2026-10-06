@@ -913,6 +913,18 @@
       "until": "Ends",
       "until_help": "Optional. Empty: until it is switched off.",
       "until_past": "Pick a time in the future."
+    },
+    "suspend": {
+      "action": "Suspend",
+      "title": "Suspend account",
+      "reactivate": "Let back in",
+      "confirm": "Suspend {{email}}? They can no longer sign in, and their sign-ins, API tokens and agents stop working within a minute. Nothing of theirs is deleted, and you can let them back in.",
+      "failed": "Could not change the account"
+    },
+    "tokens": {
+      "action": "API tokens",
+      "title": "API tokens of {{email}}",
+      "none": "No API tokens."
     }
   },
   "container_detail": {
