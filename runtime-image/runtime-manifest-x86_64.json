@@ -1,35 +1,51 @@
 {
-  "release_tag": "faden-ray-runtime-x86_64:2.58.0",
-  "image_id": "sha256:724ddfe4c49efe8f498916d14100b5c0eb2ea1a1b014b0b50467c7c31f573c15",
+  "schema_version": "1.1.0",
   "runtime_id": "faden-ray-vllm-x86_64-ray2.58",
   "flavor": "x86_64",
+  "release_tag": "faden-ray-runtime-x86_64:2.58.0",
+  "image_id": "sha256:9d10f7766d272a1b463cb0b1c3a9ecc7977e2ab6575d85e85e69b841b23d6d49",
   "rootfs_layers": [
     "sha256:a6dc765193a52cbaede3c93a9ff48b9540948dd0774bbe7031fcb5847606f9ac",
     "sha256:7ca599ccfc97fa428fcf941eda7c2d643f066feb947020dcdbbf913cec34d5dc",
     "sha256:b54011271bdbf69ae643cb5a4af6a5bc2f834ae8bc0833b736b52bbd2396e99f",
     "sha256:c321a426ca693e386f4df5f198d7f32c2da49e29f53ff77d695ceb02dfb0a421",
     "sha256:02af6141a7b33188fd44fa6f650a9b1b5378c5c43b600f27e6cf2d459407fd46",
-    "sha256:d42c5e3f14e91e7ed5c8c4c89eec7e13c51f147d03aee7c1bd5c0c1f719a0207",
-    "sha256:8160b6d2a4843f6354b9c22e570ce12123f5739452c7979dc011beffcb8381c2",
-    "sha256:b9b0cbd1ddd63c3b4377db4aad85fb0fe8723ade4e917be769a6449704bc376f",
-    "sha256:a44371bc10993cdac33f04315c2a5084db5b7ff517039772a85d8c81963d9cb6",
-    "sha256:36a04310e974c4e332a2e678d67e4d7e51af1f598fd569338007f3af27759974",
-    "sha256:508d4032f347642aa6a84616ae79514f83bc89e9885576aaad05bc9cb0f5c7ca",
-    "sha256:24e18552bac146660e0e0441beef1d1468579973aa218471faf425dbbb8cdfba",
-    "sha256:ed2fc036e2c171b8c9c0048c26626dded3864a2f4942fc18c5b49df1bd16edbb",
-    "sha256:2a0615aed1bf9cfefd0cb47f25c30a002fb12a2f3f0ac688ac01b398dd71ce69",
+    "sha256:f16e1f42be46571fff997680f758cb839bfc74d1df577ffda5e41363e7a142e9",
+    "sha256:493ff2f2d6c8cdee326e9cf7ea39faef659fcfac74e932c45496ea14c65f7ed2",
+    "sha256:04ff25846ecce1f23a9b7b88bc47309c5575f2ccc91adfc37a0ff51fcf32fd02",
     "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
-    "sha256:54353c1c55f325ec5cb28855c613c81930b5c714f5bba9859dfcb4bc5a97550d"
+    "sha256:f411caea364d5857f9e1fc06bcac7d3504f4b02a846684c92cc432c1d3c39094",
+    "sha256:f30f56fb388be27dbff9e206d51e11effd96eafb3730cd666ba7cefb98c80073",
+    "sha256:ad63b5c7c373a931251426544a03000bbba679187f4709ce0fadf09c8b25c1ec",
+    "sha256:93d76ea812263616ecd9b917406bd495e9fd9f58757aeed334715c9ffff698c0",
+    "sha256:85b158344390b55861eb77ba9a1ddce59fbc9f478c36b67e1adc374dfc771be2",
+    "sha256:63f9157db6f5cb4babe6ead1f8cb3e4a7ee6680dd0ea96cb3fb3bf57698a801e",
+    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+    "sha256:8be5f8c2cd0e5dc5acbf7772e016a112ebceb08d57bc3269e500714c42e57dd3"
   ],
+  "repo_digest": "sha256:9d10f7766d272a1b463cb0b1c3a9ecc7977e2ab6575d85e85e69b841b23d6d49",
+  "base_image": {
+    "repository": "python",
+    "tag": "3.12.14-slim-trixie"
+  },
+  "target_hardware": {
+    "platform": "generic x86_64",
+    "gpu": "NVIDIA",
+    "architecture": "x86_64"
+  },
   "stack_components": {
+    "python": "3.12.14",
     "ray": "2.58.0",
     "vllm": "0.26.0",
-    "torch": "2.11.0",
+    "torch": "2.11.0+cu130",
     "cuda": "13.0",
-    "python": "3.12.14",
-    "transformers": "5.17.0",
-    "triton": "3.6.0"
+    "transformers": "5.18.0",
+    "pyarrow": "25.0.1",
+    "triton": "3.6.0",
+    "flashinfer": "0.6.14",
+    "nccl": "2.28.9"
   },
+  "machine": "x86_64",
   "arch_list": [
     "sm_75",
     "sm_80",
@@ -46,7 +62,6 @@
     "10.0",
     "12.0"
   ],
-  "machine": "x86_64",
   "supported_model_types": [
     "EvollaModel",
     "RefinedWeb",
@@ -325,6 +340,7 @@
     "groupvit",
     "groupvit_text_model",
     "groupvit_vision_model",
+    "gte",
     "helium",
     "hgnet_v2",
     "hiera",
@@ -340,6 +356,7 @@
     "hy_v3",
     "hy_v4",
     "hyperclovax",
+    "hyperclovax_vision_v2",
     "hyperclovax_vlm",
     "ibert",
     "idefics",
@@ -438,6 +455,8 @@
     "minicpm3",
     "minicpmv4_6",
     "minicpmv4_6_vision",
+    "minicpmv4_7",
+    "minicpmv4_7_vision",
     "minimax",
     "minimax_m2",
     "minimax_m3_mtp",
@@ -489,9 +508,12 @@
     "nanochat",
     "nemotron",
     "nemotron3_5_asr",
+    "nemotron3_diarization",
+    "nemotron3_diarization_audio",
     "nemotron_asr_streaming",
     "nemotron_asr_streaming_encoder",
     "nemotron_h",
+    "nemotron_h_omni",
     "neomme",
     "neucodec",
     "nllb-moe",
@@ -1163,10 +1185,12 @@
     "Zamba2ForCausalLM"
   ],
   "certification": {
-    "overall_status": "uncertified",
-    "checks_total": 0,
-    "checks": [],
     "hardware_target": "generic x86_64 NVIDIA",
-    "detail": "The generic x86_64 NVIDIA runtime: Ray 2.58.0 with ray.serve.llm, vLLM, and the llm-port-ray-runtime control helper the node agent drives the container through. Kernels span sm_75 to sm_120, so it serves every mainstream NVIDIA card since Turing. Not yet certified: a single-node cluster has been started and observed on a TITAN RTX (sm_75), but no two-node run has been recorded against it."
+    "overall_status": "uncertified",
+    "checks": [],
+    "checks_passed": 0,
+    "checks_total": 0,
+    "timestamp": null,
+    "detail": "The generic x86_64 NVIDIA runtime: Ray 2.58.0 with ray.serve.llm, vLLM, and the llm-port-ray-runtime control helper the node agent drives the container through. Kernels span sm_75 to sm_120, so it serves every mainstream NVIDIA card since Turing. Not yet certified: no two-node run has been recorded against it."
   }
 }
