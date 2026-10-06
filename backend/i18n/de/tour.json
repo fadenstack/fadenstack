@@ -7,7 +7,8 @@
     "how_to_guides_subtitle": "Jede Anleitung führt Sie durch eine Aufgabe auf den echten Seiten. Sie klicken selbst; die Anleitung zeigt den Weg.",
     "start_guide": "Starten",
     "no_guides_available": "Für diese Einrichtung gibt es keine Anleitungen.",
-    "reset_guides": "Anleitungen zurücksetzen"
+    "reset_guides": "Anleitungen zurücksetzen",
+    "help_pages": "Hilfeseiten"
   },
   "guides": {
     "ui": {
@@ -626,6 +627,7 @@
       "action_password": "Ihr Passwort ändern",
       "action_tokens": "API-Tokens für Skripte und Anwendungen erstellen; jedes wird nur einmal angezeigt",
       "action_revoke": "Ein Token widerrufen; Anwendungen, die es nutzen, hören innerhalb einer Minute auf"
-    }
+    },
+    "read_more": "Mehr dazu in der Hilfe"
   }
 }

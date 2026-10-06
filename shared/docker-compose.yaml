@@ -615,6 +615,9 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      # Help is built into the image from docs/help and docs/theme and served at /help.
+      additional_contexts:
+        docs: ../docs
     container_name: faden-frontend
     restart: unless-stopped
     depends_on:

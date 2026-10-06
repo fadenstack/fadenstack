@@ -96,7 +96,7 @@ jobs:
           filters: |
             gateway:      ['gateway/**']
             backend:  ['backend/**', 'runtime-image/runtime-manifest*.json']
-            frontend: ['frontend/**']
+            frontend: ['frontend/**', 'docs/help/**', 'docs/theme/**']
             pii:      ['pii/**']
             mcp:      ['mcp/**']
             skills:   ['skills/**']
@@ -153,6 +153,8 @@ jobs:
     with:
       service: frontend
       context: frontend
+      # Help, built into the image and served at /help.
+      build-contexts: docs=docs
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   pii:

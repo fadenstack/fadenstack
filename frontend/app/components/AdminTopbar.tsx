@@ -23,6 +23,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import ChecklistIcon from "@mui/icons-material/Checklist";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -93,9 +94,18 @@ export function AdminTopbar({
     null,
   );
   const helpItems = [
-    { key: "getting_started", icon: ChecklistIcon, onClick: onGettingStartedOpen },
+    {
+      key: "getting_started",
+      icon: ChecklistIcon,
+      onClick: onGettingStartedOpen,
+    },
     { key: "console_tour", icon: TourIcon, onClick: onConsoleTourOpen },
-    { key: "how_to_guides", icon: SchoolIcon, onClick: onHowToGuidesOpen, divider: true },
+    {
+      key: "how_to_guides",
+      icon: SchoolIcon,
+      onClick: onHowToGuidesOpen,
+      divider: true,
+    },
     { key: "reset_guides", icon: ReplayIcon, onClick: onResetGuides },
   ];
 
@@ -161,6 +171,19 @@ export function AdminTopbar({
               variant="outlined"
               sx={{ ml: 1, height: 20, fontSize: "0.7rem" }}
             />
+          </MenuItem>
+          <MenuItem
+            data-help-item="help_pages"
+            component="a"
+            href="/help/"
+            target="_blank"
+            rel="noopener"
+            onClick={() => setHelpMenuAnchor(null)}
+          >
+            <ListItemIcon>
+              <MenuBookOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>{t("help.help_pages", { ns: "tour" })}</ListItemText>
           </MenuItem>
           {helpItems.map(({ key, icon: Icon, onClick, divider }) => (
             <MenuItem
@@ -240,7 +263,10 @@ export function AdminTopbar({
                   size="small"
                   variant="filled"
                   // On a phone the red Deactivate button says it alone.
-                  sx={{ fontWeight: 700, display: { xs: "none", sm: "inline-flex" } }}
+                  sx={{
+                    fontWeight: 700,
+                    display: { xs: "none", sm: "inline-flex" },
+                  }}
                 />
                 <Button
                   size="small"

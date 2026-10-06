@@ -17,6 +17,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
 
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardIcon from "@mui/icons-material/Keyboard";
@@ -24,6 +25,7 @@ import SchoolIcon from "@mui/icons-material/School";
 
 import { useGuides } from "~/lib/guidesContext";
 import { guideTitleKey } from "~/lib/guides";
+import { helpUrl } from "~/lib/pageHelp";
 import { resolvePageHelp } from "~/lib/pageHelp";
 
 export interface PageHelpDrawerProps {
@@ -114,9 +116,28 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
             >
               {t("page_help.show_me", { ns: "tour" })}
             </Button>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mt: 0.5 }}
+            >
               {t(guideTitleKey(entry.guide), { ns: "tour" })}
             </Typography>
+          </Box>
+        )}
+
+        {entry?.doc && (
+          <Box sx={{ mt: 2 }}>
+            <Button
+              variant="text"
+              startIcon={<MenuBookOutlinedIcon />}
+              href={helpUrl(entry.doc)}
+              target="_blank"
+              rel="noopener"
+              data-page-help-doc={entry.doc}
+            >
+              {t("page_help.read_more", { ns: "tour" })}
+            </Button>
           </Box>
         )}
 

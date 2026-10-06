@@ -16,6 +16,8 @@ export interface PageHelpEntry {
   actionKeys: string[];
   /** A how-to guide for the page's main task. */
   guide?: string;
+  /** Where Help explains the page: the console serves Help at /help (see {@link helpUrl}). */
+  doc?: string;
 }
 
 interface PageHelpDef {
@@ -24,55 +26,161 @@ interface PageHelpDef {
   id: string;
   actions: string[];
   guide?: string;
+  /** The Help page for it: a path under docs/help/pages, without ".md". */
+  doc?: string;
 }
 
 /** Ordered list: most specific prefixes first. */
 const PAGES: PageHelpDef[] = [
-  { prefix: "/admin/dashboard", id: "dashboard", actions: ["getting_started", "attention", "customize", "status"] },
+  {
+    prefix: "/admin/dashboard",
+    id: "dashboard",
+    actions: ["getting_started", "attention", "customize", "status"],
+    doc: "administer/dashboard",
+  },
 
   // Containers, images, networks, stacks
-  { prefix: "/admin/containers/new", id: "create_container", actions: ["image", "config", "class"] },
-  { prefix: /^\/admin\/containers\/[^/]+\/edit/, id: "edit_container", actions: ["change", "save"] },
-  { prefix: "/admin/containers/", id: "container_detail", actions: ["logs", "edit", "exec"] },
-  { prefix: "/admin/containers", id: "containers", actions: ["filter", "control", "class", "create"] },
-  { prefix: "/admin/images", id: "images", actions: ["pull", "prune"] },
-  { prefix: "/admin/networks", id: "networks", actions: ["create", "inspect", "delete"] },
-  { prefix: "/admin/stacks", id: "stacks", actions: ["deploy", "diff", "rollback"] },
+  {
+    prefix: "/admin/containers/new",
+    id: "create_container",
+    actions: ["image", "config", "class"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: /^\/admin\/containers\/[^/]+\/edit/,
+    id: "edit_container",
+    actions: ["change", "save"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: "/admin/containers/",
+    id: "container_detail",
+    actions: ["logs", "edit", "exec"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: "/admin/containers",
+    id: "containers",
+    actions: ["filter", "control", "class", "create"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: "/admin/images",
+    id: "images",
+    actions: ["pull", "prune"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: "/admin/networks",
+    id: "networks",
+    actions: ["create", "inspect", "delete"],
+    doc: "operate/containers",
+  },
+  {
+    prefix: "/admin/stacks",
+    id: "stacks",
+    actions: ["deploy", "diff", "rollback"],
+    doc: "operate/containers",
+  },
 
   // Observability, logs, data residency
-  { prefix: "/admin/observability", id: "observability", actions: ["overview", "requests", "pricing", "export"] },
-  { prefix: "/admin/logs", id: "logs", actions: ["filter", "audit"] },
-  { prefix: "/admin/security-map", id: "security_map", actions: ["residency", "where", "volume"] },
+  {
+    prefix: "/admin/observability",
+    id: "observability",
+    actions: ["overview", "requests", "pricing", "export"],
+    doc: "administer/usage",
+  },
+  {
+    prefix: "/admin/logs",
+    id: "logs",
+    actions: ["filter", "audit"],
+    doc: "operate/failures",
+  },
+  {
+    prefix: "/admin/security-map",
+    id: "security_map",
+    actions: ["residency", "where", "volume"],
+    doc: "administer/providers",
+  },
 
   // LLM
-  { prefix: "/admin/llm/agent-trace", id: "agent_trace", actions: ["graph", "live"] },
-  { prefix: "/admin/llm/endpoint", id: "endpoint", actions: ["docs", "container"] },
-  { prefix: "/admin/llm/runtimes/", id: "runtime_detail", actions: ["control", "config", "logs"] },
+  {
+    prefix: "/admin/llm/agent-trace",
+    id: "agent_trace",
+    actions: ["graph", "live"],
+  },
+  {
+    prefix: "/admin/llm/endpoint",
+    id: "endpoint",
+    actions: ["docs", "container"],
+  },
+  {
+    prefix: "/admin/llm/runtimes/",
+    id: "runtime_detail",
+    actions: ["control", "config", "logs"],
+    doc: "administer/providers",
+  },
   {
     prefix: "/admin/llm/providers",
     id: "providers",
     actions: ["add", "test", "price", "manage"],
     guide: "connect_provider",
+    doc: "administer/providers",
   },
 
   // AI infrastructure
-  { prefix: "/admin/nodes/profiles", id: "node_profiles", actions: ["create", "assign"] },
-  { prefix: "/admin/nodes/", id: "node_detail", actions: ["status", "maintenance", "updates", "vllm"] },
-  { prefix: "/admin/nodes", id: "nodes", actions: ["add", "status", "maintenance", "delete"], guide: "add_machine" },
+  {
+    prefix: "/admin/nodes/profiles",
+    id: "node_profiles",
+    actions: ["create", "assign"],
+    doc: "operate/machines",
+  },
+  {
+    prefix: "/admin/nodes/",
+    id: "node_detail",
+    actions: ["status", "maintenance", "updates", "vllm"],
+    doc: "operate/machines",
+  },
+  {
+    prefix: "/admin/nodes",
+    id: "nodes",
+    actions: ["add", "status", "maintenance", "delete"],
+    guide: "add_machine",
+    doc: "operate/machines",
+  },
   {
     prefix: "/admin/clusters/",
     id: "cluster_detail",
     actions: ["deploy", "machines", "wiring", "security", "runtime", "control"],
+    doc: "operate/clusters",
   },
-  { prefix: "/admin/clusters", id: "clusters", actions: ["create", "open", "found"], guide: "create_cluster" },
+  {
+    prefix: "/admin/clusters",
+    id: "clusters",
+    actions: ["create", "open", "found"],
+    guide: "create_cluster",
+    doc: "operate/clusters",
+  },
   {
     prefix: "/admin/marketplace",
     id: "marketplace",
     actions: ["find", "fit", "host", "local", "token"],
     guide: "host_model",
+    doc: "administer/models",
   },
-  { prefix: "/admin/deployments/", id: "deployment_detail", actions: ["scale", "change", "logs", "control"] },
-  { prefix: "/admin/deployments", id: "deployments", actions: ["deploy", "control", "open"], guide: "host_model" },
+  {
+    prefix: "/admin/deployments/",
+    id: "deployment_detail",
+    actions: ["scale", "change", "logs", "control"],
+    doc: "administer/deployments",
+  },
+  {
+    prefix: "/admin/deployments",
+    id: "deployments",
+    actions: ["deploy", "control", "open"],
+    guide: "host_model",
+    doc: "administer/deployments",
+  },
   { prefix: "/admin/scheduler", id: "scheduler", actions: ["watch", "retry"] },
 
   // Access control
@@ -81,44 +189,165 @@ const PAGES: PageHelpDef[] = [
     id: "users",
     actions: ["create", "roles", "developer", "delete"],
     guide: "invite_people",
+    doc: "administer/users",
   },
-  { prefix: "/admin/roles", id: "roles", actions: ["create", "edit"] },
-  { prefix: "/admin/groups", id: "groups", actions: ["create", "members"] },
-  { prefix: "/admin/auth-providers", id: "auth_providers", actions: ["add", "auto"] },
+  {
+    prefix: "/admin/roles",
+    id: "roles",
+    actions: ["create", "edit"],
+    doc: "administer/users",
+  },
+  {
+    prefix: "/admin/groups",
+    id: "groups",
+    actions: ["create", "members"],
+    doc: "administer/users",
+  },
+  {
+    prefix: "/admin/auth-providers",
+    id: "auth_providers",
+    actions: ["add", "auto"],
+    doc: "administer/users",
+  },
 
   // Privacy
-  { prefix: "/admin/pii/dashboard", id: "pii_dashboard", actions: ["stats", "breakdown"] },
-  { prefix: "/admin/pii/activity", id: "pii_activity", actions: ["filter"] },
-  { prefix: "/admin/pii/policies", id: "pii_policies", actions: ["load", "edit", "preview"] },
+  {
+    prefix: "/admin/pii/dashboard",
+    id: "pii_dashboard",
+    actions: ["stats", "breakdown"],
+    doc: "administer/policies",
+  },
+  {
+    prefix: "/admin/pii/activity",
+    id: "pii_activity",
+    actions: ["filter"],
+    doc: "administer/policies",
+  },
+  {
+    prefix: "/admin/pii/policies",
+    id: "pii_policies",
+    actions: ["load", "edit", "preview"],
+    doc: "administer/policies",
+  },
 
   // Knowledge (RAG)
-  { prefix: "/admin/rag/knowledge-base", id: "rag_knowledge_base", actions: ["upload", "describe", "retry"] },
-  { prefix: "/admin/rag/documents", id: "rag_documents", actions: ["upload", "manage"] },
-  { prefix: "/admin/rag/collections", id: "rag_collections", actions: ["create", "delete"] },
-  { prefix: "/admin/rag/runtime", id: "rag_runtime", actions: ["view", "edit"] },
-  { prefix: "/admin/rag/collectors", id: "rag_collectors", actions: ["run", "jobs"] },
-  { prefix: "/admin/rag/explorer", id: "rag_explorer", actions: ["container", "upload", "publish"] },
+  {
+    prefix: "/admin/rag/knowledge-base",
+    id: "rag_knowledge_base",
+    actions: ["upload", "describe", "retry"],
+    doc: "use/knowledge",
+  },
+  {
+    prefix: "/admin/rag/documents",
+    id: "rag_documents",
+    actions: ["upload", "manage"],
+    doc: "use/knowledge",
+  },
+  {
+    prefix: "/admin/rag/collections",
+    id: "rag_collections",
+    actions: ["create", "delete"],
+    doc: "use/knowledge",
+  },
+  {
+    prefix: "/admin/rag/runtime",
+    id: "rag_runtime",
+    actions: ["view", "edit"],
+  },
+  {
+    prefix: "/admin/rag/collectors",
+    id: "rag_collectors",
+    actions: ["run", "jobs"],
+  },
+  {
+    prefix: "/admin/rag/explorer",
+    id: "rag_explorer",
+    actions: ["container", "upload", "publish"],
+  },
   { prefix: "/admin/rag/publishes", id: "rag_publishes", actions: ["watch"] },
-  { prefix: "/admin/rag/search", id: "rag_search", actions: ["query", "pro"] },
+  {
+    prefix: "/admin/rag/search",
+    id: "rag_search",
+    actions: ["query", "pro"],
+    doc: "use/knowledge",
+  },
 
   // Chat workspace
-  { prefix: "/admin/chat/projects", id: "chat_projects", actions: ["browse", "delete"] },
-  { prefix: "/admin/chat/sessions", id: "chat_sessions", actions: ["browse", "delete"] },
-  { prefix: "/admin/chat/attachments", id: "chat_attachments", actions: ["browse", "delete"] },
+  {
+    prefix: "/admin/chat/projects",
+    id: "chat_projects",
+    actions: ["browse", "delete"],
+  },
+  {
+    prefix: "/admin/chat/sessions",
+    id: "chat_sessions",
+    actions: ["browse", "delete"],
+  },
+  {
+    prefix: "/admin/chat/attachments",
+    id: "chat_attachments",
+    actions: ["browse", "delete"],
+  },
 
   // Extensions
-  { prefix: "/admin/mcp/servers/", id: "mcp_detail", actions: ["tools", "test", "edit"] },
-  { prefix: "/admin/mcp/servers", id: "mcp_servers", actions: ["register", "pii", "scan"] },
-  { prefix: "/admin/skills/", id: "skill_detail", actions: ["edit", "share", "export"] },
-  { prefix: "/admin/skills", id: "skills", actions: ["create", "publish", "views"] },
+  {
+    prefix: "/admin/mcp/servers/",
+    id: "mcp_detail",
+    actions: ["tools", "test", "edit"],
+    doc: "administer/mcp-servers",
+  },
+  {
+    prefix: "/admin/mcp/servers",
+    id: "mcp_servers",
+    actions: ["register", "pii", "scan"],
+    doc: "administer/mcp-servers",
+  },
+  {
+    prefix: "/admin/skills/",
+    id: "skill_detail",
+    actions: ["edit", "share", "export"],
+    doc: "administer/skills",
+  },
+  {
+    prefix: "/admin/skills",
+    id: "skills",
+    actions: ["create", "publish", "views"],
+    doc: "administer/skills",
+  },
 
   // Agents and governance
-  { prefix: "/admin/agents/", id: "agent_detail", actions: ["definition", "publish", "access", "activity"] },
-  { prefix: "/admin/agents", id: "agents", actions: ["create", "open"] },
-  { prefix: "/admin/governance", id: "governance", actions: ["rules", "classes", "decisions"] },
+  {
+    prefix: "/admin/agents/",
+    id: "agent_detail",
+    actions: ["definition", "publish", "access", "activity"],
+    doc: "administer/agents",
+  },
+  {
+    prefix: "/admin/agents",
+    id: "agents",
+    actions: ["create", "open"],
+    doc: "administer/agents",
+  },
+  {
+    prefix: "/admin/governance",
+    id: "governance",
+    actions: ["rules", "classes", "decisions"],
+    doc: "administer/policies",
+  },
 
-  { prefix: "/admin/settings", id: "settings", actions: ["general", "modules", "appearance"] },
-  { prefix: "/admin/profile", id: "profile", actions: ["password", "tokens", "revoke"], guide: "create_api_token" },
+  {
+    prefix: "/admin/settings",
+    id: "settings",
+    actions: ["general", "modules", "appearance"],
+    doc: "administer/index",
+  },
+  {
+    prefix: "/admin/profile",
+    id: "profile",
+    actions: ["password", "tokens", "revoke"],
+    guide: "create_api_token",
+    doc: "use/account",
+  },
 ];
 
 function toEntry(def: PageHelpDef): PageHelpEntry {
@@ -127,7 +356,20 @@ function toEntry(def: PageHelpDef): PageHelpEntry {
     descriptionKey: `page_help.${def.id}.description`,
     actionKeys: def.actions.map((a) => `page_help.${def.id}.action_${a}`),
     guide: def.guide,
+    doc: def.doc,
   };
+}
+
+/** Where the console serves a Help page (built into the frontend image from docs/help). */
+export function helpUrl(doc?: string): string {
+  return doc ? `/help/${doc}/` : "/help/";
+}
+
+/** Every Help page the console links to: a test holds them to pages that exist. */
+export function pageHelpDocs(): string[] {
+  return [
+    ...new Set(PAGES.map((p) => p.doc).filter((d): d is string => Boolean(d))),
+  ];
 }
 
 /**
@@ -136,7 +378,9 @@ function toEntry(def: PageHelpDef): PageHelpEntry {
  */
 export function resolvePageHelp(pathname: string): PageHelpEntry | null {
   const def = PAGES.find((p) =>
-    typeof p.prefix === "string" ? pathname.startsWith(p.prefix) : p.prefix.test(pathname),
+    typeof p.prefix === "string"
+      ? pathname.startsWith(p.prefix)
+      : p.prefix.test(pathname),
   );
   return def ? toEntry(def) : null;
 }

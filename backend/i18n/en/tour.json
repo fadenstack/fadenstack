@@ -7,7 +7,8 @@
     "how_to_guides_subtitle": "Each guide walks you through one task on the real pages. You do the clicks; the guide shows the way.",
     "start_guide": "Start",
     "no_guides_available": "No guides for this setup.",
-    "reset_guides": "Reset guides"
+    "reset_guides": "Reset guides",
+    "help_pages": "Help pages"
   },
   "guides": {
     "ui": {
@@ -626,6 +627,7 @@
       "action_password": "Change your password",
       "action_tokens": "Create API tokens for scripts and applications; each is shown once",
       "action_revoke": "Revoke a token; applications using it stop within a minute"
-    }
+    },
+    "read_more": "Read more in Help"
   }
 }

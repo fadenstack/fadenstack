@@ -7,7 +7,8 @@
     "how_to_guides_subtitle": "Cada guía le acompaña en una tarea sobre las páginas reales. Usted hace los clics; la guía le muestra el camino.",
     "start_guide": "Empezar",
     "no_guides_available": "No hay guías para esta configuración.",
-    "reset_guides": "Restablecer guías"
+    "reset_guides": "Restablecer guías",
+    "help_pages": "Páginas de ayuda"
   },
   "guides": {
     "ui": {
@@ -626,6 +627,7 @@
       "action_password": "Cambiar su contraseña",
       "action_tokens": "Crear tokens de API para scripts y aplicaciones; cada uno se muestra una sola vez",
       "action_revoke": "Revocar un token; las aplicaciones que lo usan dejan de funcionar en menos de un minuto"
-    }
+    },
+    "read_more": "Más información en la ayuda"
   }
 }

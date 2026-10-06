@@ -74,16 +74,17 @@ describe("AttentionWidget muting", () => {
 
     expect(dashboardFleet.acknowledge).toHaveBeenCalledWith(offline);
     const toggle = await screen.findByRole("button", { name: "1 muted" });
-    expect(screen.getByText("All clear")).toBeTruthy();
+    expect(await screen.findByText("All clear")).toBeTruthy();
 
     fireEvent.click(toggle);
-    const list = screen.getByTestId("attention-muted");
+    const list = await screen.findByTestId("attention-muted");
     expect(within(list).getByText(/Muted by admin@example.com/)).toBeTruthy();
 
     fireEvent.click(within(list).getByRole("button", { name: "Show again" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "1 muted" })).toBeNull());
     expect(dashboardFleet.unacknowledge).toHaveBeenCalledWith(offline.id);
-    expect(screen.getByRole("button", { name: "Mute" })).toBeTruthy();
+    // The item comes back with the refetch, which may land a render after the muted count goes.
+    expect(await screen.findByRole("button", { name: "Mute" })).toBeTruthy();
   });
 
   it("keeps the item's link apart from the mute button", async () => {

@@ -7,7 +7,8 @@
     "how_to_guides_subtitle": "Chaque guide vous accompagne dans une tâche, sur les vraies pages. C'est vous qui cliquez ; le guide montre le chemin.",
     "start_guide": "Démarrer",
     "no_guides_available": "Aucun guide pour cette configuration.",
-    "reset_guides": "Réinitialiser les guides"
+    "reset_guides": "Réinitialiser les guides",
+    "help_pages": "Pages d'aide"
   },
   "guides": {
     "ui": {
@@ -626,6 +627,7 @@
       "action_password": "Changer votre mot de passe",
       "action_tokens": "Créer des jetons API pour les scripts et les applications ; chacun n'est affiché qu'une fois",
       "action_revoke": "Révoquer un jeton ; les applications qui l'utilisent s'arrêtent en moins d'une minute"
-    }
+    },
+    "read_more": "En savoir plus dans l'aide"
   }
 }

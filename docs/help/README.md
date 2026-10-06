@@ -21,15 +21,24 @@ python docs/help/scripts/check.py      # the docs hub's scrub, and the links bet
 
 It needs the docs hub (`fadenstack/docs`) checked out next to this repo, or `FADEN_DOCS_HUB` pointing at it.
 
-## Preview
+## Preview and build
+
+`scripts/build.py` puts the site together with the Fadenstack theme (`docs/theme/`, shared with the Developers
+site) and builds it, for one of two places:
 
 ```sh
-cd docs/help
-zensical serve                          # plain theme: http://localhost:8000
+python docs/help/scripts/build.py --target console --out build/help --build   # what the console serves at /help
+python docs/help/scripts/build.py --target public  --out build/help           # help.fadenstack.com (the docs hub builds it)
+cd build/help && zensical serve                                                # http://localhost:8000
 ```
 
-The branded site, with the Fadenstack theme and the links to the website and the Developers site, is built by
-the docs hub: `python scripts/assemble.py help` there takes `docs/help/pages/` and this nav.
+The **console** copy is built into the frontend image (`frontend/Dockerfile`, build context `docs`), so every
+install serves the help of its own release at `/help`, offline too; the console's page help links to it
+(`doc` in `frontend/app/lib/pageHelp.ts`, held to existing pages by `pageHelp.test.ts`). The **public** copy has
+the site's address and links to the website and the Developers site; the docs hub (`fadenstack/docs`) builds and
+publishes it from the release tag. Both use the nav in `zensical.toml` here and the settings in `site.toml`.
+
+`cd docs/help && zensical serve` still works for a quick look at the pages in the plain theme.
 
 ## Screenshots
 
