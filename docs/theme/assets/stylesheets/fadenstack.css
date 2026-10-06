@@ -137,10 +137,11 @@
   color: var(--md-default-fg-color);
   background: var(--md-default-fg-color--lightest);
 }
+/* The phone menu's title shows the mark through a more specific theme rule, so these match it as closely. */
 [data-md-color-scheme="default"] .md-logo img.fs-logo--dark,
 [data-md-color-scheme="slate"] .md-logo img.fs-logo--light,
-[data-md-color-scheme="default"] .md-nav__button img.fs-logo--dark,
-[data-md-color-scheme="slate"] .md-nav__button img.fs-logo--light {
+[data-md-color-scheme="default"] .md-nav .md-nav__title[for="__drawer"] .md-logo img.fs-logo--dark,
+[data-md-color-scheme="slate"] .md-nav .md-nav__title[for="__drawer"] .md-logo img.fs-logo--light {
   display: none;
 }
 @media screen and (max-width: 59.9844em) {

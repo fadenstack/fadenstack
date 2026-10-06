@@ -1,0 +1,25 @@
+{#- Copied from Zensical's partials/alternate.html (zensical pinned in requirements.txt); the only change is that
+    each language links to this page in that language, not to its start page. Zensical's script would do that
+    itself, but not when a language lives at the site's root: every address of the other languages starts with
+    the root's, so it takes them for the root's own pages. The Help builds every page in every language
+    (docs/help/scripts/build.py), so the same page always exists. Re-copy it when Zensical is upgraded. -#}
+{% set here = page.url if page and page.url and page.url is not endingwith(".html") else "" %}
+<div class="md-header__option">
+  <div class="md-select">
+    {% set icon = config.theme.icon.alternate or "material/translate" %}
+    <button class="md-header__button md-icon" aria-label="{{ lang.t('select.language') }}">
+      {% include ".icons/" ~ icon ~ ".svg" %}
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        {% for alt in config.extra.alternate %}
+          <li class="md-select__item">
+            <a href="{{ (alt.link ~ here) | url }}" hreflang="{{ alt.lang }}" class="md-select__link">
+              {{ alt.name }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
