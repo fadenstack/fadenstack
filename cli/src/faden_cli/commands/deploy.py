@@ -29,6 +29,7 @@ from faden_cli.core.compose import (
     pull_base_images,
     up as compose_up,
 )
+from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
 from faden_cli.core.env_gen import default_env_vars, read_env_file, write_env_file
@@ -583,6 +584,7 @@ def deploy_cmd(
             success("Base image built.")
 
         rc = compose_build(ctx, no_cache=no_cache)
+        installation.record_build(shared_dir, complete=rc == 0)
         if rc != 0:
             warning(
                 "Some images failed to build. Services with successful"

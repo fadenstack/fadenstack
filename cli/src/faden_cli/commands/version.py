@@ -8,8 +8,10 @@ import sys
 import click
 
 from faden_cli import __version__
+from faden_cli.core import installation
 from faden_cli.core.console import console, kv_table
 from faden_cli.core.detect import detect_docker
+from faden_cli.core.settings import load_config
 
 
 @click.command("version")
@@ -32,3 +34,9 @@ def version_cmd(*, short: bool) -> None:
 
     kv_table("Fadenstack CLI", rows)
     console.print()
+
+    # What the installation this CLI looks after runs: the CLI's own version says nothing about that.
+    cfg = load_config()
+    if cfg.install_dir:
+        kv_table("Fadenstack installation", installation.describe(cfg.install_path))
+        console.print()
