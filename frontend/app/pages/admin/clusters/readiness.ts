@@ -27,6 +27,7 @@ export type ReadinessStage =
   | "starting"
   | "degraded"
   | "stopped"
+  | "cluster-stopping"
   | "ready"
   | "deploying"
   | "stopping"
@@ -126,6 +127,18 @@ export function clusterReadiness(
     };
   }
 
+  // Asked to stop, still up: the teardown takes its turn. Saying "stopped"
+  // with a Start button while it still served read as if the Stop had not
+  // been taken.
+  if (cluster.desired_state === "stopped" && cluster.status !== "stopped") {
+    return {
+      stage: "cluster-stopping",
+      title: i18n.t("clusters.next.cluster_stopping.title"),
+      detail: i18n.t("clusters.next.cluster_stopping.detail"),
+      tone: "progress",
+    };
+  }
+
   if (cluster.desired_state === "stopped") {
     return {
       stage: "stopped",
@@ -149,7 +162,8 @@ export function clusterReadiness(
     };
   }
 
-  if (IN_PROGRESS.has(cluster.status)) {
+  // Asked to run and still "stopped": the start has not had its pass yet.
+  if (IN_PROGRESS.has(cluster.status) || cluster.status === "stopped") {
     // The first start moves a ~12 GB runtime image to every machine. What the
     // machine reports about it is the only honest answer to "is anything
     // happening?", so show that rather than a fixed sentence.

@@ -2366,7 +2366,8 @@
       "running": "En ejecución",
       "degraded": "Requiere atención",
       "failed": "Fallido",
-      "stopped": "Detenido"
+      "stopped": "Detenido",
+      "stopping": "Deteniéndose"
     },
     "next": {
       "no_nodes": {
@@ -2438,6 +2439,10 @@
       "serving": {
         "title": "Sirviendo",
         "detail": "{{deployments}} en ejecución en {{replicas}}."
+      },
+      "cluster_stopping": {
+        "title": "Deteniendo el clúster",
+        "detail": "Sus modelos dejan de responder. Las máquinas y la red se conservan."
       }
     },
     "list": {
@@ -2599,7 +2604,9 @@
       "delete_stopped": "Se elimina el clúster. Sus máquinas siguen registradas y pueden unirse a otro.",
       "remove_title": "¿Quitar esta máquina?",
       "remove_message": "{{name}} saldrá del clúster. Su parte de cualquier modelo en ejecución se detiene.",
-      "page_title": "Clúster"
+      "page_title": "Clúster",
+      "stop_confirm": "Detener el clúster",
+      "stop_warning": "¿Detener {{name}}? Todos sus modelos dejan de responder hasta que vuelva a iniciar el clúster. Las máquinas y la red se conservan."
     },
     "stray": {
       "title": "Modelos que se ejecutan aquí sin despliegue",

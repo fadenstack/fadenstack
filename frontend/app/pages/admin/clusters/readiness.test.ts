@@ -12,6 +12,7 @@ import {
   hasNetwork,
   suggestHeadNode,
 } from "./readiness";
+import { clusterShownStatus, clusterStatusLabel } from "./presentation";
 import {
   deployment,
   environment,
@@ -55,8 +56,23 @@ describe("clusterReadiness", () => {
   });
 
   it("offers to start a stopped cluster", () => {
-    const stopped = { ...environment, desired_state: "stopped" };
+    const stopped = { ...environment, desired_state: "stopped", status: "stopped" };
     expect(clusterReadiness(stopped, environmentNodes, []).stage).toBe("stopped");
+  });
+
+  it("says a cluster asked to stop is stopping until it has", () => {
+    const stopping = { ...environment, desired_state: "stopped", status: "ready" };
+    const step = clusterReadiness(stopping, environmentNodes, []);
+    expect(step.stage).toBe("cluster-stopping");
+    expect(step.tone).toBe("progress");
+    expect(step.actionLabel).toBeUndefined();
+  });
+
+  it("says a cluster asked to run is starting before its first pass", () => {
+    const asked = { ...environment, desired_state: "running", status: "stopped" };
+    const step = clusterReadiness(asked, environmentNodes, []);
+    expect(step.stage).toBe("starting");
+    expect(step.actionLabel).toBeUndefined();
   });
 
   it("reports a converging cluster as progress, not as an action", () => {
@@ -234,5 +250,15 @@ describe("clusterReadiness while a cluster comes up and when it cannot", () => {
   it("offers no retry for a degraded cluster that is still running", () => {
     const degraded: InferenceEnvironment = { ...environment, status: "degraded" };
     expect(clusterReadiness(degraded, environmentNodes, []).actionLabel).toBeUndefined();
+  });
+});
+
+describe("the status a cluster shows", () => {
+  it("is where it is going while that differs from where it is", () => {
+    expect(clusterShownStatus({ desired_state: "running", status: "stopped" })).toBe("preparing");
+    expect(clusterShownStatus({ desired_state: "stopped", status: "ready" })).toBe("stopping");
+    expect(clusterShownStatus({ desired_state: "stopped", status: "stopped" })).toBe("stopped");
+    expect(clusterShownStatus({ desired_state: "running", status: "degraded" })).toBe("degraded");
+    expect(clusterStatusLabel("stopping")).toBe("Stopping");
   });
 });

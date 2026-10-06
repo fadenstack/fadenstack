@@ -2366,7 +2366,8 @@
       "running": "Läuft",
       "degraded": "Braucht Aufmerksamkeit",
       "failed": "Fehlgeschlagen",
-      "stopped": "Gestoppt"
+      "stopped": "Gestoppt",
+      "stopping": "Wird gestoppt"
     },
     "next": {
       "no_nodes": {
@@ -2438,6 +2439,10 @@
       "serving": {
         "title": "Aktiv",
         "detail": "{{deployments}} laufen auf {{replicas}}."
+      },
+      "cluster_stopping": {
+        "title": "Cluster wird gestoppt",
+        "detail": "Seine Modelle antworten nicht mehr. Maschinen und Netzwerk bleiben erhalten."
       }
     },
     "list": {
@@ -2599,7 +2604,9 @@
       "delete_stopped": "Der Cluster wird entfernt. Seine Maschinen bleiben registriert und können einem anderen beitreten.",
       "remove_title": "Diese Maschine entfernen?",
       "remove_message": "{{name}} verlässt den Cluster. Ihr Anteil an laufenden Modellen wird beendet.",
-      "page_title": "Cluster"
+      "page_title": "Cluster",
+      "stop_confirm": "Cluster stoppen",
+      "stop_warning": "{{name}} stoppen? Alle Modelle darauf antworten nicht mehr, bis Sie den Cluster wieder starten. Maschinen und Netzwerk bleiben erhalten."
     },
     "stray": {
       "title": "Modelle, die hier ohne Deployment laufen",

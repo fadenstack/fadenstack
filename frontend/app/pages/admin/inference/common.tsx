@@ -37,6 +37,7 @@ export function environmentStatusColor(status: string): ChipColor {
       return "success";
     case "preparing":
     case "pending":
+    case "stopping":
       return "info";
     case "degraded":
       return "warning";

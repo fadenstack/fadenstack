@@ -8,7 +8,7 @@
  */
 import i18n from "i18next";
 
-import type { ComputePool, EnvironmentNode } from "~/api/inference";
+import type { ComputePool, EnvironmentNode, InferenceEnvironment } from "~/api/inference";
 import type { ManagedNode } from "~/api/nodes";
 
 export {
@@ -78,12 +78,28 @@ export function phaseLabel(phase: string): string {
   }
 }
 
+/**
+ * The status to show for a cluster: where it is going while that differs from
+ * where it is. Right after Start a cluster still reads "stopped", right after
+ * Stop "running" -- and with the button already offering the opposite, the
+ * next click undid the first.
+ */
+export function clusterShownStatus(
+  cluster: Pick<InferenceEnvironment, "status" | "desired_state">,
+): string {
+  if (cluster.desired_state === "stopped" && cluster.status !== "stopped") return "stopping";
+  if (cluster.desired_state === "running" && cluster.status === "stopped") return "preparing";
+  return cluster.status;
+}
+
 /** Cluster status in the same register. */
 export function clusterStatusLabel(status: string): string {
   switch (status) {
     case "pending":
     case "preparing":
       return i18n.t("clusters.status.starting");
+    case "stopping":
+      return i18n.t("clusters.status.stopping");
     case "ready":
     case "running":
       return i18n.t("clusters.status.running");

@@ -33,7 +33,12 @@ import { ControlPlanesDialog } from "../inference/ControlPlanesDialog";
 import { CreateClusterWizard } from "./CreateClusterWizard";
 import { FoundClustersCard } from "./FoundClustersCard";
 import { NextStepBanner } from "./NextStepBanner";
-import { clusterStatusColor, clusterStatusLabel, memberSummary } from "./presentation";
+import {
+  clusterShownStatus,
+  clusterStatusColor,
+  clusterStatusLabel,
+  memberSummary,
+} from "./presentation";
 import { fleetReadiness, gpuCount } from "./readiness";
 
 interface FleetData {
@@ -189,8 +194,8 @@ export default function ClustersPage() {
                         </Typography>
                         <Chip
                           size="small"
-                          label={clusterStatusLabel(cluster.status)}
-                          color={clusterStatusColor(cluster.status)}
+                          label={clusterStatusLabel(clusterShownStatus(cluster))}
+                          color={clusterStatusColor(clusterShownStatus(cluster))}
                         />
                       </Stack>
                       <Typography variant="body2" color="text.secondary">

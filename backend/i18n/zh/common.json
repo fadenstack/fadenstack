@@ -2366,7 +2366,8 @@
       "running": "运行中",
       "degraded": "需要处理",
       "failed": "失败",
-      "stopped": "已停止"
+      "stopped": "已停止",
+      "stopping": "正在停止"
     },
     "next": {
       "no_nodes": {
@@ -2438,6 +2439,10 @@
       "serving": {
         "title": "服务中",
         "detail": "{{deployments}}正在 {{replicas}}上运行。"
+      },
+      "cluster_stopping": {
+        "title": "正在停止集群",
+        "detail": "其上的模型停止服务。机器和网络会保留。"
       }
     },
     "list": {
@@ -2599,7 +2604,9 @@
       "delete_stopped": "集群将被删除。其机器仍保持注册，并可加入其他集群。",
       "remove_title": "移除此机器？",
       "remove_message": "{{name}} 将离开集群，其承担的正在运行的模型部分会停止。",
-      "page_title": "集群"
+      "page_title": "集群",
+      "stop_confirm": "停止集群",
+      "stop_warning": "停止 {{name}}？在重新启动集群之前，其上的所有模型都会停止服务。机器和网络会保留。"
     },
     "stray": {
       "title": "在此运行但没有部署的模型",

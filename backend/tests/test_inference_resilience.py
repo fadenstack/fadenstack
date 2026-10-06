@@ -14,6 +14,7 @@ import uuid
 from typing import Any
 
 import pytest
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dao.inference_dao import DeploymentDAO
@@ -475,6 +476,61 @@ async def test_a_model_that_cannot_be_checked_keeps_its_counts(
     assert dep.phase == "degraded"
     assert dep.ready_replicas == 2
     assert dep.phase_message.startswith("Cannot check the model right now. gpu-01 is offline")
+
+
+async def test_a_model_on_a_stopped_cluster_waits_for_it(
+    deployment_env, dbsession: AsyncSession,
+) -> None:
+    """Stopped on purpose is not broken: the model waits, routed nowhere, and is not looked at."""
+    dep, _node = deployment_env
+    dep.spec_json = _deployment_spec(replicas=2)
+    _serving(dep, ready=2)
+    env = await _cluster(
+        dbsession, dep, status=EnvironmentStatus.STOPPED.value, message=None, cluster={"alive": False},
+    )
+    env.desired_state = "stopped"
+    await dbsession.flush()
+    fake = _Scripted({})
+
+    await _deploy(dbsession, dep, fake)
+
+    assert fake.issued == [], "nothing to ask a cluster that is stopped"
+    assert dep.phase == "pending", "not degraded: nothing is wrong"
+    assert dep.ready_replicas == 0 and dep.total_replicas == 2, "zero stops the gateway routing to it"
+    assert dep.phase_message == (
+        f"Waiting for its cluster: {env.name} is stopped. The model starts again with it."
+    )
+    assert dep.observed_generation == dep.generation, "the wait is the answer: not 'checking now'"
+    await dbsession.flush()
+    queued = await DeploymentDAO(dbsession).list_pending_observation()
+    assert dep.id in {d.id for d in queued}, "looked at again, and applied once the cluster is back"
+
+
+async def test_nothing_is_applied_to_a_cluster_that_is_being_stopped(
+    deployment_env, dbsession: AsyncSession,
+) -> None:
+    """A Stop that came in during the pass: the cluster still reads ready, the row in hand still reads running."""
+    dep, _node = deployment_env
+    env = await _cluster(
+        dbsession, dep, status=EnvironmentStatus.READY.value, message=None, cluster=_probe(HEAD_IP),
+    )
+    assert env.desired_state == "running"
+    # The Stop, committed by another request: the pass session keeps the row it loaded.
+    await dbsession.execute(
+        update(InferenceEnvironment)
+        .where(InferenceEnvironment.id == env.id)
+        .values(desired_state="stopped")
+        .execution_options(synchronize_session=False)
+    )
+    assert env.desired_state == "running"
+    app = f"faden-{dep.id}"
+    fake = _Scripted({RUN: [_run_serve_result(app)], SERVE: [_serve_status(app)]})
+
+    await _deploy(dbsession, dep, fake)
+
+    assert RUN not in fake.types, "a cluster being stopped gets no new models"
+    assert dep.phase == "pending"
+    assert dep.phase_message.startswith("Waiting for its cluster:")
 
 
 async def test_a_model_is_reapplied_when_the_cluster_has_a_new_head(

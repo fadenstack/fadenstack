@@ -2366,7 +2366,8 @@
       "running": "En marche",
       "degraded": "Nécessite une intervention",
       "failed": "Échec",
-      "stopped": "Arrêté"
+      "stopped": "Arrêté",
+      "stopping": "Arrêt en cours"
     },
     "next": {
       "no_nodes": {
@@ -2438,6 +2439,10 @@
       "serving": {
         "title": "En service",
         "detail": "{{deployments}} en cours sur {{replicas}}."
+      },
+      "cluster_stopping": {
+        "title": "Arrêt du cluster",
+        "detail": "Ses modèles cessent de répondre. Les machines et le réseau sont conservés."
       }
     },
     "list": {
@@ -2599,7 +2604,9 @@
       "delete_stopped": "Le cluster est supprimé. Ses machines restent inscrites et peuvent en rejoindre un autre.",
       "remove_title": "Retirer cette machine ?",
       "remove_message": "{{name}} quittera le cluster. Sa part de tout modèle en cours s'arrête.",
-      "page_title": "Cluster"
+      "page_title": "Cluster",
+      "stop_confirm": "Arrêter le cluster",
+      "stop_warning": "Arrêter {{name}} ? Tous ses modèles cessent de répondre jusqu'à ce que vous redémarriez le cluster. Les machines et le réseau sont conservés."
     },
     "stray": {
       "title": "Modèles qui tournent ici sans déploiement",

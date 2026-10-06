@@ -399,16 +399,34 @@ describe("ClusterDetailPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("stops the cluster through desired state", async () => {
+  it("stops the cluster through desired state, once confirmed", async () => {
     const update = vi
       .spyOn(inferenceApi, "updateEnvironment")
       .mockResolvedValue(environment);
     await renderDetail();
 
     await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+    // The button stands where Start stood: a click alone must not stop it.
+    expect(update).not.toHaveBeenCalled();
+    expect(screen.getByText(/Every model on it stops serving/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Stop cluster" }));
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith(ENV_ID, { desired_state: "stopped" }),
     );
+  });
+
+  it("does not stop the cluster when the stop is cancelled", async () => {
+    const update = vi
+      .spyOn(inferenceApi, "updateEnvironment")
+      .mockResolvedValue(environment);
+    await renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(update).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Every model on it stops serving/)).not.toBeInTheDocument();
   });
 
   it("still surfaces the worker-metrics partial, in Advanced", async () => {

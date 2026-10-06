@@ -201,7 +201,8 @@ export default function DeploymentsPage() {
             label={phaseLabel(row.phase)}
             color={deploymentPhaseColor(row.phase)}
           />
-          {row.desired_state === "stopped" && (
+          {/* Only while it is on its way: a stopped row kept saying "stopping" for good. */}
+          {row.desired_state === "stopped" && row.phase !== "stopped" && row.phase !== "deleted" && (
             <Chip size="small" variant="outlined" label={t("clusters.deployments.stopping")} />
           )}
         </Stack>

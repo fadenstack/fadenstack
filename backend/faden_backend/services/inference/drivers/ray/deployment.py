@@ -66,6 +66,7 @@ from faden_backend.db.models.inference import (
     DeploymentDesiredState,
     DeploymentPhase,
     EndpointStatus,
+    EnvironmentDesiredState,
     EnvironmentStatus,
     InferenceDeployment,
     InferenceEnvironment,
@@ -653,6 +654,27 @@ class RayDeploymentManager:
         # ------------------------------------------------------------------
         # Desired ACTIVE
         # ------------------------------------------------------------------
+
+        # 3'. Not on a cluster that is meant to be stopped. Its status lags the
+        # operator: it reads "ready" until its teardown has had its turn in the
+        # pass, and applying in between started models on a cluster that was
+        # being stopped -- two applies of 75 s each after a Stop, which the
+        # Stop then waited out. Whatever the model was doing, it now waits for
+        # its cluster, routed nowhere, and starts again with it; "degraded"
+        # stays for a cluster that is meant to run and does not.
+        if not await self._cluster_wanted(session, facts.environment):
+            name = getattr(facts.environment, "name", None) or "its cluster"
+            self._observe(
+                deployment, DeploymentPhase.PENDING,
+                f"Waiting for its cluster: {name} is stopped. The model starts again with it.", False,
+                observed={"reconciled": False, "reason": "cluster stopped", "app": app_name},
+                # Observed: the wait is the answer, and leaving the generation
+                # behind read "checking now" for as long as the cluster was
+                # stopped. PENDING keeps the row in the queue on its own.
+                ready_replicas=0,
+                total_replicas=_copies_wanted(facts.spec_data)[0],
+            )
+            return
 
         # 3. Gate on the environment (head must exist).
         if facts.head_node_id is None:
@@ -1505,6 +1527,22 @@ class RayDeploymentManager:
             for node in await EnvironmentNodeDAO(session).machines(environment.id)
             if str(node.status or "").lower() == NodeHealthStatus.OFFLINE.value
         )
+
+    @staticmethod
+    async def _cluster_wanted(session, environment: InferenceEnvironment) -> bool:
+        """Whether the cluster is meant to run, as the database says now.
+
+        Not the attribute: the pass session keeps every row it loaded across
+        its commits (``expire_on_commit=False``), so the cluster read here is
+        the one loaded when the pass began -- from before a Stop that came in
+        while the pass was applying models.
+        """
+        desired = (
+            await session.execute(
+                select(InferenceEnvironment.desired_state).where(InferenceEnvironment.id == environment.id)
+            )
+        ).scalar_one_or_none()
+        return str(getattr(desired, "value", desired) or "") == EnvironmentDesiredState.RUNNING.value
 
     async def _environment_of(self, session, environment_id: uuid.UUID) -> InferenceEnvironment | None:
         try:

@@ -2364,7 +2364,8 @@
       "running": "Running",
       "degraded": "Needs attention",
       "failed": "Failed",
-      "stopped": "Stopped"
+      "stopped": "Stopped",
+      "stopping": "Stopping"
     },
     "next": {
       "no_nodes": {
@@ -2436,6 +2437,10 @@
       "serving": {
         "title": "Serving",
         "detail": "{{deployments}} running on {{replicas}}."
+      },
+      "cluster_stopping": {
+        "title": "Stopping the cluster",
+        "detail": "Its models stop serving. The machines and the network are kept."
       }
     },
     "list": {
@@ -2597,7 +2602,9 @@
       "delete_stopped": "The cluster is removed. Its machines stay enrolled and can join another.",
       "remove_title": "Remove this machine?",
       "remove_message": "{{name}} will leave the cluster. Its share of any running model stops.",
-      "page_title": "Cluster"
+      "page_title": "Cluster",
+      "stop_confirm": "Stop cluster",
+      "stop_warning": "Stop {{name}}? Every model on it stops serving until you start the cluster again. Its machines and network are kept."
     },
     "stray": {
       "title": "Models running here without a deployment",

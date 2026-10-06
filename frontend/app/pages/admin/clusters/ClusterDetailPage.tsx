@@ -83,7 +83,9 @@ import InsightsIcon from "@mui/icons-material/Insights";
 
 import { ClusterTopology } from "./ClusterTopology";
 import { NextStepBanner } from "./NextStepBanner";
+import RestartConfirm from "./RestartConfirm";
 import {
+  clusterShownStatus,
   clusterStatusColor,
   clusterStatusLabel,
   formatTimestamp,
@@ -224,6 +226,9 @@ export default function ClusterDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Stop takes every model on the cluster down, and the button stands where
+  // Start stood a moment ago: a second click on "Start" stopped the cluster.
+  const [confirmStop, setConfirmStop] = useState(false);
 
   if (clusterLoading && !cluster) {
     return (
@@ -356,8 +361,8 @@ export default function ClusterDetailPage() {
         </Typography>
         <Chip
           size="small"
-          label={clusterStatusLabel(cluster.status)}
-          color={clusterStatusColor(cluster.status)}
+          label={clusterStatusLabel(clusterShownStatus(cluster))}
+          color={clusterStatusColor(clusterShownStatus(cluster))}
         />
         <Button
           size="small"
@@ -372,12 +377,8 @@ export default function ClusterDetailPage() {
             size="small"
             color="warning"
             startIcon={<StopIcon />}
-            disabled={busy}
-            onClick={() =>
-              void run(() =>
-                inferenceApi.updateEnvironment(cluster.id, { desired_state: "stopped" }),
-              )
-            }
+            disabled={busy || confirmStop}
+            onClick={() => setConfirmStop(true)}
           >
             {t("common.stop")}
           </Button>
@@ -425,6 +426,20 @@ export default function ClusterDetailPage() {
           {t("common.delete")}
         </Button>
       </Stack>
+      {confirmStop && cluster.desired_state === "running" && (
+        <RestartConfirm
+          confirmLabel={t("clusters.detail.stop_confirm")}
+          busy={busy}
+          onConfirm={() =>
+            void run(() =>
+              inferenceApi.updateEnvironment(cluster.id, { desired_state: "stopped" }),
+            ).then(() => setConfirmStop(false))
+          }
+          onCancel={() => setConfirmStop(false)}
+        >
+          {t("clusters.detail.stop_warning", { name: cluster.name })}
+        </RestartConfirm>
+      )}
       {deleting && <Alert severity="info">{deleting}</Alert>}
 
       <NextStepBanner
