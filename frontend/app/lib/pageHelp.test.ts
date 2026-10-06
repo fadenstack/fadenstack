@@ -7,6 +7,8 @@ import { helpUrl, pageHelpDocs, resolvePageHelp } from "./pageHelp";
 
 /** Help's pages, which the frontend image builds and serves at /help (tests run in frontend/). */
 const PAGES = join(process.cwd(), "..", "docs", "help", "pages");
+/** The German ones, served at /help/de. */
+const PAGES_DE = join(process.cwd(), "..", "docs", "help", "pages-de");
 
 describe("links from the console to Help", () => {
   it("every page the console links to exists in docs/help", () => {
@@ -22,5 +24,18 @@ describe("links from the console to Help", () => {
     );
     expect(helpUrl("operate/clusters")).toBe("/help/operate/clusters/");
     expect(helpUrl()).toBe("/help/");
+  });
+
+  it("links a German console to the German Help, the other languages to the English", () => {
+    expect(helpUrl("operate/clusters", "de")).toBe("/help/de/operate/clusters/");
+    expect(helpUrl(undefined, "de-DE")).toBe("/help/de/");
+    expect(helpUrl("operate/clusters", "fr")).toBe("/help/operate/clusters/");
+  });
+
+  it("every page the console links to exists in German too", () => {
+    const missing = pageHelpDocs().filter(
+      (doc) => !existsSync(join(PAGES_DE, `${doc}.md`)),
+    );
+    expect(missing).toEqual([]);
   });
 });

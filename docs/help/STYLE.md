@@ -83,3 +83,41 @@ What they see when it worked.
 
 **The message they see.** What it means, and what to do.
 ```
+
+## German pages (Deutsch)
+
+The German Help is `pages-de/`: the same files as `pages/`, the same order, the same links. Its navigation
+titles are in `nav-de.toml`. Everything above applies; in addition:
+
+- **Address the reader as "Sie"**, as the German console does. Plain, short sentences; a verb at the start of
+  a step ("Öffnen Sie **Cluster** und wählen Sie **Maschinen hinzufügen**.").
+- **Name things exactly as the German console shows them**, in bold. Look a label up instead of translating
+  it: `python docs/help/scripts/ui_label.py "Create User" --lang de` prints the German text of every key
+  that holds that English text. Where the console has no German text for it, keep the English label.
+- **Untranslated:** commands, code, file and folder names, paths, setting keys (`users.login_lifetime_s`),
+  environment variables, role and permission names (`default_user`, `rag.search:write`), product names
+  (Fadenstack, Ray, vLLM, NVIDIA), HTTP status codes, and messages quoted as the system shows them.
+- **Pictures** are the English screenshots until German ones are taken: the paths stay as in `pages/`
+  (`../images/...`), only the alt text is German.
+- **Typography:** „…" for quotes, "z. B.", "d. h.", a space before units ("12 GB"), a decimal comma in prose
+  ("1,5 GB"), " – " for a dash. Headings in sentence case, as in German anyway.
+- **Words**, one German word for one thing, everywhere:
+
+| English | Deutsch |
+|---|---|
+| chat, console | Chat, Konsole |
+| superuser, administrator | Superuser, Administrator |
+| user / account, role, group, permission | Benutzer / Konto, Rolle, Gruppe, Berechtigung |
+| sign in, sign-in | anmelden, Anmeldung |
+| API token | API-Token |
+| knowledge base, collection, document | Wissensdatenbank, Sammlung, Dokument |
+| model, deployment | Modell, Bereitstellung (the menu says **Deployments**: name it so) |
+| cluster, machine, GPU machine | Cluster, Maschine, GPU-Maschine |
+| runtime, provider, remote provider | Runtime, Provider, externer Provider |
+| agent, add-in, skill, tool, MCP server | Agent, Add-in, Skill, Tool, MCP-Server |
+| policy, personal data | Richtlinie, personenbezogene Daten |
+| usage, costs | Nutzung, Kosten |
+| install, upgrade (noun / verb), backup, restore | Installation, Upgrade / aktualisieren, Sicherung, Wiederherstellung |
+| maintenance page, troubleshooting | Wartungsseite, Fehlerbehebung |
+| request, reply | Anfrage, Antwort |
+| copy (of a model) | Kopie |

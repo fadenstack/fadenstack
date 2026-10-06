@@ -361,8 +361,11 @@ function toEntry(def: PageHelpDef): PageHelpEntry {
 }
 
 /** Where the console serves a Help page (built into the frontend image from docs/help). */
-export function helpUrl(doc?: string): string {
-  return doc ? `/help/${doc}/` : "/help/";
+export function helpUrl(doc?: string, language?: string): string {
+  // Help is in English and German (docs/help/pages-de, served under /help/de); the other console
+  // languages read the English one.
+  const root = language?.toLowerCase().startsWith("de") ? "/help/de/" : "/help/";
+  return doc ? `${root}${doc}/` : root;
 }
 
 /** Every Help page the console links to: a test holds them to pages that exist. */

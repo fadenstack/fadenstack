@@ -34,7 +34,7 @@ export interface PageHelpDrawerProps {
 }
 
 export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const { startGuide } = useGuides();
 
@@ -131,7 +131,7 @@ export function PageHelpDrawer({ open, onClose }: PageHelpDrawerProps) {
             <Button
               variant="text"
               startIcon={<MenuBookOutlinedIcon />}
-              href={helpUrl(entry.doc)}
+              href={helpUrl(entry.doc, i18n.language)}
               target="_blank"
               rel="noopener"
               data-page-help-doc={entry.doc}

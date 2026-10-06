@@ -63,7 +63,8 @@ The upgrade, in order:
 
 !!! warning
     An upgrade only moves forward: the databases are migrated to the new release. The tool refuses to move an
-    install to an older release. To go back, restore the backup the upgrade took (see [Going back](#going-back)).
+    install to an older release, and going back to the release before is not possible yet (see
+    [Going back](#going-back)).
 
 Changes you made to the deployment files themselves, such as `nginx/nginx.conf`, are replaced. Keep your changes
 in `.env`.
@@ -150,7 +151,15 @@ for a model that needs a newer runtime than the cluster runs (see [Models](../ad
 
 ## Going back
 
-Every upgrade leaves a backup in `~/fadenstack/backups/<time>/`. Going back is a restore of that backup:
+!!! warning "Under testing"
+    Going back after an upgrade is being tested, and goes back only part of the way. A restore puts the data
+    back as it was before the upgrade, but the server stays on the new release: its programs and deployment
+    files stay as the upgrade left them, and the databases are migrated to the new release again when the
+    services start. Going back to the earlier release itself is not possible yet. The sure way back is a
+    snapshot of the whole server, taken before the upgrade: a virtual machine snapshot or a disk image.
+
+Every upgrade leaves a backup in `~/fadenstack/backups/<time>/`. To put the data back as it was before the
+upgrade, restore that backup:
 
 ```bash
 faden restore ~/fadenstack/backups/<time>

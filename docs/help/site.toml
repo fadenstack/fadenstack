@@ -1,26 +1,27 @@
-# The Help site's settings. scripts/build.py fills in the #...# lines: the address, the links in the top bar and
-# the navigation (from zensical.toml in this folder), for the public site (help.fadenstack.com) or for /help in
-# the console.
+# The Help site's settings. scripts/build.py fills in the #...# lines, for each language (its name, words and
+# navigation) and for the public site (help.fadenstack.com) or /help in the console (the address, the links in
+# the top bar, the language switch).
 [project]
-site_name = "Fadenstack Help"
+#SITE_NAME#
 #SITE_URL#
-site_description = "Using, administering and running Fadenstack: the chat, the console, the server and the GPU machines."
+#SITE_DESCRIPTION#
 site_author = "Emagin8 UG (haftungsbeschränkt)"
 docs_dir = "docs"
 site_dir = "site"
-copyright = '© 2026 Emagin8 UG (haftungsbeschränkt) · <a href="https://fadenstack.com/impressum/">Impressum</a> · <a href="https://fadenstack.com/privacy/">Privacy</a>'
+#COPYRIGHT#
 extra_css = ["assets/stylesheets/fonts.css", "assets/stylesheets/fadenstack.css"]
 #NAV#
 
 [project.extra]
 site_key = "help"
 #SITES#
+#ALTERNATE#
 
 [project.theme]
 custom_dir = "overrides"
 favicon = "assets/images/favicon.svg"
 logo = "assets/images/mark.svg"
-language = "en"
+#LANGUAGE#
 font = false
 features = [
   "content.code.annotate",

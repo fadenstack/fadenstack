@@ -28,8 +28,8 @@ site) and builds it, for one of two places:
 
 ```sh
 python docs/help/scripts/build.py --target console --out build/help --build   # what the console serves at /help
-python docs/help/scripts/build.py --target public  --out build/help           # help.fadenstack.com (the docs hub builds it)
-cd build/help && zensical serve                                                # http://localhost:8000
+python docs/help/scripts/build.py --target public  --out build/help --build   # help.fadenstack.com (the docs hub builds it)
+cd build/help/en && zensical serve                                             # http://localhost:8000 (build/help/de: German)
 ```
 
 The **console** copy is built into the frontend image (`frontend/Dockerfile`, build context `docs`), so every
@@ -39,6 +39,15 @@ the site's address and links to the website and the Developers site; the docs hu
 publishes it from the release tag. Both use the nav in `zensical.toml` here and the settings in `site.toml`.
 
 `cd docs/help && zensical serve` still works for a quick look at the pages in the plain theme.
+
+## Languages
+
+English in `pages/`, German in `pages-de/`: the same files, the same order, German navigation titles in
+`nav-de.toml`. The site has English at its root and German under `de/` (`/help/de` in the console), with a
+language switch in the top bar; the console links to the German pages when it is in German. A page not
+translated yet is the English one with a note, so the German build never fails for want of one -- but translate
+it in the same change: STYLE.md says how, and `scripts/ui_label.py` finds what the German console calls a button.
+The German pages use the English screenshots until German ones are taken.
 
 ## Screenshots
 

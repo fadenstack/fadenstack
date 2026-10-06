@@ -1,12 +1,13 @@
 """Check Help pages before they go anywhere.
 
-    python docs/help/scripts/check.py [PATH ...]      # default: docs/help/pages/
+    python docs/help/scripts/check.py [PATH ...]      # default: docs/help/pages/ and docs/help/pages-de/
 
 Two checks:
   - the docs hub's scrub patterns (private addresses, lab names, internal wording, timings, e-mail addresses,
     secrets): the same rules the hub applies when it builds help.fadenstack.com. Read from the hub, so they are
     kept in one place: FADEN_DOCS_HUB, or the hub checked out next to this repo (../docs);
-  - every relative link to a Markdown page, and every picture, points at a file that exists.
+  - every relative link to a Markdown page, and every picture, points at a file that exists. A translated page
+    (pages-de/) uses the English pictures: its picture links are looked up in pages/ as well.
 
 A reviewed line passes the scrub when it ends with `<!-- scrub: ok -->`, as in the hub.
 """
@@ -38,8 +39,19 @@ def scrub_rules() -> dict[str, re.Pattern[str]]:
     return rules
 
 
+def _shared_picture(page: Path, target: str) -> bool:
+    """A translated page's picture: the English one, at the same place under pages/."""
+    if target.endswith(".md"):
+        return False
+    resolved = (page.parent / target).resolve()
+    for translated in HELP.glob("pages-*"):
+        if resolved.is_relative_to(translated.resolve()):
+            return (HELP / "pages" / resolved.relative_to(translated.resolve())).is_file()
+    return False
+
+
 def main() -> int:
-    targets = [Path(a) for a in sys.argv[1:]] or [HELP / "pages"]
+    targets = [Path(a) for a in sys.argv[1:]] or [d for d in (HELP / "pages", HELP / "pages-de") if d.is_dir()]
     pages = sorted(p for t in targets for p in ([t] if t.is_file() else t.rglob("*.md")))
     rules = scrub_rules()
     hits = []
@@ -59,7 +71,7 @@ def main() -> int:
             for target in LINK.findall(line):
                 if "://" in target:
                     continue
-                if not (page.parent / target).resolve().is_file():
+                if not (page.parent / target).resolve().is_file() and not _shared_picture(page, target):
                     hits.append(f"{where}: link to a file that does not exist: {target}")
     if hits:
         print("\n".join(hits))

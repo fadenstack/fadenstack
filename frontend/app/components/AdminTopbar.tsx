@@ -38,6 +38,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import AgentAvatar from "~/components/AgentAvatar";
 import { NavLogoButton } from "~/components/NavLogoButton";
 import { UserMenuButton } from "~/components/UserMenuButton";
+import { helpUrl } from "~/lib/pageHelp";
 
 export interface AdminTopbarProps {
   mode: "light" | "dark";
@@ -85,7 +86,7 @@ export function AdminTopbar({
   onLogout,
   onOpenNav,
 }: AdminTopbarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const isRootActive = rootStatus?.active ?? false;
 
@@ -175,7 +176,7 @@ export function AdminTopbar({
           <MenuItem
             data-help-item="help_pages"
             component="a"
-            href="/help/"
+            href={helpUrl(undefined, i18n.language)}
             target="_blank"
             rel="noopener"
             onClick={() => setHelpMenuAnchor(null)}

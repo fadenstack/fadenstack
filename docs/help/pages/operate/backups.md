@@ -61,6 +61,12 @@ Every `faden upgrade` also takes a backup before it changes anything.
 
 ## Restore
 
+!!! warning "Under testing"
+    Restoring is being tested. It puts back the data: the databases, the `.env`, the certificate material, and
+    volumes if the backup holds them. It does not put back the deployment files or the release the backup was
+    taken with. While it runs, the services are stopped and the console does not answer: there is no
+    maintenance page yet. Try a restore on a copy of the server before you rely on one.
+
 ```bash
 faden restore ~/fadenstack/backups/<time>
 ```
