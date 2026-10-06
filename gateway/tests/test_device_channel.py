@@ -388,3 +388,95 @@ async def test_a_call_that_needs_approval_asks_the_device_to_ask_its_user(
     ws.say(type="tool_call_result", call_id="call_1", status="ok", result="read")
     assert (await call).content == "read"
     await _drop(ws, task)
+
+
+# -- while it stays connected ------------------------------------------------------
+
+
+class _Verdicts:
+    """An authenticator whose answer changes while the device is connected."""
+
+    def __init__(self) -> None:
+        self.refusal: tuple[str, str] | None = None
+        self.as_whom: dict[str, DeviceIdentity] = {GOOD: ME}
+        self.seen: list[str] = []
+
+    async def __call__(self, token: str) -> DeviceIdentity:
+        self.seen.append(token)
+        if self.refusal is not None:
+            raise PermissionError(*self.refusal)
+        if token not in self.as_whom:
+            raise PermissionError("invalid_token", "Invalid JWT token.")
+        return self.as_whom[token]
+
+
+async def _connect_with(hub: DeviceHub, verdicts: _Verdicts) -> tuple[_Socket, asyncio.Task[None]]:
+    ws = _Socket()
+    task = asyncio.create_task(handle_client_websocket(
+        ws, _Dao(), authenticate=verdicts, owns_session=_owns, hub=hub,
+    ))
+    ws.say(type="session_init", token=GOOD, client_id="laptop", session_id=str(SESSION), tools=[])
+    assert (await ws.heard())["type"] == "session_ack"
+    return ws, task
+
+
+@pytest.fixture
+def quick_recheck(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("faden_gateway.services.gateway.client_ws.RECHECK_SEC", 0.02)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("code", "closed"), [("api_token_revoked", 4401), ("user_inactive", 4403)])
+async def test_a_device_is_let_go_once_its_caller_may_no_longer(code: str, closed: int, quick_recheck: None) -> None:
+    """A revoked token, a suspended person: told why, and the channel closes -- not hours later."""
+    hub = DeviceHub()
+    verdicts = _Verdicts()
+    ws, task = await _connect_with(hub, verdicts)
+    verdicts.refusal = (code, "Refused.")
+
+    told = await ws.heard()
+    assert told == {"type": "error", "code": code, "message": "Refused."}
+    await asyncio.wait_for(task, 2)
+    assert ws.closed == closed
+
+
+@pytest.mark.anyio
+async def test_a_check_that_could_not_be_made_keeps_the_device(quick_recheck: None) -> None:
+    hub = DeviceHub()
+    verdicts = _Verdicts()
+    ws, task = await _connect_with(hub, verdicts)
+    verdicts.refusal = ("access_check_failed", "Your access could not be checked; try again.")
+    await asyncio.sleep(0.1)
+    assert ws.closed is None and ws.outbox.empty()
+    verdicts.refusal = None
+    await _drop(ws, task)
+
+
+@pytest.mark.anyio
+async def test_a_device_renews_its_token_in_place(quick_recheck: None) -> None:
+    hub = DeviceHub()
+    verdicts = _Verdicts()
+    verdicts.as_whom["renewed"] = ME
+    ws, task = await _connect_with(hub, verdicts)
+
+    ws.say(type="token_refresh", token="renewed")
+    assert await ws.heard() == {"type": "token_refreshed"}
+    del verdicts.as_whom[GOOD]  # the old token is no good any more; the new one carries on
+    await asyncio.sleep(0.1)
+    assert ws.closed is None and verdicts.seen[-1] == "renewed"
+    await _drop(ws, task)
+
+
+@pytest.mark.anyio
+async def test_a_token_of_someone_else_does_not_take_over_a_device() -> None:
+    hub = DeviceHub()
+    verdicts = _Verdicts()
+    verdicts.as_whom["someone-else"] = DeviceIdentity(
+        tenant_id="tenant-a", user_id="another-user", device_id=None, agent_id=None,
+    )
+    ws, task = await _connect_with(hub, verdicts)
+
+    ws.say(type="token_refresh", token="someone-else")
+    assert (await ws.heard())["code"] == "token_mismatch"
+    await asyncio.wait_for(task, 2)
+    assert ws.closed == 4403

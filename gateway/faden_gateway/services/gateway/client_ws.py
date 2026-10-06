@@ -29,14 +29,21 @@ What changed from the first version, and why:
 - **Reconnects.** A device that drops keeps its pending calls for a grace
   period; reconnecting as the same device gets them again. After it, they
   fail with a clear error.
+- **Checked while connected.** The token was checked once, at connect: a
+  revoked or expired token, a suspended person, an agent whose access was
+  taken away went on getting calls for hours. The caller is checked again
+  every ``RECHECK_SEC``; when it may no longer be served, the device gets an
+  ``error`` saying why and the channel closes (4401: the token is no good,
+  4403: the caller may not). A device renews its token in place with
+  ``token_refresh`` -- an agent's lasts minutes -- as the same caller only.
 
 Protocol (JSON text frames):
 
   device -> gateway: session_init, tool_call_result, tool_call_error,
                      tool_call_progress, tool_call_approval_pending,
-                     tool_registry_update, ping
+                     tool_registry_update, token_refresh, ping
   gateway -> device: session_ack, tool_call_request, tool_call_cancel,
-                     tool_registry_update_ack, pong, error
+                     tool_registry_update_ack, token_refreshed, pong, error
 """
 
 from __future__ import annotations
@@ -553,6 +560,85 @@ async def _error(ws: Any, code: str, message: str) -> None:
     await ws.send_json({"type": "error", "code": code, "message": message})
 
 
+#: How often a connected device's caller is checked again. The token was checked once, at connect: a revoked
+#: or expired token, a suspended person, an agent whose access was taken away went on getting tool calls for
+#: as long as the device stayed connected -- hours.
+RECHECK_SEC = 60.0
+
+#: Refusals that mean "this token is no good" (4401); the others say the caller may not (4403).
+_UNAUTHENTICATED = frozenset({
+    "invalid_token", "invalid_token_sub", "missing_authorization", "sign_in_outdated",
+    "api_token_revoked", "api_token_expired", "api_token_outdated",
+})
+#: Refusals that say nothing about the caller -- the check itself could not be made -- try again next round.
+_TRANSIENT = frozenset({"access_check_failed", "agent_lookup_failed", "jwt_not_configured"})
+
+
+@dataclass
+class _Caller:
+    """The token a connection runs on; ``token_refresh`` replaces it."""
+
+    token: str | None
+
+
+def _same_caller(identity: DeviceIdentity, conn: DeviceConnection) -> bool:
+    tenant, user, device = conn.key
+    return (
+        identity.tenant_id == tenant
+        and identity.user_id == user
+        and identity.agent_id == conn.agent_id
+        and (identity.device_id is None or identity.device_id == device)
+    )
+
+
+async def _refuse(ws: Any, code: str, message: str) -> None:
+    with contextlib.suppress(Exception):
+        await _error(ws, code, message)
+    with contextlib.suppress(Exception):
+        await ws.close(code=4401 if code in _UNAUTHENTICATED else 4403)
+
+
+async def _still_allowed(ws: Any, caller: _Caller, conn: DeviceConnection, authenticate: Authenticator) -> bool:
+    """Whether the connection's caller may still be served; refuses and closes it when not."""
+    if caller.token is None:
+        return True
+    try:
+        identity: DeviceIdentity = await authenticate(caller.token)
+    except PermissionError as exc:
+        code = str(exc.args[0])
+        if code in _TRANSIENT:
+            return True
+        await _refuse(ws, code, str(exc.args[1] if len(exc.args) > 1 else "Refused."))
+        return False
+    if not _same_caller(identity, conn):
+        await _refuse(ws, "token_mismatch", "The token is someone else's.")
+        return False
+    return True
+
+
+async def _recheck(ws: Any, caller: _Caller, conn: DeviceConnection, authenticate: Authenticator) -> None:
+    while conn.connected:
+        await asyncio.sleep(RECHECK_SEC)
+        if not await _still_allowed(ws, caller, conn, authenticate):
+            return
+
+
+async def _refresh_token(
+    ws: Any, msg: dict[str, Any], caller: _Caller, conn: DeviceConnection, authenticate: Authenticator,
+) -> bool:
+    """``token_refresh``: carry on with a new token of the same caller. False when it was refused."""
+    token = msg.get("token")
+    if not isinstance(token, str) or not token:
+        await _error(ws, "missing_authorization", "token_refresh needs a token.")
+        return True
+    renewed = _Caller(token)
+    if not await _still_allowed(ws, renewed, conn, authenticate):
+        return False
+    caller.token = token
+    await ws.send_json({"type": "token_refreshed"})
+    return True
+
+
 async def handle_client_websocket(
     ws: Any,
     dao: GatewayDAO,
@@ -580,18 +666,25 @@ async def handle_client_websocket(
     await ws.accept(subprotocol=SUBPROTOCOL if SUBPROTOCOL in offered else None)
 
     conn: DeviceConnection | None = None
+    watch: asyncio.Task[None] | None = None
     try:
         first = await asyncio.wait_for(ws.receive_text(), timeout=AUTH_TIMEOUT_SEC)
         conn = await _init(ws, first, dao, identity, authenticate, owns_session, hub)
         if conn is None:
             await ws.close(code=4401)
             return
+        caller = _Caller(handshake_token or _init_token(first))
+        watch = asyncio.create_task(_recheck(ws, caller, conn, authenticate))
         while True:
             raw = await ws.receive_text()
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 await _error(ws, "invalid_json", "Expected JSON.")
+                continue
+            if isinstance(msg, dict) and msg.get("type") == "token_refresh":
+                if not await _refresh_token(ws, msg, caller, conn, authenticate):
+                    return
                 continue
             await _dispatch(conn, msg, dao, hub)
     except TimeoutError:
@@ -600,12 +693,24 @@ async def handle_client_websocket(
     except Exception:
         logger.debug("Device channel closed", exc_info=True)
     finally:
+        if watch is not None:
+            watch.cancel()
         if conn is not None:
             await hub.disconnect(conn)
             if conn.session_id is not None:
                 with contextlib.suppress(Exception):
                     await dao.mark_client_tools_unavailable(conn.session_id, conn.key[2])
             logger.info("Device %s of user %s disconnected", conn.key[2], conn.key[1])
+
+
+def _init_token(raw: str) -> str | None:
+    """The token ``session_init`` carried, when the handshake had none."""
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    token = msg.get("token") if isinstance(msg, dict) else None
+    return token if isinstance(token, str) and token else None
 
 
 async def _init(
