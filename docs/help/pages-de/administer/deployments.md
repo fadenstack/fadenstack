@@ -130,7 +130,8 @@ der Konsole legt immer eine feste Zahl fest.
 
 Eine Bereitstellung, die von einer früheren Fadenstack-Version gestartet wurde, startet jede Kopie einmal neu,
 wenn sich nach dem Upgrade zum ersten Mal die Zahl ihrer Kopien ändert. Danach bedienen die laufenden Kopien
-weiter Anfragen, wenn sich die Zahl ändert.
+weiter Anfragen, wenn sich die Zahl ändert. Dazu braucht es aktuelle Agenten auf den Maschinen des Clusters und
+eine aktuelle Runtime; ohne sie startet jede Änderung jede Kopie neu.
 
 ## Engine-Einstellungen {#engine-settings}
 

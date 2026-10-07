@@ -12,9 +12,11 @@ die Maschinen teilen.
 | GPU-Maschinen | Server | 443, oder 80, solange HTTPS aus ist | Die Verbindung des Agents: Befehle, Status, Downloads des Agents, der Runtime-Images und der Modelle, Logs | Ja, sobald HTTPS an ist |
 | Server | Head-Maschine jedes Clusters | Der Serving-Port des Clusters (standardmäßig 8010) | Jeder Prompt und jede Antwort, vom Gateway zu den Modellen | Ja, immer (gegenseitiges TLS) |
 | Server | Eine Maschine mit einem vLLM, das Sie über Fadenstack routen | Der Port dieses vLLM plus 20000 | Prompts und Antworten | Ja, immer (gegenseitiges TLS) |
+| Server | Eine Maschine mit einem vLLM, das Fadenstack gefunden hat | Der eigene Port dieses vLLM | Eine Frage nach den Modellen, die es bereitstellt, bevor es geroutet wird und wenn die Konsole es auflistet | Nein |
 | Server | Cluster-Maschinen | Die Metrik-Ports von Ray | Metriken: nur Zahlen | Nein |
-| Cluster-Maschinen | Untereinander, im Netzwerk des Clusters | Der Head-Port von Ray (standardmäßig 6390) und Ports, die Ray selbst wählt | Steuerung des Clusters, Daten, Aufrufe an Modellkopien auf anderen Maschinen (Prompts eingeschlossen), das zwischen Maschinen kopierte Runtime-Image | Immer authentifiziert; verschlüsselt, sobald **Verkehr zwischen den Maschinen** für den Cluster an ist |
+| Cluster-Maschinen | Untereinander, im Netzwerk des Clusters | Der Head-Port von Ray (standardmäßig 6390) und Ports, die Ray selbst wählt | Steuerung des Clusters, Daten, Aufrufe an Modellkopien auf anderen Maschinen (Prompts eingeschlossen) | Immer authentifiziert; verschlüsselt, sobald **Verkehr zwischen den Maschinen** für den Cluster an ist |
 | Cluster-Maschinen | Untereinander, im Netzwerk des Clusters | GPU-zu-GPU (RDMA) | Die Daten eines Modells, solange sich eine Kopie über mehrere Maschinen erstreckt | Nein: lässt sich nicht verschlüsseln |
+| Cluster-Maschinen | Untereinander, im Netzwerk des Clusters | 8271, während eine Kopie läuft | Das Runtime-Image, weitergegeben von einer Maschine, die es hat | Nein: gegen seinen Digest geprüft |
 | Server | Das Internet | 443 | Abrufen von Images, Modell-Downloads, externe Provider und MCP-Server, die Sie anbinden | Ja |
 
 Die Maschinen öffnen keinen Port, über den der Server sie steuert: Ihre Agenten bauen die Verbindung zum Server
@@ -57,12 +59,15 @@ Jede Maschine muss den Eingang des Servers erreichen, unter der Adresse, die Sie
 zugehörigen Netzwerkschnittstelle auf; wählen Sie eine im Netzwerk, das die Maschine mit dem Server teilt. Der Server
 selbst baut keine Verbindungen zum Agent auf.
 
-Für zwei Dinge baut der Server allerdings Verbindungen zu den Maschinen auf:
+Für drei Dinge baut der Server allerdings Verbindungen zu den Maschinen auf:
 
 - **Die Modelle.** Das Gateway sendet jede Anfrage an die Head-Maschine des Clusters, der das Modell bereitstellt,
   auf dem Serving-Port des Clusters. Erlauben Sie dem Server, diesen Port auf jeder Head-Maschine zu erreichen.
 - **Metriken.** Das Prometheus des Servers sammelt Metriken von den Maschinen des Clusters. Blockiert eine Firewall
   das, zeigt die Cluster-Seite keine Metriken; das Beantworten von Anfragen ist nicht betroffen.
+- **Gefundene vLLM.** Bevor der Server ein vLLM routet, das er auf einer Maschine gefunden hat, und wenn die Konsole
+  diese auflistet, fragt er jedes auf seinem eigenen Port, welche Modelle es bereitstellt (siehe
+  [Vorhandene vLLM-Server](existing-vllm.md)).
 
 ## Zwischen den Maschinen eines Clusters {#between-the-machines-of-a-cluster}
 
@@ -91,6 +96,7 @@ des Clusters erreichen (siehe [Cluster](clusters.md#add-machines-to-a-running-cl
 | Der Head-Port des Clusters (standardmäßig 6390) | der Head-Maschine | den Head von Ray |
 | Der Serving-Port des Clusters (standardmäßig 8010) | der Head-Maschine | die Modelle, hinter dem Proxy, der nur das Gateway durchlässt |
 | Der Serving-Port plus 20000 (standardmäßig 28010) | der Head-Maschine, nur Loopback | die Modelle selbst |
+| 8271 | jeder Maschine des Clusters, während sie das Runtime-Image weitergibt | das Runtime-Image für die anderen Maschinen |
 
 Das Dashboard von Ray lauscht nur auf der Loopback-Adresse der Head-Maschine (8265). Belegt etwas auf einer Maschine
 bereits einen dieser Ports, kann der Cluster nicht starten, und die Cluster-Seite zeigt den Fehler von Ray, der mit

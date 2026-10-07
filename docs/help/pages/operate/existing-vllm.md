@@ -45,7 +45,8 @@ Containers Fadenstack started itself are not listed here; they are on the **Depl
 Requests for that name now go to the container, as it runs. It appears on the **Providers** page, linked to the
 machine's page, which is where you manage it. Chat offers it if it is a chat model; an embeddings model answers at
 `/v1/embeddings`, a scoring model at `/v1/rerank`. A request of the wrong kind is refused with a message that says
-where to send it.
+where to send it. A routed container counts as a remote provider, and Core takes at most three of those (see
+[Remote providers](../administer/providers.md)).
 
 Nothing on the machine changes: not the container, its settings or its restart policy. Whoever started it still
 starts and stops it.
@@ -73,12 +74,13 @@ stopped"), and put back when it runs again. Requests for its name fail in betwee
 
 The gateway reaches a routed container over mutual TLS, through the same proxy on the machine that protects the
 models Fadenstack runs, on the container's port plus 20000 (8102 becomes 28102). Allow the server to reach that
-port.
+port, and the container's own port: the server asks the container there which models it serves, before routing it
+and when the console lists it.
 
 !!! warning
     The container's own port stays open: Fadenstack did not start the container and does not close it. vLLM often
-    runs that port without any authentication. Firewall it so only the machine itself reaches it, or deploy the
-    model on a cluster instead.
+    runs that port without any authentication. Firewall it so only the machine itself and the Fadenstack server
+    reach it, or deploy the model on a cluster instead.
 
 ## When it does not work
 

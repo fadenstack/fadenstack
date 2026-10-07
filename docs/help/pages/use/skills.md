@@ -10,7 +10,7 @@ Skills are an optional part of Fadenstack. If the chat has no puzzle-piece butto
 
 A skill is a set of written instructions. While it is picked, they go to the model with each of your messages, so the reply follows them: the steps, the format, the checks, the tone. A skill can also bring files, such as a template, which the model can read when it needs them.
 
-A skill does not change what the model knows or what it may do. Documents come from [Knowledge](knowledge.md), actions from [Tools](tools.md).
+A skill does not add to what the model knows or what it may do: documents come from [Knowledge](knowledge.md), actions from [Tools](tools.md). A skill can keep some tools out of the chat while it is used.
 
 ## Use a skill in a chat
 
@@ -34,10 +34,10 @@ When a conversation went the way you want it to go next time, save it as a skill
 1. Type `/skill` in the message box and press Enter. You can add what the skill should do, for example `/skill review pull requests the way we just did`. Or select the puzzle piece and **Create a skill from this chat…**.
 2. In **New skill**, select **Draft from this chat**. The chat's model reads the conversation and writes a draft: a name, a description and the instructions. Or select **Write it myself**.
 3. Read the draft and change what is needed. The model is asked to leave out names, passwords and other details of the conversation, but check for them yourself.
-4. Choose a **Short name**: it is what you type after `$`. Tick **Use it in this chat now** if you want it picked straight away.
+4. Choose a **Short name**: it is what you type after `$`. **Use it in this chat now** is ticked, so the skill is picked straight away; untick it if you do not want that.
 5. Select **Save skill**.
 
-Nothing is saved before you select **Save skill**. New skills are private: only you see them until you share them.
+Nothing is saved before you select **Save skill**. New skills are private: only you, and administrators, see them until you share them.
 
 ## Your skills
 

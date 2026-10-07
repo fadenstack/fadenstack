@@ -35,9 +35,10 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
    müssen.
 
 `faden deploy` prüft Docker, schreibt die Installation nach `~/fadenstack` (oder in das Verzeichnis, das Sie
-angeben: `faden deploy /opt/faden`), erzeugt eine `.env` mit einem zufälligen Passwort für jeden Dienst, bemisst
-die Dienste für den Host, lädt die Images genau des Release herunter, zu dem das Werkzeug gehört, startet alles
-und legt den ersten Administrator an.
+angeben: `faden deploy /opt/faden`), erzeugt eine `.env` mit zufälligen Passwörtern und Schlüsseln, bemisst die
+Dienste für den Host, lädt die Images genau des Release herunter, zu dem das Werkzeug gehört, startet alles und
+legt den ersten Administrator an. Die Admin-Anmeldungen von Grafana, RabbitMQ und Langfuse erhalten die E-Mail-Adresse
+und das Passwort des ersten Administrators.
 
 ### Was der Befehl fragt {#what-it-asks}
 
@@ -111,7 +112,7 @@ Als Nächstes: [die GPU-Maschinen hinzufügen](machines.md).
 | `~/fadenstack/.env` | Alle Passwörter, Schlüssel und Einstellungen. Halten Sie die Datei vertraulich und bewahren Sie eine Kopie bei Ihren Sicherungen auf |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem Schlüssel |
 | `~/fadenstack/backups/` | Sicherungen |
-| `~/fadenstack/logs/` | Logs der geplanten Jobs |
+| `~/fadenstack/logs/` | Das Log der täglichen Zertifikatserneuerung (die nächtliche Sicherung schreibt nach `~/fadenstack/backups/backup.log`) |
 | `~/.config/faden/faden.yaml` | Die Einstellungen des Werkzeugs selbst: wo die Installation liegt, welche Module eingeschaltet sind |
 
 Die Daten liegen in Docker-Volumes namens `fadenstack_*`, z. B. `fadenstack_pg_data`.
@@ -161,7 +162,7 @@ sich nach dem Hinzufügen ab und wieder an).
 
 **`HTTP port 80 is in use by something else.`** Ein anderes Programm belegt den Port. Geben Sie ihn frei oder
 führen Sie `faden deploy --http-port 8080 --https-port 8443` aus. `faden doctor` listet alle Ports auf, die die
-Installation nach außen öffnet, und wer sie gerade belegt.
+Installation nach außen öffnet, und ob etwas anderes sie gerade belegt.
 
 **`Backend did not become healthy in time — skipping admin setup.`** Die Dienste sind gestartet, aber die
 Konsolen-API hat nicht rechtzeitig geantwortet. Prüfen Sie `faden status` und `faden logs faden-backend`, beheben

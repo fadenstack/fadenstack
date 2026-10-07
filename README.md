@@ -25,7 +25,7 @@
   <img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="API: OpenAI-compatible" src="https://img.shields.io/badge/API-OpenAI--compatible-486A91?style=flat-square&labelColor=0A0E1A">
   <img alt="Runs on your hardware" src="https://img.shields.io/badge/runs%20on-your%20hardware-486A91?style=flat-square&labelColor=0A0E1A">
-  <img alt="Console in English, German, Français, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
+  <img alt="Console in English, German, French, Spanish and Chinese" src="https://img.shields.io/badge/console-EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20%E4%B8%AD%E6%96%87-486A91?style=flat-square&labelColor=0A0E1A">
 </p>
 
 ---
@@ -64,17 +64,17 @@ Fadenstack was called LLM.Port up to release 0.3.
 - An OpenAI-compatible `/v1` for chat completions (streamed or whole), embeddings and the model list. Any OpenAI SDK works: change the base URL and the key.
 - Every request goes through the same steps as the chat: limits, routing, skills, PII, tools and the audit log. See [what happens to a request](docs/help/pages/administer/requests.md).
 - **Tools on the server and on the user's side.** MCP servers are registered once on the server. Agents can also connect over a WebSocket and offer local tools, such as the open document or files on the user's machine. Each session's policy decides where its tools run: on the server, locally or both.
-- SDKs for Python (`faden`) and .NET (`Faden.Client`) add sessions, memory, tools and attachments to the OpenAI SDKs. They live in their own repositories.
+- SDKs for .NET (`Faden.Client`, `Faden.Agents`) and TypeScript (`@fadenstack/client`, `@fadenstack/agents`) run agents inside other software, with their tools and approvals on the user's device, governed by the server. They live in their own repositories and need a server newer than 0.4.1.
 
 ### For IT: one console for all of it
 
-- **GPU machines.** Add a Linux machine with an NVIDIA GPU, x86_64 or aarch64 (DGX Spark included), with one install line and an approval code. The agent dials out to the server, so it needs no inbound port, and nobody hands over SSH keys. Model traffic reaches a cluster through one port that only accepts the gateway's client certificate.
+- **GPU machines.** Add a Linux machine with an NVIDIA GPU, x86_64 or an NVIDIA DGX Spark (aarch64), with one install line and an approval code. The agent dials out to the server, so the server needs no port and no SSH keys to control the machine. Model traffic reaches a cluster's head machine through one port that only accepts the gateway's client certificate, and the machines of a cluster reach each other on Ray's ports.
 - **Clusters and models.** Machines form Ray clusters that serve models with vLLM. The model marketplace searches Hugging Face, says whether a model fits your cluster and fills in vLLM's settings.
 - **What you already run.** Fadenstack finds the vLLM containers already on your machines and routes to them without restarting them. A server rebuilt from a backup takes over the clusters its machines still run.
 - **When something fails.** A cluster re-forms when a machine drops out, and the console says what happened.
 - **Personal data.** Presidio-based detection on messages, history and tool results, redacted or tokenised before a model sees them.
-- **Security.** HTTPS by default, with nginx as the only public port. Model traffic between the gateway and the machines uses mutual TLS, and Ray runs over TLS between machines. The data stores listen on localhost only.
-- **Oversight.** A dashboard with where each request was served (your machines, your private network, or an outside provider), usage per user and group, cost per request from model prices, traces, and logs from the server and the machines in one place. Prometheus, Grafana and Loki come with it.
+- **Security.** HTTPS by default, with nginx as the only public port. Model traffic between the gateway and the machines uses mutual TLS, and Ray's traffic between machines runs over TLS once a cluster's switch for it is on. The data stores listen on localhost only.
+- **Oversight.** A dashboard with where each request was served (your machines, your private network, or an outside provider), usage per user, cost per request from model prices, traces, and logs from the server and the machines in one place. Prometheus, Grafana and Loki come with it.
 - **Operations.** Containers, modules, backups, restores and upgrades, from the console or with `faden`.
 
 ## How it fits together
@@ -128,9 +128,9 @@ pipx install fadenstack        # or: uv tool install fadenstack
 faden deploy
 ```
 
-`faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator. Then open `https://<server>` and sign in.
+`faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator; Grafana, Langfuse and RabbitMQ's management then sign in with that administrator's password. Then open `https://<server>` and sign in.
 
-**The GPU machines** run Linux (x86_64 or aarch64) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is in [GPU machines](docs/help/pages/operate/machines.md) and [Clusters](docs/help/pages/operate/clusters.md).
+**The GPU machines** run Linux (x86_64, or aarch64 on NVIDIA DGX Spark) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is in [GPU machines](docs/help/pages/operate/machines.md) and [Clusters](docs/help/pages/operate/clusters.md).
 
 **Your apps** use any OpenAI client:
 
@@ -172,7 +172,7 @@ The Help pages are in [docs/help](docs/help/README.md); they become `help.fadens
 | `docs` | The guides linked above | | |
 | `dev` | Scripts for working on Fadenstack | | |
 
-A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.4.0`, `0.4`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
+A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.4.1`, `0.4`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
 
 ## Building and developing
 
@@ -207,4 +207,4 @@ Apache-2.0 grants no general right to use the Fadenstack name or logo for a modi
 
 ---
 
-<p align="center"><sub>Built in Germany by <a href="https://emagin8.de">Emagin8</a> · English · Deutsch · Español · 中文</sub></p>
+<p align="center"><sub>Built in Germany by <a href="https://emagin8.de">Emagin8</a> · English · Deutsch · Français · Español · 中文</sub></p>

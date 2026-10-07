@@ -31,7 +31,7 @@ Some things to know:
 
 - **Pictures** help only with a model that can read pictures. Ask your administrator which models can.
 - **Scans** (documents whose pages are pictures) may have no text the server can read. The model then does not get the file. If an answer seems to ignore your file, this may be why.
-- **Long files** may not fit whole into what the model can read at once. The model then searches the file for the parts it needs, or reads its beginning.
+- **Long files** may not fit whole into what the model can read at once. The model then searches the file for the parts it needs, or reads its beginning. With the tool mode **Off**, it gets neither.
 - After you send, the chat does not list the files you attached.
 
 ## Ask about your organisation's documents

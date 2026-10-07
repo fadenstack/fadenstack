@@ -5,7 +5,7 @@ Im Chat sprechen Sie mit den Modellen Ihrer Organisation. Diese Seite zeigt, wie
 ## Einen Chat beginnen {#start-a-chat}
 
 1. Wählen Sie in der Seitenleiste **Neuer Chat**.
-2. Wählen Sie in der Auswahl **Modell** neben dem Nachrichtenfeld ein Modell. Das erste Modell der Liste ist bereits ausgewählt.
+2. Wählen Sie in der Auswahl **Modell** neben dem Nachrichtenfeld ein Modell. Ein Modell ist bereits ausgewählt: das erste der Liste oder das, das Sie zuletzt gewählt haben.
 3. Geben Sie Ihre Nachricht ein und drücken Sie die Eingabetaste. Umschalt+Eingabetaste beginnt eine neue Zeile.
 
 Die Antwort erscheint, während sie geschrieben wird. Ein neuer Chat wird nach dem Anfang Ihrer ersten Nachricht benannt.
@@ -43,7 +43,7 @@ Eine fehlgeschlagene Antwort wird mit Ihren späteren Nachrichten nicht an das M
 
 Unter jeder Antwort stehen:
 
-- wie lange sie gedauert hat;
+- wie lange sie gedauert hat, bei einer Antwort, die geschrieben wurde, während der Chat bei Ihnen offen war;
 - ein Feld mit ihrer Größe in Tokens (den Einheiten, in denen Modelle Text zählen). Zeigen Sie mit der Maus darauf, um Prompt, Antwort und Summe zu sehen;
 - ein ⓘ: Zeigen Sie darauf, um zu sehen, welches Modell geantwortet hat.
 

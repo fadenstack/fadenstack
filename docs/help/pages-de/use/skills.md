@@ -10,7 +10,7 @@ Skills sind ein optionaler Teil von Fadenstack. Wenn der Chat neben dem Nachrich
 
 Ein Skill ist eine Sammlung schriftlicher Anweisungen. Solange er ausgewählt ist, gehen sie mit jeder Ihrer Nachrichten an das Modell, sodass die Antwort ihnen folgt: den Schritten, dem Format, den Prüfungen, dem Ton. Ein Skill kann auch Dateien mitbringen, z. B. eine Vorlage, die das Modell lesen kann, wenn es sie braucht.
 
-Ein Skill ändert nicht, was das Modell weiß oder was es tun darf. Dokumente kommen aus [Wissen](knowledge.md), Aktionen aus [Tools](tools.md).
+Ein Skill erweitert nicht, was das Modell weiß oder was es tun darf: Dokumente kommen aus [Wissen](knowledge.md), Aktionen aus [Tools](tools.md). Ein Skill kann einige Tools aus dem Chat heraushalten, solange er genutzt wird.
 
 ## Einen Skill in einem Chat nutzen {#use-a-skill-in-a-chat}
 
@@ -34,10 +34,10 @@ Wenn ein Gespräch so gelaufen ist, wie es beim nächsten Mal laufen soll, speic
 1. Tippen Sie `/skill` in das Nachrichtenfeld und drücken Sie die Eingabetaste. Sie können ergänzen, was der Skill tun soll, z. B. `/skill review pull requests the way we just did`. Oder wählen Sie das Puzzleteil und dann **Fähigkeit aus diesem Chat erstellen…**.
 2. Wählen Sie in **Neue Fähigkeit** die Option **Aus diesem Chat entwerfen**. Das Modell des Chats liest das Gespräch und schreibt einen Entwurf: einen Namen, eine Beschreibung und die Anweisungen. Oder wählen Sie **Selbst schreiben**.
 3. Lesen Sie den Entwurf und ändern Sie, was nötig ist. Das Modell wird angewiesen, Namen, Passwörter und andere Einzelheiten des Gesprächs wegzulassen; prüfen Sie das aber selbst.
-4. Legen Sie unter **Kurzname** einen Namen fest: Ihn tippen Sie nach `$`. Setzen Sie einen Haken bei **Jetzt in diesem Chat nutzen**, wenn der Skill sofort ausgewählt sein soll.
+4. Legen Sie unter **Kurzname** einen Namen fest: Ihn tippen Sie nach `$`. **Jetzt in diesem Chat nutzen** ist angehakt, sodass der Skill sofort ausgewählt ist; entfernen Sie den Haken, wenn Sie das nicht möchten.
 5. Wählen Sie **Fähigkeit speichern**.
 
-Gespeichert wird erst, wenn Sie **Fähigkeit speichern** wählen. Neue Skills sind privat: Nur Sie sehen sie, bis Sie sie teilen.
+Gespeichert wird erst, wenn Sie **Fähigkeit speichern** wählen. Neue Skills sind privat: Nur Sie und die Administratoren sehen sie, bis Sie sie teilen.
 
 ## Ihre Skills {#your-skills}
 

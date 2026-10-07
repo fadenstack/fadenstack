@@ -23,7 +23,7 @@ seinen eigenen Bedingungen:
 | RabbitMQ | Nachrichten zwischen den Diensten |
 | ClickHouse | Der Trace-Speicher hinter Langfuse |
 | MinIO | Der Dateispeicher hinter Langfuse |
-| Langfuse (web und worker) | Traces der Anfragen |
+| Langfuse (web und worker) | Traces der Anfragen, wenn das Tracing eingeschaltet ist (standardmäßig ist es aus) |
 | Prometheus | Metriken |
 | Loki | Logs |
 | Grafana | Dashboards |

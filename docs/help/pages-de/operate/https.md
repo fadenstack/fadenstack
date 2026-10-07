@@ -31,8 +31,8 @@ RabbitMQ und die übrigen Datenspeicher lauschen nur auf der Loopback-Adresse de
 ## Zwei Arten von Zertifikaten {#two-kinds-of-certificate}
 
 **Ein auf dem Server erstelltes Zertifikat** (`generate`, die Voreinstellung). Das Tool erstellt eine
-Zertifizierungsstelle für die Installation und signiert damit ein Zertifikat für jeden Namen und jede Adresse des
-Servers, dazu für Namen, die Sie hinzufügen. Browsern und API-Clients muss einmal gesagt werden, dass sie dieser
+Zertifizierungsstelle für die Installation und signiert damit ein Zertifikat für die Namen und IPv4-Adressen des
+Servers, dazu für Namen und Adressen, die Sie hinzufügen. Browsern und API-Clients muss einmal gesagt werden, dass sie dieser
 Zertifizierungsstelle vertrauen. Die Maschinen lernen sie von selbst.
 
 **Ihr eigenes Zertifikat** (`use`), von einem öffentlichen Aussteller oder von der Zertifizierungsstelle Ihres

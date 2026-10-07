@@ -1,7 +1,8 @@
 # Fadenstack Ray runtime image
 
-The container Fadenstack runs models in. Ray 2.58 + Ray Serve LLM + vLLM, built
-as one thin layer on top of NVIDIA's own vLLM image.
+The container Fadenstack runs models in. Ray 2.58 + Ray Serve LLM + vLLM. The
+GB10 image is one thin layer on top of NVIDIA's own vLLM image; the x86_64
+image is built on `python:3.12` slim.
 
 This is a release artifact, not a test fixture. The backend reads every
 `runtime-manifest*.json` from this directory at run time to build its runtime
@@ -155,7 +156,8 @@ Certify each image on its hardware, record the report, then commit its
 manifest here; the next core release builds the backend with it, and from
 then on the catalogue points at the published image.
 
-The GB10 manifests above name local tags (`faden/ray-vllm-gb10:…`): those
-images are on the DGX pair and nowhere else yet. A server can hand out only
+The manifests above name local tags (`faden/ray-vllm-gb10:…`,
+`faden-ray-runtime-x86_64:2.58.0`): those images are on the machines they were
+built on (the GB10 ones on the DGX pair) and nowhere else yet. A server can hand out only
 images it holds, so they reach a server that does not have them once they
 are published to GHCR and their manifests name the registry.

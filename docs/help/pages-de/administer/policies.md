@@ -24,10 +24,14 @@ Bei eingeschaltetem Modul gilt diese Standardrichtlinie:
 - Sie schützt Anfragen an **Cloud-Provider**; Anfragen an die Modelle Ihrer eigenen Maschinen werden nicht geprüft.
 - Sie **schwärzt**: Personenbezogene Daten werden ersetzt, und das Modell sieht sie nie.
 - Sie **blockiert** eine Anfrage an einen Cloud-Provider, wenn der Filter nicht laufen kann.
-- Sie erkennt englischen Text und diese Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
+- Sie liest englischen Text und sucht nach diesen Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
   `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`. Datumsangaben (`DATE_TIME`)
   stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst werden sollen; einfache Zahlen
   in einer Nachricht können dann ebenfalls als Datum maskiert werden.
+
+Der Filter hat nur ein englisches Sprachmodell. In deutschem oder anderssprachigem Text findet er weiterhin, was eine
+feste Form hat (E-Mail-Adressen, Telefon-, Karten- und Kontonummern, IP-Adressen, Links), übersieht aber oft Namen
+und Orte.
 
 ### Die Richtlinie ändern {#change-the-policy}
 
@@ -60,8 +64,8 @@ Die Felder sind an beiden Stellen dieselben:
 | **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
 | **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
 | **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
-| **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Welche Sprache der Filter liest, wie sicher er sein muss und nach welchen Arten von Daten er sucht. Ein höherer Schwellenwert maskiert weniger. |
-| **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Ob aus den Aufzeichnungen (Traces), die zur Fehlerbehebung von Anfragen aufbewahrt werden, personenbezogene Daten entfernt werden (`sanitized`) oder ob sie nur Kennzahlen enthalten (`metrics_only`). |
+| **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Welche Sprache der Filter liest, wie sicher er sein muss und nach welchen Arten von Daten er sucht. Ein höherer Schwellenwert maskiert weniger. Installiert ist nur Englisch: Lassen Sie **Sprache** auf `en`. Mit einer anderen Sprache schlägt jede Prüfung fehl, und **Wenn die Erkennung fehlschlägt** entscheidet. |
+| **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
 
 ### Chats und Agenten {#chats-and-agents}
 

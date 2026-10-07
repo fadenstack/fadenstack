@@ -23,10 +23,13 @@ With the module on, the default policy:
 - protects requests to **cloud providers**; requests to your own machines' models are not scanned;
 - **redacts**: personal data is replaced, and the model never sees it;
 - **blocks** a request to a cloud provider when the filter cannot run;
-- detects English text, and these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
+- reads English text, and looks for these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
   `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`. Dates (`DATE_TIME`) are
   not on the list. Add them if you need dates of birth covered; plain numbers in a message may then be masked
   as dates too.
+
+The filter has an English language model only. In German or other languages it still finds what has a fixed form
+(e-mail addresses, phone, card and account numbers, IP addresses, links), but often misses names and places.
 
 ### Change the policy
 
@@ -56,8 +59,8 @@ The fields are the same in both places:
 | **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
 | **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
 | **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
-| **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | Which language the filter reads, how sure it must be, and which kinds of data it looks for. A higher threshold masks less. |
-| **Telemetry**: **Remove personal data from telemetry**, **Mode** | Whether the traces kept of requests for troubleshooting have personal data removed (`sanitized`), or keep figures only (`metrics_only`). |
+| **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | Which language the filter reads, how sure it must be, and which kinds of data it looks for. A higher threshold masks less. Only English is installed: keep **Language** at `en`. With another language every check fails, and **If detection fails** decides. |
+| **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
 
 ### Chats and agents
 

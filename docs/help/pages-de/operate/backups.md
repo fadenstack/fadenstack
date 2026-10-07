@@ -2,16 +2,17 @@
 
 `faden backup` sichert alles, was der Server braucht, um wieder in Betrieb zu gehen: jede Datenbank, die `.env`
 mit ihren Schlüsseln und das Zertifikatsmaterial, dem die Maschinen vertrauen. `faden restore` stellt es wieder
-her. Bei der Installation wird eine nächtliche Sicherung eingerichtet.
+her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore)). Bei der Installation wird eine nächtliche Sicherung eingerichtet.
 
 ## Was eine Sicherung enthält {#what-a-backup-holds}
 
 | Teil | In der Sicherung | Warum es wichtig ist |
 |---|---|---|
 | Jede Datenbank im Postgres des Servers | Ja | Benutzer, Einstellungen, Provider, Maschinen, Cluster, Bereitstellungen, Chats, das Anfrageprotokoll |
-| `.env` | Ja, außer mit `--db-only` | Sie enthält den Schlüssel, mit dem die Chats verschlüsselt sind, und den Schlüssel, der gespeicherte Geheimnisse verschlüsselt (API-Schlüssel der Provider, das Hugging-Face-Token). Eine Datenbank, die ohne ihre `.env` wiederhergestellt wird, enthält Chats und Geheimnisse, die niemand lesen kann |
+| `.env` | Ja, außer mit `--db-only` | Sie enthält den Schlüssel, mit dem die Chats verschlüsselt sind, und die Schlüssel, die gespeicherte Geheimnisse verschlüsseln (das Hugging-Face-Token, geheime Einstellungen, die Zugangsdaten der MCP-Server). Eine Datenbank, die ohne ihre `.env` wiederhergestellt wird, enthält Chats und Geheimnisse, die niemand lesen kann |
 | Zertifikatsmaterial (`tls/`, `tls-ca/`) | Ja, außer mit `--db-only` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem privaten Schlüssel. Damit ist ein neu aufgesetzter Server einer, dem die Maschinen weiterhin vertrauen |
-| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft jede Datei, bevor es etwas ändert |
+| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps und die Zertifikatsdateien, bevor es etwas ändert |
+| Dateien, die in die Wissensdatenbank hochgeladen oder an Chats angehängt wurden | Nein | Der daraus gelesene Text liegt in der Datenbank, die Dateien selbst nicht. Bewahren Sie die Originale auf, die Sie brauchen |
 | Modelle | Nein | Sie lassen sich erneut herunterladen. Bewahren Sie eine Kopie der Modelle auf, die Sie importiert statt heruntergeladen haben |
 | Logs, Metriken, Traces | Nein | Sie werden zum Ansehen auf dem Server aufbewahrt, nicht wiederhergestellt |
 | Runtime-Images | Nein | `faden runtime-images` holt sie erneut |
@@ -40,7 +41,8 @@ listet auf, was er gesichert hat.
 
 !!! note
     `--retain` zählt jede Sicherung im Verzeichnis, auch die nächtlichen und die, die Upgrades anlegen. Ein von
-    Hand gestartetes `faden backup` in das Standardverzeichnis behält 5, sofern Sie keine größere Zahl angeben.
+    Hand gestartetes `faden backup` in das Standardverzeichnis behält 5, sofern Sie keine größere Zahl angeben,
+    und jedes `faden upgrade` behält 5.
 
 ## Die nächtliche Sicherung {#the-nightly-backup}
 
@@ -78,7 +80,8 @@ faden restore ~/fadenstack/backups/<time>
 Die Wiederherstellung:
 
 1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-2. prüft jede Datei gegen die Prüfsummen in der Sicherung und bricht ab, wenn eine nicht passt;
+2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab, wenn
+   eine nicht passt;
 3. fragt nach einer Bestätigung (`-y` überspringt sie);
 4. stoppt die Dienste, stellt jede Datenbank und, sofern nicht anders angegeben, die `.env` und das
    Zertifikatsmaterial wieder her;
@@ -98,9 +101,13 @@ Die Wiederherstellung:
 ### Eine Sicherung prüfen {#check-a-backup}
 
 Führen Sie ab und zu `faden restore --verify-only` mit einer Kopie einer Sicherung aus. Der Befehl zeigt Ihnen,
-ob die Dateien vollständig und unverändert sind, ohne die Installation anzutasten.
+ob die Datenbank-Dumps und die Zertifikatsdateien vollständig und unverändert sind, ohne die Installation
+anzutasten.
 
 ## Einen verlorenen Server neu aufbauen {#rebuild-a-lost-server}
+
+Die Wiederherstellung wird noch getestet: Probieren Sie sie zuerst an einer Kopie des Servers aus (siehe
+[Wiederherstellen](#restore)).
 
 1. Installieren Sie mit `faden deploy` einen neuen Server mit demselben Release, mit dem die Sicherung angelegt
    wurde (`faden restore --verify-only` zeigt es an).

@@ -29,7 +29,7 @@ stores listen on the server's own loopback address only. See [Network and ports]
 ## Two kinds of certificate
 
 **A certificate made on the server** (`generate`, the default). The tool creates a certificate authority for the
-install and signs a certificate with it for every name and address the server has, plus names you add. Browsers
+install and signs a certificate with it for the server's names and IPv4 addresses, plus names and addresses you add. Browsers
 and API clients have to be told once to trust that authority. The machines learn it by themselves.
 
 **Your own certificate** (`use`), from a public issuer or from your company's certificate authority. A public

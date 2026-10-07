@@ -33,16 +33,16 @@ and stop or start it. Models are deployed onto a cluster by an administrator (se
 The cluster page opens on **Starting**. The machines:
 
 1. get the runtime image and check it. It comes from the server once; the first machine that has it passes it on
-   to the others over the cluster's network. A dropped transfer resumes where it stopped. The page shows a bar per
-   machine;
+   to the others over the cluster's network. A dropped transfer resumes where it stopped, when the machine has room on
+   disk for a copy of the image. The page shows a bar per machine;
 2. start Ray in it: the head first, then the other machines join;
 3. report what they found.
 
 The cluster reaches **Running**, with every machine up and its accelerators counted, and offers **Deploy a
 model**. If the totals are lower than you expect, a machine did not join: open it and read its status.
 
-**A machine you cannot pick.** A machine already in another cluster is marked so. "No certified runtime image runs
-on …" means there is no runtime for that kind of machine; remove it from the selection.
+**Machines marked in the list.** A machine already in another cluster is marked so: take it out of that cluster
+before you pick it. "No certified runtime image runs on …" means there is no runtime for that kind of machine; remove it from the selection.
 
 **"These machines cannot form a cluster yet."** The network step found no network all of them share. Check their
 cabling and addresses, then try again.

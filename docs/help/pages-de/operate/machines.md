@@ -10,8 +10,8 @@ ist dasselbe.
 ## Bevor Sie beginnen {#before-you-start}
 
 - Sie sind in der Konsole als Administrator angemeldet.
-- Die Maschine erfüllt die [Systemanforderungen](requirements.md#gpu-machines): Linux, x86_64 oder aarch64, eine
-  NVIDIA-GPU, Docker oder Podman.
+- Die Maschine erfüllt die [Systemanforderungen](requirements.md#gpu-machines): Linux auf x86_64 mit einer
+  NVIDIA-GPU oder eine NVIDIA DGX Spark, mit Docker oder Podman.
 - `nvidia-smi` gibt auf der Maschine Ihre Karte aus. Eine Maschine, die ihre GPU nicht sieht, tritt trotzdem bei,
   kann aber keinem Cluster hinzugefügt werden.
 - Die Maschine erreicht den Server unter einer Adresse, die Sie kennen, z. B. `https://ai.example.internal`.
@@ -69,7 +69,7 @@ sudo loginctl enable-linger <user>
 ```
 
 Wenn Ihr Benutzer `sudo` ohne Passwort verwenden kann, Sie aber trotzdem einen Benutzerdienst möchten, ergänzen Sie
-die Zeile um `--user`.
+die Zeile um `--user`, weiterhin ohne `sudo`.
 
 ### Ohne jede Maschine zu genehmigen {#without-approving-each-machine}
 
@@ -89,7 +89,10 @@ eigene Kopie des Agents auf dem Server zurück. Der Server hat eine solche Kopie
 `~/fadenstack/agent-binaries/` ablegen: `faden-agent-linux-x86_64` und `faden-agent-linux-aarch64` mit ihren
 `.sha256`-Dateien, von der Release-Seite des Projekts. Ersetzen Sie sie nach jedem Upgrade des Servers.
 
-Mit dieser Kopie wird jeder Download, aus welcher Quelle auch immer, gegen sie geprüft. Ohne sie meldet das
+Mit dieser Kopie wird jeder Download, aus welcher Quelle auch immer, gegen sie geprüft. Eine Kopie, die nicht der
+Build des Release des Servers ist, wird beiseitegelassen, wenn der Server den eigenen Digest des Release lesen kann:
+Die Maschinen bekommen dann das Release, geprüft gegen diesen Digest, und eine Maschine ohne Internetzugang kann
+nicht installieren. Ohne Kopie meldet das
 Installationsprogramm `this backend published no digest, so nothing was verified`, und eine Maschine ohne
 Internetzugang bricht mit `could not download the agent` ab.
 
@@ -155,7 +158,7 @@ genehmigt werden, und die Modelle laufen weiter. Siehe [Upgrade](upgrading.md#up
 | `faden-agent status` | Ob der Dienst läuft |
 | `faden-agent show` | Die verwendete Konfiguration, die Adresse des Servers und ob der Agent zu HTTPS gewechselt hat |
 | `faden-agent configure --set KEY=VALUE` | Ändert eine Einstellung, z. B. `BACKEND_URL` oder `ADVERTISE_HOST` |
-| `faden-agent stop` | Stoppt den Dienst und entfernt ihn (mit `sudo` bei einem Systemdienst) |
+| `faden-agent stop` | Stoppt den Dienst und deaktiviert ihn; ein Benutzerdienst wird außerdem entfernt (`sudo` bei einem Systemdienst) |
 | `faden-agent run` | Läuft im Vordergrund, damit Sie sehen, was schiefgeht |
 | `faden-agent scan` | Listet die Modelle auf, die bereits im Modellspeicher der Maschine liegen |
 
@@ -197,8 +200,8 @@ erneut auf ihr aus; sie stellt dann wie beim ersten Mal eine Beitrittsanfrage.
 **Das Installationsprogramm fragt nach einem `sudo`-Passwort, das Sie nicht haben.** Lassen Sie `sudo` in der Zeile
 weg (siehe [Ohne sudo](#without-sudo)).
 
-**`ERROR: this backend publishes no agent build for linux-…`.** Der Server hat keinen Agent-Build für diese Art von
-Maschine, und das Release war nicht erreichbar. Legen Sie die Builds in `~/fadenstack/agent-binaries/` ab.
+**`ERROR: this backend publishes no agent build for linux-…`.** Für diese Maschine gibt es keinen Agent-Build: Unter
+Linux läuft der Agent nur auf x86_64 und aarch64.
 
 **`ERROR: the download does not match the expected digest.`** Der Download ist nicht der Build, den der Server
 erwartet, meist weil die Kopie in `~/fadenstack/agent-binaries/` aus einem älteren Release stammt. Ersetzen Sie sie

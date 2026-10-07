@@ -11,7 +11,7 @@ Was zu tun ist: Führen Sie `faden status` aus. Bei einem Dienst, der nicht läu
 Log (`faden logs faden-backend`, `faden logs nginx`). `faden doctor` zeigt, ob etwas anderes Port 80 oder 443
 belegt; ändern Sie die Ports bei Bedarf mit `faden ports --http 8080 --https 8443`.
 
-**Jede Seite zeigt „Fadenstack wird aktualisiert“.**
+**Jede Seite zeigt „Fadenstack wird aktualisiert“ oder „Fadenstack wird gewartet“.**
 Ursache: Der Wartungsmodus ist eingeschaltet, durch ein Upgrade oder von Hand.
 Was zu tun ist: `faden maintenance status` nennt den Grund und seit wann. `faden maintenance off` hebt ihn auf.
 
@@ -97,7 +97,8 @@ Wählen Sie dann **Erneut versuchen**.
 
 **Das Kopieren des Runtime-Images auf eine Maschine wurde unterbrochen.**
 Was zu tun ist: nichts. Es geht dort weiter, wo es aufgehört hat, vom Server oder von einer Maschine des Clusters,
-die das Image hat.
+die das Image hat, solange die Maschine Platz für eine Kopie des Images auf der Festplatte hat; sonst beginnt es
+von vorn.
 
 **Der Cluster meldet, dass er sich selbst neu startet.**
 Ursache: Ray ist auf der Head-Maschine gestoppt, oder eine Maschine ist ausgefallen. Fadenstack repariert das.

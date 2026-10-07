@@ -4,7 +4,7 @@ The Office add-ins put a Fadenstack agent in a pane beside your document in Word
 
 ## Before you start
 
-- **Windows and desktop Office.** The add-ins work in the desktop versions of Word, Excel, PowerPoint and Outlook on Windows. They do not work in Office on the web or on a Mac.
+- **Windows and desktop Office.** The add-ins work in the desktop versions of Word, Excel, PowerPoint and Outlook on Windows. They do not work in Office on the web or on a Mac. They are tested with the Microsoft 365 desktop apps only.
 - **Classic Outlook.** In Outlook, the add-in works only in classic Outlook, not in the new Outlook for Windows, which runs no add-ins of this kind. If you use the new Outlook, switch back to classic Outlook to use the agent.
 - **Installed by IT.** Your IT department installs the add-ins and usually sets the server's address for you.
 - **Access.** Your administrator has given you the agent for each application you use. See [Agents and add-ins](../administer/agents.md).
@@ -30,20 +30,20 @@ One sign-in covers Word, Excel, PowerPoint and Outlook on this computer. Each do
 | Application | It reads | It can change (asks first in **Ask**) | It asks every time before it | Taking a change back |
 |---|---|---|---|---|
 | **Word** | The document, its sections, tables and comments, your selection | Insert or replace text, add comments, apply styles, insert tables | Deletes text | Word's own Undo. By default every change is also a tracked change you accept or reject. Comments are by "Fadenstack agent" |
-| **Excel** | The workbook, sheets, tables, charts, named ranges, any range, with formulas | Write cells, add sheets, format cells, create tables and charts | Clears cells, deletes a sheet | **Undo agent change** on the ribbon, one change at a time. Formatting changes are not covered |
+| **Excel** | The workbook, sheets, tables, charts, named ranges, any range, with formulas | Write cells, add sheets, format cells, create tables and charts | Clears cells, deletes a sheet | **Undo agent change** on the ribbon, one change at a time. Formatting changes and a deleted sheet are not covered |
 | **PowerPoint** | The presentation, slides, shapes and their text, tables, alt text of pictures, speaker notes | Add slides, set slide text and speaker notes, add text boxes, move slides | Deletes a slide | PowerPoint's own Undo, one change at a time |
-| **Outlook** | The selected messages or the open one, their conversation, the folder in view, your calendar's coming days, the draft you are writing | Draft a reply or a new mail, insert text into a draft, create an appointment, set categories, flag or move a message | Deletes a message (to Deleted Items) | **Undo agent change** on the ribbon: a draft or appointment is deleted, a move or delete goes back, categories and flags are restored |
+| **Outlook** | The selected messages or the open one, their conversation, the folder in view (for a calendar: its next 14 days), the draft you are writing; it can also search your Inbox and Sent Items | Draft a reply or a new mail, insert text into a draft, create an appointment, set categories, flag or move a message | Deletes a message (to Deleted Items) | **Undo agent change** on the ribbon: a draft or appointment is deleted, a move or delete goes back, categories and flags are restored |
 
 ![A Word document with two review comments by the Fadenstack agent, and the agent's pane beside it saying what it added](../images/use/office-word-comments.png)
 
 !!! note "The agent never sends"
-    In Outlook the agent writes drafts and opens them for you; you send them. An appointment it creates waits in its window for you to send or save.
+    In Outlook the agent writes drafts and opens them for you; you send them. An appointment it creates is saved in your calendar and opened; a meeting with attendees waits in its window for you to send it.
 
 ![The agent's pane in Outlook after it drafted a reply: what the draft says, and that it has sent nothing](../images/use/office-outlook-draft-reply.png)
 
 ## What it asks first
 
-Every chat starts in the **Ask** tool mode: the agent reads without asking, and asks before it changes anything. When it asks, a card shows **Run …?** with what it will do. Select **Allow**, **Allow for this chat**, or **Deny**. Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even in **Auto**, the agent asks before anything that cannot be undone. More on tool modes: [Tools in the chat](tools.md#choose-the-tool-mode).
+Every chat starts in the **Ask** tool mode: the agent reads without asking, and asks before it changes anything. When it asks, a card shows **Run …?** with what it will do. Select **Allow**, **Allow for this chat**, or **Deny**. Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even in **Auto**, the agent asks before it deletes or clears anything. More on tool modes: [Tools in the chat](tools.md#choose-the-tool-mode).
 
 ![A Run add_comment? card in Word showing the comment the agent wants to add, with Allow, Allow for this chat and Deny](../images/use/office-word-approval.png)
 
@@ -67,7 +67,7 @@ On the ribbon, select **More**, then **Sign out**. This signs you out of all fou
 
 **The e-mail or password is not right.** Check them, and sign in again. Forgot your password? See [Your account](account.md#forgot-your-password).
 
-**You have no access to this agent.** Your administrator has not given it to you yet.
+**You have no access to this agent.** Your administrator has not given it to you yet, or the agent's address set for this application is wrong.
 
 **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** Leave the cell, or close the dialog, and ask again.
 

@@ -31,7 +31,7 @@ Gut zu wissen:
 
 - **Bilder** helfen nur bei einem Modell, das Bilder lesen kann. Fragen Sie Ihren Administrator, welche Modelle das können.
 - **Scans** (Dokumente, deren Seiten Bilder sind) enthalten möglicherweise keinen Text, den der Server lesen kann. Das Modell erhält die Datei dann nicht. Wenn eine Antwort Ihre Datei zu ignorieren scheint, kann das der Grund sein.
-- **Lange Dateien** passen möglicherweise nicht vollständig in das, was das Modell auf einmal lesen kann. Das Modell durchsucht die Datei dann nach den Teilen, die es braucht, oder liest ihren Anfang.
+- **Lange Dateien** passen möglicherweise nicht vollständig in das, was das Modell auf einmal lesen kann. Das Modell durchsucht die Datei dann nach den Teilen, die es braucht, oder liest ihren Anfang. Im Tool-Modus **Aus** bekommt es keins von beiden.
 - Nach dem Senden listet der Chat die Dateien, die Sie angehängt haben, nicht auf.
 
 ## Fragen zu den Dokumenten Ihrer Organisation stellen {#ask-about-your-organisations-documents}

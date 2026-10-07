@@ -1,6 +1,6 @@
 # The browser agent
 
-The browser agent is Fadenstack in Chrome's side panel. It works with the page you have open: it answers questions about it, shows you where something is, copies tables out, compares tabs, reads PDFs, and writes into the mail or ticket you are working on. It answers with your organisation's model, through your Fadenstack server, and it asks before it changes anything.
+The browser agent is Fadenstack in Chrome's side panel. It works with the page you have open: it answers questions about it, shows you where something is, copies tables out, compares tabs, reads PDFs, and writes into the mail or ticket you are working on. It answers with your organisation's model, through your Fadenstack server, and in the **Ask** tool mode, where every chat starts, it asks before it changes anything.
 
 ## Before you start
 
@@ -22,7 +22,7 @@ Type your question in the panel, for example "Summarise this page" or "What does
 
 ![The browser agent's panel: suggested questions, the bar naming the open page, and the message box with its four buttons below](../images/use/browser-agent-panel.png)
 
-The agent reads the page itself when you ask about it: its text, headings, lists and tables, the visible part, without menus, ads or hidden text. A long page is read in parts.
+The agent reads the page itself when you ask about it: its text, headings, lists and tables, the visible part, without menus, footers and side bars, and without text the page marks as hidden. A long page is read in parts.
 
 The buttons under the message box add something to your next message:
 
@@ -56,21 +56,21 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 | Fill a field, write into an editor, copy to the clipboard, open a page | no | no | asks | runs |
 | Press a button or follow a link | no | no | asks | asks |
 
-When it asks, a card shows **Run …?** with what it will do and where. Select **Allow**, **Allow for this chat**, or **Deny**.
+When it asks, a card shows **Run …?** with the action and what it is given; for a field or a button that is the page's internal reference, not its label. Select **Allow**, **Allow for this chat**, or **Deny**.
 
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
 
 ## What it never does
 
-- It never reads a site you have not allowed. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it.
-- It never reads out or fills in passwords or payment details.
+- It never reads the content of a site you have not allowed; only the titles and addresses of this window's tabs reach the model. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it.
+- It never reads out or fills in password fields, nor card fields the site marks as such. A payment field the site does not mark is read and filled like any other field.
 - It never presses a button, such as **Send**, without asking you separately.
-- It never takes instructions from the page. Text on a page is something to read, never an order to follow.
+- It is told never to take instructions from the page: text on a page is something to read, not an order to follow. A page can still mislead a model, so read what a card asks before you allow it.
 - It never reaches files on your computer that you did not add.
 
 ## Permissions it asks for
 
-At installation, Chrome lets the extension open its side panel, keep its settings and your sign-in, add its right-click items, read the title and address of the page you are on, and read and act on pages, but only on sites you allow. It asks separately to reach your Fadenstack server (when you select **Connect**) and for each site you allow. You can take any site back in Chrome's settings for the extension.
+At installation, Chrome lets the extension open its side panel, keep its settings and your sign-in, add its right-click items, read the titles and addresses of your tabs, and read and act on pages, but only on sites you allow. It asks separately to reach your Fadenstack server (when you select **Connect**) and for each site you allow. You can take any site back in Chrome's settings for the extension.
 
 ## Where your data goes
 

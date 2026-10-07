@@ -33,8 +33,9 @@ Run `faden doctor` after installing the tool to check the host first.
    certificate it made, the file to trust.
 
 `faden deploy` checks Docker, writes the deployment into `~/fadenstack` (or the directory you name:
-`faden deploy /opt/faden`), generates `.env` with a random password for every service, sizes the services for
-the host, pulls the images for the tool's own release, starts everything, and creates the first administrator.
+`faden deploy /opt/faden`), generates `.env` with random passwords and keys, sizes the services for the host,
+pulls the images for the tool's own release, starts everything, and creates the first administrator. The admin
+sign-ins of Grafana, RabbitMQ and Langfuse get the first administrator's e-mail and password.
 
 ### What it asks
 
@@ -103,7 +104,7 @@ Next: [add the GPU machines](machines.md).
 | `~/fadenstack/.env` | Every password, key and setting. Keep it private, and keep a copy with your backups |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | The served certificate, and the server's own certificate authority with its key |
 | `~/fadenstack/backups/` | Backups |
-| `~/fadenstack/logs/` | Logs of the scheduled jobs |
+| `~/fadenstack/logs/` | The log of the daily certificate renewal (the nightly backup logs to `~/fadenstack/backups/backup.log`) |
 | `~/.config/faden/faden.yaml` | The tool's own settings: where the install is, which modules are on |
 
 The data lives in Docker volumes named `fadenstack_*`, such as `fadenstack_pg_data`.
@@ -151,8 +152,8 @@ faden up
 start it, and make sure your user is in the `docker` group (log out and in again after adding it).
 
 **`HTTP port 80 is in use by something else.`** Another program holds the port. Free it, or run
-`faden deploy --http-port 8080 --https-port 8443`. `faden doctor` lists every port the install publishes and who
-holds it.
+`faden deploy --http-port 8080 --https-port 8443`. `faden doctor` lists every port the install publishes and whether
+something else holds it.
 
 **`Backend did not become healthy in time — skipping admin setup.`** The services started but the console API
 did not answer in time. Check `faden status` and `faden logs faden-backend`, fix what they show, then run

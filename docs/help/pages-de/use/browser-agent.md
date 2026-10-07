@@ -1,6 +1,6 @@
 # Der Browser-Agent {#the-browser-agent}
 
-Der Browser-Agent ist Fadenstack in der Seitenleiste von Chrome. Er arbeitet mit der Seite, die Sie geöffnet haben: Er beantwortet Fragen dazu, zeigt Ihnen, wo etwas steht, kopiert Tabellen heraus, vergleicht Tabs, liest PDFs und schreibt in die E-Mail oder das Ticket, an dem Sie gerade arbeiten. Er antwortet mit dem Modell Ihrer Organisation, über Ihren Fadenstack-Server, und er fragt, bevor er etwas ändert.
+Der Browser-Agent ist Fadenstack in der Seitenleiste von Chrome. Er arbeitet mit der Seite, die Sie geöffnet haben: Er beantwortet Fragen dazu, zeigt Ihnen, wo etwas steht, kopiert Tabellen heraus, vergleicht Tabs, liest PDFs und schreibt in die E-Mail oder das Ticket, an dem Sie gerade arbeiten. Er antwortet mit dem Modell Ihrer Organisation, über Ihren Fadenstack-Server, und im Tool-Modus **Ask**, mit dem jeder Chat beginnt, fragt er, bevor er etwas ändert.
 
 ## Bevor Sie beginnen {#before-you-start}
 
@@ -22,7 +22,7 @@ Geben Sie Ihre Frage in der Seitenleiste ein, z. B. „Fasse diese Seite zusamme
 
 ![Die Seitenleiste des Browser-Agenten: vorgeschlagene Fragen, die Leiste mit der geöffneten Seite und das Nachrichtenfeld mit seinen vier Schaltflächen darunter](../images/use/browser-agent-panel.png)
 
-Der Agent liest die Seite selbst, wenn Sie danach fragen: ihren Text, ihre Überschriften, Listen und Tabellen, also den sichtbaren Inhalt, ohne Menüs, Werbung oder versteckten Text. Eine lange Seite liest er in Teilen.
+Der Agent liest die Seite selbst, wenn Sie danach fragen: ihren Text, ihre Überschriften, Listen und Tabellen, also den sichtbaren Inhalt, ohne Menüs, Fußzeilen und Seitenleisten und ohne Text, den die Seite als verborgen markiert. Eine lange Seite liest er in Teilen.
 
 Die Schaltflächen unter dem Nachrichtenfeld fügen Ihrer nächsten Nachricht etwas hinzu:
 
@@ -56,21 +56,21 @@ Der **Tool mode** oben in der Seitenleiste legt fest, was ohne Nachfrage ausgef�
 | Ein Feld ausfüllen, in einen Editor schreiben, in die Zwischenablage kopieren, eine Seite öffnen | nein | nein | fragt | läuft |
 | Eine Schaltfläche drücken oder einem Link folgen | nein | nein | fragt | fragt |
 
-Wenn er fragt, zeigt eine Karte **Run …?** mit dem, was er tun will, und wo. Wählen Sie **Allow**, **Allow for this chat** oder **Deny**.
+Wenn er fragt, zeigt eine Karte **Run …?** mit der Aktion und dem, was sie bekommt; bei einem Feld oder einer Schaltfläche ist das ein interner Verweis der Seite, nicht ihre Beschriftung. Wählen Sie **Allow**, **Allow for this chat** oder **Deny**.
 
 ![Eine Karte mit der Frage Run copy_to_clipboard?, die die zu kopierende Tabelle zeigt, mit den Schaltflächen Allow, Allow for this chat und Deny](../images/use/browser-agent-approval.png)
 
 ## Was er nie tut {#what-it-never-does}
 
-- Er liest nie eine Website, die Sie nicht erlaubt haben. Auf einer solchen Website zeigt die Leiste **The agent cannot read …**; wählen Sie **Allow on this site** (oder **All sites**), um es zu erlauben.
-- Er liest Passwörter und Zahlungsdaten nie aus und trägt sie nie ein.
+- Er liest nie den Inhalt einer Website, die Sie nicht erlaubt haben; nur die Titel und Adressen der Tabs dieses Fensters erreichen das Modell. Auf einer solchen Website zeigt die Leiste **The agent cannot read …**; wählen Sie **Allow on this site** (oder **All sites**), um es zu erlauben.
+- Er liest Passwortfelder und Kartenfelder, die die Website als solche kennzeichnet, nie aus und füllt sie nie aus. Ein Zahlungsfeld, das die Website nicht kennzeichnet, liest und füllt er wie jedes andere Feld.
 - Er drückt nie eine Schaltfläche wie **Senden**, ohne Sie gesondert zu fragen.
-- Er nimmt nie Anweisungen von der Seite an. Text auf einer Seite ist etwas zum Lesen, nie ein Befehl, dem er folgt.
+- Er ist angewiesen, nie Anweisungen von der Seite anzunehmen: Text auf einer Seite ist etwas zum Lesen, kein Befehl, dem er folgt. Eine Seite kann ein Modell trotzdem in die Irre führen; lesen Sie deshalb, worum eine Karte bittet, bevor Sie es erlauben.
 - Er greift nie auf Dateien auf Ihrem Computer zu, die Sie nicht hinzugefügt haben.
 
 ## Berechtigungen, die er anfordert {#permissions-it-asks-for}
 
-Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffnen, ihre Einstellungen und Ihre Anmeldung zu speichern, ihre Einträge zum Kontextmenü (Rechtsklick) hinzuzufügen, Titel und Adresse der Seite zu lesen, auf der Sie sind, und Seiten zu lesen und darauf zu handeln, aber nur auf Websites, die Sie erlauben. Gesondert fragt sie nach dem Zugriff auf Ihren Fadenstack-Server (wenn Sie **Connect** wählen) und nach jeder Website, die Sie erlauben. Sie können die Erlaubnis für jede Website in den Einstellungen von Chrome für die Erweiterung wieder zurücknehmen.
+Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffnen, ihre Einstellungen und Ihre Anmeldung zu speichern, ihre Einträge zum Kontextmenü (Rechtsklick) hinzuzufügen, Titel und Adressen Ihrer Tabs zu lesen, und Seiten zu lesen und darauf zu handeln, aber nur auf Websites, die Sie erlauben. Gesondert fragt sie nach dem Zugriff auf Ihren Fadenstack-Server (wenn Sie **Connect** wählen) und nach jeder Website, die Sie erlauben. Sie können die Erlaubnis für jede Website in den Einstellungen von Chrome für die Erweiterung wieder zurücknehmen.
 
 ## Wohin Ihre Daten gehen {#where-your-data-goes}
 

@@ -49,7 +49,8 @@ Das Upgrade, der Reihe nach:
 2. sichert jede Datenbank, die `.env` und das Zertifikatsmaterial nach `~/fadenstack/backups/<time>/` und bricht
    ab, wenn sich nichts sichern ließ;
 3. ersetzt die Dateien der Installation durch die des neuen Release und ergänzt in der `.env` nur die
-   Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten;
+   Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten, außer der
+   Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird;
 4. lädt die Images des neuen Release herunter;
 5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen;
 6. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
@@ -139,9 +140,10 @@ angewiesen sind.
 
 ## Einen Cluster auf eine andere Runtime umstellen {#move-a-cluster-to-another-runtime}
 
-Eine Runtime ist das Image, das die Maschinen eines Clusters ausführen: Ray und vLLM zusammen, zertifiziert für
-diese Maschinenart. Ein Release liefert für jede Maschinenart eine als **Empfohlen** markierte Runtime, kann eine
-neuere **Vorschau** mitliefern und behält eine ältere, zu der Sie zurückkehren können. Ein neuer Cluster bekommt
+Eine Runtime ist das Image, das die Maschinen eines Clusters ausführen: Ray und vLLM zusammen, gebaut für
+diese Maschinenart. Die Karte **Laufzeit** des Clusters zeigt, ob sie zertifiziert ist: **Zertifiziert**,
+**Teilweise zertifiziert** oder **Nicht zertifiziert**. Ein Release liefert für jede Maschinenart eine als
+**Empfohlen** markierte Runtime, kann eine neuere **Vorschau** mitliefern und behält eine ältere, zu der Sie zurückkehren können. Ein neuer Cluster bekommt
 die empfohlene.
 
 Ein Cluster behält die Runtime, mit der er gestartet wurde: über Neustarts hinweg, beim Wiederanlaufen nach einer

@@ -21,7 +21,7 @@ and notices inside each image are what count.
 | RabbitMQ | Messages between the services |
 | ClickHouse | The trace store behind Langfuse |
 | MinIO | File storage behind Langfuse |
-| Langfuse (web and worker) | Request traces |
+| Langfuse (web and worker) | Request traces, when tracing is switched on (it is off by default) |
 | Prometheus | Metrics |
 | Loki | Logs |
 | Grafana | Dashboards |

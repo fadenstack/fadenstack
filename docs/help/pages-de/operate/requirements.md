@@ -66,7 +66,7 @@ ab (siehe [Sicherungen](backups.md)).
 
 | | |
 |---|---|
-| Betriebssystem | Linux, x86_64 oder aarch64 |
+| Betriebssystem | Linux: x86_64, oder aarch64 nur auf NVIDIA DGX Spark |
 | GPU | Nur NVIDIA, mit funktionierendem Treiber: `nvidia-smi` muss Ihre Karte anzeigen |
 | Container | Docker oder Podman, laufend und nutzbar für den Benutzer, unter dem der Agent läuft, mit Zugriff auf die GPU (bei Docker: das NVIDIA Container Toolkit) |
 | Dienstverwaltung | systemd: Der Agent läuft als Systemdienst oder, wenn er ohne `sudo` installiert wurde, als Benutzerdienst |
@@ -75,11 +75,14 @@ ab (siehe [Sicherungen](backups.md)).
 
 Zwei Maschinenarten werden unterstützt, jede mit eigenem Runtime-Image:
 
-- **x86_64-Maschinen mit NVIDIA-GPUs**, von der Turing-Generation bis Blackwell.
+- **x86_64-Maschinen mit NVIDIA-GPUs**, von der Turing-Generation bis Blackwell. Ihr Runtime-Image ist noch
+  nicht zertifiziert: Die Karte **Laufzeit** des Clusters zeigt **Nicht zertifiziert**.
 - **NVIDIA DGX Spark** (GB10, aarch64).
 
-Eine Maschine anderer Art kann beitreten, aber keinem Cluster zugeordnet werden: Der Cluster-Assistent meldet,
-dass kein zertifiziertes Runtime-Image auf ihr läuft.
+Andere Maschinen werden nicht unterstützt. Eine Maschine ohne NVIDIA-GPU oder mit einer anderen
+Prozessorarchitektur kann beitreten, aber keinem Cluster zugeordnet werden: Der Cluster-Assistent meldet, dass kein
+zertifiziertes Runtime-Image auf ihr läuft. Einer anderen aarch64-Maschine mit NVIDIA-GPU wird das Image für DGX
+Spark angeboten, das nicht für sie gemacht ist.
 
 !!! note
     Ein Modell läuft jeweils auf einer GPU-Art. Gemischte Maschinen können sich einen Cluster teilen, aber jede

@@ -42,9 +42,9 @@ A container's class decides what the console lets anyone do with it:
 | `TENANT_APP` | Containers you run | yes | yes | yes | yes |
 | `UNTRUSTED` | Anything not classified | yes | no | no | no |
 
-A container made elsewhere is classified by its name the first time the list sees it: Fadenstack's services and
-the infrastructure above are system containers, a name starting with `mcp-` is `MCP`, anything else is
-`UNTRUSTED`. Change a container's class from its row; `SYSTEM_CORE` stays locked.
+A container made elsewhere is classified by its name the first time the list sees it: a name that contains the name
+of one of Fadenstack's services or of the infrastructure above (`redis`, `postgres` and so on) makes a system
+container, a name that contains `mcp-` makes `MCP`, anything else is `UNTRUSTED`. Change a container's class from its row; `SYSTEM_CORE` stays locked.
 
 **Root Mode** lifts the class limits for the administrator who activates it, for system maintenance. Select
 **Activate Root Mode**, give a **Reason** (at least 10 characters) and a **Duration** (60 to 3600 seconds). Every
@@ -87,8 +87,8 @@ Its page has three tabs:
 
 - **Overview**: state, image, networks.
 - **Logs**: the **Last 300 lines**, to refresh or download.
-- **Exec**: starts a shell session for a websocket client and shows its ID. There is no terminal on the page.
-  Exec needs the `TENANT_APP` class, or Root Mode.
+- **Exec**: prepares a shell session in the container and shows its ID. There is no terminal on the page, and
+  nothing in the console connects to the session yet. Exec needs the `TENANT_APP` class, or Root Mode.
 
 Stop a container before you delete it: a running one is not deleted. A process that ignores the stop signal is
 killed after ten seconds and shows as `Exited (137)`. Deleting asks for confirmation; the image stays under
@@ -119,8 +119,10 @@ console API's own container cannot be edited from the console: change its settin
 read-only. You can create a network (optionally internal, without outbound access), inspect one, and delete the
 ones you created.
 
-**Containers → Stacks** deploys a Docker Compose stack from a compose file. Deploying again under the same ID
-makes a new revision; every revision is kept, two can be compared, and you can roll back to an earlier one.
+**Containers → Stacks** keeps Docker Compose files under an ID. **Deploy Stack** saves one; saving again under the
+same ID makes a new revision. Every revision is kept, two can be compared, and you can roll back to an earlier one.
+Despite its name, **Deploy Stack** does not start the containers a file describes: run it with `docker compose` on
+the server yourself.
 
 ## Related
 

@@ -45,8 +45,9 @@ Die Klasse eines Containers legt fest, was die Konsole mit ihm zulässt, gleich 
 | `UNTRUSTED` | Alles, was nicht klassifiziert ist | ja | nein | nein | nein |
 
 Ein Container, der anderswo erstellt wurde, wird nach seinem Namen klassifiziert, wenn die Liste ihn zum ersten
-Mal sieht: Die Dienste von Fadenstack und die Infrastruktur oben sind Systemcontainer, ein Name, der mit `mcp-`
-beginnt, wird `MCP`, alles andere `UNTRUSTED`. Die Klasse eines Containers ändern Sie in seiner Zeile;
+Mal sieht: Ein Name, der den Namen eines Fadenstack-Dienstes oder der Infrastruktur oben enthält (`redis`,
+`postgres` usw.), macht ihn zum Systemcontainer, ein Name, der `mcp-` enthält, zu `MCP`, alles andere zu
+`UNTRUSTED`. Die Klasse eines Containers ändern Sie in seiner Zeile;
 `SYSTEM_CORE` bleibt gesperrt.
 
 Der **Root-Modus** hebt die Grenzen der Klassen für den Administrator auf, der ihn aktiviert, für Wartungsarbeiten
@@ -95,8 +96,8 @@ Seine Seite hat drei Tabs:
 
 - **Übersicht**: Status, Image, Netzwerke.
 - **Logs**: **Letzte 300 Zeilen**, zum Aktualisieren oder Herunterladen.
-- **Exec**: startet eine Shell-Sitzung für einen Websocket-Client und zeigt ihre ID. Ein Terminal gibt es auf der
-  Seite nicht. Exec braucht die Klasse `TENANT_APP` oder den Root-Modus.
+- **Exec**: bereitet eine Shell-Sitzung im Container vor und zeigt ihre ID. Ein Terminal gibt es auf der Seite
+  nicht, und noch verbindet sich nichts in der Konsole mit der Sitzung. Exec braucht die Klasse `TENANT_APP` oder den Root-Modus.
 
 Stoppen Sie einen Container, bevor Sie ihn löschen: Ein laufender Container wird nicht gelöscht. Ein Prozess, der
 das Stoppsignal ignoriert, wird nach zehn Sekunden zwangsweise beendet und erscheint als `Exited (137)`. Vor dem
@@ -129,9 +130,10 @@ aus.
 Fadenstack; Systemnetzwerke sind schreibgeschützt. Sie können ein Netzwerk erstellen (wahlweise intern, ohne
 Zugang nach außen), eines untersuchen und die von Ihnen erstellten löschen.
 
-**Container → Stacks** stellt einen Docker-Compose-Stack aus einer Compose-Datei bereit. Ein erneutes Bereitstellen
-unter derselben ID erzeugt eine neue Revision; jede Revision bleibt erhalten, zwei lassen sich vergleichen, und Sie
-können zu einer früheren zurückkehren.
+**Container → Stacks** bewahrt Docker-Compose-Dateien unter einer ID auf. **Stack deployen** speichert eine; ein
+erneutes Speichern unter derselben ID erzeugt eine neue Revision. Jede Revision bleibt erhalten, zwei lassen sich
+vergleichen, und Sie können zu einer früheren zurückkehren. Trotz seines Namens startet **Stack deployen** die
+Container nicht, die eine Datei beschreibt: Führen Sie sie selbst mit `docker compose` auf dem Server aus.
 
 ## Siehe auch {#related}
 

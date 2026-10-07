@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/fadenstack/fadenstack/blob/main/cli/LICENSE)
 
 The single entry point to **deploy, configure, and manage** the
-[fadenstack](https://fadenstack.github.io) platform — an open-source LLM gateway
+[fadenstack](https://fadenstack.com) platform — an open-source LLM gateway
 that routes, secures, and observes traffic across local runtimes and remote
 providers.
 
@@ -15,7 +15,7 @@ faden deploy                 # installs Fadenstack into ~/fadenstack and starts 
 ```
 
 The CLI carries the deployment files of its release and runs that release's
-published images: `fadenstack 0.3.0` deploys Fadenstack 0.3.0. To upgrade,
+published images: `fadenstack 0.4.1` deploys Fadenstack 0.4.1. To upgrade,
 upgrade the CLI and run `faden upgrade`. See
 [Installing Fadenstack](https://github.com/fadenstack/fadenstack/blob/main/docs/help/pages/operate/installing.md).
 
@@ -30,14 +30,13 @@ upgrade the CLI and run `faden upgrade`. See
 - **Auto-tuning** — detects host CPU / RAM and computes optimal worker counts,
   DB pool sizes, and queue channel pools.
 - **Module management** — enable / disable optional services
-  (PII redaction, Auth, Mailer, Docling OCR) via Docker Compose profiles.
-- **GPU auto-detection** — discovers NVIDIA (CUDA), AMD (ROCm), and Intel GPUs;
-  selects the correct vLLM container image automatically.
+  (PII redaction, MCP tools, skills) via Docker Compose profiles.
+- **GPU detection** — `faden doctor` lists the host's GPUs; `faden deploy`
+  adds the NVIDIA GPU overlay when the host has an NVIDIA runtime.
 - **Developer workflow** — clone all repos, install deps, run infra + migrations,
   and generate a VS Code workspace in one command.
 - **Rich terminal UI** — tables, progress bars, and themed output powered by
-  [Rich](https://github.com/Textualize/rich). Interactive TUI wizard via
-  [Textual](https://github.com/Textualize/textual).
+  [Rich](https://github.com/Textualize/rich).
 - **Command abbreviation** — type `faden st` instead of `faden status`.
 
 ---
@@ -94,7 +93,7 @@ faden deploy                      # into ~/fadenstack
 faden deploy /opt/faden         # into a directory of your choice
 
 # Enable optional modules
-faden deploy --modules pii,auth
+faden deploy --modules pii,mcp
 
 # From a source checkout: build the images instead of pulling them
 faden deploy --build
@@ -161,7 +160,7 @@ faden admin reset-password --email admin@localhost
 # run migrations, generate VS Code workspace
 faden dev init ~/projects/fadenstack
 faden dev init ~/projects/fadenstack --ssh        # SSH cloning
-faden dev init ~/projects/fadenstack --overwrite   # force pull
+faden dev init ~/projects/fadenstack --overwrite   # re-clone existing repos
 
 # Start / stop / status
 faden dev up
@@ -208,7 +207,7 @@ Use `--local-node-no-sudo` to skip privileged systemd setup.
 | `faden tune`                               | Auto-tune worker and pool settings (`--profile`, `--dry-run`) |
 | `faden admin reset-password`               | Reset a user password directly in the database                |
 | `faden dev init [DIR]`                     | Bootstrap full developer workspace                            |
-| `faden dev up`                             | Start backend, worker, and frontend dev servers               |
+| `faden dev up`                             | Start backend, worker, gateway, and frontend dev servers      |
 | `faden dev up --modules pii,mcp,skills`    | Also run the optional modules on the host                     |
 | `faden dev up --local-node`                | Start dev services and provision node-agent                   |
 | `faden dev down`                           | Stop all dev processes                                        |
@@ -223,7 +222,7 @@ Use `--local-node-no-sudo` to skip privileged systemd setup.
 cli/
 ├── pyproject.toml
 ├── src/
-│   └── faden/
+│   └── faden_cli/
 │       ├── cli.py                 # Click root group + AliasedGroup
 │       ├── commands/
 │       │   ├── version.py         # version

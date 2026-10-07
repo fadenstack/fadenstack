@@ -60,7 +60,7 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und
 veröffentlichen**); Versionen ändern sich nie. Eine veröffentlichte Version erreicht alle, die den Agenten
-nutzen, ab ihrer nächsten Anfrage.
+nutzen, innerhalb einer Minute.
 
 ![Der Reiter Versionen des Word-Assistenten: v2 live mit Ansehen und Änderungen, v1 mit Ansehen und Zurücksetzen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
 
@@ -69,7 +69,8 @@ schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutze
 Konsole brauchen sie nicht.
 
 **Lokale MCP-Server**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Tools des Servers
-und die der Anwendung selbst. **Erlaubt** lässt ihn MCP-Server auf dem Computer der Person einbinden; deren
+und die Tools der Anwendung, die seine Version unter **Host-Tools** nennt; eine Version, die keine nennt, hält nichts
+zurück. **Erlaubt** lässt ihn MCP-Server auf dem Computer der Person einbinden; deren
 Tools sind nicht eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
 [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
 
@@ -86,7 +87,8 @@ Tools sind nicht eingestuft und fragen deshalb immer zuerst. Personen im **Entwi
 Chrome nutzt den Zertifikatspeicher des Betriebssystems: Die Computer müssen dem Zertifikat des Servers
 vertrauen (siehe [HTTPS und Vertrauen](../operate/https.md)).
 
-**Office.** Die Add-ins laufen im Desktop-Office für Windows: Word, Excel, PowerPoint und Outlook. Bei Outlook
+**Office.** Die Add-ins laufen im Desktop-Office für Windows: Word, Excel, PowerPoint und Outlook, getestet nur mit
+den Apps von Microsoft 365. Bei Outlook
 nur im klassischen Outlook: Das neue Outlook für Windows führt solche Add-ins nicht aus. Die IT gibt Server und
 Agenten in der Computerrichtlinie `%PROGRAMDATA%\Fadenstack\Office\policy.json` vor; was dort festgelegt ist,
 können Benutzer nicht ändern:
@@ -125,7 +127,8 @@ Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des A
 Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
 **Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
 gelten für Agenten ebenso wie für Chats. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
-Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwort- und Zahlungsfelder.
+Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die Website als
+solche kennzeichnet.
 
 ## Wenn eine Anwendung neue Tools mitbringt {#when-an-application-brings-new-tools}
 
@@ -167,7 +170,7 @@ der Konsole oder auf ihrer Seite **Agenten**.
 
 ## Stilllegen und löschen {#retire-and-delete}
 
-- **Stilllegen** sperrt den Agenten sofort für alle: Anmeldungen funktionieren nicht mehr; seine Versionen,
+- **Stilllegen** sperrt den Agenten innerhalb einer Minute für alle: Anmeldungen funktionieren nicht mehr; seine Versionen,
   Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war.
 - Ein stillgelegter Agent kann endgültig gelöscht werden: **Löschen**, dann zur Bestätigung seine Adresse
   eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den

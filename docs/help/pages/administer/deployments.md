@@ -114,7 +114,8 @@ A deployment set up through the API to scale itself between a lowest and a highe
 restarts every copy when those bounds change. **Scale** in the console always sets a fixed number.
 
 A deployment that was started by an earlier Fadenstack release restarts every copy once, the first time its
-number of copies changes after the upgrade. From then on, changing the number keeps the running copies serving.
+number of copies changes after the upgrade. From then on, changing the number keeps the running copies serving. This needs recent agents on the cluster's
+machines and a recent runtime; without them, every change restarts every copy.
 
 ## Engine settings
 

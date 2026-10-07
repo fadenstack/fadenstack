@@ -46,7 +46,8 @@ The upgrade, in order:
 2. backs up every database, the `.env` and the certificate material into `~/fadenstack/backups/<time>/`, and stops
    if nothing could be backed up;
 3. replaces the deployment files with the new release's, and adds to `.env` only the settings the release
-   introduces: every value you set is kept;
+   introduces: every value you set is kept, except the sizing of the services, which is worked out again for the
+   host as `faden tune` does;
 4. pulls the new release's images;
 5. restarts the services behind the maintenance page; the database migrations run here;
 6. waits for the console API to answer, then lifts the maintenance page;
@@ -129,7 +130,8 @@ for you, and an old copy holds back the machines that rely on it.
 
 ## Move a cluster to another runtime
 
-A runtime is the image a cluster's machines run: Ray and vLLM together, certified on that kind of machine. A
+A runtime is the image a cluster's machines run: Ray and vLLM together, built for that kind of machine. The
+cluster's **Runtime** card says whether it is certified: **Certified**, **Partly certified** or **Not certified**. A
 release ships a **Recommended** runtime for each kind of machine, can ship a newer **Preview**, and keeps an older
 one to go back to. A new cluster gets the recommended one.
 

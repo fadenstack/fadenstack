@@ -47,7 +47,8 @@ Container, die Fadenstack selbst gestartet hat, sind hier nicht aufgeführt; sie
 Anfragen für diesen Namen gehen nun an den Container, so wie er läuft. Er erscheint auf der Seite **Provider**, mit
 einem Link zur Seite der Maschine, auf der Sie ihn verwalten. Der Chat bietet ihn an, wenn es ein Chat-Modell ist;
 ein Embeddings-Modell antwortet unter `/v1/embeddings`, ein Bewertungsmodell unter `/v1/rerank`. Eine Anfrage der
-falschen Art wird abgelehnt, mit einer Meldung, die sagt, wohin sie gehört.
+falschen Art wird abgelehnt, mit einer Meldung, die sagt, wohin sie gehört. Ein gerouteter Container zählt als
+externer Provider, und Core nimmt davon höchstens drei auf (siehe [Externe Provider](../administer/providers.md)).
 
 Auf der Maschine ändert sich nichts: weder der Container noch seine Einstellungen oder seine Neustart-Richtlinie. Wer
 ihn gestartet hat, startet und stoppt ihn weiterhin.
@@ -76,12 +77,14 @@ der Zwischenzeit fehl.
 
 Das Gateway erreicht einen gerouteten Container über gegenseitiges TLS, über denselben Proxy auf der Maschine, der
 auch die Modelle schützt, die Fadenstack ausführt, und zwar auf dem Port des Containers plus 20000 (aus 8102 wird
-28102). Erlauben Sie dem Server, diesen Port zu erreichen.
+28102). Erlauben Sie dem Server, diesen Port zu erreichen, und auch den eigenen Port des Containers: Dort fragt der
+Server den Container, welche Modelle er bereitstellt, bevor er ihn routet und wenn die Konsole ihn auflistet.
 
 !!! warning
     Der eigene Port des Containers bleibt offen: Fadenstack hat den Container nicht gestartet und schließt ihn nicht.
     vLLM betreibt diesen Port oft ganz ohne Authentifizierung. Schützen Sie ihn mit einer Firewall, sodass nur die
-    Maschine selbst ihn erreicht, oder stellen Sie das Modell stattdessen auf einem Cluster bereit.
+    Maschine selbst und der Fadenstack-Server ihn erreichen, oder stellen Sie das Modell stattdessen auf einem
+    Cluster bereit.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

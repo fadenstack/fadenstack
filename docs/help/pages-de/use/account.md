@@ -40,7 +40,7 @@ Anmeldung mit Ihrem Firmenkonto (Single Sign-on) <span class="fs-planned">Geplan
 
 ## API-Tokens {#api-tokens}
 
-Mit einem API-Token kann ein Skript oder eine Anwendung die Modelle Ihrer Organisation in Ihrem Namen nutzen, über die API, die wie die von OpenAI funktioniert. Das Token steht für Sie: Was darüber gesendet wird, zählt als Ihre Nutzung und unterliegt denselben Regeln wie Ihre Chats. Für den Chat, den Browser-Agenten oder die Office-Add-ins brauchen Sie kein Token.
+Mit einem API-Token kann ein Skript oder eine Anwendung die Modelle Ihrer Organisation in Ihrem Namen nutzen, über die API, die für Chat, Embeddings und Rerank wie die von OpenAI funktioniert. Das Token steht für Sie: Was darüber gesendet wird, zählt als Ihre Nutzung und unterliegt denselben Regeln wie Ihre Chats. Für den Chat, den Browser-Agenten oder die Office-Add-ins brauchen Sie kein Token.
 
 ### Ein Token erstellen {#create-a-token}
 

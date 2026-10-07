@@ -5,7 +5,7 @@ The chat is where you talk to your organisation's models. This page covers start
 ## Start a chat
 
 1. Select **New chat** in the sidebar.
-2. Pick a model in the **Model** picker beside the message box. The first model in the list is already picked.
+2. Pick a model in the **Model** picker beside the message box. A model is already picked: the first in the list, or the one you picked last.
 3. Type your message and press Enter. Shift+Enter starts a new line.
 
 The reply appears as it is written. A new chat is named after the start of your first message.
@@ -43,7 +43,7 @@ A failed reply is not sent to the model with your later messages. A stopped repl
 
 Under each reply:
 
-- how long it took;
+- how long it took, for a reply written while you had the chat open;
 - a badge with its size in tokens (the units models count text in). Point at it for the prompt, the reply and the total;
 - an ⓘ: point at it to see which model answered.
 

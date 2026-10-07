@@ -11,7 +11,7 @@ What to do: run `faden status`. For a service that is not running or unhealthy, 
 (`faden logs faden-backend`, `faden logs nginx`). `faden doctor` shows whether something else holds port 80 or
 443; change the ports with `faden ports --http 8080 --https 8443` if needed.
 
-**Every page says "Fadenstack is being updated".**
+**Every page says "Fadenstack is being updated" or "Fadenstack is under maintenance".**
 Cause: maintenance is on, from an upgrade or switched on by hand.
 What to do: `faden maintenance status` says why and since when. `faden maintenance off` lifts it.
 
@@ -90,7 +90,8 @@ What to do: `faden runtime-images --check` shows what the server holds; `faden r
 missing. Then select **Try again**.
 
 **The runtime image copy to a machine was interrupted.**
-What to do: nothing. It resumes where it stopped, from the server or from a machine of the cluster that has it.
+What to do: nothing. It resumes where it stopped, from the server or from a machine of the cluster that has it,
+as long as the machine has room on disk for a copy of the image; otherwise it starts again.
 
 **The cluster says it is restarting itself.**
 Cause: Ray stopped on the head, or a machine dropped out. Fadenstack repairs it.

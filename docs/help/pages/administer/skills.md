@@ -65,7 +65,8 @@ or must not use, and the knowledge sources it draws on.
 
 ## Versions
 
-Every save is a new version; no version is ever changed or deleted. A skill points at two of them:
+Every save is a new version; no version is ever changed, and none is deleted while the skill exists. A skill
+points at two of them:
 
 - the latest version, which the editor shows;
 - the **published** (live) version, which chats get.
@@ -77,8 +78,9 @@ publishes an older one, with its triggers and tool lists. The skill's status say
 
 ![A skill's Versions tab: version 1, live, with its date and fingerprint](../images/administer/skill-versions.png)
 
-Each version has a fingerprint of its content. The audit log records the skill, the version and that
-fingerprint for every request that used it, so what the model was told can always be looked up.
+Each version has a fingerprint of its content. The request log records the skill, the version and that
+fingerprint for every request that used it, so what the model was told can be looked up as long as the skill is not
+deleted.
 
 If two people save the same skill at once, the second save is refused with "This skill changed since you
 opened it", instead of replacing the first.

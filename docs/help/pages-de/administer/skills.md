@@ -70,7 +70,8 @@ der Skill nutzen darf, bevorzugt oder nicht nutzen darf, und die Wissensquellen,
 
 ## Versionen {#versions}
 
-Jedes Speichern erzeugt eine neue Version; keine Version wird je geändert oder gelöscht. Ein Skill verweist auf
+Jedes Speichern erzeugt eine neue Version; keine Version wird je geändert, und keine wird gelöscht, solange es den
+Skill gibt. Ein Skill verweist auf
 zwei davon:
 
 - die neueste Version, die der Editor zeigt;
@@ -83,9 +84,9 @@ Tool-Listen. Der Status des Skills zeigt, was live ist, z. B. „Live v3 · Entw
 
 ![Der Reiter Versionen eines Skills: Version 1, live, mit Datum und Fingerabdruck](../images/administer/skill-versions.png)
 
-Jede Version hat einen Fingerabdruck ihres Inhalts. Das Audit-Log hält für jede Anfrage, die einen Skill
-genutzt hat, den Skill, die Version und diesen Fingerabdruck fest; so lässt sich immer nachschlagen, was dem
-Modell gesagt wurde.
+Jede Version hat einen Fingerabdruck ihres Inhalts. Das Anfrageprotokoll hält für jede Anfrage, die einen
+Skill genutzt hat, den Skill, die Version und diesen Fingerabdruck fest; so lässt sich nachschlagen, was dem Modell
+gesagt wurde, solange der Skill nicht gelöscht ist.
 
 Speichern zwei Personen denselben Skill gleichzeitig, wird das zweite Speichern mit „This skill changed since
 you opened it“ abgelehnt, statt das erste zu überschreiben.

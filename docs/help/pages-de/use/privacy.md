@@ -43,7 +43,7 @@ Wenn es aktiv ist, werden personenbezogene Daten auf eine von zwei Arten maskier
 
 Wenn die Prüfung nicht laufen kann, entscheidet die Richtlinie: Ihre Nachricht wird nicht gesendet, sie wird trotzdem gesendet, oder sie geht stattdessen an eines der eigenen Modelle Ihrer Organisation.
 
-Die Erkennung findet die meisten personenbezogenen Daten, aber nicht alle. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
+Die Erkennung findet in englischem Text die meisten personenbezogenen Daten, aber nicht alle. In deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
 
 ### Für einen Chat ansehen und verschärfen {#see-and-tighten-it-for-one-chat}
 

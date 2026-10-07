@@ -11,9 +11,11 @@ it to set up firewalls and to decide which networks the machines share.
 | GPU machines | Server | 443, or 80 while HTTPS is off | The agent's connection: commands, status, downloads of the agent, runtime images and models, logs | Yes, once HTTPS is on |
 | Server | Each cluster's head machine | The cluster's serving port (8010 by default) | Every prompt and answer, from the gateway to the models | Yes, always (mutual TLS) |
 | Server | A machine running a vLLM you routed | That vLLM's port plus 20000 | Prompts and answers | Yes, always (mutual TLS) |
+| Server | A machine running a vLLM Fadenstack found | That vLLM's own port | A question for the models it serves, before it is routed and when the console lists it | No |
 | Server | Cluster machines | Ray's metrics ports | Metrics: numbers only | No |
-| Cluster machines | Each other, on the cluster's network | Ray's head port (6390 by default), and ports Ray picks itself | Cluster control, data, calls into model copies on other machines (prompts included), the runtime image copied between machines | Authenticated always; encrypted once the cluster's **Traffic between machines** is on |
+| Cluster machines | Each other, on the cluster's network | Ray's head port (6390 by default), and ports Ray picks itself | Cluster control, data, calls into model copies on other machines (prompts included) | Authenticated always; encrypted once the cluster's **Traffic between machines** is on |
 | Cluster machines | Each other, on the cluster's network | GPU-to-GPU (RDMA) | A model's data while one copy spans machines | No: cannot be encrypted |
+| Cluster machines | Each other, on the cluster's network | 8271, while a copy runs | The runtime image, passed on by a machine that has it | No: checked against its digest |
 | Server | The internet | 443 | Image pulls, model downloads, remote providers and MCP servers you connect | Yes |
 
 The machines open no port for the server to control them: their agents connect out to the server and keep that
@@ -55,12 +57,14 @@ Each machine needs to reach the server's front door, at the address you pick in 
 The panel lists the server's addresses with the interface each belongs to; pick one on the network the machine
 shares with the server. The server itself does not open connections to the agent.
 
-The server does open connections to the machines for two things:
+The server does open connections to the machines for three things:
 
 - **The models.** The gateway sends every request to the head machine of the cluster that serves the model, on
   the cluster's serving port. Allow the server to reach that port on every head machine.
 - **Metrics.** The server's Prometheus collects metrics from the cluster's machines. If a firewall blocks it, the
   cluster page shows no metrics; serving is not affected.
+- **vLLM it found.** Before it routes a vLLM it found on a machine, and when the console lists those, the server
+  asks each one which models it serves, on the vLLM's own port (see [Existing vLLM servers](existing-vllm.md)).
 
 ## Between the machines of a cluster
 
@@ -86,6 +90,7 @@ A machine added to a running cluster is checked first: it must reach the head on
 | The cluster's head port (6390 by default) | the head machine | Ray's head |
 | The cluster's serving port (8010 by default) | the head machine | the models, behind the proxy that only lets the gateway in |
 | The serving port plus 20000 (28010 by default) | the head machine, loopback only | the models themselves |
+| 8271 | each machine of the cluster, while it passes the runtime image on | the runtime image for the other machines |
 
 Ray's dashboard listens on the head machine's loopback address only (8265). If something on a machine already
 holds one of these ports, the cluster cannot start and the cluster page shows Ray's error, ending in

@@ -63,7 +63,7 @@ Backups land on the same disk by default; leave room for them, or send them else
 
 | | |
 |---|---|
-| Operating system | Linux, x86_64 or aarch64 |
+| Operating system | Linux: x86_64, or aarch64 on NVIDIA DGX Spark only |
 | GPU | NVIDIA only, with a working driver: `nvidia-smi` must print your card |
 | Containers | Docker or Podman, running, and usable by the user the agent runs as, with access to the GPU (for Docker, the NVIDIA Container Toolkit) |
 | Service manager | systemd: the agent runs as a system service, or as a user service when installed without `sudo` |
@@ -72,11 +72,13 @@ Backups land on the same disk by default; leave room for them, or send them else
 
 Two kinds of machine are supported, each with its own runtime image:
 
-- **x86_64 machines with NVIDIA GPUs**, from the Turing generation to Blackwell.
+- **x86_64 machines with NVIDIA GPUs**, from the Turing generation to Blackwell. Their runtime image is not
+  certified yet: the cluster's **Runtime** card says **Not certified**.
 - **NVIDIA DGX Spark** (GB10, aarch64).
 
-A machine of another kind joins, but cannot be put in a cluster: the cluster wizard says that no certified
-runtime image runs on it.
+Other machines are not supported. One without an NVIDIA GPU, or with another processor architecture, joins but
+cannot be put in a cluster: the cluster wizard says that no certified runtime image runs on it. Another aarch64
+machine with an NVIDIA GPU is offered the DGX Spark image, which is not made for it.
 
 !!! note
     A model runs on one kind of GPU at a time. Mixed machines can share a cluster, but each copy of a model

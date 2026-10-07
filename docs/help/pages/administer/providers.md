@@ -38,6 +38,12 @@ The model is available in the chat and through the API at once, under the model'
 One provider entry offers one model. To offer several models of the same provider, add one entry for each,
 with the same key.
 
+!!! note "At most three"
+    Core takes at most three remote providers in all, stopped ones included, so at most three remote models. A
+    fourth is refused with "Resource capacity reached for this deployment. Please upgrade your plan to add more
+    providers." A vLLM server routed through Fadenstack counts as one too (see
+    [Existing vLLM servers](../operate/existing-vllm.md)).
+
 ## The provider's key
 
 - The key stays on the server. People using the chat or the API never see it, and the console does not show
@@ -78,7 +84,8 @@ The answer comes back the same way. What the provider keeps, and for how long, i
 
 **Personal data.** With the **Privacy (PII)** module on, the policy decides whether personal data is
 replaced before a request leaves. The policy Fadenstack starts with protects requests to cloud providers:
-names, e-mail addresses, phone numbers, card and account numbers and similar data are removed from them.
+names, e-mail addresses, phone numbers, card and account numbers and similar data are removed from them. The
+filter reads English: names and places in German or other languages are often missed.
 Check and adjust it under [Policies and personal data](policies.md).
 
 **Choose with care which model an agent uses.** Everything an agent reads for a person goes to the agent's

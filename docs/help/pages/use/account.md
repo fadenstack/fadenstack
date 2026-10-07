@@ -40,7 +40,7 @@ Signing in with your company account (single sign-on) <span class="fs-planned">P
 
 ## API tokens
 
-An API token lets a script or an application use your organisation's models in your name, through the API that works like OpenAI's. It acts as you: what it sends counts as your usage, under the same rules as your chats. You do not need a token for the chat, the browser agent or the Office add-ins.
+An API token lets a script or an application use your organisation's models in your name, through the API that works like OpenAI's for chat, embeddings and rerank. It acts as you: what it sends counts as your usage, under the same rules as your chats. You do not need a token for the chat, the browser agent or the Office add-ins.
 
 ### Create a token
 

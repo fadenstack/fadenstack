@@ -56,9 +56,9 @@ where the policy allows it.
 
 | Record | What it holds |
 |---|---|
-| The request log | Who asked, which model and where it ran, how many tokens, how long it took, the estimated cost and the outcome. Not the text. See [Usage and costs](usage.md). |
+| The request log | Who asked, which model and where it ran, how many tokens, how long it took, the estimated cost and the outcome, and which version of which skill was used. Not the text. See [Usage and costs](usage.md). |
 | The chat | The conversation itself, kept with the person's chat on the server and encrypted there. Agents keep their conversations on the person's computer. |
-| The audit log | Which version of which skill was used, and who changed what in the console. |
+| The audit log | Who changed what in the console. |
 | Governance decisions | What a rule refused or let through after asking. Never the refused text. |
 | The privacy log | How much personal data was found, by kind. Never the text. |
 

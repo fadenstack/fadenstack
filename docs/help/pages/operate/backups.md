@@ -1,16 +1,18 @@
 # Backups
 
 `faden backup` saves everything the server needs to come back: every database, the `.env` with its keys, and the
-certificate material the machines trust. `faden restore` puts it back. A nightly backup is set up when you install.
+certificate material the machines trust. `faden restore` puts it back; restoring is still being tested (see [Restore](#restore)). A nightly backup is set up
+when you install.
 
 ## What a backup holds
 
 | Part | In the backup | Why it matters |
 |---|---|---|
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
-| `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the key that seals stored secrets (provider API keys, the Hugging Face token). A database restored without its `.env` has chats and secrets nobody can read |
+| `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
-| Migration versions and checksums | Yes | `faden restore` checks every file before it changes anything |
+| Migration versions and checksums | Yes | `faden restore` checks the database dumps and the certificate files before it changes anything |
+| Files uploaded to the knowledge base or attached to chats | No | The text read from them is in the database; the files themselves are not. Keep the originals you need |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
 | Logs, metrics, traces | No | They are kept on the server for viewing, not restored |
 | Runtime images | No | `faden runtime-images` fetches them again |
@@ -37,7 +39,8 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 
 !!! note
     `--retain` counts every backup in the directory, including the nightly ones and the ones upgrades take. A
-    manual `faden backup` into the default directory keeps 5 unless you pass a larger number.
+    manual `faden backup` into the default directory keeps 5 unless you pass a larger number, and every
+    `faden upgrade` keeps 5.
 
 ## The nightly backup
 
@@ -74,7 +77,8 @@ faden restore ~/fadenstack/backups/<time>
 The restore:
 
 1. shows the backup's date, the tool version it was taken with, and what it holds;
-2. checks every file against the checksums in the backup, and stops if one does not match;
+2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one does
+   not match;
 3. asks for confirmation (`-y` skips it);
 4. stops the services, restores every database and, unless told otherwise, the `.env` and the certificate
    material;
@@ -93,10 +97,12 @@ The restore:
 
 ### Check a backup
 
-Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the files are complete
-and unchanged, without touching the install.
+Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps and the
+certificate files are complete and unchanged, without touching the install.
 
 ## Rebuild a lost server
+
+Restoring is still being tested: try it on a copy of the server first (see [Restore](#restore)).
 
 1. Install a new server with the same release the backup was taken with (`faden restore --verify-only` shows it),
    using `faden deploy`.

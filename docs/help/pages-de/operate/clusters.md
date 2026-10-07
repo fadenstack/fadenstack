@@ -37,7 +37,7 @@ Die Seite des Clusters öffnet sich im Zustand **Wird gestartet**. Die Maschinen
 
 1. holen das Runtime-Image und prüfen es. Es kommt einmal vom Server; die erste Maschine, die es hat, gibt es über das
    Netzwerk des Clusters an die anderen weiter. Eine abgebrochene Übertragung wird dort fortgesetzt, wo sie stehen
-   blieb. Die Seite zeigt einen Balken pro Maschine;
+   blieb, wenn die Maschine Platz für eine Kopie des Images auf der Festplatte hat. Die Seite zeigt einen Balken pro Maschine;
 2. starten darin Ray: zuerst den Head, dann treten die anderen Maschinen bei;
 3. melden, was sie vorgefunden haben.
 
@@ -45,8 +45,8 @@ Der Cluster erreicht **Läuft**: Jede Maschine ist aktiv, ihre Beschleuniger sin
 **Modell bereitstellen** an. Sind die Summen niedriger als erwartet, ist eine Maschine nicht beigetreten: Öffnen Sie
 sie und lesen Sie ihren Status.
 
-**Eine Maschine, die Sie nicht wählen können.** Eine Maschine, die bereits zu einem anderen Cluster gehört, ist
-entsprechend gekennzeichnet. „Auf … läuft kein zertifiziertes Runtime-Image“ bedeutet, dass es für diese Art von
+**Gekennzeichnete Maschinen in der Liste.** Eine Maschine, die bereits zu einem anderen Cluster gehört, ist
+entsprechend gekennzeichnet: Nehmen Sie sie aus diesem Cluster heraus, bevor Sie sie wählen. „Auf … läuft kein zertifiziertes Runtime-Image“ bedeutet, dass es für diese Art von
 Maschine keine Runtime gibt; nehmen Sie sie aus der Auswahl.
 
 **„Diese Maschinen können noch keinen Cluster bilden.“** Der Netzwerkschritt hat kein Netzwerk gefunden, das alle

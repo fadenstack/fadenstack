@@ -8,8 +8,8 @@ The console calls them **Machines**. The agent, the API and some messages still 
 ## Before you start
 
 - You are signed in to the console as an administrator.
-- The machine meets the [System requirements](requirements.md#gpu-machines): Linux, x86_64 or aarch64, an NVIDIA
-  GPU, Docker or Podman.
+- The machine meets the [System requirements](requirements.md#gpu-machines): Linux on x86_64 with an NVIDIA GPU,
+  or an NVIDIA DGX Spark, with Docker or Podman.
 - `nvidia-smi` on the machine prints your card. A machine that cannot see its GPU still joins, but cannot be put
   in a cluster.
 - The machine can reach the server at an address you know, such as `https://ai.example.internal`.
@@ -59,7 +59,7 @@ machine does not allow that, it says so and names the command an administrator r
 sudo loginctl enable-linger <user>
 ```
 
-If your user has passwordless `sudo` but you want a user service anyway, add `--user` to the line.
+If your user has passwordless `sudo` but you want a user service anyway, add `--user` to the line, still without `sudo`.
 
 ### Without approving each machine
 
@@ -78,7 +78,9 @@ A server holds a copy when you put the builds in `~/fadenstack/agent-binaries/`:
 `faden-agent-linux-aarch64`, with their `.sha256` files, from the project's releases page. Replace them after every
 server upgrade.
 
-With that copy, every download, from either source, is checked against it. Without it, the installer says
+With that copy, every download, from either source, is checked against it. A copy that is not the build of the
+server's release is set aside when the server can read the release's own digest: machines then get the release,
+checked against that digest, and a machine without internet access cannot install. Without a copy, the installer says
 `this backend published no digest, so nothing was verified`, and a machine without internet access stops with
 `could not download the agent`.
 
@@ -141,7 +143,7 @@ keep running. See [Upgrading](upgrading.md#update-the-machines-agents).
 | `faden-agent status` | Whether the service runs |
 | `faden-agent show` | The configuration in use, the server's address, and whether it moved to HTTPS |
 | `faden-agent configure --set KEY=VALUE` | Change one setting, such as `BACKEND_URL` or `ADVERTISE_HOST` |
-| `faden-agent stop` | Stop the service and remove it (with `sudo` for a system service) |
+| `faden-agent stop` | Stop the service and disable it; a user service is also removed (`sudo` for a system service) |
 | `faden-agent run` | Run in the foreground, to watch what goes wrong |
 | `faden-agent scan` | List the models already in the machine's model store |
 
@@ -181,8 +183,8 @@ it did the first time.
 **The installer asks for a `sudo` password you do not have.** Leave `sudo` out of the line (see
 [Without sudo](#without-sudo)).
 
-**`ERROR: this backend publishes no agent build for linux-…`.** The server has no agent build for this kind of
-machine and the release could not be reached. Put the builds in `~/fadenstack/agent-binaries/`.
+**`ERROR: this backend publishes no agent build for linux-…`.** There is no agent build for this machine: on Linux,
+the agent runs on x86_64 and aarch64 only.
 
 **`ERROR: the download does not match the expected digest.`** The download is not the build the server expects,
 usually because the copy in `~/fadenstack/agent-binaries/` is from an older release. Replace it with the current

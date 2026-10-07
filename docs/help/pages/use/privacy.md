@@ -43,7 +43,7 @@ When it is on, personal data is masked in one of two ways:
 
 If the check cannot run, the policy decides: your message is not sent, it is sent anyway, or it goes to one of your organisation's own models instead.
 
-Detection finds most personal data, not all of it. Do not paste anything you are not allowed to share.
+Detection finds most personal data in English text, not all of it. In German or other languages it often misses names and places. Do not paste anything you are not allowed to share.
 
 ### See and tighten it for one chat
 

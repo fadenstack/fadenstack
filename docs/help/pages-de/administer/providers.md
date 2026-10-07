@@ -41,6 +41,12 @@ eingegeben haben.
 Ein Provider-Eintrag bietet genau ein Modell an. Um mehrere Modelle desselben Providers anzubieten, legen Sie
 für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
 
+!!! note "Höchstens drei"
+    Core nimmt insgesamt höchstens drei externe Provider auf, angehaltene eingeschlossen, also höchstens drei
+    externe Modelle. Ein vierter wird abgelehnt mit „Resource capacity reached for this deployment. Please upgrade
+    your plan to add more providers.“ Ein vLLM-Server, den Sie über Fadenstack routen, zählt ebenfalls als einer
+    (siehe [Vorhandene vLLM-Server](../operate/existing-vllm.md)).
+
 ## Der Schlüssel des Providers {#the-providers-key}
 
 - Der Schlüssel bleibt auf dem Server. Wer den Chat oder die API nutzt, sieht ihn nie, und die Konsole zeigt
@@ -85,7 +91,8 @@ eigenen Bedingungen.
 **Personenbezogene Daten.** Ist das Modul **Datenschutz (PII)** eingeschaltet, entscheidet die Richtlinie, ob
 personenbezogene Daten ersetzt werden, bevor eine Anfrage hinausgeht. Die Richtlinie, mit der Fadenstack
 startet, schützt Anfragen an Cloud-Provider: Namen, E-Mail-Adressen, Telefonnummern, Karten- und
-Kontonummern und ähnliche Daten werden daraus entfernt. Prüfen und ändern Sie sie unter
+Kontonummern und ähnliche Daten werden daraus entfernt. Der Filter liest Englisch: Namen und Orte in deutschem
+oder anderssprachigem Text übersieht er oft. Prüfen und ändern Sie sie unter
 [Richtlinien und personenbezogene Daten](policies.md).
 
 **Wählen Sie sorgfältig, welches Modell ein Agent nutzt.** Alles, was ein Agent für eine Person liest, geht an

@@ -56,7 +56,7 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
-change. Publishing a version reaches everyone who uses the agent from their next request.
+change. Publishing a version reaches everyone who uses the agent within a minute.
 
 ![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
 
@@ -64,7 +64,7 @@ change. Publishing a version reaches everyone who uses the agent from their next
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
 
 **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
-application's own. **Allowed** lets it attach MCP servers on the person's computer; their tools are
+application tools its version lists under **Host tools**; a version that lists none holds nothing back. **Allowed** lets it attach MCP servers on the person's computer; their tools are
 unclassified, so they always ask first. People in **Developer mode** (see
 [Users, groups and roles](users.md#developer-mode)) may attach them either way.
 
@@ -81,7 +81,8 @@ sign in and cannot change them:
 Chrome uses the operating system's certificate store: the computers must trust the server's certificate (see
 [HTTPS and trust](../operate/https.md)).
 
-**Office.** The add-ins run in desktop Office for Windows: Word, Excel, PowerPoint and Outlook. For Outlook,
+**Office.** The add-ins run in desktop Office for Windows: Word, Excel, PowerPoint and Outlook, tested with the
+Microsoft 365 apps only. For Outlook,
 only classic Outlook: the new Outlook for Windows runs no such add-ins. IT presets the server and the agents
 in the machine policy `%PROGRAMDATA%\Fadenstack\Office\policy.json`; what it sets, people cannot change:
 
@@ -117,7 +118,7 @@ Each tool an application brings has a class, which the agent's version sets:
 People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
 as well as chats. Two examples: the Outlook add-in never sends mail itself, it opens drafts for the person;
-and the browser agent never reads or fills password and payment fields.
+and the browser agent never reads or fills password fields, nor card fields the site marks as such.
 
 ## When an application brings new tools
 
@@ -158,7 +159,7 @@ on their **Agents** page.
 
 ## Retire and delete
 
-- **Retire** closes the agent to everyone at once: sign-ins stop working, and its versions, access and history
+- **Retire** closes the agent to everyone within a minute: sign-ins stop working, and its versions, access and history
   are kept. **Restore** brings it back as it was.
 - A retired agent can be deleted for good: **Delete**, then type its address to confirm. Its versions, access
   and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent.
