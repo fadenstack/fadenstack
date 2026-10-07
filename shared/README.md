@@ -2,7 +2,7 @@
 
 ## Config Ownership
 
-Shared stack runtime configuration is now intended to be managed by backend system settings APIs and the frontend initialization wizard.
+Shared stack runtime configuration is now intended to be managed by backend system settings APIs.
 
 Primary flow:
 1. Operator updates settings in `/admin/settings`.

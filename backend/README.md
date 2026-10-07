@@ -18,7 +18,7 @@ This will start the server on the configured host.
 
 You can find swagger documentation at `/api/docs`.
 
-You can read more about uv here: https://docs.astral.sh/ruff/
+You can read more about uv here: https://docs.astral.sh/uv/
 
 ## Docker
 
@@ -48,7 +48,6 @@ docker-compose build
 ```bash
 $ tree "faden_backend"
 faden_backend
-├── conftest.py  # Fixtures for all tests.
 ├── db  # module contains db configurations
 │   ├── dao  # Data Access Objects. Contains different classes to interact with database.
 │   └── models  # Package contains different models for ORMs.
@@ -56,13 +55,14 @@ faden_backend
 ├── services  # Package for different external services such as rabbit or redis etc.
 ├── settings.py  # Main configuration settings for project.
 ├── static  # Static content.
-├── tests  # Tests for project.
 └── web  # Package contains web server. Handlers, startup config.
     ├── api  # Package with all handlers.
     │   └── router.py  # Main router.
     ├── application.py  # FastAPI application configuration.
     └── lifespan.py  # Contains actions to perform on startup and shutdown.
 ```
+
+The tests and their fixtures (`conftest.py`) are in `tests/`, next to `faden_backend`.
 
 ## Configuration
 
@@ -75,8 +75,8 @@ All environment variables should start with "FADEN_BACKEND_" prefix.
 
 For example if you see in your "faden_backend/settings.py" a variable named like
 `random_parameter`, you should provide the "FADEN_BACKEND_RANDOM_PARAMETER" 
-variable to configure the value. This behaviour can be changed by overriding `env_prefix` property
-in `faden_backend.settings.Settings.Config`.
+variable to configure the value. This behaviour can be changed by overriding `env_prefix` in the
+`model_config` of `faden_backend.settings.Settings`.
 
 An example of .env file:
 ```bash
@@ -95,15 +95,15 @@ FADEN_BACKEND_I18N_DIR="i18n"
 
 You can read more about BaseSettings class here: https://pydantic-docs.helpmanual.io/usage/settings/
 
-## Breaking Rename Migration (`fadenstack` -> `fadenstack`)
+## Breaking Rename Migration (`llm-port` -> `fadenstack`)
 
 This release switches backend configuration names to `FADEN_BACKEND_*` and removes support for the old
-`faden_*` variable namespace.
+`LLM_PORT_*` variable namespace.
 
 Required migration actions:
-1. Rename all backend env vars from `faden_backend_*` to `FADEN_BACKEND_*`.
-2. Rename Grafana env vars from `faden_GRAFANA_*` to `FADEN_GRAFANA_*`.
-3. Recreate containers/volumes if you rely on old docker identifiers (`faden_backend-*`).
+1. Rename all backend env vars from `LLM_PORT_BACKEND_*` to `FADEN_BACKEND_*`.
+2. Rename Grafana env vars from `LLM_PORT_GRAFANA_*` to `FADEN_GRAFANA_*`.
+3. Recreate containers/volumes if you rely on old docker identifiers (`llm-port-backend-*`).
 4. Redeploy backend and worker together to avoid mixed env namespace usage.
 
 ## Logs API (Loki Proxy)
@@ -123,7 +123,7 @@ The backend now exposes graph data for the admin React Flow visualizer:
 
 - `GET /api/llm/graph/topology`
 - `GET /api/llm/graph/traces`
-- `GET /api/llm/graph/traces/stream` (SSE)
+- `GET /api/llm/graph/traces/stream` (SSE; answers 402 unless a plugin provides it)
 
 All endpoints require RBAC permission `llm.graph:read` (superusers bypass checks).
 
@@ -184,9 +184,9 @@ Like this:
 docker-compose -f docker-compose.yml -f deploy/docker-compose.otlp.yml --project-directory . up
 ```
 
-This command will start OpenTelemetry collector and jaeger. 
-After sending a requests you can see traces in jaeger's UI
-at http://localhost:16686/.
+This command will start an OpenTelemetry collector with Grafana (`grafana/otel-lgtm`).
+After sending a requests you can see traces in its Grafana UI
+at http://localhost:3000/.
 
 This docker configuration is not supposed to be used in production. 
 It's only for demo purpose.
@@ -204,8 +204,8 @@ pre-commit is very useful to check your code before publishing it.
 It's configured using .pre-commit-config.yaml file.
 
 By default it runs:
-* mypy (validates types);
-* ruff (spots possible bugs);
+* trailing-whitespace (removes trailing whitespace);
+* end-of-file-fixer (ends files with one newline);
 
 
 You can read more about pre-commit here: https://pre-commit.com/

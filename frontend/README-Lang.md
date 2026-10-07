@@ -3,11 +3,12 @@
 This project uses runtime i18n with `react-i18next`.
 
 - Frontend reads translations from: `/api/i18n/{lang}/{namespace}`
-- Current namespace: `common`
+- Namespaces: `common`, `chat`, `tour` (one JSON file each per language)
 - Source bundles are stored in backend (runtime-loaded):
   - `backend/i18n/en/common.json`
   - `backend/i18n/es/common.json`
   - `backend/i18n/de/common.json`
+  - `backend/i18n/fr/common.json`
   - `backend/i18n/zh/common.json`
 
 ## 1. Add or Update UI Text in Code
@@ -31,7 +32,7 @@ Rules:
 1. Add new keys to English first:
    - `backend/i18n/en/common.json`
 2. Add the same keys to other languages:
-   - `es`, `de`, `zh`
+   - `es`, `de`, `fr`, `zh`
 3. Keep JSON structure aligned across languages.
 
 Recommended key style:

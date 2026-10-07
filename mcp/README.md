@@ -2,15 +2,18 @@
 
 MCP Tool Registry — governed MCP broker for Fadenstack.
 
-Registers MCP-compliant servers (stdio + SSE), discovers tools automatically,
-converts them to OpenAI-compatible tool definitions, and routes all tool
-invocations through a Privacy Proxy (Presidio-based PII detection/redaction).
+Registers MCP-compliant servers (stdio, SSE and streamable HTTP), discovers tools
+automatically, converts them to OpenAI-compatible tool definitions, and routes all
+tool invocations through a Privacy Proxy: it checks each call's arguments with the
+PII service (Presidio-based) and redacts or blocks per the server's PII mode.
+Without a PII service, in `allow` mode, or while the service is unreachable, calls
+pass unscanned.
 
 ## Quick Start
 
 ```bash
 uv sync
-python -m faden_mcp
+uv run -m faden_mcp
 ```
 
 ## Environment Variables

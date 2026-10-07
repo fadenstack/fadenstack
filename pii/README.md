@@ -2,23 +2,23 @@
 
 This project was generated using fastapi_template.
 
-## Poetry
+## UV
 
-This project uses poetry. It's a modern dependency management
+This project uses uv. It's a modern dependency management
 tool.
 
 To run the project use this set of commands:
 
 ```bash
-poetry install
-poetry run python -m faden_pii
+uv sync --locked
+uv run -m faden_pii
 ```
 
 This will start the server on the configured host.
 
 You can find swagger documentation at `/api/docs`.
 
-You can read more about poetry here: https://python-poetry.org/
+You can read more about uv here: https://docs.astral.sh/uv/
 
 ## Docker
 
@@ -37,7 +37,7 @@ docker-compose -f docker-compose.yml -f deploy/docker-compose.dev.yml --project-
 
 This command exposes the web application on port 8000, mounts current directory and enables autoreload.
 
-But you have to rebuild image every time you modify `poetry.lock` or `pyproject.toml` with this command:
+But you have to rebuild image every time you modify `uv.lock` or `pyproject.toml` with this command:
 
 ```bash
 docker-compose build
@@ -48,7 +48,6 @@ docker-compose build
 ```bash
 $ tree "faden_pii"
 faden_pii
-├── conftest.py  # Fixtures for all tests.
 ├── db  # module contains db configurations
 │   ├── dao  # Data Access Objects. Contains different classes to interact with database.
 │   └── models  # Package contains different models for ORMs.
@@ -56,13 +55,14 @@ faden_pii
 ├── services  # Package for different external services such as rabbit or redis etc.
 ├── settings.py  # Main configuration settings for project.
 ├── static  # Static content.
-├── tests  # Tests for project.
 └── web  # Package contains web server. Handlers, startup config.
     ├── api  # Package with all handlers.
     │   └── router.py  # Main router.
     ├── application.py  # FastAPI application configuration.
     └── lifespan.py  # Contains actions to perform on startup and shutdown.
 ```
+
+The tests and their fixtures (`conftest.py`) are in `tests/`, next to `faden_pii`.
 
 ## Configuration
 
@@ -75,8 +75,8 @@ All environment variables should start with "FADEN_PII_" prefix.
 
 For example if you see in your "faden_pii/settings.py" a variable named like
 `random_parameter`, you should provide the "FADEN_PII_RANDOM_PARAMETER" 
-variable to configure the value. This behaviour can be changed by overriding `env_prefix` property
-in `faden_pii.settings.Settings.Config`.
+variable to configure the value. This behaviour can be changed by overriding `env_prefix` in the
+`model_config` of `faden_pii.settings.Settings`.
 
 An example of .env file:
 ```bash
@@ -117,9 +117,8 @@ pre-commit is very useful to check your code before publishing it.
 It's configured using .pre-commit-config.yaml file.
 
 By default it runs:
-* black (formats your code);
-* mypy (validates types);
-* ruff (spots possible bugs);
+* trailing-whitespace (removes trailing whitespace);
+* end-of-file-fixer (ends files with one newline);
 
 
 You can read more about pre-commit here: https://pre-commit.com/

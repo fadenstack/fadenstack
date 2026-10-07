@@ -135,7 +135,7 @@ For privacy-heavy tenants:
 
 - `egress.fail_action=fallback_to_local` is now active in gateway routing.
 - If cloud egress PII sanitization fails:
-  1. cloud lease is released,
+  1. the cloud candidates are dropped (the scan runs before a model slot is taken),
   2. gateway tries local provider candidates for the same alias,
   3. gateway continues request through local provider if capacity exists.
 - If no local candidate or no local capacity exists, gateway returns deterministic `503` error codes:

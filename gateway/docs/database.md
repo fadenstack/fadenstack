@@ -29,7 +29,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO llm_user;
 - `llm_gateway_request_log`
 
 ## Migrations
-Run from `faden_gateway` root:
+Run from `gateway/`:
 ```bash
 alembic upgrade head
 ```
@@ -40,6 +40,8 @@ alembic downgrade base
 ```
 
 ## Notes
-- This service stores only gateway metadata and audit logs.
+- This service stores gateway metadata and audit logs, and the chat data of the server's own sessions (projects,
+  sessions, messages, summaries, memory facts, attachment records) and of agents (client events, manifests).
+  Chat content is encrypted at rest when `FADEN_GATEWAY_ENCRYPTION_KEY` is set.
 - Do not grant `llm_user` permissions on unrelated databases.
 - `tenant_id` is derived from JWT claims and matched to `tenant_llm_policy.tenant_id`.

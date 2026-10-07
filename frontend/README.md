@@ -1,6 +1,6 @@
 # Fadenstack Frontend
 
-This is the React-based admin console for Fadenstack, providing a unified UI to manage containers and LLM infrastructure, configure system settings and initialization workflows, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
+This is the React-based admin console for Fadenstack, providing a unified UI to manage containers and LLM infrastructure, configure system settings, monitor logs/traces, and operate the centralized OpenAI-compatible gateway through backend APIs.
 
 ## Getting Started
 
@@ -59,7 +59,7 @@ npm run build
 To build and run using Docker:
 
 ```bash
-docker build -t my-app .
+docker build --build-context docs=../docs -t my-app .
 
 # Run the container
 docker run -p 3000:3000 my-app
@@ -98,12 +98,13 @@ Make sure to deploy the output of `npm run build`
 
 ## LLM Graph Visualizer
 
-- New route: `/admin/llm/graph`
+- Route: `/admin/llm/agent-trace`
 - Built with `reactflow` and rendered as read-only topology + live traces view.
 - Data source is backend-only:
   - `GET /api/llm/graph/topology`
   - `GET /api/llm/graph/traces`
-  - `GET /api/llm/graph/traces/stream` (SSE)
+  - `GET /api/llm/graph/data-usage`
+  - `GET /api/llm/graph/traces/stream` (SSE; answers 402 unless a plugin provides it)
 - Frontend never calls Langfuse directly and does not contain Langfuse credentials.
 
 ## Frontend System Overview
@@ -131,7 +132,7 @@ sequenceDiagram
 
     Frontend->>Backend: Subscribe to graph/log streams
     Backend->>Shared: Fetch recent trace/log events
-    Backend-->>Frontend: SSE updates for live views
+    Backend-->>Frontend: SSE/WebSocket updates for live views
 ```
 
 ## LLM Endpoint Admin Page
@@ -145,14 +146,13 @@ sequenceDiagram
 - Route: `/admin/settings?tab=general`
   - Backend schema-driven settings rendering (`/api/admin/system/settings/*`)
   - Searchable/grouped fields with apply-scope badges.
-- Route: `/admin/settings?tab=system-init`
-  - Step-based system initialization wizard (`/api/admin/system/wizard/*`)
-  - Uses the same backend settings update/apply path as General settings.
+- The step-based system initialization wizard's API (`/api/admin/system/wizard/*`) has no console page.
 
-## Breaking Rename Migration (`fadenstack` -> `fadenstack`)
+## Breaking Rename Migration (`llm-port` -> `fadenstack`)
 
 - Frontend branding is now `fadenstack`.
 - Local storage keys changed:
-  - `faden-lang` -> `faden-lang`
-  - `faden-theme-mode` -> `faden-theme-mode`
+  - `llm-port-lang` -> `faden-lang`
+  - `llm-port-theme-mode` -> `faden-theme-mode`
+  - `llm-port-accent` -> `faden-accent`
 - Existing browsers may need one fresh login/theme/language re-selection after upgrade.

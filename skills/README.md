@@ -23,8 +23,9 @@ What users see: [Skills](../docs/help/pages/use/skills.md); what administrators 
 
 ## Who is asking
 
-The backend is the only caller of the skills API. It sends the shared
-service token plus the user in headers — believed only next to the token:
+The backend calls the skills API for users, and the gateway calls the internal
+API; both send the shared service token. The backend adds the user in headers —
+believed only next to the token, or when no service token is set (development):
 
 | Header | Value |
 |---|---|

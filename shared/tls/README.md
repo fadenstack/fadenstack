@@ -15,7 +15,7 @@ Put them here with the CLI, which checks them and restarts the proxy:
 ```bash
 faden tls generate              # a certificate made here for this machine
 faden tls use CERT KEY          # your own (--ca ROOT for a private issuer)
-faden tls renew                 # renew what is due; runs every morning by itself
+faden tls renew                 # renew what is due; runs every morning by itself where there is systemd or cron
 faden tls off                   # back to plain HTTP
 ```
 
@@ -27,4 +27,4 @@ The authority's key is kept in `../tls-ca/`, outside every container, with the
 authority before a rotation, an operator's private issuer and where an
 operator's certificate was imported from. `edge.json` here is the CLI's note of
 this host's addresses and ports, which the backend cannot see from its container.
-The certificate files are ignored by git; only this note is tracked.
+The certificate files and `edge.json` are ignored by git; only this README is tracked.

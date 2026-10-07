@@ -30,12 +30,13 @@
 - TTFT, usage, status, and latency are finalized to Langfuse.
 
 ## Langfuse
-- Langfuse is integrated at gateway level so all `/v1/chat/completions` and `/v1/embeddings` calls are observed.
+- Langfuse is integrated at gateway level: with `FADEN_GATEWAY_LANGFUSE_ENABLED` on, all `/v1/chat/completions` and `/v1/embeddings` calls are observed.
 - Trace metadata includes `request_id`, `tenant_id`, `user_id`, endpoint, model alias, and provider instance id.
 - Payload capture is controlled by tenant `privacy_mode`:
   - `full`: full prompt/output (except embedding vectors).
   - `redacted`: content redacted, structure and lengths preserved.
   - `metadata_only`: content omitted, only metadata/timing/usage/error recorded.
+- `full` and `redacted` need an installed gateway plugin; without one they are recorded as `metadata_only`.
 
 ## Compatibility Strategy
 - Permissive passthrough for optional OpenAI request keys.
@@ -44,12 +45,11 @@
   - `{ "error": { "type", "message", "param", "code" } }`
 
 ## Redis Keys
-- `llm:active:{instance_id}`
-- `llm:lease:{request_id}`
+- `llm:inflight:{instance_id}` (sorted set of the request ids in flight, scored by start time)
 - `ratelimit:rpm:{tenant_id}:{window}`
 - `ratelimit:tpm:{tenant_id}:{window}`
 
 ## Security
 - JWT secret and algorithm are configured via env vars.
 - `tenant_id` JWT claim is authoritative for policy resolution.
-- Missing/invalid token and missing `tenant_id` return OpenAI-style errors.
+- Missing/invalid token returns OpenAI-style errors; a token without `tenant_id` counts as the `default` tenant.

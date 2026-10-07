@@ -12,8 +12,8 @@ Internal template/debug endpoints remain under `/api/*`.
 
 ## Quick Start
 ```bash
-poetry install
-poetry run python -m faden_gateway
+uv sync --locked
+uv run -m faden_gateway
 ```
 
 Swagger UI:
@@ -114,9 +114,9 @@ curl http://localhost:8000/v1/embeddings \
 
 ## Quality Gates
 ```bash
-poetry run ruff check .
-poetry run mypy faden_gateway
-poetry run pytest -vv
+uv run ruff check .
+uv run mypy faden_gateway
+uv run pytest -vv
 ```
 
 ## Additional Docs

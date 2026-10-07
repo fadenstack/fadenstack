@@ -146,5 +146,5 @@ All endpoint failures are returned in OpenAI-compatible shape:
 
 ## Admin Graph Consumption
 
-`faden_backend` consumes `llm_gateway_request_log` from the `faden_gateway` database to power `/api/llm/graph/traces` and `/api/llm/graph/traces/stream`.
-The frontend visualizer (`/admin/llm/graph`) subscribes to backend SSE only; it never calls Langfuse directly.
+`faden_backend` consumes `llm_gateway_request_log` from the `faden_gateway` database to power `/api/llm/graph/traces` and `/api/llm/graph/traces/stream` (the stream answers 402 unless a plugin provides it).
+The frontend visualizer (`/admin/llm/agent-trace`) reads the backend's graph routes (`/topology`, `/traces`, `/data-usage`, and the stream where it is available); it never calls Langfuse directly.

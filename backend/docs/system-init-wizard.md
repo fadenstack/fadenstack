@@ -13,13 +13,15 @@ The wizard provides step-based initialization while reusing the same settings up
 
 1. Host Target
 2. Core Data Services
-3. Auth and Shared Secrets
-4. LLM Gateway Integration
-5. Langfuse + Grafana/Loki/Alloy
-6. Health Verification
+3. Auth and Secrets
+4. LLM Gateway
+5. Langfuse / Grafana / Loki
+6. PII Protection
+7. Health Verification
 
 ## Execution Model
 
 - Step apply calls settings updates directly.
 - Any non-live setting triggers immediate apply behavior.
-- Failures are returned per-setting and retained in apply job events.
+- Apply failures are returned per-setting and retained in apply job events. An unknown key, an invalid value
+  or a protected key without root mode fails the whole request instead.
