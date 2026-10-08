@@ -1585,7 +1585,8 @@
       "legacy_entity": "{{entity}} (no longer supported)",
       "no_entities": "No entities selected.",
       "add_entity": "Add entity"
-    }
+    },
+    "accuracy_note": "Detection is automatic, and how well it works depends on the language and the structure of the content (tables, lists, code, short fragments). It can miss personal data or flag words that are not personal. Try it on your organisation's typical content before you rely on it."
   },
   "roles": {
     "title": "Role Management",

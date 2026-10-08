@@ -137,6 +137,23 @@
   color: var(--md-default-fg-color);
   background: var(--md-default-fg-color--lightest);
 }
+/* the website (or the console) as a house, and the GitHub button: icons the size of the header's own */
+.fs-sites a.fs-icon-link {
+  display: inline-flex;
+  padding: 0.3rem 0.4rem;
+}
+.fs-sites a.fs-icon-link svg,
+.md-header .fs-github svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.md-header .fs-github {
+  color: var(--md-default-fg-color--light);
+}
+.md-header .fs-github:hover,
+.md-header .fs-github:focus-visible {
+  color: var(--md-default-fg-color);
+}
 /* The phone menu's title shows the mark through a more specific theme rule, so these match it as closely. */
 [data-md-color-scheme="default"] .md-logo img.fs-logo--dark,
 [data-md-color-scheme="slate"] .md-logo img.fs-logo--light,
@@ -144,8 +161,12 @@
 [data-md-color-scheme="slate"] .md-nav .md-nav__title[for="__drawer"] .md-logo img.fs-logo--light {
   display: none;
 }
+/* On phones only the house stays. */
 @media screen and (max-width: 59.9844em) {
   .fs-sites {
+    margin: 0;
+  }
+  .fs-sites a:not(.fs-icon-link) {
     display: none;
   }
 }

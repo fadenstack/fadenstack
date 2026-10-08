@@ -16,6 +16,12 @@ The personal data filter finds names, e-mail addresses, phone numbers, account a
 similar data in what people send, and masks it before the request reaches a model. It runs only as your
 policy says: you choose which data, for which models, and what happens when the filter cannot run.
 
+!!! note "Detection is not always right"
+    How well the filter works depends on the language and on the structure of the content: it does best on plain
+    English sentences, and less well on other languages and on tables, lists, code and short fragments. It can miss
+    personal data, and it can mask words that are not personal data. Try it on your organisation's typical content
+    before you rely on it, and tell people not to paste what they may not share.
+
 ### The policy Fadenstack starts with
 
 With the module on, the default policy:

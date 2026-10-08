@@ -68,7 +68,8 @@
     "entities_count": "实体 ({{count}})",
     "no_entities": "未配置实体。",
     "add_entity": "添加实体",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "accuracy_note": "检测是自动进行的，并不总是准确：取决于语言和文本的写法，它可能漏掉个人数据，也可能把并非个人数据的词语遮盖。请不要粘贴您无权分享的内容。"
   },
   "thinking": "思考中…",
   "thought_for": "思考了 {{seconds}} 秒",

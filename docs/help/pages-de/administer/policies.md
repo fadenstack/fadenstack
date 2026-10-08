@@ -17,6 +17,13 @@ Orte und ähnliche Daten in dem, was Benutzer senden, und maskiert sie, bevor di
 arbeitet nur so, wie Ihre Richtlinie es vorgibt: Sie wählen, welche Daten, für welche Modelle und was geschieht,
 wenn der Filter nicht laufen kann.
 
+!!! note "Die Erkennung ist nicht immer richtig"
+    Wie gut der Filter arbeitet, hängt von der Sprache und vom Aufbau der Inhalte ab: Am besten erkennt er ganze
+    englische Sätze, weniger gut andere Sprachen sowie Tabellen, Listen, Code und kurze Fragmente. Er kann
+    personenbezogene Daten übersehen und Wörter maskieren, die keine sind. Testen Sie ihn mit typischen Inhalten Ihrer
+    Organisation, bevor Sie sich darauf verlassen, und weisen Sie Ihre Benutzer darauf hin, nichts einzufügen, was sie
+    nicht weitergeben dürfen.
+
 ### Die Richtlinie, mit der Fadenstack startet {#the-policy-fadenstack-starts-with}
 
 Bei eingeschaltetem Modul gilt diese Standardrichtlinie:

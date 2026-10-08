@@ -14,6 +14,7 @@ extra_css = ["assets/stylesheets/fonts.css", "assets/stylesheets/fadenstack.css"
 
 [project.extra]
 site_key = "help"
+github = "https://github.com/fadenstack"
 #SITES#
 #ALTERNATE#
 

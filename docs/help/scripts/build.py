@@ -41,7 +41,7 @@ LANGS: dict[str, dict[str, str]] = {
         "site_name": "Fadenstack Help",
         "description": "Using, administering and running Fadenstack: the chat, the console, the server and the GPU machines.",
         "privacy": "Privacy",
-        "website": "Website",
+        "website": "fadenstack.com",
         "help": "Help",
         "developers": "Developers",
         "console": "Console",
@@ -56,7 +56,7 @@ LANGS: dict[str, dict[str, str]] = {
         "site_name": "Fadenstack-Hilfe",
         "description": "Fadenstack nutzen, verwalten und betreiben: der Chat, die Konsole, der Server und die GPU-Maschinen.",
         "privacy": "Datenschutz",
-        "website": "Website",
+        "website": "fadenstack.com",
         "help": "Hilfe",
         "developers": "Developers",
         "console": "Konsole",
@@ -120,10 +120,11 @@ def _files(nav: list) -> list[str]:
 def _sites(target: str, lang: str) -> list[dict[str, str]]:
     t, words = TARGETS[target], LANGS[lang]
     help_url = f"{t['base']}{words['prefix']}"
+    # The website (or, in the console, the console's start) shows as a house; its name is the tooltip.
     first = (
-        {"name": words["website"], "url": f"{t['home']}{words['website_path']}"}
+        {"name": words["website"], "url": f"{t['home']}{words['website_path']}", "icon": "home"}
         if target == "public"
-        else {"name": words["console"], "url": str(t["home"])}
+        else {"name": words["console"], "url": str(t["home"]), "icon": "home"}
     )
     return [
         first,

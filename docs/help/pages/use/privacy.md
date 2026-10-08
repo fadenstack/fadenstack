@@ -43,7 +43,8 @@ When it is on, personal data is masked in one of two ways:
 
 If the check cannot run, the policy decides: your message is not sent, it is sent anyway, or it goes to one of your organisation's own models instead.
 
-Detection finds most personal data in English text, not all of it. In German or other languages it often misses names and places. Do not paste anything you are not allowed to share.
+!!! note "Detection is not always right"
+    Personal data is found automatically, and how well that works depends on the language and on how the text is written: tables, lists, code and short fragments are harder than plain sentences. It finds most personal data in English text, not all of it; in German or other languages it often misses names and places. It can also mask words that are not personal data. Do not paste anything you are not allowed to share.
 
 ### See and tighten it for one chat
 

@@ -68,7 +68,8 @@
     "entities_count": "Entitäten ({{count}})",
     "no_entities": "Keine Entitäten konfiguriert.",
     "add_entity": "Entität hinzufügen",
-    "refresh": "Aktualisieren"
+    "refresh": "Aktualisieren",
+    "accuracy_note": "Die Erkennung ist automatisch und nicht immer richtig: Je nach Sprache und Aufbau des Textes kann sie personenbezogene Daten übersehen oder Wörter maskieren, die keine sind. Fügen Sie nichts ein, was Sie nicht teilen dürfen."
   },
   "thinking": "Denkt nach…",
   "thought_for": "{{seconds}} s nachgedacht",

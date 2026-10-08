@@ -33,11 +33,16 @@
         </div>
       </div>
     </div>
-    {#- Fadenstack: links to the other sites, from extra.sites; extra.site_key marks this one -#}
+    {#- Fadenstack: links to the other sites, from extra.sites; extra.site_key marks this one; a site with
+        icon = "home" (the website, or the console) shows as a house, named by its tooltip -#}
     {% if config.extra.sites %}
       <nav class="fs-sites" aria-label="Fadenstack sites">
         {% for s in config.extra.sites %}
-          <a href="{{ s.url }}"{% if s.key and s.key == config.extra.site_key %} aria-current="true"{% endif %}>{{ s.name }}</a>
+          {% if s.icon == "home" %}
+            <a class="fs-icon-link" href="{{ s.url }}" title="{{ s.name }}" aria-label="{{ s.name }}">{% include ".icons/lucide/house.svg" %}</a>
+          {% else %}
+            <a href="{{ s.url }}"{% if s.key and s.key == config.extra.site_key %} aria-current="true"{% endif %}>{{ s.name }}</a>
+          {% endif %}
         {% endfor %}
       </nav>
     {% endif %}
@@ -61,6 +66,11 @@
         </label>
         {% include "partials/search.html" %}
       {% endif %}
+    {% endif %}
+    {#- Fadenstack: the GitHub organisation, an icon only. Counts (stars, downloads) would be put in at build
+        time; fetching them in the page would send every visitor to GitHub. -#}
+    {% if config.extra.github %}
+      <a class="md-header__button md-icon fs-github" href="{{ config.extra.github }}" title="GitHub" aria-label="GitHub">{% include ".icons/simple/github.svg" %}</a>
     {% endif %}
     <div class="md-header__source">
       {% if config.repo_url %}

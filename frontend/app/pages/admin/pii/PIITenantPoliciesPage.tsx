@@ -200,6 +200,12 @@ export default function PIITenantPoliciesPage() {
             defaultValue: "Override the default PII policy for a specific tenant.",
           })}
         </Typography>
+        <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>
+          {t("pii_policy.accuracy_note", {
+            defaultValue:
+              "Detection is automatic, and how well it works depends on the language and the structure of the content (tables, lists, code, short fragments). It can miss personal data or flag words that are not personal. Try it on your organisation's typical content before you rely on it.",
+          })}
+        </Alert>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
           <TextField
             size="small"

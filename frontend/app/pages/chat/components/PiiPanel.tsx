@@ -179,6 +179,14 @@ export default function PiiPanel({
         )}
         {saving && <CircularProgress size={16} sx={{ alignSelf: "center" }} />}
 
+        {/* Accuracy note: detection misses and over-matches depending on language and text */}
+        <Typography variant="caption" color="text.secondary">
+          {t(
+            "pii_panel.accuracy_note",
+            "Detection is automatic and not always right: depending on the language and how the text is written, it can miss personal data or mask words that are not personal. Don't paste anything you're not allowed to share.",
+          )}
+        </Typography>
+
         {/* Egress section */}
         <Paper variant="outlined" sx={{ p: 1.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>

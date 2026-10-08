@@ -68,7 +68,8 @@
     "entities_count": "Entities ({{count}})",
     "no_entities": "No entities configured.",
     "add_entity": "Add entity",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "accuracy_note": "Detection is automatic and not always right: depending on the language and how the text is written, it can miss personal data or mask words that are not personal. Don't paste anything you're not allowed to share."
   },
   "thinking": "Thinking…",
   "thought_for": "Thought for {{seconds}} s",

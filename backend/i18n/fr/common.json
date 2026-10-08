@@ -1587,7 +1587,8 @@
       "legacy_entity": "{{entity}} (plus pris en charge)",
       "no_entities": "Aucune entité sélectionnée.",
       "add_entity": "Ajouter une entité"
-    }
+    },
+    "accuracy_note": "La détection est automatique et sa précision dépend de la langue et de la structure du contenu (tableaux, listes, code, fragments courts). Elle peut manquer des données personnelles ou signaler des mots qui n'en sont pas. Testez-la sur des contenus typiques de votre organisation avant de vous y fier."
   },
   "roles": {
     "title": "Gestion des rôles",

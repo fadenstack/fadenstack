@@ -1444,7 +1444,8 @@
       "legacy_entity": "{{entity}} (nicht mehr unterstützt)",
       "no_entities": "Keine Entitäten ausgewählt.",
       "add_entity": "Entität hinzufügen"
-    }
+    },
+    "accuracy_note": "Die Erkennung ist automatisch; wie gut sie arbeitet, hängt von der Sprache und vom Aufbau der Inhalte ab (Tabellen, Listen, Code, kurze Fragmente). Sie kann personenbezogene Daten übersehen oder Wörter markieren, die keine sind. Testen Sie sie mit typischen Inhalten Ihrer Organisation, bevor Sie sich darauf verlassen."
   },
   "roles": {
     "title": "Rollenverwaltung",

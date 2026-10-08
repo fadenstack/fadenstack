@@ -43,7 +43,8 @@ Wenn es aktiv ist, werden personenbezogene Daten auf eine von zwei Arten maskier
 
 Wenn die Prüfung nicht laufen kann, entscheidet die Richtlinie: Ihre Nachricht wird nicht gesendet, sie wird trotzdem gesendet, oder sie geht stattdessen an eines der eigenen Modelle Ihrer Organisation.
 
-Die Erkennung findet in englischem Text die meisten personenbezogenen Daten, aber nicht alle. In deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
+!!! note "Die Erkennung ist nicht immer richtig"
+    Personenbezogene Daten werden automatisch erkannt. Wie gut das gelingt, hängt von der Sprache und vom Aufbau des Textes ab: Tabellen, Listen, Code und kurze Fragmente sind schwieriger als ganze Sätze. In englischem Text findet die Erkennung die meisten personenbezogenen Daten, aber nicht alle; in deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Sie kann auch Wörter maskieren, die keine personenbezogenen Daten sind. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
 
 ### Für einen Chat ansehen und verschärfen {#see-and-tighten-it-for-one-chat}
 
