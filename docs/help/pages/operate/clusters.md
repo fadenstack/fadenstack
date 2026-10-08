@@ -60,7 +60,7 @@ the totals are lower than you expect, a machine did not join: open it and read i
 
 Open **Clusters** and select the cluster.
 
-![A running cluster's page: its state and actions at the top, the summary, and how its two machines are wired](../images/operate/cluster-page.png)
+![A running cluster's page: its state and actions at the top, a banner saying one deployment failed to start, the summary, and how its two machines are wired](../images/operate/cluster-page.png)
 
 | Part | What it holds |
 |---|---|
@@ -68,6 +68,9 @@ Open **Clusters** and select the cluster.
 | A summary | **Machines** up, **Accelerators**, **Free accelerators**, **Deployments**. |
 | **How this cluster is wired** | The machines and how they connect. Select a machine to see what it runs, and to **Drain** it or **Remove from cluster**. |
 | **Models on this cluster** | Each deployment with its state and copies. |
+
+When a deployment on the cluster fails to start, a banner at the top says so, with the message the engine gave.
+[Failures and logs](failures.md#what-the-deployment-messages-mean) says what such messages mean.
 | Cards | The **Runtime**, **Model traffic**, **Traffic between machines** and **Where the machines get models**. |
 | **Advanced** | The **Health checks** the server ran, **Change the network**, and the raw status. |
 
@@ -128,6 +131,8 @@ deployment up; changing the number of copies does not restart the copies already
 
 Draining moves a machine's model copies to the cluster's other machines and keeps new copies off it: before
 maintenance, a reboot, or taking it out of the cluster. You see a plan first, and nothing stops unless you agree.
+
+![The cluster's page with gpu-02 selected: its status, the deployments on the cluster, and Drain and Remove from cluster](../images/operate/cluster-machine-selected.png)
 
 ![The drain plan for gpu-02: one copy stops because no other machine has enough free GPU, and the button reads Drain and stop 1](../images/operate/cluster-drain-plan.png)
 

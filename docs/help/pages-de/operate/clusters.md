@@ -64,7 +64,7 @@ nicht beigetreten: Öffnen Sie sie und lesen Sie ihren Status.
 
 Öffnen Sie **Cluster** und wählen Sie den Cluster.
 
-![Die Seite eines laufenden Clusters: oben sein Zustand und die Aktionen, die Übersicht und wie seine zwei Maschinen verbunden sind](../images/operate/cluster-page.png)
+![Die Seite eines laufenden Clusters: oben sein Zustand und die Aktionen, ein Hinweis, dass eine Bereitstellung nicht starten konnte, die Übersicht und wie seine zwei Maschinen verbunden sind](../images/operate/cluster-page.png)
 
 | Teil | Was er enthält |
 |---|---|
@@ -72,6 +72,9 @@ nicht beigetreten: Öffnen Sie sie und lesen Sie ihren Status.
 | Eine Übersicht | Aktive **Maschinen**, **Beschleuniger**, **Freie Beschleuniger**, **Bereitstellungen**. |
 | **So ist dieser Cluster verbunden** | Die Maschinen und wie sie miteinander verbunden sind. Wählen Sie eine Maschine, um zu sehen, was sie ausführt, und um **Leeren** oder **Aus Cluster entfernen** zu wählen. |
 | **Modelle auf diesem Cluster** | Jede Bereitstellung mit ihrem Zustand und ihren Kopien. |
+
+Wenn eine Bereitstellung auf dem Cluster nicht starten kann, sagt das ein Hinweis oben auf der Seite, mit der Meldung
+der Engine. [Fehler und Logs](failures.md#what-the-deployment-messages-mean) erklärt, was solche Meldungen bedeuten.
 | Karten | Für **Laufzeit**, **Modellverkehr**, **Verkehr zwischen den Maschinen** und **Woher die Maschinen Modelle bekommen**. |
 | **Erweitert** | Die **Zustandsprüfungen**, die der Server ausgeführt hat, **Netzwerk ändern** und der Rohstatus. |
 
@@ -136,6 +139,8 @@ nicht neu (siehe [Bereitstellungen](../administer/deployments.md)).
 Leeren zieht die Modellkopien einer Maschine auf die anderen Maschinen des Clusters um und hält neue Kopien von ihr
 fern: vor einer Wartung, einem Neustart oder bevor Sie sie aus dem Cluster nehmen. Sie sehen zuerst einen Plan, und
 nichts stoppt, ohne dass Sie zustimmen.
+
+![Die Seite des Clusters mit ausgewählter Maschine gpu-02: ihr Zustand, die Bereitstellungen auf dem Cluster, „Leeren“ und „Aus Cluster entfernen“](../images/operate/cluster-machine-selected.png)
 
 ![Der Leeren-Plan für gpu-02: Eine Kopie stoppt, weil keine andere Maschine genug freie GPU hat, und die Schaltfläche lautet „Leeren und 1 stoppen“](../images/operate/cluster-drain-plan.png)
 
