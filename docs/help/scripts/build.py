@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+import unicodedata
 from pathlib import Path
 
 HELP = Path(__file__).resolve().parent.parent          # docs/help
@@ -35,6 +36,7 @@ LANGS: dict[str, dict[str, str]] = {
     "en": {
         "pages": "pages",
         "nav": "zensical.toml",
+        "questions": "questions.toml",
         "prefix": "",
         "website_path": "",
         "name": "English",
@@ -50,6 +52,7 @@ LANGS: dict[str, dict[str, str]] = {
     "de": {
         "pages": "pages-de",
         "nav": "nav-de.toml",
+        "questions": "questions-de.toml",
         "prefix": "de/",
         "website_path": "de/",
         "name": "Deutsch",
@@ -133,6 +136,68 @@ def _sites(target: str, lang: str) -> list[dict[str, str]]:
     ]
 
 
+_HEADING = re.compile(r"^(#{1,6}) +(.+?)\s*$")
+_EXPLICIT_ID = re.compile(r"\{#([\w-]+)\}\s*$")
+
+
+def _slug(text: str) -> str:
+    """The anchor the toc extension gives a heading."""
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^\w\s-]", "", text).strip().lower()
+    return re.sub(r"[-\s]+", "-", text)
+
+
+def _anchors(text: str) -> tuple[str, set[str]]:
+    """A page's title and the anchors of its headings (code blocks skipped)."""
+    title, anchors, fenced = "", set(), False
+    for line in text.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            continue
+        m = None if fenced else _HEADING.match(line)
+        if not m:
+            continue
+        heading = m[2]
+        explicit = _EXPLICIT_ID.search(heading)
+        heading = _EXPLICIT_ID.sub("", heading).strip()
+        if m[1] == "#" and not title:
+            title = heading
+        anchors.add(explicit[1] if explicit else _slug(heading))
+    return title, anchors
+
+
+def _page_url(page: str) -> str:
+    """The address of a page below the site's root: use/chat.md -> use/chat/, index.md -> ''."""
+    stem = page[: -len(".md")]
+    if stem == "index":
+        return ""
+    return (stem[: -len("index")] if stem.endswith("/index") else stem + "/")
+
+
+def _questions(lang: str, docs: Path) -> None:
+    """Write assets/questions.json for the front page's question search, from the language's questions file."""
+    words = LANGS[lang]
+    data = tomllib.loads((HELP / words["questions"]).read_text(encoding="utf-8"))
+    pages = set(_files(_nav("en")))
+    out = []
+    for page, questions in data.items():
+        if page not in pages:
+            raise SystemExit(f"{words['questions']}: {page} is not a page in the navigation")
+        _, anchors = _anchors((HELP / "pages" / page).read_text(encoding="utf-8"))
+        title, _ = _anchors((docs / page).read_text(encoding="utf-8"))
+        for question, anchor in questions.items():
+            if anchor and anchor not in anchors:
+                raise SystemExit(f"{words['questions']}: {page} has no section #{anchor} ({question})")
+        out.append({
+            "url": _page_url(page),
+            "title": title,
+            "questions": [{"q": q, "at": a} for q, a in questions.items()],
+        })
+    target = docs / "assets" / "questions.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps({"pages": out}, ensure_ascii=False), encoding="utf-8")
+
+
 def _with_note(text: str, note: str) -> str:
     """*text* with *note* after its front matter and its title."""
     head = ""
@@ -170,6 +235,7 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
             fell_back.append(page)
     _title_admonitions(out / "docs", lang)
     shutil.copytree(theme / "assets", out / "docs" / "assets", dirs_exist_ok=True)
+    _questions(lang, out / "docs")
     shutil.copytree(theme / "overrides", out / "overrides")
 
     base = str(t["base"])

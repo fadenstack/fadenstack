@@ -1,0 +1,201 @@
+# Die Fragen, die jede Seite der Hilfe beantwortet, für die Fragesuche auf der Startseite. Dieselben Seiten und
+# Anker wie in questions.toml; Wörter nach dem Glossar in STYLE.md.
+
+["use/index.md"]
+"Was kann ich mit Fadenstack machen?" = "what-you-can-do"
+"Wie melde ich mich an?" = "sign-in"
+"Wo finde ich was im Chat?" = "where-things-are-in-the-chat"
+
+["use/chat.md"]
+"Wie starte ich einen neuen Chat?" = "start-a-chat"
+"Wie wähle oder wechsle ich das Modell?" = "choose-a-model"
+"Kann ich die Seite verlassen, während eine Antwort geschrieben wird?" = "leave-while-a-reply-is-written"
+"Was tue ich, wenn eine Antwort fehlschlägt?" = "when-a-reply-fails"
+"Wie suche, benenne oder ordne ich meine Chats in Projekte?" = "titles-projects-and-search"
+"Kann ich den Chat auf dem Handy nutzen?" = "on-a-phone"
+
+["use/knowledge.md"]
+"Wie frage ich zu einem Dokument oder einer Datei?" = "attach-a-file"
+"Wie durchsuche ich die Dokumente meiner Organisation?" = "ask-about-your-organisations-documents"
+
+["use/skills.md"]
+"Was ist ein Skill?" = "what-a-skill-does-to-a-reply"
+"Wie nutze ich einen Skill im Chat?" = "use-a-skill-in-a-chat"
+"Wie speichere ich einen eigenen Skill aus einem Chat?" = "save-a-skill-from-a-chat"
+"Wo finde ich meine Skills?" = "your-skills"
+
+["use/tools.md"]
+"Wie schalte ich Tools im Chat ein?" = "switch-tools-on"
+"Warum fragt ein Tool nach meiner Freigabe?" = "approve-a-tool"
+"Was sind die Tool-Modi?" = "choose-the-tool-mode"
+"Welche Daten bekommen Tools?" = "what-tools-receive"
+
+["use/browser-agent.md"]
+"Wie nutze ich den Assistenten in Chrome?" = "open-the-panel-and-sign-in"
+"Kann der Assistent eine Webseite oder ein PDF lesen und zusammenfassen?" = "ask-about-a-page"
+"Was fragt der Browser-Agent, bevor er handelt?" = "what-it-asks-first"
+"Welche Berechtigungen braucht er im Browser?" = "permissions-it-asks-for"
+
+["use/office-add-ins.md"]
+"Wie nutze ich den Assistenten in Word, Excel, PowerPoint oder Outlook?" = "open-the-agent-and-sign-in"
+"Was kann er in jeder Office-Anwendung?" = "what-it-can-do-in-each-application"
+"Wohin gehen meine Daten aus Office?" = "where-your-data-goes"
+
+["use/privacy.md"]
+"Wer kann meine Chats sehen?" = "who-can-see-what"
+"Können andere Personen oder Administratoren meine Chats lesen?" = "who-can-see-what"
+"Werden meine personenbezogenen Daten geschützt oder maskiert?" = "personal-data-protection"
+"Was wird an externe Provider wie OpenAI gesendet?" = "models-at-outside-providers"
+"Wie lösche ich meine Chats oder Dateien?" = "deleting"
+"Warum steht in einer Antwort <PERSON> statt eines Namens?" = "when-it-does-not-work"
+
+["use/account.md"]
+"Wie ändere ich mein Passwort?" = "change-your-password"
+"Ich habe mein Passwort vergessen" = "forgot-your-password"
+"Wie ändere ich die Sprache oder schalte den dunklen Modus ein?" = "language-and-theme"
+"Wie erstelle ich ein API-Token oder einen Schlüssel?" = "api-tokens"
+"Warum wurde ich abgemeldet?" = "how-long-a-sign-in-lasts"
+
+["administer/index.md"]
+"Wo fange ich als Administrator an?" = "first-steps-in-order"
+"Welche Module kann ich einschalten?" = "modules"
+
+["administer/dashboard.md"]
+"Was zeigt das Dashboard?" = "what-each-card-shows"
+"Was braucht meine Aufmerksamkeit?" = "needs-attention"
+"Wie ordne ich das Dashboard neu an?" = "arrange-it"
+
+["administer/users.md"]
+"Wie füge ich einen Benutzer hinzu oder lade jemanden ein?" = "add-a-person"
+"Wie ändere ich die Rolle oder die Berechtigungen von jemandem?" = "change-what-someone-may-do"
+"Wie lege ich eine eigene Rolle an?" = "roles-of-your-own"
+"Wie nutze ich Gruppen?" = "groups"
+"Wie entferne oder sperre ich einen Benutzer?" = "end-someones-access"
+"Wie lange gelten Anmeldungen und API-Token?" = "sign-ins-and-api-tokens"
+"Was ist der Entwicklermodus?" = "developer-mode"
+
+["administer/models.md"]
+"Wie finde und lade ich ein Modell herunter?" = "find-a-model"
+"Welche Modelle passen auf meine GPUs?" = "which-models-fit"
+"Wie stelle ich ein Modell auf unseren eigenen Maschinen bereit?" = "host-a-model"
+"Wie nutze ich ein geschütztes Modell mit einem Hugging-Face-Token?" = "gated-models-and-the-hugging-face-token"
+"Bekomme ich Modelle auch ohne Internetzugang?" = "without-internet-access"
+
+["administer/deployments.md"]
+"Wie mache ich ein Modell im Chat verfügbar?" = "offer-it-in-the-chat"
+"Wie betreibe ich mehr Kopien eines Modells?" = "scale-it"
+"Wie stoppe, starte oder lösche ich eine Bereitstellung?" = "stop-start-and-delete"
+"Was bedeuten die Zustände einer Bereitstellung?" = "states"
+"Wie ändere ich Engine-Einstellungen wie die Kontextlänge?" = "engine-settings"
+
+["administer/providers.md"]
+"Wie verbinde ich OpenAI, Azure oder einen anderen Provider?" = "connect-a-provider"
+"Wie ändere ich den API-Schlüssel eines Providers?" = "the-providers-key"
+"Welche Daten verlassen die Organisation?" = "what-leaves-the-organisation"
+"Wo werden die Daten verarbeitet (Datenresidenz)?" = "data-residency"
+
+["administer/mcp-servers.md"]
+"Wie verbinde ich einen MCP-Server oder ein Tool?" = "register-a-server"
+"Wer darf die Tools eines MCP-Servers nutzen?" = "who-can-use-the-tools"
+"Wie werden personenbezogene Daten in Tool-Aufrufen behandelt?" = "personal-data-pii-mode"
+
+["administer/skills.md"]
+"Wie lege ich einen Skill für alle an?" = "create-a-skill-for-everyone"
+"Wie funktionieren Versionen von Skills?" = "versions"
+"Wer sieht welchen Skill?" = "owners-and-who-sees-a-skill"
+
+["administer/agents.md"]
+"Wie lege ich einen Agenten oder ein Add-in an?" = "create-the-agent"
+"Wie installiere ich die Office-Add-ins oder die Browser-Erweiterung für die Benutzer?" = "install-the-applications"
+"Wie funktionieren Freigaben für die Tools eines Agenten?" = "tools-and-approvals"
+"Wie lege ich einen Agenten still oder lösche ihn?" = "retire-and-delete"
+
+["administer/policies.md"]
+"Wie schalte ich den Schutz personenbezogener Daten (PII) ein?" = "personal-data"
+"Wie ändere ich die Datenschutz-Richtlinie?" = "change-the-policy"
+"Wie sperre oder erlaube ich Tools?" = "tool-rules"
+"Was sehen Benutzer, wenn eine Anfrage gestoppt wird?" = "what-people-see-when-something-is-stopped"
+
+["administer/requests.md"]
+"Was passiert mit einer Anfrage auf dem Weg zum Modell?" = "six-things-happen-to-every-request"
+"Worauf können sich Benutzer verlassen?" = "what-people-can-rely-on"
+
+["administer/usage.md"]
+"Wo sehe ich Nutzung und Kosten?" = "where-to-see-it"
+"Wie lege ich Preise für Modelle fest?" = "set-prices"
+"Wie sehe ich die Nutzung pro Person oder Gruppe?" = "usage-per-person-and-per-group"
+"Kann ich Limits oder Budgets festlegen?" = "limits-and-budgets"
+
+["operate/index.md"]
+"Was betreibe ich als Betreiber?" = "what-you-run"
+"In welcher Reihenfolge richte ich alles ein?" = "the-order-of-work"
+
+["operate/requirements.md"]
+"Welche Hardware braucht der Server?" = "the-server"
+"Welche GPU-Maschinen werden unterstützt?" = "gpu-machines"
+"Was braucht Internetzugang?" = "what-needs-the-internet"
+
+["operate/installing.md"]
+"Wie installiere ich Fadenstack?" = "install"
+"Wie melde ich mich nach der Installation zum ersten Mal an?" = "sign-in-for-the-first-time"
+"Welche Befehle brauche ich im Alltag?" = "everyday-commands"
+"Wie deinstalliere ich Fadenstack?" = "removing-fadenstack"
+
+["operate/upgrading.md"]
+"Wie aktualisiere ich Fadenstack?" = "upgrade-the-server"
+"Wie aktualisiere ich die Agenten auf den GPU-Maschinen?" = "update-the-machines-agents"
+"Wie gehe ich zur vorherigen Version zurück?" = "going-back"
+
+["operate/backups.md"]
+"Wie sichere ich den Server?" = "back-up-now"
+"Gibt es eine automatische nächtliche Sicherung?" = "the-nightly-backup"
+"Wie stelle ich eine Sicherung wieder her?" = "restore"
+"Wie baue ich einen verlorenen Server neu auf?" = "rebuild-a-lost-server"
+
+["operate/machines.md"]
+"Wie füge ich eine GPU-Maschine hinzu?" = "add-a-machine"
+"Wie versetze ich eine Maschine in die Wartung?" = "maintenance-and-draining"
+"Wie entferne ich eine Maschine?" = "remove-a-machine"
+
+["operate/clusters.md"]
+"Wie lege ich einen Cluster an?" = "create-a-cluster"
+"Wie füge ich einem laufenden Cluster Maschinen hinzu?" = "add-machines-to-a-running-cluster"
+"Wie leere ich eine Maschine vor der Wartung?" = "drain-a-machine"
+"Wie wechsle ich die Runtime eines Clusters?" = "runtime"
+"Ist der Verkehr zwischen den Maschinen verschlüsselt?" = "encryption"
+
+["operate/existing-vllm.md"]
+"Kann Fadenstack unsere vorhandenen vLLM-Server nutzen?" = "route-one-through-fadenstack"
+"Was wird auf einer Maschine gefunden?" = "what-is-found"
+
+["operate/taking-over.md"]
+"Wie übernehme ich Cluster von einem verlorenen Server?" = "take-over-a-cluster"
+
+["operate/containers.md"]
+"Wie lege ich einen Container an?" = "create-a-container"
+"Wie bekomme ich ein Container-Image?" = "get-an-image"
+"Wie bearbeite ich einen Container?" = "edit-a-container"
+
+["operate/https.md"]
+"Wie schalte ich HTTPS ein?" = "switch-https-on"
+"Welche Zertifikate kann ich nutzen?" = "two-kinds-of-certificate"
+"Wie werden Zertifikate erneuert?" = "renewal-and-warnings"
+"Wie härte ich den Server ab?" = "hardening-checklist"
+
+["operate/network.md"]
+"Welche Ports müssen offen sein?" = "at-a-glance"
+"Welche Ports muss eine GPU-Maschine frei haben?" = "ports-a-gpu-machine-must-have-free"
+"Was geht ins Internet?" = "what-reaches-the-internet"
+
+["operate/failures.md"]
+"Wo finde ich die Protokolle?" = "reading-the-logs"
+"Was bedeuten die Fehlermeldungen einer Bereitstellung?" = "what-the-deployment-messages-mean"
+"Was repariert sich selbst?" = "what-repairs-itself"
+
+["operate/troubleshooting.md"]
+"Der Server startet nicht" = "the-server"
+"Eine Maschine lässt sich nicht hinzufügen" = "adding-a-machine"
+"Ein Modell startet nicht" = "models"
+
+["operate/third-party.md"]
+"Welche Komponenten und Lizenzen von Dritten nutzt Fadenstack?" = ""

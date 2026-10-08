@@ -61,6 +61,14 @@ e-mail addresses, secrets) and on links to pages that do not exist.
   real machine, cluster or person names, no private addresses, no error that the page does not explain.
   Alt text says what the picture shows: `![The cluster page with two machines](../images/operate/cluster.png)`.
 
+## Questions for the front page
+
+The front page answers questions as readers ask them (`assets/javascripts/fs-ask.js` in the theme, no model and no
+server). It knows each page by the questions in `questions.toml` and `questions-de.toml`: when you add a page or a
+section that answers something new, add the question there, in the reader's words, with the section's anchor.
+`scripts/build.py` fails on a page or an anchor that does not exist. A question that finds the wrong page is fixed
+there, by adding the question the reader asked.
+
 ## Page template
 
 ```markdown

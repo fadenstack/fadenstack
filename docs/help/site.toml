@@ -10,6 +10,8 @@ docs_dir = "docs"
 site_dir = "site"
 #COPYRIGHT#
 extra_css = ["assets/stylesheets/fonts.css", "assets/stylesheets/fadenstack.css"]
+# The question search on the front page (assets/questions.json, written by scripts/build.py).
+extra_javascript = ["assets/javascripts/fs-ask.js"]
 #NAV#
 
 [project.extra]
