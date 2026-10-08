@@ -818,7 +818,13 @@ class LLMAdapter:
         return result
 
     async def _non_stream_completion(self, **kwargs: Any) -> CompletionResult:
-        """Execute a non-streaming completion."""
+        """Execute a non-streaming completion.
+
+        The whole answer has to be written before a byte comes back, so the wait is the one for a whole
+        answer, not LiteLLM's 60 s: a model that thinks first ran past it on drafting a skill, and LiteLLM
+        gave up and asked again, three times.
+        """
+        kwargs.setdefault("timeout", settings.non_stream_timeout_sec)
         try:
             response = await litellm.acompletion(**kwargs)
             # LiteLLM returns a ModelResponse — convert to dict

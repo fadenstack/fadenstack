@@ -156,6 +156,10 @@ class Settings(BaseSettings):
     # Also the longest silence between two events of a reply streamed straight
     # from vLLM, once it has started.
     litellm_request_timeout: float = 60.0
+    # How long a reply that is not streamed may take in all. It arrives only
+    # when the whole answer is written, which for a model that thinks first is
+    # often more than a minute; the edge and the backend wait 300 s for it.
+    non_stream_timeout_sec: float = 300.0
     # How long a reply streamed straight from vLLM may take to start, for a
     # model that sets no wait of its own (its deployment's
     # ``service.first_token_timeout_sec``). The engine sends nothing while a
