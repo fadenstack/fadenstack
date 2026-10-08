@@ -18,6 +18,7 @@ install has, so it has no fixed address and links back to the console.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -286,8 +287,27 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
         if config.count(marker) != 1:
             raise SystemExit(f"site.toml needs exactly one {marker}")
         config = config.replace(marker, value)
+    config = _fingerprint(out / "docs" / "assets", config)
     (out / "zensical.toml").write_text(config, encoding="utf-8")
     return fell_back
+
+
+#: The theme's own files that pages load by name. They are built with a hash of their content in the name, so a
+#: cache (the browser's, a proxy's) never serves an old one with a new page; Zensical's own files are named so already.
+FINGERPRINTED = ("stylesheets/fonts.css", "stylesheets/fadenstack.css", "javascripts/fs-ask.js")
+
+
+def _fingerprint(assets: Path, config: str) -> str:
+    """Rename the theme's own CSS and scripts to name.<hash>.ext and point *config* at the new names."""
+    for rel in FINGERPRINTED:
+        src = assets / rel
+        if not src.is_file():
+            continue
+        digest = hashlib.sha256(src.read_bytes()).hexdigest()[:10]
+        hashed = src.with_name(f"{src.stem}.{digest}{src.suffix}")
+        src.replace(hashed)
+        config = config.replace(f'"assets/{rel}"', f'"assets/{Path(rel).parent.as_posix()}/{hashed.name}"')
+    return config
 
 
 def build(out: Path) -> None:

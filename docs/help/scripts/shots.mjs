@@ -26,8 +26,7 @@ const LANG = process.env.HELP_SHOTS_LANG || "en";
 const OUT = process.env.HELP_SHOTS_OUT || resolve(HERE, LANG === "en" ? "../pages/images" : `../pages/images/${LANG}`);
 
 /** The console's own text in LANG for an English label, from backend/i18n (the label itself if there is none). */
-const L = (() => {
-  if (LANG === "en") return (text) => text;
+const I18N = (() => {
   const flat = (dir) => {
     const out = {};
     const walk = (obj, path) => {
@@ -39,12 +38,21 @@ const L = (() => {
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".json"))) walk(JSON.parse(readFileSync(resolve(dir, f), "utf-8")), `${f}:`);
     return out;
   };
-  const en = flat(resolve(REPO, "backend/i18n/en"));
-  const other = flat(resolve(REPO, `backend/i18n/${LANG}`));
+  return { en: flat(resolve(REPO, "backend/i18n/en")), here: flat(resolve(REPO, `backend/i18n/${LANG}`)) };
+})();
+const L = (() => {
+  if (LANG === "en") return (text) => text;
   const byText = new Map();
-  for (const [key, text] of Object.entries(en)) if (!byText.has(text) && other[key]) byText.set(text, other[key]);
+  for (const [key, text] of Object.entries(I18N.en)) if (!byText.has(text) && I18N.here[key]) byText.set(text, I18N.here[key]);
   return (text) => byText.get(text) ?? text;
 })();
+/** The console's text for one key ("file.json:a.b", or "a.b" in common.json), where an English label has several. */
+const K = (key) => {
+  const full = key.includes(":") ? key : `common.json:${key}`;
+  const text = I18N.here[full] ?? I18N.en[full];
+  if (!text) throw new Error(`no text for ${key}`);
+  return text;
+};
 const env = (name) => {
   const v = process.env[name];
   if (!v) throw new Error(`set ${name}`);
@@ -128,6 +136,14 @@ const settle = async (page, ms = 1500) => {
   await page.evaluate(() => window.__neutral?.());
 };
 
+/** The card (or panel) a heading sits in. */
+const cardOfHeading = (p, text) =>
+  p.getByRole("heading", { name: text, exact: true }).first().locator("xpath=ancestor::*[contains(@class,'MuiPaper-root')][1]");
+
+/** The card (or panel) a heading or a line of text sits in. */
+const card = (p, text) =>
+  p.getByText(text, { exact: true }).first().locator("xpath=ancestor::*[contains(@class,'MuiPaper-root')][1]");
+
 // name: the file under pages/images/; path: where to go; act: what to open first (never a confirm button);
 // clip: a locator to picture instead of the whole window; region: a fixed part of the window.
 const SHOTS = [
@@ -143,7 +159,7 @@ const SHOTS = [
   // Administer
   { name: "administer/dashboard", path: "/admin/dashboard" },
   { name: "administer/users", path: "/admin/users" },
-  { name: "administer/roles", path: "/admin/roles" },
+  { name: "administer/roles", path: "/admin/roles", wait: 5000 },
   { name: "administer/marketplace", path: "/admin/marketplace" },
   { name: "administer/deployments", path: "/admin/deployments" },
   { name: "administer/deployment", path: () => `/admin/deployments/${IDS.deployment}` },
@@ -153,7 +169,7 @@ const SHOTS = [
   },
   { name: "administer/providers", path: "/admin/llm/providers" },
   { name: "administer/mcp-servers", path: "/admin/mcp/servers" },
-  { name: "administer/skills", path: "/admin/skills" },
+  { name: "administer/skills", path: "/admin/skills", wait: 5000 },
   { name: "administer/agents", path: "/admin/agents" },
   { name: "administer/pii-policies", path: "/admin/pii/policies" },
   { name: "administer/governance", path: "/admin/governance" },
@@ -162,7 +178,7 @@ const SHOTS = [
   // Operate
   { name: "operate/machines", path: "/admin/nodes" },
   { name: "operate/machine", path: () => `/admin/nodes/${IDS.machine}` },
-  { name: "operate/clusters", path: "/admin/clusters" },
+  { name: "operate/clusters", path: "/admin/clusters", wait: 5000 },
   { name: "operate/cluster", path: () => `/admin/clusters/${IDS.cluster}` },
   {
     name: "operate/cluster-add-machines", path: () => `/admin/clusters/${IDS.cluster}`,
@@ -224,11 +240,11 @@ const SHOTS = [
   { name: "administer/marketplace-model", path: "/admin/marketplace", act: async (p) => p.getByRole("button", { name: /Qwen3\.8-27B-FP8/ }).first().click({ force: true }) },
   { name: "administer/marketplace-on-server", path: "/admin/marketplace", act: async (p) => p.getByRole("tab", { name: L("On this server") }).click() },
   { name: "administer/marketplace-hf-token", path: "/admin/marketplace", act: async (p) => p.getByText(/^Hugging Face:/).first().click(), clip: (p) => p.getByRole("dialog") },
-  { name: "administer/host-where", path: "/admin/marketplace", act: async (p) => p.getByRole("button", { name: L("Host"), exact: true }).first().click(), clip: (p) => p.getByRole("dialog") },
+  { name: "administer/host-where", path: "/admin/marketplace", act: async (p) => p.getByRole("button", { name: K("marketplace.host"), exact: true }).first().click(), clip: (p) => p.getByRole("dialog") },
   {
     name: "administer/host-engine", path: "/admin/marketplace", clip: (p) => p.getByRole("dialog"),
     act: async (p) => {
-      await p.getByRole("button", { name: L("Host"), exact: true }).first().click();
+      await p.getByRole("button", { name: K("marketplace.host"), exact: true }).first().click();
       await settle(p, 1500);
       await p.getByRole("dialog").getByRole("button", { name: L("Next") }).click();
     },
@@ -236,14 +252,14 @@ const SHOTS = [
   {
     name: "administer/host-review", path: "/admin/marketplace", clip: (p) => p.getByRole("dialog"),
     act: async (p) => {
-      await p.getByRole("button", { name: L("Host"), exact: true }).first().click();
+      await p.getByRole("button", { name: K("marketplace.host"), exact: true }).first().click();
       await settle(p, 1500);
       await p.getByRole("dialog").getByRole("button", { name: L("Next") }).click();
       await settle(p, 1000);
       await p.getByRole("dialog").getByRole("button", { name: L("Next") }).click();
     },
   },
-  { name: "administer/deployment-logs", path: () => `/admin/deployments/${IDS.deployment}`, act: async (p) => p.getByText(L("Logs"), { exact: true }).last().scrollIntoViewIfNeeded() },
+  { name: "administer/deployment-logs", path: () => `/admin/deployments/${IDS.deployment}`, act: async (p) => p.getByText(K("inference.detail.logs"), { exact: true }).last().scrollIntoViewIfNeeded() },
   { name: "administer/governance-add-rule", path: "/admin/governance", act: async (p) => p.getByRole("button", { name: L("Add rule") }).click(), clip: (p) => p.getByRole("dialog") },
   { name: "administer/governance-classes", path: "/admin/governance", act: async (p) => p.getByRole("tab", { name: L("Tool classes") }).click() },
   { name: "administer/governance-decisions", path: "/admin/governance", act: async (p) => p.getByRole("tab", { name: L("Decisions") }).click() },
@@ -273,10 +289,10 @@ const SHOTS = [
   { name: "operate/images", path: "/admin/images", region: { x: 240, y: 0, width: 1200, height: 560 } },
   { name: "operate/container-new", path: "/admin/containers/new" },
   { name: "operate/container", path: () => `/admin/containers/${IDS.container}` },
-  { name: "operate/container-edit", path: () => `/admin/containers/${IDS.container}/edit` },
+  { name: "operate/container-edit", path: () => `/admin/containers/${IDS.container}/edit`, wait: 4000 },
 
   // Fewer words, more pictures: the parts of a screen a step talks about.
-  { name: "use/chat-composer", path: "/chat", region: { x: 452, y: 826, width: 796, height: 70 } },
+  { name: "use/chat-composer", path: "/chat", wait: 4000, region: { x: 452, y: 826, width: 796, height: 70 } },
   { name: "use/chat-sidebar", path: "/chat", region: { x: 0, y: 0, width: 260, height: 460 } },
   {
     name: "use/chat-reply-details", path: "/chat",
@@ -305,6 +321,80 @@ const SHOTS = [
     act: async (p) => p.getByText(L("Sign-in lifetime (s)")).first().scrollIntoViewIfNeeded(),
     // The card that holds the sign-in and API token lifetimes.
     clip: (p) => p.getByText(L("Sign-in lifetime (s)")).first().locator("xpath=ancestor::div[contains(@class,'MuiPaper-root')][1]"),
+  },
+  // Pictures earlier rounds cut from other ones or copied in; taken here so every language gets them.
+  // Getting started shows only on an install whose first steps are not all done (a fresh one).
+  { name: "administer/getting-started", path: "/admin/dashboard", clip: (p) => card(p, L("Getting started")) },
+  { name: "operate/getting-started", path: "/admin/dashboard", clip: (p) => card(p, L("Getting started")) },
+  { name: "administer/needs-attention", path: "/admin/dashboard", clip: (p) => cardOfHeading(p, K("dashboard.widgets.attention.title")) },
+  { name: "administer/providers-list-top", path: "/admin/llm/providers", region: { x: 248, y: 60, width: 1184, height: 213 } },
+  { name: "administer/skills-hub-toolbar", path: "/admin/skills", region: { x: 248, y: 60, width: 1184, height: 114 } },
+  { name: "administer/cost-dashboard-top", path: "/admin/observability", wait: 5000, region: { x: 0, y: 0, width: 1440, height: 214 } },
+  {
+    name: "administer/cost-pricing-list", path: "/admin/observability", region: { x: 0, y: 0, width: 1440, height: 740 },
+    act: async (p) => p.getByRole("tab", { name: L("Pricing") }).click(),
+  },
+  {
+    name: "administer/governance-decisions-top", path: "/admin/governance", region: { x: 0, y: 0, width: 1440, height: 525 },
+    act: async (p) => p.getByRole("tab", { name: L("Decisions") }).click(),
+  },
+  {
+    name: "administer/marketplace-on-server-top", path: "/admin/marketplace", region: { x: 0, y: 0, width: 1440, height: 498 },
+    act: async (p) => p.getByRole("tab", { name: L("On this server") }).click(),
+  },
+  {
+    name: "administer/new-agent", path: "/admin/agents", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      await p.getByRole("button", { name: L("New agent") }).first().click();
+      await p.getByRole("dialog").getByRole("button", { name: "Chrome" }).first().click();
+    },
+  },
+  {
+    name: "administer/agent-apps-review", path: () => `/admin/agents/${IDS.agent}`,
+    act: async (p) => p.getByRole("tab", { name: L("Apps") }).click(),
+  },
+  {
+    name: "administer/pii-tenant-policy", path: "/admin/pii/policies",
+    act: async (p) => {
+      // The policy shows once a tenant is loaded; the default one.
+      await p.getByPlaceholder(K("pii_policy.tenant_id_placeholder")).fill("default");
+      await p.getByRole("button", { name: L("Load Tenant") }).click();
+      await settle(p, 2000);
+      await p.getByText(L("Let chats and agents change the PII mode")).first().scrollIntoViewIfNeeded();
+    },
+  },
+  {
+    name: "administer/mcp-register-server", path: "/admin/mcp/servers", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => p.getByRole("button", { name: K("mcp.register_server") }).first().click({ force: true }),
+  },
+  {
+    name: "administer/mcp-edit-server", path: "/admin/mcp/servers", clip: (p) => p.getByRole("dialog"),
+    act: async (p) => {
+      // Edit is on a server's own page: open the first one in the list.
+      await p.locator("tbody tr").first().click({ force: true });
+      await settle(p, 1500);
+      await p.getByRole("button", { name: L("Edit") }).first().click({ force: true });
+    },
+  },
+  { name: "operate/add-machine-panel", path: "/admin/nodes?add=1", clip: (p) => p.getByRole("dialog") },
+  { name: "operate/cluster-page", path: () => `/admin/clusters/${IDS.cluster}`, region: { x: 0, y: 0, width: 1440, height: 750 } },
+  { name: "operate/cluster-model-traffic", path: () => `/admin/clusters/${IDS.cluster}`, clip: (p) => card(p, L("Model traffic")) },
+  {
+    name: "operate/cluster-traffic-encrypted", path: () => `/admin/clusters/${IDS.cluster}`,
+    clip: (p) => card(p, L("Traffic between machines")),
+  },
+  {
+    name: "operate/cluster-runtime-card", path: () => `/admin/clusters/${IDS.cluster}`,
+    clip: (p) => card(p, L("The image the machines run, with Ray and vLLM together. It changes only when you switch it here.")),
+  },
+  { name: "operate/machine-vllm-found", path: () => `/admin/nodes/${IDS.machine}`, clip: (p) => card(p, L("vLLM on this machine")) },
+  {
+    name: "operate/container-edit-notice", path: () => `/admin/containers/${IDS.container}/edit`,
+    region: { x: 256, y: 56, width: 1168, height: 120 },
+  },
+  {
+    name: "use/chat-search", path: "/chat",
+    act: async (p) => p.getByPlaceholder(L("Search chats")).fill("quantum"),
   },
 ];
 
