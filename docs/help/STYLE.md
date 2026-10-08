@@ -54,11 +54,18 @@ e-mail addresses, secrets) and on links to pages that do not exist.
   page the first time it matters, not every time.
 - **Examples** use `https://ai.example.internal` for the server, `gpu-01`, `gpu-02` for machines,
   `192.0.2.x` for addresses, `alex@example.com` for people.
-- **Screenshots** show a screen the reader is about to use, or what they should see when it worked: one to
-  three on a page, next to the step they belong to, never instead of the text. They live in
-  `pages/images/<section>/` and are taken with `scripts/shots.mjs`, which swaps every name, address and person
-  for the neutral examples above before the picture is taken. Look at every picture before you add it: no
-  real machine, cluster or person names, no private addresses, no error that the page does not explain.
+- **Show, then say.** Fadenstack is meant to be simple to run, and a page should look it. Put a picture of the
+  screen at the top of a page, and one above each step that opens a dialog or a part of the screen the text
+  talks about: the picture carries the layout, so the text does not describe it. Keep the steps short.
+- **Fold the details away.** What most readers do not need on the first read (field-by-field explanations,
+  limits, edge cases, background) goes into a collapsed block, `??? info "More about …"`, under the step it
+  belongs to. Nothing is cut that a reader may need; it is one click away.
+- **Tables for lookups.** "When it does not work" is a table, **You see** | **What to do**, and so is anything
+  else a reader scans rather than reads.
+- **Screenshots** live in `pages/images/<section>/` and are taken with `scripts/shots.mjs`, which swaps every
+  name, address and person for the neutral examples above before the picture is taken. Look at every picture
+  before you add it: no real machine, cluster or person names, no private addresses, no test data, no error
+  that the page does not explain.
   Alt text says what the picture shows: `![The cluster page with two machines](../images/operate/cluster.png)`.
 
 ## Questions for the front page
@@ -105,8 +112,9 @@ titles are in `nav-de.toml`. Everything above applies; in addition:
 - **Untranslated:** commands, code, file and folder names, paths, setting keys (`users.login_lifetime_s`),
   environment variables, role and permission names (`default_user`, `rag.search:write`), product names
   (Fadenstack, Ray, vLLM, NVIDIA), HTTP status codes, and messages quoted as the system shows them.
-- **Pictures** are the English screenshots until German ones are taken: the paths stay as in `pages/`
-  (`../images/...`), only the alt text is German.
+- **Pictures** keep the paths of `pages/` (`../images/...`), with German alt text. `HELP_SHOTS_LANG=de` takes
+  them with the console in German into `pages/images/de/`, and the German Help shows those wherever there is
+  one (`scripts/build.py`); otherwise the English picture.
 - **Typography:** „…" for quotes, "z. B.", "d. h.", a space before units ("12 GB"), a decimal comma in prose
   ("1,5 GB"), " – " for a dash. Headings in sentence case, as in German anyway.
 - **Words**, one German word for one thing, everywhere:

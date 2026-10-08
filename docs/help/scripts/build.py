@@ -166,6 +166,28 @@ def _anchors(text: str) -> tuple[str, set[str]]:
     return title, anchors
 
 
+_IMAGE = re.compile(r"(\]\()((?:\.\./)*)images/([^)\s]+?\.png)")
+
+
+def _local_images(docs: Path, lang: str) -> None:
+    """Point a translation's pictures at pages/images/<lang>/ where there is one, and keep only its language's."""
+    for other in LANGS:
+        if other not in ("en", lang):
+            shutil.rmtree(docs / "images" / other, ignore_errors=True)
+    if lang == "en":
+        return
+
+    def swap(m: re.Match) -> str:
+        local = HELP / "pages" / "images" / lang / m[3]
+        return f"{m[1]}{m[2]}images/{lang}/{m[3]}" if local.is_file() else m[0]
+
+    for page in docs.rglob("*.md"):
+        text = page.read_text(encoding="utf-8")
+        localised = _IMAGE.sub(swap, text)
+        if localised != text:
+            page.write_text(localised, encoding="utf-8")
+
+
 def _page_url(page: str) -> str:
     """The address of a page below the site's root: use/chat.md -> use/chat/, index.md -> ''."""
     stem = page[: -len(".md")]
@@ -223,7 +245,8 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
         shutil.rmtree(child) if child.is_dir() else child.unlink()
     shutil.copytree(pages, out / "docs", dirs_exist_ok=True) if pages.is_dir() else (out / "docs").mkdir()
     if lang != "en":
-        # The English pictures, until there are others; a page not translated yet is the English one.
+        # The pictures: the language's own under images/<lang>/ where taken (_local_images), the English ones
+        # otherwise; a page not translated yet is the English one.
         shutil.copytree(HELP / "pages" / "images", out / "docs" / "images", dirs_exist_ok=True)
     fell_back = []
     for page in english:
@@ -234,6 +257,7 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
             target_file.write_text(_with_note(text, words["untranslated"]), encoding="utf-8")
             fell_back.append(page)
     _title_admonitions(out / "docs", lang)
+    _local_images(out / "docs", lang)
     shutil.copytree(theme / "assets", out / "docs" / "assets", dirs_exist_ok=True)
     _questions(lang, out / "docs")
     shutil.copytree(theme / "overrides", out / "overrides")
