@@ -217,3 +217,201 @@
   border-radius: var(--fs-radius);
   border: 1px solid var(--md-default-fg-color--lightest);
 }
+
+/* front pages: the hero, icons in cards, the SDK diagram, the request flow */
+.md-typeset .fs-hero {
+  margin: 0.5rem 0 2rem;
+  padding: 2rem 2rem 1.6rem;
+  border-radius: var(--fs-radius);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--md-accent-fg-color--transparent), transparent 60%),
+    linear-gradient(180deg, var(--md-default-fg-color--lightest), transparent);
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .fs-hero h1 {
+  margin: 0 0 0.6rem;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--md-default-fg-color);
+}
+.md-typeset .fs-hero .md-button {
+  margin: 0.4rem 0.4rem 0 0;
+  border-radius: var(--fs-radius);
+}
+.md-typeset .grid.cards .lg {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-right: 0.3rem;
+  color: var(--md-accent-fg-color);
+}
+
+.md-typeset .fs-arch {
+  margin: 1.2rem 0 1.6rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  font-size: 0.72rem;
+}
+.md-typeset .fs-arch__label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+}
+.md-typeset .fs-arch__band,
+.md-typeset .fs-arch__sdk,
+.md-typeset .fs-arch__plain {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: var(--fs-radius);
+  background: var(--md-default-bg-color);
+}
+.md-typeset .fs-arch__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.md-typeset .fs-arch__chips > span {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color);
+}
+.md-typeset .fs-arch__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.md-typeset .fs-arch__sdk {
+  border-color: var(--md-accent-fg-color);
+  background: var(--md-accent-fg-color--transparent);
+}
+.md-typeset .fs-arch__sdk,
+.md-typeset .fs-arch__plain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.md-typeset .fs-arch__layer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: calc(var(--fs-radius) - 4px);
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .fs-arch__layer b {
+  min-width: 6.5rem;
+  color: var(--md-default-fg-color);
+}
+.md-typeset .fs-arch__layer > span {
+  flex: 1 1 10rem;
+  color: var(--md-default-fg-color--light);
+}
+.md-typeset .fs-arch__layer code {
+  font-size: 0.66rem;
+}
+.md-typeset .fs-arch__layer--key {
+  border-color: var(--md-accent-fg-color);
+}
+.md-typeset .fs-arch__layer--tools {
+  border-style: dashed;
+}
+.md-typeset .fs-arch__plain {
+  justify-content: flex-start;
+}
+/* the line between the device and the server, with an arrow at each end */
+.md-typeset .fs-arch__wire {
+  position: relative;
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.66rem;
+}
+.md-typeset .fs-arch__wire::before {
+  content: "";
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 50%;
+  border-left: 2px solid var(--fs-thread);
+}
+.md-typeset .fs-arch__wire > span {
+  position: relative;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-typeset .fs-arch__band--server {
+  border-color: var(--md-default-fg-color--lighter);
+}
+.md-typeset .fs-arch figcaption {
+  margin: 0.8rem 0 0;
+  max-width: none;
+  text-align: left;
+  font-size: 0.68rem;
+  color: var(--md-default-fg-color--light);
+}
+@media screen and (max-width: 44.9844em) {
+  .md-typeset .fs-arch__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .md-typeset .fs-hero {
+    padding: 1.4rem 1.1rem 1.2rem;
+  }
+  .md-typeset .fs-hero h1 {
+    font-size: 1.7rem;
+  }
+}
+
+/* the steps every request takes, left to right on a wide screen */
+.md-typeset ol.fs-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 1.4rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: fs-flow;
+}
+.md-typeset ol.fs-flow > li {
+  position: relative;
+  margin: 0;
+  padding: 0.75rem 0.8rem 0.8rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: var(--fs-radius);
+  counter-increment: fs-flow;
+  font-size: 0.7rem;
+}
+.md-typeset ol.fs-flow > li::before {
+  content: counter(fs-flow);
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-bottom: 0.4rem;
+  border-radius: 50%;
+  background: var(--md-accent-fg-color--transparent);
+  color: var(--md-accent-fg-color);
+  font-weight: 600;
+  font-size: 0.65rem;
+}
+.md-typeset ol.fs-flow > li b {
+  display: block;
+  color: var(--md-default-fg-color);
+}
+.md-typeset ol.fs-flow > li span {
+  color: var(--md-default-fg-color--light);
+}
