@@ -159,11 +159,16 @@ def parse_draft(text: str, *, fallback_name: str = "new-skill") -> Draft:
             None,
         )
         if end is not None:
+            block = lines[start + 1 : end]
             try:
-                loaded = yaml.safe_load("\n".join(lines[start + 1 : end]))
+                loaded = yaml.safe_load("\n".join(block))
             except yaml.YAMLError:
                 loaded = None
-            if isinstance(loaded, dict):
+            if not isinstance(loaded, dict):
+                # A description with a colon in it ("... error code: explain ...") is not YAML, and models
+                # write one often: read the block a line at a time instead of losing the name and description.
+                loaded = _loose_front(block)
+            if loaded:
                 front = loaded
                 body = "\n".join(lines[end + 1 :]).strip()
 
@@ -180,6 +185,23 @@ def parse_draft(text: str, *, fallback_name: str = "new-skill") -> Draft:
         description=description,
         body_markdown=body,
     )
+
+
+_KEY_RE = re.compile(r"^([A-Za-z][\w-]*):\s?(.*)$")
+
+
+def _loose_front(block: list[str]) -> dict[str, str]:
+    """``key: value`` lines, the value running to the end of the line and on over indented lines."""
+    front: dict[str, str] = {}
+    key = None
+    for line in block:
+        match = _KEY_RE.match(line)
+        if match:
+            key = match.group(1)
+            front[key] = match.group(2).strip().strip("\"'")
+        elif key is not None and line[:1].isspace() and line.strip():
+            front[key] = f"{front[key]} {line.strip()}".strip()
+    return front
 
 
 def slugify(text: str) -> str:

@@ -286,6 +286,25 @@ def test_a_loose_answer_still_becomes_a_draft() -> None:
     assert unclosed_think.body_markdown == "Body"
 
 
+def test_a_description_with_a_colon_is_still_read() -> None:
+    """Not YAML, as the 27B wrote it on .61: the form showed "New Skill" and the header in the instructions."""
+    answer = (
+        "---\n"
+        "name: machine-fault-customer-replies\n"
+        "description: Draft short customer replies about a machine fault or error code: explain the code in\n"
+        "  plain terms, and confirm the technician visit.\n"
+        "---\n\n"
+        "## Goal\nA short, accurate reply."
+    )
+    draft = drafting.parse_draft(answer)
+    assert draft.slug == "machine-fault-customer-replies"
+    assert draft.description == (
+        "Draft short customer replies about a machine fault or error code: explain the code in plain terms, "
+        "and confirm the technician visit."
+    )
+    assert draft.body_markdown == "## Goal\nA short, accurate reply."
+
+
 def test_the_transcript_keeps_the_newest_turns() -> None:
     messages = [{"role": "user", "content": f"turn {i} " + "x" * 50} for i in range(100)]
     messages.append({"role": "system", "content": "hidden"})
