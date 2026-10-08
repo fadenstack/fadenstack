@@ -205,6 +205,11 @@ function id(value: string): string {
 
 // ── Skills ─────────────────────────────────────────────────────────────────
 
+/** Whether the Skills module is on; anyone who may use skills may ask. */
+export async function skillsStatus(): Promise<{ enabled: boolean }> {
+  return request<{ enabled: boolean }>("/status");
+}
+
 export async function listSkills(params?: {
   view?: SkillListView;
   q?: string;

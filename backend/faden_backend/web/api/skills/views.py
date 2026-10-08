@@ -39,6 +39,7 @@ from faden_backend.services.skills.client import (
     SkillsPrincipal,
     SkillsServiceClient,
     get_skills_client,
+    skills_client_if_enabled,
 )
 from faden_backend.web.api.rbac import require_permission
 
@@ -106,6 +107,24 @@ async def list_principals(
     (``user:<id>,group:<id>``) names the ones a skill is already shared with.
     """
     return await find_principals(session, q=q, ids=ids)
+
+
+class SkillsStatus(BaseModel):
+    """Whether skills can be used on this server."""
+
+    enabled: bool
+
+
+@router.get("/status", response_model=SkillsStatus)
+async def skills_status(
+    _user: Annotated[User, Depends(require_permission(RESOURCE, "read"))],
+) -> SkillsStatus:
+    """Whether the Skills module is on, for everyone who may use skills.
+
+    The chat asks before it offers skills. It used to read the list of modules, which only administrators may
+    (``modules:read``), so for everyone else skills looked switched off.
+    """
+    return SkillsStatus(enabled=skills_client_if_enabled() is not None)
 
 
 class DraftRequest(BaseModel):

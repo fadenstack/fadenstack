@@ -18,6 +18,7 @@ from httpx import ASGITransport, AsyncClient
 from faden_backend.db.dao.rbac_dao import _DEFAULT_ROLES, RbacDAO
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.skills import client as skills_client
 from faden_backend.services.skills import drafting
 from faden_backend.services.skills.client import SkillsPrincipal, SkillsServiceClient, get_skills_client
 from faden_backend.web.api.skills import views as skills_views
@@ -148,6 +149,27 @@ async def test_nothing_reaches_the_services_internal_api(
     response = await _call(app, "GET", path)
     assert response.status_code == 404
     assert upstream.requests == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("on", [True, False])
+async def test_a_user_who_may_read_skills_learns_whether_they_are_on(
+    on: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    upstream: _Upstream,
+) -> None:
+    """The chat asked the administrators' module list, so for every other user skills looked off."""
+    monkeypatch.setattr(skills_client.settings, "skills_enabled", on)
+    application = get_app()
+    application.dependency_overrides[get_db_session] = _no_db
+    application.dependency_overrides[current_active_user] = lambda: _user(superuser=False)
+    dao = MagicMock(spec=RbacDAO)
+    dao.has_permission = AsyncMock(return_value=True)
+    application.dependency_overrides[RbacDAO] = lambda: dao
+    response = await _call(application, "GET", "/api/skills/status")
+    assert response.status_code == 200
+    assert response.json() == {"enabled": on}
+    assert upstream.requests == []  # answered here, not by the service
 
 
 @pytest.mark.anyio
