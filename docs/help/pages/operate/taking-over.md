@@ -4,8 +4,9 @@ If the server is rebuilt without its database, or restored from a backup older t
 keep running the clusters and models the old server started. The new server can take such a cluster over as it
 runs: its machines, and each model it serves. No model restarts, during the takeover or afterwards.
 
-Creating the cluster again instead would restart every model, and while the old copies still hold their GPUs the
-new ones often do not fit.
+??? info "Why not create the cluster again?"
+    Creating the cluster again instead would restart every model, and while the old copies still hold their GPUs the
+    new ones often do not fit.
 
 ## Before you start
 
@@ -16,12 +17,10 @@ new ones often do not fit.
 
 ## Take over a cluster
 
-1. Open **Clusters**. A card, **Running on your machines, not managed here**, lists every cluster a machine runs
-   that this server does not manage: its machines, and each model with its copies and GPUs per copy.
+1. Open **Clusters** and find the card **Running on your machines, not managed here**.
 2. Select **Take over…** on the cluster.
 3. Enter a **Cluster name**.
-4. For each model, enter the name clients ask for at the gateway (*model*: **name at the gateway**). The old
-   server kept these names in its own database, not on the machines, so they have to be entered again. The
+4. For each model, enter the name clients ask for at the gateway (*model*: **name at the gateway**). The
    suggestion is the model's own name in lower case.
 5. Select **Take over**.
 
@@ -31,17 +30,22 @@ the name you gave it.
 Before anything is recorded, the cluster is asked to confirm that what this server would deploy for each model is
 exactly what runs. If anything differs, nothing is recorded and the dialog shows the difference.
 
+??? info "More about the card and the names"
+    The card lists every cluster a machine runs that this server does not manage: its machines, and each model with
+    its copies and GPUs per copy.
+
+    The old server kept the names at the gateway in its own database, not on the machines, so they have to be
+    entered again.
+
 ## What is carried over, and what is not
 
-Carried over: the cluster's machines, the network it runs on, its token, and each model Fadenstack deployed on it
-with its settings and copies.
-
-Not carried over:
-
-- **The names** shown in the console and used at the gateway. You enter them again when you take over.
-- **History**: logs, metrics and past requests stay with the old server.
-- **Applications Fadenstack did not deploy.** They keep running and are listed ("Also running, not deployed by
-  Fadenstack and left as they are"), but are not managed.
+| What | Carried over |
+|---|---|
+| The cluster's machines, the network it runs on, its token | Yes |
+| Each model Fadenstack deployed on it, with its settings and copies | Yes |
+| **The names** shown in the console and used at the gateway | No. You enter them again when you take over |
+| **History**: logs, metrics and past requests | No. They stay with the old server |
+| **Applications Fadenstack did not deploy** | No. They keep running and are listed ("Also running, not deployed by Fadenstack and left as they are"), but are not managed |
 
 ## When a cluster cannot be taken over
 

@@ -40,19 +40,18 @@ newer runtime. Each is a separate step that you start; nothing upgrades itself.
 
 4. Check it (below).
 
-The upgrade, in order:
-
-1. checks Docker, and that no container it is about to replace was created by something else;
-2. backs up every database, the `.env` and the certificate material into `~/fadenstack/backups/<time>/`, and stops
-   if nothing could be backed up;
-3. replaces the deployment files with the new release's, and adds to `.env` only the settings the release
-   introduces: every value you set is kept, except the sizing of the services, which is worked out again for the
-   host as `faden tune` does;
-4. pulls the new release's images;
-5. restarts the services behind the maintenance page; the database migrations run here;
-6. waits for the console API to answer, then lifts the maintenance page;
-7. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
-   nothing: retry it with `faden runtime-images`.
+??? info "What the upgrade does, in order"
+    1. checks Docker, and that no container it is about to replace was created by something else;
+    2. backs up every database, the `.env` and the certificate material into `~/fadenstack/backups/<time>/`, and
+       stops if nothing could be backed up;
+    3. replaces the deployment files with the new release's, and adds to `.env` only the settings the release
+       introduces: every value you set is kept, except the sizing of the services, which is worked out again for
+       the host as `faden tune` does;
+    4. pulls the new release's images;
+    5. restarts the services behind the maintenance page; the database migrations run here;
+    6. waits for the console API to answer, then lifts the maintenance page;
+    7. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
+       nothing: retry it with `faden runtime-images`.
 
 | Option | What it does |
 |---|---|
@@ -72,12 +71,13 @@ in `.env`.
 
 ### What people see meanwhile
 
-While the services restart, every page of the console shows "Fadenstack is being updated" and reloads itself into
-the console once it is back. The API (`/api`) and the gateway (`/v1`) answer `503` with `Retry-After: 30`, so
-scripts and SDKs can wait and retry. A console page left open notices the new version and offers **Reload**; a page
-with text typed and not sent is never reloaded by itself.
-
 ![The maintenance page: Fadenstack is being updated, and it reloads by itself when it is back](../images/operate/maintenance-page.png)
+
+| Who | What they see while the services restart |
+|---|---|
+| People in the console | Every page of the console shows "Fadenstack is being updated" and reloads itself into the console once it is back. |
+| Scripts and SDKs | The API (`/api`) and the gateway (`/v1`) answer `503` with `Retry-After: 30`, so scripts and SDKs can wait and retry. |
+| A console page left open | It notices the new version and offers **Reload**; a page with text typed and not sent is never reloaded by itself. |
 
 The models on the clusters keep running throughout: a cluster runs on its machines, not on the server.
 
@@ -109,13 +109,17 @@ A new release may expect a newer node agent than the machines run. The **Machine
 then show **Agent *version* available** on that machine, with the version the server expects. Agents never update themselves, and the server never
 updates them: you pick the window.
 
+![The Add a machine panel with the install line to copy](../images/operate/add-machine-panel.png){ width="360" }
+
 1. In the console, open **Machines** and select **Add a machine**, and copy the install line.
 2. On each machine, run the line again, the same way you ran it the first time: with `sudo` for an agent that runs
    as a system service, without it for one that runs as a user service.
 
 The installer downloads the agent the server now expects, sees that the machine is already a member, and
-restarts the agent on the new build. There is nothing to approve. The models on the machine keep running: the
-agent is the machine's link to the server, and the cluster's containers do not depend on it running.
+restarts the agent on the new build. There is nothing to approve. The models on the machine keep running.
+
+??? info "Why the models keep running"
+    The agent is the machine's link to the server, and the cluster's containers do not depend on it running.
 
 Update the agents soon after an upgrade. Some features need a recent agent on every machine of a cluster, and
 the console names the machines to update when one is missing (for example on the cluster's **Traffic between
@@ -130,26 +134,29 @@ for you, and an old copy holds back the machines that rely on it.
 
 ## Move a cluster to another runtime
 
-A runtime is the image a cluster's machines run: Ray and vLLM together, built for that kind of machine. The
-cluster's **Runtime** card says whether it is certified: **Certified**, **Partly certified** or **Not certified**. A
-release ships a **Recommended** runtime for each kind of machine, can ship a newer **Preview**, and keeps an older
-one to go back to. A new cluster gets the recommended one.
+A runtime is the image a cluster's machines run: Ray and vLLM together, built for that kind of machine. When a
+newer certified runtime is out, the cluster's **Runtime** card says so. Nothing changes until you switch.
 
-A cluster keeps the runtime it was started with: through restarts, through recovery after a fault, and through
-server upgrades that ship a newer one. When a newer certified runtime is out, the cluster's **Runtime** card says
-so. Nothing changes until you switch.
+![The Runtime card on a cluster's page: the runtime it runs, and Switch to with Switch](../images/operate/cluster-runtime-card.png)
 
 1. Open **Clusters**, then the cluster.
 2. On the **Runtime** card, choose the runtime under **Switch to** and select **Switch**.
-
-    ![The Runtime card on a cluster's page: the runtime it runs, and Switch to with Switch](../images/operate/cluster-runtime-card.png)
-
 3. Read the warning and select **Restart on this runtime**.
 
 Each machine's container is made again from the new image (a machine that does not hold it yet fetches it first),
-and every model on the cluster loads again. Plan a window for it. A **Preview** runs models the recommended
-runtime cannot; choose it for a cluster that needs those models. The model marketplace says **Cannot run here**
-for a model that needs a newer runtime than the cluster runs (see [Models](../administer/models.md)).
+and every model on the cluster loads again. Plan a window for it.
+
+??? info "More about runtimes"
+    The cluster's **Runtime** card says whether it is certified: **Certified**, **Partly certified** or **Not
+    certified**. A release ships a **Recommended** runtime for each kind of machine, can ship a newer **Preview**,
+    and keeps an older one to go back to. A new cluster gets the recommended one.
+
+    A cluster keeps the runtime it was started with: through restarts, through recovery after a fault, and through
+    server upgrades that ship a newer one.
+
+    A **Preview** runs models the recommended runtime cannot; choose it for a cluster that needs those models. The
+    model marketplace says **Cannot run here** for a model that needs a newer runtime than the cluster runs (see
+    [Models](../administer/models.md)).
 
 ## Going back
 
@@ -174,24 +181,11 @@ over instead of creating it again (see [Taking over clusters](taking-over.md)). 
 
 ## When it does not work
 
-**`These containers have names this installation uses, but it did not create them`.** A container with one of
-Fadenstack's names was made some other way, by hand or by another compose project. The message lists them and
-the command to remove them (`docker rm -f <name>`). Removing a container keeps its data volumes. Then run the
-upgrade again.
-
-**`This CLI (<version>) is older than the install (<version>).`** The tool is older than the release the install
-runs. Upgrade the tool first.
-
-**`Backup failed — aborting upgrade.`** Usually a full disk, or Postgres not running. Free space, check
-`faden status`, and run it again. Use `--no-backup` only if you have a current backup.
-
-**`Backend did not become healthy within 120 s.`** The services were restarted but the console API does not answer
-yet. Read `faden logs faden-backend`. The maintenance page is lifted anyway, so whatever runs can be reached.
-
-**`... this release names a build that is on no registry.`** A runtime image for one kind of machine is not
-published. The upgrade is not affected and running clusters keep their images. A machine of that kind can still
-get the image from another machine of its cluster that holds it.
-
-**The disk is full.** Postgres, the log store and the other stores restart over and over. Nothing works until
-there is space: remove images no container uses (`docker image prune`), move old backups off the server, then run
-the upgrade again. The dashboard warns earlier: **Disk space low**.
+| You see | What to do |
+|---|---|
+| **`These containers have names this installation uses, but it did not create them`** | A container with one of Fadenstack's names was made some other way, by hand or by another compose project. The message lists them and the command to remove them (`docker rm -f <name>`). Removing a container keeps its data volumes. Then run the upgrade again. |
+| **`This CLI (<version>) is older than the install (<version>).`** | The tool is older than the release the install runs. Upgrade the tool first. |
+| **`Backup failed — aborting upgrade.`** | Usually a full disk, or Postgres not running. Free space, check `faden status`, and run it again. Use `--no-backup` only if you have a current backup. |
+| **`Backend did not become healthy within 120 s.`** | The services were restarted but the console API does not answer yet. Read `faden logs faden-backend`. The maintenance page is lifted anyway, so whatever runs can be reached. |
+| **`... this release names a build that is on no registry.`** | A runtime image for one kind of machine is not published. The upgrade is not affected and running clusters keep their images. A machine of that kind can still get the image from another machine of its cluster that holds it. |
+| The disk is full: Postgres, the log store and the other stores restart over and over | Nothing works until there is space: remove images no container uses (`docker image prune`), move old backups off the server, then run the upgrade again. The dashboard warns earlier: **Disk space low**. |

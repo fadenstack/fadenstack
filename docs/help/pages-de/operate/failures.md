@@ -6,9 +6,11 @@ bleibt und wo Sie die Logs lesen, wenn Sie sie brauchen.
 ## Was sich selbst repariert {#what-repairs-itself}
 
 Jede Minute sieht sich Fadenstack jeden laufenden Cluster und jedes aktive Modell an, und zusätzlich, wenn sich eine
-Maschine wieder verbindet oder der Server startet. Eine solche Prüfung startet nur dann etwas neu, wenn etwas nicht
-stimmt, und Fadenstack prüft ein zweites Mal, bevor es irgendetwas neu startet: Ein ausgelasteter Head, der langsam
-geantwortet hat, ist kein ausgefallener.
+Maschine wieder verbindet oder der Server startet.
+
+??? info "Wann eine Prüfung etwas neu startet"
+    Eine solche Prüfung startet nur dann etwas neu, wenn etwas nicht stimmt, und Fadenstack prüft ein zweites Mal,
+    bevor es irgendetwas neu startet: Ein ausgelasteter Head, der langsam geantwortet hat, ist kein ausgefallener.
 
 | Was ausfällt | Was Sie sehen | Was Fadenstack tut |
 |---|---|---|
@@ -21,13 +23,14 @@ geantwortet hat, ist kein ausgefallener.
 | Das Gateway startet neu | Chat- und API-Anfragen schlagen fehl, solange es nicht läuft | Nichts nötig |
 | Die Verbindung zwischen einer Maschine und dem Server bricht ab | Die Maschine zeigt **Offline**, wenn sie wegbleibt | Was die Maschine gerade tat, z. B. ein Modell kopieren, läuft weiter; das Ergebnis wird gemeldet, wenn sie sich wieder verbindet |
 
-Nach einem Ausfall des Heads entfällt der größte Teil der Unterbrechung auf das erneute Laden der Modelle; der
-Cluster selbst ist viel früher wieder da.
-
 Während ein Cluster neu gestartet wird, zeigen seine Modelle **Not serving**, und das Gateway schickt ihnen keine
 Anfragen mehr. Auf einen Cluster, der nicht bereit ist, wird nichts angewendet, und nichts wird angewendet, solange
 eine seiner Maschinen offline ist: Das Modell meldet „Waiting for *Maschine* to reconnect before applying.“ und macht
 weiter, sobald sie wieder verbunden ist.
+
+??? info "Wie lange eine Unterbrechung dauert"
+    Nach einem Ausfall des Heads entfällt der größte Teil der Unterbrechung auf das erneute Laden der Modelle; der
+    Cluster selbst ist viel früher wieder da.
 
 ### Wenn Fadenstack es nicht reparieren kann {#when-it-cannot-repair-it}
 
@@ -36,12 +39,14 @@ Nach drei Neustarts, die den Head nicht zurückgebracht haben, zeigt der Cluster
 > Ray on *Maschine*, the cluster's head, is not running. Fadenstack restarted it 3 times and it did not come back
 > (last: …). It tries again every 15 minutes; use Try again once the cause is fixed.
 
-Fadenstack versucht es weiterhin alle 15 Minuten, weil die Ursache verschwinden kann, ohne dass jemand Fadenstack
-Bescheid gibt, etwa eine Netzwerkverbindung, die wieder da ist. Beheben Sie die Ursache und wählen Sie dann
-**Erneut versuchen** auf der Seite des Clusters.
+Beheben Sie die Ursache und wählen Sie dann **Erneut versuchen** auf der Seite des Clusters.
 
 Es startet nichts neu, wenn niemand auf seine Prüfung geantwortet hat: Dann ist über Ray nichts bekannt, und das
 Modell meldet „Could not check the model just now; it is looked at again within a minute.“
+
+??? info "Warum Fadenstack es weiter versucht"
+    Fadenstack versucht es weiterhin alle 15 Minuten, weil die Ursache verschwinden kann, ohne dass jemand
+    Fadenstack Bescheid gibt, etwa eine Netzwerkverbindung, die wieder da ist.
 
 ### Was Ihnen überlassen bleibt {#what-is-left-to-you}
 
@@ -53,6 +58,8 @@ Modell meldet „Could not check the model just now; it is looked at again withi
   nicht stimmt.
 
 ## Was die Meldungen einer Bereitstellung bedeuten {#what-the-deployment-messages-mean}
+
+![Die Seite einer Bereitstellung: Zustand Aktiv, Kopien (bereit / gewünscht) 2 / 2, ihr Cluster und Letzte Meldung „Serving on 2 copies.“](../images/administer/deployment.png)
 
 Die Seite einer Bereitstellung sagt in einer Zeile, was sie gerade tut. Die Meldungen, denen Sie begegnen werden:
 
@@ -78,6 +85,8 @@ Karte nicht unterstützt. Die Einstellungen einer Bereitstellung zu ändern ist 
 
 ### In der Konsole {#in-the-console}
 
+![Die Seite Logs auf dem Reiter Systemprotokolle: der Zeitraum, die Suche, die Filter Maschine, Quelle, Container und Stufe sowie Live](../images/operate/logs.png)
+
 **Logs** (in der Navigation) sammelt die Logs aller Maschinen und der eigenen Dienste des Servers. Auf dem Reiter
 **Systemprotokolle** können Sie:
 
@@ -86,8 +95,6 @@ Karte nicht unterstützt. Die Einstellungen einer Bereitstellung zu ändern ist 
 - nach **Maschine**, **Quelle**, **Deployment**, **Komponente**, **Kopie**, **Dienst**, **Container** und **Stufe**
   eingrenzen. Die Filter bieten nur an, was der gewählte Zeitraum enthält;
 - den Text durchsuchen.
-
-![Die Seite Logs auf dem Reiter Systemprotokolle: der Zeitraum, die Suche, die Filter Maschine, Quelle, Container und Stufe sowie Live](../images/operate/logs.png)
 
 | Quelle | Was sie ist |
 |---|---|
@@ -100,19 +107,20 @@ Der Reiter **Audit** listet auf, wer was geändert hat: die Aktion, ihr Ziel, ih
 
 An anderen Stellen zeigt die Konsole dieselben Logs dort, wo Sie sie brauchen:
 
-- die **Seite einer Maschine**: ihre **Systemprotokolle** der letzten 15 Minuten und **In Logs öffnen** für den Rest;
-- die **Seite einer Bereitstellung**: ihre **Protokolle**, mit den Zeilen der Modellbereitstellung und der Engine
-  (vLLM), nach Stufe filterbar, durchsuchbar und mit **Neuen Zeilen folgen**, **Angezeigte Zeilen kopieren** und
-  **Angezeigte Zeilen herunterladen**;
-- die **Seite eines Containers** unter **Container**: seine letzten 300 Zeilen.
-
-Die Modellkopien schreiben eine Zeile, wenn etwas geschieht (Start, Stopp, ein Fehler), nicht für jede Anfrage.
-
-Maschinen senden ihre Logs über die normale Adresse des Servers, mit ihren eigenen Zugangsdaten; eine Zeile, die der
-Server nicht angenommen hat, wird später erneut gesendet. Auf den Maschinen muss nichts eingerichtet werden.
+| Wo | Was dort steht |
+|---|---|
+| Die **Seite einer Maschine** | Ihre **Systemprotokolle** der letzten 15 Minuten und **In Logs öffnen** für den Rest |
+| Die **Seite einer Bereitstellung** | Ihre **Protokolle**, mit den Zeilen der Modellbereitstellung und der Engine (vLLM), nach Stufe filterbar, durchsuchbar und mit **Neuen Zeilen folgen**, **Angezeigte Zeilen kopieren** und **Angezeigte Zeilen herunterladen** |
+| Die **Seite eines Containers** unter **Container** | Seine letzten 300 Zeilen |
 
 Metrik-Dashboards finden Sie in Grafana, das Sie aus der Konsole unter `/grafana/` erreichen (die Seite eines
 Clusters hat **Metrik-Dashboard öffnen**).
+
+??? info "Mehr zu den Logs"
+    Die Modellkopien schreiben eine Zeile, wenn etwas geschieht (Start, Stopp, ein Fehler), nicht für jede Anfrage.
+
+    Maschinen senden ihre Logs über die normale Adresse des Servers, mit ihren eigenen Zugangsdaten; eine Zeile, die
+    der Server nicht angenommen hat, wird später erneut gesendet. Auf den Maschinen muss nichts eingerichtet werden.
 
 ### Auf dem Server {#on-the-server}
 

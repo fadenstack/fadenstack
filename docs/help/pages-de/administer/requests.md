@@ -37,11 +37,15 @@ Inhaltsrichtlinien, die eine Eingabe oder eine Antwort anhand ihres Inhalts able
 
 ### 4. Das gewählte Modell antwortet {#4-the-model-you-chose-answers}
 
+![Observability → Datenresidenz: wie viele Daten lokal blieben und wie viele nach außen gingen, und jeder Provider unter „Lokal (On-Premises)“ oder „Extern“](../images/administer/data-residency.png)
+
 Die Anfrage nennt ein Modell: den Namen, der im Chat gewählt, im Agenten eingestellt oder von der Anwendung
 angegeben wurde. Dieser Name ist entweder eine Ihrer [Bereitstellungen](deployments.md), die auf Ihren eigenen
-Maschinen läuft, oder ein [externer Provider](providers.md). Bieten mehrere Bereitstellungen denselben Namen an,
-antwortet eine davon, die funktionsfähig ist. Ein Modell, das nicht antwortet, erhält keine Anfragen, bis es
-wieder antwortet.
+Maschinen läuft, oder ein [externer Provider](providers.md).
+
+??? info "Mehr dazu, welche Bereitstellung antwortet"
+    Bieten mehrere Bereitstellungen denselben Namen an, antwortet eine davon, die funktionsfähig ist. Ein Modell,
+    das nicht antwortet, erhält keine Anfragen, bis es wieder antwortet.
 
 Wo das Modell läuft, bestimmt, wohin die Anfrage geht: [Datenresidenz](providers.md#data-residency) zeigt das für
 jedes Modell.

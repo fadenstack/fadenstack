@@ -2,6 +2,8 @@
 
 The browser agent is Fadenstack in Chrome's side panel. It works with the page you have open: it answers questions about it, shows you where something is, copies tables out, compares tabs, reads PDFs, and writes into the mail or ticket you are working on. It answers with your organisation's model, through your Fadenstack server, and in the **Ask** tool mode, where every chat starts, it asks before it changes anything.
 
+![The browser agent's panel: suggested questions, the bar naming the open page, and the message box with its four buttons below](../images/use/browser-agent-panel.png)
+
 ## Before you start
 
 - **The extension** is installed in Chrome. Your IT department installs it for you, or tells you where to get it.
@@ -11,27 +13,32 @@ The browser agent is Fadenstack in Chrome's side panel. It works with the page y
 ## Open the panel and sign in
 
 1. Select the Fadenstack button in Chrome's toolbar, or press Alt+Shift+F.
-2. The first time, **Connect to Fadenstack** asks for the **Server** (for example `https://ai.example.internal`) and the **Agent** (its address, as the console shows it under **Agents**; `browser-assistant` unless you were told otherwise). Select **Connect**, and allow the access when Chrome asks.
-3. Enter your **E-mail** and **Password** (your Fadenstack account) and select **Sign in**.
+2. The first time, enter the **Server** and the **Agent** in **Connect to Fadenstack**.
+3. Select **Connect**, and allow the access when Chrome asks.
+4. Enter your **E-mail** and **Password** (your Fadenstack account).
+5. Select **Sign in**.
 
 If your IT department set the server and agent, you only sign in.
+
+??? info "Server and Agent"
+    - **Server**: your Fadenstack server, for example `https://ai.example.internal`.
+    - **Agent**: its address, as the console shows it under **Agents**; `browser-assistant` unless you were told otherwise.
 
 ## Ask about a page
 
 Type your question in the panel, for example "Summarise this page" or "What does this contract say about notice periods?". The bar above the message box names the page the agent works with.
 
-![The browser agent's panel: suggested questions, the bar naming the open page, and the message box with its four buttons below](../images/use/browser-agent-panel.png)
-
-The agent reads the page itself when you ask about it: its text, headings, lists and tables, the visible part, without menus, footers and side bars, and without text the page marks as hidden. A long page is read in parts.
+??? info "What the agent reads on a page"
+    The agent reads the page itself when you ask about it: its text, headings, lists and tables, the visible part, without menus, footers and side bars, and without text the page marks as hidden. A long page is read in parts.
 
 The buttons under the message box add something to your next message:
 
 | Button | Adds |
 |---|---|
-| **Add this page** | The page you are on |
-| **Add the selection** | What you selected on the page |
-| **Add tabs** | Tabs of this window you pick, to compare them (**All readable tabs** takes all of them) |
-| **Add a PDF from this computer** | A PDF file; you can also drop it on the panel |
+| **Add this page** (the page) | The page you are on |
+| **Add the selection** (the quote mark) | What you selected on the page |
+| **Add tabs** (the tab) | Tabs of this window you pick, to compare them (**All readable tabs** takes all of them) |
+| **Add a PDF from this computer** (the paper clip) | A PDF file; you can also drop it on the panel |
 
 ![Add tabs opened: All readable tabs and the window's two tabs to tick, with Cancel and Add](../images/use/browser-agent-add-tabs.png)
 
@@ -41,10 +48,12 @@ You can also right-click a selection and choose **Ask Fadenstack about "…"**, 
 
 ## What else it can do
 
-- **Show you where.** Ask where something is on the page: the agent marks the passage and scrolls to it. In a PDF it opens the PDF at the right page.
-- **Copy a table.** Ask it to copy a table or text: it goes on your clipboard as text and as a table, so it pastes into Excel as cells and into Word or Outlook as a table. Every table in an answer also has a copy button.
-- **Write into a mail, a ticket or a form.** The agent fills form fields, and writes formatted text into the editor on the page, such as a mail in Outlook on the web or Gmail, a ticket, or a note. Say where: at your cursor, below the greeting, at the end, or replacing everything.
-- **Read PDFs** open in Chrome, and PDFs you add. Long PDFs are read page by page as needed.
+| Ask it to | What it does |
+|---|---|
+| **Show you where** something is on the page | It marks the passage and scrolls to it. In a PDF it opens the PDF at the right page. |
+| **Copy a table** or text | It puts it on your clipboard as text and as a table, so it pastes into Excel as cells and into Word or Outlook as a table. Every table in an answer also has a copy button. |
+| **Write into a mail, a ticket or a form** | It fills form fields, and writes formatted text into the editor on the page, such as a mail in Outlook on the web or Gmail, a ticket, or a note. Say where: at your cursor, below the greeting, at the end, or replacing everything. |
+| **Read PDFs** | It reads PDFs open in Chrome, and PDFs you add. Long PDFs are read page by page as needed. |
 
 ## What it asks first
 
@@ -56,9 +65,12 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 | Fill a field, write into an editor, copy to the clipboard, open a page | no | no | asks | runs |
 | Press a button or follow a link | no | no | asks | asks |
 
-When it asks, a card shows **Run …?** with the action and what it is given; for a field or a button that is the page's internal reference, not its label. Select **Allow**, **Allow for this chat**, or **Deny**.
-
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
+
+When it asks, a card shows **Run …?** with the action and what it is given. Select **Allow**, **Allow for this chat**, or **Deny**.
+
+??? info "What the card shows for a field or a button"
+    For a field or a button, what the action is given is the page's internal reference, not its label.
 
 ## What it never does
 
@@ -94,14 +106,11 @@ More on what is kept and who sees it: [Your data and privacy](privacy.md).
 
 ## When it does not work
 
-**… does not answer. Check the server's address, and that this computer trusts its certificate.** The address is wrong, or your computer does not trust the server's certificate. Check the address, or tell your IT department.
-
-**There is no agent '…' on …** The **Agent** name is wrong. Use **Change server or agent** and enter it as your administrator gave it.
-
-**You have no access to '…'. Ask your administrator to grant it to you or your team.** You are not yet allowed to use this agent.
-
-**'…' has no published version yet.** or **'…' is retired.** The agent is not available. Ask your administrator.
-
-**Your account is deactivated.** Ask your administrator.
-
-**Fadenstack needs to reach the server. Allow it when Chrome asks.** You declined Chrome's question. Select **Connect** again and allow it.
+| You see | What to do |
+|---|---|
+| **… does not answer. Check the server's address, and that this computer trusts its certificate.** | The address is wrong, or your computer does not trust the server's certificate. Check the address, or tell your IT department. |
+| **There is no agent '…' on …** | The **Agent** name is wrong. Use **Change server or agent** and enter it as your administrator gave it. |
+| **You have no access to '…'. Ask your administrator to grant it to you or your team.** | You are not yet allowed to use this agent. |
+| **'…' has no published version yet.** or **'…' is retired.** | The agent is not available. Ask your administrator. |
+| **Your account is deactivated.** | Ask your administrator. |
+| **Fadenstack needs to reach the server. Allow it when Chrome asks.** | You declined Chrome's question. Select **Connect** again and allow it. |

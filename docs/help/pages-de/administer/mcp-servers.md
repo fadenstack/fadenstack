@@ -4,6 +4,8 @@ Ein MCP-Server gibt Chats und Agenten Tools: ein Repository durchsuchen, ein Tic
 Sie registrieren den Server einmal; Fadenstack verbindet sich mit ihm, listet seine Tools auf und führt ein Tool
 aus, wenn ein Modell es anfordert – nach den Regeln, die Sie festlegen.
 
+![MCP-Server mit zwei Servern, beide aktiv, mit ihrem Transport, der Zahl ihrer Tools und ihrem PII-Modus, oben „Netzwerk durchsuchen“ und „Server registrieren“](../images/administer/mcp-servers.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Das Modul **MCP** ist eingeschaltet (**Einstellungen → Module**; siehe [Module](index.md#modules)). Seine
@@ -18,9 +20,20 @@ aus, wenn ein Modell es anfordert – nach den Regeln, die Sie festlegen.
 
 ## Einen Server registrieren {#register-a-server}
 
-1. Öffnen Sie **Erweiterungen → MCP Hub** und wählen Sie **Server registrieren**.
-2. Füllen Sie das Formular aus:
+![Der Dialog „Server registrieren“: Servername, Transport auf Streamable HTTP, Server-URL, Tool-Präfix, PII-Modus, Zeitlimit (Sekunden) und Header mit „Header hinzufügen“](../images/administer/mcp-register-server.png)
 
+1. Öffnen Sie **Erweiterungen → MCP Hub** und wählen Sie **Server registrieren**.
+2. Geben Sie unter **Servername** einen Namen ein und wählen Sie den **Transport**.
+3. Geben Sie die **Server-URL** (HTTP) oder den **Befehl** (Stdio) ein.
+4. Wählen Sie den **PII-Modus** (siehe [Personenbezogene Daten](#personal-data-pii-mode)).
+5. Fügen Sie unter **Header** (HTTP) oder **Umgebungsvariablen** (Stdio) hinzu, was der Server für den Zugang
+   braucht, z. B. `Authorization: Bearer <token>`.
+6. Wählen Sie **Registrieren**.
+
+Fadenstack verbindet sich mit dem Server und listet seine Tools auf. Der Server erscheint dann als aktiv, mit der
+Zahl seiner Tools.
+
+??? info "Mehr zu den Feldern"
     | Feld | Was Sie eingeben |
     |---|---|
     | **Servername** | Der Name, den die Konsole anzeigt. |
@@ -30,17 +43,6 @@ aus, wenn ein Modell es anfordert – nach den Regeln, die Sie festlegen.
     | **Tool-Präfix** | Ein kurzer, eindeutiger Name. Die Tools des Servers heißen `mcp.<prefix>.<tool>`, z. B. `mcp.github.search_repositories`. Bleibt das Feld leer, wird einer erzeugt. |
     | **PII-Modus** | Was der Server von personenbezogenen Daten sehen darf (siehe [Personenbezogene Daten](#personal-data-pii-mode)). |
     | **Zeitlimit (Sekunden)** | Wie lange der Verbindungsaufbau und jeder Tool-Aufruf dauern dürfen: 5 bis 600 Sekunden. |
-
-    ![Der Dialog Server registrieren: Servername, Transport auf Streamable HTTP, Server-URL, Tool-Präfix, PII-Modus, Zeitlimit (Sekunden) und Header mit Header hinzufügen](../images/administer/mcp-register-server.png)
-
-3. Fügen Sie unter **Header** (HTTP) oder **Umgebungsvariablen** (Stdio) hinzu, was der Server für den Zugang
-   braucht, z. B. `Authorization: Bearer <token>`.
-4. Wählen Sie **Registrieren**.
-
-Fadenstack verbindet sich mit dem Server und listet seine Tools auf. Der Server erscheint dann als aktiv, mit der
-Zahl seiner Tools.
-
-![MCP-Server mit zwei Servern, beide aktiv, mit ihrem Transport, der Zahl ihrer Tools und ihrem PII-Modus, oben Netzwerk durchsuchen und Server registrieren](../images/administer/mcp-servers.png)
 
 !!! warning "Alle nutzen diese Zugangsdaten"
     Header und Variablen werden verschlüsselt gespeichert und nie wieder angezeigt; die Konsole listet nur ihre
@@ -56,16 +58,20 @@ Wählen Sie einen Server in der Liste aus, um seine Seite zu öffnen. Sie zeigt 
 PII-Modus, Zeitlimit und welche Header gesetzt sind und, wenn die letzte Verbindung fehlgeschlagen ist,
 **Der letzte Verbindungsversuch ist fehlgeschlagen** mit dem Grund.
 
-- **Entdeckte Tools** listet jedes Tool auf, das der Server anbietet. Der Schalter **Aktiviert** neben einem
-  Tool schaltet es für alle aus (oder ein).
-- **Aktiviert** oben schaltet den ganzen Server aus oder ein.
-- **Aktualisieren** listet die Tools neu auf; **Testen** prüft die Verbindung und zählt die Tools.
-- **Bearbeiten** ändert URL oder Befehl, Zeitlimit, PII-Modus sowie Header oder Variablen. Ein gespeicherter
-  Header wird einzeln ersetzt oder entfernt, ohne dass Sie die anderen neu eingeben müssen. Beim Speichern wird
-  der Server neu verbunden, und seine Tools werden neu aufgelistet.
-- **Server löschen** entfernt ihn mit allen seinen Tools.
+| Um | So geht's |
+|---|---|
+| jedes Tool zu sehen, das der Server anbietet | **Entdeckte Tools** listet sie auf. |
+| ein Tool für alle aus- (oder ein-)zuschalten | Der Schalter **Aktiviert** neben dem Tool, unter **Entdeckte Tools**. |
+| den ganzen Server aus- oder einzuschalten | **Aktiviert** oben. |
+| die Tools neu aufzulisten | **Aktualisieren**. |
+| die Verbindung zu prüfen und die Tools zu zählen | **Testen**. |
+| URL oder Befehl, Zeitlimit, PII-Modus sowie Header oder Variablen zu ändern | **Bearbeiten** (siehe unten). |
+| ihn mit allen seinen Tools zu entfernen | **Server löschen**. |
 
 ![Einen Server bearbeiten: Server-URL, Zeitlimit (Sekunden) und PII-Modus sowie der gespeicherte Authorization-Header, als gesetzt markiert, mit Ersetzen und Entfernen](../images/administer/mcp-edit-server.png)
+
+Unter **Bearbeiten** wird ein gespeicherter Header einzeln ersetzt oder entfernt, ohne dass Sie die anderen neu
+eingeben müssen. Beim Speichern wird der Server neu verbunden, und seine Tools werden neu aufgelistet.
 
 ## Wer die Tools nutzen kann {#who-can-use-the-tools}
 
@@ -84,6 +90,8 @@ Verfügung. Eine Liste von MCP-Servern pro Person gibt es nicht. Was ausgeführt
 
 ## Wie Benutzer die Tools im Chat erhalten {#how-people-get-the-tools-in-a-chat}
 
+![Der Bereich „Tools“ im Chat: der Tool-Modus mit Aus, Nur lesen, Fragen (gewählt) und Automatisch, und die Tools eines Servers, jedes ausgeschaltet, nicht eingestuft und fragt zuerst](../images/use/chat-tools-panel.png){ width="280" }
+
 - **Jedes MCP-Tool ist in einem neuen Chat zunächst ausgeschaltet.** Jedes Tool, das dem Modell angeboten wird,
   braucht in jeder Nachricht Platz; deshalb werden nur die Tools gesendet, die ein Chat braucht.
 - Ein Tool wird eingeschaltet, wenn die Person es im Bereich **Tools** des Chats (der Schraubenschlüssel)
@@ -95,8 +103,9 @@ Verfügung. Eine Liste von MCP-Servern pro Person gibt es nicht. Was ausgeführt
 
 [Tools im Chat](../use/tools.md) erklärt das für die Benutzer, die damit arbeiten.
 
-Gehostete Server mit vielen Tools lassen sich oft über einen Header eingrenzen. Der Server von GitHub z. B.
-akzeptiert `X-MCP-Toolsets: repos` oder `X-MCP-Readonly: true`.
+??? info "Die Tools eines gehosteten Servers eingrenzen"
+    Gehostete Server mit vielen Tools lassen sich oft über einen Header eingrenzen. Der Server von GitHub z. B.
+    akzeptiert `X-MCP-Toolsets: repos` oder `X-MCP-Readonly: true`.
 
 ## Personenbezogene Daten (PII-Modus) {#personal-data-pii-mode}
 
@@ -115,18 +124,11 @@ ausgeschaltet oder nicht erreichbar, geht der Aufruf unverändert durch.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**„… ist registriert, konnte aber nicht verbunden werden: … Öffnen Sie den Server, um die URL oder die
-Zugangsdaten zu korrigieren.“** Der Server ist gespeichert, steht aber auf Fehler. Öffnen Sie ihn, lesen Sie
-den Grund und wählen Sie **Bearbeiten**. Häufige Gründe:
-
-- er hat mit `401 Unauthorized` geantwortet: Er braucht Zugangsdaten; fügen Sie sie als Header hinzu, z. B.
-  `Authorization: Bearer <token>`;
-- unter dieser Adresse gibt es keinen MCP-Endpunkt (`404`): Adressen für Streamable HTTP enden meist auf
-  `/mcp`, Adressen für SSE auf `/sse`;
-- `Connection refused`: Unter dieser Adresse lauscht nichts, oder der Fadenstack-Server erreicht sie nicht.
-
-**„MCP-Server … ist …“** im Dashboard. Der Server ist fehlerhaft oder getrennt, und seine Tools stehen Chats
-nicht zur Verfügung. Öffnen Sie ihn und wählen Sie **Testen**.
-
-**Benutzer sehen im Chat keine Tools.** Prüfen Sie, ob der Server aktiviert ist, ob seine Tools aktiviert sind
-und ob das Modell, mit dem sie chatten, Tools aufrufen kann.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **„… ist registriert, konnte aber nicht verbunden werden: … Öffnen Sie den Server, um die URL oder die Zugangsdaten zu korrigieren.“** | Der Server ist gespeichert, steht aber auf Fehler. Öffnen Sie ihn, lesen Sie den Grund und wählen Sie **Bearbeiten**. Die häufigen Gründe stehen in den nächsten drei Zeilen. |
+| Der Grund lautet `401 Unauthorized` | Der Server braucht Zugangsdaten: Fügen Sie sie als Header hinzu, z. B. `Authorization: Bearer <token>`. |
+| Der Grund lautet `404` | Unter dieser Adresse gibt es keinen MCP-Endpunkt: Adressen für Streamable HTTP enden meist auf `/mcp`, Adressen für SSE auf `/sse`. |
+| Der Grund lautet `Connection refused` | Unter dieser Adresse lauscht nichts, oder der Fadenstack-Server erreicht sie nicht. |
+| **„MCP-Server … ist …“** im Dashboard | Der Server ist fehlerhaft oder getrennt, und seine Tools stehen Chats nicht zur Verfügung. Öffnen Sie ihn und wählen Sie **Testen**. |
+| Benutzer sehen im Chat keine Tools | Prüfen Sie, ob der Server aktiviert ist, ob seine Tools aktiviert sind und ob das Modell, mit dem sie chatten, Tools aufrufen kann. |

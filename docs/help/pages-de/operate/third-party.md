@@ -50,8 +50,11 @@ Bedingungen.
 | Modell-TLS-Proxy | nginx | Die Lizenz von nginx |
 | Die Modelle | Was Sie von Hugging Face bereitstellen oder importieren | Die eigene Lizenz jedes Modells, die der Administrator bei zugangsbeschränkten Modellen auf Hugging Face akzeptiert |
 
-Die Maschinen erhalten diese Images vom Server. Wenn Sie ein Runtime-Image außerhalb Ihrer Organisation
-weitergeben, prüfen Sie vorher die genauen Bedingungen seines Basis-Images.
+Die Maschinen erhalten diese Images vom Server.
+
+!!! note
+    Wenn Sie ein Runtime-Image außerhalb Ihrer Organisation weitergeben, prüfen Sie vorher die genauen Bedingungen
+    seines Basis-Images.
 
 ## Quellen {#sources}
 

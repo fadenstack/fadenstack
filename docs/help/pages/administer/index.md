@@ -4,6 +4,8 @@ As the administrator, you set Fadenstack up for your organisation in the console
 people can use and where they run, add the people, connect tools, and set the rules for personal data. This
 section walks through each of those tasks.
 
+![The console: the menu on the left, the dashboard on the right, and in the top bar the question mark that opens the Help menu](../images/administer/dashboard.png)
+
 ## Before you start
 
 - Fadenstack is installed, and you can sign in to the console, for example at
@@ -15,17 +17,22 @@ section walks through each of those tasks.
 
 The **Help** menu (the question mark in the top bar) has:
 
-- **Getting started** is a list on the [dashboard](dashboard.md) that takes you from a fresh install to people
-  using it. Each step ticks itself when the server has what it needs, so you can do the steps in any order.
-  **Show me** starts a guide for the step; **Hide** removes the list from the dashboard. It stays under
-  **Help**.
-- **Tour of the console** is a minute's look at where things are.
-- **About this page** (or ++f1++) explains the page you are on and what you can do there. **How-to guides**
-  walk you through a task on the real pages: you do the clicks, the guide shows the way. There are guides
-  for adding a machine, creating a cluster, hosting a model, connecting a cloud model, adding people and
-  creating an API token.
+| Entry | What it does |
+|---|---|
+| **Getting started** | A list on the [dashboard](dashboard.md) that takes you from a fresh install to people using it. |
+| **Tour of the console** | A minute's look at where things are. |
+| **About this page** (or ++f1++) | Explains the page you are on and what you can do there. |
+| **How-to guides** | Walk you through a task on the real pages: you do the clicks, the guide shows the way. |
 
 ![The Getting started list on the dashboard: five steps, four of them ticked, each with Open, and Hide at the top right](../images/administer/getting-started.png)
+
+Each step of **Getting started** ticks itself when the server has what it needs, so you can do the steps in
+any order. **Show me** starts a guide for the step; **Hide** removes the list from the dashboard. It stays
+under **Help**.
+
+??? info "Which how-to guides there are"
+    There are guides for adding a machine, creating a cluster, hosting a model, connecting a cloud model,
+    adding people and creating an API token.
 
 ## First steps, in order
 

@@ -5,8 +5,9 @@ seine Cluster, betreiben die GPU-Maschinen weiter die Cluster und Modelle, die d
 Server kann einen solchen Cluster im laufenden Betrieb übernehmen: seine Maschinen und jedes Modell, das er
 bereitstellt. Kein Modell startet neu, weder während der Übernahme noch danach.
 
-Den Cluster stattdessen neu anzulegen würde jedes Modell neu starten, und solange die alten Kopien ihre GPUs noch
-belegen, passen die neuen oft nicht.
+??? info "Warum den Cluster nicht neu anlegen?"
+    Den Cluster stattdessen neu anzulegen würde jedes Modell neu starten, und solange die alten Kopien ihre GPUs noch
+    belegen, passen die neuen oft nicht.
 
 ## Bevor Sie beginnen {#before-you-start}
 
@@ -18,15 +19,11 @@ belegen, passen die neuen oft nicht.
 
 ## Einen Cluster übernehmen {#take-over-a-cluster}
 
-1. Öffnen Sie **Cluster**. Eine Karte, **Läuft auf Ihren Maschinen, wird hier nicht verwaltet**, listet jeden
-   Cluster auf, den eine Maschine betreibt und den dieser Server nicht verwaltet: seine Maschinen und jedes Modell mit
-   seinen Kopien und den GPUs pro Kopie.
+1. Öffnen Sie **Cluster** und suchen Sie die Karte **Läuft auf Ihren Maschinen, wird hier nicht verwaltet**.
 2. Wählen Sie beim Cluster **Übernehmen…**.
 3. Geben Sie einen **Clustername** ein.
 4. Geben Sie für jedes Modell den Namen ein, unter dem Clients es am Gateway anfragen
-   (*Modell*: **Name am Gateway**). Der alte Server hat diese Namen in seiner eigenen Datenbank gespeichert, nicht auf
-   den Maschinen, deshalb müssen sie erneut eingegeben werden. Vorgeschlagen wird der eigene Name des Modells in
-   Kleinbuchstaben.
+   (*Modell*: **Name am Gateway**). Vorgeschlagen wird der eigene Name des Modells in Kleinbuchstaben.
 5. Wählen Sie **Übernehmen**.
 
 Das dauert einige Sekunden. Danach öffnet sich der Cluster mit seinen laufenden Modellen, und das Gateway bietet
@@ -36,18 +33,22 @@ Bevor etwas erfasst wird, wird der Cluster gebeten zu bestätigen, dass das, was
 bereitstellen würde, genau dem entspricht, was läuft. Weicht etwas ab, wird nichts erfasst, und der Dialog zeigt den
 Unterschied.
 
+??? info "Mehr zur Karte und zu den Namen"
+    Die Karte listet jeden Cluster auf, den eine Maschine betreibt und den dieser Server nicht verwaltet: seine
+    Maschinen und jedes Modell mit seinen Kopien und den GPUs pro Kopie.
+
+    Der alte Server hat die Namen am Gateway in seiner eigenen Datenbank gespeichert, nicht auf den Maschinen,
+    deshalb müssen sie erneut eingegeben werden.
+
 ## Was übernommen wird und was nicht {#what-is-carried-over-and-what-is-not}
 
-Übernommen werden: die Maschinen des Clusters, das Netzwerk, in dem er läuft, sein Token und jedes Modell, das
-Fadenstack auf ihm bereitgestellt hat, mit seinen Einstellungen und Kopien.
-
-Nicht übernommen werden:
-
-- **Die Namen**, die in der Konsole angezeigt und am Gateway verwendet werden. Sie geben sie bei der Übernahme
-  erneut ein.
-- **Verlauf**: Logs, Metriken und vergangene Anfragen bleiben beim alten Server.
-- **Anwendungen, die Fadenstack nicht bereitgestellt hat.** Sie laufen weiter und werden aufgeführt („Läuft
-  ebenfalls, nicht von Fadenstack bereitgestellt und bleibt unverändert“), aber nicht verwaltet.
+| Was | Übernommen |
+|---|---|
+| Die Maschinen des Clusters, das Netzwerk, in dem er läuft, sein Token | Ja |
+| Jedes Modell, das Fadenstack auf ihm bereitgestellt hat, mit seinen Einstellungen und Kopien | Ja |
+| **Die Namen**, die in der Konsole angezeigt und am Gateway verwendet werden | Nein. Sie geben sie bei der Übernahme erneut ein |
+| **Verlauf**: Logs, Metriken und vergangene Anfragen | Nein. Sie bleiben beim alten Server |
+| **Anwendungen, die Fadenstack nicht bereitgestellt hat** | Nein. Sie laufen weiter und werden aufgeführt („Läuft ebenfalls, nicht von Fadenstack bereitgestellt und bleibt unverändert“), aber nicht verwaltet |
 
 ## Wenn sich ein Cluster nicht übernehmen lässt {#when-a-cluster-cannot-be-taken-over}
 

@@ -32,9 +32,11 @@ Bei eingeschaltetem Modul gilt diese Standardrichtlinie:
 - Sie **schwärzt**: Personenbezogene Daten werden ersetzt, und das Modell sieht sie nie.
 - Sie **blockiert** eine Anfrage an einen Cloud-Provider, wenn der Filter nicht laufen kann.
 - Sie liest englischen Text und sucht nach diesen Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`. Datumsangaben (`DATE_TIME`)
-  stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst werden sollen; einfache Zahlen
-  in einer Nachricht können dann ebenfalls als Datum maskiert werden.
+  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+
+??? info "Mehr zu Datumsangaben"
+    Datumsangaben (`DATE_TIME`) stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst
+    werden sollen; einfache Zahlen in einer Nachricht können dann ebenfalls als Datum maskiert werden.
 
 Der Filter hat nur ein englisches Sprachmodell. In deutschem oder anderssprachigem Text findet er weiterhin, was eine
 feste Form hat (E-Mail-Adressen, Telefon-, Karten- und Kontonummern, IP-Adressen, Links), übersieht aber oft Namen
@@ -56,25 +58,31 @@ Die **Standardrichtlinie** gilt für die gesamte Installation:
 Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten (Ihre Organisation ist der Mandant
 `default`, sofern Ihre Installation keine weiteren nutzt):
 
+![Datenschutz (PII) → Mandantenrichtlinien: das Feld „Mandanten-ID“ und „Mandanten laden“](../images/administer/pii-policies.png)
+
 1. Öffnen Sie **Datenschutz (PII) → Mandantenrichtlinien**, geben Sie die **Mandanten-ID** ein und wählen Sie
    **Mandanten laden**.
+
+    ![Eine Mandantenrichtlinie: Erkennung (Presidio) mit Sprache, Schwellenwert und Entitäten, Override löschen und Speichern, der Schalter „Chats und Agenten dürfen den PII-Modus ändern“ und die Vorschau der effektiven Richtlinie](../images/administer/pii-tenant-policy.png)
+
 2. Ändern Sie die Felder unter **Mandanten-Override**. Die **Vorschau der effektiven Richtlinie** zeigt, was für
    Anfragen gelten wird.
 3. Wählen Sie **Speichern**. **Override löschen** kehrt zur Standardrichtlinie zurück.
 
-![Eine Mandantenrichtlinie: Erkennung (Presidio) mit Sprache, Schwellenwert und Entitäten, Override löschen und Speichern, der Schalter „Chats und Agenten dürfen den PII-Modus ändern“ und die Vorschau der effektiven Richtlinie](../images/administer/pii-tenant-policy.png)
+??? info "Mehr zu den Feldern (an beiden Stellen dieselben)"
+    Die Felder sind an beiden Stellen dieselben:
 
-Die Felder sind an beiden Stellen dieselben:
-
-| Feld | Was es bewirkt |
-|---|---|
-| **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
-| **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
-| **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
-| **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Welche Sprache der Filter liest, wie sicher er sein muss und nach welchen Arten von Daten er sucht. Ein höherer Schwellenwert maskiert weniger. Installiert ist nur Englisch: Lassen Sie **Sprache** auf `en`. Mit einer anderen Sprache schlägt jede Prüfung fehl, und **Wenn die Erkennung fehlschlägt** entscheidet. |
-| **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
+    | Feld | Was es bewirkt |
+    |---|---|
+    | **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
+    | **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
+    | **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
+    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Welche Sprache der Filter liest, wie sicher er sein muss und nach welchen Arten von Daten er sucht. Ein höherer Schwellenwert maskiert weniger. Installiert ist nur Englisch: Lassen Sie **Sprache** auf `en`. Mit einer anderen Sprache schlägt jede Prüfung fehl, und **Wenn die Erkennung fehlschlägt** entscheidet. |
+    | **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
 
 ### Chats und Agenten {#chats-and-agents}
+
+![Der Reiter „Datenschutz“ im Seitenbereich des Chats: Schutz der Anfragen an die Cloud und an lokale Modelle, Modus und Fehleraktion, Telemetrie sowie Schwellenwert und Entitäten der Erkennung](../images/use/chat-privacy-tab.png){ width="280" }
 
 - Ein Benutzer kann die Richtlinie für einen einzelnen Chat im Bereich **Datenschutz** des Chats **strenger**
   machen: mehr Typen, ein höherer Schwellenwert, auch lokale Modelle prüfen.
@@ -96,9 +104,14 @@ jede Prüfung mit Modus, Arten und Anzahl auf, ohne den Text selbst.
 
 ## Tool-Regeln {#tool-rules}
 
+![Agenten → Governance auf dem Reiter „Tool-Regeln“, neben Tool-Klassen und Entscheidungen: noch keine Regeln, und „Regel hinzufügen“](../images/administer/governance.png)
+
 **Agenten → Governance → Tool-Regeln** legt nach Namen fest, was geschieht, wenn ein Modell ein Tool ausführen will:
 
 1. Wählen Sie **Regel hinzufügen**.
+
+    ![Neue Tool-Regel: Name, Tool-Muster, Aktion auf Sperren, Nachricht an den Nutzer, Kategorie, Priorität 100 und Aktiv](../images/administer/governance-add-rule.png)
+
 2. Geben Sie unter **Name** eine Bezeichnung (für Sie) und unter **Tool-Muster** einen Tool-Namen oder ein
    Muster mit `*` ein, z. B. `mcp.github.*`, `knowledge_search` oder `*`.
 3. Wählen Sie die **Aktion**: **Sperren**, **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei) oder **Erlauben**.
@@ -109,9 +122,9 @@ jede Prüfung mit Modus, Arten und Anzahl auf, ohne den Text selbst.
 
 Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
 
-![Agenten → Governance auf dem Reiter Tool-Regeln, neben Tool-Klassen und Entscheidungen: noch keine Regeln, und Regel hinzufügen](../images/administer/governance.png)
-
 ### Tool-Klassen und Tool-Modi {#tool-classes-and-tool-modes}
+
+![Agenten → Governance auf dem Reiter „Tool-Klassen“: noch keine Klassen, daher ist jedes Server-Tool nicht klassifiziert, und „Klasse hinzufügen“](../images/administer/governance-classes.png)
 
 **Agenten → Governance → Tool-Klassen** legt nach Muster fest, was Tools tun: **lesen**, **schreiben**,
 **zerstörend** oder **Wie sein MCP-Server angibt** (dem vertrauen, was der MCP-Server des Tools über das Tool
@@ -133,13 +146,13 @@ Die eigenen Tools von Fadenstack (die Suche in der Wissensdatenbank, die Uhrzeit
 
 ### Entscheidungen {#decisions}
 
+![Agenten → Governance auf dem Reiter „Entscheidungen“: Filter für Phase, Ergebnis und Agent sowie drei Tool-Entscheidungen, Freigabe nötig, Abgelaufen und Freigegeben, jeweils mit dem, was der Nutzer erfuhr](../images/administer/governance-decisions-top.png)
+
 **Agenten → Governance → Entscheidungen** listet auf, was die Prüfungen entschieden haben: wann, in welcher Phase
 (**Eingabe**, **Antwort**, **Tool**), das Ergebnis (**Gesperrt**, **Freigabe nötig**, **Freigegeben**,
 **Abgelehnt**, **Abgelaufen**), was dem Benutzer mitgeteilt wurde, den Benutzer, den Agenten und die Anfrage. Der
 abgelehnte Text selbst wird nie gespeichert, nur ein mit einem Schlüssel gebildeter Fingerabdruck: Derselbe Text,
 zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurückgewinnen.
-
-![Agenten → Governance auf dem Reiter Entscheidungen: Filter für Phase, Ergebnis und Agent sowie drei Tool-Entscheidungen, eine Abgelaufen und zwei Freigegeben, jeweils mit dem, was der Benutzer erfuhr](../images/administer/governance-decisions-top.png)
 
 ## Was Benutzer sehen, wenn etwas gestoppt wird {#what-people-see-when-something-is-stopped}
 

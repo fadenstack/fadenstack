@@ -5,6 +5,8 @@ ihn in der Konsole, er startet auf seinen Maschinen, und danach können Sie ihm 
 leeren, eine herausnehmen, seine Runtime wechseln und ihn stoppen oder starten. Modelle stellt ein Administrator auf
 einem Cluster bereit (siehe [Bereitstellungen](../administer/deployments.md)).
 
+![KI-Infrastruktur → Cluster: ein laufender Cluster mit zwei Maschinen und zwei Beschleunigern, und oben „Cluster erstellen“](../images/operate/clusters.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Die Maschinen sind hinzugefügt und haben den Status **healthy** (siehe [GPU-Maschinen](machines.md)).
@@ -22,35 +24,41 @@ einem Cluster bereit (siehe [Bereitstellungen](../administer/deployments.md)).
     ![Der Assistent „Cluster erstellen“ im ersten Schritt, „Benennen“, gefolgt von „Maschinen wählen“ und „Netzwerk bestätigen“](../images/operate/cluster-create-name.png)
 
 2. **Benennen**: Geben Sie unter **Clustername** einen Namen ein, z. B. `gpu-room`, und wählen Sie **Weiter**.
-3. **Maschinen wählen**: Markieren Sie die Maschinen, die Modelle bereitstellen sollen. Ein Cluster aus einer
-   einzigen Maschine ist völlig in Ordnung; weitere können Sie später hinzufügen. Zu jeder Maschine nennt der
-   Assistent die Runtime, die sie ausführen wird. Bei mehr als einer Maschine wählen Sie
-   **Welche Maschine den Cluster leitet** (den Head; vorgeschlagen wird die Maschine mit den meisten Beschleunigern).
-   Wählen Sie **Weiter**.
-4. **Netzwerk bestätigen**: Die Konsole listet die Netzwerke auf, die die Maschinen gemeinsam haben, testet sie und
-   schlägt das schnellste vor, das nicht mit dem Verwaltungsverkehr geteilt wird. Prüfen Sie den Vorschlag: Eine
-   VPN-Schnittstelle kann wie eine dedizierte Verbindung aussehen. Wählen Sie ein anderes Netzwerk, wenn der Vorschlag
-   nicht das Netzwerk ist, auf dem der Cluster laufen soll.
+
+    ![„Cluster erstellen“, Schritt „Maschinen wählen“: jede Maschine mit Adresse, Beschleunigern und Zustand, hier beide als bereits in einem anderen Cluster gekennzeichnet](../images/operate/cluster-create-machines.png)
+
+3. **Maschinen wählen**: Markieren Sie die Maschinen, die Modelle bereitstellen sollen. Bei mehr als einer Maschine
+   wählen Sie **Welche Maschine den Cluster leitet** (den Head). Wählen Sie **Weiter**.
+4. **Netzwerk bestätigen**: Prüfen Sie das Netzwerk, das die Konsole vorschlägt: Eine VPN-Schnittstelle kann wie
+   eine dedizierte Verbindung aussehen. Wählen Sie ein anderes Netzwerk, wenn der Vorschlag nicht das Netzwerk ist,
+   auf dem der Cluster laufen soll.
 5. Wählen Sie **Cluster erstellen**.
 
-Die Seite des Clusters öffnet sich im Zustand **Wird gestartet**. Die Maschinen:
+??? info "Mehr zur Wahl der Maschinen und des Netzwerks"
+    Ein Cluster aus einer einzigen Maschine ist völlig in Ordnung; weitere können Sie später hinzufügen. Zu jeder
+    Maschine nennt der Assistent die Runtime, die sie ausführen wird. Als Head vorgeschlagen wird die Maschine mit
+    den meisten Beschleunigern.
 
-1. holen das Runtime-Image und prüfen es. Es kommt einmal vom Server; die erste Maschine, die es hat, gibt es über das
-   Netzwerk des Clusters an die anderen weiter. Eine abgebrochene Übertragung wird dort fortgesetzt, wo sie stehen
-   blieb, wenn die Maschine Platz für eine Kopie des Images auf der Festplatte hat. Die Seite zeigt einen Balken pro Maschine;
-2. starten darin Ray: zuerst den Head, dann treten die anderen Maschinen bei;
-3. melden, was sie vorgefunden haben.
+    Bei **Netzwerk bestätigen** listet die Konsole die Netzwerke auf, die die Maschinen gemeinsam haben, testet sie
+    und schlägt das schnellste vor, das nicht mit dem Verwaltungsverkehr geteilt wird.
 
-Der Cluster erreicht **Läuft**: Jede Maschine ist aktiv, ihre Beschleuniger sind gezählt, und die Seite bietet
-**Modell bereitstellen** an. Sind die Summen niedriger als erwartet, ist eine Maschine nicht beigetreten: Öffnen Sie
-sie und lesen Sie ihren Status.
+Die Seite des Clusters öffnet sich im Zustand **Wird gestartet** und zeigt einen Balken pro Maschine, während die
+Maschinen das Runtime-Image holen. Der Cluster erreicht **Läuft**: Jede Maschine ist aktiv, ihre Beschleuniger sind
+gezählt, und die Seite bietet **Modell bereitstellen** an. Sind die Summen niedriger als erwartet, ist eine Maschine
+nicht beigetreten: Öffnen Sie sie und lesen Sie ihren Status.
 
-**Gekennzeichnete Maschinen in der Liste.** Eine Maschine, die bereits zu einem anderen Cluster gehört, ist
-entsprechend gekennzeichnet: Nehmen Sie sie aus diesem Cluster heraus, bevor Sie sie wählen. „Auf … läuft kein zertifiziertes Runtime-Image“ bedeutet, dass es für diese Art von
-Maschine keine Runtime gibt; nehmen Sie sie aus der Auswahl.
+??? info "Was die Maschinen tun, während der Cluster startet"
+    1. Sie holen das Runtime-Image und prüfen es. Es kommt einmal vom Server; die erste Maschine, die es hat, gibt
+       es über das Netzwerk des Clusters an die anderen weiter. Eine abgebrochene Übertragung wird dort fortgesetzt,
+       wo sie stehen blieb, wenn die Maschine Platz für eine Kopie des Images auf der Festplatte hat.
+    2. Sie starten darin Ray: zuerst den Head, dann treten die anderen Maschinen bei.
+    3. Sie melden, was sie vorgefunden haben.
 
-**„Diese Maschinen können noch keinen Cluster bilden.“** Der Netzwerkschritt hat kein Netzwerk gefunden, das alle
-gemeinsam haben. Prüfen Sie Verkabelung und Adressen und versuchen Sie es dann erneut.
+| Sie sehen | Was Sie tun |
+|---|---|
+| Eine Maschine in der Liste ist als bereits in einem anderen Cluster gekennzeichnet | Nehmen Sie sie aus diesem Cluster heraus, bevor Sie sie wählen. |
+| „Auf … läuft kein zertifiziertes Runtime-Image“ | Für diese Art von Maschine gibt es keine Runtime; nehmen Sie sie aus der Auswahl. |
+| **„Diese Maschinen können noch keinen Cluster bilden.“** | Der Netzwerkschritt hat kein Netzwerk gefunden, das alle gemeinsam haben. Prüfen Sie Verkabelung und Adressen und versuchen Sie es dann erneut. |
 
 ## Die Seite des Clusters {#the-clusters-page}
 
@@ -58,15 +66,16 @@ gemeinsam haben. Prüfen Sie Verkabelung und Adressen und versuchen Sie es dann 
 
 ![Die Seite eines laufenden Clusters: oben sein Zustand und die Aktionen, die Übersicht und wie seine zwei Maschinen verbunden sind](../images/operate/cluster-page.png)
 
-- Oben: sein Zustand, **Jetzt prüfen** (den Cluster sofort prüfen, statt auf die nächste Prüfung zu warten),
-  **Stopp** oder **Start**, **Maschinen hinzufügen**, **Modell bereitstellen** und **Löschen**.
-- Eine Übersicht: aktive **Maschinen**, **Beschleuniger**, **Freie Beschleuniger**, **Bereitstellungen**.
-- **So ist dieser Cluster verbunden**: die Maschinen und wie sie miteinander verbunden sind. Wählen Sie eine Maschine,
-  um zu sehen, was sie ausführt, und um **Leeren** oder **Aus Cluster entfernen** zu wählen.
-- **Modelle auf diesem Cluster**: jede Bereitstellung mit ihrem Zustand und ihren Kopien.
-- Karten für **Laufzeit**, **Modellverkehr**, **Verkehr zwischen den Maschinen** und **Woher die Maschinen Modelle
-  bekommen**.
-- **Erweitert**: die **Zustandsprüfungen**, die der Server ausgeführt hat, **Netzwerk ändern** und der Rohstatus.
+| Teil | Was er enthält |
+|---|---|
+| Oben | Sein Zustand, **Jetzt prüfen** (den Cluster sofort prüfen, statt auf die nächste Prüfung zu warten), **Stopp** oder **Start**, **Maschinen hinzufügen**, **Modell bereitstellen** und **Löschen**. |
+| Eine Übersicht | Aktive **Maschinen**, **Beschleuniger**, **Freie Beschleuniger**, **Bereitstellungen**. |
+| **So ist dieser Cluster verbunden** | Die Maschinen und wie sie miteinander verbunden sind. Wählen Sie eine Maschine, um zu sehen, was sie ausführt, und um **Leeren** oder **Aus Cluster entfernen** zu wählen. |
+| **Modelle auf diesem Cluster** | Jede Bereitstellung mit ihrem Zustand und ihren Kopien. |
+| Karten | Für **Laufzeit**, **Modellverkehr**, **Verkehr zwischen den Maschinen** und **Woher die Maschinen Modelle bekommen**. |
+| **Erweitert** | Die **Zustandsprüfungen**, die der Server ausgeführt hat, **Netzwerk ändern** und der Rohstatus. |
+
+![Weiter unten auf der Seite eines Clusters: die Karten „Modellverkehr“, „Laufzeit“, „Verkehr zwischen den Maschinen“ und „Woher die Maschinen Modelle bekommen“, „Modelle, die hier ohne Deployment laufen“, und „Erweitert“ geöffnet bei den Zustandsprüfungen](../images/operate/cluster-advanced.png)
 
 | Zustand des Clusters | Bedeutung |
 |---|---|
@@ -78,25 +87,25 @@ gemeinsam haben. Prüfen Sie Verkabelung und Adressen und versuchen Sie es dann 
 
 ## Stoppen, starten und löschen {#stop-start-and-delete}
 
-**Stopp** stoppt den Cluster auf seinen Maschinen und gibt ihre GPUs frei. Maschinen, Netzwerk und Bereitstellungen
-bleiben erhalten; **Start** bringt ihn zurück und wendet seine Modelle erneut an.
+| Aktion | Was sie tut |
+|---|---|
+| **Stopp** | Stoppt den Cluster auf seinen Maschinen und gibt ihre GPUs frei. Maschinen, Netzwerk und Bereitstellungen bleiben erhalten. |
+| **Start** | Bringt ihn zurück und wendet seine Modelle erneut an. |
+| **Löschen** | Entfernt den Cluster. Ein Cluster, der noch Bereitstellungen hat, kann nicht gelöscht werden: Löschen Sie diese zuerst, damit kein Modell auf den Maschinen weiterläuft. Ein laufender Cluster wird zuerst gestoppt und dann gelöscht; die Maschinen bleiben registriert und können einem anderen Cluster beitreten. |
 
-**Löschen** entfernt den Cluster. Ein Cluster, der noch Bereitstellungen hat, kann nicht gelöscht werden: Löschen Sie
-diese zuerst, damit kein Modell auf den Maschinen weiterläuft. Ein laufender Cluster wird zuerst gestoppt und dann
-gelöscht; die Maschinen bleiben registriert und können einem anderen Cluster beitreten. Sind alle Maschinen des
-Clusters offline, lässt er sich von hier aus nicht stoppen; er wird trotzdem gelöscht, und was er auf einer Maschine
-hinterlassen hat, wird ersetzt, wenn diese Maschine das nächste Mal einen Cluster startet.
+??? info "Einen Cluster löschen, dessen Maschinen alle offline sind"
+    Sind alle Maschinen des Clusters offline, lässt er sich von hier aus nicht stoppen; er wird trotzdem gelöscht,
+    und was er auf einer Maschine hinterlassen hat, wird ersetzt, wenn diese Maschine das nächste Mal einen Cluster
+    startet.
 
 ## Maschinen zu einem laufenden Cluster hinzufügen {#add-machines-to-a-running-cluster}
+
+![Maschinen zu gpu-cluster hinzufügen: hier gibt es noch keine Maschine außerhalb des Clusters, und jede Maschine wird zuerst geprüft](../images/operate/cluster-add-machines.png)
 
 1. Wählen Sie auf der Seite des Clusters **Maschinen hinzufügen**.
 2. Markieren Sie die Maschinen, die hinzukommen sollen. Maschinen, die nicht beitreten können, sind mit dem Grund
    aufgeführt und lassen sich nicht markieren.
 3. Wählen Sie **Hinzufügen**.
-
-Jede Maschine wird zuerst geprüft: Sie muss den Head des Clusters im Netzwerk des Clusters erreichen. Dann erhält sie
-das Runtime-Image (von einer Maschine des Clusters, die es hat), startet ihren Container und tritt Ray bei, so wie die
-ersten Maschinen des Clusters.
 
 Die bereits laufenden Kopien bleiben, wo sie sind. Neue Kopien und neue Modelle können die neue Maschine nutzen; sie
 erhält die Dateien der Modelle, wenn sie sie braucht. Um ein Modell auf die neue Maschine zu bringen, skaliert ein
@@ -113,9 +122,14 @@ nicht neu (siehe [Bereitstellungen](../administer/deployments.md)).
 | The cluster runs Ray with TLS, which needs agent … or later on it. | Aktualisieren Sie den Agent der Maschine (führen Sie die Installationszeile erneut aus) |
 | *Maschine* could not reach the cluster's head on … | Die Maschine hat eine Adresse im Netzwerk, erreicht den Head dort aber nicht: Prüfen Sie Verkabelung, Routen und Firewalls |
 
-Eine Warnung, dass die Maschine von einer anderen Art ist als der Head (eine andere Architektur), ist keine
-Ablehnung: Sie führt ein anderes Runtime-Image aus, und keine Kopie eines Modells darf sich über beide Arten
-erstrecken.
+??? info "Mehr zum Hinzufügen von Maschinen"
+    Jede Maschine wird zuerst geprüft: Sie muss den Head des Clusters im Netzwerk des Clusters erreichen. Dann
+    erhält sie das Runtime-Image (von einer Maschine des Clusters, die es hat), startet ihren Container und tritt Ray
+    bei, so wie die ersten Maschinen des Clusters.
+
+    Eine Warnung, dass die Maschine von einer anderen Art ist als der Head (eine andere Architektur), ist keine
+    Ablehnung: Sie führt ein anderes Runtime-Image aus, und keine Kopie eines Modells darf sich über beide Arten
+    erstrecken.
 
 ## Eine Maschine leeren {#drain-a-machine}
 
@@ -123,18 +137,14 @@ Leeren zieht die Modellkopien einer Maschine auf die anderen Maschinen des Clust
 fern: vor einer Wartung, einem Neustart oder bevor Sie sie aus dem Cluster nehmen. Sie sehen zuerst einen Plan, und
 nichts stoppt, ohne dass Sie zustimmen.
 
+![Der Leeren-Plan für gpu-02: Eine Kopie stoppt, weil keine andere Maschine genug freie GPU hat, und die Schaltfläche lautet „Leeren und 1 stoppen“](../images/operate/cluster-drain-plan.png)
+
 1. Wählen Sie auf der Seite des Clusters die Maschine und dann **Leeren**. (Oder **Leeren** auf der Seite der
    Maschine selbst oder in der Liste **Maschinen**.)
 2. Lesen Sie den Plan. Für jede Kopie auf der Maschine steht dort entweder **Zieht um auf** mit dem Namen einer
    Maschine oder **Stoppt** mit dem Grund.
 3. Wählen Sie **Leeren**. Würden Kopien stoppen, lautet die Schaltfläche **Leeren und … stoppen** mit deren Anzahl:
    Damit stimmen Sie dem zu.
-
-![Der Leeren-Plan für gpu-02: Eine Kopie stoppt, weil keine andere Maschine genug freie GPU hat, und die Schaltfläche lautet „Leeren und 1 stoppen“](../images/operate/cluster-drain-plan.png)
-
-Eine Kopie zieht nur um, wenn eine andere Maschine des Clusters die Dateien des Modells hat und sowohl den Anteil an
-Beschleunigern als auch den GPU-Speicher frei hat, den die Kopie braucht. Jede umziehende Kopie bedient weiter
-Anfragen, bis ihr Ersatz auf der anderen Maschine läuft; nichts wird vorzeitig gestoppt.
 
 Eine Kopie, die nicht umziehen kann, nennt den Grund:
 
@@ -145,8 +155,13 @@ Eine Kopie, die nicht umziehen kann, nennt den Grund:
 | It needs … GPU; the most another machine has free is … GPU. | Anderswo sind nicht genug Beschleuniger frei |
 | It needs about … of GPU memory; the most another machine has free is … | Anderswo ist nicht genug GPU-Speicher frei |
 
-Kopien, deren Stopp Sie zugestimmt haben, starten von selbst wieder, sobald eine Maschine Platz hat, z. B. nachdem
-das Leeren beendet wurde.
+??? info "Wann eine Kopie umzieht, und wann gestoppte Kopien zurückkommen"
+    Eine Kopie zieht nur um, wenn eine andere Maschine des Clusters die Dateien des Modells hat und sowohl den
+    Anteil an Beschleunigern als auch den GPU-Speicher frei hat, den die Kopie braucht. Jede umziehende Kopie
+    bedient weiter Anfragen, bis ihr Ersatz auf der anderen Maschine läuft; nichts wird vorzeitig gestoppt.
+
+    Kopien, deren Stopp Sie zugestimmt haben, starten von selbst wieder, sobald eine Maschine Platz hat, z. B.
+    nachdem das Leeren beendet wurde.
 
 Während das Leeren läuft, zeigt die Seite des Clusters es mit seinem Zustand: **Leeren beginnt**,
 **Kopien ziehen um**, **Geleert**. Eine geleerte Maschine führt nichts aus und übernimmt nichts Neues; erledigen Sie
@@ -183,15 +198,17 @@ sich eine Maschine wieder verbindet. Es startet nur dann etwas neu, wenn etwas n
 zweites Mal. Was es selbst repariert und was Sie währenddessen sehen, steht in [Fehler und Logs](failures.md). Kurz
 gesagt:
 
-- eine Maschine, die aus dem Cluster ausgefallen ist, wird aus Ray genommen und tritt wieder bei; Kopien auf den
-  anderen Maschinen bedienen weiter Anfragen;
-- ein Head, der gestoppt ist, wird mit dem ganzen Cluster neu gestartet, und die Modelle werden erneut angewendet;
-- nach drei fehlgeschlagenen Neustarts zeigt der Cluster **Fehlgeschlagen** und wird alle 15 Minuten erneut
-  versucht. **Erneut versuchen** auf der Seite des Clusters beginnt sofort von vorn.
+| Wenn | Was geschieht |
+|---|---|
+| Eine Maschine ist aus dem Cluster ausgefallen | Sie wird aus Ray genommen und tritt wieder bei; Kopien auf den anderen Maschinen bedienen weiter Anfragen. |
+| Der Head ist gestoppt | Er wird mit dem ganzen Cluster neu gestartet, und die Modelle werden erneut angewendet. |
+| Drei Neustarts sind fehlgeschlagen | Der Cluster zeigt **Fehlgeschlagen** und wird alle 15 Minuten erneut versucht. **Erneut versuchen** auf der Seite des Clusters beginnt sofort von vorn. |
 
 **Erweitert → Zustandsprüfungen** listet die Prüfungen auf und was sie ergeben haben.
 
 ## Runtime {#runtime}
+
+![Die Karte „Laufzeit“: die Runtime, mit der der Cluster läuft, ob sie zertifiziert ist, und „Umschalten auf“ mit „Umschalten“](../images/operate/cluster-runtime-card.png)
 
 Die Karte **Laufzeit** zeigt das Image, das die Maschinen des Clusters ausführen, Ray und vLLM zusammen, und ob eine
 neuere zertifizierte Runtime verfügbar ist. Ein Cluster behält seine Runtime, bis Sie sie wechseln; das startet jedes
@@ -199,11 +216,16 @@ Modell darauf neu. Siehe [Einen Cluster auf eine andere Runtime umstellen](upgra
 
 ## Verschlüsselung {#encryption}
 
-- **Modellverkehr**: Das Gateway erreicht die Modelle des Clusters über gegenseitiges TLS (mutual TLS). Ein Cluster,
-  der gestartet wurde, bevor es diesen Schutz gab, zeigt „unverschlüsselt“; **Modellverkehr verschlüsseln** stellt
-  seine Modelle hinter TLS, und sie laden neu.
-- **Verkehr zwischen den Maschinen**: **Verschlüsseln** schaltet TLS für Ray zwischen den Maschinen des Clusters ein.
-  Das startet den Cluster und seine Modelle neu; jede Maschine braucht einen aktuellen Agent.
+![Die Karte „Modellverkehr“, „Verschlüsselt“: Das Gateway erreicht die Modelle des Clusters über gegenseitiges TLS](../images/operate/cluster-model-traffic.png)
+
+**Modellverkehr**: Das Gateway erreicht die Modelle des Clusters über gegenseitiges TLS (mutual TLS). Ein Cluster,
+der gestartet wurde, bevor es diesen Schutz gab, zeigt „unverschlüsselt“; **Modellverkehr verschlüsseln** stellt
+seine Modelle hinter TLS, und sie laden neu.
+
+![Die Karte „Verkehr zwischen den Maschinen“, „Verschlüsselt“, mit „Ausschalten“](../images/operate/cluster-traffic-encrypted.png)
+
+**Verkehr zwischen den Maschinen**: **Verschlüsseln** schaltet TLS für Ray zwischen den Maschinen des Clusters ein.
+Das startet den Cluster und seine Modelle neu; jede Maschine braucht einen aktuellen Agent.
 
 Beides ist in [HTTPS und Vertrauen](https.md#model-traffic-the-gateway-and-the-machines) erklärt.
 
@@ -225,17 +247,9 @@ Sie es, oder löschen Sie es ordnungsgemäß.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**Der Cluster startet nicht, mit `Address already in use`.** Etwas auf einer Maschine belegt einen der Ports des
-Clusters. Geben Sie ihn frei (siehe [Netzwerk und Ports](network.md#ports-a-gpu-machine-must-have-free)) und wählen
-Sie dann **Erneut versuchen**.
-
-**„This will not change by retrying …“** Der Cluster wartet, statt es erneut zu versuchen, weil die Ursache jedes Mal
-gleich ausfällt; am häufigsten hält der Server einen anderen Build des Runtime-Images, als der Cluster braucht.
-Führen Sie auf dem Server `faden runtime-images --check` aus, holen Sie, was fehlt, und wählen Sie dann
-**Erneut versuchen**.
-
-**Andere Startfehler** werden in den Worten der Maschine angezeigt und mit wachsenden Pausen erneut versucht. Beheben
-Sie die Ursache und wählen Sie **Erneut versuchen**, um es sofort erneut zu versuchen.
-
-**„Die Maschinen haben das Stoppen nicht bestätigt.“** Prüfen Sie, ob sie online sind, und stoppen oder löschen Sie
-dann erneut.
+| Sie sehen | Was Sie tun |
+|---|---|
+| Der Cluster startet nicht, mit `Address already in use` | Etwas auf einer Maschine belegt einen der Ports des Clusters. Geben Sie ihn frei (siehe [Netzwerk und Ports](network.md#ports-a-gpu-machine-must-have-free)) und wählen Sie dann **Erneut versuchen**. |
+| **„This will not change by retrying …“** | Der Cluster wartet, statt es erneut zu versuchen, weil die Ursache jedes Mal gleich ausfällt; am häufigsten hält der Server einen anderen Build des Runtime-Images, als der Cluster braucht. Führen Sie auf dem Server `faden runtime-images --check` aus, holen Sie, was fehlt, und wählen Sie dann **Erneut versuchen**. |
+| Andere Startfehler, in den Worten der Maschine angezeigt | Sie werden mit wachsenden Pausen erneut versucht. Beheben Sie die Ursache und wählen Sie **Erneut versuchen**, um es sofort erneut zu versuchen. |
+| **„Die Maschinen haben das Stoppen nicht bestätigt.“** | Prüfen Sie, ob sie online sind, und stoppen oder löschen Sie dann erneut. |

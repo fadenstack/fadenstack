@@ -43,16 +43,31 @@ Sie stehen als `FADEN_HTTP_PORT` und `FADEN_HTTPS_PORT` in `~/fadenstack/.env`. 
 dann den neuen Port in der Adresse des Servers.
 
 Alles andere auf dem Server lauscht nur auf der Loopback-Adresse und ist vom Netzwerk aus nicht erreichbar:
-Postgres (5432), Redis (6379), RabbitMQ (5672, 15672), ClickHouse (8123, 9000), MinIO (9090, 9091), Prometheus
-(9099), Loki (3100), Grafana (3001), Langfuse (3002), der eigene Port des Gateways (8001) und einige weitere. Diese
-Ports müssen auf dem Server selbst trotzdem frei sein; `faden doctor` listet jeden Port auf, den die Installation
-verwendet, und ob ein anderes Programm ihn belegt.
+
+| Dienst | Port auf der Loopback-Adresse |
+|---|---|
+| Postgres | 5432 |
+| Redis | 6379 |
+| RabbitMQ | 5672, 15672 |
+| ClickHouse | 8123, 9000 |
+| MinIO | 9090, 9091 |
+| Prometheus | 9099 |
+| Loki | 3100 |
+| Grafana | 3001 |
+| Langfuse | 3002 |
+| Der eigene Port des Gateways | 8001 |
+| Einige weitere | `faden doctor` listet sie auf |
+
+Diese Ports müssen auf dem Server selbst trotzdem frei sein; `faden doctor` listet jeden Port auf, den die
+Installation verwendet, und ob ein anderes Programm ihn belegt.
 
 !!! warning
     Geben Sie diese Ports nicht im Netzwerk frei. Loki hat keine eigene Authentifizierung, und der eigene Port von
     Grafana zeigt jedem, der ihn erreicht, alle Dashboards. Die Konsole erreicht beide über den Eingang.
 
 ## Die Maschinen und der Server {#the-machines-and-the-server}
+
+![Maschine hinzufügen: die Installationszeile und die Adressen des Servers zur Auswahl, jeweils mit der Schnittstelle, zu der sie gehören](../images/operate/add-machine.png){ width="320" }
 
 Jede Maschine muss den Eingang des Servers erreichen, unter der Adresse, die Sie in
 **Maschinen → Maschine hinzufügen** auswählen. Der Bereich listet die Adressen des Servers mit der jeweils
@@ -61,13 +76,11 @@ selbst baut keine Verbindungen zum Agent auf.
 
 Für drei Dinge baut der Server allerdings Verbindungen zu den Maschinen auf:
 
-- **Die Modelle.** Das Gateway sendet jede Anfrage an die Head-Maschine des Clusters, der das Modell bereitstellt,
-  auf dem Serving-Port des Clusters. Erlauben Sie dem Server, diesen Port auf jeder Head-Maschine zu erreichen.
-- **Metriken.** Das Prometheus des Servers sammelt Metriken von den Maschinen des Clusters. Blockiert eine Firewall
-  das, zeigt die Cluster-Seite keine Metriken; das Beantworten von Anfragen ist nicht betroffen.
-- **Gefundene vLLM.** Bevor der Server ein vLLM routet, das er auf einer Maschine gefunden hat, und wenn die Konsole
-  diese auflistet, fragt er jedes auf seinem eigenen Port, welche Modelle es bereitstellt (siehe
-  [Vorhandene vLLM-Server](existing-vllm.md)).
+| Für | Der Server verbindet sich mit | Was Sie erlauben |
+|---|---|---|
+| **Die Modelle** | Der Head-Maschine des Clusters, der das Modell bereitstellt, auf dem Serving-Port des Clusters: Das Gateway sendet jede Anfrage dorthin | Erlauben Sie dem Server, diesen Port auf jeder Head-Maschine zu erreichen |
+| **Metriken** | Den Maschinen des Clusters: Das Prometheus des Servers sammelt Metriken von ihnen | Blockiert eine Firewall das, zeigt die Cluster-Seite keine Metriken; das Beantworten von Anfragen ist nicht betroffen |
+| **Gefundene vLLM** | Jedem vLLM, das er auf einer Maschine gefunden hat, auf dessen eigenem Port: Bevor der Server eines routet, und wenn die Konsole diese auflistet, fragt er jedes, welche Modelle es bereitstellt | Siehe [Vorhandene vLLM-Server](existing-vllm.md) |
 
 ## Zwischen den Maschinen eines Clusters {#between-the-machines-of-a-cluster}
 

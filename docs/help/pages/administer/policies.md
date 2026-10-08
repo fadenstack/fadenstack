@@ -30,9 +30,11 @@ With the module on, the default policy:
 - **redacts**: personal data is replaced, and the model never sees it;
 - **blocks** a request to a cloud provider when the filter cannot run;
 - reads English text, and looks for these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
-  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`. Dates (`DATE_TIME`) are
-  not on the list. Add them if you need dates of birth covered; plain numbers in a message may then be masked
-  as dates too.
+  `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+
+??? info "More about dates"
+    Dates (`DATE_TIME`) are not on the list. Add them if you need dates of birth covered; plain numbers in a
+    message may then be masked as dates too.
 
 The filter has an English language model only. In German or other languages it still finds what has a fixed form
 (e-mail addresses, phone, card and account numbers, IP addresses, links), but often misses names and places.
@@ -52,23 +54,29 @@ The **default policy** applies to the whole installation:
 A **tenant policy** replaces the default for one tenant (your organisation is the tenant `default` unless
 your installation uses others):
 
+![Privacy (PII) → Tenant Policies: the Tenant ID box and Load Tenant](../images/administer/pii-policies.png)
+
 1. Open **Privacy (PII) → Tenant Policies**, enter the **Tenant ID** and select **Load Tenant**.
+
+    ![A tenant policy: Detection (Presidio) with the language, the score threshold and the entities, Clear Override and Save, the switch Let chats and agents change the PII mode, and the Effective Policy Preview](../images/administer/pii-tenant-policy.png)
+
 2. Change the fields under **Tenant Override**. **Effective Policy Preview** shows what requests will get.
 3. Select **Save**. **Clear Override** goes back to the default policy.
 
-![A tenant policy: Detection (Presidio) with the language, the score threshold and the entities, Clear Override and Save, the switch Let chats and agents change the PII mode, and the Effective Policy Preview](../images/administer/pii-tenant-policy.png)
+??? info "More about the fields (the same in both places)"
+    The fields are the same in both places:
 
-The fields are the same in both places:
-
-| Field | What it does |
-|---|---|
-| **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
-| **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
-| **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
-| **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | Which language the filter reads, how sure it must be, and which kinds of data it looks for. A higher threshold masks less. Only English is installed: keep **Language** at `en`. With another language every check fails, and **If detection fails** decides. |
-| **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
+    | Field | What it does |
+    |---|---|
+    | **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
+    | **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
+    | **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
+    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | Which language the filter reads, how sure it must be, and which kinds of data it looks for. A higher threshold masks less. Only English is installed: keep **Language** at `en`. With another language every check fails, and **If detection fails** decides. |
+    | **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
 
 ### Chats and agents
+
+![The Privacy tab of the chat's side panel: protection of requests to cloud and to local models, the mode and the fail action, telemetry, and the detection threshold and entities](../images/use/chat-privacy-tab.png){ width="280" }
 
 - A person can make the policy **stricter** for one chat in the chat's **Privacy** panel: more types, a
   higher threshold, local models scanned too.
@@ -89,9 +97,14 @@ the text itself.
 
 ## Tool rules
 
+![Agents → Governance on the Tool rules tab, beside Tool classes and Decisions: no rules yet, and Add rule](../images/administer/governance.png)
+
 **Agents → Governance → Tool rules** decides, by name, what happens when a model wants to run a tool:
 
 1. Select **Add rule**.
+
+    ![New tool rule: Name, Tool pattern, Action set to Deny, Message to the user, Category, Priority 100 and Enabled](../images/administer/governance-add-rule.png)
+
 2. Give it a **Name** (for you) and a **Tool pattern**: a tool name, or a pattern with `*`, such as
    `mcp.github.*`, `knowledge_search` or `*`.
 3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**.
@@ -102,9 +115,9 @@ the text itself.
 
 Without rules, tools run as the tool mode says.
 
-![Agents → Governance on the Tool rules tab, beside Tool classes and Decisions: no rules yet, and Add rule](../images/administer/governance.png)
-
 ### Tool classes and tool modes
+
+![Agents → Governance on the Tool classes tab: no classes yet, so every server tool is unclassified, and Add class](../images/administer/governance-classes.png)
 
 **Agents → Governance → Tool classes** says what tools do, by pattern: **read**, **write**, **destructive**,
 or **As its MCP server says** (trust what the tool's MCP server declares about itself). **Reaches outside**
@@ -125,13 +138,13 @@ Fadenstack's own tools (the knowledge base search, the time, the tool search) ar
 
 ### Decisions
 
+![Agents → Governance on the Decisions tab: filters for Stage, Outcome and Agent, and three tool decisions, Approval required, Expired and Approved, each with what the user was told](../images/administer/governance-decisions-top.png)
+
 **Agents → Governance → Decisions** lists what the checks decided: when, at which stage (**Prompt**,
 **Answer**, **Tool**), the outcome (**Blocked**, **Approval required**, **Approved**, **Rejected**,
 **Expired**), what the person was told, the user, the agent and the request. The refused text itself is never
 stored: only a keyed fingerprint, so the same text refused twice shows the same value, and nobody can read it
 back.
-
-![Agents → Governance on the Decisions tab: filters for Stage, Outcome and Agent, and three tool decisions, one Expired and two Approved, each with what the user was told](../images/administer/governance-decisions-top.png)
 
 ## What people see when something is stopped
 

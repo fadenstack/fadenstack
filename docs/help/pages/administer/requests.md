@@ -36,10 +36,15 @@ Content policies that refuse a prompt or an answer by what it says are
 
 ### 4. The model you chose answers
 
+![Observability → Data Residency: how much data stayed on premises and how much went outside, and each provider under Local (On-Premises) or External](../images/administer/data-residency.png)
+
 The request names a model: the name picked in the chat, set in the agent, or given by the application. That
 name is either one of your [deployments](deployments.md), running on your own machines, or a
-[remote provider](providers.md). If several deployments offer the same name, one of them that is healthy
-answers. A model that does not answer gets no requests until it answers again.
+[remote provider](providers.md).
+
+??? info "More about which deployment answers"
+    If several deployments offer the same name, one of them that is healthy answers. A model that does not
+    answer gets no requests until it answers again.
 
 Where it runs decides where the request goes: [Data residency](providers.md#data-residency) shows it for every
 model.

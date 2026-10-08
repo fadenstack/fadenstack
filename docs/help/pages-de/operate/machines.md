@@ -4,6 +4,8 @@ Eine GPU-Maschine tritt Fadenstack bei, indem Sie einen Befehl auf ihr ausführe
 Danach verwalten Sie sie über die Konsole: ihre Hardware, ihre Logs, Wartung, Leeren und die Cluster, zu denen sie
 gehört.
 
+![KI-Infrastruktur → Maschinen: zwei Maschinen im Zustand healthy, gpu-01 und gpu-02, und oben „Maschine hinzufügen“](../images/operate/machines.png)
+
 Die Konsole nennt sie **Maschinen**. Der Agent, die API und manche Meldungen sagen noch *node* bzw. *Knoten*; gemeint
 ist dasselbe.
 
@@ -18,24 +20,24 @@ ist dasselbe.
 
 ## Eine Maschine hinzufügen {#add-a-machine}
 
+![Der Bereich „Maschine hinzufügen“: die zu kopierende Installationszeile, die Adressen des Servers zur Wahl, die Liste der Maschinen, die auf Genehmigung warten, und „Genehmigungsschritt überspringen“](../images/operate/add-machine-panel.png){ width="360" }
+
 1. Öffnen Sie in der Konsole **KI-Infrastruktur → Maschinen** und wählen Sie **Maschine hinzufügen**.
-
-    ![Der Bereich Maschine hinzufügen: die zu kopierende Installationszeile, die Liste der Maschinen, die auf Genehmigung warten, und Genehmigungsschritt überspringen](../images/operate/add-machine-panel.png)
-
 2. Wenn der Bereich angibt, dass der Server mehr als eine Adresse hat, wählen Sie die, die die Maschine erreichen
-   kann. Jede Adresse ist mit ihrer Netzwerkschnittstelle aufgeführt; der Befehl ändert sich mit Ihrer Auswahl.
+   kann.
 3. Wählen Sie **Befehl kopieren**.
 4. Führen Sie den Befehl in einem Terminal auf der Maschine aus. Er installiert den Agent, zeigt einen kurzen Code an
    und wartet.
-5. Zurück in der Konsole erscheint die wartende Maschine im Bereich unter **Wartet auf Genehmigung**, und die Seite
-   **Maschinen** zeigt an, wie viele Maschinen warten, mit **Prüfen**.
+5. Suchen Sie zurück in der Konsole die wartende Maschine im Bereich unter **Wartet auf Genehmigung**. Die Seite
+   **Maschinen** zeigt außerdem an, wie viele Maschinen warten, mit **Prüfen**.
 6. Prüfen Sie, ob der Code mit dem auf der Maschine übereinstimmt, und wählen Sie **Genehmigen**. **Nicht diese**
    lehnt sie ab.
 
 Die Maschine wird als **healthy** aufgeführt, und ihre Seite zeigt ihre GPUs. Als Nächstes: Nehmen Sie sie in einen
 [Cluster](clusters.md) auf.
 
-![Die Seite Maschinen mit zwei Maschinen im Zustand healthy, gpu-01 und gpu-02, und der Schaltfläche Maschine hinzufügen](../images/operate/machines.png)
+??? info "Mehr zu den Adressen des Servers"
+    Jede Adresse ist mit ihrer Netzwerkschnittstelle aufgeführt; der Befehl ändert sich mit Ihrer Auswahl.
 
 ### Die Installationszeile {#the-install-line}
 
@@ -89,12 +91,13 @@ eigene Kopie des Agents auf dem Server zurück. Der Server hat eine solche Kopie
 `~/fadenstack/agent-binaries/` ablegen: `faden-agent-linux-x86_64` und `faden-agent-linux-aarch64` mit ihren
 `.sha256`-Dateien, von der Release-Seite des Projekts. Ersetzen Sie sie nach jedem Upgrade des Servers.
 
-Mit dieser Kopie wird jeder Download, aus welcher Quelle auch immer, gegen sie geprüft. Eine Kopie, die nicht der
-Build des Release des Servers ist, wird beiseitegelassen, wenn der Server den eigenen Digest des Release lesen kann:
-Die Maschinen bekommen dann das Release, geprüft gegen diesen Digest, und eine Maschine ohne Internetzugang kann
-nicht installieren. Ohne Kopie meldet das
-Installationsprogramm `this backend published no digest, so nothing was verified`, und eine Maschine ohne
-Internetzugang bricht mit `could not download the agent` ab.
+??? info "Wie das Installationsprogramm den Download gegen die Kopie des Servers prüft"
+    Mit dieser Kopie wird jeder Download, aus welcher Quelle auch immer, gegen sie geprüft. Eine Kopie, die nicht
+    der Build des Release des Servers ist, wird beiseitegelassen, wenn der Server den eigenen Digest des Release
+    lesen kann: Die Maschinen bekommen dann das Release, geprüft gegen diesen Digest, und eine Maschine ohne
+    Internetzugang kann nicht installieren. Ohne Kopie meldet das Installationsprogramm
+    `this backend published no digest, so nothing was verified`, und eine Maschine ohne Internetzugang bricht mit
+    `could not download the agent` ab.
 
 ## Was die Seite einer Maschine zeigt {#what-a-machines-page-shows}
 
@@ -102,18 +105,15 @@ Internetzugang bricht mit `could not download the agent` ab.
 
 ![Die Seite einer Maschine: Status und Agent-Version, die Aktionen Wartung, Leeren und weitere, ihre Hardware und die darauf gefundenen vLLM-Container](../images/operate/machine.png)
 
-- **Status**: **healthy**, **degraded**, **unhealthy** oder **offline**, mit Chips für **Wartung**,
-  **Wird geleert** und **Agent *Version* verfügbar**, wenn der Server einen neueren Agent erwartet. Die Version des
-  Agents selbst steht unter dem Namen. **Live** aktualisiert die Seite von selbst.
-- **Hardware**: Auslastung von **CPU**, **Speicher**, **Festplatte**, **GPU** und **Netzwerk**, die
-  **GPU-Geräte** und **System** (Betriebssystem, Architektur, Docker, Netzwerkschnittstellen).
-- **Systemprotokolle**: die letzten 15 Minuten der eigenen Logs der Maschine. **In Logs öffnen** öffnet die
-  vollständige Seite **Logs** für diese Maschine.
-- **Bereitstellungen auf dieser Maschine**: was ihre Cluster bereitstellen.
-- **vLLM auf dieser Maschine**: vLLM-Container, die Fadenstack nicht gestartet hat (siehe
-  [Vorhandene vLLM-Server](existing-vllm.md)).
-- **Befehle** und **Zeitverlauf**: worum der Server die Maschine gebeten hat und was daraufhin geschah.
-- **Rohinventar & Auslastung**: alles, was der Agent meldet, als Daten.
+| Teil | Was er zeigt |
+|---|---|
+| **Status** | **healthy**, **degraded**, **unhealthy** oder **offline**, mit Chips für **Wartung**, **Wird geleert** und **Agent *Version* verfügbar**, wenn der Server einen neueren Agent erwartet. Die Version des Agents selbst steht unter dem Namen. **Live** aktualisiert die Seite von selbst. |
+| **Hardware** | Auslastung von **CPU**, **Speicher**, **Festplatte**, **GPU** und **Netzwerk**, die **GPU-Geräte** und **System** (Betriebssystem, Architektur, Docker, Netzwerkschnittstellen). |
+| **Systemprotokolle** | Die letzten 15 Minuten der eigenen Logs der Maschine. **In Logs öffnen** öffnet die vollständige Seite **Logs** für diese Maschine. |
+| **Bereitstellungen auf dieser Maschine** | Was ihre Cluster bereitstellen. |
+| **vLLM auf dieser Maschine** | vLLM-Container, die Fadenstack nicht gestartet hat (siehe [Vorhandene vLLM-Server](existing-vllm.md)). |
+| **Befehle** und **Zeitverlauf** | Worum der Server die Maschine gebeten hat und was daraufhin geschah. |
+| **Rohinventar & Auslastung** | Alles, was der Agent meldet, als Daten. |
 
 Und ihre Aktionen:
 
@@ -131,14 +131,10 @@ Agents das ohne Passwort darf.
 
 ## Wartung und Leeren {#maintenance-and-draining}
 
-**Wartung** markiert eine Maschine zur Wartung: Es wird nichts Neues auf ihr platziert, sie kann keinem Cluster
-hinzugefügt werden, und was bereits auf ihr läuft, läuft weiter. Verwenden Sie sie, während Sie an einer Maschine
-arbeiten.
-
-**Leeren** räumt eine Maschine: Ihre Modellkopien ziehen auf die anderen Maschinen des Clusters um, jede beantwortet
-weiter Anfragen, bis ihr Ersatz läuft, und keine neuen Kopien landen auf ihr. Sie sehen vorher, welche Kopien
-umziehen können und welche nicht. Leeren Sie eine Maschine, bevor Sie sie neu starten, ihre Hardware ändern oder sie
-aus ihrem Cluster nehmen. Details: [Eine Maschine leeren](clusters.md#drain-a-machine).
+| | Was es tut | Wann Sie es verwenden |
+|---|---|---|
+| **Wartung** | Markiert eine Maschine zur Wartung: Es wird nichts Neues auf ihr platziert, sie kann keinem Cluster hinzugefügt werden, und was bereits auf ihr läuft, läuft weiter. | Während Sie an einer Maschine arbeiten. |
+| **Leeren** | Räumt eine Maschine: Ihre Modellkopien ziehen auf die anderen Maschinen des Clusters um, jede beantwortet weiter Anfragen, bis ihr Ersatz läuft, und keine neuen Kopien landen auf ihr. Sie sehen vorher, welche Kopien umziehen können und welche nicht. | Bevor Sie eine Maschine neu starten, ihre Hardware ändern oder sie aus ihrem Cluster nehmen. Details: [Eine Maschine leeren](clusters.md#drain-a-machine). |
 
 Beides gibt es auch in der Liste **Maschinen**, als Schaltflächen **Wartung aktivieren** und **Leeren** in der Zeile
 der Maschine.
@@ -162,9 +158,10 @@ genehmigt werden, und die Modelle laufen weiter. Siehe [Upgrade](upgrading.md#up
 | `faden-agent run` | Läuft im Vordergrund, damit Sie sehen, was schiefgeht |
 | `faden-agent scan` | Listet die Modelle auf, die bereits im Modellspeicher der Maschine liegen |
 
-Das eigene Log des Agents steht im Systemjournal: `journalctl -u faden-agent` bei einem Systemdienst,
-`journalctl --user -u faden-agent` bei einem Benutzerdienst. Starten Sie ihn nach dem Ändern einer Einstellung neu:
-`sudo systemctl restart faden-agent` oder `systemctl --user restart faden-agent`.
+| | Systemdienst | Benutzerdienst |
+|---|---|---|
+| Das eigene Log des Agents, im Systemjournal | `journalctl -u faden-agent` | `journalctl --user -u faden-agent` |
+| Den Agent nach dem Ändern einer Einstellung neu starten | `sudo systemctl restart faden-agent` | `systemctl --user restart faden-agent` |
 
 ### Eine Maschine mit mehreren Netzwerken {#a-machine-with-several-networks}
 
@@ -197,24 +194,12 @@ erneut auf ihr aus; sie stellt dann wie beim ersten Mal eine Beitrittsanfrage.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**Das Installationsprogramm fragt nach einem `sudo`-Passwort, das Sie nicht haben.** Lassen Sie `sudo` in der Zeile
-weg (siehe [Ohne sudo](#without-sudo)).
-
-**`ERROR: this backend publishes no agent build for linux-…`.** Für diese Maschine gibt es keinen Agent-Build: Unter
-Linux läuft der Agent nur auf x86_64 und aarch64.
-
-**`ERROR: the download does not match the expected digest.`** Der Download ist nicht der Build, den der Server
-erwartet, meist weil die Kopie in `~/fadenstack/agent-binaries/` aus einem älteren Release stammt. Ersetzen Sie sie
-durch die Builds des aktuellen Releases.
-
-**Die Maschine erscheint nie zur Genehmigung.** Eine Anfrage läuft ab, wenn sie niemand rechtzeitig genehmigt; führen
-Sie die Zeile erneut aus, um einen neuen Code zu erhalten. Kann die Maschine den Server überhaupt nicht erreichen,
-meldet das Installationsprogramm `could not reach` mit der Adresse: Wählen Sie in **Maschine hinzufügen** eine andere
-Adresse.
-
-**Die Maschine ist beigetreten, zeigt aber keine GPU.** Der Treiber funktioniert in Ihrer Shell, aber nicht für den
-Dienst. Prüfen Sie, ob `nvidia-smi` in einem Standardpfad liegt und ob der Dienst den Agent ausführt, den Sie
-installiert haben: `sudo systemctl show faden-agent -p ExecStart` (oder
-`systemctl --user show faden-agent -p ExecStart`).
+| Sie sehen | Was Sie tun |
+|---|---|
+| Das Installationsprogramm fragt nach einem `sudo`-Passwort, das Sie nicht haben | Lassen Sie `sudo` in der Zeile weg (siehe [Ohne sudo](#without-sudo)). |
+| **`ERROR: this backend publishes no agent build for linux-…`** | Für diese Maschine gibt es keinen Agent-Build: Unter Linux läuft der Agent nur auf x86_64 und aarch64. |
+| **`ERROR: the download does not match the expected digest.`** | Der Download ist nicht der Build, den der Server erwartet, meist weil die Kopie in `~/fadenstack/agent-binaries/` aus einem älteren Release stammt. Ersetzen Sie sie durch die Builds des aktuellen Releases. |
+| Die Maschine erscheint nie zur Genehmigung | Eine Anfrage läuft ab, wenn sie niemand rechtzeitig genehmigt; führen Sie die Zeile erneut aus, um einen neuen Code zu erhalten. Kann die Maschine den Server überhaupt nicht erreichen, meldet das Installationsprogramm `could not reach` mit der Adresse: Wählen Sie in **Maschine hinzufügen** eine andere Adresse. |
+| Die Maschine ist beigetreten, zeigt aber keine GPU | Der Treiber funktioniert in Ihrer Shell, aber nicht für den Dienst. Prüfen Sie, ob `nvidia-smi` in einem Standardpfad liegt und ob der Dienst den Agent ausführt, den Sie installiert haben: `sudo systemctl show faden-agent -p ExecStart` (oder `systemctl --user show faden-agent -p ExecStart`). |
 
 Mehr: [Fehlerbehebung](troubleshooting.md).

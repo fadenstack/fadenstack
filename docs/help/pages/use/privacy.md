@@ -17,8 +17,10 @@ On a standard installation, the messages, the replies, chat titles, project inst
 
 On your own computer:
 
-- **The browser agent** keeps its conversations in your browser, not on the server. Your sign-in is kept there too, not encrypted.
-- **The Office add-ins** keep their conversations on your computer, encrypted, and your sign-in protected by Windows.
+| | Its conversations | Your sign-in |
+|---|---|---|
+| **The browser agent** | In your browser, not on the server | In your browser too, not encrypted |
+| **The Office add-ins** | On your computer, encrypted | Protected by Windows |
 
 Fadenstack keeps your chats until they are deleted. See [Deleting](#deleting).
 
@@ -38,26 +40,39 @@ Your organisation can have Fadenstack find personal data, such as names, e-mail 
 
 When it is on, personal data is masked in one of two ways:
 
-- **`redact`**: it is replaced by a label such as `<PERSON>` before the model sees it, and it does not come back. An answer that mentions it shows the label.
-- **`tokenize_reversible`**: it is replaced by a placeholder such as `[PERSON_1]` on the way to the model, and the real value is put back in the answer you see.
+| Mode | What happens to personal data |
+|---|---|
+| **`redact`** | It is replaced by a label such as `<PERSON>` before the model sees it, and it does not come back. An answer that mentions it shows the label. |
+| **`tokenize_reversible`** | It is replaced by a placeholder such as `[PERSON_1]` on the way to the model, and the real value is put back in the answer you see. |
 
-If the check cannot run, the policy decides: your message is not sent, it is sent anyway, or it goes to one of your organisation's own models instead.
+??? info "If the check cannot run"
+    If the check cannot run, the policy decides: your message is not sent, it is sent anyway, or it goes to one of your organisation's own models instead.
 
 !!! note "Detection is not always right"
     Personal data is found automatically, and how well that works depends on the language and on how the text is written: tables, lists, code and short fragments are harder than plain sentences. It finds most personal data in English text, not all of it; in German or other languages it often misses names and places. It can also mask words that are not personal data. Do not paste anything you are not allowed to share.
 
 ### See and tighten it for one chat
 
-1. Open the tools panel with the wrench beside the message box, and select **Privacy**.
-2. The top line says **Using tenant defaults** (your organisation's policy) or **Session override active** (this chat has its own settings).
-3. To protect more in this chat: switch on **Cloud egress** (for models at outside providers) or **Local egress** (for your organisation's own models), choose **Fail Action**, or add a kind of personal data under **Detection Settings** with **Add entity**. If your organisation allows it, **Mode** switches between `redact` and `tokenize_reversible`.
-4. **Clear Session Override** goes back to your organisation's settings.
-
 ![The Privacy tab saying Using tenant defaults, with Cloud egress, Local egress, Mode and Fail Action, and the kinds of personal data looked for, each with a lock, above Add entity](../images/use/chat-privacy-tab.png)
+
+1. Open the tools panel with the wrench beside the message box.
+2. Select **Privacy**.
+3. Read the top line: **Using tenant defaults** (your organisation's policy) or **Session override active** (this chat has its own settings).
+4. To protect more in this chat, change a setting:
+
+| Setting | What it does |
+|---|---|
+| **Cloud egress** | Switch it on to protect what goes to models at outside providers |
+| **Local egress** | Switch it on to protect what goes to your organisation's own models |
+| **Fail Action** | Choose what happens when the check cannot run |
+| **Add entity**, under **Detection Settings** | Adds a kind of personal data to look for |
+| **Mode** | Switches between `redact` and `tokenize_reversible`, if your organisation allows it |
+| **Clear Session Override** | Goes back to your organisation's settings |
 
 You can only make the protection stricter than your organisation's policy, never looser. Settings the policy enforces show a lock.
 
-In the browser agent and the Office add-ins, a note **Personal data protected** says how many values were kept from the model, and of which kinds.
+??? info "In the browser agent and the Office add-ins"
+    In the browser agent and the Office add-ins, a note **Personal data protected** says how many values were kept from the model, and of which kinds.
 
 ## Models at outside providers
 
@@ -72,18 +87,19 @@ The model list does not always show where a model runs. If it matters for what y
 
 ## Deleting
 
-- **A chat** you delete disappears from your list at once. It is not erased from the server: its messages and files stay there until an administrator deletes the chat.
-- **A project** you delete is deleted with all its chats.
-- **In the browser agent**, deleting a chat in **Chat history** removes it from your browser.
+| You delete | What happens |
+|---|---|
+| **A chat** | It disappears from your list at once. It is not erased from the server: its messages and files stay there until an administrator deletes the chat. |
+| **A project** | It is deleted with all its chats. |
+| A chat in **Chat history**, in the browser agent | It is removed from your browser. |
 
 If something must be erased for good, for example personal data you pasted by mistake, ask your administrator.
 
 ## When it does not work
 
-**PII service unavailable and fail_action=block.** The personal-data check could not run, and your organisation's policy says not to send messages without it. Try again later; if it keeps happening, tell your administrator.
-
-**An answer shows `<PERSON>` or `[PERSON_1]` where a name should be.** The name was masked before it reached the model. With `redact` this is expected. With `tokenize_reversible` the name should come back; if it does not, tell your administrator.
-
-**Your admin hasn't allowed changing the PII mode for this chat.** Your organisation fixes the mode. The other settings in **Privacy** may still be open to you.
-
-**… is not applied. Choose it again to apply it.** The mode you chose earlier did not take effect. Choose it again in **Mode**.
+| You see | What to do |
+|---|---|
+| **PII service unavailable and fail_action=block.** | The personal-data check could not run, and your organisation's policy says not to send messages without it. Try again later; if it keeps happening, tell your administrator. |
+| An answer shows `<PERSON>` or `[PERSON_1]` where a name should be | The name was masked before it reached the model. With `redact` this is expected. With `tokenize_reversible` the name should come back; if it does not, tell your administrator. |
+| **Your admin hasn't allowed changing the PII mode for this chat.** | Your organisation fixes the mode. The other settings in **Privacy** may still be open to you. |
+| **… is not applied. Choose it again to apply it.** | The mode you chose earlier did not take effect. Choose it again in **Mode**. |

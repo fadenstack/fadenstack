@@ -5,6 +5,8 @@ und wo es lief, wie viele Tokens sie verbraucht hat, wie lange sie gedauert hat 
 festgelegten Preisen kosten würde. Diese Seite zeigt, wo Sie diese Zahlen finden und wie die Kostenschätzungen
 aussagekräftig werden.
 
+![Kosten-Observability auf dem Reiter „Übersicht“: Geschätzte Ausgaben, Anfragen gesamt, Tokens gesamt, Durchschn. Latenz und Fehlerrate, darunter Kosten im Zeitverlauf, Anfrage-Durchsatz, Latenz-Perzentile und Ausgaben nach Modell](../images/administer/observability.png)
+
 ## Was gezählt wird {#what-is-counted}
 
 Für jede Anfrage hält das Anfrageprotokoll fest:
@@ -31,45 +33,50 @@ Chat, die Agenten und Anwendungen, die API-Tokens nutzen.
 
 ## Die Kosten- und Nutzungsseiten {#the-cost-and-usage-pages}
 
+![Kosten-Observability, geöffnet über Observability → Kosten-Dashboard: die Reiter Übersicht, Anfragen und Preise sowie die Zeiträume 7d bis 90d mit Aktualisieren und Herunterladen oben rechts](../images/administer/cost-dashboard-top.png)
+
 Öffnen Sie **Observability → Kosten-Dashboard** (die Seite heißt **Kosten-Observability**) und wählen Sie einen
 Zeitraum.
 
-![Kosten-Observability, geöffnet über Observability → Kosten-Dashboard: die Reiter Übersicht, Anfragen und Preise sowie die Zeiträume 7d bis 90d mit Aktualisieren und Herunterladen oben rechts](../images/administer/cost-dashboard-top.png)
+| Reiter | Was er zeigt |
+|---|---|
+| **Übersicht** | **Geschätzte Ausgaben**, **Anfragen gesamt**, **Tokens gesamt**, **Durchschn. Latenz** und **Fehlerrate**, dazu **Kosten im Zeitverlauf**, **Anfrage-Durchsatz**, **Latenz-Perzentile**, **Ausgaben nach Modell** und **Top-Benutzer**. |
+| **Anfragen** | Jede Anfrage, die neueste zuerst. Filtern Sie nach **Modell** oder **Benutzer-ID** und öffnen Sie eine Anfrage, um ihre Details zu sehen: Tokens, Kosten, Zeiten, die Tools und Skills, die sie genutzt hat, und die Schritte, die sie durchlaufen hat. |
+| **Preise** | Die Preise, mit denen die Schätzungen rechnen (siehe unten). |
 
-- **Übersicht**: **Geschätzte Ausgaben**, **Anfragen gesamt**, **Tokens gesamt**, **Durchschn. Latenz** und
-  **Fehlerrate**, dazu **Kosten im Zeitverlauf**, **Anfrage-Durchsatz**, **Latenz-Perzentile**, **Ausgaben nach
-  Modell** und **Top-Benutzer**.
-- **Anfragen**: jede Anfrage, die neueste zuerst. Filtern Sie nach **Modell** oder **Benutzer-ID** und öffnen Sie
-  eine Anfrage, um ihre Details zu sehen: Tokens, Kosten, Zeiten, die Tools und Skills, die sie genutzt hat, und
-  die Schritte, die sie durchlaufen hat.
-- **Preise**: die Preise, mit denen die Schätzungen rechnen (siehe unten).
-- **CSV exportieren** lädt die Anfragen des Zeitraums (bis zu 5.000 Zeilen) für eine Tabellenkalkulation herunter.
+**CSV exportieren** lädt die Anfragen des Zeitraums (bis zu 5.000 Zeilen) für eine Tabellenkalkulation herunter.
 
 ## Preise festlegen {#set-prices}
 
 Kosten sind Schätzungen auf Grundlage der Preise, die Sie pro Modell festlegen. Sie ändern nichts an dem, was ein
 Provider Ihnen in Rechnung stellt.
 
+![LLM-Provider: die Zeile eines Providers mit seinem Modell, „Preis festlegen“ in der Spalte „Preis $/1 Mio.“, seinem Status und Endpunkt](../images/administer/providers-list-top.png)
+
 1. Öffnen Sie **LLM → Provider** und wählen Sie in der Zeile des Modells **Preis festlegen** (in der Spalte
    **Preis $/1 Mio.**).
-2. Geben Sie ein, was eine Million Eingabe-Tokens und eine Million Ausgabe-Tokens kosten.
 
     ![Der Preisdialog für ein Modell: Eingabepreis und Ausgabepreis in USD pro Million Tokens, und Speichern](../images/administer/provider-set-price.png)
 
+2. Geben Sie ein, was eine Million Eingabe-Tokens und eine Million Ausgabe-Tokens kosten.
 3. Speichern Sie. Anfragen werden innerhalb einer Minute mit diesem Preis berechnet.
 
-Sie können Preise auch festlegen, wenn Sie einen Provider anbinden, oder unter **Preise** auf den Kostenseiten,
-wo der Preisverlauf jedes Modells aufbewahrt wird. Verwenden Sie für ein Cloud-Modell die Listenpreise des
-Providers. Für Ihre eigenen Modelle können Sie mit einem eigenen Preis (z. B. dem, was Sie die Hardware pro
-Million Tokens kostet) die interne Nutzung vergleichen und intern verrechnen; lassen Sie das Feld leer, wenn Sie
-das nicht brauchen.
+![Der Reiter „Preise“ der Kostenseiten: Eingabe- und Ausgabepreis jedes Modells pro Million Tokens, ob es ein Standardwert ist oder von einem Administrator festgelegt wurde, ab wann er gilt, und „Preis hinzufügen“](../images/administer/cost-pricing-list.png)
 
-![Der Reiter Preise der Kostenseiten: Eingabe- und Ausgabepreis jedes Modells pro Million Tokens, ob es ein Standardwert ist oder von einem Administrator festgelegt wurde, ab wann er gilt, und Preis hinzufügen](../images/administer/cost-pricing-list.png)
+Sie können Preise auch festlegen, wenn Sie einen Provider anbinden, oder unter **Preise** auf den Kostenseiten,
+wo der Preisverlauf jedes Modells aufbewahrt wird.
+
+??? info "Welchen Preis Sie festlegen"
+    Verwenden Sie für ein Cloud-Modell die Listenpreise des Providers. Für Ihre eigenen Modelle können Sie mit
+    einem eigenen Preis (z. B. dem, was Sie die Hardware pro Million Tokens kostet) die interne Nutzung
+    vergleichen und intern verrechnen; lassen Sie das Feld leer, wenn Sie das nicht brauchen.
 
 Anfragen an ein externes Modell ohne Preis werden trotzdem gezählt. **Kosten diesen Monat** auf dem Dashboard
 zeigt, wie viele es waren („Anfragen ohne Preis“), damit Sie wissen, dass die Schätzung zu niedrig ist.
 
 ## Nutzung pro Person und pro Gruppe {#usage-per-person-and-per-group}
+
+![„Rollen zuweisen“ für eine Person: die Rollen zum Ankreuzen und die Nutzungsgruppe, der ihre Nutzung zugeordnet wird](../images/administer/users-edit-roles.png)
 
 - **Pro Person**: **Top-Benutzer** auf den Kostenseiten und der Filter **Benutzer-ID** unter **Anfragen**.
 - **Pro Gruppe**: Jede Anfrage wird mit der **Nutzungsgruppe** des Benutzers erfasst, also der Gruppe, die in
@@ -84,11 +91,8 @@ begrenzen, wie viel eine Person, ein Team oder ein Agent nutzen darf.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**Die Zahlen sind leer.** Im Zeitraum gibt es keine Anfragen, oder das Gateway kann sein Protokoll nicht
-schreiben. Senden Sie eine Nachricht im Chat und aktualisieren Sie dann die Seite.
-
-**Die Kosten zeigen „Keine“ oder wirken zu niedrig.** Die verwendeten Modelle haben keinen Preis. Legen Sie ihn wie
-oben beschrieben fest.
-
-**Eine Anfrage fehlt auf den Kostenseiten.** Gezählt werden nur Anfragen, die das Gateway erreichen: Ein Modell,
-das jemand direkt an seinem Endpunkt aufruft, an Fadenstack vorbei, wird nicht gezählt.
+| Sie sehen | Was Sie tun |
+|---|---|
+| Die Zahlen sind leer | Im Zeitraum gibt es keine Anfragen, oder das Gateway kann sein Protokoll nicht schreiben. Senden Sie eine Nachricht im Chat und aktualisieren Sie dann die Seite. |
+| Die Kosten zeigen „Keine“ oder wirken zu niedrig | Die verwendeten Modelle haben keinen Preis. Legen Sie ihn wie oben beschrieben fest. |
+| Eine Anfrage fehlt auf den Kostenseiten | Gezählt werden nur Anfragen, die das Gateway erreichen: Ein Modell, das jemand direkt an seinem Endpunkt aufruft, an Fadenstack vorbei, wird nicht gezählt. |

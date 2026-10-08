@@ -47,8 +47,10 @@ images those files name are downloaded separately and keep their own terms.
 | Model-TLS proxy | nginx | nginx's licence |
 | The models | Whatever you deploy from Hugging Face or import | Each model's own licence, which the administrator accepts on Hugging Face for gated models |
 
-The machines get these images from the server. If you redistribute a runtime image outside your organisation,
-check the exact terms of its base image first.
+The machines get these images from the server.
+
+!!! note
+    If you redistribute a runtime image outside your organisation, check the exact terms of its base image first.
 
 ## Sources
 

@@ -4,6 +4,8 @@ A remote provider is a model that runs elsewhere: at a cloud provider such as Op
 Anthropic, Google, Mistral or OpenRouter, or on any server that speaks the OpenAI API. Once connected, it is
 offered in the chat and at the API next to your own models, under the same rules.
 
+![LLM → Providers: each entry with its target (Remote Endpoint or Cluster), model, price, status and endpoint, the search and Add Provider at the top, and the actions at the end of each remote provider's row](../images/administer/providers.png)
+
 ## Before you start
 
 - An account at the provider and an API key from its console.
@@ -14,24 +16,26 @@ offered in the chat and at the API next to your own models, under the same rules
 
 1. Open **LLM → Providers** and select **Add Provider**.
 
-    ![LLM Providers with the search, Add Provider and refresh at the top, and a model your cluster serves in the list](../images/administer/providers-list-top.png)
+    ![The New Provider dialog with Target set to Remote Endpoint: Provider, Endpoint URL, API Key, Model and Test Connection, and Pricing (Optional) as the next step](../images/administer/provider-add.png)
 
 2. Enter a **Name** people will recognise, such as `OpenRouter`.
 3. Under **Target**, choose **Remote Endpoint**.
-4. Under **Provider**, pick the provider. For OpenAI, Mistral, Groq, DeepSeek and OpenRouter the
-   **Endpoint URL** is filled in; change it only for a proxy. For hosted providers such as Anthropic or Google
-   Gemini, leave it empty. For any other OpenAI-compatible service, choose **Other (OpenAI-compatible)** and
-   enter its address, for example `https://api.example.com/v1`.
+4. Under **Provider**, pick the provider. The **Endpoint URL** depends on it:
+
+    | Provider | **Endpoint URL** |
+    |---|---|
+    | OpenAI, Mistral, Groq, DeepSeek and OpenRouter | Filled in; change it only for a proxy. |
+    | Hosted providers such as Anthropic or Google Gemini | Leave it empty. |
+    | Any other OpenAI-compatible service | Choose **Other (OpenAI-compatible)** and enter its address, for example `https://api.example.com/v1`. |
+
 5. Paste the **API Key**.
 6. Select **Test Connection**. It sends a small request to check the address and the key, and lists the
    provider's models: "Connection successful — 214 model(s) available."
 7. Under **Model**, pick the model to offer, or type its name as the provider spells it.
-
-    ![The New Provider dialog with Target set to Remote Endpoint: Provider, Endpoint URL, API Key, Model and Test Connection, and Pricing (Optional) as the next step](../images/administer/provider-add.png)
-
-8. Select **Next**. Under **Pricing (Optional)**, enter what a million input and output tokens cost, so that
-   the console can estimate what usage costs (see [Usage and costs](usage.md)). Leave both empty to skip.
-9. Select **Create**.
+8. Select **Next**.
+9. Under **Pricing (Optional)**, enter what a million input and output tokens cost, so that the console can
+   estimate what usage costs (see [Usage and costs](usage.md)). Leave both empty to skip.
+10. Select **Create**.
 
 The model is available in the chat and through the API at once, under the model's name as you entered it.
 
@@ -54,14 +58,18 @@ with the same key.
 
 ## Change or remove a provider
 
-**Edit** in the provider's row changes the **Name**, the **Endpoint URL**, the **API Key** and the **Model**,
-and the switch **Offer the gateway's tools**. That switch decides whether the model is offered the time, the
-tool search and the chat's MCP tools. Switch it off for a model or a router that does not call tools; with
-OpenRouter's free router, for example, requests are then shorter and the router can choose among all free
-models.
+| In the provider's row | What it does |
+|---|---|
+| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key** and the **Model**, and the switch **Offer the gateway's tools**. |
+| **Stop** | Stops sending requests to it without removing it; **Start** sends them again. |
+| **Delete** | Removes a stopped provider. It cannot be undone. |
 
-**Stop** in the provider's row stops sending requests to it without removing it; **Start** sends them
-again. **Delete** removes a stopped provider. It cannot be undone.
+??? info "More about Offer the gateway's tools"
+    That switch decides whether the model is offered the time, the tool search and the chat's MCP tools.
+    Switch it off for a model or a router that does not call tools; with OpenRouter's free router, for
+    example, requests are then shorter and the router can choose among all free models.
+
+![The price dialog of a provider's model: Input price and Output price in USD per 1M tokens, with Save](../images/administer/provider-set-price.png)
 
 **Set price** (in the **Price $/1M** column) sets or changes the price later.
 
@@ -93,6 +101,8 @@ model.
 
 ## Data residency
 
+![Observability → Data Residency: the Hybrid badge, the number of local and external providers, the data volume, and one provider on your machines and one external, each with Where prompts go](../images/administer/data-residency.png)
+
 **Observability → Data Residency** shows where prompts are processed, for every provider:
 
 | Class | Meaning |
@@ -107,22 +117,20 @@ gpu-01". The page also shows how much data went each way, estimated from the tok
 whole setup: **Air-Gapped ✓**, **Hybrid** or **Cloud Only**. Until every unknown provider is placed, the
 setup is not counted as air-gapped.
 
-![Observability → Data Residency: the Hybrid badge, the number of local and external providers, the data volume, and one provider on your machines and one external, each with Where prompts go](../images/administer/data-residency.png)
-
 When Fadenstack cannot tell, or tells wrongly, set **Where prompts go** on the provider: **On your
-machines**, **Your network** or **External**. **Detect automatically** goes back to detection. Networks of
-your own outside the private ranges, such as your data centre's public range, are declared under **Settings
-→ General**: **Internal networks**.
+machines**, **Your network** or **External**. **Detect automatically** goes back to detection.
+
+![Settings → General: Hugging Face access, then Internal networks under LLM / Data residency, with Save](../images/operate/settings.png)
+
+Networks of your own outside the private ranges, such as your data centre's public range, are declared under
+**Settings → General**: **Internal networks**.
 
 The [dashboard](dashboard.md) shows the same classes as **Kept in-house** and in **AI traffic**.
 
 ## When it does not work
 
-**"Not OpenAI API compatible".** The address or the key is wrong, or the service does not speak the OpenAI
-API at that address. Check the address ends where the provider's documentation says, usually `/v1`.
-
-**The model is not in the chat.** Check that the provider is not stopped, and its name under **Model** in
-the provider's **Edit** dialog.
-
-**"… is not answering"** on the dashboard. The provider did not answer its last checks, and requests are
-not sent to it until it answers again. Check the provider's status page and your server's internet access.
+| You see | What to do |
+|---|---|
+| **"Not OpenAI API compatible"** | The address or the key is wrong, or the service does not speak the OpenAI API at that address. Check the address ends where the provider's documentation says, usually `/v1`. |
+| The model is not in the chat | Check that the provider is not stopped, and its name under **Model** in the provider's **Edit** dialog. |
+| **"… is not answering"** on the dashboard | The provider did not answer its last checks, and requests are not sent to it until it answers again. Check the provider's status page and your server's internet access. |

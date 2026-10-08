@@ -4,6 +4,8 @@ Als Administrator richten Sie Fadenstack in der Konsole für Ihre Organisation e
 Modelle die Benutzer verwenden können und wo diese laufen, legen die Benutzer an, binden Tools an und bestimmen
 die Regeln für personenbezogene Daten. Dieser Abschnitt führt durch jede dieser Aufgaben.
 
+![Die Konsole: links das Menü, rechts das Dashboard, und in der oberen Leiste das Fragezeichen, das das Menü „Hilfe“ öffnet](../images/administer/dashboard.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Fadenstack ist installiert, und Sie können sich an der Konsole anmelden, z. B. unter
@@ -15,18 +17,22 @@ die Regeln für personenbezogene Daten. Dieser Abschnitt führt durch jede diese
 
 Das Menü **Hilfe** (das Fragezeichen in der oberen Leiste) enthält:
 
-- **Erste Schritte** ist eine Liste auf dem [Dashboard](dashboard.md), die Sie von einer frischen Installation bis
-  dahin führt, dass die Benutzer damit arbeiten. Jeder Schritt hakt sich selbst ab, sobald der Server hat, was er
-  dafür braucht; Sie können die Schritte also in beliebiger Reihenfolge erledigen. **Zeig mir wie** startet eine
-  Anleitung für den Schritt; **Ausblenden** entfernt die Liste vom Dashboard. Sie bleibt unter **Hilfe**
-  erreichbar.
-- **Rundgang durch die Konsole** zeigt Ihnen in einer Minute, wo was zu finden ist.
-- **Über diese Seite** (oder ++f1++) erklärt die Seite, auf der Sie gerade sind, und was Sie dort tun können.
-  **Anleitungen** führen Sie auf den echten Seiten durch eine Aufgabe: Sie klicken selbst, die Anleitung zeigt
-  den Weg. Es gibt Anleitungen zum Hinzufügen einer Maschine, zum Erstellen eines Clusters, zum Bereitstellen
-  eines Modells, zum Anbinden eines Cloud-Modells, zum Anlegen von Benutzern und zum Erstellen eines API-Tokens.
+| Eintrag | Was er tut |
+|---|---|
+| **Erste Schritte** | Eine Liste auf dem [Dashboard](dashboard.md), die Sie von einer frischen Installation bis dahin führt, dass die Benutzer damit arbeiten. |
+| **Rundgang durch die Konsole** | Zeigt Ihnen in einer Minute, wo was zu finden ist. |
+| **Über diese Seite** (oder ++f1++) | Erklärt die Seite, auf der Sie gerade sind, und was Sie dort tun können. |
+| **Anleitungen** | Führen Sie auf den echten Seiten durch eine Aufgabe: Sie klicken selbst, die Anleitung zeigt den Weg. |
 
 ![Die Liste „Erste Schritte“ auf dem Dashboard: fünf Schritte, vier davon abgehakt, jeder mit „Öffnen“, und „Ausblenden“ oben rechts](../images/administer/getting-started.png)
+
+Jeder Schritt unter **Erste Schritte** hakt sich selbst ab, sobald der Server hat, was er dafür braucht; Sie
+können die Schritte also in beliebiger Reihenfolge erledigen. **Zeig mir wie** startet eine Anleitung für den
+Schritt; **Ausblenden** entfernt die Liste vom Dashboard. Sie bleibt unter **Hilfe** erreichbar.
+
+??? info "Welche Anleitungen es gibt"
+    Es gibt Anleitungen zum Hinzufügen einer Maschine, zum Erstellen eines Clusters, zum Bereitstellen eines
+    Modells, zum Anbinden eines Cloud-Modells, zum Anlegen von Benutzern und zum Erstellen eines API-Tokens.
 
 ## Die ersten Schritte, der Reihe nach {#first-steps-in-order}
 

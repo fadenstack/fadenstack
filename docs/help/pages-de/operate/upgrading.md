@@ -43,19 +43,19 @@ nichts aktualisiert sich von selbst.
 
 4. Prüfen Sie das Ergebnis (siehe unten).
 
-Das Upgrade, der Reihe nach:
-
-1. prüft Docker und stellt sicher, dass kein Container, den es gleich ersetzt, von etwas anderem angelegt wurde;
-2. sichert jede Datenbank, die `.env` und das Zertifikatsmaterial nach `~/fadenstack/backups/<time>/` und bricht
-   ab, wenn sich nichts sichern ließ;
-3. ersetzt die Dateien der Installation durch die des neuen Release und ergänzt in der `.env` nur die
-   Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten, außer der
-   Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird;
-4. lädt die Images des neuen Release herunter;
-5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen;
-6. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
-7. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
-   fehlgeschlagener Download hält nichts auf: Wiederholen Sie ihn mit `faden runtime-images`.
+??? info "Was das Upgrade tut, der Reihe nach"
+    1. prüft Docker und stellt sicher, dass kein Container, den es gleich ersetzt, von etwas anderem angelegt
+       wurde;
+    2. sichert jede Datenbank, die `.env` und das Zertifikatsmaterial nach `~/fadenstack/backups/<time>/` und
+       bricht ab, wenn sich nichts sichern ließ;
+    3. ersetzt die Dateien der Installation durch die des neuen Release und ergänzt in der `.env` nur die
+       Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten, außer der
+       Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird;
+    4. lädt die Images des neuen Release herunter;
+    5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen;
+    6. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
+    7. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
+       fehlgeschlagener Download hält nichts auf: Wiederholen Sie ihn mit `faden runtime-images`.
 
 | Option | Was sie tut |
 |---|---|
@@ -75,13 +75,13 @@ ersetzt. Halten Sie Ihre Änderungen in der `.env`.
 
 ### Was die Benutzer währenddessen sehen {#what-people-see-meanwhile}
 
-Während die Dienste neu starten, zeigt jede Seite der Konsole „Fadenstack wird aktualisiert“ und lädt sich selbst
-wieder in die Konsole, sobald sie zurück ist. Die API (`/api`) und das Gateway (`/v1`) antworten mit `503` und
-`Retry-After: 30`, sodass Skripte und SDKs warten und es erneut versuchen können. Eine offen gelassene
-Konsolenseite bemerkt die neue Version und bietet **Neu laden** an; eine Seite mit eingegebenem, aber nicht
-gesendetem Text wird nie von selbst neu geladen.
-
 ![Die Wartungsseite: Fadenstack wird aktualisiert und lädt sich von selbst neu, sobald es wieder da ist](../images/operate/maintenance-page.png)
+
+| Wer | Was er sieht, während die Dienste neu starten |
+|---|---|
+| Personen in der Konsole | Jede Seite der Konsole zeigt „Fadenstack wird aktualisiert“ und lädt sich selbst wieder in die Konsole, sobald sie zurück ist. |
+| Skripte und SDKs | Die API (`/api`) und das Gateway (`/v1`) antworten mit `503` und `Retry-After: 30`, sodass Skripte und SDKs warten und es erneut versuchen können. |
+| Eine offen gelassene Konsolenseite | Sie bemerkt die neue Version und bietet **Neu laden** an; eine Seite mit eingegebenem, aber nicht gesendetem Text wird nie von selbst neu geladen. |
 
 Die Modelle auf den Clustern laufen die ganze Zeit weiter: Ein Cluster läuft auf seinen Maschinen, nicht auf dem
 Server.
@@ -115,6 +115,8 @@ und die Seite jeder Maschine zeigen dann bei dieser Maschine **Agent *Version* v
 der Server erwartet. Agenten aktualisieren sich nie selbst, und der Server aktualisiert sie nie: Sie wählen das
 Zeitfenster.
 
+![Der Bereich „Maschine hinzufügen“ mit der Installationszeile zum Kopieren](../images/operate/add-machine-panel.png){ width="360" }
+
 1. Öffnen Sie in der Konsole **Maschinen**, wählen Sie **Maschine hinzufügen** und kopieren Sie die
    Installationszeile.
 2. Führen Sie die Zeile auf jeder Maschine erneut aus, genauso wie beim ersten Mal: mit `sudo` bei einem Agenten,
@@ -122,8 +124,11 @@ Zeitfenster.
 
 Das Installationsprogramm lädt den Agenten herunter, den der Server jetzt erwartet, erkennt, dass die Maschine
 bereits Mitglied ist, und startet den Agenten mit dem neuen Build neu. Es gibt nichts zu genehmigen. Die Modelle
-auf der Maschine laufen weiter: Der Agent ist die Verbindung der Maschine zum Server, und die Container des
-Clusters hängen nicht davon ab, dass er läuft.
+auf der Maschine laufen weiter.
+
+??? info "Warum die Modelle weiterlaufen"
+    Der Agent ist die Verbindung der Maschine zum Server, und die Container des Clusters hängen nicht davon ab, dass
+    er läuft.
 
 Aktualisieren Sie die Agenten bald nach einem Upgrade. Manche Funktionen brauchen einen aktuellen Agenten auf
 jeder Maschine eines Clusters, und die Konsole nennt die Maschinen, die aktualisiert werden müssen, wenn einer
@@ -141,27 +146,30 @@ angewiesen sind.
 ## Einen Cluster auf eine andere Runtime umstellen {#move-a-cluster-to-another-runtime}
 
 Eine Runtime ist das Image, das die Maschinen eines Clusters ausführen: Ray und vLLM zusammen, gebaut für
-diese Maschinenart. Die Karte **Laufzeit** des Clusters zeigt, ob sie zertifiziert ist: **Zertifiziert**,
-**Teilweise zertifiziert** oder **Nicht zertifiziert**. Ein Release liefert für jede Maschinenart eine als
-**Empfohlen** markierte Runtime, kann eine neuere **Vorschau** mitliefern und behält eine ältere, zu der Sie zurückkehren können. Ein neuer Cluster bekommt
-die empfohlene.
+diese Maschinenart. Ist eine neuere zertifizierte Runtime verfügbar, zeigt die Karte **Laufzeit** des Clusters das
+an. Nichts ändert sich, bis Sie umschalten.
 
-Ein Cluster behält die Runtime, mit der er gestartet wurde: über Neustarts hinweg, beim Wiederanlaufen nach einer
-Störung und bei Server-Upgrades, die eine neuere mitbringen. Ist eine neuere zertifizierte Runtime verfügbar,
-zeigt die Karte **Laufzeit** des Clusters das an. Nichts ändert sich, bis Sie umschalten.
+![Die Karte „Laufzeit“ auf der Seite eines Clusters: die Runtime, mit der er läuft, sowie „Umschalten auf“ mit „Umschalten“](../images/operate/cluster-runtime-card.png)
 
 1. Öffnen Sie **Cluster** und dann den Cluster.
 2. Wählen Sie auf der Karte **Laufzeit** unter **Umschalten auf** die Runtime aus und wählen Sie **Umschalten**.
-
-    ![Die Karte „Laufzeit“ auf der Seite eines Clusters: die Runtime, mit der er läuft, sowie „Umschalten auf“ mit „Umschalten“](../images/operate/cluster-runtime-card.png)
-
 3. Lesen Sie die Warnung und wählen Sie **Mit dieser Laufzeit neu starten**.
 
 Der Container jeder Maschine wird aus dem neuen Image neu erstellt (eine Maschine, die es noch nicht hat, holt es
-zuerst), und jedes Modell auf dem Cluster lädt neu. Planen Sie ein Zeitfenster dafür ein. Eine **Vorschau** führt
-Modelle aus, die die empfohlene Runtime nicht ausführen kann; wählen Sie sie für einen Cluster, der diese Modelle
-braucht. Der Modell-Marktplatz zeigt **Läuft hier nicht** bei einem Modell, das eine neuere Runtime braucht, als
-der Cluster ausführt (siehe [Modelle](../administer/models.md)).
+zuerst), und jedes Modell auf dem Cluster lädt neu. Planen Sie ein Zeitfenster dafür ein.
+
+??? info "Mehr zu Runtimes"
+    Die Karte **Laufzeit** des Clusters zeigt, ob die Runtime zertifiziert ist: **Zertifiziert**, **Teilweise
+    zertifiziert** oder **Nicht zertifiziert**. Ein Release liefert für jede Maschinenart eine als **Empfohlen**
+    markierte Runtime, kann eine neuere **Vorschau** mitliefern und behält eine ältere, zu der Sie zurückkehren
+    können. Ein neuer Cluster bekommt die empfohlene.
+
+    Ein Cluster behält die Runtime, mit der er gestartet wurde: über Neustarts hinweg, beim Wiederanlaufen nach
+    einer Störung und bei Server-Upgrades, die eine neuere mitbringen.
+
+    Eine **Vorschau** führt Modelle aus, die die empfohlene Runtime nicht ausführen kann; wählen Sie sie für einen
+    Cluster, der diese Modelle braucht. Der Modell-Marktplatz zeigt **Läuft hier nicht** bei einem Modell, das eine
+    neuere Runtime braucht, als der Cluster ausführt (siehe [Modelle](../administer/models.md)).
 
 ## Zurückgehen {#going-back}
 
@@ -187,27 +195,11 @@ erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt i
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**`These containers have names this installation uses, but it did not create them`.** Ein Container mit einem der
-Namen von Fadenstack wurde auf andere Weise angelegt, von Hand oder von einem anderen Compose-Projekt. Die Meldung
-listet diese Container auf, zusammen mit dem Befehl, um sie zu entfernen (`docker rm -f <name>`). Beim Entfernen
-eines Containers bleiben seine Daten-Volumes erhalten. Führen Sie das Upgrade danach erneut aus.
-
-**`This CLI (<version>) is older than the install (<version>).`** Das Werkzeug ist älter als das Release, mit dem
-die Installation läuft. Aktualisieren Sie zuerst das Werkzeug.
-
-**`Backup failed — aborting upgrade.`** Meist eine volle Festplatte oder ein Postgres, das nicht läuft. Schaffen
-Sie Platz, prüfen Sie `faden status` und führen Sie das Upgrade erneut aus. Verwenden Sie `--no-backup` nur, wenn
-Sie eine aktuelle Sicherung haben.
-
-**`Backend did not become healthy within 120 s.`** Die Dienste wurden neu gestartet, aber die Konsolen-API
-antwortet noch nicht. Lesen Sie `faden logs faden-backend`. Die Wartungsseite wird trotzdem aufgehoben, damit
-erreichbar ist, was läuft.
-
-**`... this release names a build that is on no registry.`** Ein Runtime-Image für eine Maschinenart ist nicht
-veröffentlicht. Das Upgrade ist davon nicht betroffen, und laufende Cluster behalten ihre Images. Eine Maschine
-dieser Art kann das Image weiterhin von einer anderen Maschine ihres Clusters bekommen, die es hat.
-
-**Die Festplatte ist voll.** Postgres, der Log-Speicher und die anderen Speicher starten immer wieder neu. Nichts
-funktioniert, bis wieder Platz da ist: Entfernen Sie Images, die kein Container verwendet (`docker image prune`),
-verschieben Sie alte Sicherungen vom Server und führen Sie das Upgrade dann erneut aus. Das Dashboard warnt
-früher: **Wenig Speicherplatz**.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **`These containers have names this installation uses, but it did not create them`** | Ein Container mit einem der Namen von Fadenstack wurde auf andere Weise angelegt, von Hand oder von einem anderen Compose-Projekt. Die Meldung listet diese Container auf, zusammen mit dem Befehl, um sie zu entfernen (`docker rm -f <name>`). Beim Entfernen eines Containers bleiben seine Daten-Volumes erhalten. Führen Sie das Upgrade danach erneut aus. |
+| **`This CLI (<version>) is older than the install (<version>).`** | Das Werkzeug ist älter als das Release, mit dem die Installation läuft. Aktualisieren Sie zuerst das Werkzeug. |
+| **`Backup failed — aborting upgrade.`** | Meist eine volle Festplatte oder ein Postgres, das nicht läuft. Schaffen Sie Platz, prüfen Sie `faden status` und führen Sie das Upgrade erneut aus. Verwenden Sie `--no-backup` nur, wenn Sie eine aktuelle Sicherung haben. |
+| **`Backend did not become healthy within 120 s.`** | Die Dienste wurden neu gestartet, aber die Konsolen-API antwortet noch nicht. Lesen Sie `faden logs faden-backend`. Die Wartungsseite wird trotzdem aufgehoben, damit erreichbar ist, was läuft. |
+| **`... this release names a build that is on no registry.`** | Ein Runtime-Image für eine Maschinenart ist nicht veröffentlicht. Das Upgrade ist davon nicht betroffen, und laufende Cluster behalten ihre Images. Eine Maschine dieser Art kann das Image weiterhin von einer anderen Maschine ihres Clusters bekommen, die es hat. |
+| Die Festplatte ist voll: Postgres, der Log-Speicher und die anderen Speicher starten immer wieder neu | Nichts funktioniert, bis wieder Platz da ist: Entfernen Sie Images, die kein Container verwendet (`docker image prune`), verschieben Sie alte Sicherungen vom Server und führen Sie das Upgrade dann erneut aus. Das Dashboard warnt früher: **Wenig Speicherplatz**. |

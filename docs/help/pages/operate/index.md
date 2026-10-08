@@ -5,21 +5,22 @@ installing, upgrading, securing and backing up the server, connecting machines, 
 
 ## What you run
 
-**The server.** One Linux machine that runs Fadenstack as a set of Docker containers: the console, the API, the
-OpenAI-compatible gateway (`/v1`), the database, and the logs and metrics stores. It needs no GPU. You install
-and upgrade it with the `faden` command-line tool.
-
-**GPU machines.** Linux machines with NVIDIA GPUs that run the models. Each one runs a small program, the node
-agent (`faden-agent`), that connects out to the server and carries out what the console asks of it. You add a
-machine by running one command on it and approving it in the console.
-
-**Clusters.** A cluster groups one or more machines so they can serve models together. The machines run the
-models inside a runtime image: a container with Ray, which spreads the work over the machines, and vLLM, the
-engine that runs a model. You create and manage clusters in the console; the models themselves are deployed by
-an administrator (see [Deployments](../administer/deployments.md)).
+| Part | What it is | How you manage it |
+|---|---|---|
+| **The server** | One Linux machine that runs Fadenstack as a set of Docker containers. It needs no GPU. | Install and upgrade it with the `faden` command-line tool. |
+| **GPU machines** | Linux machines with NVIDIA GPUs that run the models. | Add a machine by running one command on it and approving it in the console. |
+| **Clusters** | A cluster groups one or more machines so they can serve models together. | Create and manage clusters in the console; the models themselves are deployed by an administrator (see [Deployments](../administer/deployments.md)). |
 
 A cluster runs on its machines, not on the server. Its models keep running while the server restarts or is
 upgraded; only requests through the gateway wait until the gateway is back.
+
+??? info "More about the parts"
+    - **The server's containers:** the console, the API, the OpenAI-compatible gateway (`/v1`), the database, and
+      the logs and metrics stores.
+    - **The node agent:** each GPU machine runs a small program, the node agent (`faden-agent`), that connects out
+      to the server and carries out what the console asks of it.
+    - **The runtime image:** the machines run the models inside a runtime image: a container with Ray, which
+      spreads the work over the machines, and vLLM, the engine that runs a model.
 
 ## The order of work
 

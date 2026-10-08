@@ -32,10 +32,11 @@ Run `faden doctor` after installing the tool to check the host first.
 3. Answer its questions (below). When it finishes, it prints the addresses the console is reached at and, for a
    certificate it made, the file to trust.
 
-`faden deploy` checks Docker, writes the deployment into `~/fadenstack` (or the directory you name:
-`faden deploy /opt/faden`), generates `.env` with random passwords and keys, sizes the services for the host,
-pulls the images for the tool's own release, starts everything, and creates the first administrator. The admin
-sign-ins of Grafana, RabbitMQ and Langfuse get the first administrator's e-mail and password.
+??? info "What `faden deploy` does"
+    `faden deploy` checks Docker, writes the deployment into `~/fadenstack` (or the directory you name:
+    `faden deploy /opt/faden`), generates `.env` with random passwords and keys, sizes the services for the host,
+    pulls the images for the tool's own release, starts everything, and creates the first administrator. The admin
+    sign-ins of Grafana, RabbitMQ and Langfuse get the first administrator's e-mail and password.
 
 ### What it asks
 
@@ -89,10 +90,10 @@ faden runtime-images --check    # what the server holds, and what is missing
    then reload. See [HTTPS and trust](https.md#trusting-a-certificate-made-on-the-server).
 3. On **Sign in to Fadenstack**, enter the administrator's **Email** and **Password**, and select **Sign In**.
 
+![The Getting started list on the Dashboard, here with four of its five steps ticked](../images/operate/getting-started.png)
+
 The console opens on the **Dashboard**, with a **Getting started** list: add a machine, create a cluster, host a
 model, try it in the chat, add people. Each step ticks itself when it is done.
-
-![The Getting started list on the Dashboard, here with four of its five steps ticked](../images/operate/getting-started.png)
 
 Next: [add the GPU machines](machines.md).
 
@@ -148,25 +149,11 @@ faden up
 
 ## When it does not work
 
-**`Docker is not available` or `Docker daemon is not running`.** Install Docker Engine with the Compose plugin,
-start it, and make sure your user is in the `docker` group (log out and in again after adding it).
-
-**`HTTP port 80 is in use by something else.`** Another program holds the port. Free it, or run
-`faden deploy --http-port 8080 --https-port 8443`. `faden doctor` lists every port the install publishes and whether
-something else holds it.
-
-**`Backend did not become healthy in time — skipping admin setup.`** The services started but the console API
-did not answer in time. Check `faden status` and `faden logs faden-backend`, fix what they show, then run
-`faden deploy` again: it keeps the `.env` and creates the administrator.
-
-**`Some images failed to pull.`** The server could not reach a registry. Check its internet access and proxy,
-then run `faden deploy` again.
-
-**The browser refuses the certificate.** The server's certificate authority is not trusted on that computer yet.
-Import `~/fadenstack/tls/ca.crt`, or use a certificate from your own issuer (see [HTTPS and trust](https.md)).
-
-**The console says "This server still uses the default settings master key".** The key that seals stored secrets
-(the Hugging Face token, among others) is still the default. `faden deploy` writes a random one into `.env`; an
-install started some other way may lack it. Set `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` to a
-long random value (for example the output of `openssl rand -base64 48`), then run `faden up`. Secrets stored
-under the old key have to be entered again.
+| You see | What to do |
+|---|---|
+| **`Docker is not available`** or **`Docker daemon is not running`** | Install Docker Engine with the Compose plugin, start it, and make sure your user is in the `docker` group (log out and in again after adding it). |
+| **`HTTP port 80 is in use by something else.`** | Another program holds the port. Free it, or run `faden deploy --http-port 8080 --https-port 8443`. `faden doctor` lists every port the install publishes and whether something else holds it. |
+| **`Backend did not become healthy in time — skipping admin setup.`** | The services started but the console API did not answer in time. Check `faden status` and `faden logs faden-backend`, fix what they show, then run `faden deploy` again: it keeps the `.env` and creates the administrator. |
+| **`Some images failed to pull.`** | The server could not reach a registry. Check its internet access and proxy, then run `faden deploy` again. |
+| The browser refuses the certificate | The server's certificate authority is not trusted on that computer yet. Import `~/fadenstack/tls/ca.crt`, or use a certificate from your own issuer (see [HTTPS and trust](https.md)). |
+| The console says **"This server still uses the default settings master key"** | The key that seals stored secrets (the Hugging Face token, among others) is still the default. `faden deploy` writes a random one into `.env`; an install started some other way may lack it. Set `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` to a long random value (for example the output of `openssl rand -base64 48`), then run `faden up`. Secrets stored under the old key have to be entered again. |

@@ -37,7 +37,7 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 | `--db-only` | Databases only, without `.env` and certificate material. Keep a copy of `.env` apart, as private as the backups |
 | `-y` | Do not ask |
 
-!!! note
+??? info "How `--retain` counts"
     `--retain` counts every backup in the directory, including the nightly ones and the ones upgrades take. A
     manual `faden backup` into the default directory keeps 5 unless you pass a larger number, and every
     `faden upgrade` keeps 5.
@@ -52,9 +52,12 @@ faden backup schedule --at 01:30 --retain 14
 faden backup schedule --off
 ```
 
-It runs as a systemd user timer (`systemctl --user list-timers`), or from your crontab where there is no systemd.
 Its output goes to `~/fadenstack/backups/backup.log`. Read that log now and then: a backup that fails at night
 says so only there.
+
+??? info "How the nightly backup is started"
+    It runs as a systemd user timer (`systemctl --user list-timers`), or from your crontab where there is no
+    systemd.
 
 The nightly backup writes into `~/fadenstack/backups/`, on the same disk as the data. Copy the backups elsewhere
 with your own tooling, or schedule `faden backup -y --output-dir <your backup disk>` with your own scheduler
@@ -74,15 +77,16 @@ Every `faden upgrade` also takes a backup before it changes anything.
 faden restore ~/fadenstack/backups/<time>
 ```
 
-The restore:
+It asks for confirmation (`-y` skips it).
 
-1. shows the backup's date, the tool version it was taken with, and what it holds;
-2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one does
-   not match;
-3. asks for confirmation (`-y` skips it);
-4. stops the services, restores every database and, unless told otherwise, the `.env` and the certificate
-   material;
-5. starts everything again.
+??? info "What the restore does, in order"
+    1. shows the backup's date, the tool version it was taken with, and what it holds;
+    2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one
+       does not match;
+    3. asks for confirmation (`-y` skips it);
+    4. stops the services, restores every database and, unless told otherwise, the `.env` and the certificate
+       material;
+    5. starts everything again.
 
 | Option | What it does |
 |---|---|

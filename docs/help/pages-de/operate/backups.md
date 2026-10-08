@@ -39,7 +39,7 @@ listet auf, was er gesichert hat.
 | `--db-only` | Nur die Datenbanken, ohne `.env` und Zertifikatsmaterial. Bewahren Sie eine Kopie der `.env` getrennt auf, so vertraulich wie die Sicherungen |
 | `-y` | Nicht nachfragen |
 
-!!! note
+??? info "Wie `--retain` zählt"
     `--retain` zählt jede Sicherung im Verzeichnis, auch die nächtlichen und die, die Upgrades anlegen. Ein von
     Hand gestartetes `faden backup` in das Standardverzeichnis behält 5, sofern Sie keine größere Zahl angeben,
     und jedes `faden upgrade` behält 5.
@@ -54,9 +54,12 @@ faden backup schedule --at 01:30 --retain 14
 faden backup schedule --off
 ```
 
-Sie läuft als systemd-Timer Ihres Benutzers (`systemctl --user list-timers`) oder, wo es kein systemd gibt, aus
-Ihrer crontab. Ihre Ausgabe geht nach `~/fadenstack/backups/backup.log`. Lesen Sie dieses Log ab und zu: Eine
-Sicherung, die nachts fehlschlägt, meldet das nur dort.
+Ihre Ausgabe geht nach `~/fadenstack/backups/backup.log`. Lesen Sie dieses Log ab und zu: Eine Sicherung, die
+nachts fehlschlägt, meldet das nur dort.
+
+??? info "Wie die nächtliche Sicherung gestartet wird"
+    Sie läuft als systemd-Timer Ihres Benutzers (`systemctl --user list-timers`) oder, wo es kein systemd gibt, aus
+    Ihrer crontab.
 
 Die nächtliche Sicherung schreibt nach `~/fadenstack/backups/`, auf dieselbe Festplatte wie die Daten. Kopieren
 Sie die Sicherungen mit Ihren eigenen Werkzeugen woanders hin, oder planen Sie stattdessen
@@ -77,15 +80,16 @@ Jedes `faden upgrade` legt außerdem eine Sicherung an, bevor es etwas ändert.
 faden restore ~/fadenstack/backups/<time>
 ```
 
-Die Wiederherstellung:
+Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
 
-1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab, wenn
-   eine nicht passt;
-3. fragt nach einer Bestätigung (`-y` überspringt sie);
-4. stoppt die Dienste, stellt jede Datenbank und, sofern nicht anders angegeben, die `.env` und das
-   Zertifikatsmaterial wieder her;
-5. startet alles wieder.
+??? info "Was die Wiederherstellung tut, der Reihe nach"
+    1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
+    2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
+       wenn eine nicht passt;
+    3. fragt nach einer Bestätigung (`-y` überspringt sie);
+    4. stoppt die Dienste, stellt jede Datenbank und, sofern nicht anders angegeben, die `.env` und das
+       Zertifikatsmaterial wieder her;
+    5. startet alles wieder.
 
 | Option | Was sie tut |
 |---|---|

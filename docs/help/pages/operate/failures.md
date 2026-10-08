@@ -6,8 +6,11 @@ and where to read the logs when you need them.
 ## What repairs itself
 
 Every minute, Fadenstack looks at each running cluster and each serving model, and again when a machine
-reconnects or the server starts. A look restarts nothing unless something is wrong, and it looks a second time
-before it restarts anything: a busy head that was slow to answer is not a dead one.
+reconnects or the server starts.
+
+??? info "When a look restarts something"
+    A look restarts nothing unless something is wrong, and it looks a second time before it restarts anything: a
+    busy head that was slow to answer is not a dead one.
 
 | What fails | What you see | What Fadenstack does |
 |---|---|---|
@@ -20,11 +23,12 @@ before it restarts anything: a busy head that was slow to answer is not a dead o
 | The gateway restarts | Chat and API requests fail while it is down | Nothing needed |
 | The connection between a machine and the server drops | The machine reads **Offline** if it stays away | What the machine was doing, such as copying a model, carries on; the result is reported when it reconnects |
 
-Most of an outage after a head failure is the models loading again; the cluster itself is back much sooner.
-
 While a cluster is restarted, its models read **Not serving** and the gateway stops sending them requests. Nothing
 is applied to a cluster that is not ready, and nothing is applied while one of its machines is offline: the model
 says "Waiting for *machine* to reconnect before applying." and goes ahead once it has.
+
+??? info "How long an outage lasts"
+    Most of an outage after a head failure is the models loading again; the cluster itself is back much sooner.
 
 ### When it cannot repair it
 
@@ -33,11 +37,14 @@ After three restarts that did not bring the head back, the cluster reads **Faile
 > Ray on *machine*, the cluster's head, is not running. Fadenstack restarted it 3 times and it did not come back
 > (last: …). It tries again every 15 minutes; use Try again once the cause is fixed.
 
-It keeps trying every 15 minutes, because the cause may go away without anyone telling Fadenstack, such as a
-network link that comes back. Fix the cause, then select **Try again** on the cluster's page.
+Fix the cause, then select **Try again** on the cluster's page.
 
 It does not restart anything when nobody answered its look: then nothing is known about Ray, and the model says
 "Could not check the model just now; it is looked at again within a minute."
+
+??? info "Why it keeps trying"
+    It keeps trying every 15 minutes, because the cause may go away without anyone telling Fadenstack, such as a
+    network link that comes back.
 
 ### What is left to you
 
@@ -48,6 +55,8 @@ It does not restart anything when nobody answered its look: then nothing is know
   wrong.
 
 ## What the deployment messages mean
+
+![A deployment's page: Health Serving, Copies (ready / wanted) 2 / 2, its cluster, and Last message: Serving on 2 copies.](../images/administer/deployment.png)
 
 A deployment's page says in one line what it is doing. The ones you will meet:
 
@@ -73,6 +82,8 @@ errors.
 
 ### In the console
 
+![The Logs page on the System Logs tab: the time range, the search, the Machine, Source, Container and Level filters, and Live](../images/operate/logs.png)
+
 **Logs** (in the navigation) collects the logs of every machine and of the server's own services. On the
 **System Logs** tab:
 
@@ -80,8 +91,6 @@ errors.
 - narrow by **Machine**, **Source**, **Deployment**, **Component**, **Copy**, **Service**, **Container** and
   **Level**. The filters only offer what the chosen time range contains;
 - search the text.
-
-![The Logs page on the System Logs tab: the time range, the search, the Machine, Source, Container and Level filters, and Live](../images/operate/logs.png)
 
 | Source | What it is |
 |---|---|
@@ -94,18 +103,20 @@ The **Audit** tab lists who changed what: the action, its target, its result and
 
 Other places in the console show the same logs where you need them:
 
-- a **machine's page**: its **System Logs** of the last 15 minutes, and **Open in Logs** for the rest;
-- a **deployment's page**: its **Logs**, with the model serving and the engine (vLLM) lines, filtered by level,
-  searchable, and with **Follow new lines**, **Copy the lines shown** and **Download the lines shown**;
-- a **container's page** under **Containers**: its last 300 lines.
-
-The model copies write a line when something happens (starting, stopping, an error), not for every request.
-
-Machines send their logs through the server's normal address, with their own credential; a line the server did not
-take is sent again later. Nothing has to be set up on the machines.
+| Where | What it shows |
+|---|---|
+| A **machine's page** | Its **System Logs** of the last 15 minutes, and **Open in Logs** for the rest |
+| A **deployment's page** | Its **Logs**, with the model serving and the engine (vLLM) lines, filtered by level, searchable, and with **Follow new lines**, **Copy the lines shown** and **Download the lines shown** |
+| A **container's page** under **Containers** | Its last 300 lines |
 
 Metrics dashboards are in Grafana, reached from the console at `/grafana/` (a cluster's page has **Open the
 metrics dashboard**).
+
+??? info "More about the logs"
+    The model copies write a line when something happens (starting, stopping, an error), not for every request.
+
+    Machines send their logs through the server's normal address, with their own credential; a line the server did
+    not take is sent again later. Nothing has to be set up on the machines.
 
 ### On the server
 

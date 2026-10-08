@@ -4,25 +4,21 @@
 how much it is used and where requests were served, how busy the GPU machines are, and the health of the
 server Fadenstack runs on. This page says what each part shows and what to do about it.
 
+![The dashboard: the Critical issues pill, Customize and the refresh ring at the top, then the AI traffic, Needs attention, Key metrics, Local AI capacity and Server resources cards](../images/administer/dashboard.png)
+
 ## Before you start
 
 - You are a **Superuser**: only superusers see the dashboard.
 
 ## The header
 
-- **The status pill** sums up the system: **System healthy**, **Warnings: N** or **Critical issues: N**. It
-  counts what **Needs attention** lists.
-- **The ring** beside it shows when the figures were last updated. They refresh every 30 seconds while the
-  tab is open, and pause in a hidden tab. Select the ring to refresh at once. It turns amber, then red, when a
-  refresh is late or failed; the figures shown are then the previous ones.
-- **Getting started** sits above the cards until you hide it (see [Administering Fadenstack](index.md)).
-
-![The dashboard: the Critical issues pill, Customize and the refresh ring at the top, Getting started, then the AI traffic and Needs attention cards](../images/administer/dashboard.png)
+| | |
+|---|---|
+| **The status pill** | Sums up the system: **System healthy**, **Warnings: N** or **Critical issues: N**. It counts what **Needs attention** lists. |
+| **The ring** beside it | Shows when the figures were last updated. They refresh every 30 seconds while the tab is open, and pause in a hidden tab. Select the ring to refresh at once. It turns amber, then red, when a refresh is late or failed; the figures shown are then the previous ones. |
+| **Getting started** | Sits above the cards until you hide it (see [Administering Fadenstack](index.md)). |
 
 ## What each card shows
-
-Each card loads and refreshes on its own. A card that cannot load says "This widget could not load." with
-**Retry**, and the others carry on.
 
 | Card | What it shows | What to do with it |
 |---|---|---|
@@ -37,6 +33,10 @@ Each card loads and refreshes on its own. A card that cannot load says "This wid
 | **Top containers** | The containers using the most CPU and memory. Hidden at first. | **Containers** opens them. |
 | **Grafana** | The Grafana overview dashboard. Hidden at first. | |
 
+??? info "When a card does not load"
+    Each card loads and refreshes on its own. A card that cannot load says "This widget could not load." with
+    **Retry**, and the others carry on.
+
 ### Where requests were served
 
 **AI traffic**, **Usage**, **Integrations** and **Kept in-house** use four classes: **Our machines** (your GPU
@@ -48,9 +48,12 @@ the same as on the [Data residency](providers.md#data-residency) page.
 ### Machine health
 
 A machine's health is what the machine reports, never how busy it is: a GPU at 100 % on a healthy machine is
-healthy. VRAM reads as allocated: a running model reserves most of its accelerator's memory by design. With
-many machines, the card draws a small cell per machine, then a summary per group; select a group to list its
-machines.
+healthy.
+
+??? info "More about the Local AI capacity card"
+    VRAM reads as allocated: a running model reserves most of its accelerator's memory by design. With many
+    machines, the card draws a small cell per machine, then a summary per group; select a group to list its
+    machines.
 
 ### Key metrics
 
@@ -69,6 +72,8 @@ in-house share is green. Times follow your browser's time zone.
 
 ## Needs attention
 
+![The Needs attention card with a failed deployment, when it was reported, and the bell to mute it](../images/administer/needs-attention.png)
+
 | Problem | What to do |
 |---|---|
 | A machine **is offline**, **stopped reporting** or **reports** a bad state | Its agent is not connected or not sending. Check the machine (see [GPU machines](../operate/machines.md)). |
@@ -86,21 +91,26 @@ in-house share is green. Times follow your browser's time zone.
 | An HTTPS or model certificate runs out soon, or ran out | See [HTTPS and trust](../operate/https.md). |
 | **Model traffic to** a cluster **is not encrypted** | Turn on encryption on the cluster's page; its models load again (see [Clusters](../operate/clusters.md)). |
 
-![The Needs attention card with a failed deployment and tool changes waiting for an agent, each with the bell to mute it](../images/administer/needs-attention.png)
+To put aside a problem you already know about, select **Mute** (the bell beside it). It is muted for every
+administrator. **Show again** brings it back.
 
-**Mute** (the bell beside a problem) mutes it for every administrator. A muted problem moves under **N
-muted** at the end of the list, and leaves the header's count; the list says who muted it and when. **Show
-again** brings it back. A mute lasts while the problem does: once it clears, the mute is dropped, so the same
-problem coming back is shown as new. A muted problem that gets worse, such as a warning turning critical, is
-shown again.
+??? info "More about muting"
+    A muted problem moves under **N muted** at the end of the list, and leaves the header's count; the list
+    says who muted it and when. A mute lasts while the problem does: once it clears, the mute is dropped, so
+    the same problem coming back is shown as new. A muted problem that gets worse, such as a warning turning
+    critical, is shown again.
 
 ## Arrange it
 
 1. Select **Customize**.
-2. Drag a card by its handle to move it, pick its size (**Small**, **Medium**, **Large** or **Full width**),
-   and hide or show it with the eye. Rows close up around a hidden card.
-3. Select **Done**. **Reset layout** goes back to the default.
+2. Drag a card by its handle to move it.
+3. Pick its size: **Small**, **Medium**, **Large** or **Full width**.
+4. Hide or show it with the eye. Rows close up around a hidden card.
+5. Select **Done**.
 
-Your layout is saved on the server for you, so it follows you to another browser or device. If you change it
-on two devices at once, the second save says "Your layout was changed on another device": **Keep mine**
-overwrites the other, **OK** takes it. On a phone, the cards stack in one column.
+**Reset layout** goes back to the default. Your layout is saved on the server for you, so it follows you to
+another browser or device.
+
+??? info "More about the layout"
+    If you change it on two devices at once, the second save says "Your layout was changed on another
+    device": **Keep mine** overwrites the other, **OK** takes it. On a phone, the cards stack in one column.

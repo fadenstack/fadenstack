@@ -15,12 +15,12 @@ Modellen, die sie ausführt.
 | Speicherplatz | 60 GB | 100 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
 | GPU | keine | keine |
 
-- **Docker Engine 24 oder neuer mit Compose v2.** Der Benutzer, der `faden` ausführt, muss Docker verwenden
-  dürfen (also in der Gruppe `docker` sein).
-- **Python 3.12 oder neuer**, mit `pipx` oder `uv`, um das Kommandozeilenwerkzeug `faden` zu installieren.
-- **Ports 80 und 443 frei** auf dem Server. Andere Ports lassen sich wählen; siehe [Netzwerk und Ports](network.md).
-- **Internetzugang während Installation und Upgrade**, um die Images der Dienste und die Runtime-Images
-  herunterzuladen. Siehe [Was einen Internetzugang braucht](#what-needs-the-internet).
+| Der Server braucht außerdem | |
+|---|---|
+| **Docker Engine 24 oder neuer mit Compose v2** | Der Benutzer, der `faden` ausführt, muss Docker verwenden dürfen (also in der Gruppe `docker` sein). |
+| **Python 3.12 oder neuer** | Mit `pipx` oder `uv`, um das Kommandozeilenwerkzeug `faden` zu installieren. |
+| **Ports 80 und 443 frei** | Auf dem Server. Andere Ports lassen sich wählen; siehe [Netzwerk und Ports](network.md). |
+| **Internetzugang während Installation und Upgrade** | Um die Images der Dienste und die Runtime-Images herunterzuladen. Siehe [Was einen Internetzugang braucht](#what-needs-the-internet). |
 
 Rechnen Sie Arbeitsspeicher für alles hinzu, was sonst noch auf dem Server läuft. Der Server braucht keine GPU:
 Die Modelle laufen auf den Maschinen, die Sie hinzufügen. Einen Server mit NVIDIA-GPU können Sie zusätzlich als
@@ -40,9 +40,11 @@ ob die Ports frei sind, die die Installation nach außen öffnet.
 | GPU-Maschinen | Ein Runtime-Image pro Maschinenart auf der Festplatte; bei CPU und Arbeitsspeicher nichts Messbares |
 | Tracing | Speicherplatz für den Trace-Speicher |
 
-`faden deploy` und `faden upgrade` bemessen die Dienste für den Host, auf dem sie laufen: wie viele
-Worker-Prozesse jeder Dienst bekommt und wie viele Datenbankverbindungen Postgres annimmt. Um sie nach einer
-Änderung der Hardware neu zu bemessen, führen Sie `faden tune` und danach `faden up` aus.
+Um die Dienste nach einer Änderung der Hardware neu zu bemessen, führen Sie `faden tune` und danach `faden up` aus.
+
+??? info "Mehr zur Bemessung der Dienste"
+    `faden deploy` und `faden upgrade` bemessen die Dienste für den Host, auf dem sie laufen: wie viele
+    Worker-Prozesse jeder Dienst bekommt und wie viele Datenbankverbindungen Postgres annimmt.
 
 ### Speicherplatz {#disk}
 
@@ -79,10 +81,12 @@ Zwei Maschinenarten werden unterstützt, jede mit eigenem Runtime-Image:
   nicht zertifiziert: Die Karte **Laufzeit** des Clusters zeigt **Nicht zertifiziert**.
 - **NVIDIA DGX Spark** (GB10, aarch64).
 
-Andere Maschinen werden nicht unterstützt. Eine Maschine ohne NVIDIA-GPU oder mit einer anderen
-Prozessorarchitektur kann beitreten, aber keinem Cluster zugeordnet werden: Der Cluster-Assistent meldet, dass kein
-zertifiziertes Runtime-Image auf ihr läuft. Einer anderen aarch64-Maschine mit NVIDIA-GPU wird das Image für DGX
-Spark angeboten, das nicht für sie gemacht ist.
+Andere Maschinen werden nicht unterstützt.
+
+??? info "Was mit anderen Maschinen geschieht"
+    Eine Maschine ohne NVIDIA-GPU oder mit einer anderen Prozessorarchitektur kann beitreten, aber keinem Cluster
+    zugeordnet werden: Der Cluster-Assistent meldet, dass kein zertifiziertes Runtime-Image auf ihr läuft. Einer
+    anderen aarch64-Maschine mit NVIDIA-GPU wird das Image für DGX Spark angeboten, das nicht für sie gemacht ist.
 
 !!! note
     Ein Modell läuft jeweils auf einer GPU-Art. Gemischte Maschinen können sich einen Cluster teilen, aber jede

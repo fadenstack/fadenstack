@@ -9,6 +9,8 @@ Anwendung einen Agenten ein und gewähren ihn den Teams, die ihn haben sollen.
 Was Benutzer mit den Agenten tun, ist in [Der Browser-Agent](../use/browser-agent.md) und
 [Office-Add-ins](../use/office-add-ins.md) beschrieben.
 
+![Agenten → Agenten: jeder Agent mit Adresse, Beschreibung, Status (Veröffentlicht oder Stillgelegt), aktiver Version und wann er geändert wurde, oben „Neuer Agent“](../images/administer/agents.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - **Die Anwendung** ist für Ihre Benutzer installiert (siehe [Die Anwendungen installieren](#install-the-applications)).
@@ -20,6 +22,8 @@ Was Benutzer mit den Agenten tun, ist in [Der Browser-Agent](../use/browser-agen
   Agent wird Personen und Gruppen gewährt und allen anderen verweigert.
 
 ## Den Agenten erstellen {#create-the-agent}
+
+![Neuer Agent mit Chrome unter „Von einer App ausgehen“: der Name, die Adresse browser-assistant, das noch zu wählende Modell, „Wer ihn nutzen darf“ und „Sofort veröffentlichen“ angehakt](../images/administer/new-agent.png)
 
 1. Öffnen Sie **Agenten → Agenten** und wählen Sie **Neuer Agent**.
 2. Wählen Sie unter **Von einer App ausgehen** die Anwendung: **Chrome**, **Microsoft Word**,
@@ -43,12 +47,12 @@ Was Benutzer mit den Agenten tun, ist in [Der Browser-Agent](../use/browser-agen
    Ohne Häkchen beginnt er als Entwurf, den nur seine Betreuer nutzen können.
 7. Wählen Sie **Erstellen**.
 
-![Neuer Agent mit Chrome unter Von einer App ausgehen: der Name, die Adresse browser-assistant, ein Modell, die Gruppe Maintenance unter Wer ihn nutzen darf und Sofort veröffentlichen angehakt](../images/administer/new-agent.png)
-
 Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **Veröffentlicht** oder
 **Stillgelegt**.
 
 ## Die Seite des Agenten {#the-agents-page}
+
+![Die Seite des Word-Assistenten auf dem Reiter „Definition“: die Reiter Definition, Versionen, Apps, Zugriff und Aktivität, oben Bearbeiten und Stilllegen, die Anweisungen und das Modell](../images/administer/agent-definition.png)
 
 | Reiter | Was er enthält |
 |---|---|
@@ -58,21 +62,26 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
+??? info "Mehr zu lokalen MCP-Servern"
+    **Lokale MCP-Server**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Tools des Servers
+    und die Tools der Anwendung, die seine Version unter **Host-Tools** nennt; eine Version, die keine nennt, hält
+    nichts zurück. **Erlaubt** lässt ihn MCP-Server auf dem Computer der Person einbinden; deren Tools sind nicht
+    eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
+    [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
+
+![Der Reiter „Versionen“ des Word-Assistenten: v2 aktiv mit Ansehen und Änderungen, v1 mit Ansehen und Zurücksetzen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
+
 Das Speichern der Definition erzeugt eine neue Version (**Als neue Version speichern** oder **Speichern und
 veröffentlichen**); Versionen ändern sich nie. Eine veröffentlichte Version erreicht alle, die den Agenten
 nutzen, innerhalb einer Minute.
 
-![Der Reiter Versionen des Word-Assistenten: v2 live mit Ansehen und Änderungen, v1 mit Ansehen und Zurücksetzen, unterhalb der Reiter des Agenten und der Schaltflächen Bearbeiten und Stilllegen](../images/administer/agent-versions.png)
+![Der Reiter „Zugriff“: „Wer ihn nutzen darf“ mit „Person oder Team hinzufügen“ und den Personen, denen der Agent gewährt ist](../images/administer/agent-access.png)
 
 **Betreuer** ändern den Agenten, veröffentlichen Versionen, entscheiden, wer ihn nutzen darf, und können ihn
 schon vor der Veröffentlichung nutzen. Das tun sie über **Agenten** im Benutzermenü des Chats; Zugriff auf die
 Konsole brauchen sie nicht.
 
-**Lokale MCP-Server**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Tools des Servers
-und die Tools der Anwendung, die seine Version unter **Host-Tools** nennt; eine Version, die keine nennt, hält nichts
-zurück. **Erlaubt** lässt ihn MCP-Server auf dem Computer der Person einbinden; deren
-Tools sind nicht eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
-[Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
+![Der Reiter „Aktivität“: Anfragen, Fehler, Tokens, Nutzer und Gespräche der letzten 30 Tage mit einem Diagramm, darunter, was die Anwendungen gemeldet haben, etwa ausgeführte Tools und Freigaben](../images/administer/agent-activity.png)
 
 ## Die Anwendungen installieren {#install-the-applications}
 
@@ -88,10 +97,9 @@ Chrome nutzt den Zertifikatspeicher des Betriebssystems: Die Computer müssen de
 vertrauen (siehe [HTTPS und Vertrauen](../operate/https.md)).
 
 **Office.** Die Add-ins laufen im Desktop-Office für Windows: Word, Excel, PowerPoint und Outlook, getestet nur mit
-den Apps von Microsoft 365. Bei Outlook
-nur im klassischen Outlook: Das neue Outlook für Windows führt solche Add-ins nicht aus. Die IT gibt Server und
-Agenten in der Computerrichtlinie `%PROGRAMDATA%\Fadenstack\Office\policy.json` vor; was dort festgelegt ist,
-können Benutzer nicht ändern:
+den Apps von Microsoft 365. Bei Outlook nur im klassischen Outlook: Das neue Outlook für Windows führt solche
+Add-ins nicht aus. Die IT gibt Server und Agenten in der Computerrichtlinie
+`%PROGRAMDATA%\Fadenstack\Office\policy.json` vor; was dort festgelegt ist, können Benutzer nicht ändern:
 
 ```json
 {
@@ -106,9 +114,11 @@ können Benutzer nicht ändern:
 }
 ```
 
-`trustedCaCertificate` nennt eine CA-Zertifikatsdatei, der für den Server vertraut werden soll – für eine
-Installation, deren CA nicht an die Computer verteilt ist. Eine Anmeldung gilt für alle Office-Add-ins auf
-einem Computer.
+Eine Anmeldung gilt für alle Office-Add-ins auf einem Computer.
+
+??? info "Mehr zu trustedCaCertificate"
+    `trustedCaCertificate` nennt eine CA-Zertifikatsdatei, der für den Server vertraut werden soll – für eine
+    Installation, deren CA nicht an die Computer verteilt ist.
 
 Benutzer melden sich mit ihrem Fadenstack-Konto an. Ihre Unterhaltungen bleiben auf ihrem Computer; der Server
 speichert Nutzung und Ereignisse (welche Tools liefen, wie lange, mit welchem Ergebnis), nie den Inhalt. Was
@@ -119,16 +129,18 @@ der Agent liest, erreicht das Modell über Fadenstack, daher gilt Ihre
 
 Jedes Tool, das eine Anwendung mitbringt, hat eine Klasse, die die Version des Agenten festlegt:
 
-- Tools der Klasse **Lesen** laufen in jedem Tool-Modus außer **Aus**;
-- Tools der Klasse **Schreiben** fragen im Modus **Fragen** zuerst nach und laufen im Modus **Automatisch**;
-- Tools der Klasse **Zerstörend** fragen immer nach;
-- Tools, die **nicht eingestuft** sind, fragen immer nach.
+| Klasse | In den Tool-Modi |
+|---|---|
+| **Lesen** | Läuft in jedem Tool-Modus außer **Aus**. |
+| **Schreiben** | Fragt im Modus **Fragen** zuerst nach und läuft im Modus **Automatisch**. |
+| **Zerstörend** | Fragt immer nach. |
+| **Nicht eingestuft** | Fragt immer nach. |
 
 Benutzer wählen den Tool-Modus im Bereich des Agenten, pro Unterhaltung; jede Unterhaltung beginnt mit
 **Fragen**. Die Anwendung kann eine Klasse verschärfen, nie lockern. Ihre [Tool-Regeln](policies.md#tool-rules)
 gelten für Agenten ebenso wie für Chats. Zwei Beispiele: Das Outlook-Add-in sendet nie selbst E-Mails, es öffnet
-Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die Website als
-solche kennzeichnet.
+Entwürfe für die Person; und der Browser-Agent liest oder füllt nie Passwortfelder oder Kartenfelder, die die
+Website als solche kennzeichnet.
 
 ## Wenn eine Anwendung neue Tools mitbringt {#when-an-application-brings-new-tools}
 
@@ -139,6 +151,8 @@ Entwickler ihnen gegeben hat, den Kontext, den sie anbietet, ihre Begrüßung un
 Bringt ein Update der Anwendung ein Tool mit, das die Version des Agenten nicht aufführt, geht nichts kaputt:
 Das Tool wird zurückgehalten (das Modell sieht es nicht), und die Anwendung arbeitet mit den Tools weiter, die
 sie nutzen darf. Das [Dashboard](dashboard.md) zeigt „Wartende Tool-Änderungen bei …“, bis Sie entscheiden.
+
+![Der Reiter „Apps“ eines Agenten ohne offene Entscheidung: Version 2 enthält alles, was die Apps mitbringen, und jedes Tool mit dem Status „Im Vertrag“, seiner Klasse und dem Add-in, das es mitbringt](../images/administer/agent-apps.png)
 
 1. Öffnen Sie den Reiter **Apps** des Agenten. Jedes Tool zeigt einen Status:
 
@@ -156,8 +170,6 @@ sie nutzen darf. Das [Dashboard](dashboard.md) zeigt „Wartende Tool-Änderunge
 4. Wählen Sie **Übernehmen und veröffentlichen** oder **Als Entwurf übernehmen**, um später unter **Versionen**
    zu veröffentlichen.
 
-![Der Reiter Apps eines Agenten mit einer Tool-Änderung: das neue Tool open_page, als Neu markiert, seine Klasse Schreiben zum Behalten oder Ändern, oben Übernehmen und veröffentlichen und Als Entwurf übernehmen](../images/administer/agent-apps-review.png)
-
 Ohne diesen Klick wird nichts übernommen. **Apps im Einsatz** listet jede Anwendung und Version auf, die den
 Agenten ausführt, wer sie zuletzt gemeldet hat und welchen Kontext sie anbietet.
 
@@ -170,32 +182,24 @@ der Konsole oder auf ihrer Seite **Agenten**.
 
 ## Stilllegen und löschen {#retire-and-delete}
 
-- **Stilllegen** sperrt den Agenten innerhalb einer Minute für alle: Anmeldungen funktionieren nicht mehr; seine Versionen,
-  Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war.
-- Ein stillgelegter Agent kann endgültig gelöscht werden: **Löschen**, dann zur Bestätigung seine Adresse
-  eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den
-  Nutzungs- und Audit-Logs, und seine Adresse ist für einen neuen Agenten frei. Zum Löschen ist die Berechtigung
-  `agents:delete` nötig, die die integrierte Rolle `admin` hat, Betreuer aber nicht.
-- **Abmelden** auf dem Reiter **Aktivität** beendet die Anmeldung eines Geräts: Die Person muss sich erneut
-  anmelden.
+| Um | So geht's |
+|---|---|
+| den Agenten innerhalb einer Minute für alle zu sperren | **Stilllegen**: Anmeldungen funktionieren nicht mehr; seine Versionen, Zugriffe und sein Verlauf bleiben erhalten. **Wiederherstellen** holt ihn so zurück, wie er war. |
+| einen stillgelegten Agenten endgültig zu löschen | **Löschen**, dann zur Bestätigung seine Adresse eingeben. Seine Versionen, Zugriffe und Anmeldungen werden entfernt; was er getan hat, bleibt in den Nutzungs- und Audit-Logs, und seine Adresse ist für einen neuen Agenten frei. Zum Löschen ist die Berechtigung `agents:delete` nötig, die die integrierte Rolle `admin` hat, Betreuer aber nicht. |
+| die Anmeldung eines Geräts zu beenden | **Abmelden** auf dem Reiter **Aktivität**: Die Person muss sich erneut anmelden. |
 
-Eine Agent-Anmeldung auf einem Gerät gilt 30 Tage und endet nach 7 Tagen ohne Nutzung. Das Entziehen des
-Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
-**Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
+??? info "Wie lange Agent-Anmeldungen gelten"
+    Eine Agent-Anmeldung auf einem Gerät gilt 30 Tage und endet nach 7 Tagen ohne Nutzung. Das Entziehen des
+    Zugriffs wirkt innerhalb von zehn Minuten. Diese Werte sind **Agent sign-in lifetime (s)**,
+    **Agent sign-in idle timeout (s)** und **Agent access token lifetime (s)** unter **Einstellungen → Allgemein**.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 Der Agent zeigt in der Anwendung an, warum eine Anmeldung fehlgeschlagen ist:
 
-**Unter dieser Adresse gibt es keinen Agenten.** Die Adresse in der Anwendung weicht von der des Agenten ab.
-Vergleichen Sie sie mit der Liste **Agenten**; ein Agent, der ohne **Von einer App ausgehen** erstellt wurde,
-hat eine aus seinem Namen abgeleitete Adresse.
-
-**Die Person hat keinen Zugriff.** Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen
-Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert.
-
-**Der Server antwortet nicht.** Prüfen Sie die Serveradresse in der Anwendung und ob der Computer dem Zertifikat
-des Servers vertraut.
-
-**Ein Tool, das die Anwendung anbietet, wird nicht genutzt.** Es wird zurückgehalten: Übernehmen Sie es auf dem
-Reiter **Apps**.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **Unter dieser Adresse gibt es keinen Agenten.** | Die Adresse in der Anwendung weicht von der des Agenten ab. Vergleichen Sie sie mit der Liste **Agenten**; ein Agent, der ohne **Von einer App ausgehen** erstellt wurde, hat eine aus seinem Namen abgeleitete Adresse. |
+| **Die Person hat keinen Zugriff.** | Fügen Sie sie oder ihre Gruppe auf dem Reiter **Zugriff** hinzu, und prüfen Sie, ob der Agent veröffentlicht ist. **Zugriff prüfen** zeigt, was sie daran hindert. |
+| **Der Server antwortet nicht.** | Prüfen Sie die Serveradresse in der Anwendung und ob der Computer dem Zertifikat des Servers vertraut. |
+| Ein Tool, das die Anwendung anbietet, wird nicht genutzt | Es wird zurückgehalten: Übernehmen Sie es auf dem Reiter **Apps**. |

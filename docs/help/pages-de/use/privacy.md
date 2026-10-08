@@ -17,8 +17,10 @@ Bei einer Standardinstallation werden die Nachrichten, die Antworten, die Chat-T
 
 Auf Ihrem eigenen Computer:
 
-- **Der Browser-Agent** speichert seine Unterhaltungen in Ihrem Browser, nicht auf dem Server. Auch Ihre Anmeldung wird dort gespeichert, unverschlüsselt.
-- **Die Office-Add-ins** speichern ihre Unterhaltungen verschlüsselt auf Ihrem Computer und Ihre Anmeldung geschützt durch Windows.
+| | Seine Unterhaltungen | Ihre Anmeldung |
+|---|---|---|
+| **Der Browser-Agent** | In Ihrem Browser, nicht auf dem Server | Ebenfalls in Ihrem Browser, unverschlüsselt |
+| **Die Office-Add-ins** | Verschlüsselt auf Ihrem Computer | Geschützt durch Windows |
 
 Fadenstack bewahrt Ihre Chats auf, bis sie gelöscht werden. Siehe [Löschen](#deleting).
 
@@ -38,26 +40,39 @@ Ihre Organisation kann Fadenstack personenbezogene Daten wie Namen, E-Mail-Adres
 
 Wenn es aktiv ist, werden personenbezogene Daten auf eine von zwei Arten maskiert:
 
-- **Schwärzen** (`redact`): Die Daten werden durch eine Bezeichnung wie `<PERSON>` ersetzt, bevor das Modell sie sieht, und kommen nicht zurück. Eine Antwort, die sie erwähnt, zeigt die Bezeichnung.
-- **Tokenisierung (reversibel)** (`tokenize_reversible`): Die Daten werden auf dem Weg zum Modell durch einen Platzhalter wie `[PERSON_1]` ersetzt, und der echte Wert wird in der Antwort, die Sie sehen, wieder eingesetzt.
+| Modus | Was mit personenbezogenen Daten geschieht |
+|---|---|
+| **Schwärzen** (`redact`) | Die Daten werden durch eine Bezeichnung wie `<PERSON>` ersetzt, bevor das Modell sie sieht, und kommen nicht zurück. Eine Antwort, die sie erwähnt, zeigt die Bezeichnung. |
+| **Tokenisierung (reversibel)** (`tokenize_reversible`) | Die Daten werden auf dem Weg zum Modell durch einen Platzhalter wie `[PERSON_1]` ersetzt, und der echte Wert wird in der Antwort, die Sie sehen, wieder eingesetzt. |
 
-Wenn die Prüfung nicht laufen kann, entscheidet die Richtlinie: Ihre Nachricht wird nicht gesendet, sie wird trotzdem gesendet, oder sie geht stattdessen an eines der eigenen Modelle Ihrer Organisation.
+??? info "Wenn die Prüfung nicht laufen kann"
+    Wenn die Prüfung nicht laufen kann, entscheidet die Richtlinie: Ihre Nachricht wird nicht gesendet, sie wird trotzdem gesendet, oder sie geht stattdessen an eines der eigenen Modelle Ihrer Organisation.
 
 !!! note "Die Erkennung ist nicht immer richtig"
     Personenbezogene Daten werden automatisch erkannt. Wie gut das gelingt, hängt von der Sprache und vom Aufbau des Textes ab: Tabellen, Listen, Code und kurze Fragmente sind schwieriger als ganze Sätze. In englischem Text findet die Erkennung die meisten personenbezogenen Daten, aber nicht alle; in deutschem oder anderssprachigem Text übersieht sie oft Namen und Orte. Sie kann auch Wörter maskieren, die keine personenbezogenen Daten sind. Fügen Sie nichts ein, was Sie nicht weitergeben dürfen.
 
 ### Für einen Chat ansehen und verschärfen {#see-and-tighten-it-for-one-chat}
 
-1. Öffnen Sie mit dem Schraubenschlüssel neben dem Nachrichtenfeld den Tool-Bereich und wählen Sie **Datenschutz**.
-2. Die oberste Zeile zeigt **Mandanten-Standardwerte werden verwendet** (die Richtlinie Ihrer Organisation) oder **Sitzungsüberschreibung aktiv** (dieser Chat hat eigene Einstellungen).
-3. Um in diesem Chat mehr zu schützen: Schalten Sie **Cloud-Ausgang** ein (für Modelle bei externen Providern) oder **Lokaler Ausgang** (für die eigenen Modelle Ihrer Organisation), wählen Sie eine **Fehleraktion**, oder fügen Sie unter **Erkennungseinstellungen** mit **Entität hinzufügen** eine Art personenbezogener Daten hinzu. Wenn Ihre Organisation es erlaubt, wechselt **Modus** zwischen **Schwärzen** und **Tokenisierung (reversibel)**.
-4. Mit **Sitzungsüberschreibung löschen** gelten wieder die Einstellungen Ihrer Organisation.
+![Der Tab „Datenschutz“ mit „Mandanten-Standardwerte werden verwendet“, mit „Cloud-Ausgang“, „Lokaler Ausgang“, „Modus“ und „Fehleraktion“ sowie den gesuchten Arten personenbezogener Daten, jede mit einem Schloss, über „Entität hinzufügen“](../images/use/chat-privacy-tab.png)
 
-![Der Tab Datenschutz mit Mandanten-Standardwerte werden verwendet, mit Cloud-Ausgang, Lokaler Ausgang, Modus und Fehleraktion sowie den gesuchten Arten personenbezogener Daten, jede mit einem Schloss, über Entität hinzufügen](../images/use/chat-privacy-tab.png)
+1. Öffnen Sie mit dem Schraubenschlüssel neben dem Nachrichtenfeld den Tool-Bereich.
+2. Wählen Sie **Datenschutz**.
+3. Lesen Sie die oberste Zeile: **Mandanten-Standardwerte werden verwendet** (die Richtlinie Ihrer Organisation) oder **Sitzungsüberschreibung aktiv** (dieser Chat hat eigene Einstellungen).
+4. Um in diesem Chat mehr zu schützen, ändern Sie eine Einstellung:
+
+| Einstellung | Was sie bewirkt |
+|---|---|
+| **Cloud-Ausgang** | Schalten Sie ihn ein, um zu schützen, was an Modelle bei externen Providern geht |
+| **Lokaler Ausgang** | Schalten Sie ihn ein, um zu schützen, was an die eigenen Modelle Ihrer Organisation geht |
+| **Fehleraktion** | Wählen Sie, was geschieht, wenn die Prüfung nicht laufen kann |
+| **Entität hinzufügen**, unter **Erkennungseinstellungen** | Fügt eine Art personenbezogener Daten hinzu, nach der gesucht wird |
+| **Modus** | Wechselt zwischen **Schwärzen** und **Tokenisierung (reversibel)**, wenn Ihre Organisation es erlaubt |
+| **Sitzungsüberschreibung löschen** | Es gelten wieder die Einstellungen Ihrer Organisation |
 
 Sie können den Schutz nur strenger machen als die Richtlinie Ihrer Organisation, nie lockerer. Einstellungen, die die Richtlinie erzwingt, zeigen ein Schloss.
 
-Im Browser-Agenten und in den Office-Add-ins zeigt ein Hinweis **Personal data protected**, wie viele Werte dem Modell vorenthalten wurden und welcher Art sie waren.
+??? info "Im Browser-Agenten und in den Office-Add-ins"
+    Im Browser-Agenten und in den Office-Add-ins zeigt ein Hinweis **Personal data protected**, wie viele Werte dem Modell vorenthalten wurden und welcher Art sie waren.
 
 ## Modelle bei externen Providern {#models-at-outside-providers}
 
@@ -72,18 +87,19 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 
 ## Löschen {#deleting}
 
-- **Ein Chat**, den Sie löschen, verschwindet sofort aus Ihrer Liste. Vom Server wird er dabei nicht gelöscht: Seine Nachrichten und Dateien bleiben dort, bis ein Administrator den Chat löscht.
-- **Ein Projekt**, das Sie löschen, wird mit allen seinen Chats gelöscht.
-- **Im Browser-Agenten** entfernt das Löschen eines Chats in **Chat history** ihn aus Ihrem Browser.
+| Sie löschen | Was geschieht |
+|---|---|
+| **Einen Chat** | Er verschwindet sofort aus Ihrer Liste. Vom Server wird er dabei nicht gelöscht: Seine Nachrichten und Dateien bleiben dort, bis ein Administrator den Chat löscht. |
+| **Ein Projekt** | Es wird mit allen seinen Chats gelöscht. |
+| Einen Chat in **Chat history**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
 
 Wenn etwas endgültig gelöscht werden muss, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**PII service unavailable and fail_action=block.** Die Prüfung auf personenbezogene Daten konnte nicht laufen, und die Richtlinie Ihrer Organisation sieht vor, ohne sie keine Nachrichten zu senden. Versuchen Sie es später erneut; wenn es immer wieder passiert, wenden Sie sich an Ihren Administrator.
-
-**Eine Antwort zeigt `<PERSON>` oder `[PERSON_1]`, wo ein Name stehen sollte.** Der Name wurde maskiert, bevor er das Modell erreichte. Bei **Schwärzen** ist das so vorgesehen. Bei **Tokenisierung (reversibel)** sollte der Name wieder erscheinen; wenn nicht, wenden Sie sich an Ihren Administrator.
-
-**Ihr Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.** Ihre Organisation legt den Modus fest. Die anderen Einstellungen unter **Datenschutz** können Sie möglicherweise trotzdem ändern.
-
-**… wird nicht angewendet. Wählen Sie den Modus erneut, um ihn anzuwenden.** Der Modus, den Sie zuvor gewählt haben, wurde nicht wirksam. Wählen Sie ihn unter **Modus** erneut.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **PII service unavailable and fail_action=block.** | Die Prüfung auf personenbezogene Daten konnte nicht laufen, und die Richtlinie Ihrer Organisation sieht vor, ohne sie keine Nachrichten zu senden. Versuchen Sie es später erneut; wenn es immer wieder passiert, wenden Sie sich an Ihren Administrator. |
+| Eine Antwort zeigt `<PERSON>` oder `[PERSON_1]`, wo ein Name stehen sollte | Der Name wurde maskiert, bevor er das Modell erreichte. Bei **Schwärzen** ist das so vorgesehen. Bei **Tokenisierung (reversibel)** sollte der Name wieder erscheinen; wenn nicht, wenden Sie sich an Ihren Administrator. |
+| **Ihr Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.** | Ihre Organisation legt den Modus fest. Die anderen Einstellungen unter **Datenschutz** können Sie möglicherweise trotzdem ändern. |
+| **… wird nicht angewendet. Wählen Sie den Modus erneut, um ihn anzuwenden.** | Der Modus, den Sie zuvor gewählt haben, wurde nicht wirksam. Wählen Sie ihn unter **Modus** erneut. |

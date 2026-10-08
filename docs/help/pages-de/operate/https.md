@@ -16,9 +16,10 @@ einem Zertifikat, das der Server für sich selbst erstellt, oder mit Ihrem eigen
 | GPU-zu-GPU-Verkehr innerhalb eines Clusters | Nein | Er lässt sich nicht verschlüsseln. Beschränken Sie dieses Netzwerk auf die Maschinen des Clusters |
 | Container auf dem Server untereinander | Nein | Das interne Netzwerk von Docker; es verlässt den Server nicht |
 
-Jeder Befehl, den der Server an eine Maschine sendet, ist signiert, mit oder ohne HTTPS, und ein Agent lehnt einen
-Befehl ohne gültige Signatur ab. Die Signatur verhindert, dass jemand anderes einer Maschine Befehle sendet; sie
-verbirgt nichts.
+??? info "Signierte Befehle"
+    Jeder Befehl, den der Server an eine Maschine sendet, ist signiert, mit oder ohne HTTPS, und ein Agent lehnt
+    einen Befehl ohne gültige Signatur ab. Die Signatur verhindert, dass jemand anderes einer Maschine Befehle
+    sendet; sie verbirgt nichts.
 
 !!! warning
     Lassen Sie HTTPS eingeschaltet. Ohne HTTPS gehen Anmeldungen, API-Schlüssel, Prompts und die Zugangsdaten der
@@ -59,14 +60,15 @@ HTTPS (siehe [Die Maschinen](#the-machines)).
 Vertraut wird einer einzigen Datei: `~/fadenstack/tls/ca.crt`. Sie ist öffentlich; ihr privater Schlüssel bleibt in
 `~/fadenstack/tls-ca/`, nur für Sie lesbar, und gelangt nie in einen Container.
 
-- **Browser:** Importieren Sie `ca.crt` als vertrauenswürdige Zertifizierungsstelle, im Browser oder im
-  Betriebssystem, auf den Computern, von denen aus die Konsole genutzt wird.
-- **API-Clients:** `curl --cacert ca.crt https://ai.example.internal/v1/models`, oder `SSL_CERT_FILE=ca.crt` für
-  Python-Programme.
-- **Maschinen:** nichts zu tun.
+| Wer | Was Sie tun |
+|---|---|
+| **Browser** | Importieren Sie `ca.crt` als vertrauenswürdige Zertifizierungsstelle, im Browser oder im Betriebssystem, auf den Computern, von denen aus die Konsole genutzt wird. |
+| **API-Clients** | `curl --cacert ca.crt https://ai.example.internal/v1/models`, oder `SSL_CERT_FILE=ca.crt` für Python-Programme. |
+| **Maschinen** | Nichts zu tun. |
 
-Spätere Zertifikate (eine Erneuerung, eine neue Adresse) signiert dieselbe Zertifizierungsstelle, daher muss nichts
-erneut als vertrauenswürdig eingerichtet werden. Die Zertifizierungsstelle selbst ist zehn Jahre gültig.
+??? info "Erneuerungen und die Gültigkeit der Zertifizierungsstelle"
+    Spätere Zertifikate (eine Erneuerung, eine neue Adresse) signiert dieselbe Zertifizierungsstelle, daher muss
+    nichts erneut als vertrauenswürdig eingerichtet werden. Die Zertifizierungsstelle selbst ist zehn Jahre gültig.
 
 ### Ihr eigenes Zertifikat {#your-own-certificate}
 
@@ -76,18 +78,21 @@ faden tls use cert.pem key.pem --chain intermediates.pem
 faden tls use cert.pem key.pem --ca company-root.pem
 ```
 
-Bevor das Tool das Zertifikat installiert, prüft es, ob der Schlüssel zum Zertifikat gehört und keine Passphrase
-hat und ob das Zertifikat heute gültig ist. Ein Zertifikat, das keinen der Namen und keine der Adressen des Servers
-enthält, wird mit einer Warnung installiert, denn die Konsole kann auch unter einem Namen erreichbar sein, den nur
-das DNS kennt.
-
 Mit `--ca` erhalten die Maschinen das Stammzertifikat Ihres Unternehmens und vertrauen dem Zertifikat, ohne dass
-jemand Dateien auf sie kopieren muss. Wenn die Maschinen einen neuen Aussteller lernen müssen, wartet das Tool vor
-dem Umschalten etwa eine Minute, damit verbundene Maschinen ihn zuerst abrufen (`--no-wait` überspringt das).
+jemand Dateien auf sie kopieren muss.
 
 Einen eingebauten ACME-Client gibt es nicht. Verwenden Sie certbot, acme.sh oder die Werkzeuge Ihres Unternehmens,
 und geben Sie `faden tls use` die Dateien an, die dort an Ort und Stelle erneuert werden, z. B.
 `/etc/letsencrypt/live/ai.example.internal/fullchain.pem` und `privkey.pem`.
+
+??? info "Was das Tool prüft und wann es wartet"
+    Bevor das Tool das Zertifikat installiert, prüft es, ob der Schlüssel zum Zertifikat gehört und keine
+    Passphrase hat und ob das Zertifikat heute gültig ist. Ein Zertifikat, das keinen der Namen und keine der
+    Adressen des Servers enthält, wird mit einer Warnung installiert, denn die Konsole kann auch unter einem Namen
+    erreichbar sein, den nur das DNS kennt.
+
+    Wenn die Maschinen einen neuen Aussteller lernen müssen, wartet das Tool vor dem Umschalten etwa eine Minute,
+    damit verbundene Maschinen ihn zuerst abrufen (`--no-wait` überspringt das).
 
 ## Die Befehle {#the-commands}
 
@@ -101,22 +106,21 @@ und geben Sie `faden tls use` die Dateien an, die dort an Ort und Stelle erneuer
 | `faden tls machine-ca [--replace]` | Die Zertifikate hinter der Verschlüsselung zwischen Gateway und Maschinen (siehe unten) |
 | `faden ports [--http N] [--https N]` | Zeigt oder ändert die Ports, auf denen die Konsole, die API und `/v1` erreichbar sind |
 
-`generate`, `use` und `off` nehmen `--no-restart`, um nur die Dateien zu schreiben; der Proxy übernimmt sie bei
-seinem nächsten Start. Ein neues Zertifikat bei weiterhin eingeschaltetem HTTPS lädt den Proxy neu, statt ihn neu
-zu starten, sodass offene Verbindungen, auch die der Maschinen, bestehen bleiben.
+??? info "Neustarts und offene Verbindungen"
+    `generate`, `use` und `off` nehmen `--no-restart`, um nur die Dateien zu schreiben; der Proxy übernimmt sie bei
+    seinem nächsten Start. Ein neues Zertifikat bei weiterhin eingeschaltetem HTTPS lädt den Proxy neu, statt ihn
+    neu zu starten, sodass offene Verbindungen, auch die der Maschinen, bestehen bleiben.
 
 ## Erneuerung und Warnungen {#renewal-and-warnings}
 
 Sobald HTTPS eingeschaltet ist, läuft `faden tls renew` jeden Morgen (als systemd-Benutzer-Timer
 `faden-tls-renew.timer` oder als Crontab-Zeile) und ändert nichts, solange nichts fällig ist:
 
-- **Ein hier erstelltes Zertifikat** ist 825 Tage gültig. Es wird 30 Tage vor Ablauf neu ausgestellt, oder sobald
-  der Server eine Adresse hat, die es nicht enthält – von derselben Zertifizierungsstelle.
-- **Ihr eigenes Zertifikat** wird erneut aus den Dateien übernommen, die Sie `faden tls use` angegeben haben, sobald
-  sie sich dort ändern. Erneuerte Dateien, die die Prüfungen nicht bestehen, werden nicht übernommen; das alte
-  Zertifikat bleibt.
-- **Die Zertifizierungsstelle** wird vor ihrem Ablauf ersetzt; die alte bleibt vertrauenswürdig, solange sie gültig
-  ist.
+| Was | Wie es erneuert wird |
+|---|---|
+| **Ein hier erstelltes Zertifikat** | Es ist 825 Tage gültig. Es wird 30 Tage vor Ablauf neu ausgestellt, oder sobald der Server eine Adresse hat, die es nicht enthält – von derselben Zertifizierungsstelle. |
+| **Ihr eigenes Zertifikat** | Es wird erneut aus den Dateien übernommen, die Sie `faden tls use` angegeben haben, sobald sie sich dort ändern. Erneuerte Dateien, die die Prüfungen nicht bestehen, werden nicht übernommen; das alte Zertifikat bleibt. |
+| **Die Zertifizierungsstelle** | Sie wird vor ihrem Ablauf ersetzt; die alte bleibt vertrauenswürdig, solange sie gültig ist. |
 
 Sie werden gewarnt, bevor ein Zertifikat abläuft: von `faden tls status`, von `faden doctor` und im Dashboard der
 Konsole unter **Handlungsbedarf** („HTTPS-Zertifikat läuft in … Tagen ab“). Ein täglicher Lauf, der ein bald
@@ -140,13 +144,17 @@ faden-agent configure --set BACKEND_URL=http://ai.example.internal
 systemctl --user restart faden-agent     # oder: sudo systemctl restart faden-agent
 ```
 
+![Maschine hinzufügen bei eingeschaltetem HTTPS: die längere Installationszeile, die zuerst die Zertifizierungsstelle des Servers abruft und ihren Fingerabdruck prüft, und die Adressen des Servers zur Auswahl](../images/operate/add-machine.png){ width="320" }
+
 **Maschinen, die Sie hinzufügen, während HTTPS an ist,** erhalten unter **Maschinen → Maschine hinzufügen** eine
-längere Installationszeile. Sie ruft zuerst die Zertifizierungsstelle des Servers ab, prüft sie gegen einen
-Fingerabdruck, der in der Zeile steht, und ruft erst dann das Installationsprogramm ab, geprüft gegen diese
-Zertifizierungsstelle. Passt der Fingerabdruck nicht, bricht die Zeile ab, bevor irgendetwas ausgeführt wird. Die
-Zeile ist nur so vertrauenswürdig wie die Konsolenseite, von der sie stammt: Öffnen Sie die Konsole, nachdem Sie der
-Zertifizierungsstelle vertrauen, nicht indem Sie eine Zertifikatswarnung wegklicken. Bei einem Zertifikat eines
-öffentlichen Ausstellers bleibt es bei der kurzen Zeile.
+längere Installationszeile. Die Zeile ist nur so vertrauenswürdig wie die Konsolenseite, von der sie stammt: Öffnen
+Sie die Konsole, nachdem Sie der Zertifizierungsstelle vertrauen, nicht indem Sie eine Zertifikatswarnung
+wegklicken. Bei einem Zertifikat eines öffentlichen Ausstellers bleibt es bei der kurzen Zeile.
+
+??? info "Wie die längere Zeile den Server prüft"
+    Sie ruft zuerst die Zertifizierungsstelle des Servers ab, prüft sie gegen einen Fingerabdruck, der in der Zeile
+    steht, und ruft erst dann das Installationsprogramm ab, geprüft gegen diese Zertifizierungsstelle. Passt der
+    Fingerabdruck nicht, bricht die Zeile ab, bevor irgendetwas ausgeführt wird.
 
 Ein Agent, der das Zertifikat des Servers nicht prüfen kann, bleibt, wo er ist, und schreibt den Grund in sein Log.
 
@@ -180,16 +188,18 @@ In einem Cluster aus mehreren Maschinen läuft Ray über alle seine Maschinen: d
 bewegt werden, und die Aufrufe an eine Modellkopie auf einer anderen Maschine, Prompts eingeschlossen. Ray
 authentifiziert diesen Verkehr immer mit dem Token des Clusters. Um ihn auch zu verschlüsseln:
 
+![Die Karte Verkehr zwischen den Maschinen eines Clusters mit der Anzeige Verschlüsselt und Ausschalten](../images/operate/cluster-traffic-encrypted.png)
+
 1. Öffnen Sie **Cluster** und dann den Cluster.
 2. Wählen Sie auf der Karte **Verkehr zwischen den Maschinen** die Option **Verschlüsseln**.
 3. Lesen Sie die Warnung und wählen Sie **Cluster neu starten**.
 
 Jede Maschine des Clusters startet ihren Container neu, und jedes Modell auf dem Cluster lädt neu. Die Karte zeigt
-**Verschlüsselt**, sobald alle Maschinen damit laufen. Jeder Cluster hat seine eigene Zertifizierungsstelle; der
-Schlüssel jeder Maschine bleibt auf der Maschine. Jede Maschine braucht einen aktuellen Agent; die Karte nennt die
-Maschinen, deren Agent aktualisiert werden muss.
+**Verschlüsselt**, sobald alle Maschinen damit laufen. Jede Maschine braucht einen aktuellen Agent; die Karte nennt
+die Maschinen, deren Agent aktualisiert werden muss.
 
-![Die Karte Verkehr zwischen den Maschinen eines Clusters mit der Anzeige Verschlüsselt](../images/operate/cluster-traffic-encrypted.png)
+??? info "Mehr zur Verschlüsselung zwischen den Maschinen"
+    Jeder Cluster hat seine eigene Zertifizierungsstelle; der Schlüssel jeder Maschine bleibt auf der Maschine.
 
 Die Verschlüsselung zwischen den Maschinen verlangsamt das Übertragen großer Datenmengen zwischen ihnen; das
 Beantworten von Anfragen und der Chat werden nicht langsamer. Der GPU-zu-GPU-Verkehr gehört nicht zu Ray und lässt
@@ -217,18 +227,12 @@ eigenes Netzwerk.
 
 ## Grenzen {#limits}
 
-- **Kein Widerruf.** Die Zertifizierungsstelle des Servers veröffentlicht keine Sperrliste. Um sie zurückzuziehen,
-  verschieben Sie `tls-ca/` an einen anderen Ort und führen `faden tls generate` erneut aus; danach muss jede
-  Maschine wieder auf den Server ausgerichtet werden, wie nach `tls off`.
-- **Erstes Vertrauen über unverschlüsseltes HTTP.** Eine Maschine, die beigetreten ist, während der Server
-  unverschlüsseltes HTTP verwendete, hat seine Zertifizierungsstelle über unverschlüsseltes HTTP gelernt. Fügen Sie
-  Maschinen erst hinzu, wenn HTTPS an ist, um das zu vermeiden.
-- **Ein vLLM, das Fadenstack bereits laufend vorgefunden hat, hält seinen eigenen Port offen.** Das Gateway erreicht
-  es über den Proxy, aber sein ursprünglicher Port bleibt im Netzwerk erreichbar. Sperren Sie ihn mit einer Firewall
-  (siehe [Vorhandene vLLM-Server](existing-vllm.md)).
-- **Einiger Verkehr rund um die Maschinen ist unverschlüsselt:** das Abrufen von Metriken der Maschinen durch den
-  Server und das Runtime-Image, das zwischen Maschinen kopiert wird (gegen seinen Digest geprüft). Keines von beiden
-  enthält Prompts.
+| Grenze | Was sie bedeutet |
+|---|---|
+| **Kein Widerruf.** | Die Zertifizierungsstelle des Servers veröffentlicht keine Sperrliste. Um sie zurückzuziehen, verschieben Sie `tls-ca/` an einen anderen Ort und führen `faden tls generate` erneut aus; danach muss jede Maschine wieder auf den Server ausgerichtet werden, wie nach `tls off`. |
+| **Erstes Vertrauen über unverschlüsseltes HTTP.** | Eine Maschine, die beigetreten ist, während der Server unverschlüsseltes HTTP verwendete, hat seine Zertifizierungsstelle über unverschlüsseltes HTTP gelernt. Fügen Sie Maschinen erst hinzu, wenn HTTPS an ist, um das zu vermeiden. |
+| **Ein vLLM, das Fadenstack bereits laufend vorgefunden hat, hält seinen eigenen Port offen.** | Das Gateway erreicht es über den Proxy, aber sein ursprünglicher Port bleibt im Netzwerk erreichbar. Sperren Sie ihn mit einer Firewall (siehe [Vorhandene vLLM-Server](existing-vllm.md)). |
+| **Einiger Verkehr rund um die Maschinen ist unverschlüsselt.** | Das Abrufen von Metriken der Maschinen durch den Server und das Runtime-Image, das zwischen Maschinen kopiert wird (gegen seinen Digest geprüft). Keines von beiden enthält Prompts. |
 
 ## Selbst prüfen {#check-it-yourself}
 

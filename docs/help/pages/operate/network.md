@@ -42,10 +42,23 @@ They are `FADEN_HTTP_PORT` and `FADEN_HTTPS_PORT` in `~/fadenstack/.env`. Machin
 new port in the server's address.
 
 Everything else on the server listens on its loopback address only and is not reachable from the network:
-Postgres (5432), Redis (6379), RabbitMQ (5672, 15672), ClickHouse (8123, 9000), MinIO (9090, 9091), Prometheus
-(9099), Loki (3100), Grafana (3001), Langfuse (3002), the gateway's own port (8001) and a few more. These ports
-must still be free on the server itself; `faden doctor` lists every port the install uses and whether something
-else holds it.
+
+| Service | Port on the loopback address |
+|---|---|
+| Postgres | 5432 |
+| Redis | 6379 |
+| RabbitMQ | 5672, 15672 |
+| ClickHouse | 8123, 9000 |
+| MinIO | 9090, 9091 |
+| Prometheus | 9099 |
+| Loki | 3100 |
+| Grafana | 3001 |
+| Langfuse | 3002 |
+| The gateway's own port | 8001 |
+| A few more | `faden doctor` lists them |
+
+These ports must still be free on the server itself; `faden doctor` lists every port the install uses and whether
+something else holds it.
 
 !!! warning
     Do not publish those ports on the network. Loki has no authentication of its own, and Grafana's own port shows
@@ -53,18 +66,19 @@ else holds it.
 
 ## The machines and the server
 
+![Add a machine: the install line, and the server's addresses to pick from, each with the interface it belongs to](../images/operate/add-machine.png){ width="320" }
+
 Each machine needs to reach the server's front door, at the address you pick in **Machines → Add a machine**.
 The panel lists the server's addresses with the interface each belongs to; pick one on the network the machine
 shares with the server. The server itself does not open connections to the agent.
 
 The server does open connections to the machines for three things:
 
-- **The models.** The gateway sends every request to the head machine of the cluster that serves the model, on
-  the cluster's serving port. Allow the server to reach that port on every head machine.
-- **Metrics.** The server's Prometheus collects metrics from the cluster's machines. If a firewall blocks it, the
-  cluster page shows no metrics; serving is not affected.
-- **vLLM it found.** Before it routes a vLLM it found on a machine, and when the console lists those, the server
-  asks each one which models it serves, on the vLLM's own port (see [Existing vLLM servers](existing-vllm.md)).
+| For | The server connects to | What to allow |
+|---|---|---|
+| **The models** | The head machine of the cluster that serves the model, on the cluster's serving port: the gateway sends every request there | Allow the server to reach that port on every head machine |
+| **Metrics** | The cluster's machines: the server's Prometheus collects metrics from them | If a firewall blocks it, the cluster page shows no metrics; serving is not affected |
+| **vLLM it found** | Each vLLM it found on a machine, on the vLLM's own port: before it routes one, and when the console lists those, the server asks each one which models it serves | See [Existing vLLM servers](existing-vllm.md) |
 
 ## Between the machines of a cluster
 

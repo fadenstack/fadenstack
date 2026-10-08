@@ -4,6 +4,8 @@ An MCP server gives chats and agents tools: search a repository, open a ticket, 
 server once; Fadenstack connects to it, lists its tools, and runs a tool when a model asks for it, under the
 rules you set.
 
+![MCP Servers with two servers, both active, with their transport, number of tools and PII mode, and Scan Network and Register Server at the top](../images/administer/mcp-servers.png)
+
 ## Before you start
 
 - The **MCP** module is on (**Settings → Modules**; see [Modules](index.md#modules)). Its pages are under
@@ -17,9 +19,20 @@ rules you set.
 
 ## Register a server
 
-1. Open **Extensions → MCP Hub** and select **Register Server**.
-2. Fill in the form:
+![The Register Server dialog: Server Name, Transport set to Streamable HTTP, Server URL, Tool Prefix, PII Mode, Timeout (seconds), and Headers with Add header](../images/administer/mcp-register-server.png)
 
+1. Open **Extensions → MCP Hub** and select **Register Server**.
+2. Enter the **Server Name** and choose the **Transport**.
+3. Enter the **Server URL** (HTTP) or the **Command** (stdio).
+4. Choose the **PII Mode** (see [Personal data](#personal-data-pii-mode)).
+5. Under **Headers** (HTTP) or **Environment variables** (stdio), add what the server needs to let you in,
+   such as `Authorization: Bearer <token>`.
+6. Select **Register**.
+
+Fadenstack connects to the server and lists its tools. The server then shows as active, with its number of
+tools.
+
+??? info "More about the fields"
     | Field | What to enter |
     |---|---|
     | **Server Name** | The name shown in the console. |
@@ -29,17 +42,6 @@ rules you set.
     | **Tool Prefix** | A short, unique name. The server's tools are named `mcp.<prefix>.<tool>`, for example `mcp.github.search_repositories`. Made up if left empty. |
     | **PII Mode** | What the server may see of personal data (see [Personal data](#personal-data-pii-mode)). |
     | **Timeout (seconds)** | How long connecting and each tool call may take: 5 to 600 seconds. |
-
-    ![The Register Server dialog: Server Name, Transport set to Streamable HTTP, Server URL, Tool Prefix, PII Mode, Timeout (seconds), and Headers with Add header](../images/administer/mcp-register-server.png)
-
-3. Under **Headers** (HTTP) or **Environment variables** (stdio), add what the server needs to let you in,
-   such as `Authorization: Bearer <token>`.
-4. Select **Register**.
-
-Fadenstack connects to the server and lists its tools. The server then shows as active, with its number of
-tools.
-
-![MCP Servers with two servers, both active, with their transport, number of tools and PII mode, and Scan Network and Register Server at the top](../images/administer/mcp-servers.png)
 
 !!! warning "Everyone uses these credentials"
     Headers and variables are stored encrypted and never shown again; the console lists their names only.
@@ -55,16 +57,20 @@ Select a server in the list to open its page. It shows its status, transport, pr
 which headers are set, and, if its last connection failed, **The last connection attempt failed** with the
 reason.
 
-- **Discovered Tools** lists every tool the server offers. The **Enabled** switch beside a tool turns it off
-  (or on) for everyone.
-- **Enabled** at the top turns the whole server off or on.
-- **Refresh** lists the tools again; **Test** checks the connection and counts the tools.
-- **Edit** changes the URL or command, the timeout, the PII mode, and the headers or variables. A stored
-  header is replaced or removed on its own, without entering the others again. Saving reconnects the server
-  and lists its tools again.
-- **Delete Server** removes it and all its tools.
+| To | Do this |
+|---|---|
+| See every tool the server offers | **Discovered Tools** lists them. |
+| Turn one tool off (or on) for everyone | The **Enabled** switch beside the tool, under **Discovered Tools**. |
+| Turn the whole server off or on | **Enabled** at the top. |
+| List the tools again | **Refresh**. |
+| Check the connection and count the tools | **Test**. |
+| Change the URL or command, the timeout, the PII mode, and the headers or variables | **Edit** (below). |
+| Remove the server and all its tools | **Delete Server**. |
 
 ![Editing a server: its Server URL, Timeout (seconds) and PII Mode, and the stored Authorization header marked set, with Replace and Remove](../images/administer/mcp-edit-server.png)
+
+In **Edit**, a stored header is replaced or removed on its own, without entering the others again. Saving
+reconnects the server and lists its tools again.
 
 ## Who can use the tools
 
@@ -81,6 +87,8 @@ no per-person list of MCP servers. You decide what runs with:
 
 ## How people get the tools in a chat
 
+![The chat's Tools panel: the tool mode with Off, Read only, Ask (chosen) and Auto, and a server's tools, each switched off, unclassified and asking first](../images/use/chat-tools-panel.png){ width="280" }
+
 - **Every MCP tool starts switched off in a new chat.** Each tool offered to the model takes room in every
   message, so only the tools a chat needs are sent.
 - A tool is switched on when the person turns it on in the chat's **Tools** panel (the wrench), when their
@@ -91,8 +99,9 @@ no per-person list of MCP servers. You decide what runs with:
 
 [Tools in the chat](../use/tools.md) explains this for the people who use it.
 
-Hosted servers with many tools often let you narrow them with a header. GitHub's server, for example, takes
-`X-MCP-Toolsets: repos` or `X-MCP-Readonly: true`.
+??? info "Narrow a hosted server's tools"
+    Hosted servers with many tools often let you narrow them with a header. GitHub's server, for example, takes
+    `X-MCP-Toolsets: repos` or `X-MCP-Readonly: true`.
 
 ## Personal data (PII mode)
 
@@ -110,17 +119,11 @@ reached, the call goes through as it is.
 
 ## When it does not work
 
-**"… is registered but could not be connected: … Open it to correct the URL or credentials."** The server is
-saved in error. Open it, read the reason, and select **Edit**. Common reasons:
-
-- it answered `401 Unauthorized`: it needs credentials; add them as a header, for example
-  `Authorization: Bearer <token>`;
-- it has no MCP endpoint at that address (`404`): Streamable HTTP addresses usually end in `/mcp`, SSE ones
-  in `/sse`;
-- `Connection refused`: nothing listens at that address, or the Fadenstack server cannot reach it.
-
-**"MCP server … is …"** on the dashboard. The server is in error or disconnected, and its tools are not
-available to chats. Open it and select **Test**.
-
-**People see no tools in the chat.** Check that the server is enabled, its tools are enabled, and the model
-they chat with can call tools.
+| You see | What to do |
+|---|---|
+| **"… is registered but could not be connected: … Open it to correct the URL or credentials."** | The server is saved in error. Open it, read the reason, and select **Edit**. The common reasons are in the next three rows. |
+| The reason says `401 Unauthorized` | The server needs credentials: add them as a header, for example `Authorization: Bearer <token>`. |
+| The reason says `404` | The server has no MCP endpoint at that address: Streamable HTTP addresses usually end in `/mcp`, SSE ones in `/sse`. |
+| The reason says `Connection refused` | Nothing listens at that address, or the Fadenstack server cannot reach it. |
+| **"MCP server … is …"** on the dashboard | The server is in error or disconnected, and its tools are not available to chats. Open it and select **Test**. |
+| People see no tools in the chat | Check that the server is enabled, its tools are enabled, and the model they chat with can call tools. |

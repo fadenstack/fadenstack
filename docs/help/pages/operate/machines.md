@@ -3,6 +3,8 @@
 A GPU machine joins Fadenstack by running one command on it and being approved in the console. From then on you
 manage it from the console: its hardware, its logs, maintenance, draining, and the clusters it belongs to.
 
+![AI Infrastructure → Machines: two healthy machines, gpu-01 and gpu-02, with Add a machine at the top](../images/operate/machines.png)
+
 The console calls them **Machines**. The agent, the API and some messages still say *node*; it is the same thing.
 
 ## Before you start
@@ -16,21 +18,20 @@ The console calls them **Machines**. The agent, the API and some messages still 
 
 ## Add a machine
 
+![The Add a machine panel: the install line to copy, the server's addresses to pick from, the list of machines waiting for approval, and Skip the approval step](../images/operate/add-machine-panel.png){ width="360" }
+
 1. In the console, open **AI Infrastructure → Machines** and select **Add a machine**.
-
-    ![The Add a machine panel: the install line to copy, the list of machines waiting for approval, and Skip the approval step](../images/operate/add-machine-panel.png)
-
-2. If the panel says the server has more than one address, pick the one the machine can reach. Each address is
-   listed with its network interface; the command changes with your choice.
+2. If the panel says the server has more than one address, pick the one the machine can reach.
 3. Select **Copy command**.
 4. Run the command in a terminal on the machine. It installs the agent, shows a short code and waits.
-5. Back in the console, the waiting machine appears under **Waiting for approval** in the panel, and the
-   **Machines** page shows how many machines are waiting, with **Review**.
+5. Back in the console, find the waiting machine under **Waiting for approval** in the panel. The **Machines**
+   page also shows how many machines are waiting, with **Review**.
 6. Check that the code matches the one on the machine, and select **Approve**. **Not this one** refuses it.
 
 The machine is listed as **healthy**, and its page shows its GPUs. Next: put it in a [cluster](clusters.md).
 
-![The Machines page with two healthy machines, gpu-01 and gpu-02, and the Add a machine button](../images/operate/machines.png)
+??? info "More about the server's addresses"
+    Each address is listed with its network interface; the command changes with your choice.
 
 ### The install line
 
@@ -78,11 +79,12 @@ A server holds a copy when you put the builds in `~/fadenstack/agent-binaries/`:
 `faden-agent-linux-aarch64`, with their `.sha256` files, from the project's releases page. Replace them after every
 server upgrade.
 
-With that copy, every download, from either source, is checked against it. A copy that is not the build of the
-server's release is set aside when the server can read the release's own digest: machines then get the release,
-checked against that digest, and a machine without internet access cannot install. Without a copy, the installer says
-`this backend published no digest, so nothing was verified`, and a machine without internet access stops with
-`could not download the agent`.
+??? info "How the installer checks the download against the server's copy"
+    With that copy, every download, from either source, is checked against it. A copy that is not the build of the
+    server's release is set aside when the server can read the release's own digest: machines then get the
+    release, checked against that digest, and a machine without internet access cannot install. Without a copy,
+    the installer says `this backend published no digest, so nothing was verified`, and a machine without internet
+    access stops with `could not download the agent`.
 
 ## What a machine's page shows
 
@@ -90,17 +92,15 @@ Open **Machines** and select a machine.
 
 ![A machine's page: its status and agent version, the Maintenance, Drain and other actions, its hardware, and the vLLM containers found on it](../images/operate/machine.png)
 
-- **Status**: **healthy**, **degraded**, **unhealthy** or **offline**, with chips for **maintenance**, **draining**,
-  and **Agent *version* available** when the server expects a newer agent. The agent's own version is shown under
-  the name. **Live** refreshes the page by itself.
-- **Hardware**: **CPU**, **Memory**, **Disk**, **GPU** and **Network** use, the **GPU Devices** and **System**
-  (operating system, architecture, Docker, network interfaces).
-- **System Logs**: the last 15 minutes of the machine's own logs. **Open in Logs** opens the full **Logs** page for
-  this machine.
-- **Deployments on this machine**: what its clusters serve.
-- **vLLM on this machine**: vLLM containers Fadenstack did not start (see [Existing vLLM servers](existing-vllm.md)).
-- **Commands** and **Timeline**: what the server asked the machine to do, and what happened.
-- **Raw Inventory & Utilization**: everything the agent reports, as data.
+| Part | What it shows |
+|---|---|
+| **Status** | **healthy**, **degraded**, **unhealthy** or **offline**, with chips for **maintenance**, **draining**, and **Agent *version* available** when the server expects a newer agent. The agent's own version is shown under the name. **Live** refreshes the page by itself. |
+| **Hardware** | **CPU**, **Memory**, **Disk**, **GPU** and **Network** use, the **GPU Devices** and **System** (operating system, architecture, Docker, network interfaces). |
+| **System Logs** | The last 15 minutes of the machine's own logs. **Open in Logs** opens the full **Logs** page for this machine. |
+| **Deployments on this machine** | What its clusters serve. |
+| **vLLM on this machine** | vLLM containers Fadenstack did not start (see [Existing vLLM servers](existing-vllm.md)). |
+| **Commands** and **Timeline** | What the server asked the machine to do, and what happened. |
+| **Raw Inventory & Utilization** | Everything the agent reports, as data. |
 
 And its actions:
 
@@ -118,13 +118,10 @@ without a password.
 
 ## Maintenance and draining
 
-**Maintenance** marks a machine for servicing: nothing new is placed on it, it cannot be added to a cluster, and
-what already runs on it keeps running. Use it while you work on a machine.
-
-**Drain** empties a machine: its model copies move to the cluster's other machines, each serving until its
-replacement is up, and no new copies land on it. You see first which copies can move and which cannot. Drain a
-machine before you reboot it, change its hardware, or take it out of its cluster. Details:
-[Drain a machine](clusters.md#drain-a-machine).
+| | What it does | Use it |
+|---|---|---|
+| **Maintenance** | Marks a machine for servicing: nothing new is placed on it, it cannot be added to a cluster, and what already runs on it keeps running. | While you work on a machine. |
+| **Drain** | Empties a machine: its model copies move to the cluster's other machines, each serving until its replacement is up, and no new copies land on it. You see first which copies can move and which cannot. | Before you reboot a machine, change its hardware, or take it out of its cluster. Details: [Drain a machine](clusters.md#drain-a-machine). |
 
 Both are also on the **Machines** list, as the row's **Enable maintenance** and **Enable drain** buttons.
 
@@ -147,9 +144,10 @@ keep running. See [Upgrading](upgrading.md#update-the-machines-agents).
 | `faden-agent run` | Run in the foreground, to watch what goes wrong |
 | `faden-agent scan` | List the models already in the machine's model store |
 
-The agent's own log is in the system journal: `journalctl -u faden-agent` for a system service,
-`journalctl --user -u faden-agent` for a user service. After changing a setting, restart it:
-`sudo systemctl restart faden-agent`, or `systemctl --user restart faden-agent`.
+| | System service | User service |
+|---|---|---|
+| The agent's own log, in the system journal | `journalctl -u faden-agent` | `journalctl --user -u faden-agent` |
+| Restart it after changing a setting | `sudo systemctl restart faden-agent` | `systemctl --user restart faden-agent` |
 
 ### A machine with several networks
 
@@ -180,22 +178,12 @@ it did the first time.
 
 ## When it does not work
 
-**The installer asks for a `sudo` password you do not have.** Leave `sudo` out of the line (see
-[Without sudo](#without-sudo)).
-
-**`ERROR: this backend publishes no agent build for linux-…`.** There is no agent build for this machine: on Linux,
-the agent runs on x86_64 and aarch64 only.
-
-**`ERROR: the download does not match the expected digest.`** The download is not the build the server expects,
-usually because the copy in `~/fadenstack/agent-binaries/` is from an older release. Replace it with the current
-release's builds.
-
-**The machine never shows up for approval.** A request expires if nobody approves it in time; run the line again
-for a new code. If the machine cannot reach the server at all, the installer says `could not reach` with the
-address: pick another address in **Add a machine**.
-
-**The machine joined but shows no GPU.** The driver works in your shell but not for the service. Check that
-`nvidia-smi` is on a standard path, and that the service runs the agent you installed:
-`sudo systemctl show faden-agent -p ExecStart` (or `systemctl --user show faden-agent -p ExecStart`).
+| You see | What to do |
+|---|---|
+| The installer asks for a `sudo` password you do not have | Leave `sudo` out of the line (see [Without sudo](#without-sudo)). |
+| **`ERROR: this backend publishes no agent build for linux-…`** | There is no agent build for this machine: on Linux, the agent runs on x86_64 and aarch64 only. |
+| **`ERROR: the download does not match the expected digest.`** | The download is not the build the server expects, usually because the copy in `~/fadenstack/agent-binaries/` is from an older release. Replace it with the current release's builds. |
+| The machine never shows up for approval | A request expires if nobody approves it in time; run the line again for a new code. If the machine cannot reach the server at all, the installer says `could not reach` with the address: pick another address in **Add a machine**. |
+| The machine joined but shows no GPU | The driver works in your shell but not for the service. Check that `nvidia-smi` is on a standard path, and that the service runs the agent you installed: `sudo systemctl show faden-agent -p ExecStart` (or `systemctl --user show faden-agent -p ExecStart`). |
 
 More: [Troubleshooting](troubleshooting.md).

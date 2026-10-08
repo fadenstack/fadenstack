@@ -9,6 +9,8 @@ that should have it.
 What people do with the agents is described in [The browser agent](../use/browser-agent.md) and
 [Office add-ins](../use/office-add-ins.md).
 
+![Agents → Agents: each agent with its address, description, status (Published or Retired), live version and when it was updated, and New agent at the top](../images/administer/agents.png)
+
 ## Before you start
 
 - **The application** is installed for your users (see [Install the applications](#install-the-applications)).
@@ -19,6 +21,8 @@ What people do with the agents is described in [The browser agent](../use/browse
   granted to people and groups, and refused to everyone else.
 
 ## Create the agent
+
+![New agent with Chrome picked under Start from an app: the name, the address browser-assistant, the Model still to pick, Who may use it, and Publish it now ticked](../images/administer/new-agent.png)
 
 1. Open **Agents → Agents** and select **New agent**.
 2. Under **Start from an app**, pick the application: **Chrome**, **Microsoft Word**, **Microsoft Excel**,
@@ -41,11 +45,11 @@ What people do with the agents is described in [The browser agent](../use/browse
    that only its maintainers can use.
 7. Select **Create**.
 
-![New agent with Chrome picked under Start from an app: the name, the address browser-assistant, a model, the group Maintenance under Who may use it, and Publish it now ticked](../images/administer/new-agent.png)
-
 The agent's page opens. Its list status is **Draft**, **Published** or **Retired**.
 
 ## The agent's page
+
+![The Word assistant's page on the Definition tab: the tabs Definition, Versions, Apps, Access and Activity, Edit and Retire at the top, the instructions and the model](../images/administer/agent-definition.png)
 
 | Tab | What it holds |
 |---|---|
@@ -55,18 +59,24 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
+??? info "More about local MCP servers"
+    **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
+    application tools its version lists under **Host tools**; a version that lists none holds nothing back.
+    **Allowed** lets it attach MCP servers on the person's computer; their tools are unclassified, so they always
+    ask first. People in **Developer mode** (see [Users, groups and roles](users.md#developer-mode)) may attach
+    them either way.
+
+![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
+
 Saving the definition makes a new version (**Save as new version**, or **Save and publish**); versions never
 change. Publishing a version reaches everyone who uses the agent within a minute.
 
-![The Versions tab of the Word assistant: v2 live with View and Changes, v1 with View and Roll back, below the agent's tabs and the Edit and Retire buttons](../images/administer/agent-versions.png)
+![The Access tab: Who may use it, with Add a person or team and the people the agent is granted to](../images/administer/agent-access.png)
 
 **Maintainers** change the agent, publish versions and decide who may use it, and can use it before it is
 published. They do this from **Agents** in the chat's user menu; they need no access to the console.
 
-**Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
-application tools its version lists under **Host tools**; a version that lists none holds nothing back. **Allowed** lets it attach MCP servers on the person's computer; their tools are
-unclassified, so they always ask first. People in **Developer mode** (see
-[Users, groups and roles](users.md#developer-mode)) may attach them either way.
+![The Activity tab: requests, errors, tokens, users and conversations of the last 30 days with a chart, and below it what the applications reported, such as tools that ran and approvals](../images/administer/agent-activity.png)
 
 ## Install the applications
 
@@ -82,9 +92,9 @@ Chrome uses the operating system's certificate store: the computers must trust t
 [HTTPS and trust](../operate/https.md)).
 
 **Office.** The add-ins run in desktop Office for Windows: Word, Excel, PowerPoint and Outlook, tested with the
-Microsoft 365 apps only. For Outlook,
-only classic Outlook: the new Outlook for Windows runs no such add-ins. IT presets the server and the agents
-in the machine policy `%PROGRAMDATA%\Fadenstack\Office\policy.json`; what it sets, people cannot change:
+Microsoft 365 apps only. For Outlook, only classic Outlook: the new Outlook for Windows runs no such add-ins.
+IT presets the server and the agents in the machine policy `%PROGRAMDATA%\Fadenstack\Office\policy.json`; what
+it sets, people cannot change:
 
 ```json
 {
@@ -99,8 +109,11 @@ in the machine policy `%PROGRAMDATA%\Fadenstack\Office\policy.json`; what it set
 }
 ```
 
-`trustedCaCertificate` names a CA certificate file to trust for the server, for an installation whose CA is
-not deployed to the computers. One sign-in serves all the Office add-ins on a computer.
+One sign-in serves all the Office add-ins on a computer.
+
+??? info "More about trustedCaCertificate"
+    `trustedCaCertificate` names a CA certificate file to trust for the server, for an installation whose CA is
+    not deployed to the computers.
 
 People sign in with their Fadenstack account. Their conversations stay on their computer; the server keeps
 usage and events (which tools ran, how long, with what outcome), never the content. What the agent reads
@@ -110,10 +123,12 @@ reaches the model through Fadenstack, so your [personal data policy](policies.md
 
 Each tool an application brings has a class, which the agent's version sets:
 
-- **Read** tools run in every tool mode but **Off**;
-- **Write** tools ask first in **Ask** mode and run in **Auto**;
-- **Destructive** tools always ask;
-- **Unclassified** tools always ask.
+| Class | In the tool modes |
+|---|---|
+| **Read** | Runs in every tool mode but **Off**. |
+| **Write** | Asks first in **Ask** mode and runs in **Auto**. |
+| **Destructive** | Always asks. |
+| **Unclassified** | Always asks. |
 
 People pick the tool mode in the panel, per conversation; every conversation starts in **Ask**. The
 application can make a class stricter, never looser. Your [tool rules](policies.md#tool-rules) apply to agents
@@ -130,6 +145,8 @@ When an update of the application brings a tool the agent's version does not lis
 is held back (the model does not see it), and the application keeps working with the tools it may use. The
 [dashboard](dashboard.md) shows "Tool changes waiting for …" until you decide.
 
+![An agent's Apps tab with nothing to decide: Version 2 has everything the apps bring, and each tool with its status In the contract, its class and the add-in that brings it](../images/administer/agent-apps.png)
+
 1. Open the agent's **Apps** tab. Each tool shows a status:
 
     | Status | Meaning |
@@ -145,8 +162,6 @@ is held back (the model does not see it), and the application keeps working with
 3. Keep or change the class the application suggests, or choose **Leave out**.
 4. Select **Accept and publish**, or **Accept as draft** to publish later from **Versions**.
 
-![An agent's Apps tab with one tool change: the new tool open_page marked New, its class Write to keep or change, and Accept and publish and Accept as draft at the top](../images/administer/agent-apps-review.png)
-
 Nothing is taken in without that click. **Apps in use** lists each application and version that runs the
 agent, who last reported it and the context it offers.
 
@@ -159,29 +174,24 @@ on their **Agents** page.
 
 ## Retire and delete
 
-- **Retire** closes the agent to everyone within a minute: sign-ins stop working, and its versions, access and history
-  are kept. **Restore** brings it back as it was.
-- A retired agent can be deleted for good: **Delete**, then type its address to confirm. Its versions, access
-  and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent.
-  Deleting needs the permission `agents:delete`, which the built-in `admin` role has and maintainers do not.
-- **Sign out** on the **Activity** tab ends one device's sign-in: that person must sign in again.
+| To | Do this |
+|---|---|
+| Close the agent to everyone within a minute | **Retire**: sign-ins stop working, and its versions, access and history are kept. **Restore** brings it back as it was. |
+| Delete a retired agent for good | **Delete**, then type its address to confirm. Its versions, access and sign-ins go; what it did stays in the usage and audit logs, and its address is free for a new agent. Deleting needs the permission `agents:delete`, which the built-in `admin` role has and maintainers do not. |
+| End one device's sign-in | **Sign out** on the **Activity** tab: that person must sign in again. |
 
-An agent sign-in on a device lasts 30 days, and ends after 7 days without use. Removing someone's access
-takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
-and **Agent access token lifetime (s)** under **Settings → General**.
+??? info "How long agent sign-ins last"
+    An agent sign-in on a device lasts 30 days, and ends after 7 days without use. Removing someone's access
+    takes effect within ten minutes. These are **Agent sign-in lifetime (s)**, **Agent sign-in idle timeout (s)**
+    and **Agent access token lifetime (s)** under **Settings → General**.
 
 ## When it does not work
 
 The panel says why a sign-in failed:
 
-**There is no agent under that address.** The address in the application differs from the agent's. Compare
-it with the **Agents** list; an agent made without **Start from an app** has an address derived from its
-name.
-
-**The person has no access.** Add them, or their group, on the **Access** tab, and check that the agent is
-published. **Check someone's access** says what stops them.
-
-**The server does not answer.** Check the server address in the application and that the computer trusts the
-server's certificate.
-
-**A tool the application offers is not used.** It is held back: accept it on the **Apps** tab.
+| You see | What to do |
+|---|---|
+| **There is no agent under that address.** | The address in the application differs from the agent's. Compare it with the **Agents** list; an agent made without **Start from an app** has an address derived from its name. |
+| **The person has no access.** | Add them, or their group, on the **Access** tab, and check that the agent is published. **Check someone's access** says what stops them. |
+| **The server does not answer.** | Check the server address in the application and that the computer trusts the server's certificate. |
+| A tool the application offers is not used | It is held back: accept it on the **Apps** tab. |

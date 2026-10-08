@@ -34,11 +34,12 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
    Konsole erreichbar ist, und bei einem Zertifikat, das er selbst erstellt hat, die Datei, der Sie vertrauen
    müssen.
 
-`faden deploy` prüft Docker, schreibt die Installation nach `~/fadenstack` (oder in das Verzeichnis, das Sie
-angeben: `faden deploy /opt/faden`), erzeugt eine `.env` mit zufälligen Passwörtern und Schlüsseln, bemisst die
-Dienste für den Host, lädt die Images genau des Release herunter, zu dem das Werkzeug gehört, startet alles und
-legt den ersten Administrator an. Die Admin-Anmeldungen von Grafana, RabbitMQ und Langfuse erhalten die E-Mail-Adresse
-und das Passwort des ersten Administrators.
+??? info "Was `faden deploy` tut"
+    `faden deploy` prüft Docker, schreibt die Installation nach `~/fadenstack` (oder in das Verzeichnis, das Sie
+    angeben: `faden deploy /opt/faden`), erzeugt eine `.env` mit zufälligen Passwörtern und Schlüsseln, bemisst die
+    Dienste für den Host, lädt die Images genau des Release herunter, zu dem das Werkzeug gehört, startet alles und
+    legt den ersten Administrator an. Die Admin-Anmeldungen von Grafana, RabbitMQ und Langfuse erhalten die
+    E-Mail-Adresse und das Passwort des ersten Administrators.
 
 ### Was der Befehl fragt {#what-it-asks}
 
@@ -96,11 +97,11 @@ faden runtime-images --check    # was der Server vorhält und was fehlt
 3. Geben Sie auf der Seite **Bei Fadenstack anmelden** die **E-Mail** und das **Passwort** des Administrators ein
    und wählen Sie **Anmelden**.
 
+![Die Liste „Erste Schritte“ auf dem Dashboard, hier mit vier von fünf Schritten abgehakt](../images/operate/getting-started.png)
+
 Die Konsole öffnet sich mit dem **Dashboard** und der Liste **Erste Schritte**: eine Maschine hinzufügen, einen
 Cluster erstellen, ein Modell bereitstellen, es im Chat ausprobieren, Personen hinzufügen. Jeder Schritt hakt sich
 selbst ab, sobald er erledigt ist.
-
-![Die Liste „Erste Schritte“ auf dem Dashboard, hier mit vier von fünf Schritten abgehakt](../images/operate/getting-started.png)
 
 Als Nächstes: [die GPU-Maschinen hinzufügen](machines.md).
 
@@ -156,29 +157,11 @@ Mit `faden module disable pii` und anschließend `faden down` und `faden up` ent
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**`Docker is not available` oder `Docker daemon is not running`.** Installieren Sie Docker Engine mit dem
-Compose-Plugin, starten Sie es und stellen Sie sicher, dass Ihr Benutzer in der Gruppe `docker` ist (melden Sie
-sich nach dem Hinzufügen ab und wieder an).
-
-**`HTTP port 80 is in use by something else.`** Ein anderes Programm belegt den Port. Geben Sie ihn frei oder
-führen Sie `faden deploy --http-port 8080 --https-port 8443` aus. `faden doctor` listet alle Ports auf, die die
-Installation nach außen öffnet, und ob etwas anderes sie gerade belegt.
-
-**`Backend did not become healthy in time — skipping admin setup.`** Die Dienste sind gestartet, aber die
-Konsolen-API hat nicht rechtzeitig geantwortet. Prüfen Sie `faden status` und `faden logs faden-backend`, beheben
-Sie, was dort zu sehen ist, und führen Sie dann `faden deploy` erneut aus: Es behält die `.env` und legt den
-Administrator an.
-
-**`Some images failed to pull.`** Der Server konnte eine Registry nicht erreichen. Prüfen Sie seinen
-Internetzugang und Proxy und führen Sie dann `faden deploy` erneut aus.
-
-**Der Browser lehnt das Zertifikat ab.** Die Zertifizierungsstelle des Servers ist auf diesem Computer noch nicht
-als vertrauenswürdig eingetragen. Importieren Sie `~/fadenstack/tls/ca.crt`, oder verwenden Sie ein Zertifikat
-Ihres eigenen Ausstellers (siehe [HTTPS und Vertrauen](https.md)).
-
-**Die Konsole meldet „Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen“.** Der
-Schlüssel, der gespeicherte Geheimnisse verschlüsselt (unter anderem das Hugging-Face-Token), ist noch der
-Standardwert. `faden deploy` schreibt einen zufälligen in die `.env`; einer Installation, die auf andere Weise
-gestartet wurde, kann er fehlen. Setzen Sie `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` auf einen
-langen Zufallswert (z. B. die Ausgabe von `openssl rand -base64 48`) und führen Sie dann `faden up` aus.
-Geheimnisse, die unter dem alten Schlüssel gespeichert wurden, müssen Sie erneut eingeben.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **`Docker is not available`** oder **`Docker daemon is not running`** | Installieren Sie Docker Engine mit dem Compose-Plugin, starten Sie es und stellen Sie sicher, dass Ihr Benutzer in der Gruppe `docker` ist (melden Sie sich nach dem Hinzufügen ab und wieder an). |
+| **`HTTP port 80 is in use by something else.`** | Ein anderes Programm belegt den Port. Geben Sie ihn frei oder führen Sie `faden deploy --http-port 8080 --https-port 8443` aus. `faden doctor` listet alle Ports auf, die die Installation nach außen öffnet, und ob etwas anderes sie gerade belegt. |
+| **`Backend did not become healthy in time — skipping admin setup.`** | Die Dienste sind gestartet, aber die Konsolen-API hat nicht rechtzeitig geantwortet. Prüfen Sie `faden status` und `faden logs faden-backend`, beheben Sie, was dort zu sehen ist, und führen Sie dann `faden deploy` erneut aus: Es behält die `.env` und legt den Administrator an. |
+| **`Some images failed to pull.`** | Der Server konnte eine Registry nicht erreichen. Prüfen Sie seinen Internetzugang und Proxy und führen Sie dann `faden deploy` erneut aus. |
+| Der Browser lehnt das Zertifikat ab | Die Zertifizierungsstelle des Servers ist auf diesem Computer noch nicht als vertrauenswürdig eingetragen. Importieren Sie `~/fadenstack/tls/ca.crt`, oder verwenden Sie ein Zertifikat Ihres eigenen Ausstellers (siehe [HTTPS und Vertrauen](https.md)). |
+| Die Konsole meldet **„Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen“** | Der Schlüssel, der gespeicherte Geheimnisse verschlüsselt (unter anderem das Hugging-Face-Token), ist noch der Standardwert. `faden deploy` schreibt einen zufälligen in die `.env`; einer Installation, die auf andere Weise gestartet wurde, kann er fehlen. Setzen Sie `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` auf einen langen Zufallswert (z. B. die Ausgabe von `openssl rand -base64 48`) und führen Sie dann `faden up` aus. Geheimnisse, die unter dem alten Schlüssel gespeichert wurden, müssen Sie erneut eingeben. |

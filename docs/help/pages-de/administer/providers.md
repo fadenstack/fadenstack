@@ -4,6 +4,8 @@ Ein externer Provider ist ein Modell, das anderswo läuft: bei einem Cloud-Provi
 Anthropic, Google, Mistral oder OpenRouter oder auf einem beliebigen Server, der die OpenAI-API spricht. Sobald
 er verbunden ist, wird er im Chat und über die API neben Ihren eigenen Modellen angeboten, nach denselben Regeln.
 
+![LLM → Provider: jeder Eintrag mit Ziel („Remote-Endpunkt“ oder „Cluster“), Modell, Preis, Status und Endpunkt, oben die Suche und „Provider hinzufügen“, und am Ende der Zeile jedes externen Providers seine Aktionen](../images/administer/providers.png)
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - Ein Konto beim Provider und einen API-Schlüssel aus dessen Konsole.
@@ -14,26 +16,28 @@ er verbunden ist, wird er im Chat und über die API neben Ihren eigenen Modellen
 
 1. Öffnen Sie **LLM → Provider** und wählen Sie **Provider hinzufügen**.
 
-    ![Die Seite LLM-Provider: oben die Suche, Provider hinzufügen und Aktualisieren, in der Liste ein Modell, das Ihr Cluster bereitstellt](../images/administer/providers-list-top.png)
+    ![Der Dialog Neuer Provider mit dem Ziel Remote-Endpunkt: Anbieter, Endpunkt-URL, API-Schlüssel, Modell und Verbindung testen, als nächster Schritt Preise (Optional)](../images/administer/provider-add.png)
 
 2. Geben Sie unter **Name** einen Namen ein, den Ihre Benutzer wiedererkennen, z. B. `OpenRouter`.
 3. Wählen Sie unter **Ziel** die Option **Remote-Endpunkt**.
-4. Wählen Sie unter **Anbieter** den Provider. Für OpenAI, Mistral, Groq, DeepSeek und OpenRouter ist die
-   **Endpunkt-URL** bereits ausgefüllt; ändern Sie sie nur für einen Proxy. Für gehostete Provider wie
-   Anthropic oder Google Gemini lassen Sie sie leer. Für jeden anderen OpenAI-kompatiblen Dienst wählen Sie
-   **Andere (OpenAI-kompatibel)** und geben seine Adresse ein, z. B. `https://api.example.com/v1`.
+4. Wählen Sie unter **Anbieter** den Provider. Die **Endpunkt-URL** hängt davon ab:
+
+    | Provider | **Endpunkt-URL** |
+    |---|---|
+    | OpenAI, Mistral, Groq, DeepSeek und OpenRouter | Bereits ausgefüllt; ändern Sie sie nur für einen Proxy. |
+    | Gehostete Provider wie Anthropic oder Google Gemini | Lassen Sie sie leer. |
+    | Jeder andere OpenAI-kompatible Dienst | Wählen Sie **Andere (OpenAI-kompatibel)** und geben Sie seine Adresse ein, z. B. `https://api.example.com/v1`. |
+
 5. Fügen Sie den **API-Schlüssel** ein.
 6. Wählen Sie **Verbindung testen**. Dabei wird eine kleine Anfrage gesendet, die Adresse und Schlüssel prüft,
    und die Modelle des Providers werden aufgelistet: „Verbindung erfolgreich — 214 Modell(e) verfügbar.“
 7. Wählen Sie unter **Modell** das Modell, das Sie anbieten möchten, oder geben Sie seinen Namen so ein, wie der
    Provider ihn schreibt.
-
-    ![Der Dialog Neuer Provider mit dem Ziel Remote-Endpunkt: Anbieter, Endpunkt-URL, API-Schlüssel, Modell und Verbindung testen, als nächster Schritt Preise (Optional)](../images/administer/provider-add.png)
-
-8. Wählen Sie **Weiter**. Geben Sie unter **Preise (Optional)** ein, was eine Million Eingabe- und
-   Ausgabe-Tokens kosten, damit die Konsole die Kosten der Nutzung schätzen kann (siehe
-   [Nutzung und Kosten](usage.md)). Lassen Sie beide Felder leer, um diesen Schritt zu überspringen.
-9. Wählen Sie **Erstellen**.
+8. Wählen Sie **Weiter**.
+9. Geben Sie unter **Preise (Optional)** ein, was eine Million Eingabe- und Ausgabe-Tokens kosten, damit die
+   Konsole die Kosten der Nutzung schätzen kann (siehe [Nutzung und Kosten](usage.md)). Lassen Sie beide Felder
+   leer, um diesen Schritt zu überspringen.
+10. Wählen Sie **Erstellen**.
 
 Das Modell steht sofort im Chat und über die API zur Verfügung, unter dem Namen, den Sie für das Modell
 eingegeben haben.
@@ -58,14 +62,19 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
 
 ## Einen Provider ändern oder entfernen {#change-or-remove-a-provider}
 
-**Bearbeiten** in der Zeile des Providers ändert **Name**, **Endpunkt-URL**, **API-Schlüssel** und **Modell**
-sowie den Schalter **Tools des Gateways anbieten**. Dieser Schalter entscheidet, ob dem Modell die
-Uhrzeit, die Tool-Suche und die MCP-Tools des Chats angeboten werden. Schalten Sie ihn für ein Modell oder einen
-Router aus, der keine Tools aufruft; beim kostenlosen Router von OpenRouter z. B. werden die Anfragen dann
-kürzer, und der Router kann unter allen kostenlosen Modellen wählen.
+| In der Zeile des Providers | Was es tut |
+|---|---|
+| **Bearbeiten** | Ändert **Name**, **Endpunkt-URL**, **API-Schlüssel** und **Modell** sowie den Schalter **Tools des Gateways anbieten**. |
+| **Stopp** | Beendet das Senden von Anfragen an ihn, ohne ihn zu entfernen; **Start** sendet sie wieder. |
+| **Löschen** | Entfernt einen gestoppten Provider. Das lässt sich nicht rückgängig machen. |
 
-**Stopp** in der Zeile des Providers beendet das Senden von Anfragen an ihn, ohne ihn zu entfernen; **Start**
-sendet sie wieder. **Löschen** entfernt einen gestoppten Provider. Das lässt sich nicht rückgängig machen.
+??? info "Mehr zu „Tools des Gateways anbieten“"
+    Dieser Schalter entscheidet, ob dem Modell die Uhrzeit, die Tool-Suche und die MCP-Tools des Chats angeboten
+    werden. Schalten Sie ihn für ein Modell oder einen Router aus, der keine Tools aufruft; beim kostenlosen
+    Router von OpenRouter z. B. werden die Anfragen dann kürzer, und der Router kann unter allen kostenlosen
+    Modellen wählen.
+
+![Der Preisdialog des Modells eines Providers: „Eingabepreis“ und „Ausgabepreis“ in USD pro 1 Mio. Tokens, mit „Speichern“](../images/administer/provider-set-price.png)
 
 **Preis festlegen** (in der Spalte **Preis $/1 Mio.**) legt den Preis nachträglich fest oder ändert ihn.
 
@@ -100,6 +109,8 @@ das Modell des Agenten.
 
 ## Datenresidenz {#data-residency}
 
+![Observability → Datenresidenz: das Kennzeichen Hybrid, die Zahl der lokalen und der externen Provider, die Datenmenge sowie ein Provider auf Ihren Maschinen und ein externer, jeweils mit Wohin Prompts gehen](../images/administer/data-residency.png)
+
 **Observability → Datenresidenz** zeigt für jeden Provider, wo Prompts verarbeitet werden:
 
 | Klasse | Bedeutung |
@@ -114,24 +125,21 @@ Maschine: gpu-01“. Die Seite zeigt außerdem, wie viele Daten in jede Richtung
 der Tokens, und ein Kennzeichen für die gesamte Umgebung: **Air-Gapped ✓**, **Hybrid** oder **Nur Cloud**.
 Solange nicht jeder unbekannte Provider eingeordnet ist, gilt die Umgebung nicht als air-gapped.
 
-![Observability → Datenresidenz: das Kennzeichen Hybrid, die Zahl der lokalen und der externen Provider, die Datenmenge sowie ein Provider auf Ihren Maschinen und ein externer, jeweils mit Wohin Prompts gehen](../images/administer/data-residency.png)
-
 Wenn Fadenstack es nicht erkennen kann oder falsch erkennt, setzen Sie beim Provider **Wohin Prompts gehen**:
 **Auf Ihren Maschinen**, **Ihr Netzwerk** oder **Extern**. **Automatisch erkennen** kehrt zur automatischen
-Erkennung zurück. Eigene Netzwerke außerhalb der privaten Bereiche, z. B. den öffentlichen Adressbereich Ihres
-Rechenzentrums, geben Sie unter **Einstellungen → Allgemein** an: **Internal networks**.
+Erkennung zurück.
+
+![Einstellungen → Allgemein: „Hugging-Face-Zugang“, darunter „Internal networks“ unter „LLM / Datenresidenz“, mit „Speichern“](../images/operate/settings.png)
+
+Eigene Netzwerke außerhalb der privaten Bereiche, z. B. den öffentlichen Adressbereich Ihres Rechenzentrums,
+geben Sie unter **Einstellungen → Allgemein** an: **Internal networks**.
 
 Das [Dashboard](dashboard.md) zeigt dieselben Klassen als **Intern bearbeitet** und unter **KI-Datenverkehr**.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
-**„Nicht OpenAI-API-kompatibel“.** Die Adresse oder der Schlüssel ist falsch, oder der Dienst spricht unter
-dieser Adresse nicht die OpenAI-API. Prüfen Sie, ob die Adresse so endet, wie es die Dokumentation des
-Providers angibt, meist auf `/v1`.
-
-**Das Modell erscheint nicht im Chat.** Prüfen Sie, ob der Provider gestoppt ist, und prüfen Sie seinen Namen
-unter **Modell** im Dialog **Bearbeiten** des Providers.
-
-**„… antwortet nicht“** im Dashboard. Der Provider hat auf seine letzten Prüfungen nicht geantwortet, und
-Anfragen gehen erst wieder an ihn, wenn er antwortet. Prüfen Sie die Statusseite des Providers und den
-Internetzugang Ihres Servers.
+| Sie sehen | Was Sie tun |
+|---|---|
+| **„Nicht OpenAI-API-kompatibel“** | Die Adresse oder der Schlüssel ist falsch, oder der Dienst spricht unter dieser Adresse nicht die OpenAI-API. Prüfen Sie, ob die Adresse so endet, wie es die Dokumentation des Providers angibt, meist auf `/v1`. |
+| Das Modell erscheint nicht im Chat | Prüfen Sie, ob der Provider gestoppt ist, und prüfen Sie seinen Namen unter **Modell** im Dialog **Bearbeiten** des Providers. |
+| **„… antwortet nicht“** im Dashboard | Der Provider hat auf seine letzten Prüfungen nicht geantwortet, und Anfragen gehen erst wieder an ihn, wenn er antwortet. Prüfen Sie die Statusseite des Providers und den Internetzugang Ihres Servers. |

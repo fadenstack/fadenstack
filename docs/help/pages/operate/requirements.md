@@ -14,12 +14,12 @@ runs and the people using them; a GPU machine is sized by the models it runs.
 | Disk | 60 GB | 100 GB, plus the size of the models you intend to host |
 | GPU | none | none |
 
-- **Docker Engine 24 or later with Compose v2.** The user who runs `faden` must be able to use Docker (be in the
-  `docker` group).
-- **Python 3.12 or later**, with `pipx` or `uv`, to install the `faden` command-line tool.
-- **Ports 80 and 443 free** on the server. Other ports can be chosen; see [Network and ports](network.md).
-- **Internet access while installing and upgrading**, to pull the service images and the runtime images. See
-  [What needs the internet](#what-needs-the-internet).
+| The server also needs | |
+|---|---|
+| **Docker Engine 24 or later with Compose v2** | The user who runs `faden` must be able to use Docker (be in the `docker` group). |
+| **Python 3.12 or later** | With `pipx` or `uv`, to install the `faden` command-line tool. |
+| **Ports 80 and 443 free** | On the server. Other ports can be chosen; see [Network and ports](network.md). |
+| **Internet access while installing and upgrading** | To pull the service images and the runtime images. See [What needs the internet](#what-needs-the-internet). |
 
 Add memory for anything else you run on the server. The server needs no GPU: the models run on the machines you
 add. A server that has an NVIDIA GPU can also be added as a machine.
@@ -38,9 +38,11 @@ install publishes are free.
 | GPU machines | One runtime image per kind of machine on disk; nothing measurable in CPU or memory |
 | Tracing | Disk for the trace store |
 
-`faden deploy` and `faden upgrade` size the services for the host they run on: how many worker processes each
-service gets, and how many database connections Postgres accepts. To size them again after changing the
-hardware, run `faden tune` and then `faden up`.
+To size the services again after changing the hardware, run `faden tune` and then `faden up`.
+
+??? info "More about sizing the services"
+    `faden deploy` and `faden upgrade` size the services for the host they run on: how many worker processes each
+    service gets, and how many database connections Postgres accepts.
 
 ### Disk
 
@@ -76,9 +78,12 @@ Two kinds of machine are supported, each with its own runtime image:
   certified yet: the cluster's **Runtime** card says **Not certified**.
 - **NVIDIA DGX Spark** (GB10, aarch64).
 
-Other machines are not supported. One without an NVIDIA GPU, or with another processor architecture, joins but
-cannot be put in a cluster: the cluster wizard says that no certified runtime image runs on it. Another aarch64
-machine with an NVIDIA GPU is offered the DGX Spark image, which is not made for it.
+Other machines are not supported.
+
+??? info "What happens with other machines"
+    One without an NVIDIA GPU, or with another processor architecture, joins but cannot be put in a cluster: the
+    cluster wizard says that no certified runtime image runs on it. Another aarch64 machine with an NVIDIA GPU is
+    offered the DGX Spark image, which is not made for it.
 
 !!! note
     A model runs on one kind of GPU at a time. Mixed machines can share a cluster, but each copy of a model
