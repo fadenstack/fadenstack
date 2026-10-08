@@ -21,16 +21,21 @@ from faden_cli.core.compose import ComposeContext, up as compose_up
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
 
-# Named Docker volumes that can be included in a backup.
+# Named Docker volumes that can be included in a backup, by their name in the compose file. Not among them:
+# Postgres's data volume, because the dumps are the databases' backup, a copy of a running data directory is
+# not consistent, and writing one back under the Postgres a restore runs would break it; and the models,
+# which can be downloaded again and run to hundreds of gigabytes.
 BACKUP_VOLUMES: list[str] = [
-    "pg_data",
+    "faden_rag_lite",
     "minio_data",
     "ch_data",
     "ch_logs",
     "loki_data",
     "grafana_data",
-    "faden_models",
 ]
+
+#: Never written back by a restore, whatever an older backup holds.
+_NEVER_RESTORED = frozenset({"pg_data"})
 
 # Alembic migrator containers (service name → database).
 _MIGRATOR_SERVICES: dict[str, str] = {
@@ -275,24 +280,64 @@ def restore_env(backup_dir: Path, env_path: Path) -> bool:
 # ── Volume snapshots ──────────────────────────────────────────────
 
 
+def _compose_project(docker: str) -> str:
+    """The compose project the running install belongs to, read from its Postgres container."""
+    proc = subprocess.run(  # noqa: S603
+        [
+            docker, "inspect", "-f", '{{ index .Config.Labels "com.docker.compose.project" }}',
+            POSTGRES_CONTAINER,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    return proc.stdout.decode("utf-8", errors="replace").strip() if proc.returncode == 0 else ""
+
+
+def _compose_volume(docker: str, project: str, name: str) -> str | None:
+    """The Docker volume behind the compose volume *name*, or ``None`` when the install has none.
+
+    Compose names a volume after its project (``fadenstack_minio_data``). The bare name is another volume,
+    one ``docker run -v`` creates empty on the spot: backups tarred that and restores filled it.
+    """
+    if not project:
+        return None
+    proc = subprocess.run(  # noqa: S603
+        [
+            docker, "volume", "ls", "-q",
+            "--filter", f"label=com.docker.compose.project={project}",
+            "--filter", f"label=com.docker.compose.volume={name}",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    lines = proc.stdout.decode("utf-8", errors="replace").splitlines()
+    found = [line.strip() for line in lines if line.strip()]
+    return found[0] if proc.returncode == 0 and len(found) == 1 else None
+
+
 def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> list[str]:
     """Tar each named Docker volume into the backup directory.
 
-    Uses a temporary ``alpine`` container to read from the volume mount.
+    Uses a temporary ``alpine`` container to read from the volume mount. The archive carries the compose
+    name (``minio_data.tar.gz``), so a restore finds the volume on whichever install it runs.
     Returns list of created archive filenames.
     """
     docker = _docker_bin()
+    project = _compose_project(docker)
     targets = volumes or list(BACKUP_VOLUMES)
     created: list[str] = []
 
     for vol in targets:
+        source = _compose_volume(docker, project, vol)
+        if source is None:
+            warning(f"  No volume {vol} in this install; skipped")
+            continue
         archive = f"{vol}.tar.gz"
-        archive_path = backup_dir / archive
         info(f"  Snapshotting volume: {vol}")
         proc = subprocess.run(  # noqa: S603
             [
                 docker, "run", "--rm",
-                "-v", f"{vol}:/data:ro",
+                "-v", f"{source}:/data:ro",
                 "-v", f"{backup_dir}:/backup",
                 "alpine",
                 "tar", "czf", f"/backup/{archive}", "-C", "/data", ".",
@@ -315,6 +360,7 @@ def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
     Returns list of volume names that were restored.
     """
     docker = _docker_bin()
+    project = _compose_project(docker)
     archives = manifest.get("volumes", [])
     restored: list[str] = []
 
@@ -323,16 +369,23 @@ def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
         if not archive_path.exists():
             warning(f"  Volume archive missing: {archive}")
             continue
-        # Derive volume name from archive filename (e.g. "pg_data.tar.gz" → "pg_data")
-        vol = archive.replace(".tar.gz", "")
+        # Derive volume name from archive filename (e.g. "minio_data.tar.gz" → "minio_data")
+        vol = archive.removesuffix(".tar.gz")
+        if vol in _NEVER_RESTORED:
+            warning(f"  {vol} skipped: the databases come back from their dumps")
+            continue
+        target = _compose_volume(docker, project, vol)
+        if target is None:
+            warning(f"  No volume {vol} in this install; {archive} not restored")
+            continue
         info(f"  Restoring volume: {vol}")
         proc = subprocess.run(  # noqa: S603
             [
                 docker, "run", "--rm",
-                "-v", f"{vol}:/data",
+                "-v", f"{target}:/data",
                 "-v", f"{backup_dir}:/backup:ro",
                 "alpine",
-                "sh", "-c", f"rm -rf /data/* && tar xzf /backup/{archive} -C /data",
+                "sh", "-c", f"find /data -mindepth 1 -delete && tar xzf /backup/{archive} -C /data",
             ],
             capture_output=True,
             check=False,

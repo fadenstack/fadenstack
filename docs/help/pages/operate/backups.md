@@ -12,9 +12,10 @@ when you install.
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
 | Migration versions and checksums | Yes | `faden restore` checks the database dumps and the certificate files before it changes anything |
-| Files uploaded to the knowledge base or attached to chats | No | The text read from them is in the database; the files themselves are not. Keep the originals you need |
+| Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves |
+| Files attached to chats | No | The text read from them is in the database; the files themselves are not. Keep the originals you need |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
-| Logs, metrics, traces | No | They are kept on the server for viewing, not restored |
+| Logs, metrics, traces | With `--include-volumes`, except metrics | They are kept on the server for viewing; a backup without them loses nothing the server needs |
 | Runtime images | No | `faden runtime-images` fetches them again |
 | The GPU machines | Nothing to back up | They hold no state the server needs; their clusters keep running if the server is lost |
 
@@ -35,6 +36,7 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 | `--output-dir PATH` | Write the backup elsewhere, such as a mounted backup disk. A relative path is taken inside the install directory |
 | `--retain N` | Keep only the N most recent backups in that directory (default 5). Older ones there are deleted |
 | `--db-only` | Databases only, without `.env` and certificate material. Keep a copy of `.env` apart, as private as the backups |
+| `--include-volumes` | Also the files uploaded to the knowledge base, the logs, the traces and Grafana's own data. Not the models |
 | `-y` | Do not ask |
 
 ??? info "How `--retain` counts"

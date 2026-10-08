@@ -35,7 +35,8 @@ from faden_cli.core.settings import load_config
     "--include-volumes",
     is_flag=True,
     default=False,
-    help="Also snapshot named Docker volumes (pg_data, minio_data, …).",
+    help="Also snapshot the install's Docker volumes: knowledge-base uploads, MinIO, logs, traces, Grafana"
+    " (not Postgres's data, whose dumps are the backup, nor the models).",
 )
 @click.option(
     "--retain",
