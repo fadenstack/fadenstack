@@ -47,27 +47,38 @@ English in `pages/`, German in `pages-de/`: the same files, the same order, Germ
 language switch in the top bar; the console links to the German pages when it is in German. A page not
 translated yet is the English one with a note, so the German build never fails for want of one -- but translate
 it in the same change: STYLE.md says how, and `scripts/ui_label.py` finds what the German console calls a button.
-The German pages use the English screenshots until German ones are taken.
+The German pages show the German screenshots (`pages/images/de/`) where they exist, otherwise the English ones.
 
 ## Screenshots
 
-In `pages/images/<section>/`. Taken from a running install with `scripts/shots.mjs`, which replaces every lab
-name, address and person by the neutral examples of STYLE.md before the picture is taken. An older screenshot
-may be used only when it shows none of them (checked by eye; text recognition helps on many pictures).
+In `pages/images/<section>/` (German: `pages/images/de/<section>/`). Every picture is taken from a running install
+with `scripts/shots.mjs`, which replaces every lab name, address and person by the neutral examples of STYLE.md
+before the picture is taken. `HELP_SHOTS_LANG=de` takes the German ones; `HELP_SHOTS_OUT` puts a trial run
+elsewhere. Look at every picture before it goes in (text recognition helps): no lab names, private addresses, test
+data or errors the page does not explain.
+
+Taken by hand and English only: the browser agent's and the Office add-ins' pictures (their own repositories) and
+the maintenance page (only shown during an update). The cluster's page and the Getting started card need an
+install without a failed deployment, and with first steps still open.
 
 ### Pictures still to take
 
-With `scripts/shots.mjs` (add the screen to its list), or on a demo install where a screen needs a state:
+They need a state the test install does not have, or a dialog the script does not open yet:
 
-- **Use**: the tools panel with **Tool mode** and a realistic service, an approval card, a reply being written,
-  a failed reply with **Retry**, an attached file, a knowledge answer naming its source; the Office ribbon's
-  **Agent** button, its sign-in and **Context** menu, a changed Excel sheet; an Outlook draft with neutral people;
-  the chat list and the profile as a regular user, without test chats.
-- **Administer**: the Create User, Edit Roles and Developer mode dialogs, Groups; a skill's Versions and Sharing;
-  an agent's Access, Apps, Activity and Versions tabs without test agents; Add Provider and Set price; a model
-  card, **On this server**, the token dialog and the hosting dialog's steps; a deployment's logs; Add rule, Tool
-  classes and Decisions; the request view and Pricing of the cost dashboard, without load figures.
-- **Operate**: **Add a machine** with the install line and a machine waiting for approval; the Create a cluster
-  steps; **Add machines** with a machine to pick and one refused; a selected machine with **Drain** and
-  **Remove from cluster**; the Runtime, Model traffic and Health checks cards; a cluster starting, failed with
-  **Try again**; routing a found vLLM; the container screens (images, create, a container, edit).
+- **Use**: the sign-in page; an approval card ("… wants to run", Approve and Decline) and a **Not run** line; the
+  New skill dialog (`/skill`), the `$` list and a picked skill's chip; an attached file's chip and an answer naming
+  its document; My Profile's API Token section and the avatar menu; the browser agent's first run, its "cannot read"
+  bar and a marked passage; Word's **Agent** group, the add-in's sign-in pane, **More → Sign out** and **Undo agent
+  change**.
+- **Administer**: the Help menu opened; Settings → Modules; the dashboard in Customize mode; Add Provider's Pricing
+  step and a remote provider's Edit dialog; a deployment's Offer in chat and reply-wait dialogs and its Logs
+  section without errors; the marketplace's Search tab, a model's details and the Delete dialog on On this server;
+  an agent's Apps tab with a held-back tool, and its Activity tab at Signed-in devices; an MCP server's page and
+  the German Edit dialog; the skill editor and a skill's Settings tab; the PII dashboard; one request opened under
+  Cost Observability → Requests.
+- **Operate**: a machine waiting for approval, Skip the approval step opened, the "Agent version available" chip;
+  Create a cluster step 3; a cluster starting, one needing attention and one failed with **Try again**; a selected
+  machine's Drain and Remove from cluster, a drain in progress; switching the runtime; the cards Where the machines
+  get models, Models running here without a deployment, Health checks, and both encryption cards before
+  encryption; Add machines with a refused machine; deleting a machine; the takeover card and dialog; routing a found
+  vLLM and a routed one; Root Mode, Save and replace, Networks and Stacks.
