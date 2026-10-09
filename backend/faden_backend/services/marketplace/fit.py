@@ -164,9 +164,10 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
     kv_per_token = needs.kv_bytes_per_token
     if kv_per_token is not None and kv_dtype_bytes != 2:
         kv_per_token = kv_per_token * kv_dtype_bytes // 2
-    if kv_per_token is None:
+    if kv_per_token is None and not needs.single_device:
         # No architecture to size the cache from: allow a fifth of the weights
-        # for it, as a flat margin, and say the context figure is a guess.
+        # for it, as a flat margin, and say the context figure is a guess. A
+        # picture model has no context cache; the fifth is its working memory.
         notes.append("kv_estimated")
     ctx = context or min(needs.max_context or DEFAULT_CONTEXT, DEFAULT_CONTEXT)
     if needs.max_context and ctx > needs.max_context:

@@ -1,6 +1,9 @@
 /**
  * How vLLM runs this deployment, and a way to change it.
  *
+ * A picture model runs in the runtime's image app instead: the card shows its
+ * picture settings (steps, guidance, size) and the dialog edits only those.
+ *
  * The card lists what differs from vLLM's defaults; the dialog is the same
  * editor the host dialog uses, fed with the model's facts and the settings
  * the marketplace would suggest for it here. Saving changes the engine, so
@@ -12,6 +15,8 @@ import { useTranslation } from "react-i18next";
 import { inferenceApi, type InferenceDeployment } from "~/api/inference";
 import { marketplaceApi, type MarketDetail } from "~/api/marketplace";
 import { EngineSettingsEditor } from "~/components/engine/EngineSettingsEditor";
+import { PictureSettings, pictureSettingLabels } from "~/components/hosting/PictureSettings";
+import { PICTURE_SETTINGS } from "~/lib/hosting";
 import { toClusterConfig, toFlag, type EngineConfig, type EngineValue } from "~/lib/engine";
 
 import Alert from "@mui/material/Alert";
@@ -76,8 +81,21 @@ export interface DeploymentEngineCardProps {
   onSaved: () => void | Promise<void>;
 }
 
+/** Whether the deployment is a picture model (the image app's engine, diffusers). */
+export function isPictureDeployment(deployment: InferenceDeployment): boolean {
+  return String(asRecord(deployment.spec?.engine).name ?? "").toLowerCase() === "diffusers";
+}
+
+/** A picture model's settings out of *config*: nothing vLLM would take. */
+function pictureConfig(config: EngineConfig): EngineConfig {
+  return Object.fromEntries(
+    Object.entries(config).filter(([k]) => (PICTURE_SETTINGS as readonly string[]).includes(k)),
+  );
+}
+
 export function DeploymentEngineCard({ deployment, repoId, onSaved }: DeploymentEngineCardProps) {
   const { t } = useTranslation();
+  const pictures = isPictureDeployment(deployment);
   const current = engineConfigOf(deployment);
   const entries = Object.entries(current);
   const [open, setOpen] = useState(false);
@@ -108,7 +126,7 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
   }
 
   async function save() {
-    const { config, issues } = toClusterConfig(value, extra);
+    const { config, issues } = pictures ? { config: pictureConfig(value), issues: [] } : toClusterConfig(value, extra);
     if (issues.length > 0) return;
     setSaving(true);
     setError(null);
@@ -129,7 +147,9 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
 
   const fit = detail?.fits[deployment.environment_id] ?? null;
   const cluster = detail?.clusters.find((c) => c.environment_id === deployment.environment_id) ?? null;
-  const changed = JSON.stringify(toClusterConfig(value, extra).config) !== JSON.stringify(current);
+  const proposed = pictures ? pictureConfig(value) : toClusterConfig(value, extra).config;
+  const changed = JSON.stringify(proposed) !== JSON.stringify(current);
+  const issues = pictures ? [] : toClusterConfig(value, extra).issues;
   // A copy's share of an accelerator caps its memory (compiler.py): more is
   // asked for here than it will get, and only the Scale dialog raises the share.
   const share = acceleratorsPerCopy(deployment);
@@ -141,7 +161,7 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
       <CardContent>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
           <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-            {t("inference.engine.title")}
+            {pictures ? t("hosting.pictures_title") : t("inference.engine.title")}
           </Typography>
           <Button size="small" startIcon={<TuneIcon />} onClick={openEditor} data-testid="engine-edit">
             {t("inference.engine.edit")}
@@ -149,8 +169,14 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
         </Stack>
         {entries.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            {t("inference.engine.defaults")}
+            {pictures ? t("hosting.pictures_model_default") : t("inference.engine.defaults")}
           </Typography>
+        ) : pictures ? (
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap data-testid="engine-summary">
+            {pictureSettingLabels(current, t).map((label) => (
+              <Chip key={label} size="small" variant="outlined" label={label} />
+            ))}
+          </Stack>
         ) : (
           <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap data-testid="engine-summary">
             {entries.map(([key, v]) => (
@@ -167,7 +193,11 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
       </CardContent>
 
       <Dialog open={open} onClose={saving ? undefined : () => setOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{t("inference.engine.dialog_title", { name: deployment.name })}</DialogTitle>
+        <DialogTitle>
+          {pictures
+            ? t("inference.engine.pictures_dialog_title", { name: deployment.name })
+            : t("inference.engine.dialog_title", { name: deployment.name })}
+        </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             <Alert severity="warning">{t("inference.engine.restart_warning")}</Alert>
@@ -177,6 +207,14 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
               </Alert>
             )}
             {error && <Alert severity="error">{error}</Alert>}
+            {pictures ? (
+              <PictureSettings
+                value={value}
+                suggested={detail?.suggested.config ?? {}}
+                onChange={setValue}
+                disabled={saving}
+              />
+            ) : (
             <EngineSettingsEditor
               value={value}
               extra={extra}
@@ -202,6 +240,7 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
               suggested={detail?.suggested}
               disabled={saving}
             />
+            )}
             {saving && (
               <Box>
                 <LinearProgress />
@@ -215,7 +254,7 @@ export function DeploymentEngineCard({ deployment, repoId, onSaved }: Deployment
           </Button>
           <Button
             variant="contained"
-            disabled={saving || !changed || toClusterConfig(value, extra).issues.length > 0}
+            disabled={saving || !changed || issues.length > 0}
             onClick={() => void save()}
             data-testid="engine-save"
           >

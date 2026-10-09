@@ -67,7 +67,7 @@ import SyncIcon from "@mui/icons-material/Sync";
 import TuneIcon from "@mui/icons-material/Tune";
 
 import { suggestChatName } from "~/lib/hosting";
-import { DeploymentEngineCard } from "./DeploymentEngineCard";
+import { DeploymentEngineCard, isPictureDeployment } from "./DeploymentEngineCard";
 import { gpuCount } from "../clusters/readiness";
 import { clusterStatusLabel, nodeLabel, phaseLabel } from "../clusters/presentation";
 import {
@@ -900,7 +900,8 @@ export default function InferenceDeploymentDetailPage() {
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="caption" color="text.secondary" display="block">
-                {t("inference.detail.in_chat")}
+                {/* A picture model is not offered in chat: apps and agents reach it by this name. */}
+                {isPictureDeployment(deployment) ? t("inference.detail.at_api") : t("inference.detail.in_chat")}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="body2" data-testid="chat-alias">

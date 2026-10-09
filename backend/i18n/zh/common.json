@@ -2867,7 +2867,8 @@
       "share_invalid": "请输入 0.05 到 1。",
       "share_memory": "引擎占用每个加速器 {{percent}}% 的显存。",
       "share_restarts": "更改份额会重启所有副本，在它们恢复之前模型不可用。",
-      "show_in_logs": "显示错误"
+      "show_in_logs": "显示错误",
+      "at_api": "在 API 中"
     },
     "engine": {
       "title": "引擎设置",
@@ -2876,7 +2877,8 @@
       "dialog_title": "{{name}} 的引擎设置",
       "restart_warning": "保存后，每个副本都会以新设置重启。在它们恢复运行前，模型不可用。如果某个副本无法启动，本页面会说明原因，您可以改回原来的设置。",
       "save_restart": "保存并重启",
-      "memory_capped": "gpu_memory_utilization {{asked}} 超过了此部署的加速器份额（{{share}}）：引擎只占用 {{share}}。请在“扩缩容”中提高份额，显存会随之调整。"
+      "memory_capped": "gpu_memory_utilization {{asked}} 超过了此部署的加速器份额（{{share}}）：引擎只占用 {{share}}。请在“扩缩容”中提高份额，显存会随之调整。",
+      "pictures_dialog_title": "{{name}} 的图片设置"
     }
   },
   "audit": {
@@ -3119,7 +3121,11 @@
     "pictures_guidance_help": "对描述的遵循程度。Turbo 模型使用 0。",
     "pictures_size": "默认尺寸",
     "pictures_model_default": "使用模型自身的",
-    "pictures_suggested": "为此模型推荐"
+    "pictures_suggested": "为此模型推荐",
+    "offer_label": "提供名称",
+    "offer_help": "应用和智能体在 /v1/images/generations 使用的名称。留空则仅通过其端点提供。",
+    "pictures_settings_count_one": "{{count}} 项图片设置",
+    "pictures_settings_count_other": "{{count}} 项图片设置"
   },
   "marketplace": {
     "title": "模型市场",

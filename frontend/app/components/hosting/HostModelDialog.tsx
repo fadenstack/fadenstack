@@ -20,6 +20,7 @@ import { inferenceApi } from "~/api/inference";
 import type { Model } from "~/api/llm";
 import { marketplaceApi, type Fit, type MarketCluster, type MarketDetail } from "~/api/marketplace";
 import { EngineSettingsEditor } from "~/components/engine/EngineSettingsEditor";
+import { PictureSettings } from "~/components/hosting/PictureSettings";
 import { RecipeNotice } from "~/components/hosting/RecipeNotice";
 import { formatBytes, parseExtraFlags, type EngineConfig } from "~/lib/engine";
 import {
@@ -200,7 +201,12 @@ export function HostModelDialog({
   // Another cluster has other machines.
   useEffect(() => setMachine(""), [cluster]);
   const fit: Fit | null = (cluster && detail?.fits[cluster]) || null;
-  const choices = useMemo(() => gpuChoices(fit, chosen), [fit, chosen]);
+  const pictures = detail?.model?.task === "images";
+  // A picture model runs on one device or a share of one: never split across several.
+  const choices = useMemo(
+    () => gpuChoices(fit, chosen).filter((c) => !pictures || c.value <= 1),
+    [fit, chosen, pictures],
+  );
   const maxCopies = choices.find((c) => Math.abs(c.value - gpus) < 1e-6)?.maxCopies ?? 1;
 
   // The planned size follows the cluster; the suggested settings follow until the operator edits them.
@@ -240,7 +246,6 @@ export function HostModelDialog({
     setConfig((current) => sizedConfig(current, before, value));
   }
 
-  const pictures = detail?.model?.task === "images";
   const parsedExtra = parseExtraFlags(extra);
   const extraIssues = pictures ? [] : parsedExtra.issues;
   // A picture model takes picture settings only; a share's vLLM memory cap does not apply.
@@ -320,6 +325,9 @@ export function HostModelDialog({
   // for a model only the machines have, and this used to say the server kept it.
   // A model added from a local path has no repository to download from.
   const willDownload = kept && !kept.hf_repo_id ? false : !detail?.local?.on_server;
+  // A picture pipeline is fetched whole (its components' files), and its files are not what
+  // it takes served: Z-Image-Turbo's 32.8 GB of files take 20.5 GB in memory.
+  const downloadBytes = pictures ? (model?.total_bytes ?? model?.weights_bytes) : model?.weights_bytes;
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth>
@@ -472,10 +480,16 @@ export function HostModelDialog({
                   slotProps={{ htmlInput: { "data-testid": "host-name" } }}
                 />
                 <TextField
-                  label={t("hosting.chat_label")}
+                  label={pictures ? t("hosting.offer_label") : t("hosting.chat_label")}
                   value={chatName}
                   fullWidth
-                  helperText={chatName.trim() ? t("hosting.chat_help") : t("hosting.chat_none")}
+                  helperText={
+                    chatName.trim()
+                      ? pictures
+                        ? t("hosting.offer_help")
+                        : t("hosting.chat_help")
+                      : t("hosting.chat_none")
+                  }
                   onChange={(e) => setChatName(e.target.value)}
                   slotProps={{ htmlInput: { "data-testid": "host-chat-name" } }}
                 />
@@ -493,9 +507,13 @@ export function HostModelDialog({
                   <SummaryRow
                     label={t("hosting.summary.settings")}
                     value={
-                      settingsCount > 0
-                        ? t("hosting.settings_changed", { count: settingsCount })
-                        : t("hosting.settings_default")
+                      pictures
+                        ? settingsCount > 0
+                          ? t("hosting.pictures_settings_count", { count: settingsCount })
+                          : t("hosting.pictures_model_default")
+                        : settingsCount > 0
+                          ? t("hosting.settings_changed", { count: settingsCount })
+                          : t("hosting.settings_default")
                     }
                   />
                 </Stack>
@@ -514,8 +532,8 @@ export function HostModelDialog({
               )}
               {willDownload && (
                 <Alert severity="info" data-testid="host-download-note">
-                  {model?.weights_bytes
-                    ? t("hosting.download_note_size", { size: formatBytes(model.weights_bytes) })
+                  {downloadBytes
+                    ? t("hosting.download_note_size", { size: formatBytes(downloadBytes) })
                     : t("hosting.download_note")}
                 </Alert>
               )}
@@ -569,81 +587,6 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
         {value}
       </Typography>
-    </Stack>
-  );
-}
-
-/** Steps, guidance and size a picture model uses when a request does not say. */
-function PictureSettings({
-  value,
-  suggested,
-  onChange,
-}: {
-  value: EngineConfig;
-  suggested: EngineConfig;
-  onChange: (v: EngineConfig) => void;
-}) {
-  const { t } = useTranslation();
-  const set = (key: string, raw: string, parse: (s: string) => number) => {
-    const next = { ...value };
-    if (raw.trim() === "" || !Number.isFinite(parse(raw))) delete next[key];
-    else next[key] = parse(raw);
-    onChange(next);
-  };
-  const hint = (key: string) =>
-    suggested[key] !== undefined && suggested[key] === value[key] ? t("hosting.pictures_suggested") : undefined;
-  const sizes = ["1024x1024", "1216x832", "832x1216", "1536x1024", "1024x1536"];
-  return (
-    <Stack spacing={2}>
-      <Typography variant="subtitle2">{t("hosting.pictures_title")}</Typography>
-      <Typography variant="body2" color="text.secondary">
-        {t("hosting.pictures_intro")}
-      </Typography>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <TextField
-          label={t("hosting.pictures_steps")}
-          type="number"
-          size="small"
-          value={value.num_inference_steps ?? ""}
-          placeholder={t("hosting.pictures_model_default")}
-          helperText={hint("num_inference_steps") ?? t("hosting.pictures_steps_help")}
-          onChange={(e) => set("num_inference_steps", e.target.value, (s) => Math.round(Number(s)))}
-          slotProps={{ htmlInput: { min: 1, max: 100, "data-testid": "host-picture-steps" } }}
-          sx={{ flex: 1 }}
-        />
-        <TextField
-          label={t("hosting.pictures_guidance")}
-          type="number"
-          size="small"
-          value={value.guidance_scale ?? ""}
-          placeholder={t("hosting.pictures_model_default")}
-          helperText={hint("guidance_scale") ?? t("hosting.pictures_guidance_help")}
-          onChange={(e) => set("guidance_scale", e.target.value, Number)}
-          slotProps={{ htmlInput: { min: 0, max: 30, step: 0.5, "data-testid": "host-picture-guidance" } }}
-          sx={{ flex: 1 }}
-        />
-        <TextField
-          select
-          label={t("hosting.pictures_size")}
-          size="small"
-          value={String(value.size ?? "")}
-          onChange={(e) => {
-            const next = { ...value };
-            if (e.target.value) next.size = e.target.value;
-            else delete next.size;
-            onChange(next);
-          }}
-          slotProps={{ htmlInput: { "data-testid": "host-picture-size" } }}
-          sx={{ flex: 1 }}
-        >
-          <MenuItem value="">{t("hosting.pictures_model_default")}</MenuItem>
-          {sizes.map((s) => (
-            <MenuItem key={s} value={s}>
-              {s.replace("x", " × ")}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Stack>
     </Stack>
   );
 }
@@ -865,7 +808,12 @@ function WhereStep({
               onChange={(e) => onMachine(e.target.value)}
               helperText={t("hosting.machine_help")}
               sx={{ maxWidth: 420 }}
-              slotProps={{ htmlInput: { "data-testid": "host-machine" } }}
+              slotProps={{
+                htmlInput: { "data-testid": "host-machine" },
+                // "Any machine" is a choice too: shown, not a blank box.
+                select: { displayEmpty: true },
+                inputLabel: { shrink: true },
+              }}
             >
               <MenuItem value="">{t("hosting.machine_any")}</MenuItem>
               {chosen.machines.map((m) => {

@@ -2865,7 +2865,8 @@
       "share_invalid": "Enter 0.05 to 1.",
       "share_memory": "The engine takes {{percent}} % of each accelerator's memory.",
       "share_restarts": "Changing the share restarts every copy. The model is unavailable until they are back.",
-      "show_in_logs": "Show the errors"
+      "show_in_logs": "Show the errors",
+      "at_api": "At the API"
     },
     "engine": {
       "title": "Engine settings",
@@ -2874,7 +2875,8 @@
       "dialog_title": "Engine settings for {{name}}",
       "restart_warning": "Saving restarts every copy with the new settings. The model is unavailable until they are back up. If a copy does not start, this page says why and you can change the settings back.",
       "save_restart": "Save and restart",
-      "memory_capped": "gpu_memory_utilization {{asked}} is more than this deployment's share of an accelerator ({{share}}): the engine takes {{share}}. Raise the share under Scale, which brings the memory along."
+      "memory_capped": "gpu_memory_utilization {{asked}} is more than this deployment's share of an accelerator ({{share}}): the engine takes {{share}}. Raise the share under Scale, which brings the memory along.",
+      "pictures_dialog_title": "Picture settings for {{name}}"
     }
   },
   "audit": {
@@ -3117,7 +3119,11 @@
     "pictures_guidance_help": "How closely it follows the prompt. Turbo models take 0.",
     "pictures_size": "Default size",
     "pictures_model_default": "The model's own",
-    "pictures_suggested": "Suggested for this model"
+    "pictures_suggested": "Suggested for this model",
+    "offer_label": "Offer as",
+    "offer_help": "The name apps and agents use at /v1/images/generations. Clear it to serve by endpoint only.",
+    "pictures_settings_count_one": "{{count}} picture setting",
+    "pictures_settings_count_other": "{{count}} picture settings"
   },
   "marketplace": {
     "title": "Model marketplace",

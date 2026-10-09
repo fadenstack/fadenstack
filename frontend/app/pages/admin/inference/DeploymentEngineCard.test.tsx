@@ -46,6 +46,37 @@ describe("DeploymentEngineCard", () => {
     expect(summary).toHaveTextContent("--enable-auto-tool-choice");
   });
 
+  it("shows a picture model's picture settings, and saves only those", async () => {
+    vi.spyOn(marketplaceApi, "detail").mockRejectedValue(new Error("offline"));
+    const pictures = {
+      ...DEPLOYMENT,
+      name: "z-image-turbo",
+      spec: {
+        ...DEPLOYMENT.spec,
+        engine: { name: "diffusers", config: { num_inference_steps: 9, guidance_scale: 0 } },
+        resources: { replica: { gpus: 0.25, machine: "gpu-02" } },
+      },
+    } as InferenceDeployment;
+    vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue(pictures);
+    const update = vi.spyOn(inferenceApi, "updateDeployment").mockResolvedValue(pictures);
+    vi.spyOn(inferenceApi, "reconcileDeployment").mockResolvedValue(undefined as never);
+    render(<DeploymentEngineCard deployment={pictures} repoId={null} onSaved={() => {}} />);
+    const summary = screen.getByTestId("engine-summary");
+    expect(summary).toHaveTextContent("Steps 9");
+    expect(summary).toHaveTextContent("Guidance 0");
+    expect(summary).not.toHaveTextContent("--");
+
+    await userEvent.click(screen.getByTestId("engine-edit"));
+    const steps = screen.getByTestId("host-picture-steps");
+    await userEvent.clear(steps);
+    await userEvent.type(steps, "12");
+    await userEvent.click(screen.getByTestId("engine-save"));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    const spec = update.mock.calls[0][1].spec as { engine: unknown; resources: unknown };
+    expect(spec.engine).toEqual({ name: "diffusers", config: { num_inference_steps: 12, guidance_scale: 0 } });
+    expect(spec.resources).toEqual({ replica: { gpus: 0.25, machine: "gpu-02" } });
+  });
+
   it("says when the memory asked for is more than the copy's share of an accelerator", async () => {
     // The share caps it (compiler.py); on .61 a 0.4 kept capping a raised share (2026-10-01).
     vi.spyOn(marketplaceApi, "detail").mockRejectedValue(new Error("offline"));

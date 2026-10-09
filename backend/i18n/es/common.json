@@ -2867,7 +2867,8 @@
       "share_invalid": "Introduzca de 0,05 a 1.",
       "share_memory": "El motor usa el {{percent}} % de la memoria de cada acelerador.",
       "share_restarts": "Cambiar la fracción reinicia todas las copias. El modelo no está disponible hasta que vuelvan.",
-      "show_in_logs": "Mostrar los errores"
+      "show_in_logs": "Mostrar los errores",
+      "at_api": "En la API"
     },
     "engine": {
       "title": "Ajustes del motor",
@@ -2876,7 +2877,8 @@
       "dialog_title": "Ajustes del motor de {{name}}",
       "restart_warning": "Al guardar, cada copia se reinicia con los nuevos ajustes. El modelo no está disponible hasta que vuelvan a funcionar. Si una copia no arranca, esta página indica por qué y puede volver a los ajustes anteriores.",
       "save_restart": "Guardar y reiniciar",
-      "memory_capped": "gpu_memory_utilization {{asked}} es más que la fracción de acelerador de este despliegue ({{share}}): el motor usa {{share}}. Aumente la fracción en Escalar, que ajusta también la memoria."
+      "memory_capped": "gpu_memory_utilization {{asked}} es más que la fracción de acelerador de este despliegue ({{share}}): el motor usa {{share}}. Aumente la fracción en Escalar, que ajusta también la memoria.",
+      "pictures_dialog_title": "Ajustes de imagen de {{name}}"
     }
   },
   "audit": {
@@ -3119,7 +3121,11 @@
     "pictures_guidance_help": "Cuánto se ciñe a la descripción. Los modelos turbo usan 0.",
     "pictures_size": "Tamaño por defecto",
     "pictures_model_default": "El del modelo",
-    "pictures_suggested": "Recomendado para este modelo"
+    "pictures_suggested": "Recomendado para este modelo",
+    "offer_label": "Ofrecer como",
+    "offer_help": "El nombre que usan las aplicaciones y los agentes en /v1/images/generations. Déjelo vacío para servirlo solo en su endpoint.",
+    "pictures_settings_count_one": "{{count}} ajuste de imagen",
+    "pictures_settings_count_other": "{{count}} ajustes de imagen"
   },
   "marketplace": {
     "title": "Mercado de modelos",
