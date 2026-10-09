@@ -21,7 +21,7 @@ it is.
 |---|---|
 | `Dockerfile` | aarch64 / GB10 (DGX Spark, sm_121) |
 | `Dockerfile.x86_64` | generic x86_64 NVIDIA, Turing (sm_75) through Blackwell (sm_120) |
-| `llm_port_ray_runtime/` | the helper package baked into the image; provides the `llm-port-ray-runtime` CLI the agent drives |
+| `llm_port_ray_runtime/` | the helper package baked into the image; provides the `llm-port-ray-runtime` CLI the agent drives, and the image app that serves picture models with diffusers (`image.py`) |
 | `setup.py` | packaging for that helper |
 | `fixtures.json`, `test_local_validation.py` | copied into the image; validate imports, dependencies and `LLMConfig` shapes from inside it |
 | `check_ray_vllm.py` | run by both builds: every vLLM module and name Ray Serve LLM imports must resolve |
@@ -63,7 +63,7 @@ Today:
 | Manifest | Base | vLLM | Certified | Channel |
 |---|---|---|---|---|
 | `runtime-manifest-gb10-nv26.08.json` | NVIDIA vLLM 26.08 | 0.27.1 | passed 11/11, 2026-09-29 | stable |
-| `runtime-manifest-gb10-nv26.09.json` | NVIDIA vLLM 26.09 | 0.29.0 (+ `vllm_compat.py`) | passed 11/11, 2026-10-06 | preview |
+| `runtime-manifest-gb10-nv26.09.json` | NVIDIA vLLM 26.09 | 0.29.0 (+ `vllm_compat.py`), diffusers 0.41.0 for picture models | passed 11/11, 2026-10-09 | preview |
 | `runtime-manifest-x86_64.json` | python:3.12 slim | 0.26.0 | no | stable |
 
 ## The manifests are minted, not written
