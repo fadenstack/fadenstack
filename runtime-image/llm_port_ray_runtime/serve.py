@@ -13,8 +13,9 @@ from llm_port_ray_runtime.models import (
 
 log = logging.getLogger(__name__)
 
-#: Ray Serve LLM names a model's server deployment ``LLMServer:<model>``.
-_SERVER_PREFIX = "LLMServer"
+#: Ray Serve LLM names a model's server deployment ``LLMServer:<model>``; a
+#: picture model's is ``ImageServer:<model>`` (``image.py``).
+_SERVER_PREFIXES = ("LLMServer", "ImageServer")
 
 
 def fixed_copies(llm_serving_args: Dict[str, Any]) -> bool:
@@ -23,7 +24,7 @@ def fixed_copies(llm_serving_args: Dict[str, Any]) -> bool:
     Only such an app can take Ray's external scaler: Serve refuses it next to
     its own autoscaling, which is what a model without ``num_replicas`` gets.
     """
-    configs = llm_serving_args.get("llm_configs") or []
+    configs = llm_serving_args.get("llm_configs") or llm_serving_args.get("image_configs") or []
     if not configs:
         return False
     for config in configs:
@@ -96,7 +97,6 @@ class RayServeClient:
         self.core.ensure_attached()
 
         from ray import serve
-        from ray.serve.llm import build_openai_app
 
         opts = dict(http_options or {})
         start_kwargs: Dict[str, Any] = {
@@ -113,7 +113,15 @@ class RayServeClient:
         except Exception as exc:  # pragma: no cover - Serve already running
             log.info("serve.start skipped (%s)", exc)
 
-        app = build_openai_app(llm_serving_args)
+        if llm_serving_args.get("image_configs"):
+            # A picture model: diffusers, not vLLM (image.py).
+            from llm_port_ray_runtime.image import build_image_app
+
+            app = build_image_app(llm_serving_args)
+        else:
+            from ray.serve.llm import build_openai_app
+
+            app = build_openai_app(llm_serving_args)
         scaler = fixed_copies(llm_serving_args) and external_scaler is not False
         # ``wait_for_ingress_deployment_creation`` stays on: it is a bounded
         # controller round-trip that confirms the application was accepted, so
@@ -143,7 +151,7 @@ class RayServeClient:
         and the caller deploys it again instead.
 
         *deployment* defaults to the app's model server deployments
-        (``LLMServer:...``), not its ingress.
+        (``LLMServer:...``, ``ImageServer:...``), not its ingress.
         """
         base: Dict[str, Any] = {"scaled": False, "app_name": app_name, "replicas": int(replicas)}
         try:
@@ -166,7 +174,7 @@ class RayServeClient:
                 return {**base, "reason": "external_scaler_disabled",
                         "error": f"{app_name} was deployed without the external scaler"}
             names = [deployment] if deployment else [
-                name for name in (app.get("deployments") or {}) if name.startswith(_SERVER_PREFIX)
+                name for name in (app.get("deployments") or {}) if name.startswith(_SERVER_PREFIXES)
             ]
             if not names:
                 return {**base, "reason": "app_not_found", "error": f"{app_name} has no model server deployment"}

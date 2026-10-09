@@ -14,6 +14,7 @@ def get_runtime_versions() -> Dict[str, Any]:
         "torch": None,
         "cuda": None,
         "transformers": None,
+        "diffusers": None,
         "pyarrow": None,
         "triton": None,
         "flash_attn": None,
@@ -56,6 +57,12 @@ def get_runtime_versions() -> Dict[str, Any]:
     try:
         import transformers
         report["transformers"] = transformers.__version__
+    except ImportError:
+        pass
+
+    try:
+        import diffusers
+        report["diffusers"] = diffusers.__version__
     except ImportError:
         pass
 

@@ -50,6 +50,18 @@ import ray._private.prometheus_exporter as pe; \
 import ray.dashboard.modules.reporter.reporter_agent as ra; \
 print('metrics stack OK:', opencensus.__name__, aiohttp_cors.__name__, pe.__name__, ra.__name__)"
 
+# Picture models (text to image) run on diffusers beside vLLM: the helper's
+# image app (llm_port_ray_runtime/image.py). Held to the base's versions like
+# the layer above -- torch, Transformers and the Hub client stay NVIDIA's.
+ARG DIFFUSERS_VERSION=0.41.0
+ARG ACCELERATE_VERSION=1.15.0
+RUN pip install --no-cache-dir -c base-packages.txt \
+        "diffusers==${DIFFUSERS_VERSION}" "accelerate==${ACCELERATE_VERSION}" && \
+    { pip check > pip-check.txt 2>&1 || true; } && \
+    if grep -vxFf base-pip-check.txt pip-check.txt | grep -v '^No broken requirements found'; then \
+        echo "diffusers added the conflicts above"; exit 1; \
+    fi
+
 # Install LLM.Port Ray Runtime helper package and validation assets
 WORKDIR /opt/llm-port/runtime
 COPY setup.py /opt/llm-port/runtime/
@@ -58,7 +70,10 @@ COPY llm_port_ray_runtime /opt/llm-port/runtime/llm_port_ray_runtime/
 COPY fixtures.json test_local_validation.py /opt/llm-port/runtime/
 
 RUN pip install --no-cache-dir /opt/llm-port/runtime && \
-    llm-port-ray-runtime versions
+    llm-port-ray-runtime versions && \
+    python3 -c "from llm_port_ray_runtime.image import build_image_app, diffusers_without_xformers as d; \
+import accelerate; p = d().ZImagePipeline; \
+print('image app OK:', d().__version__, accelerate.__version__, p.__name__)"
 
 # The helper is the host/runtime control contract (4B): the Node Agent invokes
 # these verbs over `exec` and never imports Ray itself.  A build whose helper

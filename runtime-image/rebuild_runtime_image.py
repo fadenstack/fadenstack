@@ -305,8 +305,14 @@ _SUPPORT_PROBE = (
     "except Exception:\n"
     "    pass\n"
     "from vllm import ModelRegistry\n"
+    "try:\n"
+    "    import diffusers\n"
+    "    pipelines = sorted(n for n in dir(diffusers) if n.endswith('Pipeline'))\n"
+    "except Exception:\n"
+    "    pipelines = []\n"
     "print(json.dumps({'supported_model_types': sorted(types),"
-    " 'supported_architectures': sorted(ModelRegistry.get_supported_archs())}))\n"
+    " 'supported_architectures': sorted(ModelRegistry.get_supported_archs()),"
+    " 'supported_pipelines': pipelines}))\n"
 )
 
 
@@ -325,6 +331,7 @@ def read_support(tag: str, *, platform: str | None = None) -> dict:
     return {
         "supported_model_types": list(facts.get("supported_model_types") or []),
         "supported_architectures": list(facts.get("supported_architectures") or []),
+        "supported_pipelines": list(facts.get("supported_pipelines") or []),
     }
 
 
@@ -422,6 +429,9 @@ def write_manifest(
         # architectures vLLM runs natively (``read_support``).
         "supported_model_types": (support or {}).get("supported_model_types", []),
         "supported_architectures": (support or {}).get("supported_architectures", []),
+        # The picture pipelines its diffusers runs (a model_index.json's
+        # ``_class_name``); none for an image without diffusers.
+        "supported_pipelines": (support or {}).get("supported_pipelines", []),
         # Certification is evidence from a run, not from a build, so none of
         # it survives a rebuild (--record-certification adds it).
         "certification": {

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="llm_port_ray_runtime",
-    version="0.2.0",
+    version="0.3.0",
     license="Apache-2.0",
     license_files=["LICENSE", "NOTICE"],
     packages=find_packages(),
