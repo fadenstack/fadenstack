@@ -79,7 +79,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = settings.users_secret
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
-        """Assign default RBAC role to newly registered non-superusers."""
+        """Assign default RBAC role to newly registered non-superusers.
+
+        Runs for every account made through ``UserManager.create``, such as one a sign-in module's
+        OAuth callback creates. There is no self-registration route; the admin API and bootstrap
+        create their accounts and give them their roles themselves.
+        """
         if user.is_superuser:
             return
 
