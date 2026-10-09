@@ -270,3 +270,59 @@ async def test_a_failed_download_is_not_resumed_by_itself(
     copy = await server_copy.ensure_server_copy(dbsession, model)
     assert copy.blocker is not None and "401" in copy.blocker
     assert sent == []
+
+
+# -- a job made in a request that has not committed yet ------------------------
+
+
+class _Session:
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
+    async def close(self) -> None: ...
+
+
+class _App:
+    class state:  # noqa: N801 - shaped like FastAPI's app.state
+        @staticmethod
+        def db_session_factory() -> _Session:
+            return _Session()
+
+
+def _jobs_seen_after(monkeypatch: pytest.MonkeyPatch, looks: int | None) -> dict[str, int]:
+    """DAOs over a job the task sees only from its *looks*-th look on (never, for None)."""
+    from faden_backend.db.dao import llm_dao
+
+    seen = {"looks": 0}
+
+    class _Jobs:
+        def __init__(self, _session: object) -> None: ...
+
+        async def claim(self, *_args: object, **_kw: object) -> bool:
+            seen["looks"] += 1
+            return looks is not None and seen["looks"] >= looks
+
+        async def get(self, _job_id: object) -> None:
+            return None
+
+    class _Models:
+        def __init__(self, _session: object) -> None: ...
+
+        async def set_status(self, *_args: object) -> None: ...
+
+    monkeypatch.setattr(llm_dao, "DownloadJobDAO", _Jobs)
+    monkeypatch.setattr(llm_dao, "ModelDAO", _Models)
+    monkeypatch.setattr(llm_tasks, "_UNSEEN_POLL_SEC", 0.01)
+    return seen
+
+
+async def test_a_job_not_committed_yet_is_waited_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The task arrived 20 ms after the job was made, before the request committed (a fresh install)."""
+    seen = _jobs_seen_after(monkeypatch, looks=4)
+    assert await llm_tasks._claim(_App(), uuid.uuid4(), uuid.uuid4(), llm_tasks._Run()) is None
+    assert seen["looks"] == 4
+
+
+async def test_a_job_that_never_appears_is_gone(monkeypatch: pytest.MonkeyPatch) -> None:
+    _jobs_seen_after(monkeypatch, looks=None)
+    monkeypatch.setattr(llm_tasks, "JOB_COMMIT_GRACE_SEC", 0.1)
+    assert await llm_tasks._claim(_App(), uuid.uuid4(), uuid.uuid4(), llm_tasks._Run()) == "gone"

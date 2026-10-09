@@ -19,6 +19,11 @@ HEARTBEAT_SEC = 20.0
 #: How long a running download may say nothing before another delivery of its
 #: task takes it over. Several heartbeats: a busy host can miss one or two.
 TAKEOVER_AFTER_SEC = 120.0
+#: How long a job this task cannot see is waited for. The request that made it sends the task before its
+#: transaction ends, so a worker that is quick gets here first: the host dialog's download, on a fresh
+#: install, found its job "gone" 20 ms after it was made, and never ran.
+JOB_COMMIT_GRACE_SEC = 15.0
+_UNSEEN_POLL_SEC = 0.5
 #: Attempts at a download that the network broke off, before it is failed.
 _NETWORK_ATTEMPTS = 3
 _NETWORK_BACKOFF_SEC = 15.0
@@ -221,6 +226,7 @@ async def _claim(app: object, job_id: uuid.UUID, model_id: uuid.UUID, run: _Run)
 
     loop = asyncio.get_running_loop()
     deadline = loop.time() + TAKEOVER_AFTER_SEC + 2 * HEARTBEAT_SEC
+    unseen_until = loop.time() + JOB_COMMIT_GRACE_SEC
     first_beat: object = None
     while True:
         session = app.state.db_session_factory()  # type: ignore[attr-defined]
@@ -236,6 +242,10 @@ async def _claim(app: object, job_id: uuid.UUID, model_id: uuid.UUID, run: _Run)
         finally:
             await session.close()
         if status is None:
+            if loop.time() < unseen_until:
+                # Not committed yet, most likely: look again.
+                await asyncio.sleep(_UNSEEN_POLL_SEC)
+                continue
             return "gone"
         if status not in (DownloadJobStatus.QUEUED, DownloadJobStatus.RUNNING):
             return str(status.value)
