@@ -1841,7 +1841,7 @@ class RayDeploymentManager:
             # What Serve serves the model as: the compiler's request-safe id. The
             # display name went out as it was, and a name with a space in it
             # would have been refused by the server it named.
-            "model": _sanitize_model_id(facts.model.display_name, facts.model.hf_repo_id),
+            "model": _sanitize_model_id(facts.model.display_name, getattr(facts, "hf_repo_id", None)),
             "ready_replicas": ready_replicas,
             "path": path,
             "base_url": f"{address}{path}",
