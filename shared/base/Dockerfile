@@ -31,6 +31,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
     UV_NO_MANAGED_PYTHON=1
 
+# loguru prints the values of local variables in tracebacks by default (prompts,
+# provider keys, tokens). The services set diagnose=False on their sinks; this is
+# the second guard for any sink added later.
+ENV LOGURU_DIAGNOSE=NO
+
 WORKDIR /app/src
 
 # Pre-install common platform packages.  Each service's `uv sync --locked`

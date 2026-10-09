@@ -32,12 +32,12 @@ log = logging.getLogger(__name__)
 _RATE_LIMIT_PER_MINUTE = 120
 
 
-#: How often an open tail checks its caller again: the sign-in is valid, the person is active, ``logs:read`` held.
+#: How often an open tail checks its caller again: sign-in valid, person active, ``logs:read`` held.
 RECHECK_SEC = 60.0
 _WS_LOGS_PERMISSION = ("logs", "read")
 
 
-class _WsRefused(Exception):
+class _WsRefusedError(Exception):
     """A tail connection that may not be served; *code* is the WebSocket close code."""
 
     def __init__(self, code: int, reason: str) -> None:
@@ -68,7 +68,7 @@ def _ws_origin_allowed(websocket: WebSocket) -> bool:
 
 
 async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
-    """The user behind a console sign-in cookie who may read logs; ``_WsRefused`` when anything fails.
+    """The user behind a console sign-in cookie who may read logs; ``_WsRefusedError`` when anything fails.
 
     fastapi-users' ``current_user`` dependency doesn't work on WebSocket endpoints because its transport
     layer requires an HTTP ``Request``, so this reads the ``fapiauth`` cookie's JWT with the same secret and
@@ -76,7 +76,7 @@ async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
     (see ``require_permission``).
     """
     if not token:
-        raise _WsRefused(4401, "Not authenticated")
+        raise _WsRefusedError(4401, "Not authenticated")
     try:
         payload = jwt.decode(
             token,
@@ -91,15 +91,15 @@ async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
             raise ValueError("A sign-in from before sign-ins expired")
         user_uuid = uuid.UUID(str(user_id))
     except (jwt.PyJWTError, ValueError):
-        raise _WsRefused(4401, "Invalid token") from None
+        raise _WsRefusedError(4401, "Invalid token") from None
 
     session_factory = websocket.app.state.db_session_factory
     async with session_factory() as session:
         user = await SQLAlchemyUserDatabase(session, User).get(user_uuid)
         if user is None or not user.is_active:
-            raise _WsRefused(4403, "User not found or inactive")
+            raise _WsRefusedError(4403, "User not found or inactive")
         if not user.is_superuser and not await RbacDAO(session).has_permission(user.id, *_WS_LOGS_PERMISSION):
-            raise _WsRefused(4403, "Permission denied: logs:read")
+            raise _WsRefusedError(4403, "Permission denied: logs:read")
         return user
 
 
@@ -107,9 +107,9 @@ async def _ws_authenticate(websocket: WebSocket) -> User | None:
     """Origin, sign-in and ``logs:read`` before the socket is accepted; ``None`` once it was refused."""
     try:
         if not _ws_origin_allowed(websocket):
-            raise _WsRefused(4403, "Origin not allowed")
+            raise _WsRefusedError(4403, "Origin not allowed")
         return await _ws_verify(websocket, websocket.cookies.get("fapiauth"))
-    except _WsRefused as exc:
+    except _WsRefusedError as exc:
         await websocket.close(code=exc.code, reason=exc.reason)
         return None
 
@@ -123,7 +123,7 @@ async def _ws_recheck(websocket: WebSocket, token: str | None, upstream: Any) ->
         await asyncio.sleep(RECHECK_SEC)
         try:
             await _ws_verify(websocket, token)
-        except _WsRefused as exc:
+        except _WsRefusedError as exc:
             log.info("logs.tail closed: %s", exc.reason)
             with contextlib.suppress(Exception):
                 await websocket.close(code=exc.code, reason=exc.reason)

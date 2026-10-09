@@ -1,3 +1,4 @@
+# ruff: noqa: SLF001, S106
 """The live log stream: who may open it, from where, and for how long."""
 
 from __future__ import annotations

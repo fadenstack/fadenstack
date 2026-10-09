@@ -96,4 +96,7 @@ def configure_logging() -> None:  # pragma: no cover
         sys.stdout,
         level=settings.log_level.value,
         format=record_formatter,  # type: ignore
+        # Tracebacks keep their frames, not the values of the variables in them
+        # (prompts, provider keys, tokens).
+        diagnose=False,
     )
