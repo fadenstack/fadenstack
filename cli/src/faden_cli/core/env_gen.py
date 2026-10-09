@@ -48,7 +48,12 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "FADEN_SKILLS_SERVICE_TOKEN",
     "FADEN_BACKEND_RAG_SERVICE_TOKEN",
     "FADEN_RAG_SERVICE_TOKEN",
+    "FADEN_BACKEND_BOOTSTRAP_TOKEN",
 })
+
+#: What the backend asks for before it creates the first administrator (``POST /api/bootstrap``), sent by
+#: ``faden deploy``. Without it bootstrap is refused: the first admin went to whoever asked first.
+BOOTSTRAP_TOKEN_KEY = "FADEN_BACKEND_BOOTSTRAP_TOKEN"  # noqa: S105 - the variable's name
 
 
 def read_env_file(path: Path) -> dict[str, str]:
@@ -236,6 +241,9 @@ def default_env_vars(
         # Encrypts the credentials MCP stores. Without it the compose file
         # falls back to a fixed dev key, the same for every install.
         "FADEN_MCP_ENCRYPTION_KEY": _random_secret(),
+        # Asked for by the backend before it creates the first administrator;
+        # deploy sends it. Without it bootstrap is refused.
+        BOOTSTRAP_TOKEN_KEY: _random_secret(),
         # Langfuse initial admin seeding (populated during bootstrap)
         "LANGFUSE_INIT_USER_EMAIL": "",
         "LANGFUSE_INIT_USER_PASSWORD": "",
@@ -343,6 +351,22 @@ def write_env_file(
     # Always write LF line endings — .env is consumed by Linux containers.
     output_path.write_bytes("\n".join(lines).encode("utf-8"))
     return output_path
+
+
+def ensure_bootstrap_token(env_path: Path) -> bool:
+    """Give an install's ``.env`` the bootstrap token when it has none; whether it was added.
+
+    An ``.env`` written before the token existed keeps its other values. Deploy
+    never rewrites an existing ``.env``, and the backend refuses bootstrap without
+    the token, so an install whose first deploy stopped before the administrator
+    was made would otherwise never get one.
+    """
+    env = read_env_file(env_path)
+    if env.get(BOOTSTRAP_TOKEN_KEY):
+        return False
+    env[BOOTSTRAP_TOKEN_KEY] = _random_secret()
+    write_env_file(env_path, env)
+    return True
 
 
 def set_module_env(

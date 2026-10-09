@@ -15,14 +15,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.users import User
 from faden_backend.settings import settings
-from faden_backend.web.api.bootstrap.views import BOOTSTRAP_TOKEN_TTL_S
+from faden_backend.web.api.bootstrap.views import BOOTSTRAP_TOKEN_HEADER, BOOTSTRAP_TOKEN_TTL_S
 
 
 @pytest.mark.anyio
-async def test_the_setup_token_lasts_an_hour(client: AsyncClient, dbsession: AsyncSession) -> None:
+async def test_the_setup_token_lasts_an_hour(
+    client: AsyncClient, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     if await dbsession.scalar(select(func.count()).select_from(User)):
         pytest.skip("bootstrap only runs on an install without accounts")
-    r = await client.post("/api/bootstrap", json={"email": "first@example.com", "password": "first-admin-pw"})
+    monkeypatch.setattr(settings, "bootstrap_token", "the-install-bootstrap-token")
+    r = await client.post(
+        "/api/bootstrap",
+        json={"email": "first@example.com", "password": "first-admin-pw"},
+        headers={BOOTSTRAP_TOKEN_HEADER: "the-install-bootstrap-token"},
+    )
     assert r.status_code in (200, 201), r.text
     claims = jwt.decode(
         r.json()["api_token"], settings.users_secret, algorithms=["HS256"], audience="fastapi-users:auth",

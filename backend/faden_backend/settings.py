@@ -89,6 +89,11 @@ class Settings(BaseSettings):
 
     log_level: LogLevel = LogLevel.INFO
     users_secret: str = os.getenv("USERS_SECRET", "")
+    # The token ``POST /api/bootstrap`` asks for before it creates the first
+    # administrator (FADEN_BACKEND_BOOTSTRAP_TOKEN). ``faden deploy`` writes a
+    # random one into the install's .env and sends it; without one bootstrap
+    # is refused, so the first admin never goes to whoever asks first.
+    bootstrap_token: str = ""
 
     def __init__(self, **kwargs: Any) -> None:  # type: ignore[override]
         super().__init__(**kwargs)

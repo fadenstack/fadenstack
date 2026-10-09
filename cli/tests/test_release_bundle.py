@@ -128,6 +128,7 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
     assert env["GRAFANA_ADMIN_USER"] == "ops@example.com"
     assert env["FADEN_HTTP_PORT"] == "8080"
     assert "REDIS_AUTH" in env, "keys a release introduces are added"
+    assert env["FADEN_BACKEND_BOOTSTRAP_TOKEN"], "an install from before the bootstrap token gets one"
     # Pulled, not built; then the front door restarts first, and the rest.
     assert calls == ["pull", "up", "up"], "published images are pulled, not built"
     assert bundle.installed_release(install) == __version__
