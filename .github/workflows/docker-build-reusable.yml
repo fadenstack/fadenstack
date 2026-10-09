@@ -7,6 +7,18 @@
 #   registry  — GHCR registry path (default: ghcr.io/fadenstack)
 #   platforms — comma-separated platforms (default: linux/amd64)
 #   build-contexts — named build contexts, name=path per line (optional)
+#   target    — the Dockerfile stage to publish (optional; default: the last one).
+#               The services' Dockerfiles end with `FROM prod AS dev`, so they
+#               pass `prod`: without it the dev stage, with the dev tools, was
+#               what installs pulled.
+#   base-image — the platform base image to build FROM (optional): the base just
+#               built from this commit, rather than the Dockerfile's default
+#               base:latest, which moves on releases only.
+#
+# Tags: the branch (`main`), the commit (short and full SHA), and for a release
+# tag v<version> (or core-v<version>) the version, its minor, and `latest`.
+# `latest` moves on releases only: a push to main used to move it, so whatever
+# was merged last became what an unpinned install pulled.
 
 name: Build Docker Image
 
@@ -28,6 +40,14 @@ on:
         type: string
         default: linux/amd64
       build-contexts:
+        required: false
+        type: string
+        default: ""
+      target:
+        required: false
+        type: string
+        default: ""
+      base-image:
         required: false
         type: string
         default: ""
@@ -56,7 +76,8 @@ jobs:
             type=match,pattern=core-v(.*),group=1
             type=match,pattern=core-v(\d+\.\d+),group=1
             type=sha,prefix=
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/core-v') || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=sha,prefix=,format=long
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/core-v') }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,6 +94,8 @@ jobs:
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.context }}/Dockerfile
+          target: ${{ inputs.target }}
+          build-args: ${{ inputs.base-image != '' && format('BASE_IMAGE={0}', inputs.base-image) || '' }}
           build-contexts: ${{ inputs.build-contexts }}
           platforms: ${{ inputs.platforms }}
           push: true
