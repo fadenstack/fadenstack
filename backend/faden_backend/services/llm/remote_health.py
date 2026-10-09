@@ -27,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.models.llm import LLMProvider, LLMRuntime, ProviderTarget, RuntimeStatus
+from faden_backend.services import outbound
 from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
@@ -72,7 +73,11 @@ def probe_url(endpoint_url: str | None, litellm_provider: str | None) -> str | N
 
 
 async def probe(url: str, client: httpx.AsyncClient) -> Probe:
-    """Whether *url* answers at all."""
+    """Whether *url* answers at all; a link-local or metadata address is not asked."""
+    try:
+        await outbound.check_url(url)
+    except outbound.RefusedAddressError as exc:
+        return Probe(reachable=False, detail=f"not asked: {exc}")
     try:
         resp = await client.get(url)
     except httpx.TimeoutException:

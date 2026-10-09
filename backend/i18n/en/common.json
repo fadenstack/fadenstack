@@ -627,6 +627,8 @@
   },
   "common": {
     "name": "Name",
+    "image": "image",
+    "remote_image": "A picture from {{host}}, not loaded. Click to open it.",
     "actions": "Actions",
     "start": "Start",
     "stop": "Stop",

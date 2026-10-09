@@ -21,6 +21,7 @@ from faden_backend.db.models.llm import (
     ModelArtifact,
     ProviderType,
 )
+from faden_backend.services import outbound
 from faden_backend.services.llm.base import (
     CompatResult,
     ContainerSpec,
@@ -66,6 +67,10 @@ class CloudAdapter(ProviderAdapter):
         """
         if not runtime.endpoint_url:
             return HealthStatus(healthy=False, detail="No endpoint URL configured")
+        try:
+            await outbound.check_url(runtime.endpoint_url)
+        except outbound.RefusedAddressError as exc:
+            return HealthStatus(healthy=False, detail=f"Not asked: {exc}")
         try:
             async with httpx.AsyncClient(verify=default_httpx_verify(), timeout=5.0) as client:
                 resp = await client.get(runtime.endpoint_url)

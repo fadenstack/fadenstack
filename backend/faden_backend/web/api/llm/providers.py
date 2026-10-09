@@ -31,6 +31,7 @@ from faden_backend.db.models.llm import (
     ProviderType,
 )
 from faden_backend.db.models.users import User
+from faden_backend.services import outbound
 from faden_backend.services.llm import remote_health
 from faden_backend.services.llm import residency as residency_mod
 from faden_backend.services.llm.gateway_sync import _normalize_base_url
@@ -286,6 +287,7 @@ async def _probe_first_model(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     try:
+        await outbound.check_url(url)
         async with httpx.AsyncClient(verify=default_httpx_verify(), timeout=5.0) as client:
             resp = await client.get(f"{url}/models", headers=headers)
         if resp.status_code >= 400:
@@ -301,16 +303,29 @@ async def _probe_first_model(
     return None
 
 
+async def _refuse_endpoint(endpoint_url: str | None) -> None:
+    """422 for an endpoint at a link-local or cloud metadata address (services/outbound.py)."""
+    try:
+        await outbound.check_url(endpoint_url)
+    except outbound.RefusedAddressError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post("/test-endpoint", response_model=TestEndpointResponse)
 async def test_endpoint(
     body: TestEndpointRequest,
-    user: User = Depends(require_permission("llm.providers", "read")),
+    user: User = Depends(require_permission("llm.providers", "create")),
 ) -> TestEndpointResponse:
     """Probe a remote endpoint for OpenAI API compatibility.
 
     When ``litellm_provider`` is set without an ``endpoint_url``, a
     lightweight LiteLLM completion call is used to verify connectivity.
     Otherwise sends GET ``{endpoint_url}/models``.
+
+    It calls any address it is given and tells its failures apart, so it is
+    for those who may add a provider (the console's add-provider wizard),
+    not for everyone who may see them; and, as an endpoint saved, never a
+    link-local or cloud metadata address.
     """
     # ── LiteLLM provider test (no endpoint URL needed) ───────────
     if body.litellm_provider and not body.endpoint_url:
@@ -327,6 +342,10 @@ async def test_endpoint(
         )
 
     url = body.endpoint_url.rstrip("/")
+    try:
+        await outbound.check_url(url)
+    except outbound.RefusedAddressError as exc:
+        return TestEndpointResponse(compatible=False, error=str(exc))
 
     headers: dict[str, str] = {"Accept": "application/json"}
     if body.api_key:
@@ -439,6 +458,7 @@ async def create_provider(
     For remote providers a placeholder model and runtime are
     auto-created so the API gateway can route traffic immediately.
     """
+    await _refuse_endpoint(body.endpoint_url)
     provider = await llm_service.create_provider(
         provider_dao,
         name=body.name,
@@ -682,6 +702,8 @@ async def update_provider(
     if existing is None:
         raise HTTPException(status_code=404, detail="Provider not found")
     _refuse_if_derived(existing, "edited")
+    if body.endpoint_url:
+        await _refuse_endpoint(body.endpoint_url)
 
     capabilities_changed = False
     next_capabilities: dict | None = None

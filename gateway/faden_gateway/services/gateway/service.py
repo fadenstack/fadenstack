@@ -30,6 +30,7 @@ from faden_gateway.services.gateway import (
     attachment_search,
     faden_events,
     knowledge,
+    media_urls,
     skill_files,
     system_tools,
 )
@@ -1963,6 +1964,10 @@ class GatewayService:
                 code="unsupported_parameter",
                 param="rag",
             )
+        if chat:
+            # The media URLs the client sent, before anything is stored, fetched or sent; the
+            # session step adds the chat's own pictures after this, as data: URLs.
+            await media_urls.check_messages(payload.get("messages"))
         # Read before anything runs: the session step rewrites the messages.
         question = _last_user_text(payload)
         if chat:
