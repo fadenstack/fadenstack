@@ -7,12 +7,28 @@ that probes the host and returns the first working backend.
 
 from __future__ import annotations
 
+import re
 import shutil
 from typing import Any, Protocol, runtime_checkable
 
 
 class ContainerRuntimeError(RuntimeError):
     """Raised when a container-runtime operation fails."""
+
+
+#: A container image reference as Docker writes one: ``ghcr.io/org/name:tag``,
+#: ``localhost:5000/name``, ``name@sha256:...``. ``run`` puts the image right
+#: before the command, so a value starting with ``-`` was read as an option
+#: (``--privileged``) and the next word as the image. The backend checks the
+#: same rule; this one holds whatever the backend sends.
+IMAGE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:@-]{0,511}")
+
+
+def check_image_ref(image: Any) -> str:
+    """*image* if it is an image reference; :class:`ContainerRuntimeError` otherwise."""
+    if not isinstance(image, str) or IMAGE_REF.fullmatch(image) is None:
+        raise ContainerRuntimeError(f"Not an image reference: {image!r}")
+    return image
 
 
 @runtime_checkable

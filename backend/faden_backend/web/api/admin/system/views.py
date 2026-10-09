@@ -879,6 +879,41 @@ async def system_node_drain(
     return NodeDTO(**service.serialize_node(node))
 
 
+#: The commands the console sends a machine by hand (the machine pages and the
+#: system update dialog), and the payload values each takes. Everything else --
+#: a workload, a cluster, a model copy -- is issued by the service that owns it,
+#: with the payload it builds: sent from here, a deploy ran any image on the
+#: machine.
+_HAND_NODE_COMMANDS: dict[str, dict[str, frozenset[str]]] = {
+    "refresh_inventory": {},
+    "collect_diagnostics": {},
+    "check_system_updates": {},
+    "apply_system_updates": {
+        "scope": frozenset({"all", "system", "firmware"}),
+        "reboot_policy": frozenset({"prompt", "if_required", "never"}),
+    },
+}
+
+
+def _check_hand_command(command_type: str, payload: dict[str, Any]) -> None:
+    """Refuse (422) a command the console does not send by hand, or a payload value it does not take."""
+    allowed = _HAND_NODE_COMMANDS.get(command_type)
+    if allowed is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"'{command_type}' is not sent to a machine by hand. "
+                f"Commands here: {', '.join(_HAND_NODE_COMMANDS)}."
+            ),
+        )
+    for key, value in payload.items():
+        if key not in allowed or not isinstance(value, str) or value not in allowed[key]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"'{command_type}' takes no {key}={value!r}.",
+            )
+
+
 @router.post("/nodes/{node_id}/commands", response_model=NodeCommandDTO, name="system_node_command_issue")
 async def system_node_command_issue(
     node_id: str,
@@ -886,11 +921,12 @@ async def system_node_command_issue(
     user: Annotated[User, Depends(require_permission("system.node_commands", "manage"))],
     service: NodeControlService = Depends(get_node_control_service),
 ) -> NodeCommandDTO:
-    """Issue a command to one node."""
+    """Issue one of the console's hand commands (``_HAND_NODE_COMMANDS``) to one node."""
     try:
         parsed = uuid.UUID(node_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid node id.") from exc
+    _check_hand_command(body.command_type, body.payload)
     try:
         command = await service.issue_command(
             node_id=parsed,

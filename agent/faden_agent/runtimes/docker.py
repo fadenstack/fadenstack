@@ -8,7 +8,7 @@ import logging
 import shutil
 from typing import Any
 
-from faden_agent.runtimes import ContainerRuntimeError
+from faden_agent.runtimes import ContainerRuntimeError, check_image_ref
 from faden_agent.runtimes.accelerators import accelerator_run_flags
 
 log = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class DockerRuntime:
         extra_args: list[str] | None = None,
         timeout_sec: float = 120,
     ) -> str:
+        check_image_ref(image)  # it goes right before the command: never an option
         args: list[str] = ["run", "-d", "--name", name, "--restart", "unless-stopped"]
 
         for p in ports or []:
@@ -299,7 +300,7 @@ class DockerRuntime:
     # ── image management ──────────────────────────────────────
 
     async def pull(self, image: str, *, timeout_sec: float = 1800) -> None:
-        await self._exec("pull", image, timeout_sec=timeout_sec)
+        await self._exec("pull", check_image_ref(image), timeout_sec=timeout_sec)
 
     async def load_image_tar(
         self,
