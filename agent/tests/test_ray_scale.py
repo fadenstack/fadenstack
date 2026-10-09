@@ -3,12 +3,13 @@
 The scripts run here against a stand-in ``ray`` package shaped after Ray 2.58
 (``serve.RunTarget`` with ``external_scaler_enabled``, the controller's
 ``update_deployment_replicas``), and against two runtime helpers: a 0.1 one
-like the images on the machines today, and the 0.2 one in ``runtime-image``.
+like the images on the machines today, and the current one in ``runtime-image``.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import textwrap
@@ -132,7 +133,10 @@ def test_an_old_helper_has_no_scale_feature(stand_in: Path) -> None:
 
 def test_the_new_helper_says_it_scales(stand_in: Path) -> None:
     doc, _ = _run(stand_in, scale.FEATURES_SCRIPT, helper="new")
-    assert doc["version"] == "0.2.0"
+    # The helper in runtime-image moves on with each release (0.3 added the image app); scaling stays.
+    init = (RUNTIME_IMAGE / "llm_port_ray_runtime" / "__init__.py").read_text()
+    declared = re.search(r'__version__ = "([^"]+)"', init)
+    assert declared and doc["version"] == declared.group(1)
     assert scale.FEATURE in doc["features"]
 
 
