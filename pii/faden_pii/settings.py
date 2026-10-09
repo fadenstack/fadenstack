@@ -86,6 +86,9 @@ class Settings(BaseSettings):
 
     # Backend service URL for event-log forwarding
     backend_url: str = "http://127.0.0.1:8000"
+    # Presented to the backend with scan events (Bearer): the backend's
+    # FADEN_BACKEND_INTERNAL_TOKEN. Empty: nothing is sent (dev environment excepted).
+    backend_token: str = ""
 
     # RabbitMQ settings (used by taskiq worker)
     rabbit_host: str = "127.0.0.1"

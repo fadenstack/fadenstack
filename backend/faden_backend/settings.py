@@ -268,6 +268,10 @@ class Settings(BaseSettings):
     docling_enabled: bool = False
     docling_service_url: str = "http://127.0.0.1:8006"
 
+    # What the PII service presents when it reports scan events (Bearer). Empty: reports are refused,
+    # except in the dev environment, which falls back to a fixed value on both sides.
+    internal_token: str = ""
+
     # MCP module settings
     mcp_enabled: bool = False
     mcp_service_url: str = "http://127.0.0.1:8007"

@@ -44,6 +44,16 @@ def _get_event_client() -> httpx.AsyncClient:
     return _event_client
 
 
+_DEV_BACKEND_TOKEN = "dev-internal-token"  # noqa: S105
+
+
+def _backend_event_token() -> str:
+    """The token the backend takes event reports on; empty when there is none to present."""
+    if settings.backend_token:
+        return settings.backend_token
+    return _DEV_BACKEND_TOKEN if settings.environment == "dev" else ""
+
+
 def _backend_event_url() -> str:
     """Build the backend event-log ingestion URL."""
     url = settings.backend_url.strip().rstrip("/")
@@ -66,7 +76,11 @@ async def _log_event_async(
 ) -> None:
     """Fire-and-forget POST to the backend event-log endpoint."""
     url = _backend_event_url()
+    token = _backend_event_token()
     if not url:
+        return
+    if not token:
+        logger.debug("No backend token: PII event not reported")
         return
     payload = {
         "operation": operation,
@@ -80,7 +94,14 @@ async def _log_event_async(
         "request_id": request_id,
     }
     try:
-        await _get_event_client().post(url, json=payload)
+        response = await _get_event_client().post(
+            url, json=payload, headers={"Authorization": f"Bearer {token}"},
+        )
+        if response.status_code in (401, 403, 503):
+            logger.warning(
+                "The backend refused a PII event (%s): is the internal token set on both sides?",
+                response.status_code,
+            )
     except Exception:
         logger.debug("Failed to forward PII event to backend", exc_info=True)
 

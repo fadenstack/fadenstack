@@ -21,7 +21,7 @@ from faden_backend.db.dao.pii_event_dao import PIIEventDAO
 from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO
 from faden_backend.db.models.users import User
 from faden_backend.settings import settings
-from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.dependencies import require_internal_token, require_superuser
 from faden_backend.services.tls import default_httpx_verify
 
 logger = logging.getLogger(__name__)
@@ -393,15 +393,15 @@ class PIIEventLogRequest(BaseModel):
     request_id: str | None = None
 
 
-@router.post("/events/log", name="pii_event_log")
+@router.post("/events/log", name="pii_event_log", dependencies=[Depends(require_internal_token)])
 async def log_pii_event(
     body: PIIEventLogRequest,
     dao: PIIEventDAO = Depends(),
 ) -> dict[str, str]:
-    """Accept a PII scan event from the PII service or gateway.
+    """Accept a PII scan event from the PII service.
 
-    This is an **internal** endpoint — no superuser check so that the
-    PII micro-service can call it without user credentials.
+    This is an **internal** endpoint: the PII micro-service presents the
+    platform's internal token instead of a user's sign-in.
     """
     event = await dao.log_event(
         operation=body.operation,

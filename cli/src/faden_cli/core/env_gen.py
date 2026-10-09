@@ -48,6 +48,9 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "FADEN_SKILLS_SERVICE_TOKEN",
     "FADEN_BACKEND_RAG_SERVICE_TOKEN",
     "FADEN_RAG_SERVICE_TOKEN",
+    # The PII service reports its scan events to the backend with this.
+    "FADEN_BACKEND_INTERNAL_TOKEN",
+    "FADEN_PII_BACKEND_TOKEN",
 })
 
 
@@ -183,6 +186,7 @@ def default_env_vars(
     mcp_service_token = _random_secret()
     skills_service_token = _random_secret()
     rag_service_token = _random_secret()
+    internal_token = _random_secret()
 
     env = {
         # Postgres
@@ -233,6 +237,8 @@ def default_env_vars(
         "FADEN_SKILLS_SERVICE_TOKEN": skills_service_token,
         "FADEN_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
         "FADEN_RAG_SERVICE_TOKEN": rag_service_token,
+        "FADEN_BACKEND_INTERNAL_TOKEN": internal_token,
+        "FADEN_PII_BACKEND_TOKEN": internal_token,
         # Encrypts the credentials MCP stores. Without it the compose file
         # falls back to a fixed dev key, the same for every install.
         "FADEN_MCP_ENCRYPTION_KEY": _random_secret(),

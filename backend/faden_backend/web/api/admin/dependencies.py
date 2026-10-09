@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import uuid
 from typing import Annotated
 
@@ -20,6 +21,10 @@ from faden_backend.db.models.containers import (
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services.policy.enforcement import PolicyEnforcer
+from faden_backend.settings import settings
+
+#: The internal token of the dev environment, where nothing generates one.
+DEV_INTERNAL_TOKEN = "dev-internal-token"  # noqa: S105
 
 
 def get_docker(request: Request) -> DockerService:
@@ -42,6 +47,34 @@ async def require_superuser(
             detail="Admin privileges required.",
         )
     return user
+
+
+def internal_token() -> str:
+    """The token the platform's own services present to the backend; empty: none is set."""
+    if settings.internal_token:
+        return settings.internal_token
+    return DEV_INTERNAL_TOKEN if settings.environment == "dev" else ""
+
+
+async def require_internal_token(request: Request) -> None:
+    """Let only a platform service in: ``Authorization: Bearer <internal token>``.
+
+    Without a token configured every call is refused (503), never let through: these routes are
+    reachable from the same port as the console's.
+    """
+    expected = internal_token()
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal calls are not configured.",
+        )
+    header = request.headers.get("authorization", "")
+    given = header[7:].strip() if header.lower().startswith("bearer ") else ""
+    if not hmac.compare_digest(given.encode(), expected.encode()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal token.",
+        )
 
 
 async def get_root_mode_active(
