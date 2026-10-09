@@ -169,6 +169,14 @@ class ServiceSpec(BaseModel):
         le=1800,
         description="Seconds a request may wait for its reply to start; omit for the gateway's default (180).",
     )
+    #: Whether the model sees pictures: agents send a tool's picture (a rendered
+    #: slide) only to a model that does. Filled in from the model's facts when
+    #: hosted from the marketplace. Not part of what the engine runs: changing
+    #: it only republishes the deployment.
+    vision: bool | None = Field(
+        default=None,
+        description="Whether the model sees pictures; omit when not known.",
+    )
 
 
 class InferenceDeploymentSpecV1Alpha1(BaseModel):

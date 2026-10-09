@@ -29,6 +29,8 @@ from faden_gateway.db.models.gateway import (
     AgentClientManifest,
     ChatSession,
     LLMGatewayRequestLog,
+    LLMPoolMembership,
+    LLMProviderInstance,
     ProviderType,
     TenantLLMPolicy,
 )
@@ -407,6 +409,44 @@ async def test_enterprise_rules_and_extensions_plug_in(
         "message": "Excluded from this agent.", "type": "permission_error",
         "param": None, "code": "agent_access_denied",
     }
+
+
+@pytest.mark.anyio
+async def test_the_profile_says_whether_the_agents_model_sees_pictures(
+    client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    first = await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    backend.put(_profile())
+
+    async def vision() -> Any:
+        r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+        assert r.status_code == 200
+        return r.json()["vision"]
+
+    async def capabilities(instance_id: uuid.UUID, caps: dict[str, Any] | None) -> None:
+        instance = await db_session.get(LLMProviderInstance, instance_id)
+        assert instance is not None
+        instance.capabilities = caps
+        await db_session.commit()
+
+    assert await vision() is None, "nobody said"
+    await capabilities(first, {"vision": True, "tools": True})
+    assert await vision() is True
+    instance = await db_session.get(LLMProviderInstance, first)
+    assert instance is not None
+    instance.capabilities, instance.node_metadata = None, {"task": "chat", "vision": True}  # as the backend publishes it
+    await db_session.commit()
+    assert await vision() is True
+
+    second = uuid.uuid4()
+    db_session.add_all([
+        LLMProviderInstance(id=second, type=ProviderType.VLLM, base_url="http://second.local", enabled=True),
+        LLMPoolMembership(model_alias=ALIAS, provider_instance_id=second, enabled=True),
+    ])
+    await db_session.commit()
+    assert await vision() is None, "one instance says nothing: a request may go there"
+    await capabilities(second, {"vision": False})
+    assert await vision() is False
 
 
 @pytest.mark.anyio

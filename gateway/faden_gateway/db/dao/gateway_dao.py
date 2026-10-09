@@ -111,6 +111,36 @@ class GatewayDAO:
             seen.setdefault(alias, set()).add(task)
         return {alias: next(iter(kinds)) if len(kinds) == 1 else None for alias, kinds in seen.items()}
 
+    async def alias_vision(self, alias: str) -> bool | None:
+        """Whether the model behind *alias* sees pictures, from its enabled instances.
+
+        Each says so in ``node_metadata["vision"]`` (the backend publishes it beside ``tools``), or in
+        ``capabilities["vision"]``. True only when every one says so; False when one says it does not (a
+        request may go to that one); None when one of them says nothing.
+        """
+        rows = await self.session.execute(
+            select(LLMProviderInstance.node_metadata, LLMProviderInstance.capabilities)
+            .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
+            .where(
+                LLMPoolMembership.model_alias == alias,
+                LLMPoolMembership.enabled.is_(True),
+                LLMProviderInstance.enabled.is_(True),
+            ),
+        )
+
+        def said_by(metadata: object, caps: object) -> bool | None:
+            for source in (metadata, caps):
+                if isinstance(source, dict) and isinstance(source.get("vision"), bool):
+                    return source["vision"]
+            return None
+
+        said = [said_by(metadata, caps) for metadata, caps in rows.all()]
+        if any(value is False for value in said):
+            return False
+        if said and all(value is True for value in said):
+            return True
+        return None
+
     async def get_tenant_policy(self, tenant_id: str) -> TenantLLMPolicy | None:
         """Fetch tenant policy."""
         result = await self.session.execute(

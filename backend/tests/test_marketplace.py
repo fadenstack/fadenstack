@@ -227,6 +227,22 @@ def test_host_specs_compile_for_ray(gpus: float, extra: dict[str, Any]) -> None:
         assert "VLLM_RAY_PER_WORKER_GPUS" not in env_vars
 
 
+def test_whether_the_model_sees_goes_in_the_service_and_never_changes_what_ray_runs() -> None:
+    from faden_backend.services.inference.drivers.ray.compiler import compile_deployment
+
+    seeing = build_spec(_request(vision=True))
+    unknown = build_spec(_request())
+    assert seeing["service"]["vision"] is True
+    assert "vision" not in unknown["service"]
+
+    def compiled(spec: dict[str, Any]) -> Any:
+        return compile_deployment(spec_data=spec, model_display_name="Qwen3-8B", model_source="huggingface",
+                                  hf_repo_id="Qwen/Qwen3-8B")
+
+    # The serving config is what the driver hashes: the same config, no restart when it is set later.
+    assert compiled(seeing) == compiled(unknown)
+
+
 def test_a_shared_card_is_not_over_claimed_by_vllms_default() -> None:
     spec = build_spec(_request(gpus_per_copy=0.25, engine_config={}))
     assert spec["engine"]["config"]["gpu_memory_utilization"] == 0.25

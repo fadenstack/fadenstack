@@ -317,6 +317,8 @@ async def agent_profile(
         "version": profile.version,
         "draft": not profile.published,
         "model": profile.model_alias,
+        # Whether that model sees pictures, so the SDK sends a tool's picture (a rendered slide) or not.
+        "vision": await dao.alias_vision(profile.model_alias) if profile.model_alias else None,
         "instructions_sha256": profile.instructions_sha256,
         "host_tool_contract": list(profile.host_tool_contract),
         "server_tools": list(profile.server_tools) if profile.server_tools is not None else None,

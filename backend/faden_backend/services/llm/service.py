@@ -64,6 +64,12 @@ def _calls_tools(provider: LLMProvider) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _sees_pictures(provider: LLMProvider) -> bool | None:
+    """What the provider says about its model seeing pictures (None: nothing)."""
+    value = provider.capabilities.get("vision") if isinstance(provider.capabilities, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 def _remote_base_url(provider: LLMProvider) -> str:
     """Where a remote provider's runtimes send prompts."""
     if provider.endpoint_url:
@@ -770,6 +776,7 @@ class LLMService:
             litellm_model=provider.litellm_model,
             extra_params=provider.extra_params,
             tools=_calls_tools(provider),
+            vision=_sees_pictures(provider),
         )
 
     async def sync_remote_routes(self, runtime_dao: RuntimeDAO, provider: LLMProvider) -> int:

@@ -176,6 +176,9 @@ class InferencePublicationCoordinator:
                 max_concurrency=gateway_concurrency(deployment),
                 capacity_hints=_capacity_hints(spec_service),
                 tools=deployment_calls_tools(deployment.spec_json),
+                # Whether the model sees pictures: said on the deployment (the marketplace
+                # fills it in from the model's facts), unknown otherwise.
+                vision=spec_service.get("vision") if isinstance(spec_service.get("vision"), bool) else None,
                 # Behind the machine's model-TLS proxy: reached with the
                 # gateway's machine certificate (services/machine_tls).
                 machine_tls=bool((primary_endpoint.published_json or {}).get("machine_tls")),

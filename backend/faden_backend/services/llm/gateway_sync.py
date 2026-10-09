@@ -126,6 +126,7 @@ class GatewaySyncService:
         source_id: uuid.UUID | None = None,
         task: str | None = None,
         tools: bool | None = None,
+        vision: bool | None = None,
         machine_tls: bool = False,
     ) -> None:
         """Create or update gateway routing records for a runtime.
@@ -138,7 +139,8 @@ class GatewaySyncService:
         for; the gateway lists it with the model and refuses requests of the
         wrong kind up front. ``None`` when it cannot be known (a remote API).
         *tools* is whether the model answers with tool calls (``kinds``); the
-        gateway offers its own tools only where it does.
+        gateway offers its own tools only where it does. *vision* is whether it
+        sees pictures; agents send a tool's picture only where it does.
 
         Also routes a vLLM container Fadenstack found on a machine rather than
         started (``source_kind='found_container'``, ``source_id`` its adoption):
@@ -155,6 +157,8 @@ class GatewaySyncService:
             node_metadata = {**(node_metadata or {}), "task": task}
         if tools is not None:
             node_metadata = {**(node_metadata or {}), "tools": tools}
+        if vision is not None:
+            node_metadata = {**(node_metadata or {}), "vision": vision}
         gateway_type = _map_provider_type(
             backend_provider_type, is_remote=is_remote, litellm_provider=litellm_provider,
         )
@@ -420,6 +424,7 @@ class GatewaySyncService:
         capacity_hints: dict[str, Any] | None = None,
         task: str | None = "chat",
         tools: bool | None = None,
+        vision: bool | None = None,
         machine_tls: bool = False,
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
@@ -498,8 +503,11 @@ class GatewaySyncService:
                         "extra_params": json.dumps(extra_params) if extra_params else None,
                         "capacity_hints": json.dumps(capacity_hints) if capacity_hints else None,
                         "node_metadata": json.dumps(
-                            {k: v for k, v in (("task", task), ("tools", tools)) if v is not None},
-                        ) if (task or tools is not None) else None,
+                            {
+                                k: v for k, v in (("task", task), ("tools", tools), ("vision", vision))
+                                if v is not None
+                            },
+                        ) if (task or tools is not None or vision is not None) else None,
                         "dep_id": deployment_id,
                         "machine_tls": machine_tls,
                     },

@@ -388,6 +388,16 @@ async def _refuse_if_it_cannot_run(session: AsyncSession, repo_id: str, environm
         raise HTTPException(status.HTTP_409_CONFLICT, detail=verdict.message)
 
 
+async def _sees_pictures(session: AsyncSession, repo_id: str) -> bool | None:
+    """Whether the model sees pictures, from its facts (the Hub's answer is cached); None when not known."""
+    try:
+        detail = await (await _hub(session)).detail(repo_id)
+    except (HubNotFound, HubUnavailable):
+        return None
+    capabilities = detail.get("capabilities")
+    return "vision" in capabilities if isinstance(capabilities, list) else None
+
+
 @router.post("/host", status_code=status.HTTP_201_CREATED)
 async def host_model(
     body: HostBody,
@@ -411,6 +421,7 @@ async def host_model(
             gpus_per_copy=body.gpus_per_copy,
             engine_config=body.engine_config,
             revision=(body.revision or "").strip() or None,
+            vision=await _sees_pictures(session, body.repo_id.strip()),
         ))
     except HostError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc

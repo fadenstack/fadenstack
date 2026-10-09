@@ -33,6 +33,8 @@ class HostRequest:
     gpus_per_copy: float
     engine_config: dict[str, Any]
     revision: str | None = None
+    #: Whether the model sees pictures (from its facts); the deployment says so to the gateway.
+    vision: bool | None = None
 
 
 def deployment_name(repo_id: str) -> str:
@@ -59,7 +61,11 @@ def build_spec(request: HostRequest) -> dict[str, Any]:
         "engine": {"name": "vllm", "config": engine},
         "scale": {"replicas": max(1, int(request.copies))},
         "resources": {"replica": {"gpus": int(gpus) if gpus >= 1 else round(gpus, 2)}},
-        "service": {"path": "/v1", "openai": True, **({"alias": request.alias} if request.alias else {})},
+        "service": {
+            "path": "/v1", "openai": True,
+            **({"alias": request.alias} if request.alias else {}),
+            **({"vision": request.vision} if request.vision is not None else {}),
+        },
     }
     if tp > 1:
         spec["topology"] = {"tensor_parallel_size": tp}

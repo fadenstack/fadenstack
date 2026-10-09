@@ -79,8 +79,28 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         max_concurrency=2 * 256,  # two copies at vLLM's default max_num_seqs
         capacity_hints=None,  # no wait of its own: the gateway's default
         tools=False,  # no engine config: vLLM's tool calls are off
+        vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
+
+
+@pytest.mark.anyio
+async def test_a_deployment_that_says_its_model_sees_pictures_tells_the_gateway(mock_session, mock_gateway_sync):
+    dep_id = uuid.uuid4()
+    deployment = InferenceDeployment(
+        id=dep_id, name="qwen", desired_state=DeploymentDesiredState.ACTIVE, phase=DeploymentPhase.RUNNING,
+        ready_replicas=1, total_replicas=1, spec_json={"service": {"alias": "qwen", "path": "/v1", "vision": True}},
+    )
+    endpoint = InferenceEndpoint(
+        id=uuid.uuid4(), deployment_id=dep_id, name="openai", address="http://10.250.10.49:8000/faden-q", path="/v1",
+        status=EndpointStatus.PUBLISHED, published_json={"model": "Qwen/Qwen3-VL-8B-Instruct"},
+    )
+    coordinator = InferencePublicationCoordinator(mock_session, gateway_sync=mock_gateway_sync)
+    coordinator.endpoint_dao.list_for_deployment = AsyncMock(return_value=[endpoint])
+
+    await coordinator.reconcile_deployment_publication(deployment)
+
+    assert mock_gateway_sync.publish_inference_endpoint.await_args.kwargs["vision"] is True
 
 
 @pytest.mark.anyio
@@ -124,6 +144,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         max_concurrency=256,  # only the ready copy counts
         capacity_hints=None,
         tools=False,  # no engine config: vLLM's tool calls are off
+        vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
     )
 
