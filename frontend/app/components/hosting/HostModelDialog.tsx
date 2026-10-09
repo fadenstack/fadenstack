@@ -1,6 +1,10 @@
 /**
  * Host a model on a cluster: where, how big, how vLLM runs it, under what name.
  *
+ * A picture model (one that makes pictures from a prompt) runs in the
+ * runtime's image app rather than vLLM: its settings step asks for steps,
+ * guidance and size instead of vLLM's flags.
+ *
  * One dialog for every way in. From the marketplace it hosts a Hugging Face
  * repository (the server downloads it first when it does not keep it); from a
  * cluster or the deployments list it offers the models the server already
@@ -20,6 +24,7 @@ import { RecipeNotice } from "~/components/hosting/RecipeNotice";
 import { formatBytes, parseExtraFlags, type EngineConfig } from "~/lib/engine";
 import {
   DEPLOYMENT_NAME,
+  PICTURE_SETTINGS,
   buildSpec,
   defaultGpuChoice,
   deployableModels,
@@ -42,6 +47,7 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import LinearProgress from "@mui/material/LinearProgress";
+import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Radio from "@mui/material/Radio";
 import Stack from "@mui/material/Stack";
@@ -118,6 +124,8 @@ export function HostModelDialog({
   const [name, setName] = useState("");
   const [chatName, setChatName] = useState("");
   const [revision, setRevision] = useState("");
+  /** The machine every copy runs on; "" lets Ray place them. */
+  const [machine, setMachine] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,6 +149,7 @@ export function HostModelDialog({
     setName(suggestDeploymentName(preset ?? repoId ?? ""));
     setChatName(suggestChatName(preset ?? repoId ?? ""));
     setRevision("");
+    setMachine("");
     setCopies(1);
     setError(null);
     setBusy(false);
@@ -188,6 +197,8 @@ export function HostModelDialog({
   }, [open, repo, cluster, lockCluster]);
 
   const chosen = (clusters ?? []).find((c) => c.environment_id === cluster) ?? null;
+  // Another cluster has other machines.
+  useEffect(() => setMachine(""), [cluster]);
   const fit: Fit | null = (cluster && detail?.fits[cluster]) || null;
   const choices = useMemo(() => gpuChoices(fit, chosen), [fit, chosen]);
   const maxCopies = choices.find((c) => Math.abs(c.value - gpus) < 1e-6)?.maxCopies ?? 1;
@@ -229,9 +240,16 @@ export function HostModelDialog({
     setConfig((current) => sizedConfig(current, before, value));
   }
 
+  const pictures = detail?.model?.task === "images";
   const parsedExtra = parseExtraFlags(extra);
-  const extraIssues = parsedExtra.issues;
-  const settingsCount = Object.keys({ ...config, ...parsedExtra.config }).length;
+  const extraIssues = pictures ? [] : parsedExtra.issues;
+  // A picture model takes picture settings only; a share's vLLM memory cap does not apply.
+  const pictureConfig: EngineConfig = Object.fromEntries(
+    Object.entries(config).filter(([k, v]) => (PICTURE_SETTINGS as readonly string[]).includes(k) && v !== "" && v != null),
+  );
+  const settingsCount = Object.keys(pictures ? pictureConfig : { ...config, ...parsedExtra.config }).length;
+  // Where Ray puts a copy that shares a device it decides by the share alone.
+  const offerMachine = Boolean(chosen && chosen.machines.length > 1 && (gpus < 1 || pictures));
   const nameOk = DEPLOYMENT_NAME.test(name.trim());
   // A runtime that cannot read the model's config stops it before its
   // weights are even looked at -- after the download, which is the waste.
@@ -258,7 +276,8 @@ export function HostModelDialog({
     setBusy(true);
     setError(null);
     const { config: extraConfig } = parseExtraFlags(extra);
-    const engineConfig = { ...config, ...extraConfig };
+    const engineConfig = pictures ? pictureConfig : { ...config, ...extraConfig };
+    const pinned = offerMachine && machine ? machine : null;
     try {
       let deploymentId: string;
       if (kept) {
@@ -266,7 +285,7 @@ export function HostModelDialog({
           environment_id: chosen.environment_id,
           model_id: kept.id,
           name: name.trim(),
-          spec: buildSpec({ copies, gpusPerCopy: gpus, chatName, engineConfig }),
+          spec: buildSpec({ copies, gpusPerCopy: gpus, chatName, engineConfig, pictures, machine: pinned }),
         });
         deploymentId = created.id;
       } else if (repo) {
@@ -279,6 +298,7 @@ export function HostModelDialog({
           gpus_per_copy: gpus,
           engine_config: engineConfig,
           ...(revision.trim() ? { revision: revision.trim() } : {}),
+          ...(pinned ? { machine: pinned } : {}),
         });
         deploymentId = result.deployment_id;
       } else {
@@ -379,11 +399,27 @@ export function HostModelDialog({
                 onCopies={setCopies}
                 fit={fit}
                 chosen={chosen}
+                offerMachine={offerMachine}
+                machine={machine}
+                onMachine={setMachine}
               />
             </Box>
           )}
 
-          {step === "settings" && (
+          {step === "settings" && pictures && (
+            <Box data-tour-id="hosting.settings">
+              <PictureSettings
+                value={config}
+                suggested={detail?.suggested.config ?? {}}
+                onChange={(v) => {
+                  setEdited(true);
+                  setConfig(v);
+                }}
+              />
+            </Box>
+          )}
+
+          {step === "settings" && !pictures && (
             <Stack spacing={2} data-tour-id="hosting.settings">
               {detail?.recipe && (
                 <RecipeNotice
@@ -453,6 +489,7 @@ export function HostModelDialog({
                     label={t("hosting.summary.size")}
                     value={`${t("hosting.copies_value", { count: copies })} × ${gpuChoiceLabel(gpus, chosen?.accelerator)}`}
                   />
+                  {offerMachine && machine && <SummaryRow label={t("hosting.machine_label")} value={machine} />}
                   <SummaryRow
                     label={t("hosting.summary.settings")}
                     value={
@@ -536,6 +573,81 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Steps, guidance and size a picture model uses when a request does not say. */
+function PictureSettings({
+  value,
+  suggested,
+  onChange,
+}: {
+  value: EngineConfig;
+  suggested: EngineConfig;
+  onChange: (v: EngineConfig) => void;
+}) {
+  const { t } = useTranslation();
+  const set = (key: string, raw: string, parse: (s: string) => number) => {
+    const next = { ...value };
+    if (raw.trim() === "" || !Number.isFinite(parse(raw))) delete next[key];
+    else next[key] = parse(raw);
+    onChange(next);
+  };
+  const hint = (key: string) =>
+    suggested[key] !== undefined && suggested[key] === value[key] ? t("hosting.pictures_suggested") : undefined;
+  const sizes = ["1024x1024", "1216x832", "832x1216", "1536x1024", "1024x1536"];
+  return (
+    <Stack spacing={2}>
+      <Typography variant="subtitle2">{t("hosting.pictures_title")}</Typography>
+      <Typography variant="body2" color="text.secondary">
+        {t("hosting.pictures_intro")}
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+        <TextField
+          label={t("hosting.pictures_steps")}
+          type="number"
+          size="small"
+          value={value.num_inference_steps ?? ""}
+          placeholder={t("hosting.pictures_model_default")}
+          helperText={hint("num_inference_steps") ?? t("hosting.pictures_steps_help")}
+          onChange={(e) => set("num_inference_steps", e.target.value, (s) => Math.round(Number(s)))}
+          slotProps={{ htmlInput: { min: 1, max: 100, "data-testid": "host-picture-steps" } }}
+          sx={{ flex: 1 }}
+        />
+        <TextField
+          label={t("hosting.pictures_guidance")}
+          type="number"
+          size="small"
+          value={value.guidance_scale ?? ""}
+          placeholder={t("hosting.pictures_model_default")}
+          helperText={hint("guidance_scale") ?? t("hosting.pictures_guidance_help")}
+          onChange={(e) => set("guidance_scale", e.target.value, Number)}
+          slotProps={{ htmlInput: { min: 0, max: 30, step: 0.5, "data-testid": "host-picture-guidance" } }}
+          sx={{ flex: 1 }}
+        />
+        <TextField
+          select
+          label={t("hosting.pictures_size")}
+          size="small"
+          value={String(value.size ?? "")}
+          onChange={(e) => {
+            const next = { ...value };
+            if (e.target.value) next.size = e.target.value;
+            else delete next.size;
+            onChange(next);
+          }}
+          slotProps={{ htmlInput: { "data-testid": "host-picture-size" } }}
+          sx={{ flex: 1 }}
+        >
+          <MenuItem value="">{t("hosting.pictures_model_default")}</MenuItem>
+          {sizes.map((s) => (
+            <MenuItem key={s} value={s}>
+              {s.replace("x", " × ")}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Stack>
+    </Stack>
+  );
+}
+
 interface WhereStepProps {
   clusters: MarketCluster[] | null;
   cluster: string;
@@ -553,6 +665,9 @@ interface WhereStepProps {
   onCopies: (n: number) => void;
   fit: Fit | null;
   chosen: MarketCluster | null;
+  offerMachine: boolean;
+  machine: string;
+  onMachine: (name: string) => void;
 }
 
 function WhereStep({
@@ -572,6 +687,9 @@ function WhereStep({
   onCopies,
   fit,
   chosen,
+  offerMachine,
+  machine,
+  onMachine,
 }: WhereStepProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -737,6 +855,29 @@ function WhereStep({
               {t("hosting.copies_help", { count: maxCopies })}
             </Typography>
           </Stack>
+
+          {offerMachine && (
+            <TextField
+              select
+              size="small"
+              label={t("hosting.machine_label")}
+              value={machine}
+              onChange={(e) => onMachine(e.target.value)}
+              helperText={t("hosting.machine_help")}
+              sx={{ maxWidth: 420 }}
+              slotProps={{ htmlInput: { "data-testid": "host-machine" } }}
+            >
+              <MenuItem value="">{t("hosting.machine_any")}</MenuItem>
+              {chosen.machines.map((m) => {
+                const free = m.gpus.reduce((sum, g) => sum + (g.free_bytes ?? 0), 0);
+                return (
+                  <MenuItem key={m.node_id} value={m.name}>
+                    {free > 0 ? `${m.name} · ${formatBytes(free)}` : m.name}
+                  </MenuItem>
+                );
+              })}
+            </TextField>
+          )}
         </Stack>
       )}
     </Stack>

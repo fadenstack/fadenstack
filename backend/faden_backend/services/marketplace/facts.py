@@ -121,13 +121,19 @@ def _quantization_in_names(name: str, tags: list[str]) -> str | None:
 
 
 def detect_format(tags: list[str], library: str | None, has_safetensors: bool, siblings: list[str]) -> str:
-    """``safetensors`` / ``gguf`` / ``mlx`` / ``pytorch`` / ``other``."""
+    """``safetensors`` / ``diffusers`` / ``gguf`` / ``mlx`` / ``pytorch`` / ``other``.
+
+    ``diffusers``: a picture pipeline laid out in component folders
+    (``model_index.json``, ``transformer/``, ``text_encoder/``, ``vae/``).
+    """
     lowered = {t.lower() for t in tags}
     names = [s.lower() for s in siblings]
     if "gguf" in lowered or any(n.endswith(".gguf") for n in names):
         return "gguf"
     if "mlx" in lowered or (library or "").lower() == "mlx":
         return "mlx"
+    if (library or "").lower() == "diffusers" or "model_index.json" in names:
+        return "diffusers"
     if has_safetensors or any(n.endswith(".safetensors") for n in names):
         return "safetensors"
     if any(n.endswith(".bin") and "pytorch_model" in n for n in names):
@@ -135,15 +141,31 @@ def detect_format(tags: list[str], library: str | None, has_safetensors: bool, s
     return "other"
 
 
+#: The Hub's tag naming a diffusers repository's pipeline class: ``diffusers:ZImagePipeline``.
+_PIPELINE_TAG = re.compile(r"^diffusers:([A-Za-z0-9_]+Pipeline)$")
+
+
+def pipeline_of(tags: list[str]) -> str | None:
+    """The diffusers pipeline a repository is (its ``model_index.json`` class), from the Hub's tag; None without."""
+    for tag in tags:
+        match = _PIPELINE_TAG.match(str(tag))
+        if match:
+            return match.group(1)
+    return None
+
+
 def detect_capabilities(*, repo_id: str, pipeline_tag: str | None, tags: list[str],
                         architectures: list[str], chat_template: str | None) -> list[str]:
-    """What the model does beyond plain chat: tools, vision, reasoning, code, embeddings.
+    """What the model does beyond plain chat: tools, vision, reasoning, code, embeddings, images.
 
     Inferred, so best effort -- the detail view says so. ``tools`` is the one
     read from the model itself: a chat template that renders tool definitions.
+    ``images`` is a model that makes pictures from a prompt, and nothing else.
     """
     name = repo_id.lower()
     lowered = {t.lower() for t in tags}
+    if pipeline_tag == "text-to-image":
+        return ["images"]
     arch = " ".join(a.lower() for a in architectures)
     caps: list[str] = []
     if pipeline_tag in {"feature-extraction", "sentence-similarity"} or "sentence-transformers" in lowered \
@@ -168,7 +190,9 @@ def detect_capabilities(*, repo_id: str, pipeline_tag: str | None, tags: list[st
 
 
 def task_of(capabilities: list[str], pipeline_tag: str | None) -> str:
-    """``embedding`` / ``vision`` / ``chat`` / ``other`` -- what a card is filed under."""
+    """``embedding`` / ``vision`` / ``chat`` / ``images`` / ``other`` -- what a card is filed under."""
+    if "images" in capabilities:
+        return "images"
     if "embedding" in capabilities:
         return "embedding"
     if "vision" in capabilities:
@@ -176,6 +200,40 @@ def task_of(capabilities: list[str], pipeline_tag: str | None) -> str:
     if pipeline_tag in {"text-generation", "text2text-generation", "conversational", None, ""}:
         return "chat"
     return "other"
+
+
+#: diffusers' variant files (``diffusion_pytorch_model.fp16.safetensors``): a
+#: second copy of a component's weights, loaded only when asked for.
+_VARIANT = re.compile(r"\.(fp16|bf16|fp32|fp8)\.safetensors$")
+
+
+def diffusers_weight_files(names: list[str]) -> list[str]:
+    """The safetensors a diffusers pipeline loads: each component folder's, one set per folder.
+
+    Weights sit in component folders (``transformer/``, ``text_encoder/``,
+    ``vae/``), never at the top. A folder that also ships a variant (a
+    ``.fp16.`` copy) is counted once, by the set loaded by default.
+    """
+    folders: dict[str, list[str]] = {}
+    for name in names:
+        if name.endswith(".safetensors") and name.count("/") == 1:
+            folders.setdefault(name.split("/", 1)[0], []).append(name)
+    out: list[str] = []
+    for files in folders.values():
+        plain = [f for f in files if not _VARIANT.search(f)]
+        out.extend(plain or files)
+    return out
+
+
+def diffusers_memory(file_bytes: int, params_by_dtype: dict[str, int]) -> int:
+    """What a pipeline's weights take served in bfloat16: their files, with float32 ones halved.
+
+    Z-Image-Turbo keeps its transformer in float32 (24.6 GB of its 32.8 GB);
+    the image app loads it in bfloat16, so it takes 20.5 GB. The Hub's dtype
+    counts say how many parameters are float32.
+    """
+    f32 = int((params_by_dtype or {}).get("F32") or 0)
+    return max(file_bytes - 2 * f32, file_bytes // 2)
 
 
 @dataclass
@@ -253,8 +311,19 @@ def _int(value: Any) -> int | None:
         return None
 
 
-def vllm_runnable(fmt: str, task: str) -> tuple[bool, str | None]:
-    """Whether vLLM on a cluster can serve this checkpoint, and if not, why (a code)."""
+def vllm_runnable(fmt: str, task: str, pipeline: str | None = None) -> tuple[bool, str | None]:
+    """Whether a cluster can serve this checkpoint, and if not, why (a code).
+
+    vLLM serves the text models; a picture model runs in the runtime's image
+    app, which loads a whole diffusers pipeline -- a repository without one
+    (a LoRA, a single component) has nothing to load on its own.
+    """
+    if task == "images" or fmt == "diffusers":
+        if task != "images":
+            return False, "task"
+        if fmt != "diffusers" or not pipeline:
+            return False, "no_pipeline"
+        return True, None
     if fmt == "gguf":
         return False, "gguf"
     if fmt == "mlx":

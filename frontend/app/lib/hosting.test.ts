@@ -118,6 +118,27 @@ describe("the spec", () => {
     const asked = buildSpec({ copies: 1, gpusPerCopy: 0.25, engineConfig: { gpu_memory_utilization: 0.9 } });
     expect(asked.engine.config.gpu_memory_utilization).toBe(0.25);
   });
+
+  it("a picture model runs in the image app with its picture settings only", () => {
+    const spec = buildSpec({
+      copies: 1,
+      gpusPerCopy: 0.2,
+      chatName: "pictures",
+      pictures: true,
+      machine: "gpu-02",
+      engineConfig: { num_inference_steps: 9, guidance_scale: 0, gpu_memory_utilization: 0.2, max_model_len: 4096 },
+    });
+    expect(spec.engine).toEqual({ name: "diffusers", config: { num_inference_steps: 9, guidance_scale: 0 } });
+    expect(spec.resources.replica).toEqual({ gpus: 0.2, machine: "gpu-02" });
+    expect(spec.service.alias).toBe("pictures");
+    expect(spec).not.toHaveProperty("topology");
+  });
+
+  it("pins a shared chat copy to the machine chosen", () => {
+    const spec = buildSpec({ copies: 1, gpusPerCopy: 0.5, engineConfig: {}, machine: "gpu-01" });
+    expect(spec.engine.name).toBe("vllm");
+    expect(spec.resources.replica).toEqual({ gpus: 0.5, machine: "gpu-01" });
+  });
 });
 
 describe("names", () => {

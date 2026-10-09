@@ -22,6 +22,10 @@ natively. The verdicts:
 ``runs`` / ``unknown``
     Known to both; or nothing to go on (no config, or the repository brings
     its own code).
+
+A picture model (a diffusers ``pipeline``) runs in the runtime's image app:
+it runs when the runtime's diffusers has the pipeline, and cannot when the
+runtime has no image app or a diffusers without it.
 """
 
 from __future__ import annotations
@@ -43,6 +47,9 @@ class RuntimeSupport:
     transformers_version: str | None = None
     model_types: frozenset[str] = field(default_factory=frozenset)
     architectures: frozenset[str] = field(default_factory=frozenset)
+    #: The picture pipelines its image app runs; empty: none (or not known).
+    pipelines: frozenset[str] = field(default_factory=frozenset)
+    diffusers_version: str | None = None
 
 
 @dataclass
@@ -50,7 +57,8 @@ class Compat:
     """A model on one cluster's runtime: the verdict, and why, in the operator's terms."""
 
     status: str
-    #: ``model_type_unknown``, ``architecture_not_native``, ``newer_transformers``, ``remote_code``, ``no_config``.
+    #: ``model_type_unknown``, ``architecture_not_native``, ``newer_transformers``, ``remote_code``,
+    #: ``no_config``, ``no_image_app``, ``pipeline_unknown``.
     code: str | None = None
     message: str | None = None
     model_type: str | None = None
@@ -82,6 +90,9 @@ def check(facts: dict[str, Any] | None, runtime: RuntimeSupport | None) -> Compa
     architectures = [a for a in facts.get("architectures") or [] if a]
     saved_with = facts.get("transformers_version")
     runtime = runtime or RuntimeSupport()
+    pipeline = facts.get("pipeline")
+    if pipeline:
+        return _check_pipeline(str(pipeline), runtime)
     base = {
         "model_type": model_type,
         "architectures": architectures,
@@ -132,3 +143,34 @@ def check(facts: dict[str, Any] | None, runtime: RuntimeSupport | None) -> Compa
     if not runtime.model_types and not runtime.architectures:
         return Compat(status=UNKNOWN, **base)
     return Compat(status=RUNS, **base)
+
+
+def _check_pipeline(pipeline: str, runtime: RuntimeSupport) -> Compat:
+    """A picture model on a runtime: its image app has the pipeline, or not."""
+    base = {"architectures": [pipeline], "vllm_version": runtime.vllm_version,
+            "transformers_version": runtime.transformers_version}
+    if runtime.pipelines:
+        if pipeline in runtime.pipelines:
+            return Compat(status=RUNS, **base)
+        diffusers = f"diffusers {runtime.diffusers_version}" if runtime.diffusers_version else "diffusers"
+        return Compat(
+            status=CANNOT_RUN,
+            code="pipeline_unknown",
+            message=(
+                f"This cluster's runtime cannot load this model: {diffusers} in it has no {pipeline}. "
+                "It needs a newer runtime image."
+            ),
+            **base,
+        )
+    if runtime.model_types or runtime.architectures:
+        # A runtime whose lists are known, and none of them pictures: it has no image app.
+        return Compat(
+            status=CANNOT_RUN,
+            code="no_image_app",
+            message=(
+                "This cluster's runtime serves no picture models. Switch the cluster to a runtime "
+                "that has them (its Runtime card), then host it."
+            ),
+            **base,
+        )
+    return Compat(status=UNKNOWN, **base)

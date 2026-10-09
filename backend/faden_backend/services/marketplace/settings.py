@@ -114,6 +114,11 @@ def suggest(model: dict[str, Any], fit: Fit | None) -> dict[str, Any]:
     config: dict[str, Any] = {}
     reasons: dict[str, str] = {}
 
+    if "images" in caps:
+        # A picture model takes picture settings, none of vLLM's: its own
+        # defaults unless its family is known to want others (curated).
+        return {"config": config, "reasons": reasons}
+
     if "embedding" in caps:
         config["runner"] = "pooling"
         reasons["runner"] = "embedding_model"

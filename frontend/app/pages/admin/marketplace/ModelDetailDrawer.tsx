@@ -248,6 +248,7 @@ function DetailBody({ detail }: { detail: MarketDetail }) {
         <Fact label={t("marketplace.detail.precision")} value={[m.dtype, m.quantization?.toUpperCase()].filter(Boolean).join(" · ")} />
         <Fact label={t("marketplace.detail.format")} value={m.format} />
         <Fact label={t("marketplace.detail.architecture")} value={m.architecture} />
+        <Fact label={t("marketplace.detail.pipeline")} value={m.pipeline ?? null} />
         <Fact label={t("marketplace.detail.base_model")} value={m.base_model} />
         <Fact label={t("marketplace.detail.license")} value={m.license} />
         <Fact label={t("marketplace.detail.downloads")} value={m.downloads ? formatCount(m.downloads) : null} />

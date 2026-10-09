@@ -98,6 +98,8 @@ async def cluster_hardware(session: Any) -> list[ClusterHardware]:
                             transformers_version=matrix.transformers_version,
                             model_types=frozenset(matrix.supported_model_types),
                             architectures=frozenset(matrix.supported_architectures),
+                            pipelines=frozenset(matrix.supported_pipelines),
+                            diffusers_version=matrix.diffusers_version,
                         )
                 except Exception:  # noqa: BLE001 - the version is a nicety, never a blocker
                     version = None

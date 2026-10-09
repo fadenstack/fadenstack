@@ -3107,7 +3107,19 @@
     "cannot_run": "No se ejecuta aquí",
     "may_not_run": "Puede que no se ejecute",
     "compat_model_type": "El entorno de ejecución de este clúster no puede cargarlo: ni Transformers {{transformers}} ni vLLM {{vllm}} conocen el tipo de modelo \"{{type}}\" (el modelo se guardó con Transformers {{saved}}). Necesita una imagen de ejecución más reciente; no se descarga nada.",
-    "compat_architecture": "vLLM {{vllm}} en el entorno de ejecución de este clúster no tiene implementación de {{architecture}}. Solo puede intentar su backend genérico de Transformers, que no admite todos los modelos."
+    "compat_architecture": "vLLM {{vllm}} en el entorno de ejecución de este clúster no tiene implementación de {{architecture}}. Solo puede intentar su backend genérico de Transformers, que no admite todos los modelos.",
+    "machine_label": "Ejecutar en",
+    "machine_any": "Cualquier máquina (decide Ray)",
+    "machine_help": "Ray coloca una parte donde esa parte está libre y no ve qué más ejecuta una máquina. Elija la máquina que tenga memoria libre.",
+    "pictures_title": "Ajustes de imagen",
+    "pictures_intro": "Cómo crea imágenes el modelo cuando una solicitud no lo indica. Una solicitud puede pedir sus propios pasos, guía y tamaño.",
+    "pictures_steps": "Pasos",
+    "pictures_steps_help": "Más pasos dan más detalle y tardan más. Los modelos turbo están hechos para pocos.",
+    "pictures_guidance": "Guía",
+    "pictures_guidance_help": "Cuánto se ciñe a la descripción. Los modelos turbo usan 0.",
+    "pictures_size": "Tamaño por defecto",
+    "pictures_model_default": "El del modelo",
+    "pictures_suggested": "Recomendado para este modelo"
   },
   "marketplace": {
     "title": "Mercado de modelos",
@@ -3128,7 +3140,8 @@
     "task": {
       "chat": "Chat",
       "embedding": "Embeddings",
-      "vision": "Visión"
+      "vision": "Visión",
+      "images": "Imágenes"
     },
     "sort_label": "Ordenar por",
     "sort": {
@@ -3150,7 +3163,8 @@
       "code": "Programación",
       "reasoning": "Razonamiento",
       "vision": "Visión",
-      "embedding": "Embeddings"
+      "embedding": "Embeddings",
+      "images": "Imágenes"
     },
     "group_help": {
       "start": "Pequeños y rápidos de descargar: un primer despliegue en minutos.",
@@ -3158,21 +3172,24 @@
       "code": "Entrenados para escribir y explicar código.",
       "reasoning": "Piensan paso a paso antes de responder: más lentos, pero mejores con problemas difíciles.",
       "vision": "Leen imágenes además de texto.",
-      "embedding": "Convierten texto en vectores para búsqueda y bases de conocimiento, servidos en /v1/embeddings."
+      "embedding": "Convierten texto en vectores para búsqueda y bases de conocimiento, servidos en /v1/embeddings.",
+      "images": "Crean imágenes a partir de una descripción, servidas en /v1/images/generations: para diapositivas, documentos y las herramientas de imagen de los agentes."
     },
     "capability": {
       "tools": "Herramientas",
       "reasoning": "Razonamiento",
       "vision": "Visión",
       "code": "Código",
-      "embedding": "Embeddings"
+      "embedding": "Embeddings",
+      "images": "Crea imágenes"
     },
     "capability_help": {
       "tools": "Puede llamar a herramientas y funciones.",
       "reasoning": "Piensa antes de responder.",
       "vision": "Entiende imágenes.",
       "code": "Entrenado para código.",
-      "embedding": "Genera embeddings para búsqueda."
+      "embedding": "Genera embeddings para búsqueda.",
+      "images": "Crea imágenes a partir de un texto."
     },
     "params_active": "{{total}} · {{active}} activos",
     "fit": {
@@ -3198,7 +3215,8 @@
       "gguf": "Los archivos GGUF son para llama.cpp y Ollama. vLLM sirve el modelo original o una versión AWQ, GPTQ o FP8.",
       "mlx": "Los pesos MLX solo funcionan en Apple Silicon.",
       "no_weights": "Este repositorio no tiene pesos que vLLM pueda cargar.",
-      "task": "No es un modelo de chat, visión ni embeddings."
+      "task": "No es un modelo de chat, visión, embeddings ni imágenes.",
+      "no_pipeline": "No es un modelo de imagen completo: un LoRA o una parte de uno, que no se puede servir por sí solo."
     },
     "gated_help": "Acceso restringido: necesita un token de Hugging Face de una cuenta que haya aceptado la licencia del modelo.",
     "verified": "Probado aquí",
@@ -3240,7 +3258,8 @@
       "all_files_other": "Mostrar los {{count}} archivos",
       "fewer_files": "Mostrar menos",
       "download_only": "Descargar en este servidor",
-      "download_started": "Descargando en este servidor. Sígalo en «En este servidor»; continúa aunque salga de la página."
+      "download_started": "Descargando en este servidor. Sígalo en «En este servidor»; continúa aunque salga de la página.",
+      "pipeline": "Pipeline"
     },
     "blurb": {
       "tiny_verified": "El modelo de chat útil más pequeño, probado en esta configuración: la forma más rápida de ver un despliegue funcionar de principio a fin.",
@@ -3261,7 +3280,9 @@
       "vision": "Lee imágenes y documentos además de texto.",
       "gemma": "El modelo abierto de Google: buen chat multilingüe que además entiende imágenes.",
       "embedding_small": "Un modelo de embeddings pequeño y rápido para búsqueda y bases de conocimiento.",
-      "embedding_large": "Un modelo de embeddings grande: mejor recuperación, más memoria."
+      "embedding_large": "Un modelo de embeddings grande: mejor recuperación, más memoria.",
+      "images_turbo": "Imágenes en pocos segundos con un modelo de 6B bajo Apache-2.0: fotos, ilustraciones y texto legible en la imagen.",
+      "images_large": "Un modelo de imagen más grande bajo Apache-2.0: cuatro pasos, más memoria."
     },
     "recipe": {
       "applied": "vLLM publica una receta para este modelo, y sus ajustes recomendados forman parte de las sugerencias.",

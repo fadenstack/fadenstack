@@ -50,6 +50,8 @@ TASK_QUERIES: dict[str, tuple[dict[str, str], ...]] = {
     "chat": ({"filter": "conversational"},),
     "embedding": ({"pipeline_tag": "feature-extraction"}, {"pipeline_tag": "sentence-similarity"}),
     "vision": ({"pipeline_tag": "image-text-to-text"},),
+    # Whole diffusers pipelines that make pictures from a prompt.
+    "images": ({"pipeline_tag": "text-to-image", "filter": "diffusers"},),
 }
 
 #: A wildcard search fetches this many per literal piece, then filters.
@@ -105,13 +107,27 @@ def has_extra_weight_copies(names: list[str]) -> bool:
     return bool(loaded) and len(loaded) < sum(1 for n in names if n.endswith(".safetensors"))
 
 
+def _weight_files(data: dict[str, Any], names: list[str]) -> list[str]:
+    """The weight files a cluster loads: a diffusers pipeline's component folders, else the top set."""
+    if (data.get("library_name") or "").lower() == "diffusers" or "model_index.json" in names:
+        return facts.diffusers_weight_files(names)
+    return loaded_weight_files(names)
+
+
 def fill_weight_sizes(api: Any, data: dict[str, Any]) -> None:
-    """Size the loaded files when the dtype counts would be wrong (one Hub call, rarely needed)."""
+    """Size the loaded files when the dtype counts would be wrong (one Hub call, rarely needed).
+
+    Always for a diffusers pipeline: the Hub counts the parameters of one
+    component of it, not the text encoder beside it.
+    """
     siblings = data.get("siblings") or []
     names = [str(s.get("name") or "") for s in siblings]
-    if not has_extra_weight_copies(names):
+    diffusers = (data.get("library_name") or "").lower() == "diffusers" or "model_index.json" in names
+    if not diffusers and not has_extra_weight_copies(names):
         return
-    loaded = set(loaded_weight_files(names))
+    loaded = set(_weight_files(data, names))
+    if not loaded:
+        return
     if all(s.get("size") for s in siblings if s.get("name") in loaded):
         return
     try:
@@ -241,10 +257,12 @@ def card_from_dict(data: dict[str, Any]) -> dict[str, Any]:
     # dtype counts cover every safetensors file in the repository, so a model
     # that also ships a copy for other runtimes came out too large: gpt-oss-20b
     # at 22.7 GB for 13.8 GB of weights, "too large" for a 24 GB card it fits.
-    loaded = set(loaded_weight_files(siblings))
+    loaded = set(_weight_files(data, siblings))
     loaded_files = [s for s in data.get("siblings") or [] if s.get("name") in loaded]
     if loaded_files and all(s.get("size") for s in loaded_files):
         weights = sum(int(s["size"]) for s in loaded_files)
+        if fmt == "diffusers":
+            weights = facts.diffusers_memory(weights, params_by_dtype)
     else:
         weights = facts.weights_bytes(params_by_dtype)
     quant = facts.detect_quantization(repo_id, tags, config, params_by_dtype)
@@ -264,7 +282,8 @@ def card_from_dict(data: dict[str, Any]) -> dict[str, Any]:
         chat_template=chat_template if isinstance(chat_template, str) else None,
     )
     task = facts.task_of(capabilities, data.get("pipeline_tag"))
-    runnable, why_not = facts.vllm_runnable(fmt, task)
+    pipeline = facts.pipeline_of(tags)
+    runnable, why_not = facts.vllm_runnable(fmt, task, pipeline)
     card = data.get("card") or {}
     license_ = card.get("license") or next((t.split(":", 1)[1] for t in tags if t.startswith("license:")), None)
     base_model = card.get("base_model")
@@ -293,6 +312,8 @@ def card_from_dict(data: dict[str, Any]) -> dict[str, Any]:
         "runnable": runnable,
         "not_runnable_reason": why_not,
         "architecture": (list(config.get("architectures") or []) or [None])[0],
+        #: A picture model's diffusers pipeline (``ZImagePipeline``); None for the rest.
+        "pipeline": pipeline,
         "model_type": config.get("model_type"),
         "base_model": base_model,
         "languages": card.get("language") if isinstance(card.get("language"), list) else None,
@@ -440,6 +461,10 @@ class HubClient:
                 except Exception:  # noqa: BLE001
                     summary = None
             arch = facts.architecture_from_config(config)
+            facts_dict = arch.to_dict()
+            if card.get("pipeline"):
+                # What the runtime check reads for a picture model (compat.check).
+                facts_dict["pipeline"] = card["pipeline"]
             if config:
                 # The full config knows the quantization the list could only guess at.
                 card["quantization"] = facts.detect_quantization(
@@ -452,7 +477,7 @@ class HubClient:
             return {
                 **card,
                 "summary": summary,
-                "architecture_facts": arch.to_dict(),
+                "architecture_facts": facts_dict,
                 "max_context": arch.max_context,
                 "kv_bytes_per_token": arch.kv_bytes_per_token(),
                 "needs_remote_code": arch.needs_remote_code,

@@ -3107,7 +3107,19 @@
     "cannot_run": "Ne peut pas tourner ici",
     "may_not_run": "Pourrait ne pas tourner",
     "compat_model_type": "L'environnement d'exécution de ce cluster ne peut pas le charger : ni Transformers {{transformers}} ni vLLM {{vllm}} ne connaissent le type de modèle « {{type}} » (le modèle a été enregistré avec Transformers {{saved}}). Il faut une image d'exécution plus récente ; rien n'est téléchargé.",
-    "compat_architecture": "vLLM {{vllm}} dans l'environnement d'exécution de ce cluster n'a pas d'implémentation de {{architecture}}. Il ne peut qu'essayer son backend Transformers générique, qui ne prend pas en charge tous les modèles."
+    "compat_architecture": "vLLM {{vllm}} dans l'environnement d'exécution de ce cluster n'a pas d'implémentation de {{architecture}}. Il ne peut qu'essayer son backend Transformers générique, qui ne prend pas en charge tous les modèles.",
+    "machine_label": "Exécuter sur",
+    "machine_any": "N'importe quelle machine (Ray décide)",
+    "machine_help": "Ray place une part là où elle est libre, sans voir ce qu'une machine exécute d'autre. Choisissez la machine qui a de la mémoire libre.",
+    "pictures_title": "Réglages d'image",
+    "pictures_intro": "Comment le modèle crée des images quand une requête ne le précise pas. Une requête peut demander ses propres étapes, guidage et taille.",
+    "pictures_steps": "Étapes",
+    "pictures_steps_help": "Plus d'étapes donnent plus de détails et prennent plus de temps. Les modèles turbo sont faits pour peu d'étapes.",
+    "pictures_guidance": "Guidage",
+    "pictures_guidance_help": "À quel point il suit la description. Les modèles turbo prennent 0.",
+    "pictures_size": "Taille par défaut",
+    "pictures_model_default": "Celle du modèle",
+    "pictures_suggested": "Conseillé pour ce modèle"
   },
   "marketplace": {
     "title": "Catalogue de modèles",
@@ -3128,7 +3140,8 @@
     "task": {
       "chat": "Chat",
       "embedding": "Embeddings",
-      "vision": "Vision"
+      "vision": "Vision",
+      "images": "Images"
     },
     "sort_label": "Trier par",
     "sort": {
@@ -3150,7 +3163,8 @@
       "code": "Programmation",
       "reasoning": "Raisonnement",
       "vision": "Vision",
-      "embedding": "Embeddings"
+      "embedding": "Embeddings",
+      "images": "Images"
     },
     "group_help": {
       "start": "Petits et rapides à télécharger : un premier déploiement en quelques minutes.",
@@ -3158,21 +3172,24 @@
       "code": "Entraînés pour écrire et expliquer du code.",
       "reasoning": "Ils réfléchissent étape par étape avant de répondre : plus lents, mais meilleurs sur les problèmes difficiles.",
       "vision": "Ils lisent les images aussi bien que le texte.",
-      "embedding": "Ils transforment le texte en vecteurs pour la recherche et les bases de connaissances, servis sur /v1/embeddings."
+      "embedding": "Ils transforment le texte en vecteurs pour la recherche et les bases de connaissances, servis sur /v1/embeddings.",
+      "images": "Ils créent des images à partir d'une description, servies sur /v1/images/generations : pour les diapositives, les documents et les outils d'image des agents."
     },
     "capability": {
       "tools": "Outils",
       "reasoning": "Raisonnement",
       "vision": "Vision",
       "code": "Code",
-      "embedding": "Embeddings"
+      "embedding": "Embeddings",
+      "images": "Crée des images"
     },
     "capability_help": {
       "tools": "Peut appeler des outils et des fonctions.",
       "reasoning": "Réfléchit avant de répondre.",
       "vision": "Comprend les images.",
       "code": "Entraîné pour le code.",
-      "embedding": "Produit des embeddings pour la recherche."
+      "embedding": "Produit des embeddings pour la recherche.",
+      "images": "Crée des images à partir d'un texte."
     },
     "params_active": "{{total}} · {{active}} actifs",
     "fit": {
@@ -3198,7 +3215,8 @@
       "gguf": "Les fichiers GGUF sont destinés à llama.cpp et Ollama. vLLM sert le modèle d'origine, ou une version AWQ, GPTQ ou FP8.",
       "mlx": "Les poids MLX ne fonctionnent que sur Apple Silicon.",
       "no_weights": "Ce dépôt ne contient pas de poids que vLLM puisse charger.",
-      "task": "Ce n'est pas un modèle de chat, de vision ou d'embeddings."
+      "task": "Ni un modèle de chat, de vision, d'embeddings ni d'images.",
+      "no_pipeline": "Pas un modèle d'image complet : un LoRA ou une partie d'un modèle, qui ne peut pas être servi seul."
     },
     "gated_help": "Accès restreint : demande un jeton Hugging Face d'un compte qui a accepté la licence du modèle.",
     "verified": "Testé ici",
@@ -3240,7 +3258,8 @@
       "all_files_other": "Afficher les {{count}} fichiers",
       "fewer_files": "Afficher moins",
       "download_only": "Télécharger sur ce serveur",
-      "download_started": "Téléchargement sur ce serveur. Suivez-le dans « Sur ce serveur » ; il continue si vous quittez la page."
+      "download_started": "Téléchargement sur ce serveur. Suivez-le dans « Sur ce serveur » ; il continue si vous quittez la page.",
+      "pipeline": "Pipeline"
     },
     "blurb": {
       "tiny_verified": "Le plus petit modèle de chat utile, testé sur cette installation : le moyen le plus rapide de voir un déploiement fonctionner de bout en bout.",
@@ -3261,7 +3280,9 @@
       "vision": "Lit les images et les documents aussi bien que le texte.",
       "gemma": "Le modèle ouvert de Google : un bon chat multilingue qui comprend aussi les images.",
       "embedding_small": "Un petit modèle d'embeddings rapide pour la recherche et les bases de connaissances.",
-      "embedding_large": "Un grand modèle d'embeddings : meilleure recherche, plus de mémoire."
+      "embedding_large": "Un grand modèle d'embeddings : meilleure recherche, plus de mémoire.",
+      "images_turbo": "Des images en quelques secondes avec un modèle de 6B sous Apache-2.0 : photos, illustrations et texte lisible dans l'image.",
+      "images_large": "Un modèle d'image plus grand sous Apache-2.0 : quatre étapes, plus de mémoire."
     },
     "recipe": {
       "applied": "vLLM publie une recette pour ce modèle, et ses réglages recommandés font partie des suggestions.",

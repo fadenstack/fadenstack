@@ -10,7 +10,7 @@ const BASE = "/api/llm/marketplace";
 
 export type HubState = "online" | "offline";
 export type FitStatus = "fits" | "too_large" | "unknown" | "no_accelerators";
-export type ModelTask = "chat" | "embedding" | "vision" | "other";
+export type ModelTask = "chat" | "embedding" | "vision" | "images" | "other";
 export type MarketSort = "trending" | "downloads" | "likes" | "recent";
 
 export interface Fit {
@@ -69,6 +69,8 @@ export interface MarketModel {
   runnable: boolean;
   not_runnable_reason?: string | null;
   architecture?: string | null;
+  /** A picture model's diffusers pipeline (``ZImagePipeline``). */
+  pipeline?: string | null;
   base_model?: string | null;
   curated?: CuratedInfo;
   fit?: Fit | null;
@@ -128,7 +130,15 @@ export interface VllmRecipe {
 /** Whether a cluster's runtime can load the model at all (``services/marketplace/compat.py``). */
 export interface Compatibility {
   status: "runs" | "may_not_run" | "cannot_run" | "unknown";
-  code: "model_type_unknown" | "architecture_not_native" | "newer_transformers" | "remote_code" | "no_config" | null;
+  code:
+    | "model_type_unknown"
+    | "architecture_not_native"
+    | "newer_transformers"
+    | "remote_code"
+    | "no_config"
+    | "no_image_app"
+    | "pipeline_unknown"
+    | null;
   message: string | null;
   model_type: string | null;
   architectures: string[];
@@ -159,6 +169,8 @@ export interface HostPayload {
   gpus_per_copy: number;
   engine_config: EngineConfig;
   revision?: string | null;
+  /** The cluster machine every copy runs on; omitted: Ray places them. */
+  machine?: string | null;
 }
 
 export interface HostResult {

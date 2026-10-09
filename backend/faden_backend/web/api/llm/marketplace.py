@@ -89,7 +89,8 @@ def _decorate(card: dict[str, Any], cluster: fit_mod.ClusterHardware | None,
     """A card with its fit on *cluster* and whether this server keeps it."""
     item = dict(card)
     if cluster is not None and item.get("runnable", True):
-        item["fit"] = fit_mod.plan(fit_mod.quick_needs(item.get("weights_bytes")), cluster).to_dict()
+        needs = fit_mod.quick_needs(item.get("weights_bytes"), single_device=item.get("task") == "images")
+        item["fit"] = fit_mod.plan(needs, cluster).to_dict()
     else:
         item["fit"] = None
     item["local"] = local.get(item["repo_id"])
@@ -105,9 +106,9 @@ def _curated_card(entry: curated_mod.Curated) -> dict[str, Any]:
         "params_b": entry.params_b,
         "weights_bytes": None,
         "capabilities": list(entry.capabilities),
-        "task": "embedding" if entry.group == "embedding" else ("vision" if entry.group == "vision" else "chat"),
+        "task": entry.group if entry.group in {"embedding", "vision", "images"} else "chat",
         "runnable": True,
-        "format": "safetensors",
+        "format": "diffusers" if entry.group == "images" else "safetensors",
     }
 
 
@@ -155,7 +156,7 @@ async def recommended(
 async def search(
     q: str = "",
     sort: Literal["trending", "downloads", "likes", "recent"] = "trending",
-    task: Literal["chat", "embedding", "vision"] = "chat",
+    task: Literal["chat", "embedding", "vision", "images"] = "chat",
     limit: int = Query(40, ge=1, le=100),
     cluster_id: str | None = None,
     author: str | None = Query(None, max_length=96, pattern=r"^[A-Za-z0-9][\w.-]*$"),
@@ -325,6 +326,7 @@ async def model_detail(
         max_context=detail.get("max_context"),
         attention_heads=arch.get("num_attention_heads"),
         kv_heads=arch.get("num_kv_heads"),
+        single_device=detail.get("task") == "images",
     )
     fits = {c.environment_id: fit_mod.plan(needs, c, context=context).to_dict() for c in hardware}
     # Whether each cluster's runtime can load it at all -- said here, before
@@ -369,6 +371,8 @@ class HostBody(BaseModel):
     engine_config: dict[str, Any] = Field(default_factory=dict)
     #: Host it even though the cluster's runtime cannot load it (it will fail to start).
     ignore_compatibility: bool = False
+    #: The cluster machine every copy runs on (its name); omit to let Ray place them.
+    machine: str | None = Field(default=None, max_length=255)
 
 
 async def _refuse_if_it_cannot_run(session: AsyncSession, repo_id: str, environment_id: uuid.UUID) -> None:
@@ -388,14 +392,24 @@ async def _refuse_if_it_cannot_run(session: AsyncSession, repo_id: str, environm
         raise HTTPException(status.HTTP_409_CONFLICT, detail=verdict.message)
 
 
-async def _sees_pictures(session: AsyncSession, repo_id: str) -> bool | None:
-    """Whether the model sees pictures, from its facts (the Hub's answer is cached); None when not known."""
+async def _capabilities(session: AsyncSession, repo_id: str) -> list[str] | None:
+    """The model's capabilities from its facts (the Hub's answer is cached), the curated list's when
+    the Hub is out of reach; None when neither knows."""
     try:
         detail = await (await _hub(session)).detail(repo_id)
     except (HubNotFound, HubUnavailable):
-        return None
+        entry = curated_mod.curated_for(repo_id)
+        if entry is None:
+            return None
+        return list(entry.capabilities) + (["images"] if entry.group == "images" else [])
     capabilities = detail.get("capabilities")
-    return "vision" in capabilities if isinstance(capabilities, list) else None
+    return list(capabilities) if isinstance(capabilities, list) else None
+
+
+async def _sees_pictures(session: AsyncSession, repo_id: str) -> bool | None:
+    """Whether the model sees pictures, from its facts (the Hub's answer is cached); None when not known."""
+    capabilities = await _capabilities(session, repo_id)
+    return "vision" in capabilities if capabilities is not None else None
 
 
 @router.post("/host", status_code=status.HTTP_201_CREATED)
@@ -411,6 +425,7 @@ async def host_model(
 
     if not body.ignore_compatibility:
         await _refuse_if_it_cannot_run(session, body.repo_id.strip(), body.environment_id)
+    capabilities = await _capabilities(session, body.repo_id.strip()) or []
     try:
         return await host(session, llm_service, HostRequest(
             repo_id=body.repo_id.strip(),
@@ -422,6 +437,8 @@ async def host_model(
             engine_config=body.engine_config,
             revision=(body.revision or "").strip() or None,
             vision=await _sees_pictures(session, body.repo_id.strip()),
+            images="images" in capabilities,
+            machine=(body.machine or "").strip() or None,
         ))
     except HostError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc

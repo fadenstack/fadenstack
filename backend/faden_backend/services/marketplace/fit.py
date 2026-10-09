@@ -106,6 +106,8 @@ class ModelNeeds:
     max_context: int | None
     attention_heads: int | None = None
     kv_heads: int | None = None
+    #: A picture model runs on one device (or a share of one): no tensor parallelism.
+    single_device: bool = False
 
 
 @dataclass
@@ -180,7 +182,7 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
 
     chosen: int | None = None
     for tp in TP_SIZES:
-        if tp > len(gpus):
+        if tp > len(gpus) or (needs.single_device and tp > 1):
             break
         if needs.attention_heads and needs.attention_heads % tp:
             continue  # vLLM splits attention heads evenly across the copy
@@ -188,7 +190,7 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
             chosen = tp
             break
     if chosen is None:
-        biggest = max((tp for tp in TP_SIZES if tp <= len(gpus)), default=1)
+        biggest = 1 if needs.single_device else max((tp for tp in TP_SIZES if tp <= len(gpus)), default=1)
         return Fit(
             status="too_large",
             needed_bytes_per_gpu=need(biggest),
@@ -252,6 +254,8 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
     )
 
 
-def quick_needs(weights: int | None) -> ModelNeeds:
+def quick_needs(weights: int | None, *, single_device: bool = False) -> ModelNeeds:
     """Needs from the weights alone, for a list where no config has been read."""
-    return ModelNeeds(weights_bytes=weights, kv_bytes_per_token=None, max_context=None)
+    return ModelNeeds(
+        weights_bytes=weights, kv_bytes_per_token=None, max_context=None, single_device=single_device,
+    )

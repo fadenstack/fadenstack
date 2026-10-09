@@ -19,6 +19,43 @@ export interface SpecOptions {
   chatName?: string;
   engineConfig?: EngineConfig;
   revision?: string | null;
+  /** A picture model: it runs in the runtime's image app (diffusers), not vLLM. */
+  pictures?: boolean;
+  /** The cluster machine every copy runs on; omitted: Ray places them. */
+  machine?: string | null;
+}
+
+/** The deployment document ``buildSpec`` writes (a ``type``: the API takes any JSON object). */
+export type SpecDocument = {
+  api_version: string;
+  engine: { name: string; config: EngineConfig };
+  scale: { replicas: number };
+  resources: { replica: { gpus: number; machine?: string } };
+  service: { path: string; openai: boolean; alias?: string };
+  topology?: { tensor_parallel_size: number };
+  artifacts?: { source: string; revision: string };
+};
+
+/** What a picture model's engine settings may hold (the backend's ``IMAGE_SETTINGS``). */
+export const PICTURE_SETTINGS = ["num_inference_steps", "guidance_scale", "size", "dtype", "max_pixels"] as const;
+
+/** A picture model's spec: one device or a share of one, its picture settings only. */
+function pictureSpec({ copies, gpusPerCopy, chatName = "", engineConfig = {}, revision, machine }: SpecOptions): SpecDocument {
+  const alias = chatName.trim();
+  const settings: EngineConfig = {};
+  for (const key of PICTURE_SETTINGS) {
+    const value = engineConfig[key];
+    if (value !== undefined && value !== null && value !== "") settings[key] = value;
+  }
+  const share = gpusPerCopy < 1 ? Math.round(gpusPerCopy * 100) / 100 : 1;
+  return {
+    api_version: "inference.fadenstack.com/v1alpha1",
+    engine: { name: "diffusers", config: settings },
+    scale: { replicas: Math.max(1, Math.round(copies)) },
+    resources: { replica: { gpus: share, ...(machine ? { machine } : {}) } },
+    service: { path: "/v1", openai: true, ...(alias ? { alias } : {}) },
+    ...(revision ? { artifacts: { source: "sync", revision } } : {}),
+  };
 }
 
 /**
@@ -27,7 +64,9 @@ export interface SpecOptions {
  * ``chatName`` becomes ``service.alias``: the backend never makes one up, so a
  * deployment without one serves and never appears in chat.
  */
-export function buildSpec({ copies, gpusPerCopy, chatName = "", engineConfig = {}, revision }: SpecOptions) {
+export function buildSpec(options: SpecOptions): SpecDocument {
+  if (options.pictures) return pictureSpec(options);
+  const { copies, gpusPerCopy, chatName = "", engineConfig = {}, revision, machine } = options;
   const alias = chatName.trim();
   const engine: EngineConfig = {};
   for (const [key, value] of Object.entries(engineConfig)) {
@@ -45,7 +84,7 @@ export function buildSpec({ copies, gpusPerCopy, chatName = "", engineConfig = {
     api_version: "inference.fadenstack.com/v1alpha1",
     engine: { name: "vllm", config: engine },
     scale: { replicas: Math.max(1, Math.round(copies)) },
-    resources: { replica: { gpus: sharing ? Math.round(gpusPerCopy * 100) / 100 : tp } },
+    resources: { replica: { gpus: sharing ? Math.round(gpusPerCopy * 100) / 100 : tp, ...(machine ? { machine } : {}) } },
     service: { path: "/v1", openai: true, ...(alias ? { alias } : {}) },
     ...(tp > 1 ? { topology: { tensor_parallel_size: tp } } : {}),
     ...(revision ? { artifacts: { source: "sync", revision } } : {}),

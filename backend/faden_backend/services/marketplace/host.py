@@ -35,6 +35,10 @@ class HostRequest:
     revision: str | None = None
     #: Whether the model sees pictures (from its facts); the deployment says so to the gateway.
     vision: bool | None = None
+    #: A model that makes pictures (a diffusers pipeline): it runs in the image app, not vLLM.
+    images: bool = False
+    #: The cluster machine every copy runs on; None lets Ray place them.
+    machine: str | None = None
 
 
 def deployment_name(repo_id: str) -> str:
@@ -49,6 +53,8 @@ def build_spec(request: HostRequest) -> dict[str, Any]:
     gpus = float(request.gpus_per_copy)
     if gpus <= 0:
         raise HostError("A copy needs at least part of an accelerator.")
+    if request.images:
+        return _image_spec(request, engine, gpus)
     if gpus >= 1 and not float(gpus).is_integer():
         raise HostError("More than one accelerator per copy must be a whole number.")
     tp = int(gpus) if gpus >= 1 else 1
@@ -69,6 +75,33 @@ def build_spec(request: HostRequest) -> dict[str, Any]:
     }
     if tp > 1:
         spec["topology"] = {"tensor_parallel_size": tp}
+    if request.machine:
+        spec["resources"]["replica"]["machine"] = request.machine
+    if request.revision:
+        spec["artifacts"] = {"source": "sync", "revision": request.revision}
+    return spec
+
+
+def _image_spec(request: HostRequest, engine: dict[str, Any], gpus: float) -> dict[str, Any]:
+    """A picture model's spec: the image app on one device (or a share of one), its picture settings."""
+    from faden_backend.services.inference.drivers.ray.compiler import (  # noqa: PLC0415
+        IMAGE_ENGINE,
+        IMAGE_SETTINGS,
+    )
+
+    if gpus > 1:
+        raise HostError("A picture model runs on one accelerator, or a share of one.")
+    settings = {k: v for k, v in engine.items() if k in IMAGE_SETTINGS}
+    replica: dict[str, Any] = {"gpus": 1 if gpus >= 1 else round(gpus, 2)}
+    if request.machine:
+        replica["machine"] = request.machine
+    spec: dict[str, Any] = {
+        "api_version": "inference.fadenstack.com/v1alpha1",
+        "engine": {"name": IMAGE_ENGINE, "config": settings},
+        "scale": {"replicas": max(1, int(request.copies))},
+        "resources": {"replica": replica},
+        "service": {"path": "/v1", "openai": True, **({"alias": request.alias} if request.alias else {})},
+    }
     if request.revision:
         spec["artifacts"] = {"source": "sync", "revision": request.revision}
     return spec

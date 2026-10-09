@@ -25,6 +25,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ImageIcon from "@mui/icons-material/Image";
 import LockIcon from "@mui/icons-material/Lock";
+import PaletteIcon from "@mui/icons-material/Palette";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import ScatterPlotIcon from "@mui/icons-material/ScatterPlot";
 import StorageIcon from "@mui/icons-material/Storage";
@@ -36,9 +37,10 @@ const CAPABILITY_ICONS: Record<string, React.ReactElement> = {
   vision: <ImageIcon />,
   code: <CodeIcon />,
   embedding: <ScatterPlotIcon />,
+  images: <PaletteIcon />,
 };
 
-export const CAPABILITIES = ["tools", "reasoning", "vision", "code", "embedding"] as const;
+export const CAPABILITIES = ["tools", "reasoning", "vision", "code", "embedding", "images"] as const;
 
 /** A small chip per capability, in a fixed order. */
 export function CapabilityChips({ capabilities }: { capabilities: string[] }) {

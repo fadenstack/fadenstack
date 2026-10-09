@@ -3107,7 +3107,19 @@
     "cannot_run": "无法在此运行",
     "may_not_run": "可能无法运行",
     "compat_model_type": "此集群的运行时无法加载它：其中的 Transformers {{transformers}} 和 vLLM {{vllm}} 都不认识模型类型“{{type}}”（该模型使用 Transformers {{saved}} 保存）。需要更新的运行时镜像；不会下载任何内容。",
-    "compat_architecture": "此集群运行时中的 vLLM {{vllm}} 没有 {{architecture}} 的实现。它只能尝试其通用的 Transformers 后端，而并非所有模型都受支持。"
+    "compat_architecture": "此集群运行时中的 vLLM {{vllm}} 没有 {{architecture}} 的实现。它只能尝试其通用的 Transformers 后端，而并非所有模型都受支持。",
+    "machine_label": "运行于",
+    "machine_any": "任意机器（由 Ray 决定）",
+    "machine_help": "Ray 会把份额放在有空闲份额的地方，但看不到机器上还运行着什么。请选择仍有空闲内存的机器。",
+    "pictures_title": "图片设置",
+    "pictures_intro": "请求未指定时模型生成图片的方式。请求仍可指定自己的步数、引导和尺寸。",
+    "pictures_steps": "步数",
+    "pictures_steps_help": "步数越多细节越多，耗时越长。Turbo 模型只需少量步数。",
+    "pictures_guidance": "引导",
+    "pictures_guidance_help": "对描述的遵循程度。Turbo 模型使用 0。",
+    "pictures_size": "默认尺寸",
+    "pictures_model_default": "使用模型自身的",
+    "pictures_suggested": "为此模型推荐"
   },
   "marketplace": {
     "title": "模型市场",
@@ -3128,7 +3140,8 @@
     "task": {
       "chat": "聊天",
       "embedding": "向量嵌入",
-      "vision": "视觉"
+      "vision": "视觉",
+      "images": "图片"
     },
     "sort_label": "排序方式",
     "sort": {
@@ -3150,7 +3163,8 @@
       "code": "编程",
       "reasoning": "推理",
       "vision": "视觉",
-      "embedding": "向量嵌入"
+      "embedding": "向量嵌入",
+      "images": "图片"
     },
     "group_help": {
       "start": "体积小、下载快：几分钟内完成第一次部署。",
@@ -3158,21 +3172,24 @@
       "code": "专为编写和解释代码而训练。",
       "reasoning": "回答前逐步思考：速度较慢，但更擅长难题。",
       "vision": "既能读文本，也能读图像。",
-      "embedding": "将文本转换为向量，用于搜索和知识库，通过 /v1/embeddings 提供服务。"
+      "embedding": "将文本转换为向量，用于搜索和知识库，通过 /v1/embeddings 提供服务。",
+      "images": "根据描述生成图片，通过 /v1/images/generations 提供：用于幻灯片、文档和智能体的图片工具。"
     },
     "capability": {
       "tools": "工具",
       "reasoning": "推理",
       "vision": "视觉",
       "code": "代码",
-      "embedding": "向量嵌入"
+      "embedding": "向量嵌入",
+      "images": "生成图片"
     },
     "capability_help": {
       "tools": "可以调用工具和函数。",
       "reasoning": "回答前会先思考。",
       "vision": "能理解图像。",
       "code": "专为代码训练。",
-      "embedding": "为搜索生成向量嵌入。"
+      "embedding": "为搜索生成向量嵌入。",
+      "images": "根据文本描述生成图片。"
     },
     "params_active": "{{total}} · {{active}} 激活",
     "fit": {
@@ -3198,7 +3215,8 @@
       "gguf": "GGUF 文件用于 llama.cpp 和 Ollama。vLLM 提供原始模型，或其 AWQ、GPTQ、FP8 版本。",
       "mlx": "MLX 权重只能在 Apple 芯片上运行。",
       "no_weights": "此仓库没有 vLLM 可以加载的权重。",
-      "task": "不是聊天、视觉或向量嵌入模型。"
+      "task": "不是对话、视觉、嵌入或图片模型。",
+      "no_pipeline": "不是完整的图片模型：只是 LoRA 或模型的一部分，无法单独提供服务。"
     },
     "gated_help": "受限：需要一个已接受该模型许可的账号的 Hugging Face 令牌。",
     "verified": "已在此测试",
@@ -3240,7 +3258,8 @@
       "all_files_other": "显示全部 {{count}} 个文件",
       "fewer_files": "收起",
       "download_only": "下载到本服务器",
-      "download_started": "正在下载到本服务器。可在“本服务器上”查看进度；离开页面也会继续下载。"
+      "download_started": "正在下载到本服务器。可在“本服务器上”查看进度；离开页面也会继续下载。",
+      "pipeline": "Pipeline"
     },
     "blurb": {
       "tiny_verified": "最小的实用聊天模型，已在此环境中测试：最快看到部署端到端运行的方式。",
@@ -3261,7 +3280,9 @@
       "vision": "既能读文本，也能读图像和文档。",
       "gemma": "Google 的开放模型：强大的多语言聊天能力，并能理解图像。",
       "embedding_small": "小巧快速的向量嵌入模型，用于搜索和知识库。",
-      "embedding_large": "大型向量嵌入模型：检索效果更好，显存占用更多。"
+      "embedding_large": "大型向量嵌入模型：检索效果更好，显存占用更多。",
+      "images_turbo": "Apache-2.0 许可的 6B 模型，几秒内生成图片：照片、插图以及图中清晰的文字。",
+      "images_large": "Apache-2.0 许可的较大图片模型：四步生成，需要更多内存。"
     },
     "recipe": {
       "applied": "vLLM 为此模型发布了配方，其推荐设置已包含在建议中。",

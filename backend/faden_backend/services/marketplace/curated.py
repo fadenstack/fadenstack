@@ -19,7 +19,7 @@ from typing import Any
 @dataclass(frozen=True)
 class Curated:
     repo_id: str
-    #: ``start`` / ``chat`` / ``code`` / ``reasoning`` / ``vision`` / ``embedding``
+    #: ``start`` / ``chat`` / ``code`` / ``reasoning`` / ``vision`` / ``embedding`` / ``images``
     group: str
     #: Translation key for the one line saying why it is here.
     blurb: str
@@ -75,9 +75,16 @@ CURATED: tuple[Curated, ...] = (
     # ── embeddings (for knowledge bases) ──
     Curated("Qwen/Qwen3-Embedding-0.6B", "embedding", "marketplace.blurb.embedding_small", params_b=0.6),
     Curated("Qwen/Qwen3-Embedding-8B", "embedding", "marketplace.blurb.embedding_large", params_b=7.6),
+    # ── pictures from a prompt (the runtime's image app; licences checked 2026-10-09) ──
+    Curated("Tongyi-MAI/Z-Image-Turbo", "images", "marketplace.blurb.images_turbo",
+            # Turbo is distilled to 8 steps without guidance; the pipeline's own
+            # defaults (50 steps, guidance 5) are slow and wash it out.
+            settings={"num_inference_steps": 9, "guidance_scale": 0.0}, params_b=6.2),
+    Curated("black-forest-labs/FLUX.1-schnell", "images", "marketplace.blurb.images_large",
+            settings={"num_inference_steps": 4, "guidance_scale": 0.0}, params_b=12.0),
 )
 
-GROUPS = ("start", "chat", "code", "reasoning", "vision", "embedding")
+GROUPS = ("start", "chat", "code", "reasoning", "vision", "embedding", "images")
 
 BY_REPO = {c.repo_id: c for c in CURATED}
 

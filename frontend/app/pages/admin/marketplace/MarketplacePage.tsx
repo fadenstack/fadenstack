@@ -57,7 +57,7 @@ import { ModelDetailDrawer } from "./ModelDetailDrawer";
 type TabId = "recommended" | "search" | "local";
 const TABS: TabId[] = ["recommended", "search", "local"];
 const SORTS: MarketSort[] = ["trending", "downloads", "likes", "recent"];
-const TASKS: ModelTask[] = ["chat", "embedding", "vision"];
+const TASKS: ModelTask[] = ["chat", "embedding", "vision", "images"];
 /** Suggestions for the author filter; any Hub organisation or user can be typed. */
 const AUTHORS = [
   "Qwen",
