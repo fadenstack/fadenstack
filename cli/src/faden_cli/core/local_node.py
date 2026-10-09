@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import httpx
 
 from faden_cli.core.console import error, info, success, warning
+from faden_cli.core.private_files import write_private
 from faden_cli.core.registry import CORE_REPO, core_repo_clone_url, repo_clone_url
 
 _NODE_AGENT_REPO = "faden-node-agent"
@@ -249,7 +250,7 @@ def _provision_local(
     try:
         if _run(["sudo", "install", "-m", "0644", str(service_file), "/etc/systemd/system/faden-agent.service"]) != 0:
             return False
-        if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/faden-agent.env"]) != 0:
+        if _run(["sudo", "install", "-m", "0600", str(temp_env), "/etc/faden-agent.env"]) != 0:
             return False
         if _run(["sudo", "systemctl", "daemon-reload"]) != 0:
             return False
@@ -330,7 +331,7 @@ def _provision_local_binary(
         try:
             if _run(["sudo", "install", "-m", "0644", str(service_src), "/etc/systemd/system/faden-agent.service"]) != 0:
                 return False
-            if _run(["sudo", "install", "-m", "0644", str(temp_env), "/etc/faden-agent.env"]) != 0:
+            if _run(["sudo", "install", "-m", "0600", str(temp_env), "/etc/faden-agent.env"]) != 0:
                 return False
             if _run(["sudo", "systemctl", "daemon-reload"]) != 0:
                 return False
@@ -381,7 +382,8 @@ def _start_agent_foreground(repo_dir: Path, env_lines: list[str]) -> bool:
     """Write a .env file and start the node agent as a background process (non-Linux)."""
     # Write env file
     env_file = repo_dir / ".env"
-    env_file.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+    # Owner-only: it carries the enrollment token.
+    write_private(env_file, ("\n".join(env_lines) + "\n").encode("utf-8"))
     info(f"Wrote agent env to {env_file}")
 
     # Resolve the Python interpreter from the uv venv
@@ -626,11 +628,11 @@ TMP_ENV="$(mktemp)"
 }} >"$TMP_ENV"
 
 if [ -n "$SUDO_BIN" ]; then
-  $SUDO_BIN install -m 0644 "$TMP_ENV" /etc/faden-agent.env
+  $SUDO_BIN install -m 0600 "$TMP_ENV" /etc/faden-agent.env
   $SUDO_BIN systemctl daemon-reload
   $SUDO_BIN systemctl enable --now faden-agent
 else
-  install -m 0644 "$TMP_ENV" /etc/faden-agent.env
+  install -m 0600 "$TMP_ENV" /etc/faden-agent.env
   systemctl daemon-reload
   systemctl enable --now faden-agent
 fi

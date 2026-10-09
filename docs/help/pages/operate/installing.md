@@ -102,7 +102,7 @@ Next: [add the GPU machines](machines.md).
 | Path | What it is |
 |---|---|
 | `~/fadenstack/` | The deployment: compose file, `.env`, service configuration |
-| `~/fadenstack/.env` | Every password, key and setting. Keep it private, and keep a copy with your backups |
+| `~/fadenstack/.env` | Every password, key and setting, readable by you only. Keep it private, and keep a copy with your backups |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | The served certificate, and the server's own certificate authority with its key |
 | `~/fadenstack/backups/` | Backups |
 | `~/fadenstack/logs/` | The log of the daily certificate renewal (the nightly backup logs to `~/fadenstack/backups/backup.log`) |

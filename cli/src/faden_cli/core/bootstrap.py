@@ -12,7 +12,6 @@ is sent in the ``X-Faden-Bootstrap-Token`` header.
 from __future__ import annotations
 
 import os
-import stat
 import time
 from pathlib import Path
 
@@ -21,6 +20,7 @@ import httpx
 from faden_cli.core.console import console, error, success, warning
 from faden_cli.core.edge import verify_for
 from faden_cli.core.env_gen import BOOTSTRAP_TOKEN_KEY, read_env_file
+from faden_cli.core.private_files import write_private
 
 #: The header the backend reads the install's bootstrap token from.
 BOOTSTRAP_TOKEN_HEADER = "X-Faden-Bootstrap-Token"  # noqa: S105 - a header name
@@ -185,10 +185,8 @@ def save_credentials_file(creds: dict, directory: Path) -> Path | None:
     )
 
     try:
-        creds_path.write_text("\n".join(content_lines) + "\n", encoding="utf-8")
-        # Restrict read/write to owner only
-        if os.name != "nt":
-            creds_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        # Readable by its owner only from the start: it was written with the default mode, then narrowed.
+        write_private(creds_path, ("\n".join(content_lines) + "\n").encode("utf-8"))
         return creds_path
     except OSError as exc:
         error(f"Could not save credentials file: {exc}")

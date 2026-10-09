@@ -34,6 +34,7 @@ from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
 from faden_cli.core.env_gen import default_env_vars, ensure_bootstrap_token, read_env_file, write_env_file
+from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
 from faden_cli.core.settings import FadenConfig, load_config, save_config
@@ -527,6 +528,10 @@ def deploy_cmd(
     _regenerate_rmq_definitions(shared_dir, existing, profiles)
     success("RabbitMQ definitions.json generated.")
 
+    # .env, the saved credentials and the backups, readable by this user only -- an install made
+    # before kept them readable by every local user.
+    secure_install(shared_dir)
+
     # ── 3d. Ports and HTTPS ───────────────────────────────────────
     # Before anything starts: nginx picks plain HTTP or HTTPS when it starts.
     console.print("\n[bold cyan]Step 3d: Ports and HTTPS…[/bold cyan]")
@@ -771,8 +776,7 @@ def deploy_cmd(
     if schedule.available() and schedule.current() is None:
         console.print()
         if yes or click.confirm("  Back up every night at 03:00, keeping the last 7?", default=True):
-            backups = shared_dir / "backups"
-            backups.mkdir(parents=True, exist_ok=True)
+            backups = private_dir(shared_dir / "backups")
             try:
                 how, notes = schedule.install(hour=3, minute=0, retain=7, log=backups / "backup.log")
             except (RuntimeError, OSError) as exc:

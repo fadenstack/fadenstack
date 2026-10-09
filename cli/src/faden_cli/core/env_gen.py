@@ -13,6 +13,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from faden_cli.core.private_files import write_private
 from faden_cli.core.registry import module_env_vars
 from faden_cli.core.sysinfo import calculate_tune_profile
 
@@ -349,7 +350,8 @@ def write_env_file(
         lines.append("")
 
     # Always write LF line endings — .env is consumed by Linux containers.
-    output_path.write_bytes("\n".join(lines).encode("utf-8"))
+    # Readable by its owner only: it holds every password and key of the install.
+    write_private(output_path, "\n".join(lines).encode("utf-8"))
     return output_path
 
 
@@ -403,8 +405,8 @@ def set_module_env(
         if lines and lines[-1].strip():
             lines.append("")
         lines += ["# ── Modules (faden module enable) ──", *appended]
-    # LF, like write_env_file: the file is read by Linux containers.
-    env_path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+    # LF, like write_env_file: the file is read by Linux containers. Owner-only, like write_env_file.
+    write_private(env_path, ("\n".join(lines) + "\n").encode("utf-8"))
     return list(changes)
 
 

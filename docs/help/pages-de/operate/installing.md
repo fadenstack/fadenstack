@@ -110,7 +110,7 @@ Als Nächstes: [die GPU-Maschinen hinzufügen](machines.md).
 | Pfad | Was es ist |
 |---|---|
 | `~/fadenstack/` | Die Installation: Compose-Datei, `.env`, Konfiguration der Dienste |
-| `~/fadenstack/.env` | Alle Passwörter, Schlüssel und Einstellungen. Halten Sie die Datei vertraulich und bewahren Sie eine Kopie bei Ihren Sicherungen auf |
+| `~/fadenstack/.env` | Alle Passwörter, Schlüssel und Einstellungen, nur für Sie lesbar. Halten Sie die Datei vertraulich und bewahren Sie eine Kopie bei Ihren Sicherungen auf |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem Schlüssel |
 | `~/fadenstack/backups/` | Sicherungen |
 | `~/fadenstack/logs/` | Das Log der täglichen Zertifikatserneuerung (die nächtliche Sicherung schreibt nach `~/fadenstack/backups/backup.log`) |
