@@ -13,15 +13,17 @@ from starlette import status
 
 from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
+from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.containers import (
     AuditResult,
     ContainerClass,
     ContainerPolicy,
 )
-from faden_backend.db.models.users import User
+from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services.docker import recreate
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services.policy.enforcement import Action, PolicyEnforcer
+from faden_backend.web.api.admin.containers import host_access
 from faden_backend.web.api.admin.containers.schema import (
     ContainerDetailDTO,
     ContainerSettingsDTO,
@@ -56,6 +58,15 @@ _LIFECYCLE_ACTION_MAP: dict[str, Action] = {
     "pause": Action.PAUSE,
     "unpause": Action.UNPAUSE,
 }
+#: The ``containers`` permission each lifecycle action needs. There is no
+#: ``unpause`` permission: who may pause a container may resume it.
+_LIFECYCLE_PERMISSION: dict[str, str] = {
+    "start": "start",
+    "stop": "stop",
+    "restart": "restart",
+    "pause": "pause",
+    "unpause": "pause",
+}
 
 _ROOT_MODE_SEVERITY = "high"
 _NORMAL_SEVERITY = "normal"
@@ -63,6 +74,49 @@ _NORMAL_SEVERITY = "normal"
 
 def _severity(root_mode: bool) -> str:
     return _ROOT_MODE_SEVERITY if root_mode else _NORMAL_SEVERITY
+
+
+async def _lifecycle_user(
+    action: str,
+    user: User = Depends(current_active_user),
+    rbac_dao: RbacDAO = Depends(),
+) -> User:
+    """The user, holding the ``containers`` permission of *action*: stop needs ``stop``, not ``start``."""
+    permission = _LIFECYCLE_PERMISSION.get(action)
+    if permission is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown action '{action}'. Valid: {list(_LIFECYCLE_ACTION_MAP)}",
+        )
+    return await require_permission("containers", permission)(user=user, rbac_dao=rbac_dao)
+
+
+async def _refuse_host_access(
+    reasons: list[str],
+    *,
+    root_mode: bool,
+    doing: str,
+    audit: str,
+    target_id: str,
+    user: User,
+    audit_dao: AuditDAO,
+) -> None:
+    """Refuse a container with root on the host unless Root Mode is on; the refusal is audited."""
+    if not reasons or root_mode:
+        return
+    await audit_action(
+        action=audit,
+        target_type="container",
+        target_id=target_id,
+        result=AuditResult.DENY,
+        actor_id=user.id,
+        severity=_ROOT_MODE_SEVERITY,
+        audit_dao=audit_dao,
+        metadata_json=json.dumps({"host_access": reasons}),
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail=host_access.refusal(reasons, doing=doing),
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -218,12 +272,23 @@ def _container_summary_from_docker(
 @router.post("/", response_model=ContainerSummaryDTO, status_code=201, name="create_container")
 async def create_container(
     body: CreateContainerRequest,
-    user: User = Depends(require_permission("containers", "create")),
+    # A container is made with any image, binds and network: superusers only.
+    user: User = Depends(require_superuser),
     docker: DockerService = Depends(get_docker),
+    root_mode: bool = Depends(get_root_mode_active),
     registry_dao: ContainerRegistryDAO = Depends(),
     audit_dao: AuditDAO = Depends(),
 ) -> ContainerSummaryDTO:
-    """Create a new container and register it in the classification registry."""
+    """Create a new container and register it in the classification registry.
+
+    One with root on the host (the Docker socket, a system folder, the host's
+    network) is made only in Root Mode.
+    """
+    reasons = host_access.host_access(body.volumes, body.network)
+    await _refuse_host_access(
+        reasons, root_mode=root_mode, doing="create", audit="container.create",
+        target_id=body.name or body.image, user=user, audit_dao=audit_dao,
+    )
     # Build Docker port binding config: {"80/tcp": [{"HostIp": "", "HostPort": "8080"}]}
     port_bindings: dict[str, list[dict[str, str]]] | None = None
     if body.ports:
@@ -261,7 +326,7 @@ async def create_container(
         target_id=container_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        severity="normal",
+        severity=_ROOT_MODE_SEVERITY if reasons else _severity(root_mode),
         audit_dao=audit_dao,
         metadata_json=json.dumps(
             {
@@ -269,6 +334,7 @@ async def create_container(
                 "name": raw_name,
                 "class": body.container_class.value,
                 "policy": body.policy.value,
+                **({"host_access": reasons} if reasons else {}),
             }
         ),
     )
@@ -402,7 +468,8 @@ async def container_settings(
 async def update_container(
     container_id: str,
     body: CreateContainerRequest,
-    user: User = Depends(require_permission("containers", "update")),
+    # The new container takes any image, binds and network: superusers only.
+    user: User = Depends(require_superuser),
     docker: DockerService = Depends(get_docker),
     entry: Any = Depends(get_registry_entry),
     enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
@@ -415,6 +482,8 @@ async def update_container(
     Docker changes none of the settings the form edits in a container that
     exists. The new container has a new id; the old one is removed once the
     new one runs, and is back as it was if the new one cannot be made.
+    A new container with root on the host, from the form or from what the
+    old one kept, is made only in Root Mode.
     """
     try:
         enforcer.enforce(Action.UPDATE_CONFIG, entry.container_class, entry.policy, root_mode)
@@ -442,6 +511,11 @@ async def update_container(
                 "in .env and run faden upgrade."
             ),
         )
+    reasons = host_access.host_access(body.volumes, body.network, raw.get("HostConfig") or {})
+    await _refuse_host_access(
+        reasons, root_mode=root_mode, doing="change", audit="container.update",
+        target_id=container_id, user=user, audit_dao=audit_dao,
+    )
     image = await _image_of(docker, raw)
     old = recreate.own_settings(raw, image)
     edit = recreate.ContainerEdit(
@@ -488,6 +562,7 @@ async def update_container(
                 "env": sorted(item.split("=", 1)[0] for item in edit.env),
                 "class": body.container_class.value,
                 "policy": body.policy.value,
+                **({"host_access": reasons} if reasons else {}),
             }),
         )
     except Exception:
@@ -555,7 +630,7 @@ async def container_exec(
 async def container_lifecycle(
     container_id: str,
     action: str,
-    user: User = Depends(require_permission("containers", "start")),
+    user: User = Depends(_lifecycle_user),
     docker: DockerService = Depends(get_docker),
     entry: Any = Depends(get_registry_entry),
     enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
@@ -565,14 +640,10 @@ async def container_lifecycle(
     """
     Perform a lifecycle action (start/stop/restart/pause/unpause) on a container.
 
-    Action is policy-enforced before execution.
+    The action needs its own permission (``_LIFECYCLE_PERMISSION``) and is
+    policy-enforced before execution.
     """
-    policy_action = _LIFECYCLE_ACTION_MAP.get(action)
-    if policy_action is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown action '{action}'. Valid: {list(_LIFECYCLE_ACTION_MAP)}",
-        )
+    policy_action = _LIFECYCLE_ACTION_MAP[action]  # an unknown one was refused by _lifecycle_user
 
     try:
         enforcer.enforce(policy_action, entry.container_class, entry.policy, root_mode)
@@ -705,7 +776,9 @@ async def delete_container(
 async def register_container(
     container_id: str,
     body: RegisterContainerRequest,
-    user: User = Depends(require_permission("containers", "update")),
+    # The class decides what may be done to the container (a system container
+    # made TENANT_APP may be exec'd into): superusers only.
+    user: User = Depends(require_superuser),
     docker: DockerService = Depends(get_docker),
     registry_dao: ContainerRegistryDAO = Depends(),
     audit_dao: AuditDAO = Depends(),

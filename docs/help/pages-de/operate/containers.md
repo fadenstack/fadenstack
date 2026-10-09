@@ -100,6 +100,12 @@ Sie zuerst einen **Testlauf**.
     Umgebungsvariablen sind für jeden sichtbar, der den Container sehen kann. Legen Sie dort keine Geheimnisse ab,
     die diese Personen nicht sehen sollen.
 
+Container erstellen, bearbeiten und neu klassifizieren kann nur ein Superuser. Ein Container, der Root-Rechte auf dem
+Server hätte, braucht den **Root-Modus**: einer, der den Docker-Socket, `/` oder einen Systemordner wie `/etc`,
+`/proc` oder `/var/lib/docker` einbindet (oder einen Ordner, der einen davon enthält), oder der das Netzwerk `host`
+oder das Netzwerk eines anderen Containers nutzt. Ohne Root-Modus lehnt die Konsole ihn ab und sagt, warum. Das gilt
+auch beim Bearbeiten, ebenso wenn der Container eine solche Einbindung schon hatte oder privilegiert läuft.
+
 ## Mit einem Container arbeiten {#work-with-a-container}
 
 ![Die Seite eines Containers: Name, Klasse und ID, die Tabs Übersicht, Logs und Exec, Status und Netzwerke, und Bearbeiten](../images/operate/container.png)

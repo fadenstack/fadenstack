@@ -95,6 +95,12 @@ A container starts from an image on the server; creating one does not pull it.
     Environment variables are visible to anyone who can see the container. Do not put secrets there that those
     people should not see.
 
+Only a superuser creates, edits or reclassifies containers. A container that would have root on the server needs
+**Root Mode**: one that mounts the Docker socket, `/` or a system folder such as `/etc`, `/proc` or `/var/lib/docker`
+(or a folder that holds one), or that uses the `host` network or another container's network. Without Root Mode
+the console refuses it and says why. The same goes for an edit, also when the container already had such a mount or
+runs privileged.
+
 ## Work with a container
 
 ![A container's page: its name, class and ID, the Overview, Logs and Exec tabs, its status and networks, and Edit](../images/operate/container.png)
