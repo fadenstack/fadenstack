@@ -249,6 +249,13 @@ def upgrade_cmd(
     else:
         warning("No .env file found — skipping env refresh.")
 
+    # .env, the saved credentials and the install's backups, readable by this user only -- an install
+    # made before kept them readable by every local user. (A --backup-dir of the operator's keeps its
+    # mode; the backup written into it is private.)
+    from faden_cli.core.private_files import secure_install  # noqa: PLC0415
+
+    secure_install(shared_dir)
+
     # The authority machines keep for when HTTPS is switched on (faden tls):
     # made while they can still fetch it over plain HTTP.
     from faden_cli.core import tls as edge_tls  # noqa: PLC0415

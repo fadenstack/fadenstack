@@ -23,6 +23,9 @@ when you install.
     A backup holds private keys and every secret of the install. Keep backups as private as `.env`, and keep
     copies off the server: a backup on the same disk does not survive losing the disk.
 
+On the server, a backup is readable by the user who runs `faden` only, like `.env`; `faden deploy` and
+`faden upgrade` do the same for backups made before.
+
 ## Back up now
 
 ```bash

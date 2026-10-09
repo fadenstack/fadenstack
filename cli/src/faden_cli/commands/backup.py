@@ -20,6 +20,7 @@ import click
 from faden_cli.core.backup import create_backup
 from faden_cli.core.compose import build_context_from_config
 from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.private_files import private_dir
 from faden_cli.core.settings import load_config
 
 
@@ -146,8 +147,7 @@ def schedule_cmd(*, at: str, retain: int, off: bool) -> None:
     if not cfg.install_dir:
         error("No install to back up: run `faden deploy` first.")
         sys.exit(1)
-    backups = cfg.install_path / "backups"
-    backups.mkdir(parents=True, exist_ok=True)
+    backups = private_dir(cfg.install_path / "backups")
     try:
         how, warnings = schedule.install(hour=hour, minute=minute, retain=retain, log=backups / "backup.log")
     except (RuntimeError, OSError) as exc:

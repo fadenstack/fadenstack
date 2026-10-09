@@ -4,6 +4,11 @@ Shared by ``faden backup``, ``faden restore``, and
 ``faden upgrade``.  All database operations run via
 ``docker exec`` against the running ``faden-postgres`` container —
 no direct network connection is needed.
+
+A backup holds every database and every secret of the install, so it is
+readable by the user who made it only: its directory 0700, its files 0600,
+the volume archives too (the CLI writes them from the helper container's
+output, rather than the container writing them as root).
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from pathlib import Path
 from faden_cli import __version__
 from faden_cli.core.compose import ComposeContext, up as compose_up
 from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.private_files import PRIVATE_DIR, open_private, private_dir, write_private
 from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
 
 # Named Docker volumes that can be included in a backup, by their name in the compose file. Not among them:
@@ -151,7 +157,7 @@ def dump_databases(
             warning(f"  pg_dump failed for {db}: {stderr}")
             continue
 
-        dump_path.write_bytes(proc.stdout)
+        write_private(dump_path, proc.stdout)
         results[db] = dump_file
 
     return results
@@ -263,17 +269,17 @@ def snapshot_env(env_path: Path, backup_dir: Path) -> str:
         warning("  No .env file found — skipping env snapshot.")
         return ""
     dest = backup_dir / ".env.bak"
-    shutil.copy2(env_path, dest)
+    write_private(dest, env_path.read_bytes())
     return ".env.bak"
 
 
 def restore_env(backup_dir: Path, env_path: Path) -> bool:
-    """Restore the .env snapshot from a backup."""
+    """Restore the .env snapshot from a backup, readable by its owner only."""
     src = backup_dir / ".env.bak"
     if not src.exists():
         warning("  No .env snapshot in backup.")
         return False
-    shutil.copy2(src, env_path)
+    write_private(env_path, src.read_bytes())
     return True
 
 
@@ -321,6 +327,10 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> l
     Uses a temporary ``alpine`` container to read from the volume mount. The archive carries the compose
     name (``minio_data.tar.gz``), so a restore finds the volume on whichever install it runs.
     Returns list of created archive filenames.
+
+    The container writes the archive to its output and the CLI into the backup, readable by its owner
+    only. Written by the container into a mounted backup directory, it was root's, 0644, for every
+    local user to read.
     """
     docker = _docker_bin()
     project = _compose_project(docker)
@@ -333,21 +343,24 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> l
             warning(f"  No volume {vol} in this install; skipped")
             continue
         archive = f"{vol}.tar.gz"
+        archive_path = backup_dir / archive
         info(f"  Snapshotting volume: {vol}")
-        proc = subprocess.run(  # noqa: S603
-            [
-                docker, "run", "--rm",
-                "-v", f"{source}:/data:ro",
-                "-v", f"{backup_dir}:/backup",
-                "alpine",
-                "tar", "czf", f"/backup/{archive}", "-C", "/data", ".",
-            ],
-            capture_output=True,
-            check=False,
-        )
+        with open_private(archive_path) as out:
+            proc = subprocess.run(  # noqa: S603
+                [
+                    docker, "run", "--rm",
+                    "-v", f"{source}:/data:ro",
+                    "alpine",
+                    "tar", "czf", "-", "-C", "/data", ".",
+                ],
+                stdout=out,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
         if proc.returncode != 0:
             stderr = proc.stderr.decode("utf-8", errors="replace").strip()
             warning(f"  Volume snapshot failed for {vol}: {stderr[:200]}")
+            archive_path.unlink(missing_ok=True)
             continue
         created.append(archive)
 
@@ -379,17 +392,20 @@ def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
             warning(f"  No volume {vol} in this install; {archive} not restored")
             continue
         info(f"  Restoring volume: {vol}")
-        proc = subprocess.run(  # noqa: S603
-            [
-                docker, "run", "--rm",
-                "-v", f"{target}:/data",
-                "-v", f"{backup_dir}:/backup:ro",
-                "alpine",
-                "sh", "-c", f"find /data -mindepth 1 -delete && tar xzf /backup/{archive} -C /data",
-            ],
-            capture_output=True,
-            check=False,
-        )
+        # The archive goes in on the container's input: the backup is its owner's only, which a container's
+        # root may not be (user namespaces), and a mount of it is not needed.
+        with archive_path.open("rb") as archive_in:
+            proc = subprocess.run(  # noqa: S603
+                [
+                    docker, "run", "--rm", "-i",
+                    "-v", f"{target}:/data",
+                    "alpine",
+                    "sh", "-c", "find /data -mindepth 1 -delete && tar xzf - -C /data",
+                ],
+                stdin=archive_in,
+                capture_output=True,
+                check=False,
+            )
         if proc.returncode != 0:
             stderr = proc.stderr.decode("utf-8", errors="replace").strip()
             warning(f"  Volume restore failed for {vol}: {stderr[:200]}")
@@ -430,14 +446,23 @@ def snapshot_tls(install_dir: Path, backup_dir: Path) -> list[str]:
         if not src.is_file():
             continue
         dest = backup_dir / _TLS_BACKUP_DIR / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
+        private_dir(dest.parent)
+        write_private(dest, src.read_bytes())
         copied.append(rel)
     return copied
 
 
+def _tls_mode(rel: str) -> int:
+    """The mode a certificate file has in an install: keys (and where they came from) owner-only."""
+    return 0o600 if rel.endswith((".key", "source.json")) else 0o644
+
+
 def restore_tls(backup_dir: Path, install_dir: Path, files: list[str]) -> list[str]:
-    """Put the certificate material back, keys readable by their owner only."""
+    """Put the certificate material back, keys readable by their owner only.
+
+    Each file gets the mode it has in an install, not the backup's (where every file is its owner's only):
+    the certificates are read by nginx and handed to the machines.
+    """
     restored: list[str] = []
     for rel in files:
         if rel not in TLS_MATERIAL:
@@ -447,12 +472,10 @@ def restore_tls(backup_dir: Path, install_dir: Path, files: list[str]) -> list[s
             continue
         dest = install_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
-        if rel.endswith((".key", "source.json")):
-            dest.chmod(0o600)
+        write_private(dest, src.read_bytes(), mode=_tls_mode(rel))
         restored.append(rel)
     if any(rel.startswith("tls-ca/") for rel in restored):
-        (install_dir / "tls-ca").chmod(0o700)
+        (install_dir / "tls-ca").chmod(PRIVATE_DIR)
     return restored
 
 
@@ -488,10 +511,7 @@ def write_manifest(
     }
 
     manifest_path = backup_dir / "manifest.json"
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_private(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     return manifest_path
 
 
@@ -575,10 +595,15 @@ def create_backup(
     7. Write manifest
     8. Rotate old backups
     """
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Owner-only, the directory and each backup in it: a backup holds every database and secret. A directory
+    # of the operator's (--output-dir) that already exists keeps its mode; the backups in it are private.
+    installs_own = ctx.project_dir is not None and (
+        output_dir.resolve() == (Path(str(ctx.project_dir)) / "backups").resolve()
+    )
+    if installs_own or not output_dir.exists():
+        private_dir(output_dir)
     timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup_dir = output_dir / timestamp
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_dir = private_dir(output_dir / timestamp)
 
     result = BackupResult(backup_dir=backup_dir)
 

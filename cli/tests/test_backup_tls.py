@@ -46,6 +46,13 @@ def test_the_certificate_material_goes_into_the_backup_and_back(tmp_path: Path) 
     if sys.platform != "win32":
         assert (rebuilt / "tls-ca" / "ca.key").stat().st_mode & 0o777 == 0o600
         assert (rebuilt / "tls-ca").stat().st_mode & 0o777 == 0o700
+        # In the backup every file is its owner's only; restored, a certificate is readable again, as nginx
+        # and the machines need it.
+        assert all(
+            (backup_dir / "tls-material" / rel).stat().st_mode & 0o777 == 0o600 for rel in copied
+        )
+        assert (rebuilt / "tls" / "edge.crt").stat().st_mode & 0o777 == 0o644
+        assert (rebuilt / "tls-ca" / "ca.crt").stat().st_mode & 0o777 == 0o644
 
 
 def test_a_tampered_certificate_file_fails_the_check(tmp_path: Path) -> None:

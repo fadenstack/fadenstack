@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from faden_backend.db.models.users import (
-    UserCreate,  # type: ignore
     UserRead,  # type: ignore
     UserUpdate,  # type: ignore
     api_users,  # type: ignore
@@ -15,11 +14,9 @@ from faden_backend.settings import settings
 
 router = APIRouter()
 
-router.include_router(
-    api_users.get_register_router(UserRead, UserCreate),
-    prefix="/auth",
-    tags=["auth"],
-)
+# No register router: accounts are made by an administrator (POST /api/admin/users/, the console's Users
+# page), by bootstrap for the first one, or by a sign-in provider set to create them. With it mounted at
+# POST /api/auth/register, anyone who reached the server could make an account with the default role.
 
 router.include_router(
     api_users.get_reset_password_router(),

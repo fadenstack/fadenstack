@@ -24,6 +24,9 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
     vertraulich wie die `.env`, und bewahren Sie Kopien außerhalb des Servers auf: Eine Sicherung auf derselben
     Festplatte übersteht den Verlust dieser Festplatte nicht.
 
+Auf dem Server kann eine Sicherung nur der Benutzer lesen, der `faden` ausführt, wie die `.env`; `faden deploy` und
+`faden upgrade` tun dasselbe für Sicherungen von früher.
+
 ## Jetzt sichern {#back-up-now}
 
 ```bash

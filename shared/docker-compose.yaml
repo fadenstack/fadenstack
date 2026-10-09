@@ -492,6 +492,9 @@ services:
       FADEN_BACKEND_LOKI_BASE_URL: http://faden-loki:3100
       FADEN_BACKEND_COOKIE_SECURE: "false"
       USERS_SECRET: ${USERS_SECRET:-}
+      # Asked for before the first administrator is created (POST /api/bootstrap);
+      # `faden deploy` writes it into .env and sends it. Empty: bootstrap is refused.
+      FADEN_BACKEND_BOOTSTRAP_TOKEN: ${FADEN_BACKEND_BOOTSTRAP_TOKEN:-}
       # Module enabled flags + service URLs (Docker-internal for health probes)
       FADEN_BACKEND_PII_ENABLED: ${FADEN_BACKEND_PII_ENABLED:-false}
       FADEN_BACKEND_PII_SERVICE_URL: ${FADEN_BACKEND_PII_SERVICE_URL:-http://faden-pii:8000/api}

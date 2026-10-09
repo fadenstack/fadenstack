@@ -1,10 +1,14 @@
 # Build and push all Fadenstack core Docker images to GHCR.
 #
 # Trigger options:
-#   - Push to main (builds changed services only)
+#   - Push to main (builds changed services only), tagged main and the commit
+#     SHA. It does not move latest.
 #   - A release tag v<version> (e.g. v0.3.0): every image, tagged 0.3.0, 0.3 and
 #     latest. `faden deploy` from the CLI of that version pulls exactly
 #     <version>, so the images must be published before the CLI is.
+#
+# The services are published from their Dockerfile's `prod` stage, built FROM the
+# base image of the same commit (base:<sha>, built first).
 #   - Manual dispatch (choose which services to build)
 #
 # Prerequisites:
@@ -123,6 +127,9 @@ jobs:
     with:
       service: gateway
       context: gateway
+      # The production stage; the Dockerfile ends with the dev one.
+      target: prod
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   backend:
@@ -137,6 +144,9 @@ jobs:
     with:
       service: backend
       context: backend
+      # The production stage; the Dockerfile ends with the dev one.
+      target: prod
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       # The runtime manifests the Dockerfile copies in.
       build-contexts: runtime_manifests=runtime-image
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
@@ -169,6 +179,9 @@ jobs:
     with:
       service: pii
       context: pii
+      # The production stage; the Dockerfile ends with the dev one.
+      target: prod
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   mcp:
@@ -183,6 +196,9 @@ jobs:
     with:
       service: mcp
       context: mcp
+      # The production stage; the Dockerfile ends with the dev one.
+      target: prod
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
   skills:
@@ -197,4 +213,7 @@ jobs:
     with:
       service: skills
       context: skills
+      # The production stage; the Dockerfile ends with the dev one.
+      target: prod
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}

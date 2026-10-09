@@ -1,14 +1,17 @@
 """First-admin bootstrap — calls ``POST /api/bootstrap``.
 
-Used by ``faden deploy`` and ``faden dev init`` to create the
+Used by ``faden deploy`` and ``faden dev up --local-node`` to create the
 initial admin user after services are up.  The raw credentials are
 displayed once and optionally saved to a local file.
+
+The backend creates the first administrator only for a caller with the
+install's bootstrap token (``FADEN_BACKEND_BOOTSTRAP_TOKEN`` in ``.env``), which
+is sent in the ``X-Faden-Bootstrap-Token`` header.
 """
 
 from __future__ import annotations
 
 import os
-import stat
 import time
 from pathlib import Path
 
@@ -16,6 +19,11 @@ import httpx
 
 from faden_cli.core.console import console, error, success, warning
 from faden_cli.core.edge import verify_for
+from faden_cli.core.env_gen import BOOTSTRAP_TOKEN_KEY, read_env_file
+from faden_cli.core.private_files import write_private
+
+#: The header the backend reads the install's bootstrap token from.
+BOOTSTRAP_TOKEN_HEADER = "X-Faden-Bootstrap-Token"  # noqa: S105 - a header name
 
 
 def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
@@ -44,6 +52,11 @@ def check_needs_bootstrap(base_url: str) -> bool | None:
     return None
 
 
+def read_bootstrap_token(install_dir: Path) -> str | None:
+    """The bootstrap token in *install_dir*'s ``.env``, or ``None`` when it has none."""
+    return read_env_file(Path(install_dir) / ".env").get(BOOTSTRAP_TOKEN_KEY) or None
+
+
 def run_bootstrap(
     base_url: str,
     *,
@@ -51,8 +64,12 @@ def run_bootstrap(
     password: str | None = None,
     generate_api_token: bool = True,
     tenant_id: str = "default",
+    token: str | None = None,
 ) -> dict | None:
-    """Call the bootstrap endpoint and return the credentials dict, or None on failure."""
+    """Call the bootstrap endpoint and return the credentials dict, or None on failure.
+
+    *token* is the install's bootstrap token; the backend refuses without it.
+    """
     payload: dict = {
         "email": email,
         "generate_api_token": generate_api_token,
@@ -65,6 +82,7 @@ def run_bootstrap(
         resp = httpx.post(
             f"{base_url}/api/bootstrap",
             json=payload,
+            headers={BOOTSTRAP_TOKEN_HEADER: token} if token else None,
             timeout=30,
             verify=verify_for(base_url),
         )
@@ -77,6 +95,18 @@ def run_bootstrap(
 
     if resp.status_code == 409:  # noqa: PLR2004
         warning("System is already bootstrapped — admin users exist.")
+        return None
+
+    if resp.status_code == 403:  # noqa: PLR2004
+        try:
+            detail = resp.json().get("detail") or resp.text
+        except ValueError:
+            detail = resp.text
+        error(
+            f"The backend refused to create the administrator: {detail}\n"
+            f"  The token is {BOOTSTRAP_TOKEN_KEY} in the install's .env (faden deploy adds one when it is"
+            " missing), and the backend reads it when it starts: run `faden up`, then `faden deploy` again."
+        )
         return None
 
     error(f"Bootstrap failed (HTTP {resp.status_code}): {resp.text}")
@@ -155,10 +185,8 @@ def save_credentials_file(creds: dict, directory: Path) -> Path | None:
     )
 
     try:
-        creds_path.write_text("\n".join(content_lines) + "\n", encoding="utf-8")
-        # Restrict read/write to owner only
-        if os.name != "nt":
-            creds_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        # Readable by its owner only from the start: it was written with the default mode, then narrowed.
+        write_private(creds_path, ("\n".join(content_lines) + "\n").encode("utf-8"))
         return creds_path
     except OSError as exc:
         error(f"Could not save credentials file: {exc}")
@@ -209,6 +237,7 @@ def bootstrap_interactive(
         email=email,
         password=password,
         generate_api_token=True,
+        token=read_bootstrap_token(install_dir),
     )
     if not creds:
         return None

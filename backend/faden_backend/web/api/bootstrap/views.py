@@ -1,23 +1,31 @@
 """Bootstrap endpoint — one-shot first-admin creation.
 
-Available *only* when zero users exist in the database.  After the
-first admin is created the endpoints return 409 Conflict for all
-subsequent calls, making them self-disabling.
+Available *only* when zero users exist in the database, and only to a caller
+that sends the install's bootstrap token (``FADEN_BACKEND_BOOTSTRAP_TOKEN``,
+which ``faden deploy`` writes into ``.env``) in the ``X-Faden-Bootstrap-Token``
+header. After the first admin is created the endpoints return 409 Conflict
+for all subsequent calls, making them self-disabling.
+
+Without that token the first administrator went to whoever asked first:
+deploy opens ports 80 and 443 before it bootstraps. (It is not the hour-long
+sign-in bootstrap hands back, which the CLI finishes setting up with.)
 """
 
 from __future__ import annotations
 
+import hmac
 import logging
 import secrets
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User
+from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +33,20 @@ router = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 
 #: How long the setup token lasts: the CLI finishes setting up with it, and never needs it again.
 BOOTSTRAP_TOKEN_TTL_S = 3600
+
+#: The header the install's bootstrap token comes in.
+BOOTSTRAP_TOKEN_HEADER = "X-Faden-Bootstrap-Token"  # noqa: S105 - a header name
+
+#: The transaction lock two bootstraps at once queue on (``pg_advisory_xact_lock``): the second one
+#: counts after the first has committed, and finds its administrator.
+BOOTSTRAP_LOCK_KEY = 0x6661_6465_6E62_7374  # "fadenbst"
+
+_REFUSED_UNCONFIGURED = (
+    "Bootstrap is refused: this server has no bootstrap token. Set FADEN_BACKEND_BOOTSTRAP_TOKEN in the "
+    "install's .env to a long random value (for example the output of `openssl rand -base64 48`), "
+    "restart the backend (`faden up`), then run `faden deploy` again, which sends it."
+)
+_REFUSED_WRONG = f"Bootstrap is refused: the {BOOTSTRAP_TOKEN_HEADER} header is missing or wrong."
 
 
 # ── Schemas ────────────────────────────────────────────────────────
@@ -78,6 +100,55 @@ async def _user_count(session: AsyncSession) -> int:
     return result.scalar_one()
 
 
+def check_bootstrap_token(sent: str | None) -> None:
+    """Refuse a bootstrap without the install's bootstrap token; compared in constant time."""
+    expected = settings.bootstrap_token.strip()
+    if not expected:
+        log.warning("Bootstrap refused: FADEN_BACKEND_BOOTSTRAP_TOKEN is not set.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_REFUSED_UNCONFIGURED)
+    if not hmac.compare_digest((sent or "").strip().encode("utf-8"), expected.encode("utf-8")):
+        log.warning("Bootstrap refused: wrong or missing bootstrap token.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_REFUSED_WRONG)
+
+
+async def create_first_admin(session: AsyncSession, payload: BootstrapRequest) -> tuple[User, str]:
+    """Create the first administrator, or 409 when there is one; ``(user, password)``.
+
+    Counting and creating run under a transaction lock: two requests at once
+    both counted no users, and both made a superuser.
+    """
+    from fastapi_users.password import PasswordHelper  # noqa: PLC0415
+
+    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": BOOTSTRAP_LOCK_KEY})
+    if await _user_count(session) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="System is already bootstrapped. Admin users exist.",
+        )
+
+    raw_password = payload.password or _generate_password()
+    admin_user = User(
+        id=uuid.uuid4(),
+        email=payload.email,
+        hashed_password=PasswordHelper().hash(raw_password),
+        is_active=True,
+        is_superuser=True,
+        is_verified=True,
+    )
+    session.add(admin_user)
+    await session.flush()
+
+    # ── Assign the built-in admin role ────────────────────────
+    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
+
+    rbac_dao = RbacDAO(session)
+    admin_role = await rbac_dao.get_role_by_name("admin")
+    if admin_role:
+        await rbac_dao.assign_role(admin_user.id, admin_role.id)
+        await session.flush()
+    return admin_user, raw_password
+
+
 # ── Endpoints ──────────────────────────────────────────────────────
 
 
@@ -103,46 +174,18 @@ async def bootstrap_status(
 async def bootstrap(
     payload: BootstrapRequest,
     session: AsyncSession = Depends(get_db_session),
+    bootstrap_token: str | None = Header(default=None, alias=BOOTSTRAP_TOKEN_HEADER),
 ) -> BootstrapResponse:
     """Create the first admin user and optionally generate an API token.
 
-    This endpoint is **only** available when the ``user`` table is empty.
-    Once the first admin is created, all subsequent calls return
-    ``409 Conflict``.
+    This endpoint is **only** available when the ``user`` table is empty,
+    and to a caller with the install's bootstrap token in the
+    ``X-Faden-Bootstrap-Token`` header. Once the first admin is created, all
+    subsequent calls return ``409 Conflict``.
     """
-    from fastapi_users.password import PasswordHelper  # noqa: PLC0415
-
-    # ── Guard: only when zero users exist ─────────────────────
-    count = await _user_count(session)
-    if count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="System is already bootstrapped. Admin users exist.",
-        )
-
-    # ── Create admin user ─────────────────────────────────────
-    raw_password = payload.password or _generate_password()
-    password_helper = PasswordHelper()
-
-    admin_user = User(
-        id=uuid.uuid4(),
-        email=payload.email,
-        hashed_password=password_helper.hash(raw_password),
-        is_active=True,
-        is_superuser=True,
-        is_verified=True,
-    )
-    session.add(admin_user)
-    await session.flush()
-
-    # ── Assign the built-in admin role ────────────────────────
-    from faden_backend.db.dao.rbac_dao import RbacDAO  # noqa: PLC0415
-
-    rbac_dao = RbacDAO(session)
-    admin_role = await rbac_dao.get_role_by_name("admin")
-    if admin_role:
-        await rbac_dao.assign_role(admin_user.id, admin_role.id)
-        await session.flush()
+    # ── Guard: the install's bootstrap token, then zero users ─
+    check_bootstrap_token(bootstrap_token)
+    admin_user, raw_password = await create_first_admin(session, payload)
 
     # ── Optional: generate API gateway token ──────────────────
     api_token: str | None = None
@@ -152,7 +195,6 @@ async def bootstrap(
         import jwt as pyjwt  # noqa: PLC0415
 
         from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
-        from faden_backend.settings import settings  # noqa: PLC0415
 
         # Resolve the JWT signing secret (same logic as the token endpoint).
         # Use the secret WITHOUT stripping — JWTStrategy uses it as-is.
@@ -166,7 +208,7 @@ async def bootstrap(
             if ciphertext:
                 try:
                     secret = SettingsCrypto(settings.settings_master_key).decrypt(ciphertext).strip()
-                except Exception:  # noqa: BLE001
+                except Exception:
                     secret = ""
 
         if secret:

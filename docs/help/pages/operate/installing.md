@@ -102,7 +102,7 @@ Next: [add the GPU machines](machines.md).
 | Path | What it is |
 |---|---|
 | `~/fadenstack/` | The deployment: compose file, `.env`, service configuration |
-| `~/fadenstack/.env` | Every password, key and setting. Keep it private, and keep a copy with your backups |
+| `~/fadenstack/.env` | Every password, key and setting, readable by you only. Keep it private, and keep a copy with your backups |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | The served certificate, and the server's own certificate authority with its key |
 | `~/fadenstack/backups/` | Backups |
 | `~/fadenstack/logs/` | The log of the daily certificate renewal (the nightly backup logs to `~/fadenstack/backups/backup.log`) |
@@ -154,6 +154,7 @@ faden up
 | **`Docker is not available`** or **`Docker daemon is not running`** | Install Docker Engine with the Compose plugin, start it, and make sure your user is in the `docker` group (log out and in again after adding it). |
 | **`HTTP port 80 is in use by something else.`** | Another program holds the port. Free it, or run `faden deploy --http-port 8080 --https-port 8443`. `faden doctor` lists every port the install publishes and whether something else holds it. |
 | **`Backend did not become healthy in time — skipping admin setup.`** | The services started but the console API did not answer in time. Check `faden status` and `faden logs faden-backend`, fix what they show, then run `faden deploy` again: it keeps the `.env` and creates the administrator. |
+| **`The backend refused to create the administrator`** | The backend creates the first administrator only for whoever sends the install's bootstrap token, `FADEN_BACKEND_BOOTSTRAP_TOKEN` in `~/fadenstack/.env`. `faden deploy` writes one when `.env` has none. An install started some other way may lack it, and a backend started before it was set does not know it yet: run `faden up`, then `faden deploy` again. |
 | **`Some images failed to pull.`** | The server could not reach a registry. Check its internet access and proxy, then run `faden deploy` again. |
 | The browser refuses the certificate | The server's certificate authority is not trusted on that computer yet. Import `~/fadenstack/tls/ca.crt`, or use a certificate from your own issuer (see [HTTPS and trust](https.md)). |
 | The console says **"This server still uses the default settings master key"** | The key that seals stored secrets (the Hugging Face token, among others) is still the default. `faden deploy` writes a random one into `.env`; an install started some other way may lack it. Set `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` to a long random value (for example the output of `openssl rand -base64 48`), then run `faden up`. Secrets stored under the old key have to be entered again. |
