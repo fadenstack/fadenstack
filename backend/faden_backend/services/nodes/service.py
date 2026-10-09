@@ -10,6 +10,8 @@ from typing import Any
 
 from sqlalchemy import select
 
+from faden_backend.services.docker.image_ref import check_runtime_images
+
 log = logging.getLogger(__name__)
 
 from faden_backend.db.dao.inference_dao import ModelAvailabilityDAO
@@ -775,6 +777,11 @@ class NodeControlService:
         timeout_sec: int | None,
         idempotency_key: str | None,
     ) -> InfraNodeCommand:
+        if command_type in self._RUNTIME_COMMAND_TYPES:
+            # The agent runs this image with ``docker run``: one read there as
+            # an option is refused here, also for a runtime saved before the
+            # API checked it.
+            check_runtime_images(payload)
         node = await self._dao.get_node_by_id(node_id)
         if node is None:
             raise ValueError("Node not found.")

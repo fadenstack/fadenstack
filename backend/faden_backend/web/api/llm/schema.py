@@ -17,6 +17,18 @@ from faden_backend.db.models.llm import (
     ProviderType,
     RuntimeStatus,
 )
+from faden_backend.services.docker.image_ref import check_image_ref
+
+
+def _checked_provider_config(value: dict | None) -> dict | None:
+    """A runtime's ``provider_config`` whose ``image``, if it names one, is an image reference.
+
+    A machine's agent runs that image with ``docker run``: a value read there
+    as an option (``--privileged``) gave whoever set it root on the machine.
+    """
+    if isinstance(value, dict) and value.get("image") not in (None, ""):
+        check_image_ref(value["image"], field="provider_config.image")
+    return value
 
 # -----------------------------------------------------------------------
 # Provider
@@ -310,6 +322,8 @@ class RuntimeCreateRequest(BaseModel):
         description="How the container image reaches the remote node.",
     )
 
+    _provider_config = field_validator("provider_config")(_checked_provider_config)
+
 
 class RuntimeUpdateRequest(BaseModel):
     """Request body for updating a runtime's config (triggers container rebuild)."""
@@ -320,6 +334,8 @@ class RuntimeUpdateRequest(BaseModel):
     openai_compat: bool | None = None
     target_node_id: uuid.UUID | None = None
     placement_hints: dict | None = None
+
+    _provider_config = field_validator("provider_config")(_checked_provider_config)
 
 
 class RuntimeDTO(BaseModel):
