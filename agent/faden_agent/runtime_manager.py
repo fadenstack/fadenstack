@@ -16,7 +16,7 @@ import httpx
 ProgressEmitter = Callable[[dict[str, Any]], Awaitable[None]]
 
 from faden_agent.event_buffer import EventBuffer
-from faden_agent.runtimes import ContainerRuntime
+from faden_agent.runtimes import ContainerRuntime, ContainerRuntimeError, check_image_ref
 from faden_agent.state_store import StateStore
 
 log = logging.getLogger(__name__)
@@ -50,15 +50,29 @@ class RuntimeManager:
         "ollama": "ollama/ollama:latest",
     }
 
-    _DENIED_DOCKER_FLAGS = {
-        "--privileged",
-        "--cap-add",
-        "--pid",
-        "--security-opt",
-        "--device",
-        "--userns",
-        "--ipc=host",
+    #: Docker options refused in a command override, as ``--flag=value`` and as
+    #: ``--flag value``: ``None`` refuses every value, a set the values in it
+    #: (``container:`` stands for every ``container:<name>``).
+    _DENIED_DOCKER_FLAGS: dict[str, frozenset[str] | None] = {
+        "--privileged": None,
+        "--cap-add": None,
+        "--pid": None,
+        "--security-opt": None,
+        "--device": None,
+        "--userns": None,
+        "--ipc": frozenset({"host", "container:"}),
     }
+    #: Network options refused with the host's or another container's network.
+    _NETWORK_FLAGS = frozenset({"--network", "--net"})
+    _SHARED_NETWORKS = frozenset({"host", "container:"})
+    #: Options that mount host paths into the container.
+    _MOUNT_FLAG_PREFIXES = ("-v", "--volume", "--mount")
+
+    #: What ``--memory``/``--shm-size``, ``--cpus`` and ``--ipc`` take: sizes,
+    #: a number, a mode. Anything else is refused before it reaches ``docker run``.
+    _SIZE = re.compile(r"\d+(\.\d+)?[kKmMgGtTpP]?[iI]?[bB]?")
+    _CPUS = re.compile(r"\d+(\.\d+)?|\.\d+")
+    _IPC_MODES = frozenset({"host", "private", "shareable", "none"})
 
     # Health endpoints by provider type for readiness probing.
     _HEALTH_PATHS: dict[str, str] = {
@@ -132,6 +146,7 @@ class RuntimeManager:
         )
         if not image:
             raise RuntimeManagerError("No image provided for workload deployment.")
+        self._check_run_values(image, payload, provider_config)
 
         await _progress("validate", f"Validated payload — image={image}, provider={provider_type}")
 
@@ -835,26 +850,57 @@ class RuntimeManager:
             slug = runtime_id.replace("-", "")
         return f"faden-{slug[:48]}"
 
+    @staticmethod
+    def _matches(value: str, denied: frozenset[str]) -> bool:
+        return value in denied or ("container:" in denied and value.startswith("container:"))
+
     @classmethod
     def _sanitize_command_args(cls, args: list[str]) -> None:
-        """Reject command args containing dangerous Docker flags."""
-        for arg in args:
+        """Reject command args containing dangerous Docker flags, as ``--flag=value`` or ``--flag value``."""
+        for index, arg in enumerate(args):
             normalized = arg.strip().lower()
-            for denied in cls._DENIED_DOCKER_FLAGS:
-                if normalized == denied or normalized.startswith(denied + "="):
+            flag, joined, value = normalized.partition("=")
+            if not joined:
+                value = args[index + 1].strip().lower() if index + 1 < len(args) else ""
+            if flag in cls._DENIED_DOCKER_FLAGS:
+                denied = cls._DENIED_DOCKER_FLAGS[flag]
+                if denied is None or cls._matches(value, denied):
                     raise RuntimeManagerError(
                         f"Blocked Docker flag in command override: {arg}"
                     )
-            if normalized.startswith("-v") or normalized.startswith("--volume"):
+            if normalized.startswith(cls._MOUNT_FLAG_PREFIXES):
                 raise RuntimeManagerError(
                     f"Volume mounts in command override are not allowed: {arg}"
                 )
-            if normalized == "--network=host" or (
-                normalized == "--network" and "host" in args
-            ):
+            if flag in cls._NETWORK_FLAGS and cls._matches(value, cls._SHARED_NETWORKS):
                 raise RuntimeManagerError(
                     f"Host network mode in command override is not allowed: {arg}"
                 )
+
+    @classmethod
+    def _check_run_values(cls, image: str, payload: dict[str, Any], provider_config: dict[str, Any]) -> None:
+        """Refuse an image or a resource value that is not what it claims, before anything on the machine changes.
+
+        They go into ``docker run``: an image starting with ``-`` was read as
+        an option, and the next word as the image.
+        """
+        try:
+            check_image_ref(image)
+        except ContainerRuntimeError as exc:
+            raise RuntimeManagerError(str(exc)) from None
+
+        def value(key: str) -> str:
+            return str(payload.get(key) or provider_config.get(key) or "").strip()
+
+        for key in ("memory_limit", "shm_size"):
+            if value(key) and not cls._SIZE.fullmatch(value(key)):
+                raise RuntimeManagerError(f"{key} is not a size such as 16g or 512m: {value(key)!r}")
+        if value("cpu_limit") and not cls._CPUS.fullmatch(value("cpu_limit")):
+            raise RuntimeManagerError(f"cpu_limit is not a number of CPUs such as 8 or 1.5: {value('cpu_limit')!r}")
+        if value("ipc_mode") and value("ipc_mode") not in cls._IPC_MODES:
+            raise RuntimeManagerError(
+                f"ipc_mode is not one of {', '.join(sorted(cls._IPC_MODES))}: {value('ipc_mode')!r}"
+            )
 
     # ── provider command builders ──────────────────────────────
 
