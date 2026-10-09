@@ -23,7 +23,7 @@ dependencies = [
   "asyncpg>=0.30.0",
   "alembic>=1.14.1",
   "httpx>=0.28.1",
-  "pyjwt>=2.13.0",  # >=2.13.0: clears PYSEC-2026-120/175-179
+  "pyjwt>=2.15.0",  # >=2.15.0: clears PYSEC-2026-4140..4152/4183
   "langfuse>=2.60.5",
   "redis[hiredis]>=5.2.1",
   "cryptography>=50.0.0",  # >=50.0.0: clears PYSEC-2026-35/36/3552/3553/3554
@@ -56,7 +56,7 @@ dependencies = [
   # Transitive floors — no direct cap exists in pyproject; uv lock is conservative
   # (keeps previously locked versions), so each floor is spelled out to force the fix:
   "idna>=3.15",  # >=3.15: clears PYSEC-2026-215
-  "urllib3>=2.7.0",  # >=2.7.0: clears PYSEC-2026-141/142
+  "urllib3>=2.8.0",  # >=2.8.0: clears PYSEC-2026-4175..4177
   "requests>=2.33.0",  # >=2.33.0: clears PYSEC-2026-2275
   "mako>=1.3.12",  # >=1.3.12: clears PYSEC-2026-2617 (alembic template runtime dep)
   "click>=8.3.3",  # >=8.3.3: clears PYSEC-2026-2132

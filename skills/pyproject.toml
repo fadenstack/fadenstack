@@ -32,12 +32,12 @@ dependencies = [
   "asyncpg>=0.30.0",
   "alembic>=1.14.0",
   "httpx>=0.27.0",
-  "pyjwt>=2.13.0",  # >=2.13.0: clears PYSEC-2026-120/175-179
+  "pyjwt>=2.15.0",  # >=2.15.0: clears PYSEC-2026-4140..4152/4183
   "redis[hiredis]>=5.0.0",
   "pyyaml>=6.0",
   "python-multipart>=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   # Transitive floors — conservative uv lock, force vulnerable transitives up to the fix:
-  "urllib3>=2.7.0",  # >=2.7.0: clears PYSEC-2026-141/142
+  "urllib3>=2.8.0",  # >=2.8.0: clears PYSEC-2026-4175..4177
   "starlette>=1.3.1",  # >=1.3.1: clears starlette CVEs (requires instrumentator 8.x)
   "idna>=3.15",  # >=3.15: clears PYSEC-2026-215
   "requests>=2.33.0",  # >=2.33.0: clears PYSEC-2026-2275
@@ -161,3 +161,8 @@ ignore-decorators = ["typing.overload"]
 
 [tool.ruff.lint.pylint]
 allow-magic-value-types = ["int", "str", "float", "bytes"]
+
+[tool.uv]
+# multidict 7.x ships wheels for Python 3.11 and 3.12 only, and no sdist: the images run 3.13. 6.9.1 is the
+# first fixed release (CVE-2026-104874) and has 3.13 wheels.
+constraint-dependencies = ["multidict>=6.9.1,<7"]
