@@ -255,6 +255,16 @@ class Settings(BaseSettings):
     chat_max_total_attachment_mb: int = 50
     chat_attachment_max_pages: int = 50
 
+    # Media URLs in the messages a client sends (services/gateway/media_urls.py).
+    # The model server fetches them itself, so only data: URLs and http(s) URLs
+    # whose host resolves to public addresses only go on; others are refused
+    # with a 400. False sends every URL on, as it used to.
+    media_url_check: bool = True
+    # Comma-separated hosts (media.example.lan), host patterns (*.example.lan)
+    # and IP addresses or networks (10.20.0.0/16) whose media URLs go on although
+    # they are internal: an install whose pictures live on an internal server.
+    media_url_allowed_hosts: str = ""
+
     langfuse_debug: bool = False
 
     # ── Edge TLS (uvicorn-served HTTPS) ───────────────────────────────

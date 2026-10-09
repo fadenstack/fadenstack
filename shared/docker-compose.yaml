@@ -401,6 +401,10 @@ services:
       # Knowledge search runs in the backend. The default, 127.0.0.1:8000, is this container's own port:
       # every search reached the gateway itself and failed with 404.
       FADEN_GATEWAY_RAG_LITE_BACKEND_URL: ${FADEN_GATEWAY_RAG_LITE_BACKEND_URL:-http://faden-backend:8000}
+      # Media URLs in chat requests reach the model only as data: URLs or public addresses. Internal hosts,
+      # *.patterns or networks to let through, comma-separated; false turns the check off.
+      FADEN_GATEWAY_MEDIA_URL_CHECK: ${FADEN_GATEWAY_MEDIA_URL_CHECK:-true}
+      FADEN_GATEWAY_MEDIA_URL_ALLOWED_HOSTS: ${FADEN_GATEWAY_MEDIA_URL_ALLOWED_HOSTS:-}
       # Scalability tuning (set via faden tune)
       FADEN_GATEWAY_WORKERS_COUNT: ${FADEN_GATEWAY_WORKERS_COUNT:-4}
       # Chat replies one user may have written at once, across their chats.
