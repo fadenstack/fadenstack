@@ -39,6 +39,7 @@ from faden_gateway.services.gateway.routing import RouterService
 from faden_gateway.services.gateway.schemas import (
     ChatCompletionRequest,
     EmbeddingsRequest,
+    ImagesRequest,
     RerankRequest,
     SessionPIIPolicyDTO,
     SessionPIIPolicyPatchDTO,
@@ -625,6 +626,58 @@ async def create_embeddings(
         if routed.trace_id:
             response.headers["x-langfuse-trace-id"] = routed.trace_id
         return response
+    except GatewayError as exc:
+        return error_from(exc)
+
+
+@router.post("/v1/images/generations")
+async def create_images(
+    request: Request,
+    auth: AuthContext = Depends(get_auth_context),
+    service: GatewayService = Depends(get_gateway_service),
+) -> JSONResponse:
+    """Pictures from a prompt (OpenAI's images API); the tenant's image model when ``model`` is left out."""
+    return await serve_images(request, auth=auth, service=service)
+
+
+async def serve_images(
+    request: Request, *, auth: AuthContext, service: GatewayService, agent: AgentRequest | None = None,
+) -> JSONResponse:
+    """An images request through the shared pipeline: limits, the prompt's PII check, routing, audit."""
+    try:
+        body = ImagesRequest.model_validate(await _get_json_payload(request))
+        if body.model is None:
+            alias = await service.dao.image_alias(auth.tenant_id)
+            if alias is None:
+                raise GatewayError(
+                    status_code=400,
+                    message="No image model is set up here: an administrator hosts one first.",
+                    error_type="invalid_request_error",
+                    code="no_image_model",
+                    param="model",
+                )
+            body = body.model_copy(update={"model": alias})
+        request_id = _request_id(request)
+        routed = await service.route_non_stream(
+            auth=auth,
+            endpoint="/v1/images/generations",
+            payload=body.model_dump(exclude_none=True),
+            request_id=request_id,
+            agent=agent,
+        )
+        response = JSONResponse(status_code=routed.status_code, content=routed.payload)
+        response.headers["x-request-id"] = request_id
+        response.headers["x-provider-instance-id"] = routed.provider_instance_id
+        if routed.trace_id:
+            response.headers["x-langfuse-trace-id"] = routed.trace_id
+        return response
+    except ValidationError as exc:
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message=str(exc),
+            error_type="invalid_request_error",
+            code="validation_error",
+        )
     except GatewayError as exc:
         return error_from(exc)
 

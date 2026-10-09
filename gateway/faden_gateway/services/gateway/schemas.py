@@ -38,6 +38,25 @@ class RerankRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class ImagesRequest(BaseModel):
+    """Pictures from a prompt: OpenAI's ``/v1/images/generations``, and the settings local servers take.
+
+    No ``model``: the tenant's image model. Pictures come back in the answer (``b64_json``), never as links.
+    """
+
+    model: str | None = Field(default=None, min_length=1)
+    prompt: str = Field(min_length=1, max_length=4000)
+    n: int = Field(default=1, ge=1, le=4)
+    size: str | None = Field(default=None, pattern=r"^\d{3,4}x\d{3,4}$")
+    response_format: Literal["b64_json"] = "b64_json"
+    negative_prompt: str | None = Field(default=None, max_length=2000)
+    num_inference_steps: int | None = Field(default=None, ge=1, le=100)
+    guidance_scale: float | None = Field(default=None, ge=0, le=30)
+    seed: int | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class ModelObject(BaseModel):
     """OpenAI model object shape."""
 

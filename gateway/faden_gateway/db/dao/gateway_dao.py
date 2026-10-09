@@ -111,6 +111,12 @@ class GatewayDAO:
             seen.setdefault(alias, set()).add(task)
         return {alias: next(iter(kinds)) if len(kinds) == 1 else None for alias, kinds in seen.items()}
 
+    async def image_alias(self, tenant_id: str) -> str | None:
+        """The tenant's image model: the first alias it may use whose routes make pictures (``images``)."""
+        aliases = [a.alias for a in await self.list_enabled_aliases_for_tenant(tenant_id)]
+        kinds = await self.alias_kinds(aliases)
+        return next((alias for alias in aliases if kinds.get(alias) == "images"), None)
+
     async def alias_vision(self, alias: str) -> bool | None:
         """Whether the model behind *alias* sees pictures, from its enabled instances.
 

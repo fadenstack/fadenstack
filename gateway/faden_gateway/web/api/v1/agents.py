@@ -49,7 +49,7 @@ from faden_gateway.services.gateway.auth import (
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
-from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions
+from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions, serve_images
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -291,6 +291,17 @@ async def agent_chat_completions(
     return response
 
 
+@router.post("/v1/agents/{agent}/images/generations", response_model=None)
+async def agent_images(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+    service: Annotated[GatewayService, Depends(get_gateway_service)],
+) -> Response:
+    """Pictures for an agent's tools (a slide's picture): the tenant's image model, under its access."""
+    auth, agent = caller
+    return await serve_images(request, auth=auth, service=service, agent=agent)
+
+
 @router.get("/v1/agents/{agent}/profile")
 async def agent_profile(
     request: Request,
@@ -319,6 +330,8 @@ async def agent_profile(
         "model": profile.model_alias,
         # Whether that model sees pictures, so the SDK sends a tool's picture (a rendered slide) or not.
         "vision": await dao.alias_vision(profile.model_alias) if profile.model_alias else None,
+        # Whether its tools can make pictures (an image model is set up for the tenant).
+        "images": await dao.image_alias(auth.tenant_id) is not None,
         "instructions_sha256": profile.instructions_sha256,
         "host_tool_contract": list(profile.host_tool_contract),
         "server_tools": list(profile.server_tools) if profile.server_tools is not None else None,

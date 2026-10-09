@@ -450,6 +450,18 @@ async def test_the_profile_says_whether_the_agents_model_sees_pictures(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(("task", "images"), [("images", True), ("chat", False)])
+async def test_the_profile_says_whether_the_agents_tools_can_make_pictures(
+    task: str, images: bool, client: AsyncClient, db_session: AsyncSession, backend: _Backend,
+) -> None:
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata={"task": task})
+    backend.put(_profile())
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert r.status_code == 200
+    assert r.json()["images"] is images
+
+
+@pytest.mark.anyio
 async def test_unknown_agents_and_a_lost_backend_are_told_apart(client: AsyncClient, backend: _Backend) -> None:
     r = await client.post("/v1/agents/nope/chat/completions", headers=_headers(), json=_chat())
     assert r.status_code == 404

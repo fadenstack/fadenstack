@@ -175,13 +175,32 @@ _ENDPOINT_KINDS: dict[str, set[str | None]] = {
     "/v1/chat/completions": {"chat", None},
     "/v1/embeddings": {"embeddings", None},
     "/v1/rerank": {"scoring", None},
+    # Only a route that says it makes pictures: a route that says nothing is a chat model.
+    "/v1/images/generations": {"images"},
 }
 
 _KIND_ADVICE = {
     "chat": "is a chat model: send it to /v1/chat/completions",
     "embeddings": "is an embeddings model: send it to /v1/embeddings",
     "scoring": "is a scoring (rerank) model: send it to /v1/rerank",
+    "images": "is an image model: send it to /v1/images/generations",
 }
+
+#: Image parameters passed on to the image server as they came (the OpenAI shape, as vLLM-Omni takes it).
+_IMAGE_FIELDS = (
+    "size", "n", "negative_prompt", "num_inference_steps", "guidance_scale", "seed", "quality", "style",
+)
+
+
+def _image_trace(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """An image answer as traces and logs keep it: how many pictures and how big, never the pictures."""
+    data = (payload or {}).get("data") or []
+    return {
+        "created": (payload or {}).get("created"),
+        "data": [
+            {"b64_json": f"<{len(str(d.get('b64_json') or ''))} characters>"} for d in data if isinstance(d, dict)
+        ],
+    }
 
 
 def _as_input(rerank: dict[str, Any]) -> dict[str, Any]:
@@ -275,7 +294,8 @@ def _check_kind(endpoint: str, alias: str, candidates: list[Any]) -> None:
     kinds = {(getattr(c, "node_metadata", None) or {}).get("task") for c in candidates}
     if not kinds or kinds & allowed:
         return
-    kind = next(k for k in kinds if k is not None)
+    # A route that says nothing is taken for a chat model (the endpoints that take such routes allow None).
+    kind = next((k for k in kinds if k is not None), "chat")
     raise GatewayError(
         status_code=400,
         message=f"{alias} {_KIND_ADVICE.get(kind, f'serves {kind} requests, not this endpoint')}.",
@@ -1071,8 +1091,13 @@ class GatewayService:
     ) -> GatewayResponse:
         started = time.perf_counter()
         rerank: dict[str, Any] | None = None
+        images: dict[str, Any] | None = None
         if endpoint == "/v1/rerank":
             rerank, payload = payload, _as_input(payload)
+        elif endpoint == "/v1/images/generations":
+            # The prompt as the pipeline knows texts (``input``): PII, limits and the trace read it there.
+            prompt = str(payload.get("prompt") or "")
+            images, payload = payload, {"model": payload.get("model"), "input": [prompt]}
         model_alias = _require_model(payload)
         policy = await self.dao.get_tenant_policy(auth.tenant_id)
 
@@ -1120,6 +1145,15 @@ class GatewayService:
                         adapter_result = await self.adapter.embedding(
                             **_candidate_adapter_kwargs(decision.candidate),
                             payload=req.egress_payload,
+                        )
+                    elif images is not None:
+                        adapter_result = await self.adapter.image_generation(
+                            **_candidate_adapter_kwargs(decision.candidate),
+                            payload={
+                                "model": model_alias,
+                                "prompt": req.egress_payload["input"][0],
+                                **{k: images[k] for k in _IMAGE_FIELDS if images.get(k) is not None},
+                            },
                         )
                     elif rerank is not None:
                         texts = req.egress_payload["input"]
@@ -1190,8 +1224,12 @@ class GatewayService:
             latency_ms = int((time.perf_counter() - started) * 1000)
 
             # The client gets the values tokenize mode took out; the trace
-            # keeps the answer as the model gave it, with the tokens.
-            response_payload = restore_payload(result.payload, req.token_mapping, req.client_tools)
+            # keeps the answer as the model gave it, with the tokens. Pictures
+            # hold no text to restore, and stay out of the trace.
+            response_payload = (
+                result.payload if images is not None
+                else restore_payload(result.payload, req.token_mapping, req.client_tools)
+            )
             if req.faden_events and isinstance(response_payload, dict):
                 # Beside the OpenAI fields, which an OpenAI client reads as ever.
                 events = [*_pii_events(req), *req.faden_whole]
@@ -1212,7 +1250,7 @@ class GatewayService:
                     completion_tokens=usage_completion,
                     total_tokens=usage_total,
                     provider_instance_id=req.instance_id,
-                    output_payload=result.payload,
+                    output_payload=_image_trace(result.payload) if images is not None else result.payload,
                 )
             # Persist assistant response in session
             await self._persist_assistant_response(

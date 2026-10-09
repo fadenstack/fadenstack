@@ -971,6 +971,91 @@ class LLMAdapter:
             )
 
 
+    async def image_generation(
+        self,
+        *,
+        provider_type: ProviderType,
+        base_url: str | None,
+        api_key_encrypted: str | None,
+        litellm_provider: str | None,
+        litellm_model: str | None,
+        extra_params: dict[str, Any] | None,
+        payload: dict[str, Any],
+        instance_id: uuid.UUID | None = None,
+        ssl_verify_mode: str | None = None,
+        ssl_ca_bundle_pem: str | None = None,
+        ssl_client_cert_pem: str | None = None,
+        ssl_client_key_pem: str | None = None,
+    ) -> CompletionResult:
+        """Make pictures from a prompt: an OpenAI ``/v1/images/generations``, answered as ``b64_json``.
+
+        A local image server (vLLM-Omni, Fadenstack's own image app) takes the OpenAI shape and the
+        diffusion settings beside it (steps, guidance, seed, negative prompt), which go as the body's
+        extra fields. Pictures come back in the answer, never as links to fetch.
+        """
+        model_name = _build_litellm_model_name(
+            provider_type=provider_type,
+            litellm_provider=litellm_provider,
+            litellm_model=litellm_model,
+            requested_model=payload.get("model", ""),
+        )
+        kwargs: dict[str, Any] = {
+            "model": model_name,
+            "prompt": payload.get("prompt", ""),
+            "response_format": "b64_json",
+        }
+        for key in ("size", "n", "quality", "style"):
+            if payload.get(key) is not None:
+                kwargs[key] = payload[key]
+        diffusion = {
+            k: payload[k]
+            for k in ("negative_prompt", "num_inference_steps", "guidance_scale", "seed")
+            if payload.get(k) is not None
+        }
+        if diffusion:
+            kwargs["extra_body"] = diffusion
+        kwargs.update(
+            _upstream_kwargs(
+                base_url=base_url,
+                api_key=_resolve_api_key(api_key_encrypted),
+                provider_type=provider_type,
+            ),
+        )
+        if extra_params:
+            kwargs.update(extra_params)
+        try:
+            tls = _provider_tls(
+                instance_id=instance_id,
+                ssl_verify_mode=ssl_verify_mode,
+                ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+                ssl_client_cert_pem=ssl_client_cert_pem,
+                ssl_client_key_pem=ssl_client_key_pem,
+            )
+        except _TlsRefusedError as exc:
+            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        native = _native_kwargs(
+            tls, provider_type=provider_type, instance_id=instance_id,
+            ssl_verify_mode=ssl_verify_mode,
+            ssl_ca_bundle_pem=ssl_ca_bundle_pem,
+            ssl_client_cert_pem=ssl_client_cert_pem,
+            ssl_client_key_pem=ssl_client_key_pem,
+        )
+        _apply_tls(kwargs, tls, provider_type=provider_type, instance_id=instance_id, native=native)
+        try:
+            response = await litellm.aimage_generation(**kwargs)
+            return CompletionResult(status_code=200, payload=response.model_dump())  # type: ignore[union-attr]
+        except litellm.exceptions.AuthenticationError as exc:
+            return CompletionResult(status_code=401, payload=_error_payload("authentication_error", str(exc)))
+        except litellm.exceptions.RateLimitError as exc:
+            return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
+        except litellm.exceptions.BadRequestError as exc:
+            return CompletionResult(
+                status_code=400, payload=_error_payload("invalid_request_error", str(exc)),
+            )
+        except Exception as exc:
+            logger.exception("LiteLLM image generation failed")
+            return CompletionResult(status_code=502, payload=_error_payload("server_error", str(exc)))
+
     async def rerank(
         self,
         *,
