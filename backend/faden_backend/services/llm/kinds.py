@@ -1,4 +1,4 @@
-"""What a served model is for -- chat, embeddings, scoring -- as its route tells the gateway.
+"""What a served model is for -- chat, embeddings, scoring, images -- as its route tells the gateway.
 
 The gateway lists each model with its kind, the chat screen offers only chat
 models, and a request of the wrong kind is refused up front. That only holds
@@ -10,7 +10,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-CHAT, EMBEDDINGS, SCORING = "chat", "embeddings", "scoring"
+CHAT, EMBEDDINGS, SCORING, IMAGES = "chat", "embeddings", "scoring", "images"
+
+#: Engines that make pictures from a prompt rather than text (the runtime's image app).
+IMAGE_ENGINES = frozenset({"diffusers"})
 
 #: vLLM's ``--task`` / ``--runner`` / ``--convert`` values, in Fadenstack's words.
 _VLLM_TASKS = {
@@ -90,6 +93,24 @@ def runtime_calls_tools(runtime: Any) -> bool:
         or calls_tools(generic)
         or argv_calls_tools(provider.get("extra_args"))
     )
+
+
+def deployment_kind(spec: dict[str, Any] | None) -> str:
+    """The kind of a cluster deployment: images for a picture engine, else from its vLLM settings.
+
+    ``convert`` is read first: it names what a pooling model is turned into
+    (``runner: pooling`` with ``convert: classify`` scores), then ``task``,
+    then ``runner``. Without any, vLLM generates text: chat.
+    """
+    engine = (spec or {}).get("engine") or {}
+    if str(engine.get("name") or "").strip().lower() in IMAGE_ENGINES:
+        return IMAGES
+    config = {str(k).lstrip("-").replace("-", "_"): v for k, v in (engine.get("config") or {}).items()}
+    for name in ("convert", "task", "runner"):
+        value = str(config.get(name) or "").lower()
+        if value in _VLLM_TASKS:
+            return _VLLM_TASKS[value]
+    return CHAT
 
 
 def deployment_calls_tools(spec: dict[str, Any] | None) -> bool:

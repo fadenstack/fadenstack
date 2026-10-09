@@ -94,7 +94,9 @@ from faden_backend.services.inference.drivers.ray.client import (
 )
 from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 from faden_backend.services.inference.drivers.ray.compiler import (
+    IMAGE_ENGINE,
     ArtifactResolutionError,
+    _sanitize_model_id,
     compile_deployment,
 )
 from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
@@ -211,15 +213,20 @@ def shape_hash(llm_serving_args: dict[str, Any]) -> str:
     else -- a change Serve can make without restarting a copy (``_scale``).
     """
     shape = json.loads(json.dumps(llm_serving_args))
-    for config in shape.get("llm_configs") or []:
+    for config in _model_configs(shape):
         if isinstance(config, dict) and isinstance(config.get("deployment_config"), dict):
             config["deployment_config"].pop("num_replicas", None)
     return hashlib.sha256(json.dumps(shape, sort_keys=True).encode()).hexdigest()
 
 
+def _model_configs(llm_serving_args: dict[str, Any]) -> list[Any]:
+    """The compiled models: Serve LLM's ``llm_configs``, or a picture model's ``image_configs``."""
+    return list(llm_serving_args.get("llm_configs") or llm_serving_args.get("image_configs") or [])
+
+
 def _fixed_count(llm_serving_args: dict[str, Any]) -> int | None:
     """The one model's fixed copy count, or ``None`` (autoscaled, or not one model)."""
-    configs = llm_serving_args.get("llm_configs") or []
+    configs = _model_configs(llm_serving_args)
     if len(configs) != 1 or not isinstance(configs[0], dict):
         return None
     deployment = configs[0].get("deployment_config") or {}
@@ -360,9 +367,10 @@ def _model_server_deployments(app: dict[str, Any]) -> dict[str, Any]:
 
     ``build_openai_app`` creates one ``LLMServer:<model>`` deployment per
     model plus one ingress deployment; only the former are model replicas.
+    A picture model's app is its one ``ImageServer:<model>`` deployment.
     """
     deployments = app.get("deployments") or {}
-    servers = {k: v for k, v in deployments.items() if str(k).startswith("LLMServer")}
+    servers = {k: v for k, v in deployments.items() if str(k).startswith(("LLMServer", "ImageServer"))}
     if not servers:  # naming changed upstream: fall back to "not the ingress"
         servers = {k: v for k, v in deployments.items() if "Ingress" not in str(k)}
     return servers
@@ -526,6 +534,9 @@ class _DeploymentFacts:
     #: Serve goes behind the head's model-TLS proxy: the machine CA is on and
     #: the head's agent can run the proxy (``services/machine_tls``).
     model_tls: bool = False
+    #: Ray's resource for the machine every copy is pinned to
+    #: (``resources.replica.machine``), ``node:<address>``.
+    node_resource: str | None = None
 
 
 @dataclass
@@ -1392,6 +1403,14 @@ class RayDeploymentManager:
             return _ResolveError("environment not found", failed=True)
         facts.environment = environment
 
+        pin = ((facts.spec_data.get("resources") or {}).get("replica") or {}).get("machine")
+        if pin:
+            facts.node_resource = await self._machine_resource(session, environment, str(pin))
+            if facts.node_resource is None:
+                return _ResolveError(
+                    f"resources.replica.machine {pin!r} is not a machine of this cluster", failed=True,
+                )
+
         head = await self._head_node_of(session, environment)
         if head is None:
             # Transient: the environment may not have converged yet.
@@ -1426,6 +1445,20 @@ class RayDeploymentManager:
                     name=_RUNTIME_CONTAINER_NAME,
                     node=head_row,
                 )
+            )
+
+        engine = str(((facts.spec_data.get("engine") or {}).get("name")) or "").strip().lower()
+        if (
+            engine == IMAGE_ENGINE
+            and facts.runtime_bundle is not None
+            and not facts.runtime_bundle.compatibility_matrix.supported_pipelines
+        ):
+            # Not a failure: it starts once the cluster runs a runtime that has
+            # picture models (the cluster's Runtime card).
+            return _ResolveError(
+                f"Waiting for a runtime with picture models: {facts.runtime_bundle.display_name} has none. "
+                "Switch the cluster to one that has.",
+                failed=False,
             )
 
         model = await self._model_of(session, deployment.model_id)
@@ -1518,6 +1551,24 @@ class RayDeploymentManager:
             await coordinator.ensure(model=facts.model, environment=facts.environment, fetch_to_server=False)
         except Exception:  # noqa: BLE001 - a copy for later never disturbs a model that serves
             log.warning("Could not send %s to the cluster's new machines", facts.model.id, exc_info=True)
+
+    @staticmethod
+    async def _machine_resource(session, environment: InferenceEnvironment, pin: str) -> str | None:
+        """Ray's resource for the cluster machine named *pin* (agent name, host or id), or None.
+
+        Ray knows a machine by the address it was started on: the cluster's
+        fabric binding, else the machine's host.
+        """
+        wanted = pin.strip().lower()
+        bindings = ((environment.observed_status_json or {}).get("resolved_fabric") or {}).get("node_bindings") or {}
+        for node in await EnvironmentNodeDAO(session).machines(environment.id):
+            names = {str(node.id), str(node.agent_id or ""), str(node.host or "").removeprefix("host=")}
+            if wanted not in {n.strip().lower() for n in names if n}:
+                continue
+            address = str((bindings.get(str(node.id)) or {}).get("ip") or "").strip()
+            address = address or str(node.host or "").removeprefix("host=").strip()
+            return f"node:{address}" if address else None
+        return None
 
     @staticmethod
     async def _members_away(session, environment) -> list[str]:
@@ -1617,6 +1668,7 @@ class RayDeploymentManager:
             hf_revision=facts.hf_revision,
             availability_root_path=facts.availability_root_path,
             desired_state="active",
+            node_resource=facts.node_resource,
         )
 
     # ------------------------------------------------------------------
@@ -1786,7 +1838,10 @@ class RayDeploymentManager:
         published = {
             "app": app_name,
             "driver": "ray",
-            "model": facts.model.display_name,
+            # What Serve serves the model as: the compiler's request-safe id. The
+            # display name went out as it was, and a name with a space in it
+            # would have been refused by the server it named.
+            "model": _sanitize_model_id(facts.model.display_name, facts.model.hf_repo_id),
             "ready_replicas": ready_replicas,
             "path": path,
             "base_url": f"{address}{path}",

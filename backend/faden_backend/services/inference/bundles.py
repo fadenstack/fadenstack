@@ -233,12 +233,17 @@ class CompatibilityMatrix(BaseModel):
     nccl_version: str | None = None
     triton_version: str | None = None
     transformers_version: str | None = None
+    #: The diffusers its image app runs picture models on; None: it has none.
+    diffusers_version: str | None = None
     supported_fabrics: list[str] = Field(default_factory=lambda: ["roce", "infiniband", "ethernet"])
     #: Model types the image's Transformers and vLLM can read a config.json of,
     #: and the architectures its vLLM runs natively (``runtime-image``
     #: ``rebuild_runtime_image.py`` reads them off the image). Empty: not known.
     supported_model_types: list[str] = Field(default_factory=list)
     supported_architectures: list[str] = Field(default_factory=list)
+    #: The picture pipelines (a diffusers model_index.json's ``_class_name``)
+    #: its diffusers runs. Empty: the runtime serves no picture models.
+    supported_pipelines: list[str] = Field(default_factory=list)
 
 
 class CertificationEvidence(BaseModel):
@@ -348,8 +353,10 @@ class RuntimeBundleManifest(BaseModel):
                 nccl_version=_opt(stack.get("nccl")),
                 triton_version=_opt(stack.get("triton")),
                 transformers_version=_opt(stack.get("transformers")),
+                diffusers_version=_opt(stack.get("diffusers")),
                 supported_model_types=[str(t) for t in manifest.get("supported_model_types") or []],
                 supported_architectures=[str(a) for a in manifest.get("supported_architectures") or []],
+                supported_pipelines=[str(p) for p in manifest.get("supported_pipelines") or []],
             ),
             certification=CertificationEvidence(
                 status=status,

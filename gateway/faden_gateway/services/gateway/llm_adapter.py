@@ -337,6 +337,9 @@ _PROVIDER_PREFIX: dict[str, str] = {
     ProviderType.OLLAMA: "ollama",
 }
 
+#: Engines Fadenstack (or the operator) runs, reached through LiteLLM's ``openai`` provider.
+_LOCAL_ENGINES = frozenset({ProviderType.VLLM, ProviderType.LLAMACPP, ProviderType.TGI})
+
 
 @dataclass(slots=True, frozen=True)
 class CompletionResult:
@@ -1002,8 +1005,14 @@ class LLMAdapter:
         kwargs: dict[str, Any] = {
             "model": model_name,
             "prompt": payload.get("prompt", ""),
-            "response_format": "b64_json",
         }
+        if provider_type not in _LOCAL_ENGINES:
+            # A remote provider is asked for the pictures themselves, not links; the ones that
+            # always answer that way (gpt-image) refuse the setting, so it is dropped for them.
+            # A local image server answers b64_json anyway, and LiteLLM refuses the setting
+            # for any model name OpenAI does not have -- every local one.
+            kwargs["response_format"] = "b64_json"
+            kwargs["drop_params"] = True
         for key in ("size", "n", "quality", "style"):
             if payload.get(key) is not None:
                 kwargs[key] = payload[key]

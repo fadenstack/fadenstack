@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+import litellm
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -146,3 +147,42 @@ async def test_a_bad_request_is_refused_before_anything_runs(client: AsyncClient
         r = await client.post("/v1/images/generations", headers={"Authorization": f"Bearer {_token()}"}, json=body)
         assert r.status_code == 400, body
         assert r.json()["error"]["code"] == "validation_error"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("provider", "asks_for_b64"),
+    [(ProviderType.VLLM, False), (ProviderType.REMOTE_OPENAI, True)],
+)
+async def test_what_goes_to_litellm(
+    monkeypatch: pytest.MonkeyPatch, provider: ProviderType, asks_for_b64: bool,
+) -> None:
+    """A local image server is not asked for b64_json; the diffusion settings go in the body.
+
+    LiteLLM refuses the setting for any model name OpenAI does not have, and the server answers that way anyway.
+    """
+    sent: dict[str, Any] = {}
+
+    class _Answer:
+        def model_dump(self) -> dict[str, Any]:
+            return {"created": 1, "data": [{"b64_json": PICTURE}]}
+
+    async def aimage_generation(**kwargs: Any) -> _Answer:
+        sent.update(kwargs)
+        return _Answer()
+
+    monkeypatch.setattr(litellm, "aimage_generation", aimage_generation)
+    result = await LLMAdapter().image_generation(
+        provider_type=provider,
+        base_url="http://head:8000/faden-x/v1",
+        api_key_encrypted=None,
+        litellm_provider=None,
+        litellm_model="z-image-turbo",
+        extra_params=None,
+        payload={"prompt": "a servo motor", "size": "1216x832", "num_inference_steps": 9, "seed": 7},
+    )
+    assert result.status_code == 200
+    assert sent["prompt"] == "a servo motor"
+    assert sent["size"] == "1216x832"
+    assert sent["extra_body"] == {"num_inference_steps": 9, "seed": 7}
+    assert ("response_format" in sent) is asks_for_b64

@@ -31,6 +31,16 @@ The mapping (see the Ray migration plan, Phase 3):
 Advanced features (P/D disaggregation, LoRA, prefix/KV-aware routing, custom
 router replicas) are deliberately **not** emitted; they are left to Ray's
 defaults and a later phase.
+
+A picture model (``engine.name: diffusers``) compiles to the runtime image's
+own document instead, ``{"image_configs": [...]}``: the helper serves it with
+diffusers (``llm_port_ray_runtime/image.py``), not Serve LLM. Its
+``engine.config`` holds the picture settings (``IMAGE_SETTINGS``), its GPU
+share goes on the copy's actor, and it has no tensor or pipeline parallelism.
+
+``resources.replica.machine`` pins every copy to one machine of the cluster:
+the orchestrator resolves it to Ray's per-node resource (``node:<address>``)
+and the compiler asks a sliver of it for each copy.
 """
 
 from __future__ import annotations
@@ -49,7 +59,20 @@ from faden_backend.services.inference.schemas import (
 # the short form (``"vllm"``); Ray's ``LLMConfig.llm_engine`` validator
 # requires the exact ``"vLLM"`` spelling, and rejects everything else.
 _RAY_ENGINE_VLLM = "vLLM"
-_SUPPORTED_ENGINE_NAMES = frozenset({"vllm"})
+#: Picture models run on diffusers in the runtime's image app.
+IMAGE_ENGINE = "diffusers"
+_SUPPORTED_ENGINE_NAMES = frozenset({"vllm", IMAGE_ENGINE})
+
+#: What a picture model's ``engine.config`` may set: the image app's
+#: ``pipeline_config``. Anything else would be a vLLM flag it cannot take.
+IMAGE_SETTINGS = frozenset({"dtype", "num_inference_steps", "guidance_scale", "size", "max_pixels"})
+_IMAGE_DTYPES = frozenset({"bfloat16", "float16", "float32"})
+_IMAGE_SIZE = re.compile(r"^\d{3,4}x\d{3,4}$")
+
+#: How much of Ray's per-node resource (``node:<address>``, 1.0 per node) a
+#: pinned copy asks for: enough to bind it to the node, little enough for any
+#: number of copies.
+_NODE_PIN = 0.001
 
 # Accelerators Ray's ``AcceleratorType`` registry (``ray[serve]==2.58.0``)
 # actually accepts.  ``LLMConfig.accelerator_type`` raises
@@ -120,6 +143,8 @@ def validate_spec(spec: InferenceDeploymentSpecV1Alpha1) -> None:
         raise DeploymentValidationError(
             f"unsupported engine for Ray: {spec.engine.name!r} (expected one of {sorted(_SUPPORTED_ENGINE_NAMES)})"
         )
+    if engine_name == IMAGE_ENGINE:
+        _validate_image(spec)
     if spec.replica_routing and spec.replica_routing.kv_aware:
         raise DeploymentValidationError(
             "KV-aware replica routing is not supported on Ray Serve v1alpha1"
@@ -508,6 +533,7 @@ _ENV_VAR_PREFIXES = (
     "HSA_",
     "ZE_",     # Intel Level Zero
     "SYCL_",
+    "DIFFUSERS_",  # picture models' attention backend and the like
 )
 # Each stack's "which devices can I see" override, denied for the same reason
 # in every case: it would let a spec reach accelerators outside the allocation
@@ -577,7 +603,43 @@ def _extension_env_vars(spec: InferenceDeploymentSpecV1Alpha1) -> dict[str, str]
     return {str(k): str(v) for k, v in merged.items()}
 
 
-def _placement(spec: InferenceDeploymentSpecV1Alpha1) -> dict[str, Any] | None:
+def is_image_spec(spec: InferenceDeploymentSpecV1Alpha1) -> bool:
+    """Whether the spec is for a picture model (``engine.name: diffusers``)."""
+    return (spec.engine.name or "").strip().lower() == IMAGE_ENGINE
+
+
+def _validate_image(spec: InferenceDeploymentSpecV1Alpha1) -> None:
+    """A picture model runs on one device, with picture settings only."""
+    topology = spec.topology
+    if int(topology.tensor_parallel_size or 1) != 1 or int(topology.pipeline_parallel_size or 1) != 1:
+        raise DeploymentValidationError("a picture model runs on one device: no tensor or pipeline parallelism")
+    unknown = sorted(set(spec.engine.config or {}) - IMAGE_SETTINGS)
+    if unknown:
+        raise DeploymentValidationError(
+            f"engine.config {', '.join(unknown)} is not a picture setting "
+            f"(a diffusers model takes {', '.join(sorted(IMAGE_SETTINGS))})"
+        )
+    config = spec.engine.config or {}
+    dtype = config.get("dtype")
+    if dtype is not None and str(dtype) not in _IMAGE_DTYPES:
+        raise DeploymentValidationError(f"engine.config.dtype must be one of {sorted(_IMAGE_DTYPES)}")
+    size = config.get("size")
+    if size is not None and not _IMAGE_SIZE.match(str(size)):
+        raise DeploymentValidationError("engine.config.size must be WIDTHxHEIGHT, such as 1024x1024")
+    for key in ("num_inference_steps", "max_pixels"):
+        value = config.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            raise DeploymentValidationError(f"engine.config.{key} must be a positive whole number")
+    guidance = config.get("guidance_scale")
+    number = isinstance(guidance, (int, float)) and not isinstance(guidance, bool)
+    if guidance is not None and (not number or guidance < 0):
+        raise DeploymentValidationError("engine.config.guidance_scale must be a number of 0 or more")
+    gpus = spec.resources.replica.gpus
+    if gpus is not None and not 0 < float(gpus) <= 1:
+        raise DeploymentValidationError("resources.replica.gpus of a picture model is a share of one device (0 to 1)")
+
+
+def _placement(spec: InferenceDeploymentSpecV1Alpha1, node_resource: str | None = None) -> dict[str, Any] | None:
     """``placement_group_config`` for the replica, or ``None`` for Ray's default.
 
     Ray LLM's default is one ``{"GPU": 1}`` bundle per device (TP×PP) with
@@ -647,11 +709,14 @@ def _placement(spec: InferenceDeploymentSpecV1Alpha1) -> dict[str, Any] | None:
             # against the deadlock case just above.
             strategy = "STRICT_PACK" if topology.nodes == 1 else "SPREAD"
 
-    if per_worker_gpu == 1.0 and replica.cpu is None and strategy is None:
+    if per_worker_gpu == 1.0 and replica.cpu is None and strategy is None and node_resource is None:
         return None
     bundle: dict[str, float] = {"GPU": per_worker_gpu}
     if replica.cpu is not None:
         bundle["CPU"] = float(replica.cpu) / num_devices
+    if node_resource is not None:
+        # Every worker of every copy on the pinned machine.
+        bundle[node_resource] = _NODE_PIN
     config: dict[str, Any] = {"bundle_per_worker": bundle}
     if strategy is not None:
         config["strategy"] = strategy
@@ -666,6 +731,7 @@ def compile_spec(
     accelerator_type: str | None = None,
     revision: str | None = None,
     runtime_env: dict[str, Any] | None = None,
+    node_resource: str | None = None,
 ) -> dict[str, Any]:
     """Compile one resolved deployment into a Ray ``LLMServingArgs`` document.
 
@@ -677,6 +743,9 @@ def compile_spec(
             mapping (the caller passes the raw spec value; this function maps).
         revision: optional model revision to thread into engine_kwargs.
         runtime_env: optional runtime_env dictionary to inject into LLMConfig.
+        node_resource: Ray's resource for the machine every copy is pinned to
+            (``node:<address>``), resolved by the orchestrator from
+            ``resources.replica.machine``.
 
     Returns:
         A plain dictionary shaped like ``ray.serve.llm.LLMServingArgs`` with a
@@ -684,6 +753,11 @@ def compile_spec(
         Ray types, so it can be embedded in a control-plane command payload.
     """
     validate_spec(spec)
+    if is_image_spec(spec):
+        return _compile_image(
+            spec=spec, artifact=artifact, desired_state=desired_state,
+            runtime_env=runtime_env, node_resource=node_resource,
+        )
 
     topology = spec.topology
     tp = topology.tensor_parallel_size
@@ -725,7 +799,7 @@ def compile_spec(
 
     effective_accelerator = _accelerator_type(accelerator_type)
 
-    placement_group_config = None if stopped else _placement(spec)
+    placement_group_config = None if stopped else _placement(spec, node_resource)
 
     model_loading_config: dict[str, Any] = {
         "model_id": artifact.model_id,
@@ -780,6 +854,70 @@ def compile_spec(
     }
 
 
+def _replica_counts(spec: InferenceDeploymentSpecV1Alpha1) -> tuple[int, int | None, int | None]:
+    """(replicas, min, max) from ``scale``: a fixed count, or autoscaling bounds."""
+    scale = spec.scale
+    if scale.autoscale is not None:
+        return (
+            int(scale.autoscale.min_replicas),
+            int(scale.autoscale.min_replicas),
+            int(scale.autoscale.max_replicas),
+        )
+    return int(scale.replicas if scale.replicas is not None else 1), None, None
+
+
+def _compile_image(
+    *,
+    spec: InferenceDeploymentSpecV1Alpha1,
+    artifact: ArtifactResolution,
+    desired_state: str,
+    runtime_env: dict[str, Any] | None,
+    node_resource: str | None,
+) -> dict[str, Any]:
+    """The runtime image's document for a picture model (``image_configs``).
+
+    One deployment, ``ImageServer:<model>``, that is also the application's
+    ingress. Its GPU share is the copy's own (default one device): Ray
+    reserves it on the actor, as it reserves a vLLM copy's in its placement
+    group.
+    """
+    stopped = (desired_state or "active").strip().lower() == "stopped"
+    replicas, min_replicas, max_replicas = _replica_counts(spec)
+    scale = spec.scale
+    deployment_config = _deployment_config(
+        replicas=0 if stopped else replicas,
+        min_replicas=None if stopped else min_replicas,
+        max_replicas=None if stopped else max_replicas,
+        target_ongoing_requests=_ray_target_ongoing_requests(spec),
+        upscale_delay_s=(scale.autoscale.scale_up_timeout if scale.autoscale else None),
+        downscale_delay_s=(scale.autoscale.scale_down_timeout if scale.autoscale else None),
+    )
+    replica = spec.resources.replica
+    actor: dict[str, Any] = {"num_gpus": float(replica.gpus) if replica.gpus is not None else 1.0}
+    if replica.cpu is not None:
+        actor["num_cpus"] = float(replica.cpu)
+    if node_resource is not None:
+        actor["resources"] = {node_resource: _NODE_PIN}
+    deployment_config["ray_actor_options"] = actor
+
+    settings = dict(spec.engine.config or {})
+    settings.setdefault("dtype", "bfloat16")
+    config: dict[str, Any] = {
+        "model_loading_config": {"model_id": artifact.model_id, "model_source": artifact.model_source},
+        "pipeline_config": settings,
+        "deployment_config": deployment_config,
+    }
+    effective_runtime_env: dict[str, Any] = dict(runtime_env or {})
+    spec_env_vars = _extension_env_vars(spec)
+    if spec_env_vars:
+        env_vars = dict(effective_runtime_env.get("env_vars") or {})
+        env_vars.update(spec_env_vars)
+        effective_runtime_env["env_vars"] = env_vars
+    if effective_runtime_env:
+        config["runtime_env"] = effective_runtime_env
+    return {"image_configs": [config]}
+
+
 def compile_deployment(
     *,
     spec_data: dict[str, Any],
@@ -791,6 +929,7 @@ def compile_deployment(
     capabilities: dict[str, Any] | None = None,
     desired_state: str = "active",
     runtime_env: dict[str, Any] | None = None,
+    node_resource: str | None = None,
 ) -> dict[str, Any]:
     """End-to-end, testable compiler entrypoint.
 
@@ -819,6 +958,7 @@ def compile_deployment(
         accelerator_type=accelerator,
         revision=effective_revision,
         runtime_env=runtime_env,
+        node_resource=node_resource,
     )
 
 

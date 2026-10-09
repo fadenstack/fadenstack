@@ -429,8 +429,8 @@ class GatewaySyncService:
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
 
-        *task* is what it serves. A deployment is compiled into Ray Serve LLM's
-        OpenAI chat application, so ``chat``.
+        *task* is what it serves (``kinds.deployment_kind``): ``chat`` unless
+        the caller says otherwise.
 
         Ensures exactly one logical LLMProviderInstance exists for the deployment.
         """

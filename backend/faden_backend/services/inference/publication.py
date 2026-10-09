@@ -22,7 +22,7 @@ from faden_backend.db.models.inference import (
     InferenceEndpoint,
 )
 from faden_backend.db.models.llm import LLMProvider, ProviderTarget, ProviderType
-from faden_backend.services.llm.kinds import deployment_calls_tools
+from faden_backend.services.llm.kinds import IMAGES, deployment_calls_tools, deployment_kind
 
 #: Marks a provider row as owned by a deployment.  The same string the
 #: gateway stamps on ``llm_provider_instance``, so ownership reads the same
@@ -32,6 +32,9 @@ DERIVED_SOURCE_KIND = "inference_deployment"
 #: vLLM's own ``max_num_seqs`` for its OpenAI server on most GPUs, for a
 #: deployment that does not set one (GPUs of 70 GB and more default higher).
 DEFAULT_MAX_NUM_SEQS = 256
+#: Requests a picture model's copy takes at once: it makes one request's
+#: pictures at a time (seconds each) and queues the rest.
+IMAGE_REQUESTS_PER_COPY = 4
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,7 +50,12 @@ def gateway_concurrency(deployment: InferenceDeployment) -> int:
     itself, and Ray Serve LLM sets no limit of its own in front of a copy.
     The gateway's fixed 16 refused the 17th chat of a three-copy deployment
     whose copies take 128 each (.61, 2026-10-01).
+
+    A picture model's copy makes one request's pictures at a time: a few wait
+    in its queue (``IMAGE_REQUESTS_PER_COPY``), the gateway holds the rest.
     """
+    if deployment_kind(deployment.spec_json) == IMAGES:
+        return max(deployment.ready_replicas or 0, 1) * IMAGE_REQUESTS_PER_COPY
     config = ((deployment.spec_json or {}).get("engine") or {}).get("config") or {}
     try:
         per_copy = int(config.get("max_num_seqs") or DEFAULT_MAX_NUM_SEQS)
@@ -175,6 +183,9 @@ class InferencePublicationCoordinator:
                 is_routable=is_routable,
                 max_concurrency=gateway_concurrency(deployment),
                 capacity_hints=_capacity_hints(spec_service),
+                # What it serves: pictures for an image engine, embeddings or
+                # scores for a pooling model, chat otherwise.
+                task=deployment_kind(deployment.spec_json),
                 tools=deployment_calls_tools(deployment.spec_json),
                 # Whether the model sees pictures: said on the deployment (the marketplace
                 # fills it in from the model's facts), unknown otherwise.

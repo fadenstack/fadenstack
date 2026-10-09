@@ -78,6 +78,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         is_routable=True,
         max_concurrency=2 * 256,  # two copies at vLLM's default max_num_seqs
         capacity_hints=None,  # no wait of its own: the gateway's default
+        task="chat",  # a vLLM model with no runner or convert generates text
         tools=False,  # no engine config: vLLM's tool calls are off
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
@@ -143,6 +144,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         is_routable=True,
         max_concurrency=256,  # only the ready copy counts
         capacity_hints=None,
+        task="chat",
         tools=False,  # no engine config: vLLM's tool calls are off
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint

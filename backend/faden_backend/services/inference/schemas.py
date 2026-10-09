@@ -26,10 +26,14 @@ class EngineSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(default="vllm", min_length=1, description="Engine name, e.g. 'vllm'.")
+    name: str = Field(
+        default="vllm",
+        min_length=1,
+        description="Engine name: 'vllm' (text, embeddings, scores) or 'diffusers' (pictures from a prompt).",
+    )
     config: dict[str, Any] = Field(
         default_factory=dict,
-        description="Engine-specific kwargs (maps to engine_kwargs / LLMConfig.engine).",
+        description="Engine-specific kwargs (vLLM's engine_kwargs; for diffusers the picture settings).",
     )
 
 
@@ -76,6 +80,13 @@ class ReplicaResources(BaseModel):
     cpu: float | None = Field(None, gt=0, description="CPU cores per replica.")
     memory: str | None = Field(None, description="Memory per replica, e.g. '32Gi'.")
     accelerator: str | None = Field(None, description="Accelerator type, e.g. 'A100'.")
+    #: The cluster machine every copy runs on (its name or id). Ray sees GPUs,
+    #: not what else a machine runs: on unified-memory machines (GB10) a model
+    #: beside another needs the machine that has the memory left.
+    machine: str | None = Field(
+        None, min_length=1, max_length=255,
+        description="Run every copy on this cluster machine (name or id); omit to let Ray place them.",
+    )
 
 
 class ResourceSpec(BaseModel):
