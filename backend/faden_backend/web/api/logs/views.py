@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
 import re
@@ -19,6 +21,7 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from starlette import status
 from starlette.websockets import WebSocketDisconnect
 
+from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.users import User, is_current_sign_in
 from faden_backend.settings import settings
 from faden_backend.web.api.rbac import require_permission
@@ -29,19 +32,51 @@ log = logging.getLogger(__name__)
 _RATE_LIMIT_PER_MINUTE = 120
 
 
-async def _ws_authenticate(websocket: WebSocket) -> User:
-    """Extract and verify the user from a WebSocket cookie JWT.
+#: How often an open tail checks its caller again: the sign-in is valid, the person is active, ``logs:read`` held.
+RECHECK_SEC = 60.0
+_WS_LOGS_PERMISSION = ("logs", "read")
 
-    fastapi-users' ``current_user`` dependency doesn't work on WebSocket
-    endpoints because its transport layer requires an HTTP ``Request``.
-    This helper manually reads the ``fapiauth`` cookie set by the cookie
-    transport and validates it against the same JWT secret.
+
+class _WsRefused(Exception):
+    """A tail connection that may not be served; *code* is the WebSocket close code."""
+
+    def __init__(self, code: int, reason: str) -> None:
+        self.code = code
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _ws_origin_allowed(websocket: WebSocket) -> bool:
+    """Whether the handshake comes from this site: a browser always sends ``Origin`` on a WebSocket.
+
+    Another site's page can open a socket to us with the visitor's cookie; its Origin gives it away. The
+    Origin must name the host the request came to (nginx passes ``Host`` on) or, behind a dev proxy that
+    rewrites ``Host``, the one it forwarded. A client that sends no Origin is no browser page, so the cookie
+    check below is all it needs.
     """
-    token = websocket.cookies.get("fapiauth")
-    if not token:
-        await websocket.close(code=4401, reason="Not authenticated")
-        raise WebSocketDisconnect(code=4401, reason="Not authenticated")
+    origin = websocket.headers.get("origin")
+    if origin is None:
+        return True
+    try:
+        origin_host = (urlparse(origin).netloc or "").lower()
+    except ValueError:
+        return False
+    if not origin_host:
+        return False
+    hosts = {websocket.headers.get("host"), websocket.headers.get("x-forwarded-host")}
+    return origin_host in {h.strip().lower() for h in hosts if h}
 
+
+async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
+    """The user behind a console sign-in cookie who may read logs; ``_WsRefused`` when anything fails.
+
+    fastapi-users' ``current_user`` dependency doesn't work on WebSocket endpoints because its transport
+    layer requires an HTTP ``Request``, so this reads the ``fapiauth`` cookie's JWT with the same secret and
+    applies the same rules as the HTTP log routes: an active user, and ``logs:read`` unless a superuser
+    (see ``require_permission``).
+    """
+    if not token:
+        raise _WsRefused(4401, "Not authenticated")
     try:
         payload = jwt.decode(
             token,
@@ -54,18 +89,49 @@ async def _ws_authenticate(websocket: WebSocket) -> User:
             raise ValueError("Missing sub claim")
         if not is_current_sign_in(payload):
             raise ValueError("A sign-in from before sign-ins expired")
+        user_uuid = uuid.UUID(str(user_id))
     except (jwt.PyJWTError, ValueError):
-        await websocket.close(code=4401, reason="Invalid token")
-        raise WebSocketDisconnect(code=4401, reason="Invalid token")
+        raise _WsRefused(4401, "Invalid token") from None
 
     session_factory = websocket.app.state.db_session_factory
     async with session_factory() as session:
-        user_db = SQLAlchemyUserDatabase(session, User)
-        user = await user_db.get(uuid.UUID(user_id))
+        user = await SQLAlchemyUserDatabase(session, User).get(user_uuid)
         if user is None or not user.is_active:
-            await websocket.close(code=4403, reason="User not found or inactive")
-            raise WebSocketDisconnect(code=4403)
+            raise _WsRefused(4403, "User not found or inactive")
+        if not user.is_superuser and not await RbacDAO(session).has_permission(user.id, *_WS_LOGS_PERMISSION):
+            raise _WsRefused(4403, "Permission denied: logs:read")
         return user
+
+
+async def _ws_authenticate(websocket: WebSocket) -> User | None:
+    """Origin, sign-in and ``logs:read`` before the socket is accepted; ``None`` once it was refused."""
+    try:
+        if not _ws_origin_allowed(websocket):
+            raise _WsRefused(4403, "Origin not allowed")
+        return await _ws_verify(websocket, websocket.cookies.get("fapiauth"))
+    except _WsRefused as exc:
+        await websocket.close(code=exc.code, reason=exc.reason)
+        return None
+
+
+async def _ws_recheck(websocket: WebSocket, token: str | None, upstream: Any) -> None:
+    """While the tail is open, check the caller every ``RECHECK_SEC``; close both sockets when it fails.
+
+    A database that cannot be reached says nothing about the caller, so that round is skipped.
+    """
+    while True:
+        await asyncio.sleep(RECHECK_SEC)
+        try:
+            await _ws_verify(websocket, token)
+        except _WsRefused as exc:
+            log.info("logs.tail closed: %s", exc.reason)
+            with contextlib.suppress(Exception):
+                await websocket.close(code=exc.code, reason=exc.reason)
+            with contextlib.suppress(Exception):
+                await upstream.close()
+            return
+        except Exception:
+            log.warning("logs.tail recheck failed", exc_info=True)
 
 
 _rate_buckets: dict[str, int] = defaultdict(int)
@@ -462,12 +528,17 @@ async def tail_logs(
     each frame as-is so the frontend can parse/shape it as needed.
     """
     user = await _ws_authenticate(websocket)
+    if user is None:
+        return
     _enforce_query_allowlist(query)
+    token = websocket.cookies.get("fapiauth")
     await websocket.accept()
 
     ws_url = _loki_ws_url("/loki/api/v1/tail", {"query": query})
+    watch: asyncio.Task[None] | None = None
     try:
         async with websockets.connect(ws_url, ping_interval=20, ping_timeout=20) as loki_ws:
+            watch = asyncio.create_task(_ws_recheck(websocket, token, loki_ws))
             async for message in loki_ws:
                 if isinstance(message, bytes):
                     await websocket.send_text(message.decode("utf-8", errors="replace"))
@@ -477,4 +548,8 @@ async def tail_logs(
         return
     except Exception as exc:
         log.warning("logs.tail upstream failure: %s", exc)
-        await websocket.close(code=1011, reason="Upstream Loki tail failed.")
+        with contextlib.suppress(Exception):
+            await websocket.close(code=1011, reason="Upstream Loki tail failed.")
+    finally:
+        if watch is not None:
+            watch.cancel()

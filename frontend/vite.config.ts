@@ -23,6 +23,16 @@ export default defineConfig({
       "/api": {
         target: apiProxyTarget,
         changeOrigin: true,
+        // The live log stream is a WebSocket. changeOrigin rewrites Host, so the backend
+        // learns the page's own host from X-Forwarded-Host to check the Origin against.
+        ws: true,
+        configure: (proxy) => {
+          const forwardHost = (proxyReq: any, req: any) => {
+            if (req.headers?.host) proxyReq.setHeader("x-forwarded-host", req.headers.host);
+          };
+          proxy.on("proxyReq", forwardHost);
+          proxy.on("proxyReqWs", forwardHost);
+        },
       },
     },
   },
