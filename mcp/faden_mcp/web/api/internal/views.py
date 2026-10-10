@@ -189,10 +189,15 @@ async def call_tool(
             pii_mode=effective_pii_mode,
         )
         if not decision.allowed:
-            raise HTTPException(
-                status_code=451,
-                detail="Tool call blocked by privacy policy.",
-            )
+            if decision.redaction_summary.get("reason") == "unredactable":
+                detail = (
+                    "Tool call blocked by privacy policy: the arguments contain "
+                    "personal data that could not be redacted safely, so nothing "
+                    "was sent."
+                )
+            else:
+                detail = "Tool call blocked by privacy policy."
+            raise HTTPException(status_code=451, detail=detail)
         sanitized_args = decision.sanitized_args
         if decision.redaction_summary:
             redaction_summary = decision.redaction_summary

@@ -128,9 +128,23 @@ class PrivacyProxy:
         if pii_mode == "redact" and pii_detected:
             sanitized_payload = data.get("sanitized_payload", {})
             sanitized_text = _extract_sanitized_text(sanitized_payload)
+            sanitized_args = _text_to_args(sanitized_text)
+            if sanitized_args is None:
+                # Fail closed: the redacted text is no longer a JSON object,
+                # so the original (unredacted) arguments must not be sent.
+                return PrivacyDecision(
+                    allowed=False,
+                    sanitized_args={},
+                    entities_found=entities_found,
+                    redaction_summary={
+                        "action": "blocked",
+                        "reason": "unredactable",
+                        "count": entities_count,
+                    },
+                )
             return PrivacyDecision(
                 allowed=True,
-                sanitized_args=_text_to_args(sanitized_text, arguments),
+                sanitized_args=sanitized_args,
                 entities_found=entities_found,
                 redaction_summary={"action": "redacted", "count": entities_count},
             )
@@ -153,19 +167,17 @@ def _extract_sanitized_text(sanitized_payload: dict[str, Any]) -> str:
     return ""
 
 
-def _text_to_args(
-    sanitized_text: str,
-    original_args: dict[str, Any],
-) -> dict[str, Any]:
+def _text_to_args(sanitized_text: str) -> dict[str, Any] | None:
     """Reconstruct arguments from sanitized text.
 
-    For simple key-value arguments we attempt to parse the sanitized
-    JSON back.  If parsing fails we fall back to the original arguments
-    (the PII service already applied redaction to the text representation).
+    Returns ``None`` when the redacted text no longer parses back into a
+    JSON object.  The caller must then refuse the call: the original
+    arguments still contain the personal data.
     """
     import json
 
     try:
-        return json.loads(sanitized_text)  # type: ignore[no-any-return]
+        parsed = json.loads(sanitized_text)
     except (json.JSONDecodeError, TypeError):
-        return original_args
+        return None
+    return parsed if isinstance(parsed, dict) else None
