@@ -31,6 +31,7 @@ from faden_gateway.services.gateway import (
     faden_events,
     knowledge,
     media_fetch,
+    provider_address,
     skill_files,
     system_tools,
 )
@@ -1966,6 +1967,8 @@ class GatewayService:
                 code="unsupported_parameter",
                 param="rag",
             )
+        # A provider at a link-local or cloud metadata address gets no prompt (provider_address.py).
+        candidates = await provider_address.usable(candidates)
         if chat and media_fetch.needed(payload.get("messages")):
             # The media URLs the client sent, checked and fetched by the gateway before anything is
             # stored or sent: the model gets them as data: URLs (inlined below), and nothing after the

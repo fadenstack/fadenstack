@@ -17,6 +17,7 @@ from faden_gateway.db.dependencies import get_db_session
 from faden_gateway.db.meta import meta
 from faden_gateway.db.models import load_all_models
 from faden_gateway.services.cache.redis import RedisCache
+from faden_gateway.services.gateway import provider_address
 from faden_gateway.services.gateway.observability import GatewayObservability
 from faden_gateway.services.rabbit.dependencies import get_rmq_channel_pool
 from faden_gateway.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
@@ -31,6 +32,22 @@ def anyio_backend() -> str:
     :return: backend name.
     """
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def _no_provider_lookups(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The provider address check looks up no name in tests: names resolve to nothing, and pass.
+
+    The tests' providers are made-up names (``upstream.local``); a real
+    lookup would go to the network, and slowly. Tests of the check set a
+    resolver of their own.
+    """
+
+    async def resolve(host: str) -> list[str]:
+        return []
+
+    monkeypatch.setattr(provider_address, "resolve", resolve)
+    provider_address.forget()
 
 
 @pytest.fixture
