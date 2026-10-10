@@ -63,21 +63,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # `latest` and the X.Y tag follow final releases only: a release candidate (v0.5.0rc1)
+      # is pulled by its exact version, by whoever chose the preview channel.
+      - name: Final release or not
+        id: release
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/(core-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "final=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "final=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ inputs.registry }}/${{ inputs.service }}
+          # With the default (auto), every type=match tag would also move `latest`, a
+          # release candidate's too; the raw tag below decides instead.
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=match,pattern=^v(\d+\.\d+\.\d+.*)$,group=1
             type=match,pattern=^v(\d+\.\d+)\.\d+$,group=1
-            type=match,pattern=core-v(.*),group=1
-            type=match,pattern=core-v(\d+\.\d+),group=1
+            type=match,pattern=^core-v(\d+\.\d+\.\d+.*)$,group=1
+            type=match,pattern=^core-v(\d+\.\d+)\.\d+$,group=1
             type=sha,prefix=
             type=sha,prefix=,format=long
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/core-v') }}
+            type=raw,value=latest,enable=${{ steps.release.outputs.final == 'true' }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
