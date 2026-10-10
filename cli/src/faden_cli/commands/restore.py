@@ -114,8 +114,13 @@ def restore_cmd(
 
     # ── Sync Postgres password with restored .env ─────────────
     if result.env_restored:
-        info("Syncing Postgres password with restored .env…")
         env_path = ctx.env_file or Path(ctx.project_dir) / ".env"
+        # A .env backed up before a release required it may lack a key the compose file now requires.
+        from faden_cli.core.env_gen import fill_required_env  # noqa: PLC0415
+
+        for note in fill_required_env(env_path, profiles=list(cfg.profiles)):
+            warning(note)
+        info("Syncing Postgres password with restored .env…")
         _sync_postgres_password(ctx, env_path)
 
     # ── Restart all services ──────────────────────────────────

@@ -136,7 +136,12 @@ class Settings(BaseSettings):
     # (same PostgreSQL host/user/pass, different database).
     # Defaults match local dev bootstrap values; override in production.
     backend_db_base: str = "faden_backend"
+    # The development default; outside the dev environment the gateway refuses
+    # to start with it (published_secrets.py) unless allow_published_keys is set.
     settings_master_key: str = "dev-settings-master-key-change-me"
+    # Start anyway with the published development master key, like the backend
+    # (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).
+    allow_published_keys: bool = False
 
     # Column-level encryption for chat data (empty = disabled / plaintext)
     encryption_key: str = ""

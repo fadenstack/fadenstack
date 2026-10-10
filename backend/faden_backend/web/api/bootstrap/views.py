@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.api_tokens import ACCOUNT_TENANT
 from faden_backend.db.models.users import User
+from faden_backend.services.password_policy import MAX_LENGTH, MIN_LENGTH, password_problem
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
@@ -66,8 +67,8 @@ class BootstrapRequest(BaseModel):
     password: str | None = Field(
         default=None,
         description="Admin password.  Auto-generated if omitted.",
-        min_length=6,
-        max_length=128,
+        min_length=MIN_LENGTH,
+        max_length=MAX_LENGTH,
     )
     generate_api_token: bool = Field(
         default=True,
@@ -120,6 +121,12 @@ async def create_first_admin(session: AsyncSession, payload: BootstrapRequest) -
     both counted no users, and both made a superuser.
     """
     from fastapi_users.password import PasswordHelper  # noqa: PLC0415
+
+    # The rule every new password meets (services/password_policy.py); a generated one always does.
+    if payload.password:
+        problem = password_problem(payload.password, payload.email)
+        if problem:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
 
     await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": BOOTSTRAP_LOCK_KEY})
     if await _user_count(session) > 0:

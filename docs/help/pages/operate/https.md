@@ -194,9 +194,11 @@ a network of its own.
 
 1. Serve HTTPS (`faden tls generate` or `faden tls use`) before adding machines.
 2. Import `ca.crt` into the browsers the console is used from instead of accepting the warning.
-3. Once HTTPS stays, turn on HTTP Strict Transport Security: set `FADEN_HSTS_MAX_AGE=31536000` in
-   `~/fadenstack/.env` and apply it with `faden up nginx`. It is 0 (off) by default so that HTTPS can be switched
-   off again without locking browsers out.
+3. Once HTTPS stays and every browser the console is used from trusts its certificate, turn on HTTP Strict
+   Transport Security: set `FADEN_HSTS_MAX_AGE=31536000` in `~/fadenstack/.env` and apply it with
+   `faden up nginx`. It is 0 (off) by default: under HSTS a browser offers no way past a certificate warning, so with
+   a self-signed certificate or your own authority every browser that does not trust it yet would be locked out, and
+   HTTPS could not be switched off again.
 4. Leave Grafana and Langfuse on the server's loopback address (the default; do not set `GRAFANA_BIND` or
    `LANGFUSE_BIND`). Grafana is in the console at `/grafana/`, for signed-in users allowed to see it. Reach Langfuse
    through an SSH tunnel: `ssh -L 3002:localhost:3002 ai.example.internal`.

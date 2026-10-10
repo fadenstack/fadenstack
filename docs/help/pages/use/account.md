@@ -23,7 +23,7 @@ Your e-mail address and what you may do are set by your administrator. See [User
 ## Change your password
 
 1. In **My Profile**, under **Change Password**, enter your **Current Password**.
-2. Enter the **New Password** twice. It needs at least 6 characters.
+2. Enter the **New Password** twice. It needs at least 8 characters.
 3. Select **Change Password**.
 
 You see **Password changed successfully.**
@@ -89,5 +89,6 @@ Applications that use it stop working within a minute. Revoke a token as soon as
 | You see | What to do |
 |---|---|
 | You are sent back to the sign-in page | Your sign-in ended. Sign in again. If your password is no longer accepted, ask your administrator: your account may have been changed or deactivated. |
-| **New passwords do not match.** or **Password must be at least 6 characters.** | Enter the new password again. |
+| **New passwords do not match.** or **Password must be at least 8 characters.** | Enter the new password again. It may not be your e-mail address either. |
+| **Too many attempts from this address. Wait a minute, then try again.** | The server counts sign-in and password-reset attempts per address. Wait a minute. If it happens to many people at once, they may all reach the server through one address (a proxy); tell your administrator. |
 | An application says its token is revoked or out of date | Create a new token and give it to the application. |

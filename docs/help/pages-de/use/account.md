@@ -23,7 +23,7 @@ Ihre E-Mail-Adresse und was Sie tun dürfen, legt Ihr Administrator fest. Siehe 
 ## Ihr Passwort ändern {#change-your-password}
 
 1. Geben Sie in **Mein Profil** unter **Passwort ändern** Ihr **Aktuelles Passwort** ein.
-2. Geben Sie das **Neue Passwort** zweimal ein. Es muss mindestens 6 Zeichen lang sein.
+2. Geben Sie das **Neue Passwort** zweimal ein. Es muss mindestens 8 Zeichen lang sein.
 3. Wählen Sie **Passwort ändern**.
 
 Sie sehen **Passwort erfolgreich geändert.**
@@ -89,5 +89,6 @@ Anwendungen, die das Token nutzen, funktionieren innerhalb einer Minute nicht me
 | Sie sehen | Was Sie tun |
 |---|---|
 | Sie werden zur Anmeldeseite zurückgeleitet | Ihre Anmeldung ist abgelaufen. Melden Sie sich erneut an. Wenn Ihr Passwort nicht mehr akzeptiert wird, wenden Sie sich an Ihren Administrator: Ihr Konto wurde möglicherweise geändert oder deaktiviert. |
-| **Neue Passwörter stimmen nicht überein.** oder **Passwort muss mindestens 6 Zeichen lang sein.** | Geben Sie das neue Passwort erneut ein. |
+| **Neue Passwörter stimmen nicht überein.** oder **Passwort muss mindestens 8 Zeichen lang sein.** | Geben Sie das neue Passwort erneut ein. Es darf auch nicht Ihre E-Mail-Adresse sein. |
+| **Too many attempts from this address. Wait a minute, then try again.** | Der Server zählt Anmelde- und Passwort-Zurücksetzungsversuche pro Adresse. Warten Sie eine Minute. Trifft es viele Personen gleichzeitig, erreichen sie den Server womöglich alle über eine Adresse (einen Proxy); sagen Sie Ihrem Administrator Bescheid. |
 | Eine Anwendung meldet, dass ihr Token widerrufen oder abgelaufen ist | Erstellen Sie ein neues Token und geben Sie es der Anwendung. |

@@ -46,9 +46,12 @@ newer runtime. Each is a separate step that you start; nothing upgrades itself.
        stops if nothing could be backed up;
     3. replaces the deployment files with the new release's, and adds to `.env` only the settings the release
        introduces: every value you set is kept, except the sizing of the services, which is worked out again for
-       the host as `faden tune` does;
+       the host as `faden tune` does. A key that seals stored data and is missing gets the value the install ran
+       on, never a new one, and the upgrade says so (see [Secrets in .env](installing.md#secrets-in-env));
     4. pulls the new release's images;
-    5. restarts the services behind the maintenance page; the database migrations run here;
+    5. restarts the services behind the maintenance page; the database migrations run here, and the two Postgres
+       logins with fixed passwords that earlier releases made (`llm_user`, `faden_backend`, used by nothing) are
+       switched off;
     6. waits for the console API to answer, then lifts the maintenance page;
     7. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
        nothing: retry it with `faden runtime-images`.

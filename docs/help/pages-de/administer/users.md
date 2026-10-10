@@ -58,7 +58,7 @@ Eine eingeschränkte Sammlung zeigt ein Schloss neben ihrem Namen.
 ![Neuen Benutzer erstellen: „E-Mail“ und „Passwort“, der Schalter „Superuser“ und „Rollen zuweisen“ mit den integrierten Rollen zum Ankreuzen](../images/administer/users-create.png)
 
 1. Öffnen Sie **Zugriffskontrolle → Benutzer** und wählen Sie **Benutzer erstellen**.
-2. Geben Sie die E-Mail-Adresse der Person und ein erstes Passwort mit mindestens 6 Zeichen ein.
+2. Geben Sie die E-Mail-Adresse der Person und ein erstes Passwort mit mindestens 8 Zeichen ein.
 3. Lassen Sie **Superuser** ausgeschaltet, es sei denn, die Person verwaltet Fadenstack mit Ihnen.
 4. Lassen Sie unter **Rollen zuweisen** alles leer für Personen, die nur chatten: Sie erhalten `default_user`.
 5. Wählen Sie **Benutzer erstellen**.

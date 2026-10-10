@@ -242,6 +242,10 @@ class VLLMAdapter(ProviderAdapter):
         env: list[str] = [
             # Point HuggingFace at our mounted cache directory
             f"HF_HUB_CACHE={hf_cache_mount}",
+            # vLLM reports usage statistics to its makers unless told not to
+            # (the certified runtime images set the same).
+            "VLLM_NO_USAGE_STATS=1",
+            "DO_NOT_TRACK=1",
         ]
         if trust_remote:
             # Allow network access for custom-code models so transformers

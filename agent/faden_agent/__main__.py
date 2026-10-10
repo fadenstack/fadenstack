@@ -350,7 +350,8 @@ def _show_config() -> dict[str, str]:
     if not backend_url:
         _warn("BACKEND_URL is not set — agent cannot connect to faden.")
     if not loki_url:
-        _warn("LOKI_URL is not set — container log forwarding disabled.")
+        # Not a fault: without it the agent asks the backend where to send logs (service.py).
+        _ok("Logs go through the backend (LOKI_URL is not set).")
 
     return merged
 

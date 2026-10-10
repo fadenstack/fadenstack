@@ -20,7 +20,8 @@ Swagger UI:
 - `/api/docs`
 
 ## Docker Compose (Shared Stack)
-From `shared/`:
+From `shared/`, with a `shared/.env` that holds the passwords, keys and tokens the compose file requires
+(`faden dev init` writes a development one; Help, Installing, "Secrets in .env" lists them):
 ```bash
 # Normal containerized run
 docker compose up -d faden-gateway

@@ -128,7 +128,8 @@ async def _ensure_api_secret_read_grants(app: FastAPI) -> None:  # pragma: no co
                 text("SELECT 1 FROM pg_roles WHERE rolname = 'llm_user'"),
             )
             if role_exists.scalar_one_or_none() is None:
-                log.warning("Role 'llm_user' not found; skipping API secret-read grants.")
+                # The usual case: installs no longer have it (shared/initdb), and the gateway reads as POSTGRES_USER.
+                log.debug("Role 'llm_user' not found; skipping API secret-read grants.")
                 await session.rollback()
                 return
             await session.execute(text("GRANT USAGE ON SCHEMA public TO llm_user"))

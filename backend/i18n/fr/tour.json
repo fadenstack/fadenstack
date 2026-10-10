@@ -180,7 +180,7 @@
       },
       "account": {
         "title": "Ses identifiants",
-        "body": "Son adresse e-mail et un premier mot de passe d'au moins 6 caractères. Transmettez le mot de passe en personne ou par téléphone."
+        "body": "Son adresse e-mail et un premier mot de passe d'au moins 8 caractères. Transmettez le mot de passe en personne ou par téléphone."
       },
       "roles": {
         "title": "Ce que la personne peut faire",

@@ -57,6 +57,13 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
         error(f"Invalid email address: {email}")
         sys.exit(1)
 
+    # The backend's rule for a new password (faden_backend/services/password_policy.py).
+    from faden_cli.core.bootstrap import MIN_PASSWORD_LENGTH  # noqa: PLC0415
+
+    if password is not None and len(password) < MIN_PASSWORD_LENGTH:
+        error(f"The password needs at least {MIN_PASSWORD_LENGTH} characters (or leave out --password).")
+        sys.exit(1)
+
     docker = shutil.which("docker")
     if not docker:
         error("docker not found on PATH")

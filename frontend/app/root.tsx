@@ -28,6 +28,10 @@ import { followMaintenance } from "./lib/maintenance";
 import NewVersionNotice from "./components/NewVersionNotice";
 
 import type { Route } from "./+types/root";
+// The fonts ship with the console (SIL Open Font License 1.1, in the packages): no page asks a third
+// party for anything. Inter is the variable font with its optical-size axis, as the console used before.
+import "@fontsource-variable/inter/opsz.css";
+import "@fontsource-variable/inter/opsz-italic.css";
 import "@fontsource/sora/600.css";
 import "@fontsource/sora/700.css";
 import "./app.css";
@@ -45,16 +49,6 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
   { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
   { rel: "manifest", href: "/manifest.webmanifest" },
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
 ];
 
 // The server has no layout pass; on it this is a no-op effect.

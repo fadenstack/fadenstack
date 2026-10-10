@@ -26,3 +26,7 @@ schema_config:
 
 limits_config:
   retention_period: 168h
+
+# No usage reports to Grafana Labs (on by default).
+analytics:
+  reporting_enabled: false

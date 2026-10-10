@@ -7,11 +7,11 @@ const apiProxyTarget =
   (process.env.VITE_API_PROXY_TARGET as string | undefined) ??
   "http://127.0.0.1:8000";
 
-// Dev servers need to be reachable from other machines (e.g. a remote
-// dev box accessed over the LAN), so the dev server binds all
-// interfaces by default. Set VITE_HOST=127.0.0.1 (or localhost) to
-// restrict to the local machine.
-const devHost = (process.env.VITE_HOST as string | undefined) ?? "0.0.0.0";
+// This machine only by default: the dev backend signs anyone in as the
+// administrator (dev-login), and the dev server proxies /api to it. For a
+// dev box reached over a network you trust, `faden dev up --lan` passes
+// --host 0.0.0.0; VITE_HOST sets it too.
+const devHost = (process.env.VITE_HOST as string | undefined) ?? "127.0.0.1";
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
