@@ -29,8 +29,10 @@ services:
       - "${FADEN_HTTPS_PORT:-443}:443"
     environment:
       FADEN_HTTPS_PORT: ${FADEN_HTTPS_PORT:-443}
-      # Strict-Transport-Security max-age sent over HTTPS; 0 tells browsers
-      # to forget it, so HTTPS can be switched off again.
+      # Strict-Transport-Security max-age sent over HTTPS. Opt-in: 0 (off) by
+      # default, which also tells browsers to forget it. With a self-signed
+      # certificate or a private CA, HSTS leaves a browser that does not trust
+      # it yet no way past the warning (nginx-tls.conf, Help: HTTPS).
       FADEN_HSTS_MAX_AGE: ${FADEN_HSTS_MAX_AGE:-0}
     # select-config.sh installs the plain-HTTP or the HTTPS server config,
     # then nginx runs as usual (the image's own entrypoint still runs first).
