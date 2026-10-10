@@ -56,7 +56,21 @@ LEFT JOIN LATERAL (
 WHERE a.tenant_id = $1 AND (a.slug = $2 OR a.id::text = $2)
 """
 
-_USER_SQL = 'SELECT is_active, is_superuser FROM "user" WHERE id = $1::uuid'
+#: The user's flags, and the ``chat.*`` permissions their roles give, their groups' roles included.
+_USER_SQL = """
+SELECT u.is_active, u.is_superuser,
+       ARRAY(SELECT DISTINCT p.resource || ':' || p.action
+             FROM permissions p
+             JOIN role_permissions rp ON rp.permission_id = p.id
+             WHERE p.resource LIKE 'chat.%'
+               AND rp.role_id IN (SELECT ur.role_id FROM user_roles ur WHERE ur.user_id = u.id
+                                  UNION
+                                  SELECT gr.role_id FROM group_roles gr
+                                  JOIN user_groups ug ON ug.group_id = gr.group_id
+                                  WHERE ug.user_id = u.id)) AS chat_permissions
+FROM "user" u
+WHERE u.id = $1::uuid
+"""
 
 #: A query, not a secret; S105 only sees "TOKEN" in the name.
 _API_TOKEN_SQL = (
@@ -147,6 +161,8 @@ class UserFlags:
 
     is_active: bool
     is_superuser: bool
+    #: The ``chat.*`` permissions (``resource:action``) the user's roles and groups give.
+    chat_permissions: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -253,7 +269,11 @@ class BackendAgents:
             return None  # not a user id
         except Exception as exc:
             raise AgentLookupError(str(exc)) from exc
-        return UserFlags(bool(row["is_active"]), bool(row["is_superuser"])) if row is not None else None
+        if row is None:
+            return None
+        return UserFlags(
+            bool(row["is_active"]), bool(row["is_superuser"]), frozenset(row["chat_permissions"] or ()),
+        )
 
     async def api_token(self, token_id: str) -> ApiTokenRecord | None:
         try:

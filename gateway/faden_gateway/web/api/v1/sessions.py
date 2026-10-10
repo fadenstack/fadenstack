@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette import status
 
 from faden_gateway.db.dao.session_dao import SessionDAO
-from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.auth import AuthContext, require_chat
 from faden_gateway.services.gateway.errors import GatewayError, error_response
 from faden_gateway.services.gateway.session_schemas import (
     MessageDTO,
@@ -34,7 +34,7 @@ _UNSET = object()
 
 @router.get("/projects")
 async def list_projects(
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     projects = await dao.list_projects(
@@ -48,7 +48,7 @@ async def list_projects(
 async def create_project(
     body: ProjectCreateRequest,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:create")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     # Enforce capacity limit
@@ -84,7 +84,7 @@ async def create_project(
 @router.get("/projects/{project_id}")
 async def get_project(
     project_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     project = await dao.get_project(
@@ -104,7 +104,7 @@ async def get_project(
 async def update_project(
     project_id: uuid.UUID,
     body: ProjectUpdateRequest,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:update")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     fields = body.model_dump(exclude_unset=True)
@@ -128,7 +128,7 @@ async def update_project(
 async def delete_project(
     project_id: uuid.UUID,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:delete")),
     dao: SessionDAO = Depends(),
 ) -> None:
     # Only the caller's own project, before anything of it is touched.
@@ -165,7 +165,7 @@ async def delete_project(
 async def list_sessions(
     project_id: uuid.UUID | None = None,
     session_status: str | None = None,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     from faden_gateway.db.models.gateway import SessionStatus  # noqa: PLC0415
@@ -200,7 +200,7 @@ async def list_sessions(
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_session(
     body: SessionCreateRequest,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:create")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     # Validate project ownership if project_id is given
@@ -231,7 +231,7 @@ async def create_session(
 @router.get("/{session_id}")
 async def get_session(
     session_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     sess = await dao.get_session(
@@ -251,7 +251,7 @@ async def get_session(
 async def update_session(
     session_id: uuid.UUID,
     body: SessionUpdateRequest,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:update")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     from faden_gateway.db.models.gateway import SessionStatus  # noqa: PLC0415
@@ -298,7 +298,7 @@ async def update_session(
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     session_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:delete")),
     dao: SessionDAO = Depends(),
 ) -> None:
     deleted = await dao.delete_session(
@@ -319,7 +319,7 @@ async def delete_session(
 async def list_messages(
     session_id: uuid.UUID,
     limit: int = 100,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     # Verify session ownership
@@ -367,7 +367,7 @@ async def list_messages(
 @router.get("/{session_id}/summary")
 async def get_session_summary(
     session_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     sess = await dao.get_session(
@@ -392,7 +392,7 @@ async def get_session_summary(
 @router.get("/capacity")
 async def get_capacity(
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.projects:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     """Return project capacity for the current user."""

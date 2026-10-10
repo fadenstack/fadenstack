@@ -67,6 +67,7 @@ TEAM = "33333333-3333-3333-3333-333333333333"
 INSTRUCTIONS = "You help with EPLAN pages. Answer briefly."
 ANSWER = "Page 12 holds the motor circuit."
 USAGE = {"prompt_tokens": 21, "completion_tokens": 7, "total_tokens": 28}
+CHATS = frozenset({"chat.sessions:create", "chat.sessions:read"})
 
 
 def _profile(**overrides: Any) -> AgentProfile:
@@ -100,9 +101,10 @@ class _Backend:
 
     def __init__(self) -> None:
         self.agents: dict[str, AgentProfile] = {}
+        # Both chat (default_user): the plain chat route asks for it.
         self.users: dict[str, UserFlags] = {
-            USER: UserFlags(is_active=True, is_superuser=False),
-            MAINTAINER: UserFlags(is_active=True, is_superuser=False),
+            USER: UserFlags(is_active=True, is_superuser=False, chat_permissions=CHATS),
+            MAINTAINER: UserFlags(is_active=True, is_superuser=False, chat_permissions=CHATS),
         }
         self.groups: dict[str, tuple[str, ...]] = {}
         self.agent_reads = 0

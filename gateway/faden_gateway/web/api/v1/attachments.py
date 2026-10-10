@@ -14,7 +14,7 @@ from faden_gateway.services.gateway.attachment_service import (
     AttachmentError,
     ChatAttachmentService,
 )
-from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
+from faden_gateway.services.gateway.auth import AuthContext, require_chat
 from faden_gateway.services.gateway.docling_client import ChatDoclingClient
 from faden_gateway.services.gateway.errors import GatewayError
 from faden_gateway.services.gateway.session_schemas import (
@@ -68,7 +68,7 @@ async def upload_session_attachment(
     session_id: uuid.UUID,
     file: UploadFile,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:create")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     """Upload a file attachment scoped to a chat session."""
@@ -107,7 +107,7 @@ async def upload_session_attachment(
 async def list_session_attachments(
     session_id: uuid.UUID,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     await _own_session(dao, session_id, auth)
@@ -128,7 +128,7 @@ async def delete_session_attachment(
     session_id: uuid.UUID,
     attachment_id: uuid.UUID,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:delete")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     svc = _build_service(request, dao)
@@ -156,7 +156,7 @@ async def upload_project_attachment(
     project_id: uuid.UUID,
     file: UploadFile,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:create")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     """Upload a file attachment scoped to a project."""
@@ -195,7 +195,7 @@ async def upload_project_attachment(
 async def list_project_attachments(
     project_id: uuid.UUID,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     await _own_project(dao, project_id, auth)
@@ -214,7 +214,7 @@ async def list_project_attachments(
 @router.get("/attachments/stats")
 async def attachment_stats(
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.attachments:read")),
     dao: SessionDAO = Depends(),
 ) -> JSONResponse:
     svc = _build_service(request, dao)

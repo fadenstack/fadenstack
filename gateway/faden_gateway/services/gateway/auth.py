@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -279,6 +280,44 @@ async def get_auth_context(
             code="agent_token_not_allowed",
         )
     return await caller_context(request.app, claims, token)
+
+
+async def check_chat_permission(app: Any, auth: AuthContext, permission: str) -> None:
+    """Refuses a caller whose roles do not give *permission* (``chat.sessions:create``, ...).
+
+    The chat is for those whose roles include it (``default_user`` does); a superuser may do
+    everything. Without the backend database (development, tests) nothing is checked.
+    """
+    directory = getattr(app.state, "agent_directory", None)
+    if directory is None:
+        return
+    try:
+        user = await directory.user(auth.user_id)
+    except AgentLookupError as exc:
+        raise GatewayError(
+            status_code=503,
+            message="Your access could not be checked; try again.",
+            error_type="server_error",
+            code="access_check_failed",
+        ) from exc
+    if user is not None and (user.is_superuser or permission in user.chat_permissions):
+        return
+    raise GatewayError(
+        status_code=403,
+        message=f"Your roles do not include this part of the chat ({permission}). Ask your administrator.",
+        error_type="permission_error",
+        code="permission_denied",
+    )
+
+
+def require_chat(permission: str) -> Callable[..., Awaitable[AuthContext]]:
+    """A dependency: the caller (:func:`get_auth_context`), once their roles give *permission*."""
+
+    async def _guard(request: Request, auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
+        await check_chat_permission(request.app, auth, permission)
+        return auth
+
+    return _guard
 
 
 async def get_agent_route_claims(

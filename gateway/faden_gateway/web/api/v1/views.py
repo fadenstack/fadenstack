@@ -24,6 +24,7 @@ from faden_gateway.services.gateway.auth import (
     AuthContext,
     get_auth_context,
     pii_weaken_granted,
+    require_chat,
 )
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.lease import LeaseManager
@@ -386,7 +387,7 @@ async def _require_session_owner(
 async def get_session_tool_policy(
     session_id: str,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.tool_policy:read")),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
     """Return the current tool execution policy for a session."""
@@ -412,7 +413,7 @@ async def get_session_tool_policy(
 async def patch_session_tool_policy(
     session_id: str,
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.tool_policy:update")),
     dao: GatewayDAO = Depends(),
 ) -> JSONResponse:
     """Update the execution mode, hybrid preference, and/or tool overrides."""
@@ -726,7 +727,7 @@ def _requested_skills(value: Any) -> list[str]:
 @router.post("/v1/chat/completions", response_model=None)
 async def create_chat_completions(
     request: Request,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:create")),
     service: GatewayService = Depends(get_gateway_service),
 ) -> Response:
     """Proxy chat completions with stream and non-stream support."""
@@ -870,7 +871,7 @@ async def retry_turn(
     request: Request,
     session_id: uuid.UUID,
     turn_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:create")),
     service: GatewayService = Depends(get_gateway_service),
 ) -> Response:
     """Try the chat's last reply again, once it has failed or stopped.
@@ -942,7 +943,7 @@ async def stop_turn(
     request: Request,
     session_id: uuid.UUID,
     turn_id: uuid.UUID,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:create")),
     dao: GatewayDAO = Depends(),
     session_dao: SessionDAO = Depends(),
 ) -> JSONResponse:
@@ -1001,7 +1002,7 @@ async def _owned_session(session_id: str, auth: AuthContext, dao: GatewayDAO) ->
 async def stream_status(
     request: Request,
     session_id: str,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: GatewayDAO = Depends(),
     session_dao: SessionDAO = Depends(),
 ) -> JSONResponse:
@@ -1020,7 +1021,7 @@ async def stream_status(
 async def stream_resume(
     request: Request,
     session_id: str,
-    auth: AuthContext = Depends(get_auth_context),
+    auth: AuthContext = Depends(require_chat("chat.sessions:read")),
     dao: GatewayDAO = Depends(),
     session_dao: SessionDAO = Depends(),
 ) -> Response:
