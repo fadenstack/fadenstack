@@ -289,6 +289,8 @@ async def test_the_updates_page_shows_the_commands(
     assert body["latest"] == "0.4.2" and body["severity"] == "security"
     assert body["commands"] == ["pipx upgrade fadenstack", "faden upgrade --dry-run", "faden upgrade -y"]
     assert body["check"]["error"] is None
+    assert (body["current"]["release"], body["current"]["installer"]) == ("0.4.1", "pipx")
+    assert body["current"] == {"release": "0.4.1", "backend": body["current"]["backend"], "installer": "pipx"}
     assert any(p["kind"] == "service" and p["name"] == "faden-backend" for p in body["parts"])
 
     notice = (await client.get(fastapi_app.url_path_for("admin_updates_notice"))).json()

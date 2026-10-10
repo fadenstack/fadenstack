@@ -36,6 +36,7 @@ import BrandMark from "~/components/BrandMark";
 import { APP_BRANDING } from "~/branding";
 import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
 import { usePendingJoins } from "~/lib/usePendingJoins";
+import { useUpdateNotice } from "~/lib/updateNotice";
 import type { NavHand } from "~/lib/useNavHand";
 
 import {
@@ -66,6 +67,7 @@ import {
   NAV_BY_ID,
   linkButtonSx,
   navActiveSx,
+  type NavChild,
   type NavEntry,
 } from "~/lib/adminConstants";
 
@@ -212,11 +214,18 @@ export function AdminSidebar({
 
   // Live counts shown beside nav items that declare a badge. Only polled when
   // such an item is actually visible to this user.
-  const wantsJoins = mainVisible
-    .concat(pinnedVisible)
-    .some((e) => e.kind === "group" && e.children.some((c) => c.badge === "pendingJoins"));
-  const pendingJoins = usePendingJoins(wantsJoins);
-  const badges: Record<string, number> = { pendingJoins: pendingJoins.length };
+  const wantsBadge = (badge: NavChild["badge"]) =>
+    mainVisible
+      .concat(pinnedVisible)
+      .some((e) => e.kind === "group" && e.children.some((c) => c.badge === badge));
+  const pendingJoins = usePendingJoins(wantsBadge("pendingJoins"));
+  // Shared with the update banner: one request for both.
+  const updateNotice = useUpdateNotice(wantsBadge("updateAvailable")).data;
+  const badges: Record<string, number> = {
+    pendingJoins: pendingJoins.length,
+    updateAvailable: updateNotice?.update_available ? 1 : 0,
+  };
+  const urgentUpdate = updateNotice?.severity === "critical" || updateNotice?.severity === "security";
 
   const currentDrawerWidth = drawerOpen
     ? DRAWER_WIDTH_OPEN
@@ -467,7 +476,18 @@ export function AdminSidebar({
                         fontWeight: 500,
                       }}
                     />
-                    {child.badge && (badges[child.badge] ?? 0) > 0 && (
+                    {child.badge === "updateAvailable" && badges.updateAvailable > 0 && (
+                      // A yes/no: a dot; orange when the release fixes security problems.
+                      <Badge
+                        variant="dot"
+                        color={urgentUpdate ? "warning" : "info"}
+                        sx={{ mr: 1.5 }}
+                        role="img"
+                        aria-label={t("updates.nav_badge")}
+                        data-testid="nav-badge-updateAvailable"
+                      />
+                    )}
+                    {child.badge && child.badge !== "updateAvailable" && (badges[child.badge] ?? 0) > 0 && (
                       <Badge
                         badgeContent={badges[child.badge]}
                         color="warning"

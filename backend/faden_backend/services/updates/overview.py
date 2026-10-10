@@ -84,13 +84,14 @@ async def overview(session: AsyncSession, docker: Any, now: datetime) -> dict[st
 
     released_agent = latest.components.get("agent") if latest else None
     return {
+        # The notice's fields first: its "current" (the release) is replaced by the fuller object below.
+        **notice(state),
         "check": _check_info(state, now),
         "current": {
             "release": current,
             "backend": versions.backend_version(),
             "installer": installer,
         },
-        **notice(state),
         "latest_release": release_feed.as_dict(latest) if latest else None,
         "newer": [release_feed.as_dict(r) for r in (found.newer if found else ())],
         "path": list(found.path) if found else [],

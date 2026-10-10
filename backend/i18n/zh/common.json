@@ -77,7 +77,8 @@
     "collapse": "收起",
     "agents_group": "智能体",
     "agents": "智能体",
-    "governance": "治理"
+    "governance": "治理",
+    "updates": "更新"
   },
   "auth": {
     "logout": "退出登录",
@@ -612,6 +613,34 @@
       "gateway_machine_certificate_expiring": {
         "title": "网关的机器证书将在 {{days}} 天后到期",
         "detail": "到期日 {{until}}。后端每小时续期一次；其日志说明未续期的原因（Machine CA）。"
+      },
+      "update_available": {
+        "title": "Fadenstack {{version}} 已发布",
+        "detail": "此服务器运行 {{current}}。“更新”页面说明了如何升级。"
+      },
+      "update_available_security": {
+        "title": "安全更新：Fadenstack {{version}}",
+        "detail": "此服务器运行的 {{current}} 之后的版本修复了安全问题。"
+      },
+      "update_available_critical": {
+        "title": "严重更新：Fadenstack {{version}}",
+        "detail": "此服务器运行的 {{current}} 之后的版本修复了一个严重问题。请尽快安装。"
+      },
+      "release_unsupported": {
+        "title": "Fadenstack {{current}} 已不再受支持",
+        "detail": "支持已于 {{until}} 结束。请安装更新的版本。"
+      },
+      "update_check_failing": {
+        "title": "更新检查无法正常工作",
+        "detail": "{{error}} 请关闭检查，或在“设置 > 更新”中填写版本列表副本的地址。"
+      },
+      "agent_update_available": {
+        "title": "代理较旧的机器：{{count}}",
+        "detail": "代理 {{version}} 已发布。在每台机器上再次运行其安装命令即可更新。"
+      },
+      "release_mismatch": {
+        "title": "运行其他版本的部分：{{count}}",
+        "detail": "未运行 {{release}}：{{names}}。“更新”页面列出了每个部分运行的版本。"
       }
     },
     "integrations": {
@@ -844,7 +873,8 @@
       "database": "数据库",
       "llm": "LLM",
       "logging": "日志",
-      "observability": "可观测性"
+      "observability": "可观测性",
+      "updates": "更新"
     },
     "groups": {
       "auth": "认证",
@@ -864,7 +894,8 @@
       "rag_lite": "RAG Lite",
       "redis": "Redis",
       "skills": "技能",
-      "data_residency": "数据驻留"
+      "data_residency": "数据驻留",
+      "update_check": "更新检查"
     },
     "current_value": "（当前：{{value}}）",
     "appearance": {
@@ -3779,6 +3810,104 @@
       "engine": "推理引擎 (vLLM)",
       "agent": "系统日志",
       "container": "模型容器"
+    }
+  },
+  "updates": {
+    "title": "更新",
+    "subtitle": "此服务器运行的 Fadenstack 版本、更新的版本以及如何升级。",
+    "release_notes": "发行说明",
+    "nav_badge": "有可用更新",
+    "summary": {
+      "title": "此服务器",
+      "runs": "此服务器运行 Fadenstack {{version}}",
+      "check_now": "立即检查",
+      "checking": "正在检查…",
+      "newest": "最新版本：{{version}}，{{date}}",
+      "channel": "通道：{{channel}}",
+      "checked": "上次检查：{{ago}}",
+      "never_checked": "尚未检查",
+      "last_success": "上次成功检查：{{ago}}",
+      "feed_date": "版本列表日期：{{date}}",
+      "feed_uploaded": "版本列表日期：{{date}}，手动上传",
+      "supported_until": "支持至 {{date}}",
+      "unsupported": "Fadenstack {{version}} 的支持已于 {{date}} 结束，不再获得修复。请安装更新的版本。",
+      "unsupported_plain": "Fadenstack {{version}} 已不再受支持，不再获得修复。请安装更新的版本。",
+      "check_off": "每日检查已关闭（设置 > 更新）。“立即检查”仍然可用。",
+      "check_error": "上次检查失败：{{error}}",
+      "failing_hint": "检查已有一段时间未成功。如果此服务器无法访问互联网，请关闭检查，或在“设置 > 更新”中填写版本列表副本的地址。",
+      "open_settings": "打开设置"
+    },
+    "status": {
+      "up_to_date": "已是最新",
+      "update": "有可用更新",
+      "security": "安全更新",
+      "critical": "严重更新",
+      "unsupported": "不再受支持",
+      "not_checked": "尚未检查"
+    },
+    "channel": {
+      "stable": "稳定版",
+      "preview": "预览版"
+    },
+    "severity": {
+      "normal": "常规",
+      "security": "安全",
+      "critical": "严重"
+    },
+    "upgrade": {
+      "title": "如何升级",
+      "steps": "必须逐个安装版本：{{steps}}。下面的命令安装 {{next}}；完成后回到这里进行下一步。",
+      "where": "请在安装了 faden 的服务器上运行这些命令。系统不会自行安装任何内容。",
+      "maintenance": "faden upgrade 运行期间，控制台会短暂显示维护页面。",
+      "copy": "复制命令",
+      "copied": "已复制",
+      "agents": "升级后，各机器会显示代理更新到 {{version}}。在每台机器上再次运行其安装命令即可更新。",
+      "agents_link": "机器"
+    },
+    "newer": {
+      "title": "更新的版本"
+    },
+    "parts": {
+      "title": "此安装的组成部分",
+      "subtitle": "每个部分运行的版本，以及此版本期望的版本。",
+      "empty": "没有报告任何组成部分。",
+      "col_part": "部分",
+      "col_name": "名称",
+      "col_running": "正在运行",
+      "col_expected": "此版本期望",
+      "col_status": "状态",
+      "kind": {
+        "service": "服务",
+        "agent": "机器代理",
+        "cluster": "集群运行时",
+        "cli": "CLI"
+      },
+      "status": {
+        "current": "最新",
+        "update": "有可用更新",
+        "mismatch": "其他版本",
+        "unknown": "未知",
+        "stopped": "已停止"
+      }
+    },
+    "offline": {
+      "title": "此服务器无法访问互联网？",
+      "body": "在可上网的计算机上，从下面的地址下载 index.json 和 index.json.sig。原样复制这两个文件并在此上传。使用列表前会先校验签名。",
+      "mirror": "也可以将这两个文件放到您网络中的 Web 服务器上，并在“设置 > 更新”中填写其地址；每日检查随后会从那里读取。",
+      "choose_index": "选择 index.json",
+      "choose_signature": "选择 index.json.sig",
+      "no_file": "未选择文件",
+      "upload": "上传",
+      "uploading": "正在上传…",
+      "uploaded": "版本列表已上传。"
+    },
+    "banner": {
+      "critical": "较新的版本修复了一个严重问题：Fadenstack {{version}} 已发布，此服务器运行的是 {{current}}。请尽快安装。",
+      "security": "较新的版本修复了安全问题：Fadenstack {{version}} 已发布，此服务器运行的是 {{current}}。",
+      "unsupported": "Fadenstack {{current}} 的支持已于 {{until}} 结束。请安装更新的版本。",
+      "unsupported_plain": "Fadenstack {{current}} 已不再受支持。请安装更新的版本。",
+      "open": "查看更新",
+      "dismiss": "隐藏至下一版本"
     }
   }
 }

@@ -42,6 +42,7 @@ export default [
     route("/admin/logs", "pages/admin/LogsPage.tsx"),
     route("/admin/audit", "pages/admin/AuditRedirectPage.tsx"),
     route("/admin/settings", "pages/admin/SettingsPage.tsx"),
+    route("/admin/updates", "pages/admin/UpdatesPage.tsx"),
     route("/admin/users", "pages/admin/UsersPage.tsx"),
     route("/admin/roles", "pages/admin/RolesPage.tsx"),
     route("/admin/groups", "pages/admin/GroupsPage.tsx"),
