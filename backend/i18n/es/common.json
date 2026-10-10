@@ -3660,6 +3660,12 @@
         "approved": "aprobado",
         "timeout": "tiempo agotado"
       },
+      "scope": {
+        "once": "una vez",
+        "chat": "para este chat",
+        "always": "siempre",
+        "bypass": "modo bypass"
+      },
       "count_tools_one": "{{count}} herramienta",
       "count_tools_other": "{{count}} herramientas",
       "count_turns_one": "{{count}} turno",

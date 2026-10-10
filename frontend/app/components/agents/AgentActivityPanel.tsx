@@ -168,6 +168,7 @@ function EventsTable({
         const s = summarizeEvent(e);
         const parts = [
           ...s.facts,
+          s.scope ? t(`agents.activity.scope.${s.scope}`, { defaultValue: s.scope }) : null,
           s.durationMs !== undefined ? fmtMs(s.durationMs, i18n.language) : null,
           s.count ? t(`agents.activity.count_${s.count.key}`, { count: s.count.value }) : null,
         ].filter(Boolean);

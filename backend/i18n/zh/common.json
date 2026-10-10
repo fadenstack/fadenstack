@@ -3660,6 +3660,12 @@
         "approved": "已批准",
         "timeout": "已超时"
       },
+      "scope": {
+        "once": "仅此一次",
+        "chat": "本次聊天",
+        "always": "始终",
+        "bypass": "绕过模式"
+      },
       "count_tools_one": "{{count}} 个工具",
       "count_tools_other": "{{count}} 个工具",
       "count_turns_one": "{{count}} 轮",
