@@ -255,15 +255,24 @@ class Settings(BaseSettings):
     chat_max_total_attachment_mb: int = 50
     chat_attachment_max_pages: int = 50
 
-    # Media URLs in the messages a client sends (services/gateway/media_urls.py).
-    # The model server fetches them itself, so only data: URLs and http(s) URLs
-    # whose host resolves to public addresses only go on; others are refused
-    # with a 400. False sends every URL on, as it used to.
+    # Media URLs in the messages a client sends (services/gateway/media_urls.py,
+    # media_fetch.py). The gateway fetches each http(s) one itself -- from
+    # public addresses only, checked again on every connection and redirect --
+    # and the model gets a data: URL, so neither a model server nor LiteLLM
+    # fetches what a client named. A URL that is not public, too large, of the
+    # wrong kind or not reachable is refused with a 400. False sends every URL
+    # on as it is, for the model server to fetch, as it used to.
     media_url_check: bool = True
     # Comma-separated hosts (media.example.lan), host patterns (*.example.lan)
-    # and IP addresses or networks (10.20.0.0/16) whose media URLs go on although
-    # they are internal: an install whose pictures live on an internal server.
+    # and IP addresses or networks (10.20.0.0/16) whose media URLs are taken
+    # although they are internal: an install whose pictures live on an internal
+    # server. The gateway fetches those too.
     media_url_allowed_hosts: str = ""
+    # The most the media URLs of one request may bring in, all together, in
+    # bytes; counted as they download.
+    media_url_max_bytes: int = 20 * 1024 * 1024
+    # How long fetching one media URL may take, redirects included.
+    media_url_timeout_sec: float = 20.0
 
     langfuse_debug: bool = False
 

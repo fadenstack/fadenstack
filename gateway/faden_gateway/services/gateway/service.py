@@ -30,7 +30,7 @@ from faden_gateway.services.gateway import (
     attachment_search,
     faden_events,
     knowledge,
-    media_urls,
+    media_fetch,
     skill_files,
     system_tools,
 )
@@ -922,6 +922,8 @@ class _Prepared:
 
     payload: dict[str, Any]
     egress_payload: dict[str, Any] | None = None
+    #: The media URLs the client sent, fetched by the gateway: (url, kind) -> data: URL (media_fetch.py).
+    media: dict[tuple[str, str], str] = field(default_factory=dict)
     token_mapping: dict[str, str] | None = None
     decision: RoutingDecision | None = None
     fallback_outcome: str = "not_used"
@@ -1964,10 +1966,14 @@ class GatewayService:
                 code="unsupported_parameter",
                 param="rag",
             )
-        if chat:
-            # The media URLs the client sent, before anything is stored, fetched or sent; the
-            # session step adds the chat's own pictures after this, as data: URLs.
-            await media_urls.check_messages(payload.get("messages"))
+        if chat and media_fetch.needed(payload.get("messages")):
+            # The media URLs the client sent, checked and fetched by the gateway before anything is
+            # stored or sent: the model gets them as data: URLs (inlined below), and nothing after the
+            # gateway fetches a URL a client named. The session step adds the chat's own pictures
+            # after this, as data: URLs, which are never fetched. A fetch can take seconds: the
+            # request holds no pooled database connection meanwhile.
+            await self._release_request_connection()
+            req.media = await media_fetch.fetch_messages(payload.get("messages"))
         # Read before anything runs: the session step rewrites the messages.
         question = _last_user_text(payload)
         if chat:
@@ -2104,6 +2110,9 @@ class GatewayService:
         egress = _without_replayed_tools(egress)
         if chat:
             egress = self._offer_by_mode(req, egress)
+            # Last, on what leaves: every media URL as the data: URL the gateway fetched for it. The
+            # tool rounds, the retries and the background turn all send this payload on.
+            egress = await media_fetch.inline(egress, req.media)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
