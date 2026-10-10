@@ -12,12 +12,13 @@ import type { ChatMessage } from "~/api/chatTypes";
 
 const hook = vi.hoisted(() => ({
   messages: [] as ChatMessage[], retry: vi.fn(), loadHistory: vi.fn(), isStreaming: false,
+  streamingContent: "", streamingNotes: [] as string[], replyNotes: {} as Record<string, string[]>,
 }));
 
 vi.mock("../hooks/useChatStream", () => ({
   useChatStream: () => ({
     messages: hook.messages,
-    streamingContent: "",
+    streamingContent: hook.streamingContent,
     streamingUsage: null,
     isStreaming: hook.isStreaming,
     isLoading: false,
@@ -26,6 +27,8 @@ vi.mock("../hooks/useChatStream", () => ({
     pendingApproval: null,
     answerApproval: vi.fn(),
     toolNotices: [],
+    streamingNotes: hook.streamingNotes,
+    getReplyNotes: (id: string) => hook.replyNotes[id] ?? [],
     getResponseMs: () => null,
     send: vi.fn(),
     retry: hook.retry,
@@ -70,6 +73,7 @@ describe("ChatWindow's stored replies", () => {
     hook.retry.mockReset();
     hook.loadHistory.mockReset();
     hook.isStreaming = false;
+    hook.replyNotes = {};
     vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
   });
 
@@ -97,6 +101,16 @@ describe("ChatWindow's stored replies", () => {
     expect(screen.getByTestId("reply-stopped")).toHaveTextContent("Stopped");
   });
 
+  it("says on a reply which pictures were not sent with it", () => {
+    const note = "cat.png was not sent: text-only does not take pictures. Choose a model that does.";
+    hook.messages = [message("u1", "user", "What is in it?"), message("t1", "assistant", "I can't see it.")];
+    hook.replyNotes = { t1: [note] };
+    renderChat();
+    const [notes] = screen.getAllByTestId("reply-notes");
+    expect(notes).toHaveTextContent(note);
+    expect(notes.closest("[data-message-role]")).toHaveAttribute("data-message-role", "assistant");
+  });
+
   it("says a reply was cut off by a restart", () => {
     hook.messages = [message("u1", "user", "hi"), message("t1", "assistant", "", { status: "interrupted" })];
     renderChat();
@@ -111,7 +125,19 @@ describe("ChatWindow while a reply is written", () => {
     Element.prototype.scrollIntoView = vi.fn();
     hook.loadHistory.mockReset();
     hook.isStreaming = false;
+    hook.streamingContent = "";
+    hook.streamingNotes = [];
     vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
+  });
+
+  it("says it on the reply as it streams", () => {
+    const note = "cat.png was not sent: text-only does not take pictures. Choose a model that does.";
+    hook.messages = [message("u1", "user", "What is in it?")];
+    hook.isStreaming = true;
+    hook.streamingContent = "I can't";
+    hook.streamingNotes = [note];
+    renderChat();
+    expect(screen.getByTestId("reply-notes")).toHaveTextContent(note);
   });
 
   it("tells the chat list, which marks the chat", () => {

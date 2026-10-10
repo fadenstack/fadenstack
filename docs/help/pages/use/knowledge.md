@@ -34,7 +34,7 @@ The model gets the text of the file along with your question. The file stays wit
 ??? info "Pictures, scans and long files"
     | | Good to know |
     |---|---|
-    | **Pictures** | They help only with a model that can read pictures. Ask your administrator which models can. |
+    | **Pictures** | They help only with a model that can read pictures. Ask your administrator which models can. A picture is sent only to a model that can read pictures: with a model that cannot, its chip says so before you send, and the reply says the picture was not sent. |
     | **Scans** (documents whose pages are pictures) | They may have no text the server can read. The model then does not get the file. If an answer seems to ignore your file, this may be why. |
     | **Long files** | They may not fit whole into what the model can read at once. The model then searches the file for the parts it needs, or reads its beginning. With the tool mode **Off**, it gets neither. |
 

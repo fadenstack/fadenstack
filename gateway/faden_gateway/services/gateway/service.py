@@ -650,6 +650,16 @@ def _cap_output(payload: dict[str, Any]) -> None:
         payload["max_tokens"] = cap
 
 
+def _report_left_out(
+    notices: list[dict[str, Any]] | None, pictures: list[Any], payload: dict[str, Any],
+) -> None:
+    """Each of the chat's pictures the turn's model did not get, as a Faden event on *notices*."""
+    if notices is None:
+        return
+    model = str(payload.get("model") or "").strip()
+    notices.extend(faden_events.picture_left_out(str(p.id), p.filename, model) for p in pictures)
+
+
 def _allowing_personal_data(mcp_tools: list[dict[str, Any]] | None) -> set[str]:
     """The MCP tools whose server is set to allow personal data."""
     return {t.get("qualified_name") for t in mcp_tools or [] if t.get("pii_mode") == "allow"}
@@ -980,7 +990,8 @@ class _Prepared:
     faden_pending: list[dict[str, Any]] = field(default_factory=list)
     #: Faden events of a whole answer, sent in its ``faden`` object.
     faden_whole: list[dict[str, Any]] = field(default_factory=list)
-    #: Faden events sent before the answer (tools the client offered and a rule refuses).
+    #: Faden events sent before the answer (tools the client offered and a rule refuses, the
+    #: chat's pictures a model that does not take pictures did not get).
     faden_leading: list[dict[str, Any]] = field(default_factory=list)
     #: The governance checks this request runs: EE's, and the tenant's tool rules.
     checks: list[Any] = field(default_factory=list)
@@ -1063,6 +1074,9 @@ class GatewayService:
         # one gateway, a list that did not say offered an embedding model as a
         # chat model, and picking it failed.
         kinds = await self.dao.alias_kinds([a.alias for a in aliases])
+        # Whether each takes pictures (true, false, or null when not known): the chat says so at a
+        # picture it would not get. An extra field, as kind is: OpenAI clients read the rest as ever.
+        visions = await self.dao.alias_visions([a.alias for a in aliases])
         return {
             "object": "list",
             "data": [
@@ -1075,6 +1089,7 @@ class GatewayService:
                     "description": alias.description,
                     "enabled": alias.enabled,
                     "kind": kinds.get(alias.alias),
+                    "vision": visions.get(alias.alias),
                 }
                 for alias in aliases
             ],
@@ -1999,6 +2014,8 @@ class GatewayService:
         (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
             self._inject_session_context(
                 payload, auth, session_id, req=req if searchable else None, saved=req.user_message_ids,
+                # Sent before the answer, to a client that asked for the events.
+                notices=req.faden_leading,
             )
             if chat else _value((payload, None, None)),
             self._resolve_skills(
@@ -2369,6 +2386,19 @@ class GatewayService:
             )
             return {"model": payload.get("model"), "_pii_mode": "fallback"}
 
+    def _takes_pictures(self, payload: dict[str, Any]) -> Callable[[], Awaitable[bool | None]]:
+        """Whether the turn's model takes pictures, for the assembler to ask once the chat has one.
+
+        The alias the request names is the one the turn runs on: routing picks
+        among its instances, and ``alias_vision`` answers for all of them.
+        """
+        model = str(payload.get("model") or "").strip()
+
+        async def lookup() -> bool | None:
+            return await self.dao.alias_vision(model) if model else None
+
+        return lookup
+
     async def _inject_session_context(
         self,
         payload: dict[str, Any],
@@ -2376,13 +2406,16 @@ class GatewayService:
         session_id_str: str | None,
         req: _Prepared | None = None,
         saved: list[uuid.UUID] | None = None,
+        notices: list[dict[str, Any]] | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         """Inject session history and memory into the payload.
 
         Returns ``(updated_payload, resolved_session_id_hex)``
         where the session id is ``None`` when sessions are disabled.
         With *req*, attached files too long to include are left for the model
-        to search, and go on ``req.attachments``.
+        to search, and go on ``req.attachments``. The chat's pictures go only
+        to a model that takes them; each one left out goes on *notices*, as a
+        Faden event for the client.
         """
         if not session_id_str or not self.session_dao:
             return payload, None, None
@@ -2411,15 +2444,14 @@ class GatewayService:
                 user_id=auth.user_id,
             )
 
-        # Resolve file store for attachment context injection
-        file_store = getattr(self, "_file_store", None)
-
         assembler = ContextAssembler(
             dao=self.session_dao,
             max_recent_messages=settings.session_max_recent_messages,
             token_budget=settings.session_token_budget,
-            file_store=file_store,
+            # The file store, for the chat's attached pictures.
+            file_store=getattr(self, "_file_store", None),
             searchable=req is not None,
+            vision=self._takes_pictures(payload),
         )
 
         # Current request messages become the "tail" of the assembled context
@@ -2470,6 +2502,7 @@ class GatewayService:
             project=project,
         )
 
+        _report_left_out(notices, assembled.pictures_left_out, payload)
         payload["messages"] = assembled.messages
         _cap_output(payload)
         if req is not None:

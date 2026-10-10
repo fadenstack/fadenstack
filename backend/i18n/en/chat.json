@@ -89,6 +89,8 @@
   "turn_interrupted": "The server restarted while this reply was being written.",
   "turn_stopped": "Stopped",
   "jump_to_latest": "Jump to the latest message",
+  "picture_not_sent": "{{file}} was not sent: {{model}} does not take pictures. Choose a model that does.",
+  "picture_not_seen": "This model can't see pictures",
   "tips": {
     "title": "Tips",
     "dismiss": "Got it",

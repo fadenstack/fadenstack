@@ -21,6 +21,8 @@ const stream = {
   isLoading: false,
   error: null,
   toolNotices: [] as string[],
+  streamingNotes: [] as string[],
+  getReplyNotes: () => [] as string[],
   pendingApproval: null,
   getResponseMs: () => null,
   send: vi.fn(),

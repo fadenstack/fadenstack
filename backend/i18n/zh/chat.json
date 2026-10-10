@@ -89,6 +89,8 @@
   "turn_interrupted": "编写此回复时服务器重新启动了。",
   "turn_stopped": "已停止",
   "jump_to_latest": "跳到最新消息",
+  "picture_not_sent": "{{file}} 未发送：{{model}} 不支持图片。请选择支持图片的模型。",
+  "picture_not_seen": "此模型无法识别图片",
   "tips": {
     "title": "提示",
     "dismiss": "知道了",

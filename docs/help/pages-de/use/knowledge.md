@@ -34,7 +34,7 @@ Das Modell erhält den Text der Datei zusammen mit Ihrer Frage. Die Datei bleibt
 ??? info "Bilder, Scans und lange Dateien"
     | | Gut zu wissen |
     |---|---|
-    | **Bilder** | Sie helfen nur bei einem Modell, das Bilder lesen kann. Fragen Sie Ihren Administrator, welche Modelle das können. |
+    | **Bilder** | Sie helfen nur bei einem Modell, das Bilder lesen kann. Fragen Sie Ihren Administrator, welche Modelle das können. Ein Bild wird nur an ein Modell gesendet, das Bilder lesen kann: Bei einem Modell, das das nicht kann, weist sein Chip vor dem Senden darauf hin, und die Antwort sagt, dass das Bild nicht gesendet wurde. |
     | **Scans** (Dokumente, deren Seiten Bilder sind) | Sie enthalten möglicherweise keinen Text, den der Server lesen kann. Das Modell erhält die Datei dann nicht. Wenn eine Antwort Ihre Datei zu ignorieren scheint, kann das der Grund sein. |
     | **Lange Dateien** | Sie passen möglicherweise nicht vollständig in das, was das Modell auf einmal lesen kann. Das Modell durchsucht die Datei dann nach den Teilen, die es braucht, oder liest ihren Anfang. Im Tool-Modus **Aus** bekommt es keins von beiden. |
 
