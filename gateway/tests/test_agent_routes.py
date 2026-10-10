@@ -396,9 +396,9 @@ async def test_a_revoked_or_expired_api_token_is_refused_here_too(
 ) -> None:
     """A maintainer's API token is checked against its row as on the plain routes."""
     rows = {
-        "live": ApiTokenRecord(MAINTAINER, revoked=False),
-        "revoked": ApiTokenRecord(MAINTAINER, revoked=True),
-        "expired": ApiTokenRecord(MAINTAINER, revoked=False, expired=True),
+        "live": ApiTokenRecord(MAINTAINER, revoked=False, tenant_id="tenant-a"),
+        "revoked": ApiTokenRecord(MAINTAINER, revoked=True, tenant_id="tenant-a"),
+        "expired": ApiTokenRecord(MAINTAINER, revoked=False, expired=True, tenant_id="tenant-a"),
     }
     ids = {name: str(uuid.uuid4()) for name in rows}
 
@@ -417,6 +417,23 @@ async def test_a_revoked_or_expired_api_token_is_refused_here_too(
         assert (r.status_code, r.json()["error"]["code"]) == (401, "api_token_revoked"), "a token with no row"
         r = await client.get(path, headers=_headers(_api_token(MAINTAINER, ids["live"])))
         assert r.status_code == 200, (path, r.text)
+
+
+@pytest.mark.anyio
+async def test_an_api_tokens_tenant_is_its_rows_not_its_claims(
+    fastapi_app: FastAPI, client: AsyncClient, backend: _Backend,
+) -> None:
+    """The claim names the agent's tenant, the row another: the row decides."""
+    jti = str(uuid.uuid4())
+
+    async def fetch_api_token(token_id: str) -> ApiTokenRecord | None:
+        return ApiTokenRecord(MAINTAINER, revoked=False, tenant_id="default") if token_id == jti else None
+
+    fastapi_app.state.agent_directory = AgentDirectory(
+        fetch_agent=backend.agent, fetch_user=backend.user, fetch_api_token=fetch_api_token,
+    )
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(_api_token(MAINTAINER, jti)))
+    assert (r.status_code, r.json()["error"]["code"]) == (404, "agent_not_found")
 
 
 @pytest.mark.anyio

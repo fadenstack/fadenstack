@@ -1614,8 +1614,6 @@
     "password_changed": "Passwort erfolgreich geändert.",
     "api_token": "API-Token",
     "api_token_desc": "Erzeugen Sie ein Bearer-Token für das LLM-API-Gateway.",
-    "tenant_id": "Mandanten-ID",
-    "tenant_id_help": "Die Mandantenkennung, die in den JWT-Claims enthalten ist.",
     "token_expiry": "Token-Ablauf",
     "generate_token": "Token erzeugen",
     "generated_token_label": "Ihr API-Token:",

@@ -95,7 +95,14 @@ class ChangePasswordRequest(BaseModel):
 class GenerateApiTokenRequest(BaseModel):
     """Request to generate an API gateway JWT token."""
 
-    tenant_id: str = Field(default="default", min_length=1, max_length=128)
+    tenant_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description=(
+            "Not needed: a token is in its account's tenant. Older clients send `default`; "
+            "naming another tenant is refused."
+        ),
+    )
     expires_in: int | None = Field(
         default=None,
         gt=0,

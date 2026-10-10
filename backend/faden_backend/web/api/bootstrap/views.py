@@ -24,6 +24,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.api_tokens import ACCOUNT_TENANT
 from faden_backend.db.models.users import User
 from faden_backend.settings import settings
 
@@ -73,9 +74,10 @@ class BootstrapRequest(BaseModel):
         description="Generate an LLM gateway API token for the new admin.",
     )
     tenant_id: str = Field(
-        default="default",
+        default=ACCOUNT_TENANT,
         min_length=1,
         max_length=128,
+        description="Not needed: the admin is in the accounts' tenant. Naming another is refused.",
     )
 
 
@@ -185,6 +187,11 @@ async def bootstrap(
     """
     # ── Guard: the install's bootstrap token, then zero users ─
     check_bootstrap_token(bootstrap_token)
+    if payload.tenant_id != ACCOUNT_TENANT:
+        raise HTTPException(
+            status_code=422,
+            detail=f"The first admin is in the accounts' tenant ({ACCOUNT_TENANT}); it cannot be another.",
+        )
     admin_user, raw_password = await create_first_admin(session, payload)
 
     # ── Optional: generate API gateway token ──────────────────
@@ -218,7 +225,7 @@ async def bootstrap(
             claims = {
                 "sub": str(admin_user.id),
                 "aud": "fastapi-users:auth",
-                "tenant_id": payload.tenant_id,
+                "tenant_id": ACCOUNT_TENANT,
                 "email": admin_user.email,
                 "iat": now,
                 "exp": now + BOOTSTRAP_TOKEN_TTL_S,

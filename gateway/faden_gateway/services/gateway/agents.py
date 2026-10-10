@@ -61,7 +61,7 @@ _USER_SQL = 'SELECT is_active, is_superuser FROM "user" WHERE id = $1::uuid'
 #: A query, not a secret; S105 only sees "TOKEN" in the name.
 _API_TOKEN_SQL = (
     "SELECT user_id::text AS user_id, revoked_at IS NOT NULL AS revoked, "  # noqa: S105
-    "coalesce(expires_at <= now(), false) AS expired "
+    "coalesce(expires_at <= now(), false) AS expired, tenant_id "
     "FROM api_tokens WHERE id = $1::uuid"
 )
 
@@ -151,12 +151,14 @@ class UserFlags:
 
 @dataclass(frozen=True)
 class ApiTokenRecord:
-    """An API token's row in the backend: whose it is, whether it was revoked, whether it has expired."""
+    """An API token's row in the backend: whose it is, whether it was revoked or has expired, its tenant."""
 
     user_id: str
     revoked: bool
     #: Past the row's ``expires_at``: a token made before every token expired carries no ``exp`` claim.
     expired: bool = False
+    #: The tenant the backend made the token for. The token's ``tenant_id`` claim is not taken for it.
+    tenant_id: str = "default"
 
 
 class AgentLookupError(Exception):
@@ -263,7 +265,9 @@ class BackendAgents:
             raise AgentLookupError(str(exc)) from exc
         if row is None:
             return None
-        return ApiTokenRecord(str(row["user_id"]), bool(row["revoked"]), bool(row["expired"]))
+        return ApiTokenRecord(
+            str(row["user_id"]), bool(row["revoked"]), bool(row["expired"]), str(row["tenant_id"]),
+        )
 
     async def close(self) -> None:
         if self._pool is not None:

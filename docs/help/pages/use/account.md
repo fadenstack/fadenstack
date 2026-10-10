@@ -57,16 +57,14 @@ An API token lets a script or an application use your organisation's models in y
 
 1. In **My Profile**, go to **API Token**.
 2. Enter a **Name** after what will use the token, for example `report script`.
-3. Leave **Tenant ID** as it is.
-4. Choose the **Token Expiry**.
-5. Select **Generate Token**.
-6. Copy the token with the copy button and keep it somewhere safe.
+3. Choose the **Token Expiry**.
+4. Select **Generate Token**.
+5. Copy the token with the copy button and keep it somewhere safe.
 
 ??? info "More about the fields"
     | Field | What to know |
     |---|---|
     | **Name** | Name the token after what will use it, so you know which one to revoke later. |
-    | **Tenant ID** | Leave it as it is, unless your administrator tells you otherwise. |
     | **Token Expiry** | **1 hour**, **24 hours**, **7 days**, **30 days**, **90 days** or **1 year**. Every token expires; shorter is safer, and you can always make a new one. |
 
 !!! warning "Shown once"

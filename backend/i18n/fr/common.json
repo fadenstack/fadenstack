@@ -1757,8 +1757,6 @@
     "password_changed": "Mot de passe changé avec succès.",
     "api_token": "Jeton API",
     "api_token_desc": "Générer un jeton Bearer pour la passerelle API LLM.",
-    "tenant_id": "ID locataire",
-    "tenant_id_help": "L'identifiant du locataire inclus dans les revendications JWT.",
     "token_expiry": "Expiration du jeton",
     "generate_token": "Générer un jeton",
     "generated_token_label": "Votre jeton API :",

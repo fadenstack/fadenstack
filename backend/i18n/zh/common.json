@@ -1614,8 +1614,6 @@
     "password_changed": "密码修改成功。",
     "api_token": "API令牌",
     "api_token_desc": "为LLM API网关生成Bearer令牌。",
-    "tenant_id": "租户ID",
-    "tenant_id_help": "包含在JWT声明中的租户标识符。",
     "token_expiry": "令牌有效期",
     "generate_token": "生成令牌",
     "generated_token_label": "您的API令牌：",

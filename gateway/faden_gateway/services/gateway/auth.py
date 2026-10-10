@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import jwt
@@ -181,11 +181,12 @@ def _is_unrecorded_api_token(claims: dict[str, Any]) -> bool:
     return claims.get("typ") is None and bool(claims.get("jti")) and "aud" not in claims
 
 
-async def check_caller(app: Any, claims: dict[str, Any]) -> None:
+async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
     """Refuses a revoked or unrecorded API token, and a user who was deactivated or deleted.
 
-    Agent tokens are checked on their own routes. Without the backend database
-    (development, tests) only the claims are checked.
+    Returns an API token's tenant as its row names it, ``None`` for other tokens. Agent tokens
+    are checked on their own routes. Without the backend database (development, tests) only the
+    claims are checked.
     """
     if _is_outdated_sign_in(claims):
         raise GatewayError(
@@ -203,8 +204,9 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
         )
     directory = getattr(app.state, "agent_directory", None)
     if directory is None:
-        return
+        return None
     user_id = str(claims.get("sub", "")).strip()
+    tenant_id: str | None = None
     try:
         if claims.get("typ") == API_TOKEN_TYPE and directory.checks_api_tokens:
             record = await directory.api_token(str(claims.get("jti", "")))
@@ -220,6 +222,7 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
                     message="This API token has expired. Create a new one in your profile.",
                     code="api_token_expired",
                 )
+            tenant_id = record.tenant_id
         user = await directory.user(user_id)
     except AgentLookupError as exc:
         raise GatewayError(
@@ -235,6 +238,17 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
             error_type="permission_error",
             code="user_inactive",
         )
+    return tenant_id
+
+
+async def caller_context(app: Any, claims: dict[str, Any], token: str | None = None) -> AuthContext:
+    """Who the caller is, once :func:`check_caller` lets them in.
+
+    An API token's tenant is the one its row names; its claim is only what the token was made with.
+    """
+    auth = get_auth_context_from_claims(claims, token)
+    tenant_id = await check_caller(app, claims)
+    return replace(auth, tenant_id=tenant_id) if tenant_id is not None else auth
 
 
 async def get_auth_context(
@@ -264,9 +278,7 @@ async def get_auth_context(
             error_type="permission_error",
             code="agent_token_not_allowed",
         )
-    auth = get_auth_context_from_claims(claims, token)
-    await check_caller(request.app, claims)
-    return auth
+    return await caller_context(request.app, claims, token)
 
 
 async def get_agent_route_claims(
