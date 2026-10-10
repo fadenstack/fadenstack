@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.models.api_tokens import API_TOKEN_TYPE, ApiToken
+from faden_backend.db.models.api_tokens import ACCOUNT_TENANT, API_TOKEN_TYPE, ApiToken
 from faden_backend.db.models.users import User, current_active_user, get_jwt_strategy, login_lifetime_seconds
 from faden_backend.settings import settings
 
@@ -115,6 +115,22 @@ async def test_nobody_revokes_someone_elses_token_but_an_administrator(
     row = await dbsession.get(ApiToken, uuid.UUID(made["id"]))
     await dbsession.refresh(row)
     assert row.revoked_at is not None
+
+
+@pytest.mark.anyio
+async def test_a_token_is_in_its_accounts_tenant_never_one_the_request_names(
+    signed_in: _As, client: AsyncClient, dbsession: AsyncSession, secret: str,
+) -> None:
+    signed_in.user = await _user(dbsession)
+    r = await client.post("/api/admin/users/me/api-token", json={"tenant_id": "zzz-other"})
+    assert r.status_code == 422, r.text
+    for body in ({}, {"tenant_id": "default"}):  # older consoles send the tenant they showed
+        made = await _make(client, **body)
+        claims = jwt.decode(made["token"], secret, algorithms=["HS256"])
+        row = await dbsession.get(ApiToken, uuid.UUID(made["id"]))
+        assert (claims["tenant_id"], row.tenant_id) == (ACCOUNT_TENANT, ACCOUNT_TENANT) == ("default", "default")
+    listed = (await client.get("/api/admin/users/me/api-tokens")).json()
+    assert len(listed) == 2, "the refused request made no token"
 
 
 @pytest.mark.anyio

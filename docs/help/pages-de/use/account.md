@@ -57,16 +57,14 @@ Mit einem API-Token kann ein Skript oder eine Anwendung die Modelle Ihrer Organi
 
 1. Gehen Sie in **Mein Profil** zu **API-Token**.
 2. Geben Sie unter **Name** an, welches Skript oder welche Anwendung das Token verwenden wird, z. B. `Berichtsskript`.
-3. Lassen Sie die **Mandanten-ID** unverändert.
-4. Wählen Sie den **Token-Ablauf**.
-5. Wählen Sie **Token erzeugen**.
-6. Kopieren Sie das Token mit der Kopier-Schaltfläche und bewahren Sie es sicher auf.
+3. Wählen Sie den **Token-Ablauf**.
+4. Wählen Sie **Token erzeugen**.
+5. Kopieren Sie das Token mit der Kopier-Schaltfläche und bewahren Sie es sicher auf.
 
 ??? info "Mehr zu den Feldern"
     | Feld | Gut zu wissen |
     |---|---|
     | **Name** | Benennen Sie das Token nach dem, was es verwenden wird, damit Sie später wissen, welches Token Sie widerrufen müssen. |
-    | **Mandanten-ID** | Lassen Sie sie unverändert, es sei denn, Ihr Administrator sagt Ihnen etwas anderes. |
     | **Token-Ablauf** | **1 Stunde**, **24 Stunden**, **7 Tage**, **30 Tage**, **90 Tage** oder **1 Jahr**. Jedes Token läuft ab; kürzer ist sicherer, und Sie können jederzeit ein neues erstellen. |
 
 !!! warning "Nur einmal angezeigt"

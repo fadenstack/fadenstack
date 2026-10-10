@@ -66,6 +66,10 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.jobs": ["read"],
         "rag.search": ["read", "write"],
         "modules": ["manage", "read"],
+        # The chat, as default_user has it: the gateway refuses it to roles without these.
+        "chat.projects": ["create", "read", "update", "delete"],
+        "chat.sessions": ["create", "read", "update", "delete"],
+        "chat.attachments": ["create", "read", "delete"],
         "chat.debug": ["read"],
         "chat.tool_policy": ["read", "update"],
         "pii.session": ["read", "strengthen", "weaken"],

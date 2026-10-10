@@ -43,6 +43,7 @@ from faden_gateway.services.gateway.agents import (
 from faden_gateway.services.gateway.auth import (
     AGENT_TOKEN_TYPE,
     AuthContext,
+    caller_context,
     get_agent_route_claims,
     get_auth_context_from_claims,
 )
@@ -113,7 +114,6 @@ async def agent_request(
 ) -> tuple[AuthContext, AgentRequest]:
     """Who is calling which agent, once the token and access are checked."""
     claims, token = verified
-    auth = get_auth_context_from_claims(claims, token)
     directory = getattr(request.app.state, "agent_directory", None)
     if directory is None:
         raise GatewayError(
@@ -123,6 +123,12 @@ async def agent_request(
             code="agents_unavailable",
         )
     agent_token = claims.get("typ") == AGENT_TOKEN_TYPE
+    # Any other token is checked as on the plain routes: a revoked or expired API token, an outdated
+    # sign-in and a deactivated user are refused here too, and an API token's tenant is its row's.
+    auth = (
+        get_auth_context_from_claims(claims, token) if agent_token
+        else await caller_context(request.app, claims, token)
+    )
     try:
         profile = await directory.agent(auth.tenant_id, agent)
         if agent_token and (profile is None or f"agent:{profile.id}" not in _audiences(claims)):

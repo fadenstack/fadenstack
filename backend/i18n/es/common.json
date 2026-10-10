@@ -1614,8 +1614,6 @@
     "password_changed": "Contraseña cambiada exitosamente.",
     "api_token": "Token de API",
     "api_token_desc": "Genere un token Bearer para la puerta de enlace de API LLM.",
-    "tenant_id": "ID de inquilino",
-    "tenant_id_help": "El identificador de inquilino incluido en los claims del JWT.",
     "token_expiry": "Expiración del token",
     "generate_token": "Generar token",
     "generated_token_label": "Su token de API:",

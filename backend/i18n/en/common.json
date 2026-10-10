@@ -1755,8 +1755,6 @@
     "password_changed": "Password changed successfully.",
     "api_token": "API Token",
     "api_token_desc": "Generate a Bearer token for the LLM API gateway.",
-    "tenant_id": "Tenant ID",
-    "tenant_id_help": "The tenant identifier included in the JWT claims.",
     "token_expiry": "Token Expiry",
     "generate_token": "Generate Token",
     "generated_token_label": "Your API Token:",

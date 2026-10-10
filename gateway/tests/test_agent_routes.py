@@ -41,6 +41,7 @@ from faden_gateway.services.gateway.agents import (
     AgentLookupError,
     AgentProfile,
     AgentRequest,
+    ApiTokenRecord,
     TtlCache,
     UserFlags,
 )
@@ -66,6 +67,7 @@ TEAM = "33333333-3333-3333-3333-333333333333"
 INSTRUCTIONS = "You help with EPLAN pages. Answer briefly."
 ANSWER = "Page 12 holds the motor circuit."
 USAGE = {"prompt_tokens": 21, "completion_tokens": 7, "total_tokens": 28}
+CHATS = frozenset({"chat.sessions:create", "chat.sessions:read"})
 
 
 def _profile(**overrides: Any) -> AgentProfile:
@@ -99,9 +101,10 @@ class _Backend:
 
     def __init__(self) -> None:
         self.agents: dict[str, AgentProfile] = {}
+        # Both chat (default_user): the plain chat route asks for it.
         self.users: dict[str, UserFlags] = {
-            USER: UserFlags(is_active=True, is_superuser=False),
-            MAINTAINER: UserFlags(is_active=True, is_superuser=False),
+            USER: UserFlags(is_active=True, is_superuser=False, chat_permissions=CHATS),
+            MAINTAINER: UserFlags(is_active=True, is_superuser=False, chat_permissions=CHATS),
         }
         self.groups: dict[str, tuple[str, ...]] = {}
         self.agent_reads = 0
@@ -381,6 +384,58 @@ async def test_a_deactivated_user_is_refused(client: AsyncClient, backend: _Back
     r = await client.post(URL, headers=_headers(), json=_chat())
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "user_inactive"
+
+
+def _api_token(sub: str, jti: str) -> str:
+    now = int(time.time())
+    claims = {"sub": sub, "tenant_id": "tenant-a", "typ": "api", "jti": jti, "iat": now, "exp": now + 600}
+    return jwt.encode(claims, TEST_JWT_SECRET, algorithm="HS256")
+
+
+@pytest.mark.anyio
+async def test_a_revoked_or_expired_api_token_is_refused_here_too(
+    fastapi_app: FastAPI, client: AsyncClient, backend: _Backend,
+) -> None:
+    """A maintainer's API token is checked against its row as on the plain routes."""
+    rows = {
+        "live": ApiTokenRecord(MAINTAINER, revoked=False, tenant_id="tenant-a"),
+        "revoked": ApiTokenRecord(MAINTAINER, revoked=True, tenant_id="tenant-a"),
+        "expired": ApiTokenRecord(MAINTAINER, revoked=False, expired=True, tenant_id="tenant-a"),
+    }
+    ids = {name: str(uuid.uuid4()) for name in rows}
+
+    async def fetch_api_token(token_id: str) -> ApiTokenRecord | None:
+        return next((rows[name] for name, jti in ids.items() if jti == token_id), None)
+
+    fastapi_app.state.agent_directory = AgentDirectory(
+        fetch_agent=backend.agent, fetch_user=backend.user, fetch_api_token=fetch_api_token,
+    )
+    for path in ("/v1/agents/eplan-assistant/profile", "/v1/agents/eplan-assistant/models"):
+        for name, code in (("revoked", "api_token_revoked"), ("expired", "api_token_expired")):
+            r = await client.get(path, headers=_headers(_api_token(MAINTAINER, ids[name])))
+            assert r.status_code == 401, (path, name, r.text)
+            assert r.json()["error"]["code"] == code
+        r = await client.get(path, headers=_headers(_api_token(MAINTAINER, str(uuid.uuid4()))))
+        assert (r.status_code, r.json()["error"]["code"]) == (401, "api_token_revoked"), "a token with no row"
+        r = await client.get(path, headers=_headers(_api_token(MAINTAINER, ids["live"])))
+        assert r.status_code == 200, (path, r.text)
+
+
+@pytest.mark.anyio
+async def test_an_api_tokens_tenant_is_its_rows_not_its_claims(
+    fastapi_app: FastAPI, client: AsyncClient, backend: _Backend,
+) -> None:
+    """The claim names the agent's tenant, the row another: the row decides."""
+    jti = str(uuid.uuid4())
+
+    async def fetch_api_token(token_id: str) -> ApiTokenRecord | None:
+        return ApiTokenRecord(MAINTAINER, revoked=False, tenant_id="default") if token_id == jti else None
+
+    fastapi_app.state.agent_directory = AgentDirectory(
+        fetch_agent=backend.agent, fetch_user=backend.user, fetch_api_token=fetch_api_token,
+    )
+    r = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers(_api_token(MAINTAINER, jti)))
+    assert (r.status_code, r.json()["error"]["code"]) == (404, "agent_not_found")
 
 
 @pytest.mark.anyio

@@ -17,7 +17,7 @@ from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.api_tokens import API_TOKEN_TYPE, ApiToken
+from faden_backend.db.models.api_tokens import ACCOUNT_TENANT, API_TOKEN_TYPE, ApiToken
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
@@ -497,6 +497,12 @@ async def generate_api_token(
     from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values  # noqa: PLC0415
     from faden_backend.settings import settings  # noqa: PLC0415
 
+    # The tenant is the account's, never the caller's choice: it decides the rules the gateway applies.
+    if payload.tenant_id not in (None, ACCOUNT_TENANT):
+        raise HTTPException(
+            status_code=422,
+            detail=f"An API token is in your account's tenant ({ACCOUNT_TENANT}); it cannot name another.",
+        )
     # The lifetimes as they are now: with several workers, a change reaches only the one that took it.
     await refresh_runtime_values(session, prefix="users.api_token_")
     secret = await _resolve_users_secret(session)
@@ -518,7 +524,7 @@ async def generate_api_token(
     record = ApiToken(
         id=uuid.uuid4(),
         user_id=user.id,
-        tenant_id=payload.tenant_id,
+        tenant_id=ACCOUNT_TENANT,
         name=(payload.name or "").strip() or None,
         expires_at=datetime.fromtimestamp(now + lifetime, tz=UTC),
     )
@@ -527,7 +533,7 @@ async def generate_api_token(
 
     claims: dict = {
         "sub": str(user.id),
-        "tenant_id": payload.tenant_id,
+        "tenant_id": record.tenant_id,
         "email": user.email,
         "iat": now,
         # The gateway looks the token up by its jti, so revoking the row ends the token.

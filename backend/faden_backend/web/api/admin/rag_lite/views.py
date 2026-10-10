@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select
 from starlette import status
 
@@ -597,8 +597,8 @@ async def delete_collection(
 async def find_collection_principals(
     _user: Annotated[User, Depends(require_permission("rag.search", "write"))],
     collection_dao: RagLiteCollectionDAO = Depends(),
-    q: str | None = None,
-    ids: str | None = None,
+    q: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
+    ids: Annotated[str | None, Query(max_length=4000)] = None,
 ) -> list[PrincipalOption]:
     """The people and groups a collection can be opened to (as for skills and agents)."""
     return await find_principals(collection_dao.session, q=q, ids=ids)

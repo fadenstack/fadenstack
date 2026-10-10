@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, replace
 from typing import Any
 
 import jwt
@@ -181,11 +182,12 @@ def _is_unrecorded_api_token(claims: dict[str, Any]) -> bool:
     return claims.get("typ") is None and bool(claims.get("jti")) and "aud" not in claims
 
 
-async def check_caller(app: Any, claims: dict[str, Any]) -> None:
+async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
     """Refuses a revoked or unrecorded API token, and a user who was deactivated or deleted.
 
-    Agent tokens are checked on their own routes. Without the backend database
-    (development, tests) only the claims are checked.
+    Returns an API token's tenant as its row names it, ``None`` for other tokens. Agent tokens
+    are checked on their own routes. Without the backend database (development, tests) only the
+    claims are checked.
     """
     if _is_outdated_sign_in(claims):
         raise GatewayError(
@@ -203,8 +205,9 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
         )
     directory = getattr(app.state, "agent_directory", None)
     if directory is None:
-        return
+        return None
     user_id = str(claims.get("sub", "")).strip()
+    tenant_id: str | None = None
     try:
         if claims.get("typ") == API_TOKEN_TYPE and directory.checks_api_tokens:
             record = await directory.api_token(str(claims.get("jti", "")))
@@ -220,6 +223,7 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
                     message="This API token has expired. Create a new one in your profile.",
                     code="api_token_expired",
                 )
+            tenant_id = record.tenant_id
         user = await directory.user(user_id)
     except AgentLookupError as exc:
         raise GatewayError(
@@ -235,6 +239,17 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> None:
             error_type="permission_error",
             code="user_inactive",
         )
+    return tenant_id
+
+
+async def caller_context(app: Any, claims: dict[str, Any], token: str | None = None) -> AuthContext:
+    """Who the caller is, once :func:`check_caller` lets them in.
+
+    An API token's tenant is the one its row names; its claim is only what the token was made with.
+    """
+    auth = get_auth_context_from_claims(claims, token)
+    tenant_id = await check_caller(app, claims)
+    return replace(auth, tenant_id=tenant_id) if tenant_id is not None else auth
 
 
 async def get_auth_context(
@@ -264,9 +279,45 @@ async def get_auth_context(
             error_type="permission_error",
             code="agent_token_not_allowed",
         )
-    auth = get_auth_context_from_claims(claims, token)
-    await check_caller(request.app, claims)
-    return auth
+    return await caller_context(request.app, claims, token)
+
+
+async def check_chat_permission(app: Any, auth: AuthContext, permission: str) -> None:
+    """Refuses a caller whose roles do not give *permission* (``chat.sessions:create``, ...).
+
+    The chat is for those whose roles include it (``default_user`` does); a superuser may do
+    everything. Without the backend database (development, tests) nothing is checked.
+    """
+    directory = getattr(app.state, "agent_directory", None)
+    if directory is None:
+        return
+    try:
+        user = await directory.user(auth.user_id)
+    except AgentLookupError as exc:
+        raise GatewayError(
+            status_code=503,
+            message="Your access could not be checked; try again.",
+            error_type="server_error",
+            code="access_check_failed",
+        ) from exc
+    if user is not None and (user.is_superuser or permission in user.chat_permissions):
+        return
+    raise GatewayError(
+        status_code=403,
+        message=f"Your roles do not include this part of the chat ({permission}). Ask your administrator.",
+        error_type="permission_error",
+        code="permission_denied",
+    )
+
+
+def require_chat(permission: str) -> Callable[..., Awaitable[AuthContext]]:
+    """A dependency: the caller (:func:`get_auth_context`), once their roles give *permission*."""
+
+    async def _guard(request: Request, auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
+        await check_chat_permission(request.app, auth, permission)
+        return auth
+
+    return _guard
 
 
 async def get_agent_route_claims(
