@@ -221,7 +221,7 @@ export function getAppTheme(mode: PaletteMode, accent: Accent = DEFAULT_ACCENT) 
       divider: dark ? "rgba(255,255,255,0.08)" : "rgba(18,28,45,0.12)",
     },
     typography: {
-      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"Inter Variable", "Inter", "Roboto", "Helvetica", "Arial", sans-serif',
       h4: { fontWeight: 700 },
       h5: { fontWeight: 700 },
       h6: { fontWeight: 600 },

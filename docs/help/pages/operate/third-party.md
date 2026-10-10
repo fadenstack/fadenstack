@@ -32,7 +32,7 @@ Inside Fadenstack's own images:
 | Image | Third-party content | Terms |
 |---|---|---|
 | All service images | Python packages from the services' lock files, the Python base image, operating-system packages | Each keeps its own licence; the image's SBOM lists them |
-| Console (frontend) | npm packages (React, React Router, MUI and others); the Sora font | Each npm package keeps its own licence; Sora is under the SIL Open Font License 1.1 |
+| Console (frontend) | npm packages (React, React Router, MUI and others); the Inter and Sora fonts, served by the console itself | Each npm package keeps its own licence; Inter and Sora are under the SIL Open Font License 1.1 |
 | Console API, gateway, PII | Swagger UI and ReDoc, for the API documentation pages | Swagger UI: Apache License 2.0. ReDoc: MIT. Their licence and notice files ship next to them |
 
 The `faden` tool carries the deployment files and its Python dependencies, which keep their own licences. The
@@ -60,3 +60,4 @@ The machines get these images from the server.
 - [Swagger UI](https://github.com/swagger-api/swagger-ui)
 - [ReDoc](https://github.com/Redocly/redoc)
 - [Sora](https://github.com/sora-xor/sora-font)
+- [Inter](https://github.com/rsms/inter)
