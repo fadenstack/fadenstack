@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from faden_pii.services.pii.service import DEFAULT_ENTITIES, SUPPORTED_LANGUAGES
+from faden_pii.services.pii.service import DEFAULT_ENTITIES
 from faden_pii.services.pii.service import PIIService
 from faden_pii.settings import settings
 from faden_pii.web.api.pii.schema import (
@@ -112,11 +112,17 @@ def _get_pii_service(request: Request) -> PIIService:
 
 
 @router.get("/options", response_model=PIIPolicyOptionsResponse)
-async def get_policy_options() -> PIIPolicyOptionsResponse:
-    """Return supported option values for policy configuration UIs."""
+async def get_policy_options(request: Request) -> PIIPolicyOptionsResponse:
+    """Return supported option values for policy configuration UIs.
+
+    The languages are the ones the service has models for; a policy in any
+    other language would fail every check.
+    """
+    service = getattr(request.app.state, "pii_service", None)
+    languages = service.supported_languages if service is not None else [settings.pii_default_language]
     return PIIPolicyOptionsResponse(
         supported_entities=list(DEFAULT_ENTITIES),
-        supported_languages=list(SUPPORTED_LANGUAGES),
+        supported_languages=languages,
         supported_sanitize_modes=["redact", "tokenize"],
         default_language=settings.pii_default_language,
         default_score_threshold=settings.pii_score_threshold,

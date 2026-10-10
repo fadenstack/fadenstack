@@ -25,3 +25,24 @@ async def test_pii_options(client: AsyncClient) -> None:
     assert isinstance(body.get("supported_entities"), list)
     assert body["default_language"] == "en"
     assert body["default_score_threshold"] > 0
+
+
+@pytest.mark.anyio
+async def test_pii_options_list_only_languages_with_models(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+) -> None:
+    class _Service:
+        supported_languages = ["en", "de"]
+
+    fastapi_app.state.pii_service = _Service()
+    response = await client.get("/api/v1/pii/options")
+    assert response.json()["supported_languages"] == ["en", "de"]
+
+
+@pytest.mark.anyio
+async def test_pii_options_without_service_offer_default_language_only(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/api/v1/pii/options")
+    assert response.json()["supported_languages"] == ["en"]

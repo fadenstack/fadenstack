@@ -73,7 +73,7 @@ def _fallback_pii_options() -> dict[str, Any]:
             "MEDICAL_LICENSE",
             "URL",
         ],
-        "supported_languages": ["en", "de", "es", "zh"],
+        "supported_languages": ["en"],
         "supported_sanitize_modes": ["redact", "tokenize"],
         "telemetry_modes": ["sanitized", "metrics_only"],
         "egress_modes": ["redact", "tokenize_reversible"],
