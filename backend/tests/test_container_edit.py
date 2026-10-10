@@ -245,7 +245,8 @@ def _edited(**changes: Any) -> dict[str, Any]:
         "image": "node:22-alpine", "name": "mcp-everything", "container_class": "MCP",
         "owner_scope": "platform", "policy": "free", "auto_start": True,
         "ports": [{"host_port": "3101", "container_port": "3001/tcp"}],
-        "env": ["PORT=3001", "DEBUG=1"], "volumes": ["/srv/data:/data"],
+        # A named volume: a host folder needs Root Mode (test_container_host_access.py).
+        "env": ["PORT=3001", "DEBUG=1"], "volumes": ["mcp_data:/data"],
         "network": "fadenstack_default", **changes,
     }
 
