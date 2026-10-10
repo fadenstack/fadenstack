@@ -3,7 +3,9 @@
 A tool rule can say a tool needs the user's approval. In a streamed answer to
 a client that reads events, the gateway then sends ``faden.approval_required``
 (with an ``approvalId``) and waits; the client asks its user and answers here.
-Only the user whose request waits can answer, from any worker.
+Only the user whose request waits can answer, from any worker. A call of the
+client's own tool gets the same event without an ``approvalId``: the client
+runs that tool, so it asks and nothing is answered here.
 """
 
 from __future__ import annotations

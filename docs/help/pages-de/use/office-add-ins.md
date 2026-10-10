@@ -59,7 +59,7 @@ Jeder Chat beginnt im Tool-Modus **Ask**: Der Agent liest, ohne zu fragen, und f
 
 ![Eine Karte Run add_comment? in Word mit dem Kommentar, den der Agent hinzufügen will, und Allow, Allow for this chat und Deny](../images/use/office-word-approval.png)
 
-Wenn er fragt, zeigt eine Karte **Run …?** mit dem, was er tun will. Wählen Sie **Allow**, **Allow for this chat** oder **Deny**.
+Wenn er fragt, zeigt eine Karte **Run …?** mit dem, was er tun will. Wählen Sie **Allow** (dieses eine Mal), **Allow for this chat** (bis Sie den Chat schließen oder wieder öffnen), **Allow always** (für diesen Agenten auf diesem Computer) oder **Deny**. Was sich nicht rückgängig machen lässt, und alles, was Ihr Administrator zuerst erfragt haben will, bietet nur **Allow** und **Deny**: Er fragt jedes Mal.
 
 Den Modus ändern Sie im Aufgabenbereich: **Off**, **Read only**, **Ask** oder **Auto**. Auch in **Auto** fragt der Agent, bevor er etwas löscht oder leert. Mehr zu den Tool-Modi: [Tools im Chat](tools.md#choose-the-tool-mode).
 

@@ -22,6 +22,15 @@ describe("summarizeEvent", () => {
     ).toEqual({ subject: "read_page", result: "ok", tone: "success", durationMs: 42, facts: ["mcp", "eplan-db"] });
   });
 
+  it("an approval no one was asked about: what let it through", () => {
+    expect(summarizeEvent(event("approval.decided", { tool: "delete_page", decision: "approved", scope: "bypass" }))).toMatchObject({
+      subject: "delete_page",
+      result: "approved",
+      scope: "bypass",
+      durationMs: undefined,
+    });
+  });
+
   it("an approval: the decision and the wait", () => {
     expect(summarizeEvent(event("approval.decided", { tool: "delete_page", decision: "denied", wait_ms: 3000 }))).toMatchObject({
       subject: "delete_page",

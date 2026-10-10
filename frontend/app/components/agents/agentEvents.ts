@@ -21,6 +21,8 @@ export interface EventSummary {
   facts: string[];
   /** A count shown as "N tools" / "N turns". */
   count?: { key: "tools" | "turns"; value: number };
+  /** What let an approved call through: `once`, `chat`, `always` or `bypass` (the app's bypass mode). */
+  scope?: string;
 }
 
 const TONES: Record<string, EventTone> = {
@@ -50,7 +52,13 @@ export function summarizeEvent(event: ClientEvent): EventSummary {
         facts: facts(d.source, d.server),
       };
     case "approval.decided":
-      return { subject: text(d.tool) ?? "?", ...outcome(text(d.decision)), durationMs: number(d.wait_ms), facts: [] };
+      return {
+        subject: text(d.tool) ?? "?",
+        ...outcome(text(d.decision)),
+        durationMs: number(d.wait_ms),
+        facts: [],
+        scope: text(d.scope),
+      };
     case "local_mcp.attached":
       return {
         subject: text(d.label) ?? "?",

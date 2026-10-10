@@ -3656,6 +3656,12 @@
         "approved": "approved",
         "timeout": "timed out"
       },
+      "scope": {
+        "once": "once",
+        "chat": "for this chat",
+        "always": "always",
+        "bypass": "bypass mode"
+      },
       "count_tools_one": "{{count}} tool",
       "count_tools_other": "{{count}} tools",
       "count_turns_one": "{{count}} turn",

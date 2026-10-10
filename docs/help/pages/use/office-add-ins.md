@@ -59,7 +59,7 @@ Every chat starts in the **Ask** tool mode: the agent reads without asking, and 
 
 ![A Run add_comment? card in Word showing the comment the agent wants to add, with Allow, Allow for this chat and Deny](../images/use/office-word-approval.png)
 
-When it asks, a card shows **Run …?** with what it will do. Select **Allow**, **Allow for this chat**, or **Deny**.
+When it asks, a card shows **Run …?** with what it will do. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent on this computer), or **Deny**. Anything that cannot be undone, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time.
 
 Change the mode in the pane: **Off**, **Read only**, **Ask** or **Auto**. Even in **Auto**, the agent asks before it deletes or clears anything. More on tool modes: [Tools in the chat](tools.md#choose-the-tool-mode).
 

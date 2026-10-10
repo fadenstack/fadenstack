@@ -61,7 +61,8 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 
 ??? info "More about local MCP servers"
     **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
-    application tools its version lists under **Host tools**; a version that lists none holds nothing back.
+    application tools its version lists under **Host tools**; a version that lists none holds nothing back, but
+    then every application tool is unclassified and asks first, every time.
     **Allowed** lets it attach MCP servers on the person's computer; their tools are unclassified, so they always
     ask first. People in **Developer mode** (see [Users, groups and roles](users.md#developer-mode)) may attach
     them either way.

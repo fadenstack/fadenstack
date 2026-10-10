@@ -552,6 +552,24 @@ def _tool_name(call: dict[str, Any]) -> str:
     return match.group(0) if match else raw
 
 
+def _ends_round(raw: str, calls: ToolCalls) -> bool:
+    """Whether one SSE event of a model's stream ends its round; its tool-call pieces go in *calls*."""
+    data = next((line[6:] for line in raw.split("\n") if line.startswith("data: ")), None)
+    if data == "[DONE]":
+        return True
+    try:
+        body = json.loads(data) if data else None
+    except json.JSONDecodeError:
+        return False
+    ended = False
+    for choice in (body.get("choices") or []) if isinstance(body, dict) else []:
+        delta = choice.get("delta") or {}
+        if delta.get("tool_calls"):
+            calls.add(delta["tool_calls"])
+        ended = ended or bool(choice.get("finish_reason"))
+    return ended
+
+
 def _tool_arguments(call: dict[str, Any]) -> dict[str, Any]:
     raw = (call.get("function") or {}).get("arguments") or "{}"
     try:
@@ -961,6 +979,9 @@ class _Prepared:
     mcp_pii_allowed: set[str] = field(default_factory=set)
     #: The tools the client defined: its own to run.
     client_tools: set[str] = field(default_factory=set)
+    #: Every tool the client sent, also those a rule or the mode then left out: a call of any of them is
+    #: screened as it is handed to the client.
+    client_offered: frozenset[str] = frozenset()
     #: Whether the system tools were offered (current_time, get_available_tools).
     system_tools: bool = False
     #: The MCP tools the chat may use, in the catalog's order: what
@@ -1222,6 +1243,13 @@ class GatewayService:
                 or self.mcp_client or self.tool_router
             ):
                 result = await self._tool_loop(req, result, auth=auth, request_id=request_id)
+            if endpoint == "/v1/chat/completions" and req.faden_events and req.client_offered:
+                # Calls of the client's own tools: what it must hear about them, beside the answer.
+                choices = (result.payload or {}).get("choices") or [{}]
+                handed = (choices[0].get("message") or {}).get("tool_calls") or []
+                req.faden_whole.extend(
+                    await self._client_call_events(req, handed, auth=auth, request_id=request_id),
+                )
 
             # The model is done with this request: its slot is free for the
             # next one while the answer is saved and logged.
@@ -1442,10 +1470,12 @@ class GatewayService:
                 # answer streams. They were not: the mapping was dropped here,
                 # and the chat page -- which always streams -- showed
                 # "Hello [PERSON_1]".
+                restored = restore_sse(raw_stream, req.token_mapping, req.client_tools)
+                if req.faden_events and req.client_offered:
+                    restored = self._screen_client_stream(req, restored, auth=auth, request_id=request_id)
                 wrapped_stream, stats = await wrap_sse_stream(
                     _leading(_pii_events(req), self._govern_output(
-                        req, restore_sse(raw_stream, req.token_mapping, req.client_tools),
-                        auth=auth, request_id=request_id, model_alias=model_alias,
+                        req, restored, auth=auth, request_id=request_id, model_alias=model_alias,
                     )),
                 )
             stream_started = True
@@ -1780,8 +1810,10 @@ class GatewayService:
         """The client's tools a rule refuses are not offered to the model.
 
         The client runs its own tools, so refusing a call would come too late:
-        the model never sees the tool. One that needs approval stays: the
-        client asks its user.
+        the model never sees the tool. One that needs approval stays for a
+        client that reads events: its calls are marked as they are handed over
+        (:meth:`_client_call_events`), and the client asks its user. A client
+        that cannot be told is not offered it.
         """
         if not any(gov.GovernanceStage.TOOL in c.stages for c in req.checks):
             return
@@ -1791,7 +1823,7 @@ class GatewayService:
             name = _tool_definition_name(tool)
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
             verdict = await gov.decide(req.checks, ctx)
-            if verdict is None or not verdict.blocked:
+            if verdict is None or not (verdict.blocked or not req.faden_events):
                 kept.append(tool)
                 continue
             decision_id, _ = await gov.record(self.dao.session, ctx, verdict, text=None)
@@ -1842,7 +1874,10 @@ class GatewayService:
             if verdict is None or verdict.blocked:
                 continue
             approval_id = uuid.uuid4().hex
-            yield faden_events.sse_event(gov.approval_event(approval_id, call, name, verdict.decision.message, timeout))
+            yield faden_events.sse_event(gov.approval_event(
+                approval_id, call, name, verdict.decision.message, timeout,
+                tool_class=self._class_of(req, name), rule=verdict.check != ToolModeCheck.name,
+            ))
             approved = await gov.approvals.wait(
                 tenant_id=auth.tenant_id, user_id=auth.user_id, approval_id=approval_id, timeout=timeout,
             )
@@ -1850,6 +1885,88 @@ class GatewayService:
             ctx = self._context(req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name)
             outcome = "approved" if approved else ("rejected" if approved is False else "expired")
             await gov.record_on_own_session(self.dao.session.bind, ctx, verdict, text=None, outcome=outcome)
+
+    @staticmethod
+    def _class_of(req: _Prepared, name: str) -> str:
+        """The class the gateway holds for *name*: a rule's, the agent's contract's, else unknown."""
+        return req.classifier.classify(name).tool_class.value if req.classifier is not None else "unknown"
+
+    async def _client_call_events(
+        self, req: _Prepared, calls: list[dict[str, Any]], *, auth: AuthContext, request_id: str,
+    ) -> list[dict[str, Any]]:
+        """What the client must hear about the calls of its own tools before it runs them.
+
+        The client runs them, so the gateway cannot hold them; it tells the
+        client. A call a rule refuses, or of a tool the mode hides, is
+        ``faden.tool_denied``. A call a rule says needs approval, or that the
+        tool mode asks about, is ``faden.approval_required`` without an
+        ``approvalId``: the client asks its user. ``rule`` says an admin's rule
+        (or a policy) asks -- the SDK then asks every time, whatever else it
+        allowed -- and ``toolClass`` is the class the gateway holds, which the
+        SDK never takes looser than its own: with no contract it is unknown,
+        so the SDK asks. Refusals and rules are recorded.
+        """
+        if not req.faden_events or not req.checks:
+            return []
+        events: list[dict[str, Any]] = []
+        for call in calls:
+            name = _tool_name(call)
+            if name not in req.client_offered:
+                continue  # not the client's: a name the model made up, which the client cannot run
+            ctx = self._context(
+                req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name,
+                arguments=_tool_arguments(call),
+            )
+            verdict = await gov.decide(req.checks, ctx)
+            if verdict is None:
+                continue
+            rule = verdict.check != ToolModeCheck.name
+            decision_id = None
+            if verdict.blocked or rule:
+                decision_id, _ = await gov.record_on_own_session(
+                    self.dao.session.bind, ctx, verdict, text=None,
+                )
+            message = verdict.decision.message
+            events.append(
+                gov.tool_denied_event(call, name, message, decision_id) if verdict.blocked
+                else gov.client_approval_event(
+                    call, name, message, decision_id, tool_class=self._class_of(req, name), rule=rule,
+                ),
+            )
+        return events
+
+    async def _screen_client_stream(
+        self, req: _Prepared, stream: AsyncIterator[bytes], *, auth: AuthContext, request_id: str,
+    ) -> AsyncIterator[bytes]:
+        """The model's stream as it is, with :meth:`_client_call_events` before the round ends.
+
+        A stream without the gateway's tools goes to the client as the model
+        sends it; the client's tool calls come in pieces. They are put together
+        on the way, and what the client must hear about them goes out before
+        the chunk that ends the round, so the client has it before it runs them.
+        """
+        calls = ToolCalls()
+        told = False
+        buffer = b""  # bytes: a chunk may end inside a character
+
+        async def tell() -> list[bytes]:
+            screened = await self._client_call_events(req, calls.calls(), auth=auth, request_id=request_id)
+            return [faden_events.sse_event(event) for event in screened]
+
+        async for chunk in stream:
+            buffer += chunk
+            while b"\n\n" in buffer:
+                raw, buffer = buffer.split(b"\n\n", 1)
+                if _ends_round(raw.decode("utf-8", errors="replace"), calls) and calls and not told:
+                    told = True
+                    for event in await tell():
+                        yield event
+                yield raw + b"\n\n"
+        if calls and not told:
+            for event in await tell():
+                yield event
+        if buffer:
+            yield buffer
 
     async def _refused(
         self, req: _Prepared, call: dict[str, Any], name: str, verdict: gov.Verdict, answer: bool | None,
@@ -1969,6 +2086,7 @@ class GatewayService:
         chat = endpoint == "/v1/chat/completions"
         payload = req.payload
         req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
+        req.client_offered = frozenset(req.client_tools)
         if "rag" in payload:
             # Retrieval before the model, on every turn that asked for it, is
             # gone: the model searches when it needs to (knowledge_search).
@@ -2951,7 +3069,12 @@ class GatewayService:
                     payload = await self._offering_found(req, payload)
                     continue
             if calls:
-                # Tools the client defined: its to run, as in any streamed answer.
+                # Tools the client defined: its to run, as in any streamed answer -- after what it must hear
+                # about them (a refusal, or the user's approval first).
+                handed = calls.calls()
+                told = await self._client_call_events(req, handed, auth=auth, request_id=request_id)
+                for notice in told:
+                    yield faden_events.sse_event(notice)
                 yield sse({**head, "choices": [{
                     "index": 0,
                     "delta": {"tool_calls": restore_tool_calls(

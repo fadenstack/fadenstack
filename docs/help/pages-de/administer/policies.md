@@ -115,6 +115,9 @@ jede Prüfung mit Modus, Arten und Anzahl auf, ohne den Text selbst.
 2. Geben Sie unter **Name** eine Bezeichnung (für Sie) und unter **Tool-Muster** einen Tool-Namen oder ein
    Muster mit `*` ein, z. B. `mcp.github.*`, `knowledge_search` oder `*`.
 3. Wählen Sie die **Aktion**: **Sperren**, **Erst nachfragen** (der Benutzer gibt jeden Aufruf frei) oder **Erlauben**.
+   Eine Regel gilt auch für die Tools, die die App eines Agenten selbst ausführt, etwa die Tools des Browser- und
+   der Office-Agenten: Die App fragt jedes Mal, egal was der Benutzer vorher erlaubt hat, und einer App, die nicht
+   fragen kann, wird das Tool nicht angeboten.
 4. Schreiben Sie die **Nachricht an den Nutzer**: Das wird Benutzern mitgeteilt, wenn die Regel greift.
 5. Legen Sie die **Priorität** fest. Niedrigere Werte werden zuerst geprüft, und die erste passende Regel
    entscheidet. So kann eine Regel mit einer niedrigeren Zahl eine Ausnahme von einer allgemeineren Regel bilden.
@@ -129,7 +132,8 @@ Ohne Regeln laufen Tools so, wie es der Tool-Modus vorgibt.
 **Agenten → Governance → Tool-Klassen** legt nach Muster fest, was Tools tun: **lesen**, **schreiben**,
 **zerstörend** oder **Wie sein MCP-Server angibt** (dem vertrauen, was der MCP-Server des Tools über das Tool
 angibt). **Wirkt nach außen** hält fest, ob ein Tool über die Organisation hinaus wirkt. Ein Tool, das niemand
-einstuft, ist nicht eingestuft.
+einstuft, ist nicht eingestuft. Die eigenen Tools eines Agenten bekommen ihre Klasse aus seinen **Host-Tools**;
+bei einem Agenten, dessen Version keine nennt, ist jedes Tool nicht eingestuft.
 
 Benutzer wählen pro Chat einen Tool-Modus, und die Klasse entscheidet, was läuft:
 
