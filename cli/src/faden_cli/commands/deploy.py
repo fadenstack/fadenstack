@@ -133,14 +133,15 @@ def retire_fixed_logins(env_path: Path) -> list[str]:
 
     ``ALTER ROLE ... NOLOGIN``: the roles and their grants stay, nobody can sign
     in with them. Postgres must be running (after :func:`_sync_postgres_password`).
-    Left alone on a development stack (FADEN_BACKEND_ENVIRONMENT=dev), whose
-    host-run backend signs in as ``faden_backend``.
+    Only an install whose ``.env`` says FADEN_BACKEND_ENVIRONMENT=production (deploy
+    writes it) is touched: a development stack's host-run backend signs in as
+    ``faden_backend``, and an ``.env`` that says nothing may belong to one.
     """
     import shutil
     import subprocess
 
     env_vars = read_env_file(env_path)
-    if env_vars.get("FADEN_BACKEND_ENVIRONMENT", "production") == "dev":
+    if env_vars.get("FADEN_BACKEND_ENVIRONMENT") != "production":
         return []
     docker = shutil.which("docker")
     if not docker:

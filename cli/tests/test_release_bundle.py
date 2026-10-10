@@ -93,6 +93,7 @@ def _no_docker(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
     monkeypatch.setattr(clickhouse, "drop_stale_logs", lambda ctx: [])
     monkeypatch.setattr(bootstrap, "wait_for_backend", lambda *a, **k: True)
     monkeypatch.setattr(deploy_module, "_sync_postgres_password", lambda *a, **k: None)
+    monkeypatch.setattr(deploy_module, "retire_fixed_logins", lambda *a, **k: [])
 
 
 def _configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, install: Path) -> None:

@@ -66,9 +66,17 @@ def test_a_development_stack_keeps_its_login(tmp_path: Path, ran: _Ran) -> None:
     assert ran.calls == []
 
 
+def test_an_env_that_does_not_say_production_is_left_alone(tmp_path: Path, ran: _Ran) -> None:
+    env = tmp_path / ".env"
+    env.write_text("POSTGRES_USER=postgres\n", encoding="utf-8")
+
+    assert deploy.retire_fixed_logins(env) == []
+    assert ran.calls == []
+
+
 def test_the_install_s_own_login_is_never_switched_off(tmp_path: Path, ran: _Ran) -> None:
     env = tmp_path / ".env"
-    env.write_text("POSTGRES_USER=faden_backend\n", encoding="utf-8")
+    env.write_text("POSTGRES_USER=faden_backend\nFADEN_BACKEND_ENVIRONMENT=production\n", encoding="utf-8")
 
     deploy.retire_fixed_logins(env)
 

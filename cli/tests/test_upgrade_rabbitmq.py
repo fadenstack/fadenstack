@@ -53,6 +53,7 @@ def test_the_upgrade_writes_rabbitmqs_users_from_env(tmp_path: Path, monkeypatch
     from faden_cli.commands import deploy
 
     monkeypatch.setattr(deploy, "_sync_postgres_password", lambda *a, **k: None)
+    monkeypatch.setattr(deploy, "retire_fixed_logins", lambda *a, **k: [])
 
     result = CliRunner().invoke(upgrade_module.upgrade_cmd, ["-y", "--no-backup", "--no-build", "--skip-doctor"])
     assert result.exit_code == 0, result.output
