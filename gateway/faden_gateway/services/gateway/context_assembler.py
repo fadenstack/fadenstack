@@ -19,6 +19,7 @@ import base64
 import json
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,6 +51,8 @@ class AssembledContext:
     attachments_used: list[ChatAttachment] = field(default_factory=list)
     #: Files too long to include, for the model to search (``attachment_search``).
     searchable: list[ChatAttachment] = field(default_factory=list)
+    #: Pictures not sent: the turn's model does not take pictures.
+    pictures_left_out: list[ChatAttachment] = field(default_factory=list)
     total_token_estimate: int = 0
 
 
@@ -158,6 +161,7 @@ class ContextAssembler:
         token_budget: int = 4096,
         file_store: FileStore | None = None,
         searchable: bool = False,
+        vision: Callable[[], Awaitable[bool | None]] | None = None,
     ) -> None:
         self.dao = dao
         self.max_recent_messages = max_recent_messages
@@ -165,6 +169,11 @@ class ContextAssembler:
         self.file_store = file_store
         #: Whether a file too long to include can be searched by the model.
         self.searchable = searchable
+        #: Whether the turn's model takes pictures (True, False, None for not known). Asked once,
+        #: and only when the chat has a picture: a turn without one costs no lookup.
+        self._vision = vision
+        self._sees_pictures: bool | None = None
+        self._vision_asked = False
 
     async def assemble(
         self,
@@ -325,30 +334,73 @@ class ContextAssembler:
                 budget -= text_tokens
 
             elif att.extraction_status == ExtractionStatus.SKIPPED and self.file_store:
-                # Image attachment → inject as image_url content part
-                try:
-                    img_bytes = await self.file_store.get_bytes(att.storage_key)
-                    b64 = base64.b64encode(img_bytes).decode("ascii")
-                    data_uri = f"data:{att.content_type};base64,{b64}"
-                    img_tokens = _IMAGE_TOKEN_ESTIMATE
-                    if img_tokens > budget:
-                        continue
-                    result.messages.append({
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"[Attached image: {att.filename}]"},
-                            {"type": "image_url", "image_url": {"url": data_uri}},
-                        ],
-                    })
-                    result.attachments_used.append(att)
-                    total_tokens += img_tokens
-                    budget -= img_tokens
-                except Exception:
-                    logger.warning(
-                        "Failed to read image attachment %s", att.filename, exc_info=True,
-                    )
+                budget, total_tokens = await self._inject_picture(
+                    result, att, self.file_store, budget, total_tokens,
+                )
 
         return budget, total_tokens
+
+    async def _inject_picture(
+        self,
+        result: AssembledContext,
+        att: ChatAttachment,
+        file_store: FileStore,
+        budget: int,
+        total_tokens: int,
+    ) -> tuple[int, int]:
+        """An image attachment as an image_url content part, for a model that may take pictures."""
+        if await self._takes_pictures() is False:
+            return self._picture_left_out(result, att, budget, total_tokens)
+        try:
+            img_bytes = await file_store.get_bytes(att.storage_key)
+            b64 = base64.b64encode(img_bytes).decode("ascii")
+            data_uri = f"data:{att.content_type};base64,{b64}"
+            img_tokens = _IMAGE_TOKEN_ESTIMATE
+            if img_tokens > budget:
+                return budget, total_tokens
+            result.messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"[Attached image: {att.filename}]"},
+                    {"type": "image_url", "image_url": {"url": data_uri}},
+                ],
+            })
+            result.attachments_used.append(att)
+            total_tokens += img_tokens
+            budget -= img_tokens
+        except Exception:
+            logger.warning(
+                "Failed to read image attachment %s", att.filename, exc_info=True,
+            )
+        return budget, total_tokens
+
+    async def _takes_pictures(self) -> bool | None:
+        """Whether the turn's model takes pictures; asked of ``vision`` the first time only."""
+        if self._vision is None:
+            return None
+        if not self._vision_asked:
+            self._vision_asked = True
+            self._sees_pictures = await self._vision()
+        return self._sees_pictures
+
+    def _picture_left_out(
+        self,
+        result: AssembledContext,
+        att: ChatAttachment,
+        budget: int,
+        total_tokens: int,
+    ) -> tuple[int, int]:
+        """A picture for a model that does not take pictures: named, not sent.
+
+        Sent anyway, it can fail the request at a model that cannot read it.
+        The model is told, so it does not answer as if nothing had been
+        attached; the chat is told through ``pictures_left_out``.
+        """
+        note = f"[Attached image: {att.filename} -- not sent: this model does not take pictures.]"
+        note_tokens = _estimate_tokens(note)
+        result.messages.append({"role": "system", "content": note})
+        result.pictures_left_out.append(att)
+        return budget - note_tokens, total_tokens + note_tokens
 
     def _too_long(
         self,

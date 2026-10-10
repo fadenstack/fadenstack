@@ -18,6 +18,9 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
 - ``CUSTOM`` ``faden.gateway_round``: the round as the model saw it (its
   tool-calling turn and the tools' answers, with PII values put back), for
   the SDK to keep and send back as history. The gateway accepts it back.
+- ``CUSTOM`` ``faden.attachment_left_out``: a file of the chat that was not
+  sent to the model, and why (``no_vision``: a picture, and the model does not
+  take pictures).
 """
 
 from __future__ import annotations
@@ -103,6 +106,17 @@ def pii_notice(types: dict[str, int], mode: str | None) -> dict[str, Any] | None
         return None
     value = {"mode": mode, "entities": dict(sorted(types.items()))}
     return {"type": "CUSTOM", "name": "faden.pii", "value": value}
+
+
+def picture_left_out(attachment_id: str, filename: str, model: str) -> dict[str, Any]:
+    """A picture of the chat not sent: *model* does not take pictures."""
+    return {"type": "CUSTOM", "name": "faden.attachment_left_out", "value": {
+        "attachmentId": attachment_id,
+        "filename": filename,
+        "model": model,
+        "reason": "no_vision",
+        "message": f"{filename} was not sent: {model} does not take pictures. Choose a model that does.",
+    }}
 
 
 def gateway_round(messages: list[dict[str, Any]]) -> dict[str, Any]:

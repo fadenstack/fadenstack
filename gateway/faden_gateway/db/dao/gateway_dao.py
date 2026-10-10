@@ -124,11 +124,21 @@ class GatewayDAO:
         ``capabilities["vision"]``. True only when every one says so; False when one says it does not (a
         request may go to that one); None when one of them says nothing.
         """
+        return (await self.alias_visions([alias])).get(alias)
+
+    async def alias_visions(self, aliases: list[str]) -> dict[str, bool | None]:
+        """:meth:`alias_vision` for each of *aliases*, in one query (the model list)."""
+        if not aliases:
+            return {}
         rows = await self.session.execute(
-            select(LLMProviderInstance.node_metadata, LLMProviderInstance.capabilities)
+            select(
+                LLMPoolMembership.model_alias,
+                LLMProviderInstance.node_metadata,
+                LLMProviderInstance.capabilities,
+            )
             .join(LLMPoolMembership, LLMProviderInstance.id == LLMPoolMembership.provider_instance_id)
             .where(
-                LLMPoolMembership.model_alias == alias,
+                LLMPoolMembership.model_alias.in_(aliases),
                 LLMPoolMembership.enabled.is_(True),
                 LLMProviderInstance.enabled.is_(True),
             ),
@@ -140,12 +150,18 @@ class GatewayDAO:
                     return source["vision"]
             return None
 
-        said = [said_by(metadata, caps) for metadata, caps in rows.all()]
-        if any(value is False for value in said):
-            return False
-        if said and all(value is True for value in said):
-            return True
-        return None
+        said: dict[str, list[bool | None]] = {alias: [] for alias in aliases}
+        for alias, metadata, caps in rows.all():
+            said.setdefault(alias, []).append(said_by(metadata, caps))
+
+        def vision(values: list[bool | None]) -> bool | None:
+            if any(value is False for value in values):
+                return False
+            if values and all(value is True for value in values):
+                return True
+            return None
+
+        return {alias: vision(values) for alias, values in said.items()}
 
     async def get_tenant_policy(self, tenant_id: str) -> TenantLLMPolicy | None:
         """Fetch tenant policy."""
