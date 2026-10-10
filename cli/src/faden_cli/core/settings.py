@@ -72,6 +72,12 @@ class FadenConfig:
     #: architecture of the machines that will run models: "all", "none", or
     #: a list such as "x86_64" or "x86_64,aarch64".
     runtime_images: str = "all"
+    #: Whether commands say when a newer release is out (core/update_check.py); deploy asks.
+    update_check: bool = True
+    #: stable, or preview to hear about release candidates too.
+    update_channel: str = "stable"
+    #: Where the release feed is read; empty: fadenstack.com. A mirror for sites without internet.
+    update_feed_url: str = ""
     dev: DevConfig = field(default_factory=DevConfig)
 
     # ── Derived paths ─────────────────────────────────────────

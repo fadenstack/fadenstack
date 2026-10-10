@@ -64,10 +64,44 @@ def pin_release(env_path: Path) -> None:
     whatever was published last, and two machines deployed a day apart
     would run different releases under the same CLI.
     """
+    from faden_cli.core.update_check import installer  # noqa: PLC0415
+
     env_vars = read_env_file(env_path)
-    if env_vars.get("VERSION") != __version__:
-        env_vars["VERSION"] = __version__
+    # How this CLI was installed: the console's update notice shows the matching upgrade command.
+    pins = {"VERSION": __version__, "FADEN_CLI_INSTALLER": installer()}
+    if any(env_vars.get(k) != v for k, v in pins.items()):
+        env_vars.update(pins)
         write_env_file(env_path, env_vars)
+
+
+def update_check_step(env_path: Path, cfg: FadenConfig, *, choice: bool | None, yes: bool) -> None:
+    """Ask once whether this install hears about new releases; the CLI and the backend both follow it.
+
+    The answer goes into faden.yaml (the CLI) and .env (the backend's default; an
+    administrator can change it later under Settings > Updates).
+    """
+    from faden_cli.core.release_feed import FEED_URL  # noqa: PLC0415
+
+    env_vars = read_env_file(env_path)
+    if choice is None:
+        if "FADEN_UPDATE_CHECK" in env_vars:
+            choice = env_vars["FADEN_UPDATE_CHECK"].strip().lower() == "true"
+        elif yes:
+            choice = True
+        else:
+            console.print("\n[bold cyan]Step 3e: New releases…[/bold cyan]")
+            console.print(
+                f"  Once a day the server and this CLI read {FEED_URL},\n"
+                "  the public list of releases. They send nothing about this server: the list is\n"
+                "  compared here, and administrators see in the console when an update is out."
+            )
+            choice = click.confirm("  Check for new releases?", default=True)
+    if env_vars.get("FADEN_UPDATE_CHECK") != ("true" if choice else "false"):
+        env_vars["FADEN_UPDATE_CHECK"] = "true" if choice else "false"
+        write_env_file(env_path, env_vars)
+    cfg.update_check = choice
+    if not choice:
+        info("Update check off (update_check in faden.yaml; Settings > Updates in the console).")
 
 
 def _sync_postgres_password(ctx: ComposeContext, env_path: Path) -> None:
@@ -238,6 +272,13 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     help="With --tls generate: another DNS name or address the console is reached by (repeatable).",
 )
 @click.option(
+    "--update-check/--no-update-check",
+    "update_check",
+    default=None,
+    help="Read the public list of releases once a day and say when one is out (sends nothing about "
+    "this server). Default: ask; with --yes, on.",
+)
+@click.option(
     "--skip-doctor", is_flag=True,
     help="Skip pre-flight system checks.",
 )
@@ -295,6 +336,7 @@ def deploy_cmd(
     no_cache: bool,
     gpu: bool | None,
     force_env: bool,
+    update_check: bool | None,
     skip_doctor: bool,
     yes: bool,
     http_port: int | None,
@@ -550,6 +592,9 @@ def deploy_cmd(
         names=tls_names,
         ca=tls_ca,
     )
+
+    # ── 3e. New releases ──────────────────────────────────────────
+    update_check_step(env_path, cfg, choice=update_check, yes=yes)
 
     # ── 4. Save config ────────────────────────────────────────────
     cfg.install_dir = str(shared_dir)

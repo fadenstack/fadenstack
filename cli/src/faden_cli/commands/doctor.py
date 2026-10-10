@@ -124,6 +124,9 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
     # ── HTTPS ─────────────────────────────────────────────────────
     _https_check()
 
+    # ── Release ───────────────────────────────────────────────────
+    _release_check()
+
     # ── Verdict ───────────────────────────────────────────────────
     all_ok = (
         docker.installed
@@ -156,6 +159,42 @@ def _install_compose() -> tuple[Path | None, Path | None]:
     if bundled is not None:
         return Path(str(bundled / "docker-compose.yaml")), None
     return None, None
+
+
+def _release_check() -> None:
+    """Whether a newer release is out (the release feed, read now; the last check when offline)."""
+    from faden_cli import __version__  # noqa: PLC0415
+    from faden_cli.core import release_feed, update_check  # noqa: PLC0415
+    from faden_cli.core.settings import load_config  # noqa: PLC0415
+
+    cfg = load_config()
+    if not update_check.enabled(cfg):
+        console.print(f"{_check_mark(True)}  Release: {__version__} (update check off)")
+        return
+    try:
+        feed: release_feed.Feed | None = update_check.refresh(cfg)
+    except Exception as exc:  # offline is reported, not fatal
+        feed = update_check.cached_feed()
+        console.print(f"[cyan]i[/cyan]  Release feed not reachable ({exc}); showing the last check")
+    if feed is None:
+        console.print(f"[cyan]i[/cyan]  Release: {__version__} (never checked)")
+        return
+    found = release_feed.assess(feed, __version__, cfg.update_channel)
+    if found.unsupported:
+        console.print(
+            f"{_check_mark(False)}  Release: {__version__} no longer gets fixes "
+            f"(since {found.supported_until})"
+        )
+    if not found.update_available or found.latest is None:
+        if not found.unsupported:
+            console.print(f"{_check_mark(True)}  Release: {__version__}, the newest")
+        return
+    urgent = found.severity in ("security", "critical")
+    console.print(
+        f"{_check_mark(not urgent)}  Release: {__version__}; {found.latest.version} is available"
+        f"{f' ({found.severity})' if found.severity != 'normal' else ''}"
+        " -- faden version shows how to upgrade"
+    )
 
 
 def _https_check() -> None:
