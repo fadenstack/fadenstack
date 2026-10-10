@@ -397,6 +397,10 @@ async def lifespan_setup(
     if getattr(app.state, "agent_directory", None) is not None:
         await app.state.agent_directory.close()
     await app.state.http_client.aclose()
+    # The client the gateway fetches media URLs with (services/gateway/media_fetch.py).
+    from faden_gateway.services.gateway import media_fetch  # noqa: PLC0415
+
+    await media_fetch.aclose()
     await app.state.db_engine.dispose()
     app.state.gateway_observability.shutdown()
     await app.state.cache_backend.close()
