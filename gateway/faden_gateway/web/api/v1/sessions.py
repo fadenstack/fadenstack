@@ -131,6 +131,13 @@ async def delete_project(
     auth: AuthContext = Depends(get_auth_context),
     dao: SessionDAO = Depends(),
 ) -> None:
+    # Only the caller's own project, before anything of it is touched.
+    if await dao.get_project(project_id=project_id, tenant_id=auth.tenant_id, user_id=auth.user_id) is None:
+        raise GatewayError(
+            status_code=404,
+            message="Project not found.",
+            code="project_not_found",
+        )
     # Clean up attachment files before DB cascade deletes records
     file_store = getattr(request.app.state, "chat_file_store", None)
     if file_store:
