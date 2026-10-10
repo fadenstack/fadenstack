@@ -287,6 +287,10 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
             "FADEN_BACKEND_COOKIE_SECURE",
             "FADEN_BACKEND_GATEWAY_URL",
             "FADEN_BACKEND_ENVIRONMENT",
+            # The shared Postgres login for the gateway's tables: a fresh
+            # database has no llm_user any more (shared/initdb).
+            "FADEN_BACKEND_LLM_GRAPH_DB_USER",
+            "FADEN_BACKEND_LLM_GRAPH_DB_PASS",
         )
     }
 

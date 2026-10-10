@@ -336,9 +336,11 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     console.print(f"\n[bold cyan]Step {step}: Rolling restart…[/bold cyan]")
 
     # Sync postgres password before restarting (same as deploy)
-    from faden_cli.commands.deploy import _sync_postgres_password  # noqa: PLC0415
+    from faden_cli.commands.deploy import _sync_postgres_password, retire_fixed_logins  # noqa: PLC0415
 
     _sync_postgres_password(ctx, env_path)
+    # Earlier releases made two logins with fixed passwords on every install.
+    retire_fixed_logins(env_path)
 
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the

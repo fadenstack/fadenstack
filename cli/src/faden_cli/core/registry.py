@@ -505,6 +505,12 @@ def backend_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     """
     env = dict(BACKEND_DEV_ENV)
     shared = _read_env_values(shared_env_path)
+    # The gateway's tables (usage, chats for the admin pages) are read with the
+    # shared Postgres login, as in an install. The backend's default was
+    # llm_user/llm_user, a login the shared initdb no longer makes.
+    if shared.get("POSTGRES_USER") and shared.get("POSTGRES_PASSWORD"):
+        env["FADEN_BACKEND_LLM_GRAPH_DB_USER"] = shared["POSTGRES_USER"]
+        env["FADEN_BACKEND_LLM_GRAPH_DB_PASS"] = shared["POSTGRES_PASSWORD"]
     backend_pass = shared.get("RABBITMQ_BACKEND_PASS")
     if backend_pass:
         env["FADEN_BACKEND_RABBIT_USER"] = "faden-backend"

@@ -121,6 +121,58 @@ def _sync_postgres_password(ctx: ComposeContext, env_path: Path) -> None:
         warning(f"Could not sync Postgres password: {result.stderr.strip()}")
 
 
+#: Logins the initdb script of earlier releases made on every install, with
+#: the same fixed passwords everywhere (llm_user could read every backend
+#: table). No service of an install uses them; a development stack makes the
+#: one it needs itself (faden dev up).
+FIXED_LOGINS = ("llm_user", "faden_backend")
+
+
+def retire_fixed_logins(env_path: Path) -> list[str]:
+    """Switch off the fixed-password logins an install made before still has; returns which.
+
+    ``ALTER ROLE ... NOLOGIN``: the roles and their grants stay, nobody can sign
+    in with them. Postgres must be running (after :func:`_sync_postgres_password`).
+    Left alone on a development stack (FADEN_BACKEND_ENVIRONMENT=dev), whose
+    host-run backend signs in as ``faden_backend``.
+    """
+    import shutil
+    import subprocess
+
+    env_vars = read_env_file(env_path)
+    if env_vars.get("FADEN_BACKEND_ENVIRONMENT", "production") == "dev":
+        return []
+    docker = shutil.which("docker")
+    if not docker:
+        return []
+    pg_user = env_vars.get("POSTGRES_USER", "postgres")
+    roles = [role for role in FIXED_LOGINS if role != pg_user]
+    if not roles:
+        return []
+    names = ", ".join(f"'{role}'" for role in roles)
+    sql = (
+        f"SELECT coalesce(string_agg(rolname, ','), '') FROM pg_roles "
+        f"WHERE rolname IN ({names}) AND rolcanlogin;\n"
+        "DO $$ DECLARE r text; BEGIN "
+        f"FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ({names}) AND rolcanlogin LOOP "
+        "EXECUTE format('ALTER ROLE %I NOLOGIN', r); END LOOP; END $$;\n"
+    )
+    result = subprocess.run(  # noqa: S603
+        [docker, "exec", "-i", "faden-postgres", "psql", "-U", pg_user, "-v", "ON_ERROR_STOP=1", "-At"],
+        input=sql,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        warning(f"Could not switch off the old fixed Postgres logins: {result.stderr.strip()}")
+        return []
+    retired = [name for name in (result.stdout.splitlines() or [""])[0].split(",") if name]
+    if retired:
+        success(f"Old Postgres logins with fixed passwords switched off: {', '.join(retired)}.")
+    return retired
+
+
 def _resolve_compose_file(install_dir: Path) -> Path | None:
     """Find the shared docker-compose file."""
     for candidate in (
@@ -622,6 +674,7 @@ def deploy_cmd(
     # We boot Postgres alone, ALTER USER to match .env, then start
     # everything else.
     _sync_postgres_password(ctx, env_path)
+    retire_fixed_logins(env_path)
 
     # Start infrastructure services and wait for them to become healthy
     # BEFORE starting application containers.  This avoids a race
