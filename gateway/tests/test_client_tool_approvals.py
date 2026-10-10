@@ -9,8 +9,10 @@ a call over, it marks it (``faden.approval_required`` without an
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -20,8 +22,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import AgentClientEvent, ProviderType
+from faden_gateway.services.gateway import faden_events
 from faden_gateway.services.gateway import governance as gov
 from faden_gateway.services.gateway import tool_classes as tc
+from faden_gateway.services.gateway.service import GatewayService
 from tests.test_agent_routes import _agent_token, _Backend, _profile, backend  # noqa: F401
 from tests.test_gateway_knowledge_tools import (
     CAN_CALL_TOOLS,
@@ -207,6 +211,40 @@ async def test_an_approval_is_reported_with_what_let_it_through(
     assert sorted(e.data["scope"] for e in rows) == ["bypass", "once"]
     bad = {"events": [{"type": "approval.decided", "tool": "x", "decision": "approved", "scope": "forever"}]}
     assert (await client.post("/v1/agents/eplan-assistant/events", headers=auth, json=bad)).status_code == 400
+
+
+@pytest.mark.anyio
+async def test_the_stream_goes_on_unchanged_with_the_mark_before_the_round_ends() -> None:
+    def chunk(delta: dict[str, Any], finish: str | None = None) -> bytes:
+        body = {"choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+        return f"data: {json.dumps(body, ensure_ascii=False)}\n\n".encode()
+
+    sent = (
+        chunk({"content": "Grüße aus München"})
+        + chunk({"tool_calls": [{"index": 0, "id": "c1", "function": {"name": "send_mail", "arguments": "{}"}}]})
+        + chunk({}, "tool_calls") + b"data: [DONE]\n\n"
+    )
+    cut = sent.index("ü".encode()) + 1  # a chunk that ends inside a character
+
+    async def upstream() -> AsyncIterator[bytes]:
+        for piece in (sent[:cut], sent[cut:cut + 7], sent[cut + 7:]):
+            yield piece
+
+    mark = {"type": "CUSTOM", "name": "faden.approval_required", "value": {"toolCallId": "c1"}}
+
+    async def screen(req: Any, calls: list[dict[str, Any]], *, auth: Any, request_id: str) -> list[dict[str, Any]]:
+        assert [c["function"]["name"] for c in calls] == ["send_mail"]
+        return [mark]
+
+    service = SimpleNamespace(_client_call_events=screen)
+    out = b"".join([
+        piece async for piece in GatewayService._screen_client_stream(  # type: ignore[arg-type]  # noqa: SLF001
+            service, None, upstream(), auth=None, request_id="r",  # type: ignore[arg-type]
+        )
+    ])
+    told = faden_events.sse_event(mark)
+    assert out.replace(told, b"") == sent
+    assert out.index(told) < out.index(b'"finish_reason": "tool_calls"')
 
 
 def test_the_event_without_an_approval_id_is_the_clients_to_ask() -> None:

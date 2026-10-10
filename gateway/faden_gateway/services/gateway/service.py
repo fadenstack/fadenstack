@@ -1947,26 +1947,26 @@ class GatewayService:
         """
         calls = ToolCalls()
         told = False
-        buffer = ""
+        buffer = b""  # bytes: a chunk may end inside a character
 
         async def tell() -> list[bytes]:
             screened = await self._client_call_events(req, calls.calls(), auth=auth, request_id=request_id)
             return [faden_events.sse_event(event) for event in screened]
 
         async for chunk in stream:
-            buffer += chunk.decode()
-            while "\n\n" in buffer:
-                raw, buffer = buffer.split("\n\n", 1)
-                if _ends_round(raw, calls) and calls and not told:
+            buffer += chunk
+            while b"\n\n" in buffer:
+                raw, buffer = buffer.split(b"\n\n", 1)
+                if _ends_round(raw.decode("utf-8", errors="replace"), calls) and calls and not told:
                     told = True
                     for event in await tell():
                         yield event
-                yield (raw + "\n\n").encode()
+                yield raw + b"\n\n"
         if calls and not told:
             for event in await tell():
                 yield event
         if buffer:
-            yield buffer.encode()
+            yield buffer
 
     async def _refused(
         self, req: _Prepared, call: dict[str, Any], name: str, verdict: gov.Verdict, answer: bool | None,
