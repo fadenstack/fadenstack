@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import jwt
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, schemas
+from fastapi_users import BaseUserManager, FastAPIUsers, InvalidPasswordException, UUIDIDMixin, schemas
 from fastapi_users.authentication import (
     AuthenticationBackend,
     BearerTransport,
@@ -25,6 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from faden_backend.db.base import Base
 from faden_backend.db.dependencies import get_db_session
+from faden_backend.services.password_policy import password_problem
 from faden_backend.settings import settings
 
 log = logging.getLogger(__name__)
@@ -77,6 +78,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     reset_password_token_secret = settings.users_secret
     verification_token_secret = settings.users_secret
+
+    async def validate_password(self, password: str, user: UserCreate | User) -> None:
+        """The password rule (services/password_policy.py), for a reset and a change through /api/users/me."""
+        problem = password_problem(password, getattr(user, "email", None))
+        if problem:
+            raise InvalidPasswordException(reason=problem)
 
     async def on_after_register(self, user: User, request: Request | None = None) -> None:
         """Assign default RBAC role to newly registered non-superusers.

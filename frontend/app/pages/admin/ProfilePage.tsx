@@ -35,6 +35,7 @@ import AppearanceSettings from "~/components/AppearanceSettings";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { adminUsers, type ApiTokenInfo } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 
 // ── Token expiry options ─────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export default function ProfilePage() {
       setPwError(t("profile.password_mismatch"));
       return;
     }
-    if (newPassword.length < 6) {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
       setPwError(t("profile.password_too_short"));
       return;
     }

@@ -180,7 +180,7 @@
       },
       "account": {
         "title": "Die Anmeldung",
-        "body": "Die E-Mail-Adresse und ein erstes Passwort mit mindestens 6 Zeichen. Geben Sie das Passwort persönlich oder telefonisch weiter."
+        "body": "Die E-Mail-Adresse und ein erstes Passwort mit mindestens 8 Zeichen. Geben Sie das Passwort persönlich oder telefonisch weiter."
       },
       "roles": {
         "title": "Was die Person darf",

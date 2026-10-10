@@ -53,7 +53,7 @@ A restricted collection shows a lock beside its name.
 ![Create New User: Email and Password, the Superuser switch, and Assign Roles with the built-in roles to tick](../images/administer/users-create.png)
 
 1. Open **Access Control → Users** and select **Create User**.
-2. Enter their e-mail address and a first password of at least 6 characters.
+2. Enter their e-mail address and a first password of at least 8 characters.
 3. Leave **Superuser** off, unless they administer Fadenstack with you.
 4. Under **Assign Roles**, leave everything empty for people who only chat: they get `default_user`.
 5. Select **Create User**.

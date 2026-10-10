@@ -15,6 +15,7 @@ import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
 
 import { auth } from "~/api/auth";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 
 export default function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -33,7 +34,7 @@ export default function ResetPasswordPage() {
       setError(t("auth.reset_password_missing_token"));
       return;
     }
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError(t("auth.reset_password_too_short"));
       return;
     }

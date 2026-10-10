@@ -22,6 +22,7 @@ from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import require_superuser
 from faden_backend.web.api.admin.users.preferences import (
@@ -361,6 +362,10 @@ async def create_user(
     """Admin-initiated user creation."""
     from fastapi_users.password import PasswordHelper  # noqa: PLC0415
 
+    problem = password_problem(payload.password, payload.email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
+
     # Check if email already exists
     existing = await session.execute(select(User).where(User.email == payload.email))  # type: ignore[arg-type]
     if existing.scalar_one_or_none():
@@ -473,6 +478,9 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect.",
         )
+    problem = password_problem(payload.new_password, user.email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
     user.hashed_password = password_helper.hash(payload.new_password)
     session.add(user)
     await session.flush()
