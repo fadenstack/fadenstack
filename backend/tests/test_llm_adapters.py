@@ -228,6 +228,13 @@ def test_vllm_spec_trust_remote_code_enables_network(monkeypatch: pytest.MonkeyP
     assert "HF_HUB_OFFLINE=0" in env and "TRANSFORMERS_OFFLINE=0" in env
 
 
+def test_vllm_spec_sends_no_usage_stats(monkeypatch: pytest.MonkeyPatch) -> None:
+    """vLLM reports usage to its makers unless told not to; the runtimes it starts are told."""
+    spec = _build(monkeypatch, _inventory(GpuVendor.NVIDIA, has_gpu=False))
+    env = spec.env or []
+    assert "VLLM_NO_USAGE_STATS=1" in env and "DO_NOT_TRACK=1" in env
+
+
 # ── engine_args passthrough ──────────────────────────────────────────────────
 
 

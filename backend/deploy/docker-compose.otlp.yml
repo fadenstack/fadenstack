@@ -11,6 +11,11 @@ services:
   otel-stack:
     image: grafana/otel-lgtm
     hostname: "otel-collector"
+    environment:
+      # Its Grafana sends no usage reports and checks nothing against grafana.com.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
     ports:
       # Collector's GRPC endpoint
       - "4317:4317"

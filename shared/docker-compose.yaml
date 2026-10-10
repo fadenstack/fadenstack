@@ -177,7 +177,8 @@ services:
       DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/langfuse} # CHANGEME
       SALT: ${LANGFUSE_SALT:-mysalt} # CHANGEME
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000} # CHANGEME (openssl rand -hex 32)
-      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-true}
+      # Off: Langfuse reports usage to its makers unless told not to.
+      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
 
       CLICKHOUSE_MIGRATION_URL: ${CLICKHOUSE_MIGRATION_URL:-clickhouse://clickhouse:9000}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
@@ -232,7 +233,8 @@ services:
       DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/langfuse} # CHANGEME
       SALT: ${LANGFUSE_SALT:-mysalt} # CHANGEME
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000} # CHANGEME
-      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-true}
+      # Off: Langfuse reports usage to its makers unless told not to.
+      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
 
       CLICKHOUSE_MIGRATION_URL: ${CLICKHOUSE_MIGRATION_URL:-clickhouse://clickhouse:9000}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
@@ -915,6 +917,13 @@ services:
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_PLUGINS_PREINSTALL: ""
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      # Nothing leaves this server: no usage reports, no update or plugin
+      # checks against grafana.com, no news feed, no Gravatar pictures.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -922,13 +931,16 @@ services:
       - loki
 
   alloy:
-    image: grafana/alloy:latest
+    # Pinned, not :latest: an install otherwise ran whatever was published
+    # last. --disable-reporting: no usage reports to Grafana Labs.
+    image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
     container_name: faden-alloy
     restart: unless-stopped
     ports:
       - "127.0.0.1:12345:12345"
     command: >
       run --server.http.listen-addr=0.0.0.0:12345
+      --disable-reporting
       /etc/alloy/config.alloy
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro

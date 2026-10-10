@@ -124,6 +124,11 @@ def _build_uvicorn_ssl_kwargs() -> dict[str, Any]:
 
 def main() -> None:
     """Entrypoint of the application."""
+    # LiteLLM fetches its model price list from GitHub when it is imported,
+    # unless told to use the copy it ships. The image sets this too; a gateway
+    # run from a checkout (faden dev up) gets it here, before any worker
+    # imports LiteLLM.
+    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     set_multiproc_dir()
     ssl_kwargs = _build_uvicorn_ssl_kwargs()
     # When TLS is enabled, bind the configured HTTPS port instead of
