@@ -495,6 +495,7 @@ def _pii_policy_dto(
         mode_switch_allowed=resolved.mode_switch_allowed,
         can_switch_mode=resolved.mode_switch_allowed or caller_may_weaken,
         mode_applied=resolved.mode_applied,
+        can_weaken=caller_may_weaken,
     )
 
 

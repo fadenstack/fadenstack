@@ -34,6 +34,7 @@ import type {
   SessionPIIPolicy,
   PIIPolicyConfig,
 } from "~/api/pii";
+import { MIN_STRICT_THRESHOLD } from "../hooks/useSessionPiiPolicy";
 
 // ── Props ──────────────────────────────────────────────────────
 
@@ -86,6 +87,12 @@ export default function PiiPanel({
   const requestedMode = policy?.override?.egress_mode ?? null;
   const modeNotApplied = policy?.mode_applied === false && requestedMode !== null;
   const threshold = effective?.presidio?.threshold ?? 0;
+  // A detection counts when its score reaches the threshold, so a higher
+  // threshold finds less. Without the weaken right the slider only goes down
+  // from the policy's value (stricter); with it, anywhere.
+  const canWeaken = policy?.can_weaken === true;
+  const sliderMin = canWeaken ? 0 : MIN_STRICT_THRESHOLD;
+  const sliderMax = canWeaken ? 1 : Math.max(floorThreshold, sliderMin);
   const allEntities: string[] = useMemo(
     () => effective?.presidio?.entities ?? [],
     [effective],
@@ -396,13 +403,13 @@ export default function PiiPanel({
               <Slider
                 size="small"
                 value={threshold}
-                min={floorThreshold}
-                max={1}
+                min={sliderMin}
+                max={sliderMax}
                 step={0.01}
                 onChange={(_, val) =>
                   save({ presidio_threshold: val as number })
                 }
-                disabled={saving}
+                disabled={saving || sliderMax <= sliderMin}
                 valueLabelDisplay="auto"
               />
             </Box>

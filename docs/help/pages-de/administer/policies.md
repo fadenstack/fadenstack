@@ -85,7 +85,7 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
 ![Der Reiter „Datenschutz“ im Seitenbereich des Chats: Schutz der Anfragen an die Cloud und an lokale Modelle, Modus und Fehleraktion, Telemetrie sowie Schwellenwert und Entitäten der Erkennung](../images/use/chat-privacy-tab.png){ width="280" }
 
 - Ein Benutzer kann die Richtlinie für einen einzelnen Chat im Bereich **Datenschutz** des Chats **strenger**
-  machen: mehr Typen, ein höherer Schwellenwert, auch lokale Modelle prüfen.
+  machen: mehr Typen, ein niedrigerer Schwellenwert (er maskiert dann mehr), auch lokale Modelle prüfen.
 - Der Wechsel zwischen `redact` und `tokenize_reversible` ist keine strengere, sondern eine andere Einstellung.
   Ein Chat darf ihn deshalb nur vornehmen, wenn **Chats und Agenten dürfen den PII-Modus ändern** eingeschaltet ist
   (**Datenschutz (PII) → Mandantenrichtlinien**, standardmäßig aus).

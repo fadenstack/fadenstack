@@ -963,7 +963,7 @@ async def test_get_pii_policy_with_floor_and_override(
     resp = await client.patch(
         f"/v1/sessions/{sid}/pii-policy",
         headers={"Authorization": f"Bearer {token}"},
-        json={"egress_fail_action": "block", "presidio_threshold": 0.8},
+        json={"egress_fail_action": "block", "presidio_threshold": 0.3},
     )
     assert resp.status_code == 200
 
@@ -983,8 +983,9 @@ async def test_get_pii_policy_with_floor_and_override(
     # Effective should be clamped (override fail_action=block > floor allow)
     assert data["effective"] is not None
     assert data["effective"]["egress"]["fail_action"] == "block"
-    # Threshold clamped to max(floor=0.5, override=0.8) = 0.8
-    assert data["effective"]["presidio"]["threshold"] == 0.8
+    # A lower threshold finds more, so it is the stricter one: min(floor=0.5, override=0.3)
+    assert data["effective"]["presidio"]["threshold"] == 0.3
+    assert data["can_weaken"] is False
 
 
 @pytest.mark.anyio
