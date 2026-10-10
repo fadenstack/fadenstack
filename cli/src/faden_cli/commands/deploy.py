@@ -519,6 +519,11 @@ def deploy_cmd(
     env_path = shared_dir / ".env"
     if env_path.exists() and not force_env:
         info(f".env already exists at {env_path} (use --force-env to regenerate)")
+        # What the compose file requires and an older .env lacks; stored data keeps its key.
+        from faden_cli.core.env_gen import fill_required_env  # noqa: PLC0415
+
+        for note in fill_required_env(env_path, profiles=sorted(profiles)):
+            warning(note)
     else:
         env_vars = default_env_vars(profiles=sorted(profiles))
         write_env_file(env_path, env_vars, preserve_secrets=not force_env)

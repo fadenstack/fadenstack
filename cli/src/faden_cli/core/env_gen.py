@@ -59,6 +59,56 @@ SECRET_KEYS: frozenset[str] = frozenset({
 #: ``faden deploy``. Without it bootstrap is refused: the first admin went to whoever asked first.
 BOOTSTRAP_TOKEN_KEY = "FADEN_BACKEND_BOOTSTRAP_TOKEN"  # noqa: S105 - the variable's name
 
+#: What the compose file has no fallback for (``${NAME:?...}``): compose stops on any of them missing, for
+#: every command, whichever services it starts. It fell back to development values published with the
+#: source code; ``faden deploy`` writes them all, ``faden upgrade`` adds what an older ``.env`` lacks
+#: (:func:`fill_required_env`), and ``faden dev up`` gives a development ``.env`` the development ones.
+REQUIRED_KEYS: tuple[str, ...] = (
+    "POSTGRES_PASSWORD",
+    "REDIS_AUTH",
+    "MINIO_ROOT_PASSWORD",
+    "CLICKHOUSE_PASSWORD",
+    "LANGFUSE_NEXTAUTH_SECRET",
+    "LANGFUSE_SALT",
+    "LANGFUSE_ENCRYPTION_KEY",
+    "RABBITMQ_ADMIN_PASS",
+    "RABBITMQ_API_PASS",
+    "RABBITMQ_BACKEND_PASS",
+    "RABBITMQ_PII_PASS",
+    "GRAFANA_ADMIN_PASSWORD",
+    "FADEN_BACKEND_SETTINGS_MASTER_KEY",
+    "FADEN_MCP_ENCRYPTION_KEY",
+    "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
+    "FADEN_BACKEND_MCP_SERVICE_TOKEN",
+    "FADEN_MCP_SERVICE_TOKEN",
+    "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
+    "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
+    "FADEN_SKILLS_SERVICE_TOKEN",
+)
+
+#: Keys that seal stored data, with the value the compose file used when ``.env`` had none. They are
+#: published with the source code, and an install that ran on one reads its data only with it: an upgrade
+#: that finds one missing writes this value, never a random one.
+PUBLISHED_DATA_KEYS: dict[str, str] = {
+    "FADEN_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
+    "FADEN_MCP_ENCRYPTION_KEY": "dev-mcp-encryption-key-change-me-32b",
+    "LANGFUSE_SALT": "mysalt",
+    "LANGFUSE_ENCRYPTION_KEY": "0" * 64,
+}
+
+#: Lets the backend, the gateway and MCP start with a published key from :data:`PUBLISHED_DATA_KEYS`
+#: (which they refuse otherwise), for an install that stored its data under it.
+ALLOW_PUBLISHED_KEYS = "FADEN_ALLOW_PUBLISHED_KEYS"
+
+#: Of the published keys, the ones the services refuse without :data:`ALLOW_PUBLISHED_KEYS`.
+_REFUSED_DATA_KEYS = ("FADEN_BACKEND_SETTINGS_MASTER_KEY", "FADEN_MCP_ENCRYPTION_KEY")
+
+#: Keys that must hold one value: what the gateway and the backend present, and what the module expects.
+_TOKEN_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("FADEN_GATEWAY_MCP_SERVICE_TOKEN", "FADEN_BACKEND_MCP_SERVICE_TOKEN", "FADEN_MCP_SERVICE_TOKEN"),
+    ("FADEN_GATEWAY_SKILLS_SERVICE_TOKEN", "FADEN_BACKEND_SKILLS_SERVICE_TOKEN", "FADEN_SKILLS_SERVICE_TOKEN"),
+)
+
 
 def read_env_file(path: Path) -> dict[str, str]:
     """Parse a ``.env`` file into a dict, ignoring comments and blanks."""
@@ -135,6 +185,10 @@ def dev_env_vars(
         # JWT secrets are seeded automatically in the DB on first startup.
         "FADEN_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
         "FADEN_GATEWAY_ENCRYPTION_KEY": "dev-encryption-key-change-me",
+        # The modules' development tokens and key, the ones `faden dev up` runs them with
+        # (registry.MODULES); the compose file requires them although dev mode runs the
+        # modules on the host.
+        **_dev_module_secrets(),
         "FADEN_GATEWAY_LANGFUSE_ENABLED": "false",
         "FADEN_BACKEND_GATEWAY_URL": "http://faden-gateway:8000",
         # Dev stacks opt IN to dev mode (seeded admin, /auth/dev-login); the
@@ -164,6 +218,22 @@ def dev_env_vars(
         env.update(module_env_vars(prof))
 
     return env
+
+
+def _dev_module_secrets() -> dict[str, str]:
+    """The MCP and skills tokens and the MCP key a development stack uses."""
+    from faden_cli.core.registry import MODULES  # noqa: PLC0415
+
+    mcp, skills = MODULES["mcp"], MODULES["skills"]
+    return {
+        "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp.dev_service_token,
+        "FADEN_BACKEND_MCP_SERVICE_TOKEN": mcp.dev_service_token,
+        "FADEN_MCP_SERVICE_TOKEN": mcp.dev_service_token,
+        "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
+        "FADEN_BACKEND_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
+        "FADEN_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
+        "FADEN_MCP_ENCRYPTION_KEY": dict(mcp.dev_settings)["ENCRYPTION_KEY"],
+    }
 
 
 # ── Production defaults (random secrets) ──────────────────────────
@@ -375,6 +445,75 @@ def ensure_bootstrap_token(env_path: Path) -> bool:
     env[BOOTSTRAP_TOKEN_KEY] = _random_secret()
     write_env_file(env_path, env)
     return True
+
+
+def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] = ()) -> list[str]:
+    """Give an install's ``.env`` every key the compose file requires that it lacks; notes for the operator.
+
+    Everything else in the file stays as it is. A missing token gets the value the rest of its group holds,
+    or a new random one; a missing password a random one (deploy and upgrade then set Postgres to it, see
+    ``_sync_postgres_password``). A missing key that seals stored data means the install ran on the
+    compose file's published fallback, and its data is readable only with that: the published value is
+    written, :data:`ALLOW_PUBLISHED_KEYS` lets the services start with it, and a note says to change it.
+    Not for MCP's key when MCP is not switched on here: it stored nothing.
+    """
+    current = read_env_file(env_path)
+    defaults = default_env_vars(profiles=list(profiles))
+    added: dict[str, str] = {}
+    for group in _TOKEN_GROUPS:
+        value = next((current[key] for key in group if current.get(key)), None) or defaults[group[0]]
+        added.update({key: value for key in group if not current.get(key)})
+    kept: list[str] = []
+    for key in REQUIRED_KEYS:
+        if current.get(key) or key in added:
+            continue
+        if key in PUBLISHED_DATA_KEYS and (key != "FADEN_MCP_ENCRYPTION_KEY" or "mcp" in profiles):
+            added[key] = PUBLISHED_DATA_KEYS[key]
+            kept.append(key)
+        else:
+            added[key] = defaults[key]
+    if "POSTGRES_PASSWORD" in added and current.get("LANGFUSE_DATABASE_URL"):
+        user = current.get("POSTGRES_USER") or "postgres"
+        added["LANGFUSE_DATABASE_URL"] = f"postgresql://{user}:{added['POSTGRES_PASSWORD']}@postgres:5432/langfuse"
+    if any(key in kept for key in _REFUSED_DATA_KEYS) and not current.get(ALLOW_PUBLISHED_KEYS):
+        added[ALLOW_PUBLISHED_KEYS] = "true"
+    if added:
+        _put_env(env_path, added, header="Required by the compose file (faden upgrade)")
+    return [
+        f"{key} was not in .env: this install ran on the published development value, which is now written "
+        "there so the data stored with it stays readable. Change it as Help describes (Installing, Secrets in .env)."
+        for key in kept
+    ]
+
+
+def fill_dev_env(env_path: Path) -> list[str]:
+    """Give a development ``.env`` the keys the compose file requires that it lacks, with development values.
+
+    A development stack's own ``.env`` predates them: the compose file supplied fixed values. Returns the
+    keys it added, never their values.
+    """
+    current = read_env_file(env_path)
+    dev = dev_env_vars()
+    added = {key: dev[key] for key in REQUIRED_KEYS if not current.get(key)}
+    if added:
+        _put_env(env_path, added, header="Required by the compose file (faden dev up)")
+    return list(added)
+
+
+def _put_env(env_path: Path, values: dict[str, str], *, header: str) -> None:
+    """Set *values* in the ``.env`` at *env_path*: a key it has is rewritten in place, the rest appended."""
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    where = _key_lines(lines)
+    for key, value in values.items():
+        if key in where:
+            lines[where[key]] = f"{key}={value}"
+    appended = [f"{key}={value}" for key, value in values.items() if key not in where]
+    if appended:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines += [f"# ── {header} ──", *appended]
+    # LF and owner-only, like write_env_file.
+    write_private(env_path, ("\n".join(lines) + "\n").encode("utf-8"))
 
 
 def set_module_env(

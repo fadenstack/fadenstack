@@ -55,6 +55,10 @@ class Settings(BaseSettings):
 
     # ── Encryption ──
     encryption_key: str = ""
+    # Start anyway with the published development encryption key: for an
+    # install that has already stored credentials with it, until the key is
+    # changed (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).
+    allow_published_keys: bool = False
 
     # ── PII Service (optional) ──
     pii_service_url: str = ""

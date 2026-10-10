@@ -382,6 +382,7 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     shared_dir = compose_file.parent
     env_path = shared_dir / ".env"
     if env_path.exists():
+        heal_dev_env(env_path)
         return env_path
 
     info(f"Shared .env not found — generating fresh dev credentials at {env_path}")
@@ -393,6 +394,20 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     except Exception as exc:  # noqa: BLE001 — resync is best-effort
         warning(f"RMQ definitions resync skipped ({exc}); broker users may need a manual restart.")
     return env_path
+
+
+def heal_dev_env(env_path: Path) -> None:
+    """Give the shared development ``.env`` what the compose file requires and it lacks.
+
+    The compose file has no fallback for its secrets any more and stops on any
+    missing, whichever services start; a development ``.env`` written before
+    gets the development values (never a change to one it has).
+    """
+    from faden_cli.core.env_gen import fill_dev_env
+
+    added = fill_dev_env(env_path)
+    if added:
+        info(f"Shared .env: added the development values the compose file requires ({len(added)}).")
 
 
 def _ensure_gateway_env(api_dir: Path, workspace: Path) -> None:

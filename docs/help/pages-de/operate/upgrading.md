@@ -50,7 +50,9 @@ nichts aktualisiert sich von selbst.
        bricht ab, wenn sich nichts sichern ließ;
     3. ersetzt die Dateien der Installation durch die des neuen Release und ergänzt in der `.env` nur die
        Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten, außer der
-       Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird;
+       Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird. Fehlt ein Schlüssel, der
+       gespeicherte Daten versiegelt, bekommt er den Wert, mit dem die Installation lief, nie einen neuen, und das
+       Upgrade sagt es (siehe [Geheimnisse in der .env](installing.md#secrets-in-env));
     4. lädt die Images des neuen Release herunter;
     5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen, und die beiden
        Postgres-Anmeldungen mit festen Passwörtern, die frühere Releases angelegt haben (`llm_user`,

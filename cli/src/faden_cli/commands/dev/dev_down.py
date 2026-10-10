@@ -205,6 +205,10 @@ def dev_down(*, keep_infra: bool, yes: bool) -> None:
         from faden_cli.core.compose import ComposeContext, down as compose_down
 
         env_file = compose_file.parent / ".env"
+        if env_file.exists():
+            from faden_cli.commands.dev.dev_up import heal_dev_env
+
+            heal_dev_env(env_file)
         ctx = ComposeContext(
             compose_files=[compose_file],
             env_file=env_file if env_file.exists() else None,

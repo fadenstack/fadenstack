@@ -49,7 +49,7 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
 | Other names or addresses | Bei `generate`: Namen, unter denen die Konsole erreicht wird und die der Server selbst nicht kennt, z. B. `ai.example.internal`. Durch Kommas getrennt, leer für keine. |
 | A port to use instead | Nur wenn Port 80 oder 443 von etwas anderem belegt ist. |
 | Admin email | Die E-Mail-Adresse, mit der sich der erste Administrator anmeldet. |
-| Admin password | Leer lassen, um ein Passwort erzeugen zu lassen. |
+| Admin password | Mindestens 8 Zeichen, und nicht die E-Mail-Adresse. Leer lassen, um ein Passwort erzeugen zu lassen. |
 | Save to file? | Speichert die Zugangsdaten in `~/fadenstack/.bootstrap-credentials` (nur für Sie lesbar). |
 | Back up every night? | Ja (Standard) führt `faden backup` um 03:00 Uhr aus und behält die letzten 7. Siehe [Sicherungen](backups.md). |
 
@@ -121,6 +121,56 @@ Die Daten liegen in Docker-Volumes namens `fadenstack_*`, z. B. `fadenstack_pg_d
 Einstellungen, die Sie ändern, gehören in die `.env`. Die anderen Dateien der Installation, z. B.
 `nginx/nginx.conf`, werden beim nächsten Upgrade ersetzt.
 
+## Geheimnisse in der .env {#secrets-in-env}
+
+`faden deploy` schreibt jedes Passwort, jeden Schlüssel und jedes Token, das die Dienste brauchen, in
+`~/fadenstack/.env`, jeweils zufällig und nur für diese Installation; `faden upgrade` ergänzt die, die ein neues
+Release braucht. Die Compose-Datei hat für keines davon einen Ersatzwert: Fehlt eines, bricht `docker compose` ab
+und nennt es („required variable ... is missing a value“).
+
+Starten Sie stattdessen von Hand mit `docker compose`, setzen Sie sie selbst, jedes auf einen eigenen langen
+Zufallswert (`openssl rand -base64 48`):
+
+| Variable | Was sie schützt |
+|---|---|
+| `POSTGRES_PASSWORD` | Die Datenbank-Anmeldung aller Dienste |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert, und die Zugangsdaten der Maschinen |
+| `FADEN_MCP_ENCRYPTION_KEY` | Die Zugangsdaten der MCP-Server |
+| `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Aufrufe des MCP-Dienstes. Ein Wert für alle drei |
+| `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Aufrufe des Skills-Dienstes. Ein Wert für alle drei |
+| `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 Hex-Zeichen: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Die API-Schlüssel, gespeicherten Schlüssel und Anmeldungen von Langfuse |
+| `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana |
+| `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | Den Message-Broker. Seine Benutzer stammen aus `rabbitmq/definitions.json`, die `faden deploy` daraus schreibt |
+
+Außerhalb der Entwicklung starten das Backend, das Gateway sowie der MCP- und der Skills-Dienst nicht mit den
+Entwicklungswerten, die mit dem Quellcode veröffentlicht sind, und sagen, was zu setzen ist.
+
+### Eine von Hand gestartete Installation vor Release 0.4.2 {#an-install-started-by-hand-before-release-042}
+
+Bis dahin griff die Compose-Datei auf feste Werte zurück, wenn die `.env` keinen hatte: für jede Installation
+dieselben, veröffentlicht mit dem Quellcode. Die meisten können Sie einfach auf neue Zufallswerte setzen. Diese
+hier versiegeln gespeicherte Daten, die nur mit dem Wert lesbar sind, unter dem sie gespeichert wurden: Setzen Sie
+sie auf den alten Wert.
+
+| Variable | Der alte Wert |
+|---|---|
+| `POSTGRES_PASSWORD` | `postgres`, oder ein neuer Wert, den Sie auch in Postgres setzen: `docker exec -i faden-postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<neuer Wert>'"` |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | `dev-settings-master-key-change-me` |
+| `FADEN_MCP_ENCRYPTION_KEY` | `dev-mcp-encryption-key-change-me-32b`, wenn MCP eingeschaltet war; sonst ein neuer Zufallswert |
+| `LANGFUSE_SALT` | `mysalt` |
+| `LANGFUSE_ENCRYPTION_KEY` | 64 Nullen |
+
+Mit dem alten Hauptschlüssel für Einstellungen oder dem alten MCP-Schlüssel setzen Sie zusätzlich
+`FADEN_ALLOW_PUBLISHED_KEYS=true`. Backend, Gateway und MCP starten dann damit und warnen bei jedem Start; ohne
+diese Einstellung verweigern sie den Start. `faden upgrade` tut das von selbst für eine Installation, deren `.env`
+einer dieser Schlüssel fehlt.
+
+Einen solchen Schlüssel später zu ändern macht unlesbar, was unter dem alten gespeichert ist; eine
+Neuverschlüsselung gibt es noch nicht. Unter einem neuen Hauptschlüssel für Einstellungen müssen die in der
+Konsole gespeicherten Geheimnisse (das Hugging-Face-Token, Anmeldeanbieter und Ähnliches) neu eingegeben werden,
+alle melden sich neu an, und die Maschinen müssen neu hinzugefügt werden. Unter einem neuen MCP-Schlüssel müssen
+die Zugangsdaten der MCP-Server neu eingegeben werden. Eine neue Installation hat nichts davon zu tun.
+
 ## Optionale Module {#optional-modules}
 
 Drei Module lassen sich zu den Kerndiensten hinzufügen: `pii` (findet und maskiert personenbezogene Daten), `mcp`
@@ -165,4 +215,6 @@ Mit `faden module disable pii` und anschließend `faden down` und `faden up` ent
 | **`The backend refused to create the administrator`** | Das Backend legt den ersten Administrator nur für den an, der das Bootstrap-Token der Installation mitschickt: `FADEN_BACKEND_BOOTSTRAP_TOKEN` in `~/fadenstack/.env`. `faden deploy` schreibt eines, wenn die `.env` keines hat. Einer Installation, die auf andere Weise gestartet wurde, kann es fehlen, und ein Backend, das vor dem Eintrag gestartet wurde, kennt es noch nicht: Führen Sie `faden up` und danach erneut `faden deploy` aus. |
 | **`Some images failed to pull.`** | Der Server konnte eine Registry nicht erreichen. Prüfen Sie seinen Internetzugang und Proxy und führen Sie dann `faden deploy` erneut aus. |
 | Der Browser lehnt das Zertifikat ab | Die Zertifizierungsstelle des Servers ist auf diesem Computer noch nicht als vertrauenswürdig eingetragen. Importieren Sie `~/fadenstack/tls/ca.crt`, oder verwenden Sie ein Zertifikat Ihres eigenen Ausstellers (siehe [HTTPS und Vertrauen](https.md)). |
-| Die Konsole meldet **„Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen“** | Der Schlüssel, der gespeicherte Geheimnisse verschlüsselt (unter anderem das Hugging-Face-Token), ist noch der Standardwert. `faden deploy` schreibt einen zufälligen in die `.env`; einer Installation, die auf andere Weise gestartet wurde, kann er fehlen. Setzen Sie `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` auf einen langen Zufallswert (z. B. die Ausgabe von `openssl rand -base64 48`) und führen Sie dann `faden up` aus. Geheimnisse, die unter dem alten Schlüssel gespeichert wurden, müssen Sie erneut eingeben. |
+| **`required variable ... is missing a value`** von `docker compose` | Der `.env` fehlt ein Passwort, Schlüssel oder Token, das die Compose-Datei verlangt. `faden upgrade` ergänzt sie; für eine von Hand gestartete Installation siehe [Geheimnisse in der .env](#secrets-in-env). |
+| Ein Dienst bricht beim Start ab mit **`... is the development default published with Fadenstack's source code`** | Backend, Gateway, MCP oder der Skills-Dienst hat einen veröffentlichten Entwicklungswert gefunden. Die Meldung sagt, was zu setzen ist; [Geheimnisse in der .env](#secrets-in-env) erklärt die Einzelheiten, auch für eine Installation, die Daten darunter gespeichert hat. |
+| Die Konsole meldet **„Dieser Server verwendet noch den Standard-Hauptschlüssel für Einstellungen“** | Die Installation läuft mit dem veröffentlichten Entwicklungsschlüssel, behalten mit `FADEN_ALLOW_PUBLISHED_KEYS=true`, weil ihre gespeicherten Geheimnisse damit versiegelt sind. Was ein Wechsel bedeutet, steht unter [Geheimnisse in der .env](#an-install-started-by-hand-before-release-042). |

@@ -563,6 +563,9 @@ def dev_init(
     env_path = shared_dir / ".env"
     if env_path.exists() and not force_env:
         warning(f".env already exists at {env_path} — skipping (use --force-env to regenerate).")
+        from faden_cli.commands.dev.dev_up import heal_dev_env
+
+        heal_dev_env(env_path)
     else:
         env_vars = dev_env_vars(profiles=profiles)
         write_env_file(env_path, env_vars)

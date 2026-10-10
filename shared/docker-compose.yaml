@@ -1,3 +1,10 @@
+# Secrets: this file has no fallback for any password, key or token. Each one
+# is ${NAME:?...}, and compose stops naming the first that .env lacks.
+# `faden deploy` writes them all at random; `faden upgrade` adds what a
+# release introduces. Started by hand, set them yourself (Help: Installing,
+# Secrets in .env). The services refuse the development values that are
+# published with the source code.
+#
 # The project name decides the volume names (fadenstack_pg_data, ...).
 # Fixed, so an install keeps its data whichever directory it runs from: a
 # source checkout's shared, or the directory `faden deploy`
@@ -73,7 +80,7 @@ services:
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-250}"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres} # CHANGEME
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       TZ: UTC
       PGTZ: UTC
@@ -104,7 +111,7 @@ services:
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse} # CHANGEME
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
@@ -126,11 +133,11 @@ services:
     container_name: faden-redis
     restart: unless-stopped
     command: >
-      --requirepass ${REDIS_AUTH:-myredissecret} --maxmemory-policy noeviction
+      --requirepass ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)} --maxmemory-policy noeviction
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_AUTH:-myredissecret}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}", "ping"]
       interval: 3s
       timeout: 10s
       retries: 10
@@ -143,7 +150,7 @@ services:
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret} # CHANGEME
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
     ports:
       - "127.0.0.1:9090:9000"
       - "127.0.0.1:9091:9001"
@@ -176,27 +183,27 @@ services:
       - "127.0.0.1:3030:3030"
     environment:
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
-      DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/langfuse} # CHANGEME
-      SALT: ${LANGFUSE_SALT:-mysalt} # CHANGEME
-      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000} # CHANGEME (openssl rand -hex 32)
+      DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}@postgres:5432/langfuse}
+      SALT: ${LANGFUSE_SALT:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       # Off: Langfuse reports usage to its makers unless told not to.
       TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
 
       CLICKHOUSE_MIGRATION_URL: ${CLICKHOUSE_MIGRATION_URL:-clickhouse://clickhouse:9000}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse} # CHANGEME
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_AUTH: ${REDIS_AUTH:-myredissecret} # CHANGEME
+      REDIS_AUTH: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
 
       # S3-compatible storage (MinIO)
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-langfuse}
       LANGFUSE_S3_EVENT_UPLOAD_REGION: ${LANGFUSE_S3_EVENT_UPLOAD_REGION:-auto}
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret} # CHANGEME
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: ${LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT:-http://minio:9000}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
@@ -204,7 +211,7 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${LANGFUSE_S3_MEDIA_UPLOAD_BUCKET:-langfuse}
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${LANGFUSE_S3_MEDIA_UPLOAD_REGION:-auto}
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret} # CHANGEME
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://minio:9000}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
@@ -231,27 +238,27 @@ services:
         condition: service_healthy
     environment:
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-mysecret} # CHANGEME
-      DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/langfuse} # CHANGEME
-      SALT: ${LANGFUSE_SALT:-mysalt} # CHANGEME
-      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000} # CHANGEME
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      DATABASE_URL: ${LANGFUSE_DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}@postgres:5432/langfuse}
+      SALT: ${LANGFUSE_SALT:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       # Off: Langfuse reports usage to its makers unless told not to.
       TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY_ENABLED:-false}
 
       CLICKHOUSE_MIGRATION_URL: ${CLICKHOUSE_MIGRATION_URL:-clickhouse://clickhouse:9000}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://clickhouse:8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse} # CHANGEME
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       CLICKHOUSE_CLUSTER_ENABLED: "false"
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_AUTH: ${REDIS_AUTH:-myredissecret} # CHANGEME
+      REDIS_AUTH: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
 
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-langfuse}
       LANGFUSE_S3_EVENT_UPLOAD_REGION: ${LANGFUSE_S3_EVENT_UPLOAD_REGION:-auto}
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret} # CHANGEME
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: ${LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT:-http://minio:9000}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
@@ -259,7 +266,7 @@ services:
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${LANGFUSE_S3_MEDIA_UPLOAD_BUCKET:-langfuse}
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${LANGFUSE_S3_MEDIA_UPLOAD_REGION:-auto}
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret} # CHANGEME
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://minio:9000}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
@@ -289,7 +296,7 @@ services:
       # Management/admin account — used for console login and as
       # fallback when definitions.json is absent (dev mode).
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USER:-admin}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASS:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       RABBITMQ_DEFAULT_VHOST: "/"
       # Limit Erlang schedulers and disable busy-wait to avoid CPU spin at idle.
       # -S 2:2  — 2 online schedulers (enough for a message broker)
@@ -324,7 +331,7 @@ services:
       FADEN_GATEWAY_DB_HOST: postgres
       FADEN_GATEWAY_DB_PORT: 5432
       FADEN_GATEWAY_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_GATEWAY_DB_BASE: faden_gateway
 
   # -----------------------------
@@ -364,7 +371,11 @@ services:
       # JWT secret is read from backend DB at startup (faden_gateway.jwt_secret system setting).
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
       FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend
-      FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # An install that has stored data under the published development key may
+      # keep it, with a warning at every start, until it is changed (Help:
+      # Installing, Secrets in .env). Outside development the service refuses it otherwise.
+      FADEN_GATEWAY_ALLOW_PUBLISHED_KEYS: ${FADEN_ALLOW_PUBLISHED_KEYS:-false}
       # The key chats are encrypted with at rest: messages, titles, memory, a
       # reply's events in Redis. `faden deploy` writes one into .env; it never
       # reached the gateway, and every install stored its chats in plain text
@@ -376,16 +387,16 @@ services:
       FADEN_GATEWAY_DB_HOST: postgres
       FADEN_GATEWAY_DB_PORT: 5432
       FADEN_GATEWAY_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_GATEWAY_DB_BASE: faden_gateway
       FADEN_GATEWAY_REDIS_HOST: redis
       FADEN_GATEWAY_REDIS_PORT: 6379
-      FADEN_GATEWAY_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_GATEWAY_REDIS_PASS: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_GATEWAY_REDIS_BASE: 1
       FADEN_GATEWAY_RABBIT_HOST: faden-rmq
       FADEN_GATEWAY_RABBIT_PORT: 5672
       FADEN_GATEWAY_RABBIT_USER: faden-gateway
-      FADEN_GATEWAY_RABBIT_PASS: ${RABBITMQ_API_PASS:-guest}
+      FADEN_GATEWAY_RABBIT_PASS: ${RABBITMQ_API_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_GATEWAY_RABBIT_VHOST: /
       FADEN_GATEWAY_LANGFUSE_ENABLED: ${FADEN_GATEWAY_LANGFUSE_ENABLED:-false}
       FADEN_GATEWAY_LANGFUSE_HOST: ${FADEN_GATEWAY_LANGFUSE_HOST:-http://langfuse-web:3000}
@@ -397,11 +408,11 @@ services:
       # MCP tool registry integration (set via .env or COMPOSE_PROFILES)
       FADEN_GATEWAY_MCP_ENABLED: ${FADEN_GATEWAY_MCP_ENABLED:-false}
       FADEN_GATEWAY_MCP_SERVICE_URL: ${FADEN_GATEWAY_MCP_SERVICE_URL:-http://faden-mcp:8000}
-      FADEN_GATEWAY_MCP_SERVICE_TOKEN: ${FADEN_GATEWAY_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_GATEWAY_MCP_SERVICE_TOKEN: ${FADEN_GATEWAY_MCP_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Skills registry integration (set via .env or COMPOSE_PROFILES)
       FADEN_GATEWAY_SKILLS_ENABLED: ${FADEN_GATEWAY_SKILLS_ENABLED:-false}
       FADEN_GATEWAY_SKILLS_SERVICE_URL: ${FADEN_GATEWAY_SKILLS_SERVICE_URL:-http://faden-skills:8000}
-      FADEN_GATEWAY_SKILLS_SERVICE_TOKEN: ${FADEN_GATEWAY_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      FADEN_GATEWAY_SKILLS_SERVICE_TOKEN: ${FADEN_GATEWAY_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Knowledge search runs in the backend. The default, 127.0.0.1:8000, is this container's own port:
       # every search reached the gateway itself and failed with 404.
       FADEN_GATEWAY_RAG_LITE_BACKEND_URL: ${FADEN_GATEWAY_RAG_LITE_BACKEND_URL:-http://faden-backend:8000}
@@ -441,7 +452,7 @@ services:
       FADEN_BACKEND_DB_HOST: postgres
       FADEN_BACKEND_DB_PORT: 5432
       FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_DB_BASE: faden_backend
 
   faden-backend:
@@ -481,21 +492,25 @@ services:
       FADEN_BACKEND_DB_HOST: postgres
       FADEN_BACKEND_DB_PORT: 5432
       FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_DB_BASE: faden_backend
       FADEN_BACKEND_REDIS_HOST: redis
       FADEN_BACKEND_REDIS_PORT: 6379
-      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_RABBIT_HOST: faden-rmq
       FADEN_BACKEND_RABBIT_PORT: 5672
       FADEN_BACKEND_RABBIT_USER: faden-backend
-      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
+      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_RABBIT_VHOST: /
       FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
-      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # An install that has stored data under the published development key may
+      # keep it, with a warning at every start, until it is changed (Help:
+      # Installing, Secrets in .env). Outside development the service refuses it otherwise.
+      FADEN_BACKEND_ALLOW_PUBLISHED_KEYS: ${FADEN_ALLOW_PUBLISHED_KEYS:-false}
       FADEN_BACKEND_LLM_GRAPH_DB_HOST: postgres
       FADEN_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_LOKI_BASE_URL: http://faden-loki:3100
       FADEN_BACKEND_COOKIE_SECURE: "false"
       USERS_SECRET: ${USERS_SECRET:-}
@@ -508,13 +523,13 @@ services:
       FADEN_BACKEND_INTERNAL_TOKEN: ${FADEN_BACKEND_INTERNAL_TOKEN:-}
       FADEN_BACKEND_MCP_ENABLED: ${FADEN_BACKEND_MCP_ENABLED:-false}
       FADEN_BACKEND_MCP_SERVICE_URL: ${FADEN_BACKEND_MCP_SERVICE_URL:-http://faden-mcp:8000}
-      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_SKILLS_ENABLED: ${FADEN_BACKEND_SKILLS_ENABLED:-false}
       FADEN_BACKEND_MAILER_SERVICE_URL: ${FADEN_BACKEND_MAILER_SERVICE_URL:-http://faden-mailer:8000}
       FADEN_BACKEND_AUTH_SERVICE_URL: ${FADEN_BACKEND_AUTH_SERVICE_URL:-http://faden-auth:8000}
       FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
       FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
-      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Scalability tuning (set via faden tune)
       FADEN_BACKEND_WORKERS_COUNT: ${FADEN_BACKEND_WORKERS_COUNT:-4}
       FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
@@ -586,21 +601,21 @@ services:
       FADEN_BACKEND_DB_HOST: postgres
       FADEN_BACKEND_DB_PORT: 5432
       FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_DB_BASE: faden_backend
       FADEN_BACKEND_REDIS_HOST: redis
       FADEN_BACKEND_REDIS_PORT: 6379
-      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_BACKEND_REDIS_PASS: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_RABBIT_HOST: faden-rmq
       FADEN_BACKEND_RABBIT_PORT: 5672
       FADEN_BACKEND_RABBIT_USER: faden-backend
-      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:-guest}
+      FADEN_BACKEND_RABBIT_PASS: ${RABBITMQ_BACKEND_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_RABBIT_VHOST: /
       FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
-      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:-dev-settings-master-key-change-me}
+      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_LLM_GRAPH_DB_HOST: postgres
       FADEN_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_LOKI_BASE_URL: http://faden-loki:3100
       FADEN_BACKEND_COOKIE_SECURE: "false"
       USERS_SECRET: ${USERS_SECRET:-}
@@ -610,12 +625,12 @@ services:
       FADEN_BACKEND_PII_SERVICE_URL: ${FADEN_BACKEND_PII_SERVICE_URL:-http://faden-pii:8000/api}
       FADEN_BACKEND_INTERNAL_TOKEN: ${FADEN_BACKEND_INTERNAL_TOKEN:-}
       FADEN_BACKEND_MCP_SERVICE_URL: ${FADEN_BACKEND_MCP_SERVICE_URL:-http://faden-mcp:8000}
-      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
+      FADEN_BACKEND_MCP_SERVICE_TOKEN: ${FADEN_BACKEND_MCP_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_MAILER_SERVICE_URL: ${FADEN_BACKEND_MAILER_SERVICE_URL:-http://faden-mailer:8000}
       FADEN_BACKEND_AUTH_SERVICE_URL: ${FADEN_BACKEND_AUTH_SERVICE_URL:-http://faden-auth:8000}
       FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
       FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
-      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Scalability tuning (set via faden tune)
       FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
       FADEN_BACKEND_DB_MAX_OVERFLOW: ${FADEN_BACKEND_DB_MAX_OVERFLOW:-5}
@@ -682,7 +697,7 @@ services:
       FADEN_PII_RABBIT_HOST: faden-rmq
       FADEN_PII_RABBIT_PORT: 5672
       FADEN_PII_RABBIT_USER: faden-pii
-      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
+      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_PII_RABBIT_VHOST: /
       # Scalability tuning (set via faden tune)
       FADEN_PII_WORKERS_COUNT: ${FADEN_PII_WORKERS_COUNT:-4}
@@ -714,7 +729,7 @@ services:
       FADEN_PII_RABBIT_HOST: faden-rmq
       FADEN_PII_RABBIT_PORT: 5672
       FADEN_PII_RABBIT_USER: faden-pii
-      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:-guest}
+      FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_PII_RABBIT_VHOST: /
 
   # =====================================================================
@@ -736,7 +751,7 @@ services:
       FADEN_MCP_DB_HOST: postgres
       FADEN_MCP_DB_PORT: 5432
       FADEN_MCP_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_MCP_DB_BASE: faden_mcp
 
   faden-mcp:
@@ -765,15 +780,19 @@ services:
       FADEN_MCP_DB_HOST: postgres
       FADEN_MCP_DB_PORT: 5432
       FADEN_MCP_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_MCP_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_MCP_DB_BASE: faden_mcp
       FADEN_MCP_REDIS_HOST: redis
       FADEN_MCP_REDIS_PORT: 6379
-      FADEN_MCP_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_MCP_REDIS_PASS: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_MCP_REDIS_BASE: 3
       FADEN_MCP_PII_SERVICE_URL: ${FADEN_MCP_PII_SERVICE_URL:-http://faden-pii:8000}
-      FADEN_MCP_SERVICE_TOKEN: ${FADEN_MCP_SERVICE_TOKEN:-dev-mcp-service-token-change-me}
-      FADEN_MCP_ENCRYPTION_KEY: ${FADEN_MCP_ENCRYPTION_KEY:-dev-mcp-encryption-key-change-me-32b}
+      FADEN_MCP_SERVICE_TOKEN: ${FADEN_MCP_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      FADEN_MCP_ENCRYPTION_KEY: ${FADEN_MCP_ENCRYPTION_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # An install that has stored data under the published development key may
+      # keep it, with a warning at every start, until it is changed (Help:
+      # Installing, Secrets in .env). Outside development the service refuses it otherwise.
+      FADEN_MCP_ALLOW_PUBLISHED_KEYS: ${FADEN_ALLOW_PUBLISHED_KEYS:-false}
       FADEN_MCP_WORKERS_COUNT: ${FADEN_MCP_WORKERS_COUNT:-1}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
@@ -802,7 +821,7 @@ services:
       FADEN_SKILLS_DB_HOST: postgres
       FADEN_SKILLS_DB_PORT: 5432
       FADEN_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_SKILLS_DB_BASE: faden_skills
 
   faden-skills:
@@ -831,13 +850,13 @@ services:
       FADEN_SKILLS_DB_HOST: postgres
       FADEN_SKILLS_DB_PORT: 5432
       FADEN_SKILLS_DB_USER: ${POSTGRES_USER:-postgres}
-      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:-postgres}
+      FADEN_SKILLS_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_SKILLS_DB_BASE: faden_skills
       FADEN_SKILLS_REDIS_HOST: redis
       FADEN_SKILLS_REDIS_PORT: 6379
-      FADEN_SKILLS_REDIS_PASS: ${REDIS_AUTH:-myredissecret}
+      FADEN_SKILLS_REDIS_PASS: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_SKILLS_REDIS_BASE: 4
-      FADEN_SKILLS_SERVICE_TOKEN: ${FADEN_SKILLS_SERVICE_TOKEN:-dev-skills-service-token-change-me}
+      FADEN_SKILLS_SERVICE_TOKEN: ${FADEN_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_SKILLS_WORKERS_COUNT: ${FADEN_SKILLS_WORKERS_COUNT:-1}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
@@ -912,7 +931,7 @@ services:
       - "${GRAFANA_BIND:-127.0.0.1}:3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin} # CHANGEME
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_SECURITY_COOKIE_SAMESITE: "disabled"
       GF_AUTH_ANONYMOUS_ENABLED: "true"

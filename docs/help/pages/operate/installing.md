@@ -46,7 +46,7 @@ Run `faden doctor` after installing the tool to check the host first.
 | Other names or addresses | With `generate`: names the console is reached by that the server does not know itself, such as `ai.example.internal`. Comma-separated, blank for none. |
 | A port to use instead | Only when port 80 or 443 is taken by something else. |
 | Admin email | The first administrator's sign-in. |
-| Admin password | Leave blank to have one generated. |
+| Admin password | At least 8 characters, and not the e-mail address. Leave blank to have one generated. |
 | Save to file? | Saves the credentials to `~/fadenstack/.bootstrap-credentials` (readable by you only). |
 | Back up every night? | Yes (the default) runs `faden backup` at 03:00 and keeps the last 7. See [Backups](backups.md). |
 
@@ -113,6 +113,53 @@ The data lives in Docker volumes named `fadenstack_*`, such as `fadenstack_pg_da
 Settings you change belong in `.env`. The other deployment files, such as `nginx/nginx.conf`, are replaced by the
 next upgrade.
 
+## Secrets in .env
+
+`faden deploy` writes every password, key and token the services need into `~/fadenstack/.env`, each one random
+and this install's own; `faden upgrade` adds the ones a new release needs. The compose file has no fallback for
+any of them: started without one, `docker compose` stops and names it ("required variable ... is missing a
+value").
+
+Started by hand with `docker compose` instead, set them yourself, each to a long random value of its own
+(`openssl rand -base64 48`):
+
+| Variable | What it protects |
+|---|---|
+| `POSTGRES_PASSWORD` | The database login every service uses |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores, and the machines' credentials |
+| `FADEN_MCP_ENCRYPTION_KEY` | The credentials of MCP servers |
+| `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Calls to the MCP service. One value for all three |
+| `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Calls to the skills service. One value for all three |
+| `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Langfuse's API keys, stored keys and sign-ins |
+| `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | The stores and Grafana |
+| `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | The message broker. Its users come from `rabbitmq/definitions.json`, which `faden deploy` writes from these |
+
+Outside development, the backend, the gateway and the MCP and skills services do not start on the development
+values that are published with the source code, and say what to set.
+
+### An install started by hand before release 0.4.2
+
+Until then the compose file fell back to fixed values when `.env` had none, the same for every install and
+published with the source code. Most of them you can simply set to new random values. These seal stored data,
+which is readable only with the value it was stored under: set them to the old value.
+
+| Variable | The old value |
+|---|---|
+| `POSTGRES_PASSWORD` | `postgres`, or a new value that you also set in Postgres: `docker exec -i faden-postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new value>'"` |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | `dev-settings-master-key-change-me` |
+| `FADEN_MCP_ENCRYPTION_KEY` | `dev-mcp-encryption-key-change-me-32b`, if MCP was on; otherwise a new random value |
+| `LANGFUSE_SALT` | `mysalt` |
+| `LANGFUSE_ENCRYPTION_KEY` | 64 zeros |
+
+With the old settings master key or MCP key, also set `FADEN_ALLOW_PUBLISHED_KEYS=true`. The backend, the gateway
+and MCP then start on it and warn at every start; without it they refuse. `faden upgrade` does the same by itself
+for an install whose `.env` lacks one of these keys.
+
+Changing such a key later makes what is stored under the old one unreadable; there is no re-encryption yet.
+Under a new settings master key, the secrets saved in the console (the Hugging Face token, sign-in providers and
+the like) have to be entered again, everyone signs in again, and the machines have to be added again. Under a
+new MCP key, the MCP servers' credentials have to be entered again. A new install has none of this to do.
+
 ## Optional modules
 
 Three modules can be added to the core services: `pii` (finds and masks personal data), `mcp` (tool servers for
@@ -157,4 +204,6 @@ faden up
 | **`The backend refused to create the administrator`** | The backend creates the first administrator only for whoever sends the install's bootstrap token, `FADEN_BACKEND_BOOTSTRAP_TOKEN` in `~/fadenstack/.env`. `faden deploy` writes one when `.env` has none. An install started some other way may lack it, and a backend started before it was set does not know it yet: run `faden up`, then `faden deploy` again. |
 | **`Some images failed to pull.`** | The server could not reach a registry. Check its internet access and proxy, then run `faden deploy` again. |
 | The browser refuses the certificate | The server's certificate authority is not trusted on that computer yet. Import `~/fadenstack/tls/ca.crt`, or use a certificate from your own issuer (see [HTTPS and trust](https.md)). |
-| The console says **"This server still uses the default settings master key"** | The key that seals stored secrets (the Hugging Face token, among others) is still the default. `faden deploy` writes a random one into `.env`; an install started some other way may lack it. Set `FADEN_BACKEND_SETTINGS_MASTER_KEY` in `~/fadenstack/.env` to a long random value (for example the output of `openssl rand -base64 48`), then run `faden up`. Secrets stored under the old key have to be entered again. |
+| **`required variable ... is missing a value`** from `docker compose` | `.env` lacks a password, key or token the compose file requires. `faden upgrade` adds them; for an install started by hand, see [Secrets in .env](#secrets-in-env). |
+| A service stops at start with **`... is the development default published with Fadenstack's source code`** | The backend, the gateway, MCP or the skills service found a published development value. The message says what to set; [Secrets in .env](#secrets-in-env) has the details, also for an install that has stored data under it. |
+| The console says **"This server still uses the default settings master key"** | The install runs on the published development key, kept with `FADEN_ALLOW_PUBLISHED_KEYS=true` because its stored secrets are sealed with it. See [Secrets in .env](#an-install-started-by-hand-before-release-042) for what changing it means. |

@@ -129,6 +129,10 @@ def main() -> None:
     # run from a checkout (faden dev up) gets it here, before any worker
     # imports LiteLLM.
     os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    # Outside development, not on a secret published with the source code.
+    from faden_gateway.published_secrets import refuse_published_secrets  # noqa: PLC0415
+
+    refuse_published_secrets(settings)
     set_multiproc_dir()
     ssl_kwargs = _build_uvicorn_ssl_kwargs()
     # When TLS is enabled, bind the configured HTTPS port instead of

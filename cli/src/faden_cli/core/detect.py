@@ -210,13 +210,16 @@ def detect_os() -> OSInfo:
     )
 
 
-def _run(cmd: list[str], *, timeout: int = 10) -> subprocess.CompletedProcess[str]:
+def _run(
+    cmd: list[str], *, timeout: int = 10, env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run a subprocess, capturing output."""
     return subprocess.run(  # noqa: S603
         cmd,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
 
 
@@ -431,8 +434,16 @@ def _published_ports(compose_file: Path, env_file: Path | None) -> list[tuple[in
     cmd = [docker, "compose", "-f", str(compose_file)]
     if env_file is not None and env_file.is_file():
         cmd += ["--env-file", str(env_file)]
+    # The compose file requires its secrets (${NAME:?...}) and stops without them, before
+    # deploy has written any. Ports do not depend on them: placeholders let it answer, and
+    # the real ones never reach this process's output.
+    import os  # noqa: PLC0415
+
+    from faden_cli.core.env_gen import REQUIRED_KEYS  # noqa: PLC0415
+
+    env = {**os.environ, **dict.fromkeys(REQUIRED_KEYS, "placeholder")}
     try:
-        out = _run([*cmd, "config", "--format", "json"], timeout=30)
+        out = _run([*cmd, "config", "--format", "json"], timeout=30, env=env)
         spec = json.loads(out.stdout or "{}") if out.returncode == 0 else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
