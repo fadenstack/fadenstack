@@ -249,7 +249,7 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
     * stale values for any known dev key (e.g. the per-service RabbitMQ
       user/pass from ``RABBITMQ_BACKEND_PASS`` — old files may carry the
       hard-coded ``guest/guest`` default that no longer exists on the
-      broker, or a ``HOST`` pinning the server to loopback) are rewritten;
+      broker) are rewritten (the bind address is ``_apply_bind_hosts``'s);
     * dev keys added in newer CLI versions that the file predates
       (``COOKIE_SECURE``, ``GATEWAY_URL``, …) are appended.
     """
@@ -271,11 +271,12 @@ def _ensure_backend_env(backend_dir: Path, workspace: Path) -> None:
 
     # Keys the CLI owns outright: a stale value gets rewritten in place.
     # (DB credentials are intentionally NOT here — a user-edited DB
-    # pass in the file must survive across `dev up` runs.)
+    # pass in the file must survive across `dev up` runs. The bind address,
+    # FADEN_BACKEND_HOST, is set on every run by _apply_bind_hosts.)
     rewrite = {
         k: v
         for k, v in desired.items()
-        if k in ("FADEN_BACKEND_HOST", "FADEN_BACKEND_RABBIT_USER", "FADEN_BACKEND_RABBIT_PASS")
+        if k in ("FADEN_BACKEND_RABBIT_USER", "FADEN_BACKEND_RABBIT_PASS")
     }
     # Keys added in newer CLI versions: appended if the file predates them.
     append = {
@@ -439,6 +440,30 @@ def _ensure_gateway_env(api_dir: Path, workspace: Path) -> None:
         for k, v in missing.items():
             fh.write(f"{k}={v}\n")
     info("Gateway .env completed with missing dev defaults.")
+
+
+def _apply_bind_hosts(backend_dir: Path, api_dir: Path, *, lan: bool) -> str:
+    """Where the backend and the gateway listen this run; the address, written into their ``.env``.
+
+    This machine only, unless *lan*: dev mode lets anyone sign in as the
+    administrator (dev-login, admin/admin), and on every interface that was
+    anyone on the network. Set on every run, so ``--lan`` lasts one run.
+    """
+    from faden_cli.core.registry import DEV_BIND_HOST, DEV_LAN_HOST
+
+    host = DEV_LAN_HOST if lan else DEV_BIND_HOST
+    for service_dir, key in ((backend_dir, "FADEN_BACKEND_HOST"), (api_dir, "FADEN_GATEWAY_HOST")):
+        env_path = service_dir / ".env"
+        if env_path.exists():
+            _apply_env(env_path, {key: host}, header="faden dev up: where it listens")
+    return host
+
+
+def _frontend_command(*, lan: bool) -> str:
+    """How the frontend dev server starts: on this machine only, or with ``--lan`` on every interface."""
+    from faden_cli.core.registry import DEV_LAN_HOST
+
+    return f"npm run dev -- --host {DEV_LAN_HOST}" if lan else "npm run dev"
 
 
 def _apply_env(env_path: Path, values: dict[str, str], *, header: str) -> bool:
@@ -1016,6 +1041,14 @@ def _stop_old_workers() -> None:
     show_default=True,
     help="Use sudo for systemd installation in node-agent provisioning.",
 )
+@click.option(
+    "--lan",
+    is_flag=True,
+    help=(
+        "Listen on every network interface instead of this machine only (backend, gateway, frontend). "
+        "Dev mode signs anyone in as the administrator: use it only on a network you trust."
+    ),
+)
 def dev_up(
     *,
     backend_only: bool,
@@ -1033,8 +1066,12 @@ def dev_up(
     local_node_advertise_host: str,
     local_node_enrollment_token: str,
     local_node_sudo: bool,
+    lan: bool = False,
 ) -> None:
     """Start backend, worker, and frontend dev servers.
+
+    They listen on this machine only (127.0.0.1): dev mode signs anyone in as
+    the administrator. ``--lan`` opens them to the network for one run.
 
     Each service launches in its own terminal window, or as a
     background process with a log file when no GUI is available
@@ -1086,6 +1123,17 @@ def dev_up(
     if not frontend_only:
         _ensure_gateway_env(api_dir, workspace)
         _ensure_module_envs(workspace, backend_dir, api_dir, running_modules)
+    _apply_bind_hosts(backend_dir, api_dir, lan=lan)
+    if lan:
+        warning(
+            "--lan: the backend, gateway and frontend listen on every interface. Dev mode signs anyone\n"
+            "  who reaches them in as the administrator (dev-login, admin/admin)."
+        )
+    elif local_node and local_node_host:
+        warning(
+            f"The backend listens on this machine only; {local_node_host} cannot reach it.\n"
+            "  Add --lan to open it to the network."
+        )
 
     # ── Shared infra ──────────────────────────────────────────────
     if not skip_infra and not frontend_only:
@@ -1204,7 +1252,7 @@ def dev_up(
             error(f"Frontend directory not found: {frontend_dir}")
         else:
             console.print("\n[cyan]Launching frontend…[/cyan]")
-            if _launch_terminal("Frontend", frontend_dir, "npm run dev", headless=headless):
+            if _launch_terminal("Frontend", frontend_dir, _frontend_command(lan=lan), headless=headless):
                 success("Frontend server → http://localhost:5173")
                 started.append("Frontend")
             else:

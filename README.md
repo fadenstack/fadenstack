@@ -185,7 +185,7 @@ pipx install ./cli
 faden deploy --build
 ```
 
-For working on Fadenstack itself, `faden dev init` and `faden dev up` run the services from source against a local stack, and `faden dev doctor` checks the tools they need.
+For working on Fadenstack itself, `faden dev init` and `faden dev up` run the services from source against a local stack, and `faden dev doctor` checks the tools they need. The dev services listen on 127.0.0.1 only, as development mode signs anyone in as the administrator; `faden dev up --lan` opens them to a network you trust.
 
 The agent is published as standalone binaries for Linux x86_64 and aarch64 (no Python needed on the machine); see [agent/README.md](agent/README.md).
 
