@@ -88,6 +88,8 @@ export default function ChatWindow({
     pendingApproval,
     answerApproval,
     toolNotices,
+    streamingNotes,
+    getReplyNotes,
     getResponseMs,
     send,
     retry,
@@ -181,7 +183,7 @@ export default function ChatWindow({
 
   useEffect(() => {
     followerRef.current?.keepUp();
-  }, [messages, streamingContent, streamingReasoning, toolNotices, pendingApproval, error]);
+  }, [messages, streamingContent, streamingReasoning, toolNotices, streamingNotes, pendingApproval, error]);
 
   const jumpToLatest = () => {
     followerRef.current?.follow();
@@ -269,6 +271,7 @@ export default function ChatWindow({
                 streaming={msg.status === "running"}
                 status={msg.status}
                 notice={msg.notice}
+                notes={msg.role === "assistant" ? getReplyNotes(msg.id) : undefined}
                 stopped={msg.status === "stopped"}
                 onRetry={msg.status === "stopped" ? onRetry : undefined}
               />
@@ -302,6 +305,7 @@ export default function ChatWindow({
               usage={streamingUsage}
               streaming
               reasoning={streamingReasoning || null}
+              notes={streamingNotes}
             />
           )}
 

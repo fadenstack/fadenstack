@@ -108,11 +108,24 @@ export interface ModelAlias {
    * every route was before the gateway could hold other kinds.
    */
   kind?: string | null;
+  /**
+   * Whether it takes pictures, when the gateway knows; null when it does not.
+   * A picture attached to a chat goes only to a model that takes pictures.
+   */
+  vision?: boolean | null;
 }
 
 /** Whether a model can hold a conversation: an embedding or rerank model cannot. */
 export function isChatModel(model: ModelAlias): boolean {
   return !model.kind || model.kind === "chat";
+}
+
+/** The file types the gateway takes as pictures (not read as text, sent as pictures). */
+const PICTURE_FILE = /\.(png|jpe?g|gif|webp)$/i;
+
+/** Whether an attached file is a picture, as the gateway decides it: by its name. */
+export function isPictureFile(name: string): boolean {
+  return PICTURE_FILE.test(name);
 }
 
 export interface Capacity {

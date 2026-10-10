@@ -1,11 +1,12 @@
 /**
  * Picking skills in the chat input: ``$`` and a name, the chips, ``/skill``.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { chatApi } from "~/api/chatClient";
+import type { ModelAlias } from "~/api/chatTypes";
 import type { SkillSummary } from "~/api/skills";
 import { ChatSkillsProvider, type ChatSkills } from "../hooks/useChatSkills";
 import ChatInput from "./ChatInput";
@@ -115,5 +116,57 @@ describe("ChatInput skills", () => {
     type(box, "/skill please");
     fireEvent.keyDown(box, { key: "Enter" });
     expect(onSend).toHaveBeenCalledWith("/skill please", []);
+  });
+});
+
+describe("ChatInput pictures", () => {
+  function model(vision: boolean | null | undefined): ModelAlias {
+    return { alias: "m", description: null, enabled: true, kind: "chat", vision };
+  }
+
+  /** The picker shows the chosen model once the list has come. */
+  async function modelListed() {
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveTextContent("m"));
+  }
+
+  function attach(...names: string[]) {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: names.map((name) => new File(["x"], name)) } });
+  }
+
+  it("says at the chip when the chosen model can't see a picture, before sending", async () => {
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([model(false)]);
+    renderInput(null);
+    await modelListed();
+    attach("cat.png", "notes.txt");
+
+    expect(await screen.findByTestId("picture-hint")).toHaveTextContent("This model can't see pictures");
+    const picture = screen.getByText("cat.png").closest(".MuiChip-root") as HTMLElement;
+    const text = screen.getByText("notes.txt").closest(".MuiChip-root") as HTMLElement;
+    expect(picture).toHaveAttribute("aria-describedby", screen.getByTestId("picture-hint").id);
+    expect(text).not.toHaveAttribute("aria-describedby");
+  });
+
+  it.each([
+    ["takes pictures", true],
+    ["is not known to take them or not", null],
+  ])("says nothing when the model %s", async (_, vision) => {
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([model(vision)]);
+    renderInput(null);
+    await modelListed();
+    attach("cat.png");
+
+    expect(await screen.findByText("cat.png")).toBeInTheDocument();
+    expect(screen.queryByTestId("picture-hint")).toBeNull();
+  });
+
+  it("says nothing about a file that is not a picture", async () => {
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([model(false)]);
+    renderInput(null);
+    await modelListed();
+    attach("report.pdf");
+
+    expect(await screen.findByText("report.pdf")).toBeInTheDocument();
+    expect(screen.queryByTestId("picture-hint")).toBeNull();
   });
 });

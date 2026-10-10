@@ -89,6 +89,8 @@
   "turn_interrupted": "El servidor se reinició mientras se escribía esta respuesta.",
   "turn_stopped": "Detenida",
   "jump_to_latest": "Ir al último mensaje",
+  "picture_not_sent": "{{file}} no se envió: {{model}} no admite imágenes. Elija un modelo que las admita.",
+  "picture_not_seen": "Este modelo no puede ver imágenes",
   "tips": {
     "title": "Consejos",
     "dismiss": "Entendido",

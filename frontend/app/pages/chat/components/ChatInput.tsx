@@ -15,6 +15,7 @@ import {
   type ChangeEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -33,6 +34,7 @@ import MenuList from "@mui/material/MenuList";
 import Paper from "@mui/material/Paper";
 import Popper from "@mui/material/Popper";
 import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -44,8 +46,10 @@ import BuildIcon from "@mui/icons-material/Build";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ImageNotSupportedOutlinedIcon from "@mui/icons-material/ImageNotSupportedOutlined";
 import { useTranslation } from "react-i18next";
 
+import { isPictureFile, type ModelAlias } from "~/api/chatTypes";
 import { filterSkills, mentionAt, type SkillSummary } from "~/api/skills";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { CHAT_NAV_ID, useChatShell } from "../ChatShellContext";
@@ -95,6 +99,11 @@ export default function ChatInput({
     if (draft) setText(draft.text);
   }, [draft]);
   const [files, setFiles] = useState<File[]>([]);
+  // The chosen model as the picker lists it: a picture it would not get is
+  // marked before sending (the gateway leaves it out and says so on the reply).
+  const [model, setModel] = useState<ModelAlias | null>(null);
+  const unseen = (file: File) => model?.vision === false && isPictureFile(file.name);
+  const pictureHintId = useId();
   const [focused, setFocused] = useState(false);
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
@@ -295,6 +304,7 @@ export default function ChatInput({
       onChange={onModelChange}
       size="small"
       compact={isPhone}
+      onSelected={setModel}
     />
   );
 
@@ -381,14 +391,38 @@ export default function ChatInput({
               />
             </Tooltip>
           ))}
-          {files.map((f, i) => (
-            <Chip
-              key={`${f.name}-${i}`}
-              label={f.name}
-              size="small"
-              onDelete={() => removeFile(i)}
-            />
-          ))}
+          {files.map((f, i) =>
+            unseen(f) ? (
+              <Chip
+                key={`${f.name}-${i}`}
+                label={f.name}
+                size="small"
+                color="warning"
+                variant="outlined"
+                icon={<ImageNotSupportedOutlinedIcon />}
+                aria-describedby={pictureHintId}
+                onDelete={() => removeFile(i)}
+              />
+            ) : (
+              <Chip
+                key={`${f.name}-${i}`}
+                label={f.name}
+                size="small"
+                onDelete={() => removeFile(i)}
+              />
+            ),
+          )}
+          {files.some(unseen) && (
+            <Typography
+              id={pictureHintId}
+              variant="caption"
+              color="warning.main"
+              data-testid="picture-hint"
+              sx={{ alignSelf: "center", px: 0.5 }}
+            >
+              {t("picture_not_seen", { ns: "chat", defaultValue: "This model can't see pictures" })}
+            </Typography>
+          )}
         </Box>
       )}
 

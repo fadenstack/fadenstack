@@ -169,6 +169,45 @@ describe("useChatStream", () => {
     expect(api.stopTurn).toHaveBeenCalledWith(SID, "turn-7");
   });
 
+  it("keeps on the reply the pictures the gateway did not send", async () => {
+    const leftOut = {
+      faden: {
+        type: "CUSTOM",
+        name: "faden.attachment_left_out",
+        value: {
+          // The page says it in the user's language; the gateway's words are for other clients.
+          attachmentId: "a1", filename: "cat.png", model: "text-only", reason: "no_vision", message: "(the gateway's words)",
+        },
+      },
+    };
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    async function* reader() {
+      yield { turn_id: "turn-1" };
+      yield leftOut;
+      yield { content: "I can't see it." };
+      await held;
+    }
+    api.streamChat.mockReturnValue({ reader: reader(), abort: vi.fn() });
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "text-only" }));
+    const note = "cat.png was not sent: text-only does not take pictures. Choose a model that does.";
+
+    let sending!: Promise<void>;
+    act(() => {
+      sending = result.current.send("What is in it?", "text-only");
+    });
+    await waitFor(() => expect(result.current.streamingNotes).toEqual([note]));
+    release();
+    await act(() => sending);
+
+    expect(result.current.streamingNotes).toEqual([]);
+    expect(result.current.messages.at(-1)).toMatchObject({ id: "turn-1", content: "I can't see it." });
+    expect(result.current.getReplyNotes("turn-1")).toEqual([note]);
+    expect(result.current.getReplyNotes("u1")).toEqual([]);
+  });
+
   it("shows a reply still being written as it streams, then as stored", async () => {
     const writing = message("turn-1", "assistant", "", { status: "running" });
     api.listMessages

@@ -89,6 +89,8 @@
   "turn_interrupted": "Le serveur a redémarré pendant la rédaction de cette réponse.",
   "turn_stopped": "Arrêtée",
   "jump_to_latest": "Aller au dernier message",
+  "picture_not_sent": "{{file}} n’a pas été envoyé : {{model}} ne prend pas en charge les images. Choisissez un modèle qui les prend en charge.",
+  "picture_not_seen": "Ce modèle ne peut pas voir les images",
   "tips": {
     "title": "Astuces",
     "dismiss": "Compris",

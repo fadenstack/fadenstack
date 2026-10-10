@@ -40,6 +40,8 @@ interface Props {
   status?: TurnStatus;
   /** What the user was told about a refused message; shown in its place. */
   notice?: string | null;
+  /** Files of the chat not sent with this reply's request, and why; shown under it. */
+  notes?: string[];
   /** A reply the user stopped: it says so. */
   stopped?: boolean;
   /** Tries the reply again (the chat's last one, stopped). */
@@ -61,6 +63,7 @@ export default function MessageBubble({
   reasoningMs = null,
   status = "complete",
   notice = null,
+  notes,
   stopped = false,
   onRetry,
 }: Props) {
@@ -186,6 +189,20 @@ export default function MessageBubble({
             />
           )}
         </Box>
+
+        {/* What was left out of the request: a picture the model cannot see */}
+        {notes && notes.length > 0 && (
+          <Box data-testid="reply-notes" sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 0.25 }}>
+            {notes.map((note, i) => (
+              <Box key={i} sx={{ display: "flex", gap: 0.5, alignItems: "flex-start" }}>
+                <InfoOutlinedIcon sx={{ fontSize: 14, mt: "2px", color: "info.main" }} />
+                <Typography variant="caption" color="text.secondary">
+                  {note}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
 
         {/* Footer: info tooltip + response time + token usage */}
         {!isUser && !streaming && !blocked && (

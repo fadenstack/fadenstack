@@ -23,6 +23,8 @@ interface Props {
   size?: "small" | "medium";
   /** A borderless-label pill for a phone's composer row. */
   compact?: boolean;
+  /** The chosen model as the list describes it (whether it takes pictures); null until it is listed. */
+  onSelected?: (model: ModelAlias | null) => void;
 }
 
 export default function ModelSelector({
@@ -30,6 +32,7 @@ export default function ModelSelector({
   onChange,
   size = "small",
   compact = false,
+  onSelected,
 }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -61,6 +64,11 @@ export default function ModelSelector({
       onChange(models[0].alias);
     }
   }, [models, value, onChange]);
+
+  const selected = models.find((m) => m.alias === value) ?? null;
+  useEffect(() => {
+    onSelected?.(selected);
+  }, [selected, onSelected]);
 
   const handleChange = (e: SelectChangeEvent) => {
     onChange(e.target.value);

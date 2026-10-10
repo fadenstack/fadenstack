@@ -89,6 +89,8 @@
   "turn_interrupted": "Der Server wurde neu gestartet, während diese Antwort geschrieben wurde.",
   "turn_stopped": "Angehalten",
   "jump_to_latest": "Zur neuesten Nachricht",
+  "picture_not_sent": "{{file}} wurde nicht gesendet: {{model}} kann keine Bilder lesen. Wählen Sie ein Modell, das Bilder lesen kann.",
+  "picture_not_seen": "Dieses Modell kann keine Bilder lesen",
   "tips": {
     "title": "Tipps",
     "dismiss": "Verstanden",

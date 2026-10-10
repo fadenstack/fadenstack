@@ -85,13 +85,30 @@ export interface PendingApproval {
   timeoutS: number | null;
 }
 
+/** A file of the chat the gateway did not send to the model (``faden.attachment_left_out``). */
+export interface LeftOutFile {
+  /** Why: ``no_vision``, a picture for a model that does not take pictures. */
+  reason: string;
+  file: string;
+  model: string;
+  /** The gateway's own words, for a reason the page does not know. */
+  message: string;
+}
+
 /** What a gateway event means for the page; ``null`` for the ones it does not show. */
 export function readFadenEvent(event: FadenEvent):
   | { kind: "approval"; approval: PendingApproval }
   | { kind: "denied"; notice: string }
+  | { kind: "left_out"; leftOut: LeftOutFile }
   | null {
   const value = (event.value ?? {}) as Record<string, unknown>;
   const text = (key: string) => (typeof value[key] === "string" ? (value[key] as string) : "");
+  if (event.name === "faden.attachment_left_out") {
+    return {
+      kind: "left_out",
+      leftOut: { reason: text("reason"), file: text("filename"), model: text("model"), message: text("message") },
+    };
+  }
   if (event.name === "faden.approval_required" && text("approvalId")) {
     return {
       kind: "approval",
@@ -134,6 +151,10 @@ export interface UseChatStreamReturn {
   answerApproval: (approved: boolean) => Promise<void>;
   /** Tools refused during the answer that streams (by the tool mode or a rule). */
   toolNotices: string[];
+  /** Files of the chat not sent with the answer that streams (a picture the model cannot see). */
+  streamingNotes: string[];
+  /** The same for a reply, once written (this page only; not saved). */
+  getReplyNotes: (msgId: string) => string[];
   /** Response time in ms for the last completed assistant message. */
   lastResponseMs: number | null;
   /** Get response time for a specific message id, if tracked. */
@@ -179,6 +200,20 @@ export function useChatStream({
   }, []);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [toolNotices, setToolNotices] = useState<string[]>([]);
+  const [streamingNotes, setStreamingNotes] = useState<string[]>([]);
+  const [replyNotes, setReplyNotes] = useState<Record<string, string[]>>({});
+  const noteOf = useCallback(
+    (left: LeftOutFile) =>
+      left.reason === "no_vision" && left.file
+        ? t("picture_not_sent", {
+            ns: "chat",
+            defaultValue: "{{file}} was not sent: {{model}} does not take pictures. Choose a model that does.",
+            file: left.file,
+            model: left.model,
+          })
+        : left.message,
+    [t],
+  );
   const onFaden = useCallback((event: FadenEvent) => {
     const read = readFadenEvent(event);
     if (read?.kind === "approval") setPendingApproval(read.approval);
@@ -265,6 +300,9 @@ export function useChatStream({
       let traceId: string | null = null;
       let turnId: string | null = turn;
       let finish: string | null = null;
+      const localId = `tmp-${Date.now()}-a`;
+      // Files of the chat the gateway did not send with this reply: shown on it.
+      const notes: string[] = [];
 
       const settle = () => {
         turnRef.current = null;
@@ -275,9 +313,14 @@ export function useChatStream({
         setStreamingUsage(null);
         setIsStreaming(false);
         abortRef.current = null;
+        setStreamingNotes([]);
+        if (notes.length > 0) {
+          const id = turnId ?? localId;
+          setReplyNotes((prev) => ({ ...prev, [id]: [...notes] }));
+        }
       };
       const reply = (status: ChatMessage["status"]): ChatMessage => ({
-        id: turnId ?? `tmp-${Date.now()}-a`,
+        id: turnId ?? localId,
         session_id: sid,
         role: "assistant",
         content: accumulated,
@@ -295,9 +338,15 @@ export function useChatStream({
       });
 
       setToolNotices([]);
+      setStreamingNotes([]);
       try {
         for await (const delta of handle.reader) {
           if (delta.faden) {
+            const read = readFadenEvent(delta.faden);
+            if (read?.kind === "left_out") {
+              notes.push(noteOf(read.leftOut));
+              setStreamingNotes([...notes]);
+            }
             onFaden(delta.faden);
             continue;
           }
@@ -410,7 +459,7 @@ export function useChatStream({
         }
       }
     },
-    [onSessionUpdated, onFaden],
+    [onSessionUpdated, onFaden, noteOf],
   );
 
   // Load existing messages for the current session
@@ -595,6 +644,8 @@ export function useChatStream({
     pendingApproval,
     answerApproval,
     toolNotices,
+    streamingNotes,
+    getReplyNotes: (msgId: string) => replyNotes[msgId] ?? [],
     messages,
     streamingContent,
     streamingReasoning,
