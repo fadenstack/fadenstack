@@ -196,6 +196,22 @@ class Settings(BaseSettings):
     # got the hardcoded path, found nothing, and was sent to GitHub.
     agent_binary_dir: str = DEFAULT_AGENT_BINARY_DIR
 
+    # The update check (services/updates): once a day the release feed on
+    # fadenstack.com is read -- a GET of a public file, nothing about this
+    # install is sent -- and administrators are shown what is newer. Defaults
+    # here; Settings > Updates (updates.*) overrides them.
+    updates_check_enabled: bool = True
+    updates_channel: str = "stable"
+    #: Empty: release_feed.FEED_URL. An internal mirror for a site without internet.
+    updates_feed_url: str = ""
+    #: An HTTP(S) proxy for the feed only; empty: none (HTTPS_PROXY in the environment still applies).
+    updates_proxy_url: str = ""
+    # What `faden deploy`/`upgrade` recorded in .env: the release the install
+    # runs (VERSION) and how the CLI was installed, for the upgrade commands
+    # the console shows. Empty for a source checkout.
+    install_release: str = ""
+    cli_installer: str = ""
+
     # Where runtime images are exported once for nodes to download. A file
     # has a length and can be resumed; a live ``docker save`` has neither.
     # Empty means a directory under the system temp dir. Each export is the

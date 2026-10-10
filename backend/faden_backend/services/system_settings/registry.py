@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from faden_backend.db.models.system_settings import SystemApplyScope
+from faden_backend.settings import settings
 
 SettingType = Literal["string", "int", "bool", "secret", "json", "enum"]
 
@@ -566,6 +567,67 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         description="An agent sign-in not used for this long ends.",
         is_secret=False,
         default=604800,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="updates.check_enabled",
+        type="bool",
+        category="updates",
+        group="update_check",
+        label="Check for new releases",
+        description=(
+            "Once a day, read the public list of Fadenstack releases and show administrators when an update "
+            "is out. Nothing about this server is sent: the list is fetched like any file and compared here."
+        ),
+        is_secret=False,
+        # What `faden deploy` asked (FADEN_UPDATE_CHECK in .env), until an administrator changes it here.
+        default=settings.updates_check_enabled,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="updates.channel",
+        type="enum",
+        category="updates",
+        group="update_check",
+        label="Release channel",
+        description=(
+            "stable: releases only. preview: release candidates too, to try a release before it is out."
+        ),
+        is_secret=False,
+        default="stable",
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+        enum_values=("stable", "preview"),
+    ),
+    SettingDefinition(
+        key="updates.feed_url",
+        type="string",
+        category="updates",
+        group="update_check",
+        label="Release list address",
+        description=(
+            "Where the list of releases is read. Empty: https://fadenstack.com/updates/v1/index.json. "
+            "For a site without internet, a copy on your own web server (index.json and index.json.sig, "
+            "copied as they are)."
+        ),
+        is_secret=False,
+        default="",
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="updates.proxy_url",
+        type="string",
+        category="updates",
+        group="update_check",
+        label="Proxy for the release list",
+        description=(
+            "An HTTP(S) proxy for reading the release list only, e.g. http://proxy.example:3128. Empty: none."
+        ),
+        is_secret=False,
+        default="",
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),
