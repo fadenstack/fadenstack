@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 # ── Built-in image presets ────────────────────────────────────────────
 # Always available; extra presets are loaded from the env-var setting.
+# NVIDIA only: Fadenstack supports NVIDIA GPUs, so no AMD (ROCm) image is
+# offered or recommended.
 
 _BUILTIN_PRESETS: list[dict[str, Any]] = [
     {
@@ -50,13 +52,6 @@ _BUILTIN_PRESETS: list[dict[str, Any]] = [
         "is_default": False,
     },
     {
-        "label": "vLLM (ROCm)",
-        "image": settings.default_vllm_rocm_image,
-        "vendor": "amd",
-        "description": "Default Docker Hub image for AMD GPUs (ROCm).",
-        "is_default": True,
-    },
-    {
         "label": "vLLM (NVIDIA ARM / Unified Memory)",
         "image": settings.default_vllm_nvidia_arm_image,
         "vendor": "nvidia_arm",
@@ -69,7 +64,6 @@ _BUILTIN_PRESETS: list[dict[str, Any]] = [
 _VLLM_IMAGES: dict[str, str] = {
     "nvidia": settings.default_vllm_image,
     "nvidia_arm": settings.default_vllm_nvidia_arm_image,
-    "amd": settings.default_vllm_rocm_image,
 }
 
 

@@ -6,7 +6,7 @@ YAML-driven configuration persisted in faden.yaml.
 Async HTTP calls to backend REST API via httpx.
 Native Docker Compose integration for orchestration.
 Automatic system detection for OS, GPU, and Docker.
-GPU vendor discovery supports NVIDIA and AMD ROCm.
+GPU machines run NVIDIA GPUs only.
 Rich terminal output with tables, panels, progress.
 Advanced TUI wizard powered by Textual framework.
 Module activation via Docker Compose profiles.
