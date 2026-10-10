@@ -63,11 +63,11 @@ Der **Tool mode** oben in der Seitenleiste legt fest, was ohne Nachfrage ausgef�
 |---|---|---|---|---|
 | Seite, Tabs, PDFs und Markierung lesen; suchen; zeigen, wo etwas steht | nein | läuft | läuft | läuft |
 | Ein Feld ausfüllen, in einen Editor schreiben, in die Zwischenablage kopieren, eine Seite öffnen | nein | nein | fragt | läuft |
-| Eine Schaltfläche drücken oder einem Link folgen | nein | nein | fragt | fragt |
+| Eine Schaltfläche drücken oder einem Link folgen | nein | nein | fragt, jedes Mal | fragt, jedes Mal |
 
 ![Eine Karte mit der Frage Run copy_to_clipboard?, die die zu kopierende Tabelle zeigt, mit den Schaltflächen Allow, Allow for this chat und Deny](../images/use/browser-agent-approval.png)
 
-Wenn er fragt, zeigt eine Karte **Run …?** mit der Aktion und dem, was sie bekommt. Wählen Sie **Allow**, **Allow for this chat** oder **Deny**.
+Wenn er fragt, zeigt eine Karte **Run …?** mit der Aktion und dem, was sie bekommt. Wählen Sie **Allow** (dieses eine Mal), **Allow for this chat** (bis Sie den Chat schließen oder wieder öffnen), **Allow always** (für diesen Agenten in diesem Browser) oder **Deny**. Eine Schaltfläche zu drücken, und alles, was Ihr Administrator zuerst erfragt haben will, bietet nur **Allow** und **Deny**: Er fragt jedes Mal. **Reset approvals** unten im Menü des Tool-Modus nimmt zurück, was Sie für den Chat und für immer erlaubt haben.
 
 ??? info "Was die Karte bei einem Feld oder einer Schaltfläche zeigt"
     Bei einem Feld oder einer Schaltfläche ist das, was die Aktion bekommt, ein interner Verweis der Seite, nicht ihre Beschriftung.
@@ -76,7 +76,7 @@ Wenn er fragt, zeigt eine Karte **Run …?** mit der Aktion und dem, was sie bek
 
 - Er liest nie den Inhalt einer Website, die Sie nicht erlaubt haben; nur die Titel und Adressen der Tabs dieses Fensters erreichen das Modell. Auf einer solchen Website zeigt die Leiste **The agent cannot read …**; wählen Sie **Allow on this site** (oder **All sites**), um es zu erlauben.
 - Er liest Passwortfelder und Kartenfelder, die die Website als solche kennzeichnet, nie aus und füllt sie nie aus. Ein Zahlungsfeld, das die Website nicht kennzeichnet, liest und füllt er wie jedes andere Feld.
-- Er drückt nie eine Schaltfläche wie **Senden**, ohne Sie gesondert zu fragen.
+- Er drückt nie eine Schaltfläche wie **Senden**, ohne Sie zu fragen, jedes Mal: Keine frühere Antwort gilt dafür.
 - Er ist angewiesen, nie Anweisungen von der Seite anzunehmen: Text auf einer Seite ist etwas zum Lesen, kein Befehl, dem er folgt. Eine Seite kann ein Modell trotzdem in die Irre führen; lesen Sie deshalb, worum eine Karte bittet, bevor Sie es erlauben.
 - Er greift nie auf Dateien auf Ihrem Computer zu, die Sie nicht hinzugefügt haben.
 
