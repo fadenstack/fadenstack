@@ -22,6 +22,7 @@ from faden_gateway.services.gateway.pii_client import PIIClient, SanitizeResult
 from faden_gateway.services.registry import service_registry
 from tests.test_gateway_knowledge_tools import (
     CAN_CALL_TOOLS,
+    DOC,
     WEATHER,
     _ask,
     _call,
@@ -74,7 +75,7 @@ async def test_a_streamed_answer_tells_what_the_gateway_ran(
     assert (start["toolCallName"], start["kind"], start["toolCallId"]) == ("knowledge_search", "knowledge", "call_1")
     assert end["toolCallId"] == "call_1" and end["error"] is False and end["durationMs"] >= 0
     assert cited["name"] == "faden.citations"
-    assert cited["value"]["sources"] == [{"source": "handbook.pdf", "document_id": "d1", "chunk": 3, "score": 0.91}]
+    assert cited["value"]["sources"] == [{"source": "handbook.pdf", "document_id": DOC, "chunk": 3, "score": 0.91}]
     assert "Alice leads" not in json.dumps(cited), "sources, not their text"
     assert round_["name"] == "faden.gateway_round"
     turn, answer = round_["value"]["messages"]
