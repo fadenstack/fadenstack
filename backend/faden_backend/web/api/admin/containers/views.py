@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
 from aiodocker.exceptions import DockerError
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -91,6 +91,23 @@ async def _lifecycle_user(
     return await require_permission("containers", permission)(user=user, rbac_dao=rbac_dao)
 
 
+async def _deny(
+    detail: str, metadata: dict[str, Any], *, audit: str, target_id: str, user: User, audit_dao: AuditDAO,
+) -> NoReturn:
+    """Refuse what needs Root Mode, audited at high severity."""
+    await audit_action(
+        action=audit,
+        target_type="container",
+        target_id=target_id,
+        result=AuditResult.DENY,
+        actor_id=user.id,
+        severity=_ROOT_MODE_SEVERITY,
+        audit_dao=audit_dao,
+        metadata_json=json.dumps(metadata),
+    )
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
 async def _refuse_host_access(
     reasons: list[str],
     *,
@@ -104,18 +121,58 @@ async def _refuse_host_access(
     """Refuse a container with root on the host unless Root Mode is on; the refusal is audited."""
     if not reasons or root_mode:
         return
-    await audit_action(
-        action=audit,
-        target_type="container",
-        target_id=target_id,
-        result=AuditResult.DENY,
-        actor_id=user.id,
-        severity=_ROOT_MODE_SEVERITY,
-        audit_dao=audit_dao,
-        metadata_json=json.dumps({"host_access": reasons}),
+    await _deny(
+        host_access.refusal(reasons, doing=doing), {"host_access": reasons},
+        audit=audit, target_id=target_id, user=user, audit_dao=audit_dao,
     )
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN, detail=host_access.refusal(reasons, doing=doing),
+
+
+#: Fadenstack's own containers: the console changes their class only in Root Mode.
+_SYSTEM_CLASSES = frozenset({ContainerClass.SYSTEM_CORE, ContainerClass.SYSTEM_AUX})
+
+
+async def _classification(
+    raw: dict[str, Any], container_id: str, registry_dao: ContainerRegistryDAO,
+) -> tuple[ContainerClass, ContainerPolicy]:
+    """The class and policy a container has now: its registry entry, or the class the list gives it by name.
+
+    The registry is keyed by the full id the list uses; a container named in
+    the path by its name or a short id has no entry of its own.
+    """
+    for key in dict.fromkeys((raw.get("Id") or container_id, container_id)):
+        if (entry := await registry_dao.get(key)) is not None:
+            return entry.container_class, entry.policy
+    return _classify_by_name((raw.get("Name") or "").lstrip("/"))[0], ContainerPolicy.FREE
+
+
+async def _refuse_system_change(
+    current: tuple[ContainerClass, ContainerPolicy],
+    container_class: ContainerClass,
+    policy: ContainerPolicy,
+    *,
+    root_mode: bool,
+    audit: str,
+    target_id: str,
+    user: User,
+    audit_dao: AuditDAO,
+) -> None:
+    """Refuse a new class for a system container, or unlocking one, unless Root Mode is on.
+
+    A system container made ``TENANT_APP`` may be exec'd into and deleted.
+    """
+    cls, old_policy = current
+    if root_mode or cls not in _SYSTEM_CLASSES:
+        return
+    if container_class != cls:
+        change = f"its class from {cls.value} to {container_class.value}"
+    elif old_policy == ContainerPolicy.LOCKED and policy != ContainerPolicy.LOCKED:
+        change = f"its policy from locked to {policy.value}"
+    else:
+        return
+    await _deny(
+        f"This is a {cls.value} container, one of Fadenstack's own: activate Root Mode to change {change}.",
+        {"class": [cls.value, container_class.value], "policy": [old_policy.value, policy.value]},
+        audit=audit, target_id=target_id, user=user, audit_dao=audit_dao,
     )
 
 
@@ -281,8 +338,9 @@ async def create_container(
 ) -> ContainerSummaryDTO:
     """Create a new container and register it in the classification registry.
 
-    One with root on the host (the Docker socket, a system folder, the host's
-    network) is made only in Root Mode.
+    One with root on the host (any host folder bound, the Docker socket among
+    them; the host's network) is made only in Root Mode. Named volumes need
+    nothing.
     """
     reasons = host_access.host_access(body.volumes, body.network)
     await _refuse_host_access(
@@ -483,7 +541,8 @@ async def update_container(
     exists. The new container has a new id; the old one is removed once the
     new one runs, and is back as it was if the new one cannot be made.
     A new container with root on the host, from the form or from what the
-    old one kept, is made only in Root Mode.
+    old one kept, is made only in Root Mode; so is a new class for a system
+    container.
     """
     try:
         enforcer.enforce(Action.UPDATE_CONFIG, entry.container_class, entry.policy, root_mode)
@@ -515,6 +574,11 @@ async def update_container(
     await _refuse_host_access(
         reasons, root_mode=root_mode, doing="change", audit="container.update",
         target_id=container_id, user=user, audit_dao=audit_dao,
+    )
+    # The new container takes the form's class: the same as registering it.
+    await _refuse_system_change(
+        await _classification(raw, container_id, registry_dao), body.container_class, body.policy,
+        root_mode=root_mode, audit="container.update", target_id=container_id, user=user, audit_dao=audit_dao,
     )
     image = await _image_of(docker, raw)
     old = recreate.own_settings(raw, image)
@@ -591,6 +655,8 @@ async def container_exec(
     Create an exec session and return its ID.
 
     The client should use the returned exec_id with a websocket connection.
+    A command in a container with root on the host is root on the host,
+    whatever the container's class: it runs only in Root Mode.
     """
     try:
         enforcer.enforce(Action.EXEC, entry.container_class, entry.policy, root_mode)
@@ -605,6 +671,14 @@ async def container_exec(
             audit_dao=audit_dao,
         )
         raise
+    try:
+        raw = await docker.inspect_container(container_id)
+    except DockerError as exc:
+        raise _docker_refused(exc, "The container could not be read") from None
+    await _refuse_host_access(
+        host_access.container_reasons(raw), root_mode=root_mode, doing="run commands in",
+        audit="container.exec", target_id=container_id, user=user, audit_dao=audit_dao,
+    )
 
     exec_id = await docker.create_exec(container_id, cmd=body.cmd, workdir=body.workdir)
 
@@ -780,6 +854,7 @@ async def register_container(
     # made TENANT_APP may be exec'd into): superusers only.
     user: User = Depends(require_superuser),
     docker: DockerService = Depends(get_docker),
+    root_mode: bool = Depends(get_root_mode_active),
     registry_dao: ContainerRegistryDAO = Depends(),
     audit_dao: AuditDAO = Depends(),
 ) -> ContainerSummaryDTO:
@@ -787,7 +862,10 @@ async def register_container(
     Manually classify/register a container in the server-side registry.
 
     Backend ignores any client-supplied dgx.* labels; only this endpoint
-    sets the authoritative container class.
+    sets the authoritative container class. A container with root on the
+    host (the Docker socket, a host folder, the host's network, ...) is
+    classified only in Root Mode, whatever the class: as ``TENANT_APP`` it
+    could be exec'd into. So is a system container given another class.
     """
     try:
         raw = await docker.inspect_container(container_id)
@@ -797,9 +875,21 @@ async def register_container(
             detail=f"Container {container_id!r} not found on engine.",
         ) from exc
 
+    # Under the full id the list and the other routes look it up by, also
+    # when the path names it by its name or a short id.
+    full_id: str = raw.get("Id") or container_id
     name = raw.get("Name", "").lstrip("/") or container_id[:12]
+    reasons = host_access.container_reasons(raw)
+    await _refuse_host_access(
+        reasons, root_mode=root_mode, doing="reclassify", audit="container.register",
+        target_id=full_id, user=user, audit_dao=audit_dao,
+    )
+    await _refuse_system_change(
+        await _classification(raw, container_id, registry_dao), body.container_class, body.policy,
+        root_mode=root_mode, audit="container.register", target_id=full_id, user=user, audit_dao=audit_dao,
+    )
     entry = await registry_dao.upsert(
-        container_id=container_id,
+        container_id=full_id,
         name=name,
         container_class=body.container_class,
         owner_scope=body.owner_scope,
@@ -810,24 +900,25 @@ async def register_container(
     await audit_action(
         action="container.register",
         target_type="container",
-        target_id=container_id,
+        target_id=full_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        severity="normal",
+        severity=_ROOT_MODE_SEVERITY if reasons else _severity(root_mode),
         audit_dao=audit_dao,
         metadata_json=json.dumps(
             {
                 "class": body.container_class.value,
                 "policy": body.policy.value,
                 "owner_scope": body.owner_scope,
+                **({"host_access": reasons} if reasons else {}),
             }
         ),
     )
 
     raw_list = await docker.list_containers(all_=True)
-    raw_c = next((c for c in raw_list if c.get("Id", "").startswith(container_id)), {})
+    raw_c = next((c for c in raw_list if c.get("Id", "") == full_id), {})
     return _container_summary_from_docker(
-        raw_c or {"Id": container_id, "Name": name},
+        raw_c or {"Id": full_id, "Name": name},
         entry.container_class,
         entry.policy,
         entry.owner_scope,

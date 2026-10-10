@@ -96,10 +96,22 @@ A container starts from an image on the server; creating one does not pull it.
     people should not see.
 
 Only a superuser creates, edits or reclassifies containers. A container that would have root on the server needs
-**Root Mode**: one that mounts the Docker socket, `/` or a system folder such as `/etc`, `/proc` or `/var/lib/docker`
-(or a folder that holds one), or that uses the `host` network or another container's network. Without Root Mode
-the console refuses it and says why. The same goes for an edit, also when the container already had such a mount or
-runs privileged.
+**Root Mode**: one that mounts a folder or file of the server (a host path such as `/srv/data`, `./config` or
+`C:\data`; the Docker socket, `/` and system folders such as `/etc` among them), or that uses the `host` network or
+another container's network. Without Root Mode the console refuses it and says why. Under **Volume Mounts**, give a
+name instead of a host path (`my-data`, not `/data/app`): Docker keeps a named volume for the container, and it needs
+no Root Mode. Only the time zone may be mounted read-only without it (`/etc/localtime`, `/etc/timezone`,
+`/usr/share/zoneinfo`, with `:ro`).
+
+??? info "More about what needs Root Mode"
+    - **Edit**: the new container keeps what the form does not show, so an edit needs Root Mode also when the
+      container runs privileged, shares the server's processes or memory, uses its devices (GPUs aside) or takes
+      another container's volumes. Most of Fadenstack's own containers mount files of the install, so an edit of
+      one needs Root Mode.
+    - **Exec** in a container that has any of the above needs Root Mode, whatever its class.
+    - **Class**: changing the class of a container that has any of the above, or of a `SYSTEM_CORE` or
+      `SYSTEM_AUX` container, needs Root Mode; so does unlocking a locked system container.
+    - Start, stop and restart need no Root Mode: they run nothing new in the container.
 
 ## Work with a container
 
@@ -111,7 +123,7 @@ Its page has three tabs:
 |---|---|
 | **Overview** | State, image, networks |
 | **Logs** | The **Last 300 lines**, to refresh or download |
-| **Exec** | Prepares a shell session in the container and shows its ID. There is no terminal on the page, and nothing in the console connects to the session yet. Exec needs the `TENANT_APP` class, or Root Mode |
+| **Exec** | Prepares a shell session in the container and shows its ID. There is no terminal on the page, and nothing in the console connects to the session yet. Exec needs the `TENANT_APP` class, or Root Mode; in a container with root on the server (a host path mounted, the Docker socket, ...) it needs Root Mode |
 
 Stop a container before you delete it: a running one is not deleted. Deleting asks for confirmation; the image stays
 under **Images**.

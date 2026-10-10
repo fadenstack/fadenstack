@@ -101,10 +101,25 @@ Sie zuerst einen **Testlauf**.
     die diese Personen nicht sehen sollen.
 
 Container erstellen, bearbeiten und neu klassifizieren kann nur ein Superuser. Ein Container, der Root-Rechte auf dem
-Server hätte, braucht den **Root-Modus**: einer, der den Docker-Socket, `/` oder einen Systemordner wie `/etc`,
-`/proc` oder `/var/lib/docker` einbindet (oder einen Ordner, der einen davon enthält), oder der das Netzwerk `host`
-oder das Netzwerk eines anderen Containers nutzt. Ohne Root-Modus lehnt die Konsole ihn ab und sagt, warum. Das gilt
-auch beim Bearbeiten, ebenso wenn der Container eine solche Einbindung schon hatte oder privilegiert läuft.
+Server hätte, braucht den **Root-Modus**: einer, der einen Ordner oder eine Datei des Servers einbindet (einen
+Host-Pfad wie `/srv/data`, `./config` oder `C:\data`; darunter auch den Docker-Socket, `/` und Systemordner wie
+`/etc`), oder der das Netzwerk `host` oder das Netzwerk eines anderen Containers nutzt. Ohne Root-Modus lehnt die
+Konsole ihn ab und sagt, warum. Geben Sie unter **Volume-Mounts** statt eines Host-Pfads einen Namen an (`my-data`,
+nicht `/data/app`): Docker legt dann ein benanntes Volume für den Container an, und das braucht keinen Root-Modus.
+Ohne ihn darf nur die Zeitzone schreibgeschützt eingebunden werden (`/etc/localtime`, `/etc/timezone`,
+`/usr/share/zoneinfo`, mit `:ro`).
+
+??? info "Mehr dazu, was den Root-Modus braucht"
+    - **Bearbeiten**: Der neue Container behält, was das Formular nicht zeigt. Deshalb braucht eine Bearbeitung den
+      Root-Modus auch, wenn der Container privilegiert läuft, die Prozesse oder den Speicher des Servers teilt,
+      dessen Geräte nutzt (GPUs ausgenommen) oder die Volumes eines anderen Containers übernimmt. Die meisten
+      eigenen Container von Fadenstack binden Dateien der Installation ein; sie zu bearbeiten, braucht daher den
+      Root-Modus.
+    - **Exec** in einem Container mit einem der genannten Punkte braucht den Root-Modus, gleich welcher Klasse.
+    - **Klasse**: Die Klasse eines Containers mit einem der genannten Punkte oder eines `SYSTEM_CORE`- oder
+      `SYSTEM_AUX`-Containers zu ändern, braucht den Root-Modus; ebenso das Entsperren eines gesperrten
+      Systemcontainers.
+    - Starten, Stoppen und Neustarten brauchen keinen Root-Modus: Sie führen im Container nichts Neues aus.
 
 ## Mit einem Container arbeiten {#work-with-a-container}
 
@@ -116,7 +131,7 @@ Seine Seite hat drei Tabs:
 |---|---|
 | **Übersicht** | Status, Image, Netzwerke |
 | **Logs** | **Letzte 300 Zeilen**, zum Aktualisieren oder Herunterladen |
-| **Exec** | Bereitet eine Shell-Sitzung im Container vor und zeigt ihre ID. Ein Terminal gibt es auf der Seite nicht, und noch verbindet sich nichts in der Konsole mit der Sitzung. Exec braucht die Klasse `TENANT_APP` oder den Root-Modus |
+| **Exec** | Bereitet eine Shell-Sitzung im Container vor und zeigt ihre ID. Ein Terminal gibt es auf der Seite nicht, und noch verbindet sich nichts in der Konsole mit der Sitzung. Exec braucht die Klasse `TENANT_APP` oder den Root-Modus; in einem Container mit Root-Rechten auf dem Server (ein eingebundener Host-Pfad, der Docker-Socket, ...) braucht es den Root-Modus |
 
 Stoppen Sie einen Container, bevor Sie ihn löschen: Ein laufender Container wird nicht gelöscht. Vor dem Löschen
 fragt die Konsole nach einer Bestätigung; das Image bleibt unter **Images** erhalten.
