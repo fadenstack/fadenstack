@@ -181,6 +181,19 @@ def max_protective_action(
     return floor_action if floor_action in FAIL_ACTION_ORDER else "block"
 
 
+def _strengthened_threshold(floor: float, requested: float | None) -> float:
+    """The score threshold an override that may only strengthen ends up with.
+
+    A detection counts only when its score reaches the threshold, so a *lower*
+    threshold finds more and a higher one finds less: the override can only go
+    down from the floor. It stays above zero, which the PII service reads as
+    "use my default".
+    """
+    if requested is None:
+        return floor
+    return min(floor, max(requested, 0.01))
+
+
 def clamp_and_merge(
     floor: PIIPolicy,
     override: SessionPIIOverride,
@@ -265,7 +278,7 @@ def clamp_and_merge(
 
         presidio = PIIPresidioConfig(
             language=floor.presidio.language,
-            threshold=max(floor.presidio.threshold, override.presidio_threshold or 0.0),
+            threshold=_strengthened_threshold(floor.presidio.threshold, override.presidio_threshold),
             entities=merged_entities,
         )
 

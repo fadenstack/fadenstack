@@ -79,7 +79,7 @@ your installation uses others):
 ![The Privacy tab of the chat's side panel: protection of requests to cloud and to local models, the mode and the fail action, telemetry, and the detection threshold and entities](../images/use/chat-privacy-tab.png){ width="280" }
 
 - A person can make the policy **stricter** for one chat in the chat's **Privacy** panel: more types, a
-  higher threshold, local models scanned too.
+  lower threshold (it then masks more), local models scanned too.
 - Switching between `redact` and `tokenize_reversible` is not a stricter setting but a different one, so a
   chat may do it only when **Let chats and agents change the PII mode** is on (**Privacy (PII) → Tenant
   Policies**, off by default).

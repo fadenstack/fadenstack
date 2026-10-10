@@ -96,3 +96,30 @@ describe("a new chat's local choice", () => {
     expect(applyOverride(FLOOR, { egress_mode: "tokenize_reversible" }, true).egress.mode).toBe("tokenize_reversible");
   });
 });
+
+describe("the score threshold", () => {
+  const withThreshold = normalizePIIPolicy({
+    egress: { enabled_for_cloud: true, mode: "redact", fail_action: "block" },
+    presidio: { threshold: 0.5, entities: ["EMAIL_ADDRESS"] },
+  });
+
+  it("only goes down from the policy's value without the weaken right", () => {
+    show(policy({ floor: withThreshold, effective: withThreshold }));
+    const slider = screen.getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuemax", "0.5");
+    expect(slider).toHaveAttribute("aria-valuemin", "0.01");
+  });
+
+  it("may go anywhere with the weaken right", () => {
+    show(policy({ floor: withThreshold, effective: withThreshold, can_weaken: true }));
+    const slider = screen.getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuemax", "1");
+    expect(slider).toHaveAttribute("aria-valuemin", "0");
+  });
+
+  it("is applied locally as the stricter value unless weakening is allowed", () => {
+    expect(applyOverride(withThreshold, { presidio_threshold: 1 }, false, false).presidio.threshold).toBe(0.5);
+    expect(applyOverride(withThreshold, { presidio_threshold: 0.2 }, false, false).presidio.threshold).toBe(0.2);
+    expect(applyOverride(withThreshold, { presidio_threshold: 1 }, false, true).presidio.threshold).toBe(1);
+  });
+});
