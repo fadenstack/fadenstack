@@ -9,6 +9,44 @@ newer runtime. Each is a separate step that you start; nothing upgrades itself.
 | A machine's agent | Run the install line again on the machine | Nothing: the agent restarts, the models keep running |
 | A cluster's runtime | **Runtime** on the cluster's page | Every model on that cluster, while it loads again |
 
+## How you hear about a new release
+
+Once a day the server reads the public list of Fadenstack releases, `https://fadenstack.com/updates/v1/index.json`.
+Nothing about your server is sent: the list is fetched like any file and compared on the server. When a newer
+release is out, the administrators see it:
+
+| Where | What |
+|---|---|
+| **Updates** in the console | The release this server runs, the newest one and what it fixes, the commands to run for this install, and what each part runs: the services, every machine's agent, every cluster's runtime |
+| **Needs attention** on the dashboard | An item for each newer release; a release that fixes security problems as a warning |
+| A banner on the console's pages | For a release that fixes security problems, and when the release this server runs no longer gets fixes |
+| E-mail | One message to the administrators for a release that fixes security problems, when e-mail is set up |
+| The `faden` command | One line after a command, at most once a day: `Fadenstack <new> is available` |
+
+Nothing is installed by itself: you run the commands, as described below.
+
+??? info "More about the update check"
+    - `faden deploy` asks whether to check; `--update-check` or `--no-update-check` answers without asking.
+      Change it later in the console under **Settings**, **Updates** (**Check for new releases**), and for the
+      command line with `update_check: false` in `faden.yaml` or `FADEN_NO_UPDATE_CHECK=1`.
+    - **Release channel** `preview` also announces release candidates, to try a release before it is out.
+    - The list is signed. The server and `faden` accept only a list signed by the Fadenstack project, and never
+      an older list than the one they have, so a changed list can neither hide a release nor invent one.
+    - `faden version` and `faden doctor` check at once and say how to upgrade.
+    - Some releases cannot be skipped. **Updates** and `faden version` then name the releases to install one after
+      the other, and `faden upgrade` refuses to skip one.
+    - On a command line that is not a terminal (scripts, the backup timer) `faden` says nothing.
+
+### A server without internet access
+
+- **Behind a proxy:** set **Proxy for the release list** under **Settings**, **Updates**.
+- **With a web server of your own:** copy `index.json` and `index.json.sig` from `https://fadenstack.com/updates/v1/`
+  to it, unchanged, and set **Release list address** to the copy's address.
+- **With neither:** download the two files on another computer and upload them on **Updates**, under **No internet
+  on this server?**
+
+Or switch the check off: **Updates** still shows what each part of the install runs.
+
 ## Before you start
 
 - **Free disk space.** The new images need a few GB, a new runtime image up to about 15 GB per kind of machine,
@@ -23,6 +61,9 @@ newer runtime. Each is a separate step that you start; nothing upgrades itself.
     ```bash
     pipx upgrade fadenstack        # or: uv tool upgrade fadenstack
     ```
+
+    **Updates** in the console shows this command for the way the tool was installed on this server, and the
+    exact version when a release cannot be skipped.
 
 2. See what the upgrade would do:
 
@@ -185,6 +226,8 @@ over instead of creating it again (see [Taking over clusters](taking-over.md)). 
 |---|---|
 | **`These containers have names this installation uses, but it did not create them`** | A container with one of Fadenstack's names was made some other way, by hand or by another compose project. The message lists them and the command to remove them (`docker rm -f <name>`). Removing a container keeps its data volumes. Then run the upgrade again. |
 | **`This CLI (<version>) is older than the install (<version>).`** | The tool is older than the release the install runs. Upgrade the tool first. |
+| **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | A release in between cannot be skipped. Install the tool of the release named, run `faden upgrade`, then install the newer tool and run `faden upgrade` again. The message gives the commands. |
+| **Updates** says the release list could not be read | The server has no internet, or needs a proxy. See [A server without internet access](#a-server-without-internet-access). |
 | **`Backup failed — aborting upgrade.`** | Usually a full disk, or Postgres not running. Free space, check `faden status`, and run it again. Use `--no-backup` only if you have a current backup. |
 | **`Backend did not become healthy within 120 s.`** | The services were restarted but the console API does not answer yet. Read `faden logs faden-backend`. The maintenance page is lifted anyway, so whatever runs can be reached. |
 | **`... this release names a build that is on no registry.`** | A runtime image for one kind of machine is not published. The upgrade is not affected and running clusters keep their images. A machine of that kind can still get the image from another machine of its cluster that holds it. |

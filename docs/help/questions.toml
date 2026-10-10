@@ -145,6 +145,9 @@
 
 ["operate/upgrading.md"]
 "How do I upgrade Fadenstack?" = "upgrade-the-server"
+"How do I know when a new version is out?" = "how-you-hear-about-a-new-release"
+"Does the update check send data about my server?" = "how-you-hear-about-a-new-release"
+"How do I check for updates without internet access?" = "a-server-without-internet-access"
 "How do I update the agents on the GPU machines?" = "update-the-machines-agents"
 "How do I go back to the previous version?" = "going-back"
 

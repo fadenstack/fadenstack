@@ -45,6 +45,7 @@ Run `faden doctor` after installing the tool to check the host first.
 | **HTTPS** | `generate` (the default): a certificate made on this server for its names and addresses. `own`: your certificate and key as PEM files. `off`: plain HTTP. |
 | Other names or addresses | With `generate`: names the console is reached by that the server does not know itself, such as `ai.example.internal`. Comma-separated, blank for none. |
 | A port to use instead | Only when port 80 or 443 is taken by something else. |
+| Check for new releases? | Yes (the default): once a day the server and `faden` read the public list of releases and tell the administrators when one is out. Nothing about the server is sent. See [Upgrading](upgrading.md#how-you-hear-about-a-new-release). |
 | Admin email | The first administrator's sign-in. |
 | Admin password | Leave blank to have one generated. |
 | Save to file? | Saves the credentials to `~/fadenstack/.bootstrap-credentials` (readable by you only). |
@@ -55,7 +56,7 @@ The credentials are shown once. Store them in a password manager.
 ### Without questions
 
 `faden deploy -y` asks nothing: HTTPS with a certificate made here, the administrator `admin@localhost` with a
-generated password, saved to `~/fadenstack/.bootstrap-credentials`, and the nightly backup on. Store the
+generated password, saved to `~/fadenstack/.bootstrap-credentials`, the nightly backup and the update check on. Store the
 credentials somewhere safe, then delete that file.
 
 Choices can be given up front:

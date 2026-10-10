@@ -143,6 +143,9 @@
 
 ["operate/upgrading.md"]
 "Wie aktualisiere ich Fadenstack?" = "upgrade-the-server"
+"Woher weiß ich, dass eine neue Version erschienen ist?" = "how-you-hear-about-a-new-release"
+"Sendet die Update-Prüfung Daten über meinen Server?" = "how-you-hear-about-a-new-release"
+"Wie prüfe ich auf Updates ohne Internetzugang?" = "a-server-without-internet-access"
 "Wie aktualisiere ich die Agenten auf den GPU-Maschinen?" = "update-the-machines-agents"
 "Wie gehe ich zur vorherigen Version zurück?" = "going-back"
 
