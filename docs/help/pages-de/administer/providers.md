@@ -64,7 +64,7 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
 
 | In der Zeile des Providers | Was es tut |
 |---|---|
-| **Bearbeiten** | Ändert **Name**, **Endpunkt-URL**, **API-Schlüssel** und **Modell** sowie den Schalter **Tools des Gateways anbieten**. |
+| **Bearbeiten** | Ändert **Name**, **Endpunkt-URL**, **API-Schlüssel** und **Modell** sowie die Schalter **Tools des Gateways anbieten** und **Bilder aus dem Chat an dieses Modell senden**. |
 | **Stopp** | Beendet das Senden von Anfragen an ihn, ohne ihn zu entfernen; **Start** sendet sie wieder. |
 | **Löschen** | Entfernt einen gestoppten Provider. Das lässt sich nicht rückgängig machen. |
 
@@ -73,6 +73,10 @@ für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
     werden. Schalten Sie ihn für ein Modell oder einen Router aus, der keine Tools aufruft; beim kostenlosen
     Router von OpenRouter z. B. werden die Anfragen dann kürzer, und der Router kann unter allen kostenlosen
     Modellen wählen.
+
+    **Bilder aus dem Chat an dieses Modell senden** gilt ebenso für Bilder, die im Chat angehängt werden.
+    Schalten Sie ihn für ein Modell aus, das keine Bilder lesen kann: Der Chat lässt sie dann weg und sagt es
+    unter der Antwort, statt dass die Antwort fehlschlägt.
 
 ![Der Preisdialog des Modells eines Providers: „Eingabepreis“ und „Ausgabepreis“ in USD pro 1 Mio. Tokens, mit „Speichern“](../images/administer/provider-set-price.png)
 

@@ -60,7 +60,7 @@ with the same key.
 
 | In the provider's row | What it does |
 |---|---|
-| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key** and the **Model**, and the switch **Offer the gateway's tools**. |
+| **Edit** | Changes the **Name**, the **Endpoint URL**, the **API Key** and the **Model**, and the switches **Offer the gateway's tools** and **Send the chat's pictures to this model**. |
 | **Stop** | Stops sending requests to it without removing it; **Start** sends them again. |
 | **Delete** | Removes a stopped provider. It cannot be undone. |
 
@@ -68,6 +68,10 @@ with the same key.
     That switch decides whether the model is offered the time, the tool search and the chat's MCP tools.
     Switch it off for a model or a router that does not call tools; with OpenRouter's free router, for
     example, requests are then shorter and the router can choose among all free models.
+
+    **Send the chat's pictures to this model** works the same way for pictures attached in the chat. Switch
+    it off for a model that cannot read pictures: the chat then leaves them out and says so under the reply,
+    instead of the reply failing.
 
 ![The price dialog of a provider's model: Input price and Output price in USD per 1M tokens, with Save](../images/administer/provider-set-price.png)
 

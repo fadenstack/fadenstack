@@ -123,6 +123,8 @@ export interface Provider {
    * remote API is offered them.
    */
   calls_tools?: boolean | null;
+  /** Whether the chat's pictures are sent to its model: false leaves them out; null: not known (sent). */
+  sees_pictures?: boolean | null;
   /**
    * What owns this provider, when something does. `"inference_deployment"`
    * means a deployment created it and will remove it with itself — it cannot
@@ -286,6 +288,8 @@ export interface UpdateProviderPayload {
   extra_params?: Record<string, unknown> | null;
   /** false: no gateway tools for this model; null: as its kind decides. */
   calls_tools?: boolean | null;
+  /** false: the chat's pictures are left out for this model; null: not known (sent). */
+  sees_pictures?: boolean | null;
 }
 
 export interface DownloadModelPayload {

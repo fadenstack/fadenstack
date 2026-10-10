@@ -721,3 +721,31 @@ async def test_a_remote_model_can_be_left_without_the_gateways_tools(
     resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"calls_tools": None})
     assert resp.json()["calls_tools"] is None
     assert published[-1]["tools"] is None
+
+
+async def test_a_remote_model_can_be_marked_as_taking_no_pictures(
+    client, fastapi_app, dbsession, superuser, llm_service, monkeypatch,
+) -> None:
+    """The chat leaves a picture out for a model that takes none: the route has to say so (2026-10-10)."""
+    published: list[dict] = []
+
+    async def publish(**kwargs):
+        published.append(kwargs)
+
+    monkeypatch.setattr(llm_service.gateway_sync, "publish_runtime", publish)
+    provider, _runtime = await _litellm_remote(
+        dbsession, litellm_model="deepseek/deepseek-v4.1-flash", remote_model="deepseek/deepseek-v4.1-flash",
+    )
+    fastapi_app.dependency_overrides[current_active_user] = lambda: superuser
+
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"sees_pictures": False})
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["sees_pictures"] is False
+    assert resp.json()["remote_model"] == "deepseek/deepseek-v4.1-flash", "the rest of its capabilities kept"
+    assert [p["vision"] for p in published] == [False], "its route says so, and the gateway leaves pictures out"
+
+    # Back to not known: pictures are sent again.
+    resp = await client.patch(f"/api/llm/providers/{provider.id}", json={"sees_pictures": None})
+    assert resp.json()["sees_pictures"] is None
+    assert published[-1]["vision"] is None
+    assert resp.json()["calls_tools"] is None, "the tools setting untouched"

@@ -121,6 +121,7 @@ export default function ProvidersPage() {
   const [editApiKey, setEditApiKey] = useState("");
   const [editRemoteModel, setEditRemoteModel] = useState("");
   const [editCallsTools, setEditCallsTools] = useState(true);
+  const [editSeesPictures, setEditSeesPictures] = useState(true);
 
   // ── Derived data ─────────────────────────────────────────────────
   const runtimeByProvider = useMemo(() => {
@@ -189,6 +190,10 @@ export default function ProvidersPage() {
         // Off is said; on goes back to the default, which offers them to a remote API.
         if (editCallsTools !== (editTarget.calls_tools !== false)) {
           payload.calls_tools = editCallsTools ? null : false;
+        }
+        // The same for pictures: off leaves them out of the chat's turns; on goes back to not known (sent).
+        if (editSeesPictures !== (editTarget.sees_pictures !== false)) {
+          payload.sees_pictures = editSeesPictures ? null : false;
         }
       }
       await providers.update(editTarget.id, payload);
@@ -484,6 +489,7 @@ export default function ProvidersPage() {
                   setEditApiKey("");
                   setEditRemoteModel(r.provider.remote_model ?? "");
                   setEditCallsTools(r.provider.calls_tools !== false);
+                  setEditSeesPictures(r.provider.sees_pictures !== false);
                 }}
               >
                 <EditIcon fontSize="small" />
@@ -641,6 +647,18 @@ export default function ProvidersPage() {
             />
             <Typography variant="caption" color="text.secondary" sx={{ mt: "0 !important" }}>
               {t("llm_providers.calls_tools_help")}
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editSeesPictures}
+                  onChange={(e) => setEditSeesPictures(e.target.checked)}
+                />
+              }
+              label={t("llm_providers.sees_pictures")}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: "0 !important" }}>
+              {t("llm_providers.sees_pictures_help")}
             </Typography>
           </Stack>
         )}

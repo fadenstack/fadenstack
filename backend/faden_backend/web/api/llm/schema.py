@@ -103,6 +103,9 @@ class ProviderUpdateRequest(BaseModel):
     #: Whether the model is offered the gateway's tools (the time, the tool
     #: search, MCP). null: as the route's kind says -- a remote API is.
     calls_tools: bool | None = None
+    #: Whether the model is sent the chat's pictures. false: they are left out and
+    #: the chat says so; null: not known, they are sent.
+    sees_pictures: bool | None = None
 
 
 class ManagedByDTO(BaseModel):
@@ -166,6 +169,8 @@ class ProviderDTO(BaseModel):
     extra_params: dict | None = None
     #: Offered the gateway's tools: true, false, or null (as its kind says).
     calls_tools: bool | None = None
+    #: Sent the chat's pictures: true, false, or null (not known: sent).
+    sees_pictures: bool | None = None
     #: What owns this provider, when something does. ``inference_deployment``
     #: means a deployment created it and will remove it; the screen shows it
     #: differently and refuses edits, because they would not survive the next

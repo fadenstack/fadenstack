@@ -1146,7 +1146,9 @@
     "price_remove": "Remove price",
     "endpoint_url_filled": "{{provider}}'s address, filled in for you. Change it only for a proxy.",
     "calls_tools": "Offer the gateway's tools",
-    "calls_tools_help": "The time, the tool search and the chat's MCP tools. Switch it off for a model or router that does not call tools: OpenRouter's free router then chooses among all free models, and each request is about 440 tokens shorter."
+    "calls_tools_help": "The time, the tool search and the chat's MCP tools. Switch it off for a model or router that does not call tools: OpenRouter's free router then chooses among all free models, and each request is about 440 tokens shorter.",
+    "sees_pictures": "Send the chat's pictures to this model",
+    "sees_pictures_help": "Switch it off for a model that cannot read pictures: the chat then leaves them out and says so, instead of the reply failing."
   },
   "llm_models": {
     "title": "LLM Models",

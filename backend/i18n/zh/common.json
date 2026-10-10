@@ -1151,7 +1151,9 @@
     "price_remove": "移除价格",
     "endpoint_url_filled": "已为您填入 {{provider}} 的地址。仅在使用代理时修改。",
     "calls_tools": "向模型提供网关的工具",
-    "calls_tools_help": "时间、工具搜索以及聊天的 MCP 工具。对于不调用工具的模型或路由请关闭：OpenRouter 的免费路由随后会在所有免费模型中选择，且每个请求约少 440 个 token。"
+    "calls_tools_help": "时间、工具搜索以及聊天的 MCP 工具。对于不调用工具的模型或路由请关闭：OpenRouter 的免费路由随后会在所有免费模型中选择，且每个请求约少 440 个 token。",
+    "sees_pictures": "将聊天中的图片发送给此模型",
+    "sees_pictures_help": "对于无法读取图片的模型请关闭：聊天会略过图片并加以说明，而不是让回复失败。"
   },
   "llm_models": {
     "title": "LLM 模型",

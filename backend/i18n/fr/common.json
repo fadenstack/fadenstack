@@ -1146,7 +1146,9 @@
     "price_remove": "Supprimer le prix",
     "endpoint_url_filled": "L'adresse de {{provider}}, remplie pour vous. Ne la modifiez que pour un proxy.",
     "calls_tools": "Proposer les outils de la passerelle",
-    "calls_tools_help": "L'heure, la recherche d'outils et les outils MCP du chat. Désactivez-le pour un modèle ou un routeur qui n'appelle pas d'outils : le routeur gratuit d'OpenRouter choisit alors parmi tous les modèles gratuits, et chaque requête est plus courte d'environ 440 tokens."
+    "calls_tools_help": "L'heure, la recherche d'outils et les outils MCP du chat. Désactivez-le pour un modèle ou un routeur qui n'appelle pas d'outils : le routeur gratuit d'OpenRouter choisit alors parmi tous les modèles gratuits, et chaque requête est plus courte d'environ 440 tokens.",
+    "sees_pictures": "Envoyer les images du chat à ce modèle",
+    "sees_pictures_help": "Désactivez-le pour un modèle qui ne lit pas les images : le chat les laisse de côté et le signale, au lieu que la réponse échoue."
   },
   "llm_models": {
     "title": "Modèles LLM",

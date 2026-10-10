@@ -172,6 +172,12 @@ def calls_tools(capabilities: dict | None) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def sees_pictures(capabilities: dict | None) -> bool | None:
+    """Whether the provider's model is sent the chat's pictures; None: not known (they are sent)."""
+    value = capabilities.get("vision") if isinstance(capabilities, dict) else None
+    return value if isinstance(value, bool) else None
+
+
 def _provider_to_dto(
     provider: LLMProvider,
     owners: "dict[str, ManagedByDTO] | None" = None,
@@ -181,6 +187,7 @@ def _provider_to_dto(
     update: dict[str, Any] = {
         "remote_model": _extract_remote_model(provider.capabilities),
         "calls_tools": calls_tools(provider.capabilities),
+        "sees_pictures": sees_pictures(provider.capabilities),
     }
     if provider.source_kind and owners:
         owner = owners.get(str(provider.source_id))
@@ -767,6 +774,18 @@ async def update_provider(
             next_capabilities["tools"] = body.calls_tools
         capabilities_changed = True
 
+    # Whether the gateway sends it the chat's pictures. False leaves them out and
+    # the chat names them; null goes back to not known (sent).
+    if "sees_pictures" in body.model_fields_set:
+        if next_capabilities is None:
+            base = existing.capabilities if isinstance(existing.capabilities, dict) else {}
+            next_capabilities = dict(base)
+        if body.sees_pictures is None:
+            next_capabilities.pop("vision", None)
+        else:
+            next_capabilities["vision"] = body.sees_pictures
+        capabilities_changed = True
+
     # Normalised as on create, so the gateway does not ask for /v1/v1/...
     endpoint_url = _normalize_base_url(body.endpoint_url) if body.endpoint_url else body.endpoint_url
     provider = await provider_dao.update(
@@ -805,6 +824,7 @@ async def update_provider(
     # (which drops the old one) and asked for by it upstream.
     routing_fields = {
         "endpoint_url", "api_key", "litellm_provider", "litellm_model", "extra_params", "calls_tools",
+        "sees_pictures",
     }
     routing_changed = bool(routing_fields & body.model_fields_set) or renamed
     if existing.target == ProviderTarget.REMOTE_ENDPOINT and routing_changed:

@@ -1151,7 +1151,9 @@
     "price_remove": "Preis entfernen",
     "endpoint_url_filled": "Die Adresse von {{provider}}, für Sie eingetragen. Nur für einen Proxy ändern.",
     "calls_tools": "Tools des Gateways anbieten",
-    "calls_tools_help": "Die Uhrzeit, die Tool-Suche und die MCP-Tools des Chats. Für ein Modell oder einen Router, der keine Tools aufruft, ausschalten: Der kostenlose Router von OpenRouter wählt dann unter allen kostenlosen Modellen, und jede Anfrage ist etwa 440 Tokens kürzer."
+    "calls_tools_help": "Die Uhrzeit, die Tool-Suche und die MCP-Tools des Chats. Für ein Modell oder einen Router, der keine Tools aufruft, ausschalten: Der kostenlose Router von OpenRouter wählt dann unter allen kostenlosen Modellen, und jede Anfrage ist etwa 440 Tokens kürzer.",
+    "sees_pictures": "Bilder aus dem Chat an dieses Modell senden",
+    "sees_pictures_help": "Für ein Modell, das keine Bilder lesen kann, ausschalten: Der Chat lässt sie dann weg und sagt es, statt dass die Antwort fehlschlägt."
   },
   "llm_models": {
     "title": "LLM-Modelle",
