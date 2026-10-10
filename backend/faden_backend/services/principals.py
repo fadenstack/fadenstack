@@ -17,6 +17,8 @@ from faden_backend.db.models.users import User
 
 #: How many users and how many groups a search returns at most.
 SEARCH_LIMIT = 10
+#: The fewest characters (after trimming) a search looks for.
+MIN_QUERY = 2
 
 
 class PrincipalOption(BaseModel):
@@ -25,6 +27,19 @@ class PrincipalOption(BaseModel):
     type: str
     id: str
     label: str
+
+
+#: The escape character of ``contains_pattern``'s patterns.
+LIKE_ESCAPE = "\\"
+
+
+def contains_pattern(text: str) -> str:
+    r"""An ``ILIKE`` pattern for *text* anywhere, where ``%``, ``_`` and ``\`` match themselves.
+
+    Use it with ``escape=LIKE_ESCAPE``.
+    """
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 def parse_ids(ids: str) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
@@ -47,7 +62,10 @@ def parse_ids(ids: str) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
 async def find_principals(
     session: AsyncSession, *, q: str | None = None, ids: str | None = None,
 ) -> list[PrincipalOption]:
-    """Groups, then users: those named by *ids*, else those matching *q* (active users only)."""
+    """Groups, then users: those named by *ids*, else those matching *q* (active users only).
+
+    *q* is taken literally, and shorter than ``MIN_QUERY`` it finds nobody.
+    """
     users: list[User] = []
     groups: list[Group] = []
     if ids:
@@ -56,13 +74,13 @@ async def find_principals(
             users = list((await session.execute(select(User).where(User.id.in_(wanted_users)))).scalars())
         if wanted_groups:
             groups = list((await session.execute(select(Group).where(Group.id.in_(wanted_groups)))).scalars())
-    elif q and q.strip():
-        pattern = f"%{q.strip()}%"
+    elif q and len(q.strip()) >= MIN_QUERY:
+        pattern = contains_pattern(q.strip())
         users = list(
             (
                 await session.execute(
                     select(User)
-                    .where(User.is_active.is_(True), User.email.ilike(pattern))
+                    .where(User.is_active.is_(True), User.email.ilike(pattern, escape=LIKE_ESCAPE))
                     .order_by(User.email)
                     .limit(SEARCH_LIMIT),
                 )
@@ -72,7 +90,12 @@ async def find_principals(
             (
                 await session.execute(
                     select(Group)
-                    .where(or_(Group.name.ilike(pattern), Group.description.ilike(pattern)))
+                    .where(
+                        or_(
+                            Group.name.ilike(pattern, escape=LIKE_ESCAPE),
+                            Group.description.ilike(pattern, escape=LIKE_ESCAPE),
+                        ),
+                    )
                     .order_by(Group.name)
                     .limit(SEARCH_LIMIT),
                 )
