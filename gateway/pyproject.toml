@@ -43,7 +43,7 @@ dependencies = [
   "taskiq>=0.11.10",
   "taskiq-fastapi>=0.5.0",  # >=0.5.0: starts the app by its lifespan; 0.4 called router.startup(), gone in Starlette 1.x
   "taskiq-redis>=1.0.2",
-  "taskiq-aio-pika>=0.4.1",
+  "taskiq-aio-pika>=0.6.1",  # >=0.6.1: 0.6.0 pulled in aiostream, which is GPL-3.0-or-later
   "aiofiles>=24.1.0",
   # Local text extraction for chat attachments when Docling is absent or fails
   # (services/gateway/extraction.py); the same libraries as the backend's fallback.
