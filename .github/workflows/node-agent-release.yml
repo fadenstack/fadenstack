@@ -90,6 +90,14 @@ jobs:
           docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/faden-agent-${{ matrix.platform }}" license > "$RUNNER_TEMP/agent-license.txt"
           sed -n '1,5p' "$RUNNER_TEMP/agent-license.txt"
           grep -q 'Apache License' "$RUNNER_TEMP/agent-license.txt"
+          grep -q 'license --third-party' "$RUNNER_TEMP/agent-license.txt"
+          # And the licences of what it bundles: the packages (certifi is
+          # MPL-2.0), Python, the Debian libraries, PyInstaller's bootloader.
+          docker run --rm -v "$PWD/dist:/d:ro" debian:bookworm-slim "/d/faden-agent-${{ matrix.platform }}" license --third-party > "$RUNNER_TEMP/agent-third-party.txt"
+          for text in 'Mozilla Public License' 'The interpreter and its standard library' 'libssl3' 'Bootloader Exception'; do
+            grep -q "$text" "$RUNNER_TEMP/agent-third-party.txt" || { echo "::error::Third-party notices lack: $text"; exit 1; }
+          done
+          test -s "$BIN.THIRD-PARTY-NOTICES.txt"
           sha256sum "$BIN" | awk '{print $1}' > "$BIN.sha256"
 
       - uses: actions/upload-artifact@v4
@@ -98,6 +106,7 @@ jobs:
           path: |
             ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}
             ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}.sha256
+            ${{ env.AGENT_DIR }}/dist/faden-agent-${{ matrix.platform }}.THIRD-PARTY-NOTICES.txt
           retention-days: 30
 
   release:
@@ -118,7 +127,9 @@ jobs:
           generate_release_notes: true
           body: |
             Fadenstack-authored agent code is licensed under Apache-2.0.
-            Bundled dependencies retain their own licenses.
+            Bundled dependencies retain their own licenses: each binary's
+            `.THIRD-PARTY-NOTICES.txt` carries their texts, and
+            `faden-agent license --third-party` prints the same.
 
             Standalone agent binaries for Linux, no Python needed. Machines normally
             get them through the install line on the Fadenstack **Machines → Add a

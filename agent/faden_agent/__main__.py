@@ -929,15 +929,37 @@ def _emit(text: str) -> None:
         print()
 
 
-def cmd_license() -> None:
+_THIRD_PARTY_NOTICES = "THIRD-PARTY-NOTICES.txt"
+
+
+def cmd_license(third_party: bool = False) -> None:
     """Print the licence and attribution notice this build carries.
 
     The agent is Apache-2.0 and ships a NOTICE with the licence's
     section 7 permission; both have to reach whoever receives it. The
     binary bundles both files; this is how somebody holding only the
     binary reads them.
+
+    The binary also carries a Python, the agent's packages and a few system
+    libraries, each under its own licence. build-binary.sh bundles their
+    texts as THIRD-PARTY-NOTICES.txt; ``third_party`` prints that instead.
     """
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    notices = base / _THIRD_PARTY_NOTICES
+
+    if third_party:
+        if notices.is_file():
+            _emit(notices.read_text(encoding="utf-8").rstrip())
+        elif getattr(sys, "frozen", False):
+            # PyInstaller run by hand instead of through build-binary.sh.
+            # Never imply notices whose text we cannot actually produce.
+            print("This binary was built without its third-party notices.", file=sys.stderr)
+            sys.exit(1)
+        else:
+            _emit("faden-agent is installed here as a Python package, not as the binary:")
+            _emit("its dependencies are installed beside it, each with its own licence.")
+        return
+
     shown = False
     for name in ("NOTICE", "LICENSE"):
         path = base / name
@@ -949,6 +971,10 @@ def cmd_license() -> None:
         shown = True
 
     if shown:
+        if notices.is_file():
+            _emit("")
+            _emit("This binary also contains third-party software under its own licences;")
+            _emit("`faden-agent license --third-party` prints them.")
         return
 
     # Never imply a licence whose text we cannot actually produce.
@@ -1841,7 +1867,12 @@ def main() -> None:
     )
     sub.add_parser("stop", help="Stop and remove the background service")
     sub.add_parser("status", help="Show background service status")
-    sub.add_parser("license", help="Show licence and attribution for this build")
+    p_license = sub.add_parser("license", help="Show licence and attribution for this build")
+    p_license.add_argument(
+        "--third-party",
+        action="store_true",
+        help="Show the licences of the third-party software bundled with this build",
+    )
 
     args = parser.parse_args()
 
@@ -1869,7 +1900,7 @@ def main() -> None:
     elif args.command == "status":
         cmd_status()
     elif args.command == "license":
-        cmd_license()
+        cmd_license(third_party=args.third_party)
 
 
 if __name__ == "__main__":

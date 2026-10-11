@@ -105,9 +105,10 @@ jobs:
             count=0
             for asset in downloads/*; do
               # Not packages: checksums, earlier SBOMs, PyPI's publish attestations,
-              # and the signed release list (index.json and its signature).
+              # the signed release list (index.json and its signature), and the
+              # binaries' third-party notices.
               case "$asset" in
-                *.sha256|*.spdx.json|*.attestation|*.sig|*/SHA256SUMS|*/index.json) continue ;;
+                *.sha256|*.spdx.json|*.attestation|*.sig|*/SHA256SUMS|*/index.json|*.THIRD-PARTY-NOTICES.txt) continue ;;
               esac
               name=$(basename "$asset")
               case "$asset" in
