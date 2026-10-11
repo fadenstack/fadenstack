@@ -128,15 +128,16 @@ jobs:
           files: artifacts/*
 
   pypi:
-    # Optional: only when the repository has a PyPI token. The binaries above
-    # are what installs use; this must never hold them back. The token is the
-    # CLI's (PYPI_API_TOKEN), so it must be allowed to upload faden-agent too.
+    # The binaries above are what installs use; this must never hold them back.
+    # Trusted publishing: PyPI accepts this job's OIDC token for this workflow
+    # in the `pypi` environment, which only release tags may use.
     needs: [version, release]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/node-agent-v')
-    env:
-      TWINE_USERNAME: __token__
-      TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write  # PyPI's trusted publishing
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,22 +145,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build and upload
-        if: env.TWINE_PASSWORD != ''
+      - name: Build
         working-directory: ${{ env.AGENT_DIR }}
-        shell: bash
         run: |
-          set -o pipefail
-          pip install --upgrade build twine
+          pip install --upgrade build
           python -m build
-          # PyPI's reason becomes an annotation: the job log needs a GitHub
-          # sign-in, annotations are public (the 0.1.13 upload failed with
-          # nothing but "exit code 1" readable). --skip-existing lets a
-          # release be run again once the version is on PyPI.
-          if ! twine upload --non-interactive --skip-existing dist/* 2>&1 | tee twine.log; then
-            echo "::error title=PyPI refused faden-agent::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
-            exit 1
-          fi
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ env.AGENT_DIR }}/dist/
+          # A release can be run again once the version is on PyPI.
+          skip-existing: true
 
   sbom:
     needs: [version, release]

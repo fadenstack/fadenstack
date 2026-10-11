@@ -27,7 +27,7 @@ series: []
 releases:
   - version: 0.4.2
     channel: stable
-    date: ""
+    date: "2026-10-11"
     severity: security
     summary: >-
       Security fixes: API tokens expire and can be revoked, the setup token lasts an hour, devices are

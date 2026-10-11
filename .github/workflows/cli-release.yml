@@ -15,8 +15,8 @@
 # (cli-v* tags still publish the CLI alone, for a CLI-only fix; the images of
 # the version it pins must already exist.)
 #
-# Optional: PYPI_API_TOKEN also publishes fadenstack to PyPI. A private GitHub
-# release still works without it and carries the wheel and standalone binaries.
+# PyPI publishing is trusted publishing: PyPI trusts this workflow file in the
+# `pypi` environment of fadenstack/fadenstack, so no token is stored anywhere.
 #
 # Needed: UPDATE_FEED_SIGNING_KEY signs the release feed (job feed). Optional:
 # FEED_DEPLOY_SSH_KEY, FEED_DEPLOY_HOST, FEED_DEPLOY_KNOWN_HOSTS put it on fadenstack.com.
@@ -153,8 +153,12 @@ jobs:
     needs: [build, images-exist]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    env:
-      PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+    # Trusted publishing: PyPI accepts this job's OIDC token for this workflow
+    # in this environment, which only release tags may use.
+    environment: pypi
+    permissions:
+      contents: write  # the GitHub release
+      id-token: write  # PyPI's trusted publishing
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -162,19 +166,9 @@ jobs:
           path: dist
 
       - name: Publish to PyPI
-        if: env.PYPI_TOKEN != ''
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        shell: bash
-        run: |
-          set -o pipefail
-          pip install --upgrade twine
-          # PyPI's reason as a public annotation; the log needs a sign-in.
-          if ! twine upload --non-interactive dist/* 2>&1 | tee twine.log; then
-            echo "::error title=PyPI refused fadenstack::$(grep -E 'HTTPError|ERROR|Forbidden|Bad Request|allowed|Invalid|scope' twine.log | tail -4 | tr '\n' ' ')"
-            exit 1
-          fi
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -189,11 +183,11 @@ jobs:
             licensed under Apache-2.0. Third-party packages and images retain
             their own terms; see LICENSE, NOTICE, and docs/help/pages/operate/third-party.md.
 
-            The wheel and standalone binaries are attached to this release.
-            PyPI publication runs when `PYPI_API_TOKEN` is configured.
+            The wheel and standalone binaries are attached to this release; the
+            same version is on PyPI.
 
             ```bash
-            pipx install ./fadenstack-${{ needs.build.outputs.version }}-py3-none-any.whl
+            pipx install fadenstack==${{ needs.build.outputs.version }}
             faden deploy
             ```
             Runs the images `${{ env.REGISTRY }}/*:${{ needs.build.outputs.version }}`.
