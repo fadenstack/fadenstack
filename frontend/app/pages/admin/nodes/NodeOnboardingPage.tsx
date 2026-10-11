@@ -133,11 +133,14 @@ function CopyLine({ command }: { command: string }) {
 }
 
 /** "3 × GB10 · aarch64" — enough to recognise the box you are standing at. */
-function hardwareSummary(capabilities: Record<string, unknown>): string {
+export function hardwareSummary(capabilities: Record<string, unknown>): string {
   const gpu = (capabilities.gpu ?? {}) as Record<string, unknown>;
   const count = Number(capabilities.gpu_count ?? 0);
-  const family = String(gpu.family ?? gpu.model ?? gpu.name ?? "").trim();
-  const vendor = String(gpu.vendor ?? "").trim();
+  // The agent names each device (gpu.devices[].name: "NVIDIA GB10"); nothing at the top
+  // level, so the card said "1 × accelerator" for a DGX Spark.
+  const first = (Array.isArray(gpu.devices) ? gpu.devices[0] : undefined) as Record<string, unknown> | undefined;
+  const family = String(gpu.family ?? gpu.model ?? gpu.name ?? first?.name ?? "").trim();
+  const vendor = String(gpu.vendor ?? first?.vendor ?? "").trim();
   const arch = String(capabilities.machine ?? "").trim();
 
   const parts: string[] = [];
