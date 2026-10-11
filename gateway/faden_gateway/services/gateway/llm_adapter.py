@@ -8,6 +8,7 @@ upstream calls through this adapter instead of the raw HTTP proxy.
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import logging
 import re
@@ -1157,11 +1158,33 @@ _RERANK_AS_VLLM = (
 )
 
 
+#: An HTML page inside an error: a web server answered instead of the model.
+_HTML_PAGE = re.compile(r"(?:<!doctype[^>]*>\s*)?<html\b.*?(?:</html>|\Z)", re.IGNORECASE | re.DOTALL)
+_HTML_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+
+def _readable(message: str) -> str:
+    """*message* with any HTML page in it replaced by the page's title (or its text).
+
+    A web server in front of a model -- the machines' model-TLS proxy, a
+    remote provider's edge -- answers an error with a page, and the chat
+    showed its markup: "upstream 400: <html> <head><title>400 The plain HTTP
+    request was sent to HTTPS port</title>..." (11 October 2026).
+    """
+    def page_title(page: re.Match[str]) -> str:
+        found = _HTML_TITLE.search(page.group(0))
+        text = found.group(1) if found else _HTML_TAG.sub(" ", page.group(0))
+        return " ".join(html.unescape(text).split())
+
+    return _HTML_PAGE.sub(page_title, message).strip()
+
+
 def _error_payload(error_type: str, message: str) -> dict[str, Any]:
     return {
         "error": {
             "type": error_type,
-            "message": message,
+            "message": _readable(message),
             "param": None,
             "code": error_type,
         },
