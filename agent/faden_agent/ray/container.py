@@ -265,6 +265,8 @@ class RayContainerRuntime:
         """
         handler = self._handler(spec)
         identity = await handler.image_identity(spec.image)
+        if not identity.get("present"):
+            identity = await self._name_as_pinned(handler, spec) or identity
 
         # Absent, or present under the right name but the wrong build: either
         # way the answer is the pinned build, and the loader is how to get it.
@@ -312,6 +314,30 @@ class RayContainerRuntime:
             "repo_digests": repo_digests,
             "runtime_handler": handler.name,
         }
+
+    async def _name_as_pinned(self, handler: Any, spec: RuntimeBundleSpec) -> dict[str, Any] | None:
+        """The pinned build already here under another name: name it as pinned instead of loading it again.
+
+        Release 0.4.3 moved the runtimes to the registry's names
+        (``ghcr.io/fadenstack/ray-runtime-gb10:…``); the DGX pair held the same
+        builds as ``faden/ray-vllm-gb10:…``. Looked up by name alone, every
+        machine would have fetched the 26 GB it had. Only a build whose content
+        matches the pin is named; anything else is left to the loader.
+        """
+        if not spec.digest:
+            return None
+        found = await handler.image_identity(spec.digest)
+        if not found.get("present") or _match(found, spec) is None:
+            return None
+        try:
+            await handler.tag_image(spec.digest, spec.image)
+        except ContainerRuntimeError as exc:
+            log.warning("Runtime image %s is here as %s but could not be named: %s",
+                        spec.image, ", ".join(found.get("tags") or [spec.digest]), exc)
+            return None
+        log.info("Runtime image %s is here as %s; named as pinned",
+                 spec.image, ", ".join(found.get("tags") or [spec.digest]))
+        return await handler.image_identity(spec.image)
 
     # ------------------------------------------------------------------
     # Preflight

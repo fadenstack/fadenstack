@@ -305,6 +305,9 @@ class PodmanRuntime:
     async def pull(self, image: str, *, timeout_sec: float = 1800) -> None:
         await self._exec("pull", check_image_ref(image), timeout_sec=timeout_sec)
 
+    async def tag_image(self, source: str, target: str, *, timeout_sec: float = 60) -> None:
+        await self._exec("tag", check_image_ref(source), check_image_ref(target), timeout_sec=timeout_sec)
+
     async def load_image_tar(
         self,
         stream: Any,

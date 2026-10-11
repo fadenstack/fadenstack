@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from faden_agent.runtimes import ContainerRuntimeError
 from faden_agent.ray.container import (
     RayContainerRuntime,
     RuntimeBundleSpec,
@@ -426,3 +427,68 @@ async def test_a_mismatch_reports_a_code_the_backend_can_act_on() -> None:
     with pytest.raises(RuntimeDigestMismatch) as caught:
         await container.ensure_image(spec)
     assert caught.value.error_code == "runtime_image_mismatch"
+
+
+# -- the pinned build here under another name ---------------------------------
+#
+# Release 0.4.3 pins the runtimes by their registry names
+# (ghcr.io/fadenstack/ray-runtime-gb10:...); the DGX pair held the same builds
+# as faden/ray-vllm-gb10:.... Looked up by name alone, each machine would have
+# loaded 26 GB it already had.
+
+GHCR = "ghcr.io/fadenstack/ray-runtime-gb10:ray2.58-nv26.08"
+
+
+class _NamedRuntime(_FakeRuntime):
+    """Knows images by name and by id, as docker does."""
+
+    def __init__(self, names: dict[str, str], *, tag_fails: bool = False) -> None:
+        super().__init__()
+        self.names = dict(names)  # name -> image id
+        self.tag_fails = tag_fails
+        self.tagged: list[tuple[str, str]] = []
+
+    async def image_identity(self, image: str, *, timeout_sec: float = 20) -> dict[str, Any]:
+        image_id = self.names.get(image) or (image if image in self.names.values() else None)
+        if image_id is None:
+            return {"present": False, "id": None, "repo_digests": [], "tags": [], "rootfs_layers": []}
+        return {"present": True, "id": image_id, "repo_digests": [],
+                "tags": [n for n, i in self.names.items() if i == image_id], "rootfs_layers": list(LAYERS)}
+
+    async def tag_image(self, source: str, target: str, *, timeout_sec: float = 60) -> None:
+        if self.tag_fails:
+            raise ContainerRuntimeError("tag refused")
+        self.tagged.append((source, target))
+        self.names[target] = self.names.get(source) or source
+
+
+@pytest.mark.anyio()
+async def test_the_pinned_build_under_its_old_name_is_named_not_loaded() -> None:
+    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-nv26.08": DIGEST})
+    container = RayContainerRuntime(runtime=runtime)
+    spec = RuntimeBundleSpec.from_payload(_payload(image=GHCR))
+
+    async def _loader(_spec: RuntimeBundleSpec) -> None:
+        runtime.loaded += 1
+
+    result = await container.ensure_image(spec, loader=_loader)
+
+    assert runtime.loaded == 0, "nothing fetched: the build was here"
+    assert runtime.tagged == [(DIGEST, GHCR)]
+    assert result["verified"] is True and result["image"] == GHCR
+
+
+@pytest.mark.anyio()
+async def test_a_build_that_cannot_be_named_is_loaded_as_before() -> None:
+    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-nv26.08": DIGEST}, tag_fails=True)
+    container = RayContainerRuntime(runtime=runtime)
+    spec = RuntimeBundleSpec.from_payload(_payload(image=GHCR))
+
+    async def _loader(_spec: RuntimeBundleSpec) -> None:
+        runtime.loaded += 1
+        runtime.names[GHCR] = DIGEST
+
+    result = await container.ensure_image(spec, loader=_loader)
+
+    assert runtime.loaded == 1
+    assert result["verified"] is True

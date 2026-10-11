@@ -131,6 +131,10 @@ class ContainerRuntime(Protocol):
 
     async def pull(self, image: str, *, timeout_sec: float = 1800) -> None: ...
 
+    async def tag_image(self, source: str, target: str, *, timeout_sec: float = 60) -> None:
+        """Give the local image *source* (a name or an id) the name *target* as well."""
+        ...
+
     async def load_image_tar(
         self,
         stream: Any,
