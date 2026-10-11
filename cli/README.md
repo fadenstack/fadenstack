@@ -15,7 +15,7 @@ faden deploy                 # installs Fadenstack into ~/fadenstack and starts 
 ```
 
 The CLI carries the deployment files of its release and runs that release's
-published images: `fadenstack 0.4.2` deploys Fadenstack 0.4.2. To upgrade,
+published images: `fadenstack 0.4.3` deploys Fadenstack 0.4.3. To upgrade,
 upgrade the CLI and run `faden upgrade`. See
 [Installing Fadenstack](https://github.com/fadenstack/fadenstack/blob/main/docs/help/pages/operate/installing.md).
 

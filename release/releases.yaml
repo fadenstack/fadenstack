@@ -25,6 +25,21 @@
 series: []
 
 releases:
+  - version: 0.4.3
+    channel: stable
+    date: ""
+    severity: normal
+    summary: >-
+      The machines' runtime images come with the release, a model a machine already holds is used where it is,
+      and hybrid models such as Qwen3.8 start with the settings the console suggests.
+    highlights:
+      - "Runtime images for NVIDIA DGX Spark and x86 machines are published with the release: a new install can run models."
+      - "A model in a machine's Hugging Face cache is used in place, also when other tools share that cache."
+      - "Hybrid models (linear attention or Mamba, such as Qwen3.8) are planned with the memory each conversation needs, and start."
+      - "A cluster taken over after a reinstall keeps its encrypted model traffic, and its models answer."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.8
   - version: 0.4.2
     channel: stable
     date: "2026-10-11"
