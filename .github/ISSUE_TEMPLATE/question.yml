@@ -1,0 +1,23 @@
+name: Question
+description: Ask something Help does not answer.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please look in [Help](https://help.fadenstack.com) first. Leave out passwords, tokens, API keys and personal data.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried or read already
+  - type: input
+    id: release
+    attributes:
+      label: Release
+      description: What `faden version` prints, if it is about an installation.

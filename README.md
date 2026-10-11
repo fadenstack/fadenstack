@@ -191,7 +191,9 @@ The agent is published as standalone binaries for Linux x86_64 and aarch64 (no P
 
 ## Contributing
 
-Issues and ideas are welcome. Before we can accept pull requests, we are setting up a contributor licence agreement, so please open an issue first and describe what you would like to change.
+Questions, bug reports and ideas go in [GitHub issues](https://github.com/fadenstack/fadenstack/issues); pick the template that fits. Please open an issue before you write code for a change, so we can agree on it first. [CONTRIBUTING.md](CONTRIBUTING.md) says what a pull request needs, including the one-time [contributor licence agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md) you sign from your first pull request. Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Found a security problem? Report it privately, never in an issue: see [SECURITY.md](SECURITY.md).
 
 ## Moving from LLM.Port
 

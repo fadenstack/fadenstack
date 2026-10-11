@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Help
+    url: https://help.fadenstack.com
+    about: Installing, operating and using Fadenstack. Many questions are answered here.
+  - name: Report a security problem
+    url: https://github.com/fadenstack/fadenstack/security/policy
+    about: Please report vulnerabilities privately, never in an issue.

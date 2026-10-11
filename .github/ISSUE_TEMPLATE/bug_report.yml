@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in Fadenstack does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Please search the [existing issues](https://github.com/fadenstack/fadenstack/issues) first.
+        A security problem is reported privately: see [SECURITY.md](https://github.com/fadenstack/fadenstack/security/policy).
+        Leave out passwords, tokens, API keys, `.env` files and personal data.
+  - type: input
+    id: release
+    attributes:
+      label: Release
+      description: What `faden version` prints.
+      placeholder: "0.4.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it is installed
+      options:
+        - faden deploy (the fadenstack package from PyPI)
+        - faden deploy --build from a checkout
+        - faden dev up
+        - Other (say below)
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you did, step by step, and what happened then.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The part of `faden logs <service>` that matters, without secrets.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: The server's operating system; the GPU machines (model, driver) if it is about models; the browser if it is about the console.
