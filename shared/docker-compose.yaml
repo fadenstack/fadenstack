@@ -914,12 +914,13 @@ services:
       - loki_data:/loki
 
   grafana:
-    # The latest 11.x patch (11.6.16, June 2026), pinned by digest: it carries
-    # the fixes for the published XSS advisories 11.5.2 lacked (CVE-2025-2703,
-    # CVE-2025-4123, CVE-2025-6023) and the later 11.6 security fixes.
-    # Grafana migrates its database on the first start; going back to 11.5
-    # needs the backup the upgrade makes.
-    image: grafana/grafana:11.6.16@sha256:d67af92050b8d93b393dc741864752a69c9da1ffa39c1bb9af49ad5d9e47d2c3
+    # 12.4, the last 12.x line, security-supported until May 2027 (11.6 ended in
+    # June 2026), pinned by digest. It carries the fixes for the XSS advisories
+    # 11.5.2 lacked (CVE-2025-2703, CVE-2025-4123, CVE-2025-6023 and its bypass).
+    # The dashboards use only core panels, which 12 still ships. Grafana
+    # migrates its database on the first start (tested from 11.5.2); going
+    # back needs the backup the upgrade makes.
+    image: grafana/grafana:12.4.12@sha256:a3b504df900c24db125e5ec0646f3ac3428db38161302d69f05d0db70a330a90
     container_name: faden-grafana
     restart: unless-stopped
     ports:
