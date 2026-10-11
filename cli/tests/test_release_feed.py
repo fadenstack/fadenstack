@@ -135,6 +135,13 @@ def test_required_first_names_the_stepping_stone() -> None:
     assert rf.required_first(found, "0.4.1", "0.7.0") is None  # not in the feed: nothing to say
 
 
+def test_with_no_way_in_the_feed_the_release_it_upgrades_from_comes_first() -> None:
+    # 0.4.2 and 0.4.3 both upgrade from 0.4.0, which the feed does not list. It said
+    # "0.0.1 cannot upgrade straight to 0.4.3: 0.4.3 has to come first."
+    found = feed(release("0.4.2", upgrade_from="0.4.0"), release("0.4.3", upgrade_from="0.4.0"))
+    assert rf.required_first(found, "0.0.1", "0.4.3") == "0.4.0"
+
+
 def test_a_series_past_its_support_is_unsupported() -> None:
     found = feed(release("0.4.2"), series=[{"series": "0.4", "supported_until": "2027-04-30"}])
     assert not rf.assess(found, "0.4.2", today=date(2027, 4, 30)).unsupported

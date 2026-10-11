@@ -286,7 +286,9 @@ def required_first(feed: Feed, installed: str, target: str) -> str | None:
     if release is None or cur is None or release.upgrade_from is None or Version(release.upgrade_from) <= cur:
         return None
     path = upgrade_path(list(feed.releases), cur, release.parsed)
-    return path[0] if path else release.upgrade_from
+    # With no way there in the feed, upgrade_path names the target itself -- "0.4.3 has to come first"
+    # for 0.0.1 to 0.4.3 -- so the release it upgrades from is the one to install first.
+    return path[0] if path and path[0] != str(release.parsed) else release.upgrade_from
 
 
 #: How the CLI was installed, as `faden deploy` records it (FADEN_CLI_INSTALLER).

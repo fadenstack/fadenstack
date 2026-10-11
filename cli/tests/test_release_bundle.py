@@ -117,6 +117,12 @@ def test_an_upgrade_moves_a_release_install_to_this_release(
     _configure(tmp_path, monkeypatch, install)
     calls: list[str] = []
     _no_docker(monkeypatch, calls)
+    # Not the live release list: since 0.4.3 it says 0.0.1 cannot upgrade straight to this
+    # release, which is right, and not what this test is about.
+    from faden_cli.core import update_check  # noqa: PLC0415
+
+    monkeypatch.setenv(update_check.ENV_OFF, "1")
+    monkeypatch.setattr(update_check, "cached_feed", lambda: None)
 
     result = CliRunner().invoke(upgrade_module.upgrade_cmd, ["-y", "--no-backup", "--skip-doctor"])
     assert result.exit_code == 0, result.output
