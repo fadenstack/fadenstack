@@ -64,11 +64,23 @@ def pin_release(env_path: Path) -> None:
     whatever was published last, and two machines deployed a day apart
     would run different releases under the same CLI.
     """
+    record_installer(env_path, None)
+
+
+def record_installer(env_path: Path, source: Path | None) -> None:
+    """Pin a release install to this CLI's version, and say how the install is upgraded.
+
+    The console's update notice shows the commands for it (FADEN_CLI_INSTALLER): the
+    way this CLI was installed, or ``source`` for an install built from the checkout
+    *source*, which a newer release reaches by ``git pull``, not by a newer CLI.
+    """
     from faden_cli.core.update_check import installer  # noqa: PLC0415
 
     env_vars = read_env_file(env_path)
-    # How this CLI was installed: the console's update notice shows the matching upgrade command.
-    pins = {"VERSION": __version__, "FADEN_CLI_INSTALLER": installer()}
+    if source:
+        pins = {"FADEN_CLI_INSTALLER": "source"}
+    else:
+        pins = {"VERSION": __version__, "FADEN_CLI_INSTALLER": installer()}
     if any(env_vars.get(k) != v for k, v in pins.items()):
         env_vars.update(pins)
         write_env_file(env_path, env_vars)
@@ -153,6 +165,59 @@ def _sync_postgres_password(ctx: ComposeContext, env_path: Path) -> None:
         success("Postgres password synchronised.")
     else:
         warning(f"Could not sync Postgres password: {result.stderr.strip()}")
+
+
+#: Logins the initdb script of earlier releases made on every install, with
+#: the same fixed passwords everywhere (llm_user could read every backend
+#: table). No service of an install uses them; a development stack makes the
+#: one it needs itself (faden dev up).
+FIXED_LOGINS = ("llm_user", "faden_backend")
+
+
+def retire_fixed_logins(env_path: Path) -> list[str]:
+    """Switch off the fixed-password logins an install made before still has; returns which.
+
+    ``ALTER ROLE ... NOLOGIN``: the roles and their grants stay, nobody can sign
+    in with them. Postgres must be running (after :func:`_sync_postgres_password`).
+    Only an install whose ``.env`` says FADEN_BACKEND_ENVIRONMENT=production (deploy
+    writes it) is touched: a development stack's host-run backend signs in as
+    ``faden_backend``, and an ``.env`` that says nothing may belong to one.
+    """
+    import shutil
+    import subprocess
+
+    env_vars = read_env_file(env_path)
+    if env_vars.get("FADEN_BACKEND_ENVIRONMENT") != "production":
+        return []
+    docker = shutil.which("docker")
+    if not docker:
+        return []
+    pg_user = env_vars.get("POSTGRES_USER", "postgres")
+    roles = [role for role in FIXED_LOGINS if role != pg_user]
+    if not roles:
+        return []
+    names = ", ".join(f"'{role}'" for role in roles)
+    sql = (
+        f"SELECT coalesce(string_agg(rolname, ','), '') FROM pg_roles "
+        f"WHERE rolname IN ({names}) AND rolcanlogin;\n"
+        "DO $$ DECLARE r text; BEGIN "
+        f"FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ({names}) AND rolcanlogin LOOP "
+        "EXECUTE format('ALTER ROLE %I NOLOGIN', r); END LOOP; END $$;\n"
+    )
+    result = subprocess.run(  # noqa: S603
+        [docker, "exec", "-i", "faden-postgres", "psql", "-U", pg_user, "-v", "ON_ERROR_STOP=1", "-At"],
+        input=sql,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        warning(f"Could not switch off the old fixed Postgres logins: {result.stderr.strip()}")
+        return []
+    retired = [name for name in (result.stdout.splitlines() or [""])[0].split(",") if name]
+    if retired:
+        success(f"Old Postgres logins with fixed passwords switched off: {', '.join(retired)}.")
+    return retired
 
 
 def _resolve_compose_file(install_dir: Path) -> Path | None:
@@ -509,6 +574,11 @@ def deploy_cmd(
     env_path = shared_dir / ".env"
     if env_path.exists() and not force_env:
         info(f".env already exists at {env_path} (use --force-env to regenerate)")
+        # What the compose file requires and an older .env lacks; stored data keeps its key.
+        from faden_cli.core.env_gen import fill_required_env  # noqa: PLC0415
+
+        for note in fill_required_env(env_path, profiles=sorted(profiles)):
+            warning(note)
     else:
         env_vars = default_env_vars(profiles=sorted(profiles))
         write_env_file(env_path, env_vars, preserve_secrets=not force_env)
@@ -543,6 +613,8 @@ def deploy_cmd(
     if release is not None:
         pin_release(env_path)
         info(f"Images: release {__version__}")
+    else:
+        record_installer(env_path, shared_dir)
 
     # ── 3a. Size the services for this host ───────────────────────
     # On every deploy, not only with a new .env: an install deployed before
@@ -667,6 +739,7 @@ def deploy_cmd(
     # We boot Postgres alone, ALTER USER to match .env, then start
     # everything else.
     _sync_postgres_password(ctx, env_path)
+    retire_fixed_logins(env_path)
 
     # Start infrastructure services and wait for them to become healthy
     # BEFORE starting application containers.  This avoids a race

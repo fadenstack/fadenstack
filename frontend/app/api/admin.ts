@@ -717,13 +717,13 @@ export const adminUsers = {
       }),
     });
   },
-  generateApiToken(tenantId: string = "default", expiresIn?: number, name?: string) {
+  /** A token for the gateway's API, in the account's tenant (the server sets it). */
+  generateApiToken(expiresIn?: number, name?: string) {
     return request<{ token: string; expires_in: number | null; id: string; name: string | null; expires_at: string | null }>(
       "/users/me/api-token",
       {
         method: "POST",
         body: JSON.stringify({
-          tenant_id: tenantId,
           expires_in: expiresIn ?? null,
           name: name?.trim() || null,
         }),

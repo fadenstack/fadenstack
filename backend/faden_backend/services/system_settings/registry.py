@@ -613,7 +613,7 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
             "copied as they are)."
         ),
         is_secret=False,
-        default="",
+        default=settings.updates_feed_url,  # FADEN_UPDATE_FEED_URL in .env, until changed here
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),

@@ -163,7 +163,8 @@ faden dev init ~/projects/fadenstack --ssh        # SSH cloning
 faden dev init ~/projects/fadenstack --overwrite   # re-clone existing repos
 
 # Start / stop / status
-faden dev up
+faden dev up                            # on this machine only (127.0.0.1)
+faden dev up --lan                      # on every interface, for one run
 faden dev up --backend-only
 faden dev up --modules pii,mcp,skills   # also run the optional modules
 faden dev up --local-node
@@ -208,6 +209,7 @@ Use `--local-node-no-sudo` to skip privileged systemd setup.
 | `faden admin reset-password`               | Reset a user password directly in the database                |
 | `faden dev init [DIR]`                     | Bootstrap full developer workspace                            |
 | `faden dev up`                             | Start backend, worker, gateway, and frontend dev servers      |
+| `faden dev up --lan`                       | The same, reachable from the network (dev mode signs anyone in as admin) |
 | `faden dev up --modules pii,mcp,skills`    | Also run the optional modules on the host                     |
 | `faden dev up --local-node`                | Start dev services and provision node-agent                   |
 | `faden dev down`                           | Stop all dev processes                                        |

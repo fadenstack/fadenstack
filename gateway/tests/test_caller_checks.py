@@ -6,11 +6,14 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
+import jwt
 import pytest
 
 from faden_gateway.services.gateway.agents import AgentDirectory, AgentLookupError, ApiTokenRecord, UserFlags
-from faden_gateway.services.gateway.auth import API_TOKEN_TYPE, check_caller
+from faden_gateway.services.gateway.auth import API_TOKEN_TYPE, caller_context, check_caller
 from faden_gateway.services.gateway.errors import GatewayError
+from faden_gateway.settings import settings
+from faden_gateway.web.api.v1.devices import authenticate_device
 
 USER = "8a0e6d0e-1d4f-4c55-9a43-0b7a8f1f0a01"
 OTHER = "5b2f3c1d-7e8a-4b9c-8d0e-1f2a3b4c5d6e"
@@ -133,6 +136,33 @@ async def test_without_the_backend_database_only_the_claims_are_checked() -> Non
     app = SimpleNamespace(state=SimpleNamespace(agent_directory=None))
     await check_caller(app, _login())
     await check_caller(app, _api())
+
+
+@pytest.mark.anyio
+async def test_an_api_tokens_tenant_is_the_one_its_row_names() -> None:
+    """A token's tenant_id claim came from whoever made it; the row holds the tenant the backend gave it."""
+    app = _app({USER: ACTIVE}, {TOKEN_ID: ApiTokenRecord(USER, revoked=False, tenant_id="default")})
+    claims = {**_api(), "tenant_id": "zzz-other"}
+    assert await check_caller(app, claims) == "default"
+    auth = await caller_context(app, claims, "the-token")
+    assert (auth.user_id, auth.tenant_id, auth.token) == (USER, "default", "the-token")
+
+
+@pytest.mark.anyio
+async def test_other_tokens_keep_the_tenant_they_were_signed_with() -> None:
+    app = _app({USER: ACTIVE})
+    claims = {**_login(), "tenant_id": "tenant-a"}
+    assert await check_caller(app, claims) is None
+    assert (await caller_context(app, claims)).tenant_id == "tenant-a"
+    assert (await caller_context(app, _login())).tenant_id == "default"
+
+
+@pytest.mark.anyio
+async def test_a_device_signed_in_with_an_api_token_is_in_the_rows_tenant() -> None:
+    app = _app({USER: ACTIVE}, {TOKEN_ID: ApiTokenRecord(USER, revoked=False, tenant_id="default")})
+    token = jwt.encode({**_api(), "tenant_id": "zzz-other"}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    identity = await authenticate_device(app, token)
+    assert (identity.tenant_id, identity.user_id) == ("default", USER)
 
 
 @pytest.mark.anyio

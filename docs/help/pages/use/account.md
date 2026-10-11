@@ -23,7 +23,7 @@ Your e-mail address and what you may do are set by your administrator. See [User
 ## Change your password
 
 1. In **My Profile**, under **Change Password**, enter your **Current Password**.
-2. Enter the **New Password** twice. It needs at least 6 characters.
+2. Enter the **New Password** twice. It needs at least 8 characters.
 3. Select **Change Password**.
 
 You see **Password changed successfully.**
@@ -57,16 +57,14 @@ An API token lets a script or an application use your organisation's models in y
 
 1. In **My Profile**, go to **API Token**.
 2. Enter a **Name** after what will use the token, for example `report script`.
-3. Leave **Tenant ID** as it is.
-4. Choose the **Token Expiry**.
-5. Select **Generate Token**.
-6. Copy the token with the copy button and keep it somewhere safe.
+3. Choose the **Token Expiry**.
+4. Select **Generate Token**.
+5. Copy the token with the copy button and keep it somewhere safe.
 
 ??? info "More about the fields"
     | Field | What to know |
     |---|---|
     | **Name** | Name the token after what will use it, so you know which one to revoke later. |
-    | **Tenant ID** | Leave it as it is, unless your administrator tells you otherwise. |
     | **Token Expiry** | **1 hour**, **24 hours**, **7 days**, **30 days**, **90 days** or **1 year**. Every token expires; shorter is safer, and you can always make a new one. |
 
 !!! warning "Shown once"
@@ -91,5 +89,6 @@ Applications that use it stop working within a minute. Revoke a token as soon as
 | You see | What to do |
 |---|---|
 | You are sent back to the sign-in page | Your sign-in ended. Sign in again. If your password is no longer accepted, ask your administrator: your account may have been changed or deactivated. |
-| **New passwords do not match.** or **Password must be at least 6 characters.** | Enter the new password again. |
+| **New passwords do not match.** or **Password must be at least 8 characters.** | Enter the new password again. It may not be your e-mail address either. |
+| **Too many attempts from this address. Wait a minute, then try again.** | The server counts sign-in and password-reset attempts per address. Wait a minute. If it happens to many people at once, they may all reach the server through one address (a proxy); tell your administrator. |
 | An application says its token is revoked or out of date | Create a new token and give it to the application. |

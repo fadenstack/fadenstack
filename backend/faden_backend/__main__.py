@@ -35,6 +35,10 @@ def set_multiproc_dir() -> None:
 
 def main() -> None:
     """Entrypoint of the application."""
+    # Outside development, not on a secret published with the source code.
+    from faden_backend.published_secrets import refuse_published_secrets  # noqa: PLC0415
+
+    refuse_published_secrets(settings)
     # On Windows, aiodocker needs the proactor event loop for named-pipe access
     # to the Docker Engine.
     if sys.platform == "win32":

@@ -17,7 +17,11 @@ one contract:
 - **Tool**: a refused call is answered to the model with the admin's message
   and told to the client as ``faden.tool_denied``. A call that needs approval
   waits for the user when the client can ask them (a stream with
-  ``X-Faden-Events``); otherwise it is refused, saying so.
+  ``X-Faden-Events``); otherwise it is refused, saying so. The client's own
+  tools run on the client: a call of one is marked as it is handed over
+  (``faden.approval_required`` without an ``approvalId``, the client asks),
+  and a tool a rule says needs approval is not offered to a client that
+  cannot be told.
 
 A check objects with a :class:`GovernanceDecision` or returns ``None``. The
 most restrictive decision wins (block over approval); all are recorded.
@@ -402,14 +406,40 @@ def tool_denied_event(
 
 def approval_event(
     approval_id: str, call: Mapping[str, Any], name: str, message: str, timeout_s: float,
+    *, tool_class: str = "unknown", rule: bool = True,
 ) -> dict[str, Any]:
-    """A tool call waits for the user: answer at ``/v1/approvals/{approvalId}``."""
+    """A gateway tool call waits for the user: answer at ``/v1/approvals/{approvalId}``.
+
+    *tool_class* is the class the gateway holds for the tool; *rule* says whether an admin's rule (or a
+    policy) asks, rather than the chat's tool mode: then the client asks every time, never "for this chat".
+    """
     return {"type": "CUSTOM", "name": "faden.approval_required", "value": {
         "approvalId": approval_id,
         "toolCallId": call.get("id", ""),
         "toolCallName": name,
         "message": message,
         "timeoutS": int(timeout_s),
+        "toolClass": tool_class,
+        "rule": rule,
+    }}
+
+
+def client_approval_event(
+    call: Mapping[str, Any], name: str, message: str, decision_id: uuid.UUID | None,
+    *, tool_class: str, rule: bool,
+) -> dict[str, Any]:
+    """A call of the client's own tool the user must approve first: the client asks; nothing waits here.
+
+    The same event as :func:`approval_event`, without an ``approvalId``. An older client that only answers
+    events with an ``approvalId`` ignores it.
+    """
+    return {"type": "CUSTOM", "name": "faden.approval_required", "value": {
+        "toolCallId": call.get("id", ""),
+        "toolCallName": name,
+        "message": message,
+        "decisionId": str(decision_id) if decision_id else None,
+        "toolClass": tool_class,
+        "rule": rule,
     }}
 
 

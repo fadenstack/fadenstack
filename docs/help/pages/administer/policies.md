@@ -79,7 +79,7 @@ your installation uses others):
 ![The Privacy tab of the chat's side panel: protection of requests to cloud and to local models, the mode and the fail action, telemetry, and the detection threshold and entities](../images/use/chat-privacy-tab.png){ width="280" }
 
 - A person can make the policy **stricter** for one chat in the chat's **Privacy** panel: more types, a
-  higher threshold, local models scanned too.
+  lower threshold (it then masks more), local models scanned too.
 - Switching between `redact` and `tokenize_reversible` is not a stricter setting but a different one, so a
   chat may do it only when **Let chats and agents change the PII mode** is on (**Privacy (PII) → Tenant
   Policies**, off by default).
@@ -107,7 +107,9 @@ the text itself.
 
 2. Give it a **Name** (for you) and a **Tool pattern**: a tool name, or a pattern with `*`, such as
    `mcp.github.*`, `knowledge_search` or `*`.
-3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**.
+3. Choose the **Action**: **Deny**, **Ask first** (the person approves each call) or **Allow**. A rule also
+   covers the tools an agent's app runs itself, such as the browser and Office agents' tools: the app asks every
+   time, whatever the person allowed before, and an app that cannot ask is not offered the tool.
 4. Write the **Message to the user**: what people are told when the rule applies.
 5. Set the **Priority**. Lower is tried first, and the first rule that matches decides, so a rule with a
    lower number can make an exception to a broader one.
@@ -121,7 +123,8 @@ Without rules, tools run as the tool mode says.
 
 **Agents → Governance → Tool classes** says what tools do, by pattern: **read**, **write**, **destructive**,
 or **As its MCP server says** (trust what the tool's MCP server declares about itself). **Reaches outside**
-records whether a tool reaches outside the organisation. A tool nobody classifies is unclassified.
+records whether a tool reaches outside the organisation. A tool nobody classifies is unclassified. An agent's own
+tools take their class from its **Host tools**; an agent whose version lists none has every tool unclassified.
 
 People pick a tool mode per chat, and the class decides what runs:
 

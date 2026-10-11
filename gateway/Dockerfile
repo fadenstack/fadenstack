@@ -11,6 +11,10 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --inexact --no-dev
 
+# LiteLLM uses the model price list it ships instead of fetching one from
+# GitHub on every start.
+ENV LITELLM_LOCAL_MODEL_COST_MAP=True
+
 CMD ["/usr/local/bin/python", "-m", "faden_gateway"]
 
 FROM prod AS dev

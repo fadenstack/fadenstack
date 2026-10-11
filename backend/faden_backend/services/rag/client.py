@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import HTTPException
@@ -10,6 +12,17 @@ from starlette import status
 
 from faden_backend.settings import settings
 from faden_backend.services.tls import default_httpx_verify
+
+
+#: An id that goes into a path here: one segment, never ``.`` or ``..``, no ``/``, ``?``, ``#`` or ``%``.
+_ID = re.compile(r"(?!\.{1,2}\Z)[A-Za-z0-9._:-]{1,128}")
+
+
+def _segment(value: str) -> str:
+    """*value* as one path segment. The calls carry the service's token: an id must not lead elsewhere."""
+    if not _ID.fullmatch(value):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Not a valid id.")
+    return value
 
 
 class RagServiceClient:
@@ -119,7 +132,7 @@ class RagServiceClient:
 
     async def run_collector(self, collector_id: str) -> dict[str, Any]:
         """Trigger immediate collector run."""
-        return await self._request("POST", f"/internal/admin/collectors/{collector_id}/run")
+        return await self._request("POST", f"/internal/admin/collectors/{_segment(collector_id)}/run")
 
     async def list_jobs(self, limit: int = 50) -> dict[str, Any]:
         """List ingestion jobs."""
@@ -127,7 +140,7 @@ class RagServiceClient:
 
     async def get_job(self, job_id: str) -> dict[str, Any]:
         """Fetch one ingestion job."""
-        return await self._request("GET", f"/internal/admin/jobs/{job_id}")
+        return await self._request("GET", f"/internal/admin/jobs/{_segment(job_id)}")
 
     async def create_container(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create virtual container node."""
@@ -143,25 +156,22 @@ class RagServiceClient:
         workspace_id: str | None = None,
     ) -> dict[str, Any]:
         """List container tree."""
-        params: list[str] = []
-        if tenant_id is not None:
-            params.append(f"tenant_id={tenant_id}")
-        if workspace_id is not None:
-            params.append(f"workspace_id={workspace_id}")
-        suffix = f"?{'&'.join(params)}" if params else ""
+        params = {"tenant_id": tenant_id, "workspace_id": workspace_id}
+        query = urlencode({k: v for k, v in params.items() if v is not None})
+        suffix = f"?{query}" if query else ""
         return await self._request("GET", f"/internal/admin/containers/tree{suffix}")
 
     async def update_container(self, container_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Update virtual container."""
         return await self._request(
             "PATCH",
-            f"/internal/admin/containers/{container_id}",
+            f"/internal/admin/containers/{_segment(container_id)}",
             json_body=payload,
         )
 
     async def delete_container(self, container_id: str) -> dict[str, Any]:
         """Soft-delete virtual container."""
-        return await self._request("DELETE", f"/internal/admin/containers/{container_id}")
+        return await self._request("DELETE", f"/internal/admin/containers/{_segment(container_id)}")
 
     async def create_upload_presign(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create presigned URL for upload."""
@@ -189,13 +199,13 @@ class RagServiceClient:
 
     async def get_draft(self, draft_id: str) -> dict[str, Any]:
         """Get one draft."""
-        return await self._request("GET", f"/internal/admin/drafts/{draft_id}")
+        return await self._request("GET", f"/internal/admin/drafts/{_segment(draft_id)}")
 
     async def patch_draft(self, draft_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Patch one draft."""
         return await self._request(
             "PATCH",
-            f"/internal/admin/drafts/{draft_id}",
+            f"/internal/admin/drafts/{_segment(draft_id)}",
             json_body=payload,
         )
 
@@ -203,7 +213,7 @@ class RagServiceClient:
         """Trigger publish for one draft."""
         return await self._request(
             "POST",
-            f"/internal/admin/drafts/{draft_id}/publish",
+            f"/internal/admin/drafts/{_segment(draft_id)}/publish",
             json_body=payload,
         )
 
@@ -213,7 +223,7 @@ class RagServiceClient:
 
     async def get_publish(self, publish_id: str) -> dict[str, Any]:
         """Get one publish request."""
-        return await self._request("GET", f"/internal/admin/publishes/{publish_id}")
+        return await self._request("GET", f"/internal/admin/publishes/{_segment(publish_id)}")
 
 
 def get_rag_client() -> RagServiceClient:

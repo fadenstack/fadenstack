@@ -322,6 +322,8 @@ export interface SessionPIIPolicy {
   can_switch_mode?: boolean;
   /** False when the override asks for a mode its requests do not get. */
   mode_applied?: boolean;
+  /** The user may loosen the policy below the organisation's (the weaken right). */
+  can_weaken?: boolean;
 }
 
 async function chatRequest<T>(

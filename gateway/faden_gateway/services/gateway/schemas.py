@@ -188,6 +188,8 @@ class SessionPIIPolicyDTO(BaseModel):
     can_switch_mode: bool = False
     #: False when the override asks for a mode its requests do not get.
     mode_applied: bool = True
+    #: The caller may loosen the policy below the tenant's (the weaken right).
+    can_weaken: bool = False
 
 
 class SessionPIIPolicyPatchDTO(BaseModel):

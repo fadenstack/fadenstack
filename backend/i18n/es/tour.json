@@ -180,7 +180,7 @@
       },
       "account": {
         "title": "Sus datos de acceso",
-        "body": "Su dirección de correo electrónico y una primera contraseña de al menos 6 caracteres. Entréguele la contraseña en persona o por teléfono."
+        "body": "Su dirección de correo electrónico y una primera contraseña de al menos 8 caracteres. Entréguele la contraseña en persona o por teléfono."
       },
       "roles": {
         "title": "Qué puede hacer",

@@ -303,17 +303,30 @@ class TestClampAndMerge:
 
     # --- presidio.threshold ---
 
-    def test_can_raise_threshold(self) -> None:
-        floor = _floor()  # threshold=0.5
-        override = SessionPIIOverride(presidio_threshold=0.8)
-        result = clamp_and_merge(floor, override)
-        assert result.presidio.threshold == 0.8
+    # A detection counts when its score reaches the threshold: lower finds more.
 
-    def test_cannot_lower_threshold(self) -> None:
+    def test_can_lower_threshold(self) -> None:
         floor = _floor()  # threshold=0.5
         override = SessionPIIOverride(presidio_threshold=0.2)
         result = clamp_and_merge(floor, override)
-        assert result.presidio.threshold == 0.5
+        assert result.presidio.threshold == 0.2
+
+    def test_cannot_raise_threshold(self) -> None:
+        floor = _floor()  # threshold=0.5
+        for asked in (0.8, 1.0):
+            result = clamp_and_merge(floor, SessionPIIOverride(presidio_threshold=asked))
+            assert result.presidio.threshold == 0.5
+
+    def test_threshold_never_reaches_zero(self) -> None:
+        """Zero means "service default" over there, which can be looser than the floor."""
+        floor = _floor()
+        result = clamp_and_merge(floor, SessionPIIOverride(presidio_threshold=0.0))
+        assert 0.0 < result.presidio.threshold <= 0.5
+
+    def test_weaken_right_may_raise_threshold(self) -> None:
+        floor = _floor()
+        result = clamp_and_merge(floor, SessionPIIOverride(presidio_threshold=0.9), allow_weaken=True)
+        assert result.presidio.threshold == 0.9
 
     # --- presidio.entities ---
 
@@ -416,7 +429,7 @@ class TestResolvePiiPolicyWithOverride:
         # Cannot weaken — floor block stays
         assert result.egress.fail_action == "block"
 
-    def test_override_raises_threshold(self) -> None:
+    def test_override_cannot_raise_threshold(self) -> None:
         from faden_gateway.services.gateway.service import _resolve_pii_policy
 
         policy = self._make_mock_policy({
@@ -426,7 +439,7 @@ class TestResolvePiiPolicyWithOverride:
         override = self._make_mock_override(presidio_threshold=0.9)
         result = _resolve_pii_policy(policy, session_override=override)
         assert result is not None
-        assert result.presidio.threshold == 0.9
+        assert result.presidio.threshold == 0.5
 
     def test_no_pii_config_returns_none(self) -> None:
         from faden_gateway.services.gateway.service import _resolve_pii_policy

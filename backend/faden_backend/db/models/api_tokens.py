@@ -19,6 +19,10 @@ from faden_backend.db.base import Base
 #: The ``typ`` claim of an API token. The gateway checks such a token against its row.
 API_TOKEN_TYPE = "api"  # noqa: S105 - a claim value, not a secret
 
+#: The tenant every account is in, and so every token made for one: console sign-ins carry no other.
+#: The server sets it; a request never chooses it. The gateway takes a token's tenant from its row.
+ACCOUNT_TENANT = "default"
+
 
 class ApiToken(Base):
     """One API token. Revoking sets ``revoked_at``; the row stays, for the owner's list."""
@@ -33,7 +37,7 @@ class ApiToken(Base):
         nullable=False,
         index=True,
     )
-    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default="default")
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default=ACCOUNT_TENANT)
     #: What the owner called it, to tell their tokens apart.
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

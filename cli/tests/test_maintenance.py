@@ -72,6 +72,7 @@ def test_the_front_door_restarts_first_and_alone_behind_the_flag(
     monkeypatch.setattr(compose, "_run", run)
     monkeypatch.setattr(compose.shutil, "which", lambda name: name)
     monkeypatch.setattr("faden_cli.commands.deploy._sync_postgres_password", lambda *_: None)
+    monkeypatch.setattr("faden_cli.commands.deploy.retire_fixed_logins", lambda *_: [])
     monkeypatch.setattr("faden_cli.core.clickhouse.drop_stale_logs", lambda _ctx: [])
     monkeypatch.setattr("faden_cli.core.bootstrap.wait_for_backend", lambda *_a, **_k: True)
     monkeypatch.setattr("faden_cli.core.edge.console_url", lambda *_: "http://127.0.0.1")

@@ -43,6 +43,7 @@ from faden_gateway.services.gateway.agents import (
 from faden_gateway.services.gateway.auth import (
     AGENT_TOKEN_TYPE,
     AuthContext,
+    caller_context,
     get_agent_route_claims,
     get_auth_context_from_claims,
 )
@@ -113,7 +114,6 @@ async def agent_request(
 ) -> tuple[AuthContext, AgentRequest]:
     """Who is calling which agent, once the token and access are checked."""
     claims, token = verified
-    auth = get_auth_context_from_claims(claims, token)
     directory = getattr(request.app.state, "agent_directory", None)
     if directory is None:
         raise GatewayError(
@@ -123,6 +123,12 @@ async def agent_request(
             code="agents_unavailable",
         )
     agent_token = claims.get("typ") == AGENT_TOKEN_TYPE
+    # Any other token is checked as on the plain routes: a revoked or expired API token, an outdated
+    # sign-in and a deactivated user are refused here too, and an API token's tenant is its row's.
+    auth = (
+        get_auth_context_from_claims(claims, token) if agent_token
+        else await caller_context(request.app, claims, token)
+    )
     try:
         profile = await directory.agent(auth.tenant_id, agent)
         if agent_token and (profile is None or f"agent:{profile.id}" not in _audiences(claims)):
@@ -212,7 +218,8 @@ def apply_agent(
     Tools outside the host tool contract are held back, not refused: an app updated with new tools keeps
     working with the ones the agent allows, and the new ones wait for review (``agent_manifests``). Unless
     the device may attach local MCP servers (*local_mcp*): their tools are in no contract, and the tool mode
-    treats them as unclassified.
+    treats them as unclassified. With no contract at all nothing is held back, and every tool is
+    unclassified: the gateway marks its calls for the client to ask (``faden.approval_required``).
     """
     if "session_id" in payload:
         raise GatewayError(
@@ -409,12 +416,16 @@ class ToolExecuted(_Event):
 
 
 class ApprovalDecided(_Event):
-    """The user decided on a tool that needed approval."""
+    """A tool call that needed approval was decided: by the user, or by an approval that stood."""
 
     type: Literal["approval.decided"]
     tool: str = Field(max_length=128)
     decision: Literal["approved", "denied", "timeout"]
+    #: How long the user took; none when nobody was asked.
     wait_ms: int | None = Field(default=None, ge=0)
+    #: What let an approved call through: the user for this call, this chat, always on the device, or the
+    #: app's bypass mode (development and trusted automation).
+    scope: Literal["once", "chat", "always", "bypass"] | None = None
 
 
 class LocalMcpAttached(_Event):

@@ -38,7 +38,8 @@ from tests.test_gateway_pipeline_combined import (
 )
 
 CAN_CALL_TOOLS = {"task": "chat", "tools": True}
-HIT = {"filename": "handbook.pdf", "document_id": "d1", "chunk_index": 3, "score": 0.91,
+DOC = "6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60"
+HIT = {"filename": "handbook.pdf", "document_id": DOC, "chunk_index": 3, "score": 0.91,
        "chunk_text": "Alice leads the launch on 5 May."}
 
 
@@ -239,7 +240,7 @@ async def test_a_search_runs_as_the_user_and_its_results_go_back_to_the_model(
     assert second[-2]["role"] == "assistant" and second[-2]["tool_calls"][0]["function"]["name"] == "knowledge_search"
     assert second[-1]["role"] == "tool" and second[-1]["tool_call_id"] == "call_1"
     result = json.loads(second[-1]["content"])
-    assert result["results"][0] == {"source": "handbook.pdf", "document_id": "d1", "chunk": 3, "score": 0.91,
+    assert result["results"][0] == {"source": "handbook.pdf", "document_id": DOC, "chunk": 3, "score": 0.91,
                                     "text": "Alice leads the launch on 5 May."}
 
 
@@ -250,15 +251,52 @@ async def test_a_hit_is_read_further_with_knowledge_open(
     await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
     fastapi_app.state.gateway_observability = _Observability()
     knowledge = _Knowledge(monkeypatch)
-    model = _Model(monkeypatch, _call("knowledge_open", {"document_id": "d1", "chunk": 3}), _say("Two gates."))
+    model = _Model(monkeypatch, _call("knowledge_open", {"document_id": DOC, "chunk": 3}), _say("Two gates."))
 
     await _ask(client)
     (passage,) = knowledge.passages
-    assert {k: v for k, v in passage.items() if k != "api_token"} == {"document_id": "d1", "chunk": 3, "around": 2}
+    assert {k: v for k, v in passage.items() if k != "api_token"} == {"document_id": DOC, "chunk": 3, "around": 2}
     assert _reads_as_user_1(passage["api_token"])
     opened = json.loads(model.sent[1]["messages"][-1]["content"])
     assert opened["source"] == "handbook.pdf"
     assert opened["text"] == "Gates: security, load.\n\nAlice leads the launch on 5 May."
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("document_id", ["../../users/me", f"{DOC}/../../../users?x=", "d1", ""])
+async def test_knowledge_open_reads_only_a_document_id(
+    document_id: str,
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The model chooses the id, and it goes into a URL path: anything but an id goes nowhere."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    knowledge = _Knowledge(monkeypatch)
+    model = _Model(monkeypatch, _call("knowledge_open", {"document_id": document_id, "chunk": 3}), _say("Sorry."))
+
+    await _ask(client)
+    assert knowledge.passages == []
+    told = json.loads(model.sent[1]["messages"][-1]["content"])
+    assert told == {"error": "knowledge_open needs the document_id of a search result."}
+
+
+@pytest.mark.anyio
+async def test_the_passage_client_puts_only_an_id_into_the_path() -> None:
+    import httpx  # noqa: PLC0415
+
+    asked: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path)
+        return httpx.Response(200, json={"chunks": []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as http:
+        rag = RagLiteClient(base_url="http://backend", http_client=http)
+        for bad in ("../../users/me", f"{DOC}?x=1", f"{DOC}/../x", ""):
+            with pytest.raises(ValueError):
+                await rag.passage(document_id=bad, chunk=0)
+        await rag.passage(document_id=DOC.upper(), chunk=0)
+    assert asked == [f"/api/admin/rag/documents/{DOC}/passage"]
 
 
 @pytest.mark.anyio

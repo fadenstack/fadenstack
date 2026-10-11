@@ -242,12 +242,18 @@ INFRA_SERVICES: list[str] = [
 
 # ── Dev backend env vars ─────────────────────────────────────────
 
+#: Where the dev backend, gateway and frontend listen. This machine only: dev
+#: mode signs anyone in as the administrator (POST /auth/dev-login, admin /
+#: admin), so on every interface the whole network was an administrator.
+#: ``faden dev up --lan`` binds :data:`DEV_LAN_HOST` instead, for a dev box
+#: reached over a network you trust.
+DEV_BIND_HOST = "127.0.0.1"
+DEV_LAN_HOST = "0.0.0.0"
+
 BACKEND_DEV_ENV: dict[str, str] = {
-    # Bind the dev backend to all interfaces so it is reachable from
-    # other machines on the LAN (remote dev server, node agents,
-    # external API clients). Override with FADEN_BACKEND_HOST=
-    # 127.0.0.1 in the local .env to keep it local-only.
-    "FADEN_BACKEND_HOST": "0.0.0.0",
+    # This machine only (DEV_BIND_HOST); `faden dev up --lan` opens it to the
+    # network, rewriting this key each run.
+    "FADEN_BACKEND_HOST": DEV_BIND_HOST,
     "FADEN_BACKEND_PORT": "8000",
     # Session cookies must not carry the Secure flag in dev: browsers
     # drop Secure cookies over plain HTTP, which would silently break
@@ -301,12 +307,12 @@ INFRA_HOST_KEYS: tuple[str, ...] = (
 #: Default env for the API gateway dev process (``faden dev up``).
 #:
 #: The gateway is the OpenAI-compatible ``/v1`` edge. In dev it runs as a
-#: host process on port 8001 (bound to all interfaces, mirroring the
-#: backend) and points at the shared 127.0.0.1-published infra (postgres
+#: host process on port 8001 (on this machine only, like the backend; ``--lan``
+#: opens both) and points at the shared 127.0.0.1-published infra (postgres
 #: / redis / rabbit). Chat-file uploads go to a host-local directory
 #: instead of the containerized ``/data/faden`` volume.
 GATEWAY_DEV_ENV: dict[str, str] = {
-    "FADEN_GATEWAY_HOST": "0.0.0.0",
+    "FADEN_GATEWAY_HOST": DEV_BIND_HOST,
     "FADEN_GATEWAY_PORT": "8001",
     # 127.0.0.1, never "localhost": see INFRA_LOOPBACK.
     "FADEN_GATEWAY_DB_HOST": "127.0.0.1",
@@ -499,6 +505,12 @@ def backend_dev_env_for(shared_env_path: Path) -> dict[str, str]:
     """
     env = dict(BACKEND_DEV_ENV)
     shared = _read_env_values(shared_env_path)
+    # The gateway's tables (usage, chats for the admin pages) are read with the
+    # shared Postgres login, as in an install. The backend's default was
+    # llm_user/llm_user, a login the shared initdb no longer makes.
+    if shared.get("POSTGRES_USER") and shared.get("POSTGRES_PASSWORD"):
+        env["FADEN_BACKEND_LLM_GRAPH_DB_USER"] = shared["POSTGRES_USER"]
+        env["FADEN_BACKEND_LLM_GRAPH_DB_PASS"] = shared["POSTGRES_PASSWORD"]
     backend_pass = shared.get("RABBITMQ_BACKEND_PASS")
     if backend_pass:
         env["FADEN_BACKEND_RABBIT_USER"] = "faden-backend"

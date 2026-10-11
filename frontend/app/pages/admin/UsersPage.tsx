@@ -7,6 +7,7 @@ import { UserApiTokensDialog } from "./UserApiTokensDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
 import { formatDateTime } from "~/lib/dates";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { useAsyncData } from "~/lib/useAsyncData";
 
 import Alert from "@mui/material/Alert";
@@ -418,7 +419,7 @@ export default function UsersPage() {
         loading={creating}
         submitLabel={t("users.create")}
         cancelLabel={t("common.cancel")}
-        submitDisabled={!newEmail.trim() || newPassword.length < 6}
+        submitDisabled={!newEmail.trim() || newPassword.length < MIN_PASSWORD_LENGTH}
         onSubmit={handleCreate}
         onClose={() => setCreateOpen(false)}
       >

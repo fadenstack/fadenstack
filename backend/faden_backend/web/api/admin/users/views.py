@@ -17,11 +17,12 @@ from faden_backend.db.dao.audit_dao import AuditDAO
 from faden_backend.db.dao.groups_dao import GroupDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.dependencies import get_db_session
-from faden_backend.db.models.api_tokens import API_TOKEN_TYPE, ApiToken
+from faden_backend.db.models.api_tokens import ACCOUNT_TENANT, API_TOKEN_TYPE, ApiToken
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import require_superuser
 from faden_backend.web.api.admin.users.preferences import (
@@ -361,6 +362,10 @@ async def create_user(
     """Admin-initiated user creation."""
     from fastapi_users.password import PasswordHelper  # noqa: PLC0415
 
+    problem = password_problem(payload.password, payload.email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
+
     # Check if email already exists
     existing = await session.execute(select(User).where(User.email == payload.email))  # type: ignore[arg-type]
     if existing.scalar_one_or_none():
@@ -473,6 +478,9 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect.",
         )
+    problem = password_problem(payload.new_password, user.email)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
     user.hashed_password = password_helper.hash(payload.new_password)
     session.add(user)
     await session.flush()
@@ -497,6 +505,12 @@ async def generate_api_token(
     from faden_backend.services.system_settings.runtime_mapping import refresh_runtime_values  # noqa: PLC0415
     from faden_backend.settings import settings  # noqa: PLC0415
 
+    # The tenant is the account's, never the caller's choice: it decides the rules the gateway applies.
+    if payload.tenant_id not in (None, ACCOUNT_TENANT):
+        raise HTTPException(
+            status_code=422,
+            detail=f"An API token is in your account's tenant ({ACCOUNT_TENANT}); it cannot name another.",
+        )
     # The lifetimes as they are now: with several workers, a change reaches only the one that took it.
     await refresh_runtime_values(session, prefix="users.api_token_")
     secret = await _resolve_users_secret(session)
@@ -518,7 +532,7 @@ async def generate_api_token(
     record = ApiToken(
         id=uuid.uuid4(),
         user_id=user.id,
-        tenant_id=payload.tenant_id,
+        tenant_id=ACCOUNT_TENANT,
         name=(payload.name or "").strip() or None,
         expires_at=datetime.fromtimestamp(now + lifetime, tz=UTC),
     )
@@ -527,7 +541,7 @@ async def generate_api_token(
 
     claims: dict = {
         "sub": str(user.id),
-        "tenant_id": payload.tenant_id,
+        "tenant_id": record.tenant_id,
         "email": user.email,
         "iat": now,
         # The gateway looks the token up by its jti, so revoking the row ends the token.

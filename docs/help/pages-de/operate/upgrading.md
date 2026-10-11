@@ -96,9 +96,13 @@ Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil 
        bricht ab, wenn sich nichts sichern ließ;
     3. ersetzt die Dateien der Installation durch die des neuen Release und ergänzt in der `.env` nur die
        Einstellungen, die das Release neu einführt: Jeder Wert, den Sie gesetzt haben, bleibt erhalten, außer der
-       Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird;
+       Bemessung der Dienste, die wie bei `faden tune` neu für den Host berechnet wird. Fehlt ein Schlüssel, der
+       gespeicherte Daten versiegelt, bekommt er den Wert, mit dem die Installation lief, nie einen neuen, und das
+       Upgrade sagt es (siehe [Geheimnisse in der .env](installing.md#secrets-in-env));
     4. lädt die Images des neuen Release herunter;
-    5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen;
+    5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen, und die beiden
+       Postgres-Anmeldungen mit festen Passwörtern, die frühere Releases angelegt haben (`llm_user`,
+       `faden_backend`, von nichts genutzt), werden abgeschaltet;
     6. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
     7. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
        fehlgeschlagener Download hält nichts auf: Wiederholen Sie ihn mit `faden runtime-images`.
@@ -110,6 +114,12 @@ Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil 
 | `--backup-dir PATH` | Die Sicherung vor dem Upgrade woanders ablegen |
 | `--no-backup` | Die Sicherung überspringen. Nur, wenn Sie eine aktuelle haben |
 | `--runtime-images ARCHS` | Welche Runtime-Images geholt werden: `all`, `none`, `x86_64`, `aarch64`. Bleibt gespeichert |
+
+!!! note "Der Chat prüft seit Release 0.4.2 die Rollen"
+    Bisher konnte jedes aktive Konto chatten. Jetzt chattet, wer `default_user` hat oder eine Rolle mit den
+    Berechtigungen `chat.*`. Nach dem Upgrade chattet ein Konto, dem Sie nur andere Rollen gegeben haben, etwa
+    `operator` oder `viewer`, nicht mehr: Kreuzen Sie dafür zusätzlich `default_user` an (siehe
+    [Benutzer](../administer/users.md)).
 
 !!! warning
     Ein Upgrade geht nur vorwärts: Die Datenbanken werden auf das neue Release migriert. Das Werkzeug weigert

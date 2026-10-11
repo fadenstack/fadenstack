@@ -105,7 +105,7 @@
     "reset_password_success": "密码已重置，现在可以登录。",
     "reset_password_missing_token": "URL 中缺少重置令牌。",
     "reset_password_mismatch": "两次输入的密码不一致。",
-    "reset_password_too_short": "密码长度至少为 6 个字符。",
+    "reset_password_too_short": "密码长度至少为 8 个字符。",
     "reset_password_failed": "密码重置失败。"
   },
   "root_mode": {
@@ -1641,12 +1641,10 @@
     "new_password": "新密码",
     "confirm_password": "确认新密码",
     "password_mismatch": "两次输入的新密码不一致。",
-    "password_too_short": "密码长度至少为6个字符。",
+    "password_too_short": "密码长度至少为8个字符。",
     "password_changed": "密码修改成功。",
     "api_token": "API令牌",
     "api_token_desc": "为LLM API网关生成Bearer令牌。",
-    "tenant_id": "租户ID",
-    "tenant_id_help": "包含在JWT声明中的租户标识符。",
     "token_expiry": "令牌有效期",
     "generate_token": "生成令牌",
     "generated_token_label": "您的API令牌：",
@@ -3690,6 +3688,12 @@
         "cancelled": "已取消",
         "approved": "已批准",
         "timeout": "已超时"
+      },
+      "scope": {
+        "once": "仅此一次",
+        "chat": "本次聊天",
+        "always": "始终",
+        "bypass": "绕过模式"
       },
       "count_tools_one": "{{count}} 个工具",
       "count_tools_other": "{{count}} 个工具",

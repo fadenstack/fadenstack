@@ -192,6 +192,17 @@ def upgrade_cmd(
     else:
         console.print("\n[dim]Skipping pre-flight checks (--skip-doctor).[/dim]")
 
+    # The compose file has no fallback for its passwords, keys and tokens any
+    # more, and every compose command stops on one missing -- the checks and
+    # the backup's too. So an older .env gets them first. A missing key that
+    # seals stored data keeps the value this install ran on
+    # (env_gen.fill_required_env).
+    if env_path.exists():
+        from faden_cli.core.env_gen import fill_required_env  # noqa: PLC0415
+
+        for note in fill_required_env(env_path, profiles=list(cfg.profiles)):
+            warning(note)
+
     # Before the backup and the builds, not after: compose cannot replace a
     # container it did not create, and the restart would stop on it.
     from faden_cli.core.compose import foreign_containers  # noqa: PLC0415
@@ -246,10 +257,12 @@ def upgrade_cmd(
         env_vars = default_env_vars(profiles=list(cfg.profiles))
         env_vars.update(read_env_file(env_path))
         write_env_file(env_path, env_vars)
-        if release is not None:
-            from faden_cli.commands.deploy import pin_release  # noqa: PLC0415
+        from faden_cli.commands.deploy import pin_release, record_installer  # noqa: PLC0415
 
+        if release is not None:
             pin_release(env_path)
+        else:
+            record_installer(env_path, shared_dir)
         success(".env refreshed (existing settings kept).")
         # Sized again, as deploy does: what ``faden tune`` last chose.
         from faden_cli.core.tune import tune_env  # noqa: PLC0415
@@ -353,9 +366,11 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     console.print(f"\n[bold cyan]Step {step}: Rolling restart…[/bold cyan]")
 
     # Sync postgres password before restarting (same as deploy)
-    from faden_cli.commands.deploy import _sync_postgres_password  # noqa: PLC0415
+    from faden_cli.commands.deploy import _sync_postgres_password, retire_fixed_logins  # noqa: PLC0415
 
     _sync_postgres_password(ctx, env_path)
+    # Earlier releases made two logins with fixed passwords on every install.
+    retire_fixed_logins(env_path)
 
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the

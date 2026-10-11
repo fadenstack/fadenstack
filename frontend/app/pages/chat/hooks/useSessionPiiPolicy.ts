@@ -37,16 +37,21 @@ export interface UseSessionPiiPolicyResult {
   clearOverride: () => Promise<void>;
 }
 
+/** The lowest threshold an override without the weaken right gets (zero would mean "the service's default"). */
+export const MIN_STRICT_THRESHOLD = 0.01;
+
 /**
  * Merge a flat SessionPIIOverride onto a PIIPolicyConfig floor to produce
  * an effective config.  Mirrors the server-side clamp_and_merge logic
- * (the UI controls already prevent weakening below floor). The mode changes
- * only when the user may change it (*canSwitchMode*), as on the server.
+ * The mode changes only when the user may change it (*canSwitchMode*), and the
+ * score threshold only goes down from the floor (a higher one finds less)
+ * unless the user may weaken (*canWeaken*), as on the server.
  */
 export function applyOverride(
   floor: PIIPolicyConfig,
   ov: SessionPIIOverride,
   canSwitchMode = true,
+  canWeaken = false,
 ): PIIPolicyConfig {
   return {
     telemetry: {
@@ -70,7 +75,9 @@ export function applyOverride(
     presidio: {
       ...floor.presidio,
       ...(ov.presidio_threshold != null && {
-        threshold: ov.presidio_threshold,
+        threshold: canWeaken
+          ? ov.presidio_threshold
+          : Math.min(floor.presidio.threshold, Math.max(ov.presidio_threshold, MIN_STRICT_THRESHOLD)),
       }),
       entities: [
         ...floor.presidio.entities,
@@ -155,7 +162,12 @@ export function useSessionPiiPolicy(
     const hasOverride = Object.values(localOverrides).some((v) => v != null);
     if (hasOverride) {
       const canSwitchMode = defaults.can_switch_mode !== false;
-      const effective = applyOverride(defaults.floor, localOverrides, canSwitchMode);
+      const effective = applyOverride(
+        defaults.floor,
+        localOverrides,
+        canSwitchMode,
+        defaults.can_weaken === true,
+      );
       setPolicy({
         ...defaults,
         has_override: true,

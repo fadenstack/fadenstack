@@ -114,3 +114,19 @@ def test_an_unreachable_backend_is_no_crash(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(bootstrap.httpx, "post", down)
     assert bootstrap.run_bootstrap("https://console.example", token="t") is None  # noqa: S106
+
+
+def test_a_short_admin_password_is_asked_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The backend takes 8 characters at least; refused there, deploy stopped with everything running."""
+    answers = iter(["short", "long-enough"])
+    monkeypatch.setattr("click.prompt", lambda *_a, **_k: next(answers))
+    assert bootstrap.prompt_admin_password() == "long-enough"
+    monkeypatch.setattr("click.prompt", lambda *_a, **_k: "")
+    assert bootstrap.prompt_admin_password() is None, "blank: the backend generates one"
+
+
+def test_a_refused_password_says_why(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    detail = "The password must not be the account's e-mail address."
+    monkeypatch.setattr(bootstrap.httpx, "post", lambda *_a, **_k: _Answer(422, {"detail": detail}))
+    assert bootstrap.run_bootstrap("http://127.0.0.1", email="a@b.c", password="a@b.c", token="t") is None
+    assert "e-mail address" in capsys.readouterr().out

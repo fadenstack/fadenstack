@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from faden_backend.services.password_policy import MAX_LENGTH, MIN_LENGTH
+
 
 class PermissionDTO(BaseModel):
     """A single resource/action permission."""
@@ -89,13 +91,20 @@ class ChangePasswordRequest(BaseModel):
     """Self-service password change."""
 
     current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=MIN_LENGTH, max_length=MAX_LENGTH)
 
 
 class GenerateApiTokenRequest(BaseModel):
     """Request to generate an API gateway JWT token."""
 
-    tenant_id: str = Field(default="default", min_length=1, max_length=128)
+    tenant_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description=(
+            "Not needed: a token is in its account's tenant. Older clients send `default`; "
+            "naming another tenant is refused."
+        ),
+    )
     expires_in: int | None = Field(
         default=None,
         gt=0,
@@ -140,7 +149,7 @@ class CreateUserRequest(BaseModel):
     """Admin-initiated user creation."""
 
     email: str
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     is_superuser: bool = False
     role_ids: list[uuid.UUID] = Field(default_factory=list)
 

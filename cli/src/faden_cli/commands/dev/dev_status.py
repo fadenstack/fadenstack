@@ -94,6 +94,10 @@ def dev_status() -> None:
     compose_file = resolve_shared_compose(workspace)
     if compose_file:
         env_file = compose_file.parent / ".env"
+        if env_file.exists():
+            from faden_cli.commands.dev.dev_up import heal_dev_env
+
+            heal_dev_env(env_file)
         ctx = ComposeContext(
             compose_files=[str(compose_file)],
             env_file=str(env_file) if env_file.exists() else None,

@@ -105,7 +105,7 @@
     "reset_password_success": "Votre mot de passe a été réinitialisé. Vous pouvez vous connecter maintenant.",
     "reset_password_missing_token": "Le jeton de réinitialisation est absent de l'URL.",
     "reset_password_mismatch": "Les mots de passe ne correspondent pas.",
-    "reset_password_too_short": "Le mot de passe doit comporter au moins 6 caractères.",
+    "reset_password_too_short": "Le mot de passe doit comporter au moins 8 caractères.",
     "reset_password_failed": "Échec de la réinitialisation du mot de passe."
   },
   "root_mode": {
@@ -1784,12 +1784,10 @@
     "new_password": "Nouveau mot de passe",
     "confirm_password": "Confirmer le nouveau mot de passe",
     "password_mismatch": "Les nouveaux mots de passe ne correspondent pas.",
-    "password_too_short": "Le mot de passe doit comporter au moins 6 caractères.",
+    "password_too_short": "Le mot de passe doit comporter au moins 8 caractères.",
     "password_changed": "Mot de passe changé avec succès.",
     "api_token": "Jeton API",
     "api_token_desc": "Générer un jeton Bearer pour la passerelle API LLM.",
-    "tenant_id": "ID locataire",
-    "tenant_id_help": "L'identifiant du locataire inclus dans les revendications JWT.",
     "token_expiry": "Expiration du jeton",
     "generate_token": "Générer un jeton",
     "generated_token_label": "Votre jeton API :",
@@ -3690,6 +3688,12 @@
         "cancelled": "annulé",
         "approved": "approuvé",
         "timeout": "délai dépassé"
+      },
+      "scope": {
+        "once": "une fois",
+        "chat": "pour ce chat",
+        "always": "toujours",
+        "bypass": "mode bypass"
       },
       "count_tools_one": "{{count}} outil",
       "count_tools_other": "{{count}} outils",

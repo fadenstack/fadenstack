@@ -65,7 +65,8 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 ??? info "Mehr zu lokalen MCP-Servern"
     **Lokale MCP-Server**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Tools des Servers
     und die Tools der Anwendung, die seine Version unter **Host-Tools** nennt; eine Version, die keine nennt, hält
-    nichts zurück. **Erlaubt** lässt ihn MCP-Server auf dem Computer der Person einbinden; deren Tools sind nicht
+    nichts zurück, doch dann ist jedes Tool der Anwendung nicht eingestuft und fragt jedes Mal zuerst. **Erlaubt**
+    lässt ihn MCP-Server auf dem Computer der Person einbinden; deren Tools sind nicht
     eingestuft und fragen deshalb immer zuerst. Personen im **Entwicklermodus** (siehe
     [Benutzer, Gruppen und Rollen](users.md#developer-mode)) dürfen sie in jedem Fall einbinden.
 

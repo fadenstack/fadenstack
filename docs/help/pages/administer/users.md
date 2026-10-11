@@ -22,14 +22,16 @@ someone's access.
 ??? info "What each built-in role gives"
     | Role | Gives |
     |---|---|
-    | `default_user` | The chat: chats, projects and attachments, their own skills (create and share), and reading the knowledge base's collections that are open to them. Every new account gets it unless you pick other roles. |
+    | `default_user` | The chat: chats, projects and attachments, in the chat and through the API, their own skills (create and share), and reading the knowledge base's collections that are open to them. Every new account gets it unless you pick other roles. |
     | `viewer` | Reading the state of models, clusters, machines, containers and logs, through the API. |
     | `operator` | What `viewer` gives, and running models through the API: creating, changing, scaling, stopping and starting clusters and deployments. Not deleting. |
     | `admin` | Every permission, including deleting, making a skill visible to the whole organisation (`skills:publish`), administering every skill (`skills:manage`), and creating and deleting agents (`agents:create`, `agents:delete`). |
     | `rag_manager`, `rag_editor`, `rag_viewer` | Managing or editing the knowledge base (`rag_manager`, `rag_editor`: they see every collection and set who reads each), or reading it (`rag_viewer`). |
 
 !!! note
-    Roles you tick replace `default_user`. For someone who should also chat, tick `default_user` as well.
+    Roles you tick replace `default_user`. For someone who should also chat, tick `default_user` as well:
+    without it, or a role of your own with the `chat.*` permissions, nobody chats, in the chat or through the
+    API. Superusers need no role.
 
 ## Who reads which collection
 
@@ -53,7 +55,7 @@ A restricted collection shows a lock beside its name.
 ![Create New User: Email and Password, the Superuser switch, and Assign Roles with the built-in roles to tick](../images/administer/users-create.png)
 
 1. Open **Access Control → Users** and select **Create User**.
-2. Enter their e-mail address and a first password of at least 6 characters.
+2. Enter their e-mail address and a first password of at least 8 characters.
 3. Leave **Superuser** off, unless they administer Fadenstack with you.
 4. Under **Assign Roles**, leave everything empty for people who only chat: they get `default_user`.
 5. Select **Create User**.

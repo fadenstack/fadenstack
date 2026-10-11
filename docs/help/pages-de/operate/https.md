@@ -210,9 +210,12 @@ eigenes Netzwerk.
 
 1. Schalten Sie HTTPS ein (`faden tls generate` oder `faden tls use`), bevor Sie Maschinen hinzufügen.
 2. Importieren Sie `ca.crt` in die Browser, von denen aus die Konsole genutzt wird, statt die Warnung zu bestätigen.
-3. Wenn HTTPS dauerhaft bleibt, schalten Sie HTTP Strict Transport Security ein: Setzen Sie
-   `FADEN_HSTS_MAX_AGE=31536000` in `~/fadenstack/.env` und übernehmen Sie es mit `faden up nginx`. Standardmäßig
-   ist der Wert 0 (aus), damit sich HTTPS wieder abschalten lässt, ohne Browser auszusperren.
+3. Wenn HTTPS dauerhaft bleibt und jeder Browser, von dem aus die Konsole genutzt wird, ihrem Zertifikat vertraut,
+   schalten Sie HTTP Strict Transport Security ein: Setzen Sie `FADEN_HSTS_MAX_AGE=31536000` in
+   `~/fadenstack/.env` und übernehmen Sie es mit `faden up nginx`. Standardmäßig ist der Wert 0 (aus): Unter HSTS
+   bietet ein Browser keinen Weg an einer Zertifikatswarnung vorbei. Mit einem selbst signierten Zertifikat oder einer
+   eigenen Zertifizierungsstelle wäre jeder Browser ausgesperrt, der ihr noch nicht vertraut, und HTTPS ließe sich
+   nicht wieder abschalten.
 4. Lassen Sie Grafana und Langfuse auf der Loopback-Adresse des Servers (die Voreinstellung; setzen Sie weder
    `GRAFANA_BIND` noch `LANGFUSE_BIND`). Grafana ist in der Konsole unter `/grafana/` erreichbar, für angemeldete
    Benutzer, die es sehen dürfen. Langfuse erreichen Sie über einen SSH-Tunnel:

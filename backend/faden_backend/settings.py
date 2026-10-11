@@ -392,7 +392,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("FADEN_BACKEND_LOGS_ALLOWED_LABELS"),
     )
     i18n_dir: str = "i18n"
+    # The development default; outside the dev environment the backend refuses
+    # to start with it (published_secrets.py) unless allow_published_keys is set.
     settings_master_key: str = "dev-settings-master-key-change-me"
+    # Start anyway with the published development master key: for an install
+    # that has already stored its secrets with it, until the key is changed
+    # (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).
+    allow_published_keys: bool = False
     system_compose_file: str = "../shared/docker-compose.yaml"
     system_agent_enabled: bool = False
     system_agent_token: str | None = None

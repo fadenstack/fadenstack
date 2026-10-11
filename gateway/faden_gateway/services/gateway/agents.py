@@ -56,12 +56,26 @@ LEFT JOIN LATERAL (
 WHERE a.tenant_id = $1 AND (a.slug = $2 OR a.id::text = $2)
 """
 
-_USER_SQL = 'SELECT is_active, is_superuser FROM "user" WHERE id = $1::uuid'
+#: The user's flags, and the ``chat.*`` permissions their roles give, their groups' roles included.
+_USER_SQL = """
+SELECT u.is_active, u.is_superuser,
+       ARRAY(SELECT DISTINCT p.resource || ':' || p.action
+             FROM permissions p
+             JOIN role_permissions rp ON rp.permission_id = p.id
+             WHERE p.resource LIKE 'chat.%'
+               AND rp.role_id IN (SELECT ur.role_id FROM user_roles ur WHERE ur.user_id = u.id
+                                  UNION
+                                  SELECT gr.role_id FROM group_roles gr
+                                  JOIN user_groups ug ON ug.group_id = gr.group_id
+                                  WHERE ug.user_id = u.id)) AS chat_permissions
+FROM "user" u
+WHERE u.id = $1::uuid
+"""
 
 #: A query, not a secret; S105 only sees "TOKEN" in the name.
 _API_TOKEN_SQL = (
     "SELECT user_id::text AS user_id, revoked_at IS NOT NULL AS revoked, "  # noqa: S105
-    "coalesce(expires_at <= now(), false) AS expired "
+    "coalesce(expires_at <= now(), false) AS expired, tenant_id "
     "FROM api_tokens WHERE id = $1::uuid"
 )
 
@@ -147,16 +161,20 @@ class UserFlags:
 
     is_active: bool
     is_superuser: bool
+    #: The ``chat.*`` permissions (``resource:action``) the user's roles and groups give.
+    chat_permissions: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
 class ApiTokenRecord:
-    """An API token's row in the backend: whose it is, whether it was revoked, whether it has expired."""
+    """An API token's row in the backend: whose it is, whether it was revoked or has expired, its tenant."""
 
     user_id: str
     revoked: bool
     #: Past the row's ``expires_at``: a token made before every token expired carries no ``exp`` claim.
     expired: bool = False
+    #: The tenant the backend made the token for. The token's ``tenant_id`` claim is not taken for it.
+    tenant_id: str = "default"
 
 
 class AgentLookupError(Exception):
@@ -251,7 +269,11 @@ class BackendAgents:
             return None  # not a user id
         except Exception as exc:
             raise AgentLookupError(str(exc)) from exc
-        return UserFlags(bool(row["is_active"]), bool(row["is_superuser"])) if row is not None else None
+        if row is None:
+            return None
+        return UserFlags(
+            bool(row["is_active"]), bool(row["is_superuser"]), frozenset(row["chat_permissions"] or ()),
+        )
 
     async def api_token(self, token_id: str) -> ApiTokenRecord | None:
         try:
@@ -263,7 +285,9 @@ class BackendAgents:
             raise AgentLookupError(str(exc)) from exc
         if row is None:
             return None
-        return ApiTokenRecord(str(row["user_id"]), bool(row["revoked"]), bool(row["expired"]))
+        return ApiTokenRecord(
+            str(row["user_id"]), bool(row["revoked"]), bool(row["expired"]), str(row["tenant_id"]),
+        )
 
     async def close(self) -> None:
         if self._pool is not None:

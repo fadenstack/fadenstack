@@ -1,7 +1,7 @@
 """The update check keeps the release feed it last read, and how its last attempt went.
 
 Revision ID: upd4t3ch
-Revises: t0k3nl1f3
+Revises: ch4tr0l3s
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "upd4t3ch"
-down_revision = "t0k3nl1f3"
+down_revision = "ch4tr0l3s"
 branch_labels = None
 depends_on = None
 

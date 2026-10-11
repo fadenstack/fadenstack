@@ -105,7 +105,7 @@
     "reset_password_success": "Su contraseña fue restablecida. Ya puede iniciar sesión.",
     "reset_password_missing_token": "Falta el token de restablecimiento en la URL.",
     "reset_password_mismatch": "Las contraseñas no coinciden.",
-    "reset_password_too_short": "La contraseña debe tener al menos 6 caracteres.",
+    "reset_password_too_short": "La contraseña debe tener al menos 8 caracteres.",
     "reset_password_failed": "No se pudo restablecer la contraseña."
   },
   "root_mode": {
@@ -1641,12 +1641,10 @@
     "new_password": "Nueva contraseña",
     "confirm_password": "Confirmar nueva contraseña",
     "password_mismatch": "Las nuevas contraseñas no coinciden.",
-    "password_too_short": "La contraseña debe tener al menos 6 caracteres.",
+    "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
     "password_changed": "Contraseña cambiada exitosamente.",
     "api_token": "Token de API",
     "api_token_desc": "Genere un token Bearer para la puerta de enlace de API LLM.",
-    "tenant_id": "ID de inquilino",
-    "tenant_id_help": "El identificador de inquilino incluido en los claims del JWT.",
     "token_expiry": "Expiración del token",
     "generate_token": "Generar token",
     "generated_token_label": "Su token de API:",
@@ -3690,6 +3688,12 @@
         "cancelled": "cancelado",
         "approved": "aprobado",
         "timeout": "tiempo agotado"
+      },
+      "scope": {
+        "once": "una vez",
+        "chat": "para este chat",
+        "always": "siempre",
+        "bypass": "modo bypass"
       },
       "count_tools_one": "{{count}} herramienta",
       "count_tools_other": "{{count}} herramientas",

@@ -24,6 +24,8 @@ async def swagger_ui_html(request: Request) -> HTMLResponse:
         oauth2_redirect_url=str(request.url_for("swagger_ui_redirect")),
         swagger_js_url="/static/docs/swagger-ui-bundle.js",
         swagger_css_url="/static/docs/swagger-ui.css",
+        # FastAPI's default is an icon on fastapi.tiangolo.com: no third-party request from these pages.
+        swagger_favicon_url="/favicon.ico",
     )
 
 
@@ -50,4 +52,7 @@ async def redoc_html(request: Request) -> HTMLResponse:
         openapi_url=request.app.openapi_url,
         title=f"{title} - ReDoc",
         redoc_js_url="/static/docs/redoc.standalone.js",
+        # FastAPI's defaults load fonts from Google and an icon from fastapi.tiangolo.com.
+        redoc_favicon_url="/favicon.ico",
+        with_google_fonts=False,
     )

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -160,9 +161,11 @@ class KnowledgeTools:
         })
 
     async def _open(self, arguments: dict[str, Any]) -> str:
-        document_id = str(arguments.get("document_id") or "").strip()
-        if not document_id:
-            raise ValueError("knowledge_open needs the document_id of a search result.")
+        # The model chose it, and it goes into a URL path: an id, or nothing.
+        try:
+            document_id = str(uuid.UUID(str(arguments.get("document_id") or "").strip()))
+        except ValueError:
+            raise ValueError("knowledge_open needs the document_id of a search result.") from None
         passage = await self._client.passage(
             document_id=document_id,
             chunk=int(arguments.get("chunk") or 0),

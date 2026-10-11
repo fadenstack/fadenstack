@@ -180,7 +180,7 @@
       },
       "account": {
         "title": "Their sign-in",
-        "body": "Their email address and a first password of at least 6 characters. Pass the password on to them in person or by phone."
+        "body": "Their email address and a first password of at least 8 characters. Pass the password on to them in person or by phone."
       },
       "roles": {
         "title": "What they may do",

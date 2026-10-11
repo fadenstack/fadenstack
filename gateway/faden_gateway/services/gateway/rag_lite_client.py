@@ -7,6 +7,7 @@ who asked.
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import httpx
@@ -65,11 +66,14 @@ class RagLiteClient:
 
         The text of a document around one chunk: ``filename``, ``chunk_count``
         and ``chunks`` (``chunk_index``, ``text``). Raises on failure: the
-        model is told, rather than handed an empty passage.
+        model is told, rather than handed an empty passage. *document_id*
+        must be a UUID (``ValueError`` otherwise).
         """
+        # Only an id goes into the path: anything else could lead elsewhere on the backend.
+        document = uuid.UUID(document_id)
         headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
         resp = await self._http.get(
-            f"{self._base}/api/admin/rag/documents/{document_id}/passage",
+            f"{self._base}/api/admin/rag/documents/{document}/passage",
             params={"chunk": chunk, "around": around},
             timeout=15.0,
             headers=headers,

@@ -231,3 +231,14 @@ def test_deploy_with_yes_or_the_flag(tmp_path: Path) -> None:
     assert cfg.update_check is True and "FADEN_UPDATE_CHECK=true" in env.read_text(encoding="utf-8")
     cfg, _ = _deploy_step(env, choice=False, yes=True)
     assert cfg.update_check is False and "FADEN_UPDATE_CHECK=false" in env.read_text(encoding="utf-8")
+
+
+def test_a_source_checkout_is_upgraded_with_git_not_a_newer_cli(tmp_path: Path) -> None:
+    from faden_cli.commands import deploy as deploy_module  # noqa: PLC0415
+
+    env = tmp_path / ".env"
+    env.write_text("POSTGRES_PASSWORD=pw\n", encoding="utf-8")
+    deploy_module.record_installer(env, tmp_path)
+    text = env.read_text(encoding="utf-8")
+    assert "FADEN_CLI_INSTALLER=source" in text
+    assert "VERSION=" not in text  # a checkout builds its own images: nothing to pin

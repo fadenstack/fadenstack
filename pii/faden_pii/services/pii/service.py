@@ -46,10 +46,6 @@ DEFAULT_ENTITIES: list[str] = [
     "URL",
 ]
 
-# Supported language codes configured for PII detection.
-SUPPORTED_LANGUAGES: list[str] = ["en", "de", "es", "zh"]
-
-
 @dataclass
 class DetectedEntity:
     """A single PII entity detected in the text."""
@@ -109,6 +105,11 @@ class PIIService:
         self._default_language = default_language
         self._default_score_threshold = default_score_threshold
         self._analyses = _AnalysisCache(analysis_cache_size)
+
+    @property
+    def supported_languages(self) -> list[str]:
+        """Languages the loaded NLP models cover: the only ones a check can run in."""
+        return sorted(self._analyzer.nlp_engine.get_supported_languages())
 
     # ------------------------------------------------------------------
     # Factory

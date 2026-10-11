@@ -63,11 +63,11 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 |---|---|---|---|---|
 | Read the page, tabs, PDFs, the selection; search; show where | no | runs | runs | runs |
 | Fill a field, write into an editor, copy to the clipboard, open a page | no | no | asks | runs |
-| Press a button or follow a link | no | no | asks | asks |
+| Press a button or follow a link | no | no | asks, every time | asks, every time |
 
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
 
-When it asks, a card shows **Run …?** with the action and what it is given. Select **Allow**, **Allow for this chat**, or **Deny**.
+When it asks, a card shows **Run …?** with the action and what it is given. Select **Allow** (this once), **Allow for this chat** (until you close or reopen the chat), **Allow always** (for this agent in this browser), or **Deny**. Pressing a button, and anything your administrator wants asked first, offers only **Allow** and **Deny**: it asks every time. **Reset approvals**, at the bottom of the tool-mode menu, takes back what you allowed for the chat and always.
 
 ??? info "What the card shows for a field or a button"
     For a field or a button, what the action is given is the page's internal reference, not its label.
@@ -76,7 +76,7 @@ When it asks, a card shows **Run …?** with the action and what it is given. Se
 
 - It never reads the content of a site you have not allowed; only the titles and addresses of this window's tabs reach the model. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it.
 - It never reads out or fills in password fields, nor card fields the site marks as such. A payment field the site does not mark is read and filled like any other field.
-- It never presses a button, such as **Send**, without asking you separately.
+- It never presses a button, such as **Send**, without asking you, every time: no earlier answer covers it.
 - It is told never to take instructions from the page: text on a page is something to read, not an order to follow. A page can still mislead a model, so read what a card asks before you allow it.
 - It never reaches files on your computer that you did not add.
 

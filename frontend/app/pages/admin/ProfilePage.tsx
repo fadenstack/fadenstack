@@ -35,6 +35,7 @@ import AppearanceSettings from "~/components/AppearanceSettings";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { adminUsers, type ApiTokenInfo } from "~/api/admin";
 import { auth, type AuthUser } from "~/api/auth";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 
 // ── Token expiry options ─────────────────────────────────────────────
 
@@ -67,7 +68,6 @@ export default function ProfilePage() {
 
   // ── Token generation ─────────────────────────────────────────────
   const [tokenName, setTokenName] = useState("");
-  const [tenantId, setTenantId] = useState("default");
   const [expiresIn, setExpiresIn] = useState<number | null>(86400);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -116,7 +116,7 @@ export default function ProfilePage() {
       setPwError(t("profile.password_mismatch"));
       return;
     }
-    if (newPassword.length < 6) {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
       setPwError(t("profile.password_too_short"));
       return;
     }
@@ -143,7 +143,7 @@ export default function ProfilePage() {
     setCopied(false);
     setTokenLoading(true);
     try {
-      const result = await adminUsers.generateApiToken(tenantId, expiresIn ?? undefined, tokenName);
+      const result = await adminUsers.generateApiToken(expiresIn ?? undefined, tokenName);
       setGeneratedToken(result.token);
       setTokenName("");
       loadTokens();
@@ -336,15 +336,6 @@ export default function ProfilePage() {
               data-tour-id="profile.token.name"
             />
 
-            <TextField
-              label={t("profile.tenant_id")}
-              size="small"
-              fullWidth
-              value={tenantId}
-              onChange={(e) => setTenantId(e.target.value)}
-              helperText={t("profile.tenant_id_help")}
-            />
-
             <FormControl size="small" fullWidth data-tour-id="profile.token.lifetime">
               <InputLabel>{t("profile.token_expiry")}</InputLabel>
               <Select
@@ -368,7 +359,7 @@ export default function ProfilePage() {
               size="small"
               startIcon={<KeyIcon />}
               onClick={handleGenerateToken}
-              disabled={tokenLoading || !tenantId.trim()}
+              disabled={tokenLoading}
               sx={{ alignSelf: "flex-start" }}
               data-tour-id="profile.token.create"
             >

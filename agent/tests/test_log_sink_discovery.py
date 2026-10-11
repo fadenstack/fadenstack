@@ -166,3 +166,15 @@ async def test_pushes_through_the_backend_carry_the_credential_and_follow_its_ad
     assert [str(r.url) for r in seen] == ["https://10.250.10.61/api/node-files/logs/loki/api/v1/push"] * 2
     assert [r.headers["authorization"] for r in seen] == ["Bearer cred-1", "Bearer cred-2"]
     await backend.aclose()
+
+
+def test_show_does_not_call_a_missing_loki_url_a_fault(monkeypatch: pytest.MonkeyPatch, capsys) -> None:  # type: ignore[no-untyped-def]
+    """``faden-agent show`` warned "log forwarding disabled" though the backend says where logs go."""
+    from faden_agent import __main__ as agent_main
+
+    monkeypatch.setattr(agent_main, "_effective_env", lambda: {"FADEN_NODE_AGENT_BACKEND_URL": "https://10.250.10.61"})
+    monkeypatch.delenv("FADEN_NODE_AGENT_LOKI_URL", raising=False)
+    agent_main._show_config()
+    out = capsys.readouterr().out
+    assert "forwarding disabled" not in out
+    assert "Logs go through the backend" in out

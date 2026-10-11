@@ -25,6 +25,9 @@ from faden_cli.core.private_files import write_private
 #: The header the backend reads the install's bootstrap token from.
 BOOTSTRAP_TOKEN_HEADER = "X-Faden-Bootstrap-Token"  # noqa: S105 - a header name
 
+#: Fewest characters the backend takes for a new password (faden_backend/services/password_policy.py).
+MIN_PASSWORD_LENGTH = 8
+
 
 def wait_for_backend(base_url: str, *, timeout: int = 120) -> bool:
     """Poll the backend health endpoint until it responds 200."""
@@ -109,8 +112,38 @@ def run_bootstrap(
         )
         return None
 
+    if resp.status_code == 422:  # noqa: PLR2004
+        try:
+            detail = resp.json().get("detail") or resp.text
+        except ValueError:
+            detail = resp.text
+        error(f"The backend refused the administrator's password or e-mail: {detail}")
+        return None
+
     error(f"Bootstrap failed (HTTP {resp.status_code}): {resp.text}")
     return None
+
+
+def prompt_admin_password() -> str | None:
+    """Ask for the administrator's password; ``None`` (blank) has the backend generate one.
+
+    Asked again until it meets the backend's minimum length: refused there, the deploy
+    stopped at the very end, with every service already running.
+    """
+    import click  # noqa: PLC0415
+
+    while True:
+        value = click.prompt(
+            "  Admin password (leave blank to auto-generate)",
+            default="",
+            hide_input=True,
+            show_default=False,
+        )
+        if not value:
+            return None
+        if len(value) >= MIN_PASSWORD_LENGTH:
+            return value
+        warning(f"The password needs at least {MIN_PASSWORD_LENGTH} characters (or leave it blank).")
 
 
 def display_credentials(creds: dict) -> None:
@@ -223,13 +256,7 @@ def bootstrap_interactive(
         password = default_password
     else:
         email = click.prompt("  Admin email", default=default_email)
-        password_input = click.prompt(
-            "  Admin password (leave blank to auto-generate)",
-            default="",
-            hide_input=True,
-            show_default=False,
-        )
-        password = password_input or None
+        password = prompt_admin_password()
 
     # ── Call bootstrap API ────────────────────────────────────
     creds = run_bootstrap(

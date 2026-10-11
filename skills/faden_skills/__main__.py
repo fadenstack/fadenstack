@@ -21,6 +21,10 @@ def set_multiproc_dir() -> None:
 
 def main() -> None:
     """Entrypoint of the application."""
+    # Outside development, not on a secret published with the source code.
+    from faden_skills.published_secrets import refuse_published_secrets  # noqa: PLC0415
+
+    refuse_published_secrets(settings)
     set_multiproc_dir()
     uvicorn.run(
         "faden_skills.web.application:get_app",

@@ -87,9 +87,12 @@ Or switch the check off: **Updates** still shows what each part of the install r
        stops if nothing could be backed up;
     3. replaces the deployment files with the new release's, and adds to `.env` only the settings the release
        introduces: every value you set is kept, except the sizing of the services, which is worked out again for
-       the host as `faden tune` does;
+       the host as `faden tune` does. A key that seals stored data and is missing gets the value the install ran
+       on, never a new one, and the upgrade says so (see [Secrets in .env](installing.md#secrets-in-env));
     4. pulls the new release's images;
-    5. restarts the services behind the maintenance page; the database migrations run here;
+    5. restarts the services behind the maintenance page; the database migrations run here, and the two Postgres
+       logins with fixed passwords that earlier releases made (`llm_user`, `faden_backend`, used by nothing) are
+       switched off;
     6. waits for the console API to answer, then lifts the maintenance page;
     7. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
        nothing: retry it with `faden runtime-images`.
@@ -101,6 +104,11 @@ Or switch the check off: **Updates** still shows what each part of the install r
 | `--backup-dir PATH` | Put the pre-upgrade backup elsewhere |
 | `--no-backup` | Skip the backup. Only when you have a current one |
 | `--runtime-images ARCHS` | Which runtime images to fetch: `all`, `none`, `x86_64`, `aarch64`. Remembered |
+
+!!! note "The chat checks roles since release 0.4.2"
+    Before, every active account could chat. Now people chat with `default_user` or a role that has the
+    `chat.*` permissions. After the upgrade, an account you gave only other roles, such as `operator` or
+    `viewer`, no longer chats: tick `default_user` for it as well (see [Users](../administer/users.md)).
 
 !!! warning
     An upgrade only moves forward: the databases are migrated to the new release. The tool refuses to move an

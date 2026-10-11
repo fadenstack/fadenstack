@@ -23,7 +23,7 @@ Gruppen, und entziehen Sie jemandem den Zugang.
 ??? info "Was jede integrierte Rolle umfasst"
     | Rolle | Umfasst |
     |---|---|
-    | `default_user` | Den Chat: Chats, Projekte und Anhänge, eigene Skills (erstellen und teilen) und das Lesen der Sammlungen der Wissensdatenbank, die für den Benutzer freigegeben sind. Jedes neue Konto erhält diese Rolle, sofern Sie keine anderen Rollen auswählen. |
+    | `default_user` | Den Chat: Chats, Projekte und Anhänge, im Chat und über die API, eigene Skills (erstellen und teilen) und das Lesen der Sammlungen der Wissensdatenbank, die für den Benutzer freigegeben sind. Jedes neue Konto erhält diese Rolle, sofern Sie keine anderen Rollen auswählen. |
     | `viewer` | Das Lesen des Zustands von Modellen, Clustern, Maschinen, Containern und Logs über die API. |
     | `operator` | Was `viewer` umfasst, und das Betreiben von Modellen über die API: Cluster und Bereitstellungen erstellen, ändern, skalieren, stoppen und starten. Nicht löschen. |
     | `admin` | Jede Berechtigung, darunter Löschen, einen Skill für die ganze Organisation sichtbar machen (`skills:publish`), jeden Skill verwalten (`skills:manage`) sowie Agenten erstellen und löschen (`agents:create`, `agents:delete`). |
@@ -31,7 +31,8 @@ Gruppen, und entziehen Sie jemandem den Zugang.
 
 !!! note
     Rollen, die Sie ankreuzen, ersetzen `default_user`. Soll jemand auch chatten, kreuzen Sie zusätzlich
-    `default_user` an.
+    `default_user` an: Ohne diese Rolle oder eine eigene Rolle mit den Berechtigungen `chat.*` chattet niemand,
+    weder im Chat noch über die API. Superuser brauchen keine Rolle.
 
 ## Wer welche Sammlung liest {#who-reads-which-collection}
 
@@ -57,7 +58,7 @@ Eine eingeschränkte Sammlung zeigt ein Schloss neben ihrem Namen.
 ![Neuen Benutzer erstellen: „E-Mail“ und „Passwort“, der Schalter „Superuser“ und „Rollen zuweisen“ mit den integrierten Rollen zum Ankreuzen](../images/administer/users-create.png)
 
 1. Öffnen Sie **Zugriffskontrolle → Benutzer** und wählen Sie **Benutzer erstellen**.
-2. Geben Sie die E-Mail-Adresse der Person und ein erstes Passwort mit mindestens 6 Zeichen ein.
+2. Geben Sie die E-Mail-Adresse der Person und ein erstes Passwort mit mindestens 8 Zeichen ein.
 3. Lassen Sie **Superuser** ausgeschaltet, es sei denn, die Person verwaltet Fadenstack mit Ihnen.
 4. Lassen Sie unter **Rollen zuweisen** alles leer für Personen, die nur chatten: Sie erhalten `default_user`.
 5. Wählen Sie **Benutzer erstellen**.
