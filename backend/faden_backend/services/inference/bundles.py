@@ -427,7 +427,7 @@ def _described(manifest: dict[str, Any], what: str) -> str:
 #: manifest's, and the manifest names its flavor.
 _FLAVORS: dict[str, dict[str, Any]] = {
     "gb10": {
-        "display_name": "NVIDIA DGX Spark Blackwell GB10 Runtime",
+        "display_name": "Fadenstack runtime for NVIDIA DGX Spark (GB10)",
         "what": "with Blackwell GB10 support over 200 Gb/s RoCE",
         "target_architecture": TargetArchitecture(
             cpu="aarch64",
@@ -527,7 +527,7 @@ _FLAVORS: dict[str, dict[str, Any]] = {
     # (``/home/sachi/.cache/huggingface``), and a generic runtime has no business
     # guessing where a model store lives -- the agent supplies it.
     "x86_64": {
-        "display_name": "NVIDIA x86_64 Runtime (generic)",
+        "display_name": "Fadenstack runtime for x86_64 NVIDIA GPUs (generic)",
         "what": "for any mainstream NVIDIA card on x86_64, from Turing (sm_75) to Blackwell (sm_120)",
         "target_architecture": TargetArchitecture(
             cpu="x86_64",
