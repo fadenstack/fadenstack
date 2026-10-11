@@ -82,7 +82,12 @@ async def overview(session: AsyncSession, docker: Any, now: datetime) -> dict[st
         detail=installer,
     ))
 
-    released_agent = latest.components.get("agent") if latest else None
+    from faden_backend.web.api.install import AGENT_VERSION  # noqa: PLC0415
+
+    # Named only when the release brings a newer agent than this server hands out: then the
+    # machines show an agent update after the upgrade (seen on .61: "an update to 0.2.7" it had).
+    released = latest.components.get("agent") if latest else None
+    released_agent = released if release_feed.is_newer(released, AGENT_VERSION) else None
     return {
         # The notice's fields first: its "current" (the release) is replaced by the fuller object below.
         **notice(state),

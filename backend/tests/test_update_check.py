@@ -317,3 +317,19 @@ async def test_an_uploaded_feed_that_does_not_verify_is_refused(
     )
     assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert "does not know" in resp.json()["detail"]
+
+
+async def test_the_page_names_a_newer_agent_only(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, served: dict[str, Any]
+) -> None:
+    admin = await _admin(dbsession, superuser=True)
+    fastapi_app.dependency_overrides[current_active_user] = lambda: admin
+    fastapi_app.state.docker = None
+    major, minor, patch = (int(x) for x in AGENT_VERSION.split("."))
+    for agent, named in ((AGENT_VERSION, None), (f"{major}.{minor}.{patch + 1}", f"{major}.{minor}.{patch + 1}")):
+        served["feed"] = publish(
+            {"version": "0.4.2", "components": {"agent": agent}},
+            generated_at=f"2026-10-2{1 if named else 0}T10:00:00Z",
+        )
+        body = (await client.post(fastapi_app.url_path_for("admin_updates_check"))).json()
+        assert body["released_agent"] == named
