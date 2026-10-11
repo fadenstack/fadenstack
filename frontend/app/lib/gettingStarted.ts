@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { adminUsers } from "~/api/admin";
 import { agentsApi } from "~/api/agents";
+import { chatApi } from "~/api/chatClient";
 import { inferenceApi } from "~/api/inference";
 import { providers } from "~/api/llm";
 import { listServers } from "~/api/mcp";
@@ -64,7 +65,7 @@ export const CHECKLIST: ChecklistItem[] = [
 /** What the getting-started list keeps in the user's preferences. */
 export interface GettingStartedPrefs {
   dismissed?: boolean;
-  /** Opened the chat from the list: the one step the server cannot see. */
+  /** Opened the chat from the list (a chat of their own ticks it too). */
   chat_opened?: boolean;
 }
 
@@ -86,7 +87,7 @@ export async function loadChecklistState(isModuleEnabled: (m: string) => boolean
   prefs: GettingStartedPrefs;
 }> {
   const prefsRequest = preferences.get().catch(() => null);
-  const [machines, clusters, deployments, users, remote, policies, tools, skills, agents, tokens] = await Promise.all([
+  const [machines, clusters, deployments, users, remote, policies, tools, skills, agents, tokens, chats] = await Promise.all([
     count(() => nodesApi.list()),
     count(() => inferenceApi.listEnvironments()),
     count(() => inferenceApi.listDeployments()),
@@ -97,6 +98,9 @@ export async function loadChecklistState(isModuleEnabled: (m: string) => boolean
     isModuleEnabled("skills") ? count(() => listSkills({ limit: 1 })) : Promise.resolve(0),
     count(() => agentsApi.list()),
     count(() => adminUsers.listMyApiTokens()),
+    // A chat exists once its first message is sent: whoever has one has tried the chat,
+    // however they got there (the list's button was the only way the step ticked).
+    count(() => chatApi.listSessions()),
   ]);
   const all = ((await prefsRequest)?.preferences ?? {}) as {
     getting_started?: GettingStartedPrefs;
@@ -110,7 +114,7 @@ export async function loadChecklistState(isModuleEnabled: (m: string) => boolean
       machine: machines > 0,
       cluster: clusters > 0,
       model: deployments > 0,
-      chat: Boolean(prefs.chat_opened),
+      chat: Boolean(prefs.chat_opened) || chats > 0,
       people: users > 1,
       provider: remote > 0,
       privacy: policies > 0,
