@@ -105,28 +105,28 @@ def write(requirements: Path, out: Path, pip_licenses: str) -> None:
     if not names:
         sys.exit(f"No packages in {requirements}")
 
-    parts = [_INTRO, _heading("1. Python packages")]
-    parts.append(
-        subprocess.run(
-            [
-                pip_licenses,
-                f"--python={sys.executable}",
-                "--from=mixed",
-                "--with-license-file",
-                "--with-notice-file",
-                "--no-license-path",
-                "--with-urls",
-                "--format=plain-vertical",
-                "--packages",
-                *names,
-            ],
-            check=True,
-            capture_output=True,
-            encoding="utf-8",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-        ).stdout.rstrip()
-        + "\n"
-    )
+    listing = subprocess.run(
+        [
+            pip_licenses,
+            f"--python={sys.executable}",
+            "--from=mixed",
+            "--with-license-file",
+            "--with-notice-file",
+            "--no-license-path",
+            "--with-urls",
+            "--format=plain-vertical",
+            # Else it leaves out its own dependencies (wcwidth, prettytable)
+            # and pip's, whoever else needs them: the list is ours already.
+            "--with-system",
+            "--packages",
+            *names,
+        ],
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    ).stdout.rstrip()
+    parts = [_INTRO, _heading("1. Python packages"), listing + "\n"]
 
     # pip-licenses prints one licence file per package. A few ship several:
     # cryptography and packaging are "Apache-2.0 OR BSD", and the LICENSE it
@@ -136,6 +136,8 @@ def write(requirements: Path, out: Path, pip_licenses: str) -> None:
             dist = metadata.distribution(name)
         except metadata.PackageNotFoundError:  # a marker left it out here
             continue
+        if f"\n{dist.metadata['Name']}\n{dist.version}\n" not in f"\n{listing}\n":
+            sys.exit(f"pip-licenses left out {dist.metadata['Name']} {dist.version}")
         files = _licence_files(dist)
         if len(files) < 2:
             continue
