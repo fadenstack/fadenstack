@@ -57,6 +57,19 @@ def _regenerate_rmq_definitions(
     )
 
 
+def summary_base(shared_dir: Path, backend_url: str) -> str:
+    """The address the closing summary names: one other machines reach it by.
+
+    The backend's own URL is ``https://localhost`` on the server, which only a
+    browser on the server itself can open; the table said so above the real
+    addresses (the end-to-end test of 0.4.2).
+    """
+    from faden_cli.commands.tls import addresses, reachable_example  # noqa: PLC0415
+
+    reach = addresses(shared_dir)
+    return reachable_example(reach) if reach else backend_url
+
+
 def pin_release(env_path: Path) -> None:
     """Run the published images of this CLI's version (an install made from the bundle).
 
@@ -916,7 +929,7 @@ def deploy_cmd(
     table.add_column("Service", style="bold")
     table.add_column("URL")
 
-    base = backend_url
+    base = summary_base(shared_dir, backend_url)
     endpoints = [
         ("Application", base),
         ("API Docs", f"{base}/api/docs"),
