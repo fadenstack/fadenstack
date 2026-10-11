@@ -27,8 +27,9 @@ _SKIP_FILES = {
     ".env",
     ".bootstrap-credentials",
     ".gitattributes",
-    # Written by deploy from .env; the tracked copy is a placeholder.
+    # Written by deploy from .env, with the snippet that loads them; not tracked.
     "rabbitmq/definitions.json",
+    "rabbitmq/10-faden.conf",
     # Written by the backend at run time; an install starts it as "[]".
     "prometheus/targets.json",
     # Development-only overlay (mounts source trees that a release lacks).

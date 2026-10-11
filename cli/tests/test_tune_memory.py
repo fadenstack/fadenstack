@@ -110,5 +110,3 @@ def test_rabbitmq_lets_a_task_hold_its_message_for_as_long_as_a_download(tmp_pat
     conf = (tmp_path / "rabbitmq" / "10-faden.conf").read_text(encoding="utf-8")
     assert f"consumer_timeout = {CONSUMER_TIMEOUT_MS}" in conf
     assert CONSUMER_TIMEOUT_MS >= 24 * 3600 * 1000
-    shipped = (COMPOSE.parent / "rabbitmq" / "10-faden.conf").read_text(encoding="utf-8")
-    assert f"consumer_timeout = {CONSUMER_TIMEOUT_MS}" in shipped

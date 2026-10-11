@@ -1,7 +1,10 @@
 .env
 .empty-hf-cache/
 .bootstrap-credentials
+# RabbitMQ's users (password hashes) and the snippet that loads them: written by
+# faden deploy, upgrade and dev from .env (cli/src/faden_cli/core/rmq.py).
 rabbitmq/definitions.json
+rabbitmq/10-faden.conf
 # Backups made by faden backup / upgrade: database dumps and .env copies.
 backups/
 # The edge certificate and key nginx serves HTTPS with (docs/installing.md,

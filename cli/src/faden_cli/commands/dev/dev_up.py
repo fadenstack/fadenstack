@@ -369,6 +369,8 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     * shared ``.env`` present → untouched (its DB/RMQ credentials must
       survive so the volumes they match are still usable; when the
       volumes were wiped, fresh containers self-seed from the env).
+      The RabbitMQ files are written from it when the checkout has none:
+      they are generated, not tracked, and the compose file mounts them.
 
     Returns the shared env path (existing or newly written), or ``None``
     if the shared compose directory cannot be found.
@@ -383,6 +385,12 @@ def _ensure_shared_env(workspace: Path) -> Path | None:
     env_path = shared_dir / ".env"
     if env_path.exists():
         heal_dev_env(env_path)
+        rmq = shared_dir / "rabbitmq"
+        if not ((rmq / "definitions.json").is_file() and (rmq / "10-faden.conf").is_file()):
+            # Missing, Docker would mount a directory in their place.
+            from faden_cli.commands.dev.dev_init import _resync_rmq_credentials
+
+            _resync_rmq_credentials(shared_dir, skip_infra=True)
         return env_path
 
     info(f"Shared .env not found — generating fresh dev credentials at {env_path}")

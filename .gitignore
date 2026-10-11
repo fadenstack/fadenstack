@@ -64,4 +64,5 @@ uv.lock
 # The seeded, hand-written boards are committed; these are not.
 shared/grafana/provisioning/dashboards/json/vllm-rt-*.json
 shared/rabbitmq/definitions.json
+shared/rabbitmq/10-faden.conf
 shared/prometheus/targets.json

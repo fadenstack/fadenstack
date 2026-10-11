@@ -22,7 +22,9 @@ from faden_cli.core.bundle import installed_release
 BUILD_RECORD = ".faden-build"
 
 #: Tracked files the running install rewrites itself: a change to them is not a local change to the code.
-GENERATED = frozenset({"shared/prometheus/targets.json", "shared/rabbitmq/definitions.json"})
+GENERATED = frozenset({
+    "shared/prometheus/targets.json", "shared/rabbitmq/definitions.json", "shared/rabbitmq/10-faden.conf",
+})
 
 _AGENT_VERSION = re.compile(r'^AGENT_VERSION\s*=\s*"([^"]+)"', re.MULTILINE)
 

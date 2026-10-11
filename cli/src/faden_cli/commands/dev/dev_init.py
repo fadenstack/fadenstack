@@ -331,12 +331,11 @@ def _resync_rmq_credentials(shared_dir: Path, *, skip_infra: bool) -> None:
     """Regenerate RMQ ``definitions.json`` from the shared ``.env`` and
     restart the broker so the on-disk users match the in-env passwords.
 
-    The repo ships a checked-in ``shared/rabbitmq/definitions.json``
-    (deploy-time hashes from its original author). A fresh ``dev init``
-    writes a new shared ``.env`` (random ``RABBITMQ_*_PASS`` values), so the
-    broker's users drift out of sync and the backend/worker — which are
-    told to log in as ``faden-backend`` / ``RABBITMQ_BACKEND_PASS`` — get
-    ``ACCESS_REFUSED`` from the mgmt API / AMQP layer.
+    ``shared/rabbitmq/definitions.json`` is generated, not tracked. When it
+    is missing or older than the shared ``.env`` (new ``RABBITMQ_*_PASS``
+    values), the broker's users drift out of sync and the backend/worker —
+    which are told to log in as ``faden-backend`` / ``RABBITMQ_BACKEND_PASS``
+    — get ``ACCESS_REFUSED`` from the mgmt API / AMQP layer.
 
     Skipped when ``--skip-infra`` (no broker to restart), docker is
     unavailable, or the shared ``.env`` predates the per-service users.
@@ -589,11 +588,10 @@ def dev_init(
         success(f"Backend .env written to {backend_env_path}")
 
     # ── 2c. Resync RabbitMQ credentials with the shared .env ──────
-    # The repo ships a checked-in definitions.json with deploy-time
-    # hashes from its original author, while the fresh .env has new
-    # random RABBITMQ_*_PASS values. Regenerate definitions.json from
-    # the shared .env and recreate the broker so the backend and
-    # worker can authenticate as faden-backend / RABBITMQ_BACKEND_PASS.
+    # definitions.json is not tracked: it holds the users' password
+    # hashes, written from the shared .env. Write it (and the snippet
+    # that loads it) and recreate the broker so the backend and worker
+    # can authenticate as faden-backend / RABBITMQ_BACKEND_PASS.
     _resync_rmq_credentials(shared_dir, skip_infra=skip_infra)
 
     # ── 3. Start shared infrastructure ────────────────────────────
