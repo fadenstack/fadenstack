@@ -64,6 +64,11 @@ newer runtime. Each is a separate step that you start; nothing upgrades itself.
 | `--no-backup` | Skip the backup. Only when you have a current one |
 | `--runtime-images ARCHS` | Which runtime images to fetch: `all`, `none`, `x86_64`, `aarch64`. Remembered |
 
+!!! note "The chat checks roles since release 0.4.2"
+    Before, every active account could chat. Now people chat with `default_user` or a role that has the
+    `chat.*` permissions. After the upgrade, an account you gave only other roles, such as `operator` or
+    `viewer`, no longer chats: tick `default_user` for it as well (see [Users](../administer/users.md)).
+
 !!! warning
     An upgrade only moves forward: the databases are migrated to the new release. The tool refuses to move an
     install to an older release, and going back to the release before is not possible yet (see

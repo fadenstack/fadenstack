@@ -69,6 +69,12 @@ nichts aktualisiert sich von selbst.
 | `--no-backup` | Die Sicherung überspringen. Nur, wenn Sie eine aktuelle haben |
 | `--runtime-images ARCHS` | Welche Runtime-Images geholt werden: `all`, `none`, `x86_64`, `aarch64`. Bleibt gespeichert |
 
+!!! note "Der Chat prüft seit Release 0.4.2 die Rollen"
+    Bisher konnte jedes aktive Konto chatten. Jetzt chattet, wer `default_user` hat oder eine Rolle mit den
+    Berechtigungen `chat.*`. Nach dem Upgrade chattet ein Konto, dem Sie nur andere Rollen gegeben haben, etwa
+    `operator` oder `viewer`, nicht mehr: Kreuzen Sie dafür zusätzlich `default_user` an (siehe
+    [Benutzer](../administer/users.md)).
+
 !!! warning
     Ein Upgrade geht nur vorwärts: Die Datenbanken werden auf das neue Release migriert. Das Werkzeug weigert
     sich, eine Installation auf ein älteres Release zu bringen, und zum vorherigen Release zurückzugehen ist noch
