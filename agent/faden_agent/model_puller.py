@@ -100,6 +100,24 @@ def _safe_join(root: Path, relative: str, *, field: str) -> Path:
     return candidate
 
 
+def _link_out_of(blobs_dir: Path, blob_hash: str) -> Path | None:
+    """The blob's entry when it is a symlink leading out of *blobs_dir*, else None.
+
+    A Hugging Face cache shared with other tools can keep a model's blobs as
+    links into a content store of its own (``<cache>/blobs/<xx>/<sha256>``).
+    ``_safe_join`` refuses to write through such a link, rightly; the caller
+    decides whether the file it leads to can be used as it is.
+    """
+    literal = blobs_dir / blob_hash
+    if not literal.is_symlink():
+        return None
+    resolved = literal.resolve(strict=False)
+    root = blobs_dir.resolve(strict=False)
+    if resolved == root or root in resolved.parents:
+        return None
+    return literal
+
+
 def _expected_sha256(blob_hash: str) -> str | None:
     h = blob_hash.lower()
     if _SHA256_RE.fullmatch(h):
@@ -210,6 +228,8 @@ async def pull_model(
         downloaded = 0
         skipped = 0
         completed = 0
+        # Blobs kept as links out of the model's folder, their content checked.
+        linked: set[str] = set()
 
         async def _emit_blob_progress(blob_hash: str) -> None:
             if emit_progress is None:
@@ -238,6 +258,35 @@ async def pull_model(
                 ) from exc
 
             expected_digest = _expected_sha256(blob_hash)
+
+            # A link into another tool's content store: reading through it is
+            # safe once the file's SHA-256 is the blob's, so it is used as it
+            # is. Writing through it is not, so a link that does not check out
+            # (dangling, other content, or a blob named by a git hash that
+            # cannot be checked) is removed -- the link, not its target -- and
+            # the file downloaded in its place.
+            link = _link_out_of(blobs_dir, blob_hash)
+            if link is not None:
+                size = link.stat().st_size if link.is_file() else -1
+                if (
+                    expected_digest
+                    and size >= 0
+                    and (not expected_size or size == expected_size)
+                    and await asyncio.to_thread(_sha256_file, link) == expected_digest
+                ):
+                    linked.add(blob_hash)
+                    skipped += size
+                    completed += expected_size or size
+                    log.debug("Using linked blob %s (hash verified)", blob_hash)
+                    await _emit_blob_progress(blob_hash)
+                    continue
+                log.warning(
+                    "Blob %s links to %s, which does not hold it; replacing the link with the file",
+                    blob_hash,
+                    link.resolve(strict=False),
+                )
+                link.unlink()
+
             target = _safe_join(blobs_dir, blob_hash, field="blob path")
             target_size = target.stat().st_size if target.is_file() else 0
 
@@ -395,7 +444,11 @@ async def pull_model(
                     )
                     link_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    target_blob = _safe_join(blobs_dir, blob_hash, field="snapshot blob path")
+                    if blob_hash in linked:
+                        # The snapshot links to the blob's entry; it leads on to the checked file.
+                        target_blob = blobs_dir / blob_hash
+                    else:
+                        target_blob = _safe_join(blobs_dir, blob_hash, field="snapshot blob path")
                     if not target_blob.is_file():
                         raise ModelPullerError(
                             f"Snapshot references missing blob {blob_hash} ({rel_path})"
