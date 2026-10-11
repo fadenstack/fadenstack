@@ -133,7 +133,7 @@ async def delete_tool_rule(rule_id: uuid.UUID, request: Request, _admin: Admin) 
 
 
 class ToolClassIn(BaseModel):
-    """What a tool does, as an admin says it (fadenstack-dev sdk/07-tool-classes.md)."""
+    """What a tool does, as an admin says it (the classes: gateway ``services/gateway/tool_classes.py``)."""
 
     tenant_id: str = Field(default="default", max_length=128)
     #: A glob over tool names: ``mcp.github.*``, ``read_page``.

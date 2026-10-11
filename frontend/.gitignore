@@ -9,6 +9,6 @@ e2e/.auth/
 test-results/
 playwright-report/
 
-# The chat load kit, copied in from fadenstack-dev/chat/load to run (its home);
+# A chat load-test kit kept outside this repository, copied in to run;
 # holds a signed-in session in .auth/ and raw results.
 e2e-load/

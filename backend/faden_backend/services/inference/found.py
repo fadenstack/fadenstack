@@ -6,8 +6,6 @@ reads those reports and does the one thing Fadenstack can safely do without
 touching the container: route it at the gateway under a name, as it is, and
 stop routing it again. The container keeps running exactly as before, and
 stays whoever's it was.
-
-The plan is ``fadenstack-dev/llm_port_ray_migration/phase8_concrete_implementation_plan.md``.
 """
 
 from __future__ import annotations

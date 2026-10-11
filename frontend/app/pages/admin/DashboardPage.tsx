@@ -1,7 +1,6 @@
 /**
  * Admin dashboard: an overview of the whole platform, built from widgets the
- * user arranges, shows, hides and resizes (spec:
- * fadenstack-dev/dashboard/dashboard-redesign-spec.md).
+ * user arranges, shows, hides and resizes.
  *
  * The page is only a frame. Each widget owns its data -- it loads, refreshes
  * and fails on its own -- so one slow or broken source never holds up the

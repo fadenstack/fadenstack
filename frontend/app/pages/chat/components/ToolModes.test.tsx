@@ -1,6 +1,6 @@
 /**
  * Tool modes in the chat: the user picks what tools may do, and a tool that
- * must ask waits for them in the answer (fadenstack-dev sdk/07-tool-classes.md).
+ * must ask waits for them in the answer (the classes: gateway/faden_gateway/services/gateway/tool_classes.py).
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

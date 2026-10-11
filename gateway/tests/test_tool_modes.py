@@ -1,4 +1,4 @@
-"""Tool classes and tool modes (fadenstack-dev sdk/07-tool-classes.md).
+"""Tool classes and tool modes (``faden_gateway/services/gateway/tool_classes.py``).
 
 A tool is read, write, destructive -- or unknown when nobody vouched for it.
 Every chat starts in Ask: read tools run, everything else waits for the user.
