@@ -152,3 +152,13 @@ The manifests above name local tags (`faden/ray-vllm-gb10:…`,
 built on (the GB10 ones on the DGX pair) and nowhere else yet. A server can hand out only
 images it holds, so they reach a server that does not have them once they
 are published to GHCR and their manifests name the registry.
+
+## Licence
+
+The files in this folder are Apache-2.0, like the rest of the repository. The images built from them are not, as
+a whole: only the runtime helper in `/opt/llm-port/runtime` is. The GB10 image is built on NVIDIA's vLLM container
+(`nvcr.io/nvidia/vllm`), governed by the NVIDIA Software License Agreement and the Product-Specific Terms for NVIDIA
+AI Products; the x86_64 image contains NVIDIA's CUDA and cuDNN packages under the CUDA EULA. Those terms stay with
+the images: `NOTICE` (copied into each image) says so, the image label
+`org.opencontainers.image.licenses` names them, and Help's
+[Third-party components](../docs/help/pages/operate/third-party.md) page links them.

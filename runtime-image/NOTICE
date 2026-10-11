@@ -13,3 +13,20 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+   This image is not Apache-2.0 as a whole. Only the Fadenstack runtime
+   helper in /opt/llm-port/runtime is. The rest keeps its own terms,
+   which travel with it:
+
+   - The GB10 image is built on NVIDIA's vLLM container
+     (nvcr.io/nvidia/vllm), which is governed by the NVIDIA Software
+     License Agreement and the Product-Specific Terms for NVIDIA AI
+     Products (/workspace/license.txt). Among other things, NVIDIA's
+     software in it is licensed to run only on NVIDIA platforms.
+   - The x86_64 image contains NVIDIA's CUDA, cuDNN and related Python
+     packages under the CUDA EULA and their own licences; their licence
+     files are in their site-packages folders.
+   - Ray, vLLM and the other open-source packages keep their licences;
+     their files are in their site-packages folders.
+
+   Fadenstack is not affiliated with or endorsed by NVIDIA.
