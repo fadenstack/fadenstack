@@ -102,6 +102,15 @@ class _Machine:
             doc["cluster_token_sealed"] = seal_token(self.token)  # as the backend recorded it
         return doc
 
+    #: What MODEL_TLS_ROUTE answers: the agent's ensure_route, or None when it could not.
+    route_answer: dict[str, Any] | None = None
+    routes: list[tuple[int, int | None]]
+
+    async def model_tls_route(self, *, node_id: Any, public_port: int, internal_port: int | None = None,
+                              remove: bool = False, budget_sec: float | None = None) -> dict[str, Any] | None:
+        self.routes = [*getattr(self, "routes", []), (public_port, internal_port)]
+        return self.route_answer
+
 
 @pytest.fixture()
 async def pair(dbsession: AsyncSession) -> tuple[InfraNode, InfraNode]:
@@ -467,3 +476,64 @@ async def test_a_model_deployed_with_the_external_scaler_keeps_scaling_in_place(
     dep = await dbsession.get(InferenceDeployment, uuid.UUID("e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"))
     assert dep.observed_status_json["last_run"]["external_scaler"] is True
     assert dep.observed_status_json["observation"]["run"]["route_prefix"] == f"/{APP}"
+
+
+# ── How the taken-over models are reached ─────────────────────────
+#
+# The DGX pair's cluster served its models behind the head's model-TLS proxy:
+# Serve on 127.0.0.1:28000, the proxy on port 8000. Taken over, the model was
+# published as http://<head>:8000 -- the proxy's port -- and every chat got
+# "400 The plain HTTP request was sent to HTTPS port" (11 October 2026).
+
+
+def _served(host: str, port: int) -> dict[str, Any]:
+    return {**_doc(), "serve": {"running": True, "http_options": {"host": host, "port": port}}}
+
+
+@pytest.mark.anyio
+async def test_models_behind_the_model_tls_proxy_are_recorded_as_such(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _ = pair
+    machine = _Machine(_served("127.0.0.1", 28000))
+    machine.route_answer = {"protected": True, "public_port": 8000, "internal_port": 28000}
+    _answering(monkeypatch, machine)
+
+    await takeover.take_over(dbsession, None, node_id=head.id, name="dgx-pair", aliases={APP: "qwen2.5-0.5b-instruct"})
+
+    assert machine.routes == [(8000, 28000)], "the head confirms its proxy serves the models, with this server's certificates"
+    dep = await dbsession.get(InferenceDeployment, uuid.UUID("e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"))
+    run = dep.observed_status_json["last_run"]
+    assert run["model_tls"] == {"protected": True, "public_port": 8000, "internal_port": 28000}, "published as https://"
+    assert run["serve_http"] == {"host": "127.0.0.1", "port": 28000}
+    env = await dbsession.get(InferenceEnvironment, dep.environment_id)
+    assert env.config_json["serve_http_port"] == 8000, "a model deployed here later is published where these are"
+
+
+@pytest.mark.anyio
+async def test_a_proxy_that_does_not_confirm_stops_the_takeover(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _ = pair
+    _answering(monkeypatch, _Machine(_served("127.0.0.1", 28000)))  # route_answer None: it could not
+
+    with pytest.raises(takeover.TakeoverError, match="model-TLS proxy"):
+        await takeover.take_over(dbsession, None, node_id=head.id, name="dgx-pair", aliases={APP: "q"})
+
+    found = await dbsession.execute(select(InferenceEnvironment).where(InferenceEnvironment.name == "dgx-pair"))
+    assert found.scalar_one_or_none() is None, "nothing recorded"
+
+
+@pytest.mark.anyio
+async def test_serve_on_the_network_is_recorded_where_it_listens(
+    dbsession: AsyncSession, pair: tuple[InfraNode, InfraNode], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head, _ = pair
+    machine = _answering(monkeypatch, _Machine(_served("0.0.0.0", 8000)))
+
+    await takeover.take_over(dbsession, None, node_id=head.id, name="dgx-pair", aliases={APP: "qwen2.5-0.5b-instruct"})
+
+    assert not getattr(machine, "routes", []), "no proxy to ask"
+    dep = await dbsession.get(InferenceDeployment, uuid.UUID("e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"))
+    run = dep.observed_status_json["last_run"]
+    assert "model_tls" not in run and run["serve_http"] == {"host": "0.0.0.0", "port": 8000}

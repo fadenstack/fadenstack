@@ -26,6 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from faden_backend.services import machine_tls
 from faden_backend.services.inference.bundles import RUNTIME_KEY, default_bundle_registry
 from faden_backend.services.inference.drivers.ray.compiler import (
     DEFAULT_LOGGING_CONFIG,
@@ -588,9 +589,17 @@ async def take_over(
         await session.rollback()
         raise TakeoverError(checked.get("token_error") or "The machine did not hand over the cluster's token.")
 
+    # 2b. How the head serves them: behind its model-TLS proxy or not.
+    head = seen["head"]
+    try:
+        serving = await _serving(client, head_node_id=head["node_id"], head_name=str(head.get("name") or "the head"),
+                                 doc=doc)
+    except TakeoverError:
+        await session.rollback()
+        raise
+
     # 3. The cluster and its members, recorded as already up.
     plane = await _control_plane_for(session, name, token)
-    head = seen["head"]
     now = datetime.now(tz=UTC)
     environment = InferenceEnvironment(
         control_plane_id=plane.id,
@@ -661,6 +670,10 @@ async def take_over(
             "node_bindings": bindings,
         }
         observed["network"] = {"selected_candidate_id": chosen.candidate_id, "node_bindings": bindings}
+    # The port its models are reached on, so a model deployed here later is published where they are.
+    public = (serving.get("model_tls") or {}).get("public_port") or (serving.get("serve_http") or {}).get("port")
+    if public:
+        environment.config_json = {**(environment.config_json or {}), "serve_http_port": int(public)}
     status = cluster_status(doc)
     observed["cluster"] = status.model_dump()
     observed["conditions"] = build_environment_conditions(status, len(seen["members"]))
@@ -682,6 +695,7 @@ async def take_over(
     # 4. The models, under their own ids, recorded as applied on this head.
     taken = await _record_deployments(
         session, environment_id=environment.id, plans=plans, head_ray_id=head.get("runtime_node_id"), now=now,
+        serving=serving,
     )
     wake_reconciler_after_commit(session)
     await session.commit()
@@ -691,6 +705,50 @@ async def take_over(
         "control_plane": plane.name,
         "members": seen["members"],
         "deployments": taken,
+    }
+
+
+#: Where Serve listens when the head's model-TLS proxy serves its port to the network.
+_LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+async def _serving(client: Any, *, head_node_id: Any, head_name: str, doc: dict[str, Any]) -> dict[str, Any]:
+    """How the head serves the models it runs, as the agent reports a run: for publishing their address.
+
+    Serve on the loopback address is behind the head's model-TLS proxy, so the
+    address is ``https://`` on the proxy's port. Recorded without saying so,
+    the models were published as ``http://`` to the proxy's port and every chat
+    got "400 The plain HTTP request was sent to HTTPS port" (the DGX pair, 11
+    October 2026). The proxy follows the new server by itself -- its agent
+    takes this server's certificate authority and a certificate from it when
+    it joins -- but is asked once to confirm the route, so that nothing is
+    recorded for an address that does not answer.
+    """
+    http = (doc.get("serve") or {}).get("http_options") or {}
+    host = str(http.get("host") or "")
+    try:
+        port = int(http.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if not port:
+        return {}
+    if host not in _LOOPBACK:
+        return {"serve_http": {"host": host, "port": port}}
+    public = port - machine_tls.INTERNAL_PORT_OFFSET
+    if public <= 0:
+        raise TakeoverError(
+            f"Serve on {head_name} listens on {host}:{port} only, behind no proxy this server knows. "
+            "Nothing was changed."
+        )
+    route = await client.model_tls_route(node_id=head_node_id, public_port=public, internal_port=port)
+    if not route or not route.get("protected"):
+        raise TakeoverError(
+            f"The models are served behind the model-TLS proxy on {head_name}, port {public}, and it did not "
+            "confirm that it serves them with this server's certificates. Nothing was changed."
+        )
+    return {
+        "model_tls": {"protected": True, "public_port": public, "internal_port": port},
+        "serve_http": {"host": "127.0.0.1", "port": port},
     }
 
 
@@ -745,8 +803,9 @@ async def _confirmed_unchanged(
 
 async def _record_deployments(
     session: Any, *, environment_id: Any, plans: list[tuple], head_ray_id: Any, now: Any,
+    serving: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Record each model under its own id, as applied on the head that runs it."""
+    """Record each model under its own id, as applied on the head that runs it, served as *serving* says."""
     import uuid as _uuid  # noqa: PLC0415
 
     from sqlalchemy import select  # noqa: PLC0415
@@ -770,6 +829,8 @@ async def _record_deployments(
             # Deployed with Ray's external scaler: its copy count changes
             # without restarting copies, here as on the server that deployed it.
             **({"external_scaler": True} if app.get("external_scaler") else {}),
+            # Behind the model-TLS proxy or not: what the address is published from.
+            **(serving or {}),
         }
         session.add(InferenceDeployment(
             id=_uuid.UUID(recovered.deployment_id),
@@ -884,8 +945,10 @@ async def take_over_models(
     head_ray_id = next(
         (n.get("node_id") for n in doc.get("nodes") or [] if n.get("is_head") and n.get("alive")), None,
     )
+    serving = await _serving(client, head_node_id=env.head_node_id, head_name=env.name, doc=doc)
     taken = await _record_deployments(
         session, environment_id=env.id, plans=plans, head_ray_id=head_ray_id, now=datetime.now(tz=UTC),
+        serving=serving,
     )
     wake_reconciler_after_commit(session)
     await session.commit()
