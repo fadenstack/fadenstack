@@ -36,6 +36,9 @@ sys.path.insert(0, str(ROOT / "cli" / "src" / "faden_cli" / "core"))
 import release_feed  # noqa: E402  (the CLI's module, without importing the CLI)
 
 RELEASES = ROOT / "release" / "releases.yaml"
+#: Each release's notes, unless its entry names others: the releases page on fadenstack.com, which renders
+#: this same feed (fadenstack.com repository, src/releases.njk).
+NOTES_PAGE = "https://fadenstack.com/releases/#v{version}"
 AGENT_VERSION_FILE = ROOT / "backend" / "faden_backend" / "web" / "api" / "install" / "__init__.py"
 INDEX = "index.json"
 SIG = "index.json.sig"
@@ -88,7 +91,9 @@ def build(source: dict, *, version: str | None, agent: str | None, today: date) 
             "date": when,
             "severity": severity,
             "summary": " ".join(str(entry["summary"]).split()),
-            "notes_url": entry.get("notes_url") or release_feed.RELEASE_PAGE.format(version=parsed),
+            # What is new, for people (the releases page); installs ignore it.
+            "highlights": [" ".join(str(h).split()) for h in entry.get("highlights") or [] if str(h).strip()],
+            "notes_url": entry.get("notes_url") or NOTES_PAGE.format(version=parsed),
             "upgrade_from": str(upgrade_from) if upgrade_from is not None else None,
             "fixes": [
                 {"id": str(f["id"]), "severity": str(f.get("severity", "")), "summary": str(f.get("summary", ""))}
