@@ -531,3 +531,49 @@ async def test_ensure_runtime_reports_llm_stack_without_importing_it(
     monkeypatch.setattr(manager_mod, "_dist_version", {"torch": "2.11.0"}.get)
     result = await ray_manager.ensure_runtime({"version": "2.58.0"})
     assert result["serve_llm_available"] is False
+
+
+# -- the model-TLS proxy goes with its cluster -------------------------------
+#
+# Stopping Ray stopped Serve but left the proxy serving its port: on the DGX
+# pair, nginx on port 8000 for a cluster deleted hours before, answering 502.
+
+
+def _behind_proxy(ray_manager: RayManager, *, serve: dict, routes: dict[int, int]) -> MagicMock:
+    bundle = MagicMock()
+    bundle.name = "faden-ray-runtime"
+    ray_manager._bundle_spec = MagicMock(return_value=bundle)  # type: ignore[method-assign]
+    ray_manager._container = MagicMock()
+    ray_manager._container.is_running = AsyncMock(return_value=True)
+    ray_manager._container.stop = AsyncMock(return_value={"stopped": True})
+    ray_manager._serve_http = AsyncMock(return_value=serve)  # type: ignore[method-assign]
+    tls = MagicMock()
+    tls.routes = MagicMock(return_value=routes)
+    tls.remove_route = AsyncMock()
+    ray_manager.model_tls = tls
+    return tls
+
+
+@pytest.mark.asyncio()
+async def test_stopping_the_cluster_takes_its_serve_route_off_the_proxy(ray_manager: RayManager) -> None:
+    # 8443 fronts a vLLM found running here: not Serve's, it stays.
+    tls = _behind_proxy(ray_manager, serve={"running": True, "host": "127.0.0.1", "port": 28000},
+                        routes={8000: 28000, 8443: 8001})
+    result = await ray_manager.stop_ray({"force": True, "version": "2.58.0"})
+    tls.remove_route.assert_awaited_once_with(8000)
+    assert result["stopped"] is True
+
+
+@pytest.mark.asyncio()
+async def test_leaving_the_cluster_takes_its_serve_route_off_too(ray_manager: RayManager) -> None:
+    tls = _behind_proxy(ray_manager, serve={"running": True, "host": "127.0.0.1", "port": 28000}, routes={8000: 28000})
+    result = await ray_manager.leave_cluster({})
+    tls.remove_route.assert_awaited_once_with(8000)
+    assert result["model_tls_removed"] == [8000]
+
+
+@pytest.mark.asyncio()
+async def test_serve_on_the_network_leaves_the_proxy_alone(ray_manager: RayManager) -> None:
+    tls = _behind_proxy(ray_manager, serve={"running": True, "host": "0.0.0.0", "port": 8000}, routes={8443: 8001})
+    await ray_manager.stop_ray({"force": True, "version": "2.58.0"})
+    tls.remove_route.assert_not_awaited()

@@ -616,8 +616,10 @@ class RayManager:
             pass
         bundle = self._bundle_spec(payload)
         if bundle is not None:
+            routes = await self._serve_routes(bundle)
             result = await self._container.stop(bundle, remove=True)
-            return {"left": True, "runtime": "container", **result}
+            await self._drop_serve_routes(routes)
+            return {"left": True, "runtime": "container", **result, **({"model_tls_removed": routes} if routes else {})}
         await self._runtime.stop(version=version)
         return {"left": True}
 
@@ -630,7 +632,9 @@ class RayManager:
             pass
         bundle = self._bundle_spec(payload)
         if bundle is not None:
+            routes = await self._serve_routes(bundle)
             result = await self._container.stop(bundle, force=spec.force, remove=True)
+            await self._drop_serve_routes(routes)
         else:
             result = await self._runtime.stop(version=spec.version, force=spec.force)
 
@@ -766,6 +770,40 @@ class RayManager:
         if result.get("scaled"):
             self._events.add(event_type="ray.serve_app_scaled", payload={"app": app_name, "replicas": replicas})
         return result
+
+    async def _serve_routes(self, bundle: Any) -> list[int]:
+        """The model-TLS proxy's public ports in front of this cluster's Serve, read while it still runs.
+
+        Stopping Ray stopped Serve but left the proxy serving its port: on the
+        DGX pair, nginx on port 8000 for a cluster deleted hours before,
+        answering 502 and holding the port. Read before the stop, because
+        Serve's address goes with it; a route in front of anything else (a
+        vLLM found running here) is not Serve's and stays.
+        """
+        if self.model_tls is None:
+            return []
+        try:
+            if not await self._container.is_running(bundle.name):
+                return []
+            current = await self._serve_http(bundle.name)
+        except ContainerRuntimeError as exc:
+            log.warning("Model TLS: could not read where Serve listens before stopping (%s)", exc)
+            return []
+        from faden_agent.ray.serve_http import LOOPBACK  # noqa: PLC0415
+
+        if not current.get("running") or str(current.get("host") or "") not in LOOPBACK:
+            return []
+        port = int(current.get("port") or 0)
+        return sorted(public for public, internal in self.model_tls.routes().items() if internal == port)
+
+    async def _drop_serve_routes(self, publics: list[int]) -> None:
+        """Take the stopped Serve's routes off the proxy; with none left, the proxy goes."""
+        for public in publics:
+            try:
+                await self.model_tls.remove_route(public)
+                log.info("Model TLS: port %s no longer served, its cluster stopped here", public)
+            except Exception:  # noqa: BLE001 - the cluster is stopped either way
+                log.exception("Model TLS: could not remove the route for port %s", public)
 
     async def _serve_http(self, container: str) -> dict[str, Any]:
         """What Serve's proxy binds on this cluster: ``{"running": bool, "host", "port"}``."""
