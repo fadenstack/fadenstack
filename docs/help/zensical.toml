@@ -52,6 +52,8 @@ nav = [
 ]
 
 [project.theme]
+# Fonts come from the theme (assets/stylesheets/fonts.css), never from Google Fonts.
+font = false
 language = "en"
 features = ["navigation.tabs", "navigation.sections", "navigation.footer", "content.code.copy", "search.highlight"]
 

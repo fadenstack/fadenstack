@@ -58,8 +58,7 @@ keeps running.
 ??? info "More about a routed container"
     Chat offers it if it is a chat model; an embeddings model answers at `/v1/embeddings`, a scoring model at
     `/v1/rerank`. A request of the wrong kind is refused with a message that says where to send it. A routed
-    container counts as a remote provider, and Core takes at most three of those (see
-    [Remote providers](../administer/providers.md)).
+    container is listed with the remote providers (see [Remote providers](../administer/providers.md)).
 
 ### When the container stops
 

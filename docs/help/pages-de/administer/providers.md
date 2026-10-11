@@ -45,12 +45,6 @@ eingegeben haben.
 Ein Provider-Eintrag bietet genau ein Modell an. Um mehrere Modelle desselben Providers anzubieten, legen Sie
 für jedes einen eigenen Eintrag an, mit demselben Schlüssel.
 
-!!! note "Höchstens drei"
-    Core nimmt insgesamt höchstens drei externe Provider auf, angehaltene eingeschlossen, also höchstens drei
-    externe Modelle. Ein vierter wird abgelehnt mit „Resource capacity reached for this deployment. Please upgrade
-    your plan to add more providers.“ Ein vLLM-Server, den Sie über Fadenstack routen, zählt ebenfalls als einer
-    (siehe [Vorhandene vLLM-Server](../operate/existing-vllm.md)).
-
 ## Der Schlüssel des Providers {#the-providers-key}
 
 - Der Schlüssel bleibt auf dem Server. Wer den Chat oder die API nutzt, sieht ihn nie, und die Konsole zeigt

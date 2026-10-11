@@ -33,20 +33,22 @@ In den eigenen Images von Fadenstack:
 
 | Image | Inhalte von Drittanbietern | Bedingungen |
 |---|---|---|
-| Alle Dienst-Images | Python-Pakete aus den Lock-Dateien der Dienste, das Python-Basis-Image, Betriebssystempakete | Jedes behält seine eigene Lizenz; die SBOM des Images listet sie auf |
-| Konsole (Frontend) | npm-Pakete (React, React Router, MUI und andere); die Schriften Inter und Sora, ausgeliefert von der Konsole selbst | Jedes npm-Paket behält seine eigene Lizenz; Inter und Sora stehen unter der SIL Open Font License 1.1 |
+| Alle Dienst-Images | Python-Pakete aus den Lock-Dateien der Dienste, das Python-Basis-Image, Betriebssystempakete | Jedes behält seine eigene Lizenz, und seine Lizenzdateien bleiben im Image; die SBOM des Images listet sie auf. Die Images der Konsolen-API und des Gateways enthalten lxml, das GNU libiconv (LGPL-2.1) einbindet. Den Quellcode der Betriebssystempakete unter GPL oder LGPL gibt es auf [snapshot.debian.org](https://snapshot.debian.org) für die Versionen, die die SBOM nennt |
+| Konsole (Frontend) | npm-Pakete (React, React Router, MUI und andere); die Schriften Inter und Sora, ausgeliefert von der Konsole selbst | Jedes npm-Paket behält seine eigene Lizenz; Inter und Sora stehen unter der SIL Open Font License 1.1. Die Konsole liefert die Lizenztexte von allem, was in ihr gebündelt ist, unter `/third-party-licenses.md` aus, und die von dem, was die Build-Werkzeuge hinzufügen, unter `/licenses/supplement.md` |
+| Hilfe (von der Konsole unter `/help` ausgeliefert) | Zensical, seine Symbole (Lucide, Material Design Icons), die Schriften IBM Plex Sans, IBM Plex Mono und Sora | Zensical: MIT. Lucide: ISC. Material Design Icons: Pictogrammers Free License. Die Schriften: SIL Open Font License 1.1; „Plex“ ist ein reservierter Schriftname, deshalb sind die IBM-Plex-Dateien die von IBM, unverändert. Die Texte liegen unter `/help/assets/licenses/` und `/help/assets/fonts/` |
 | Konsolen-API, Gateway, PII | Swagger UI und ReDoc, für die Seiten der API-Dokumentation | Swagger UI: Apache License 2.0. ReDoc: MIT. Ihre Lizenz- und Hinweisdateien liegen daneben |
 
-Das Werkzeug `faden` enthält die Dateien der Installation und seine Python-Abhängigkeiten, die ihre eigenen Lizenzen
-behalten. Die Images, die diese Dateien nennen, werden separat heruntergeladen und behalten ihre eigenen
-Bedingungen.
+Das Werkzeug `faden` enthält die Dateien der Installation; seine Python-Abhängigkeiten installiert pip, und sie
+behalten ihre eigenen Lizenzen. Die eigenständigen Programme `faden` und `faden-agent` bündeln ihre
+Python-Abhängigkeiten: Jedes Release legt deren Lizenztexte neben das Programm. Die Images, die die Dateien der
+Installation nennen, werden separat heruntergeladen und behalten ihre eigenen Bedingungen.
 
 ## Auf den GPU-Maschinen {#on-the-gpu-machines}
 
 | Artefakt | Basiert auf | Bedingungen |
 |---|---|---|
-| Runtime-Image für NVIDIA DGX Spark | Der vLLM-Container von NVIDIA aus dem NVIDIA NGC catalog (`nvcr.io/nvidia/vllm`), mit CUDA und weiteren NVIDIA-Komponenten, dazu Ray und zusätzliche Python-Pakete | Das Basis-Image steht unter der [NVIDIA Deep Learning Container License](https://developer.download.nvidia.com/licenses/NVIDIA_Deep_Learning_Container_License.pdf), die Bedingungen für die Weitergabe abgeleiteter Container festlegt und die eigenständige Weitergabe einschränkt. Ray und vLLM stehen unter Apache-2.0, aber dadurch steht nicht das ganze Image unter Apache-2.0 |
-| Runtime-Image für x86_64-Maschinen | Ein schlankes Python-Basis-Image, Betriebssystempakete, Ray und vLLM aus PyPI und die Python- und CUDA-Pakete, die diese nachziehen | Jede Komponente behält ihre eigene Lizenz, auch NVIDIA-Pakete, die nicht Open Source sind. Die SBOM des Images ist das Verzeichnis |
+| Runtime-Image für NVIDIA DGX Spark | Der vLLM-Container von NVIDIA aus dem NVIDIA NGC catalog (`nvcr.io/nvidia/vllm`), mit CUDA und weiteren NVIDIA-Komponenten, dazu Ray und zusätzliche Python-Pakete | Das Basis-Image steht unter dem [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) und den [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/) (`/workspace/license.txt` im Image); unter anderem darf die NVIDIA-Software darin nur auf NVIDIA-Plattformen laufen. Ray und vLLM stehen unter Apache-2.0, aber dadurch steht nicht das ganze Image unter Apache-2.0: Nur der Runtime-Helfer von Fadenstack darin tut es |
+| Runtime-Image für x86_64-Maschinen | Ein schlankes Python-Basis-Image, Betriebssystempakete, Ray und vLLM aus PyPI und die Python- und CUDA-Pakete, die diese nachziehen | Jede Komponente behält ihre eigene Lizenz, auch CUDA, cuDNN und verwandte Pakete von NVIDIA unter der [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) und ihren eigenen Bedingungen, die nicht Open Source sind. Ihre Lizenzdateien bleiben im Image; die SBOM ist das Verzeichnis |
 | Modell-TLS-Proxy | nginx | Die Lizenz von nginx |
 | Die Modelle | Was Sie von Hugging Face bereitstellen oder importieren | Die eigene Lizenz jedes Modells, die der Administrator bei zugangsbeschränkten Modellen auf Hugging Face akzeptiert |
 
@@ -65,3 +67,9 @@ Die Maschinen erhalten diese Images vom Server.
 - [ReDoc](https://github.com/Redocly/redoc)
 - [Sora](https://github.com/sora-xor/sora-font)
 - [Inter](https://github.com/rsms/inter)
+- [IBM Plex](https://github.com/IBM/plex)
+- [Zensical](https://github.com/zensical/zensical)
+- [Lucide](https://github.com/lucide-icons/lucide)
+- [Material Design Icons](https://github.com/Templarian/MaterialDesign)
+- [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) und [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/)
+- [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html)

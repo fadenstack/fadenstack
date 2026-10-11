@@ -9,11 +9,10 @@ This is a release artifact, not a test fixture. The backend reads every
 catalogue, so nothing here is optional: without them no deployment can
 resolve a runtime.
 
-It used to live in `fadenstack-dev/llm_port_ray_migration/runtime_image/`, which
-meant a core checkout had to have the dev repo beside it to start. The
-certification suite -- the scripts that prove a built image works on real DGX
-hardware, and the reports they produced -- stayed there, because that is what
-it is.
+It used to live in a separate repository, which meant a core checkout needed
+that one beside it to start. The certification suite -- the scripts that prove
+a built image works on real DGX hardware, and the reports they produced -- is
+kept by the maintainers outside this repository, as it needs a DGX Spark pair.
 
 ## What is here
 
@@ -94,17 +93,10 @@ Dockerfile. Build it.
 
 ### Certify, then record
 
-Certify the image on its hardware with the suite in
-`fadenstack-dev/llm_port_ray_migration/runtime_image/`:
-
-```powershell
-.\deploy_and_certify_2node.ps1 -HeadHostIP 10.250.10.49 -WorkerHostIP 10.250.10.71 `
-    -Username sachi -ImageTag faden/ray-vllm-gb10:ray2.58-nv26.09 -NonInteractive
-```
-
-Stop Fadenstack's cluster on the pair first (the script refuses otherwise).
-The report records the image's layers on both machines. Put its verdict
-into the manifest:
+The maintainers certify the image on its hardware, a DGX Spark pair, with the
+certification suite; Fadenstack's cluster on the pair is stopped first. The
+report records the image's layers on both machines. Put its verdict into the
+manifest:
 
 ```bash
 python rebuild_runtime_image.py --manifest runtime-manifest-gb10-nv26.09.json \
@@ -143,8 +135,7 @@ when it is no longer needed: it passes without it.
 
 ## Releases
 
-A `runtime-v<version>` tag (pushed by `fadenstack-dev/scripts/release-runtime.ps1`)
-runs `.github/workflows/runtime-image-release.yml`: each image is built on a
+A `runtime-v<version>` tag runs `.github/workflows/runtime-image-release.yml`: each image is built on a
 runner of its own architecture, pushed to
 `ghcr.io/fadenstack/ray-runtime-gb10:<version>` and
 `ghcr.io/fadenstack/ray-runtime-x86_64:<version>`, and its manifest -- minted by
@@ -161,3 +152,13 @@ The manifests above name local tags (`faden/ray-vllm-gb10:…`,
 built on (the GB10 ones on the DGX pair) and nowhere else yet. A server can hand out only
 images it holds, so they reach a server that does not have them once they
 are published to GHCR and their manifests name the registry.
+
+## Licence
+
+The files in this folder are Apache-2.0, like the rest of the repository. The images built from them are not, as
+a whole: only the runtime helper in `/opt/llm-port/runtime` is. The GB10 image is built on NVIDIA's vLLM container
+(`nvcr.io/nvidia/vllm`), governed by the NVIDIA Software License Agreement and the Product-Specific Terms for NVIDIA
+AI Products; the x86_64 image contains NVIDIA's CUDA and cuDNN packages under the CUDA EULA. Those terms stay with
+the images: `NOTICE` (copied into each image) says so, the image label
+`org.opencontainers.image.licenses` names them, and Help's
+[Third-party components](../docs/help/pages/operate/third-party.md) page links them.

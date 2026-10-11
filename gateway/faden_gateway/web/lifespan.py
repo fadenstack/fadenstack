@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -151,6 +151,14 @@ def _init_cache(app: FastAPI) -> None:  # pragma: no cover
         app.state.cache_backend = RedisCache(pool)
     else:
         app.state.cache_backend = NoOpCache()
+
+
+def resource_capacity(plugin: Any) -> dict[str, int | None]:
+    """Per-person resource limits (``projects``): none, unless a plugin sets some."""
+    capacity: dict[str, int | None] = {}
+    if plugin is not None and hasattr(plugin, "override_resource_capacity"):
+        plugin.override_resource_capacity(capacity)
+    return capacity
 
 
 def _setup_db(app: FastAPI) -> None:  # pragma: no cover
@@ -328,10 +336,7 @@ async def lifespan_setup(
     app.state.http_client = create_shared_http_client(
         timeout_sec=settings.http_timeout_sec,
     )
-    # Resource capacity limits (EE plugin overrides to None for unlimited)
-    app.state._resource_capacity = {"projects": 0x3}
-    if gateway_plugin is not None and hasattr(gateway_plugin, "override_resource_capacity"):
-        gateway_plugin.override_resource_capacity(app.state._resource_capacity)
+    app.state._resource_capacity = resource_capacity(gateway_plugin)
     # Chat file store
     if settings.sessions_enabled:
         app.state.chat_file_store = LocalFileStore(settings.chat_file_store_root)

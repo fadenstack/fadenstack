@@ -66,6 +66,10 @@ RUN pip install --no-cache-dir -c base-packages.txt \
 WORKDIR /opt/llm-port/runtime
 COPY setup.py /opt/llm-port/runtime/
 COPY LICENSE NOTICE /opt/llm-port/runtime/
+# Only the Fadenstack runtime helper is Apache-2.0; the rest keeps its own terms (NOTICE).
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-NVIDIA-Proprietary" \
+      org.opencontainers.image.vendor="Emagin8 UG (haftungsbeschränkt)" \
+      org.opencontainers.image.source="https://github.com/fadenstack/fadenstack"
 COPY llm_port_ray_runtime /opt/llm-port/runtime/llm_port_ray_runtime/
 COPY fixtures.json test_local_validation.py /opt/llm-port/runtime/
 

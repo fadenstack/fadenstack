@@ -14,6 +14,9 @@ const apiProxyTarget =
 const devHost = (process.env.VITE_HOST as string | undefined) ?? "127.0.0.1";
 
 export default defineConfig({
+  // The licences of the packages bundled into the console, served at /third-party-licenses.md
+  // (the minified files keep none); public/licenses/supplement.md covers what Vite cannot see.
+  build: { license: { fileName: "third-party-licenses.md" } },
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   server: {
     host: devHost,

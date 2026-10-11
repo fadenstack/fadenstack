@@ -169,8 +169,7 @@ The Help pages are in [docs/help](docs/help/README.md); they become `help.fadens
 | `agent` | Machine agent (`faden-agent`) | Standalone binary | Apache-2.0 |
 | `runtime-image` | Fadenstack's Ray and vLLM runtime helper and image recipes | Docker | Apache-2.0 for Fadenstack-authored files; third-party components keep their own terms |
 | `cli` | Installer and management tool (`faden`) | PyPI (`fadenstack`) | Apache-2.0 |
-| `docs` | The guides linked above | | |
-| `dev` | Scripts for working on Fadenstack | | |
+| `docs` | The guides linked above | | Apache-2.0; its fonts are SIL OFL 1.1, two templates are MIT ([notices](THIRD-PARTY-NOTICES.md)) |
 
 A release publishes the images to `ghcr.io/fadenstack/{gateway,backend,frontend,pii,mcp,skills,base}`, tagged with its version (`0.4.1`, `0.4`, `latest`). The CLI of a release deploys the images of its own version. The machines' runtime images are `ghcr.io/fadenstack/ray-runtime-x86_64` and `ray-runtime-gb10` (DGX Spark); the machines download them from your server, not from the internet.
 
@@ -191,7 +190,9 @@ The agent is published as standalone binaries for Linux x86_64 and aarch64 (no P
 
 ## Contributing
 
-Issues and ideas are welcome. Before we can accept pull requests, we are setting up a contributor licence agreement, so please open an issue first and describe what you would like to change.
+Questions, bug reports and ideas go in [GitHub issues](https://github.com/fadenstack/fadenstack/issues); pick the template that fits. Please open an issue before you write code for a change, so we can agree on it first. [CONTRIBUTING.md](CONTRIBUTING.md) says what a pull request needs, including the one-time [contributor licence agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md) you sign from your first pull request. Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Found a security problem? Report it privately, never in an issue: see [SECURITY.md](SECURITY.md).
 
 ## Moving from LLM.Port
 
@@ -203,7 +204,9 @@ Fadenstack-authored code and deployment files in this repository are licensed un
 
 Container images also contain third-party software, including NVIDIA's runtime base image, Ray and vLLM. Those components retain their own licence terms. Release SBOMs identify the components present in each published artifact; see [Third-party components](docs/help/pages/operate/third-party.md).
 
-Apache-2.0 grants no general right to use the Fadenstack name or logo for a modified product. See [Brand and Official Releases](backend/OFFICIAL.md) for the current branding guidance.
+Some files started from other projects, and the images contain third-party software: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) gives their notices and says where the licence texts are.
+
+Apache-2.0 gives no right to use the Fadenstack name or logo: see [TRADEMARKS.md](TRADEMARKS.md).
 
 ---
 

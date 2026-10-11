@@ -42,12 +42,6 @@ The model is available in the chat and through the API at once, under the model'
 One provider entry offers one model. To offer several models of the same provider, add one entry for each,
 with the same key.
 
-!!! note "At most three"
-    Core takes at most three remote providers in all, stopped ones included, so at most three remote models. A
-    fourth is refused with "Resource capacity reached for this deployment. Please upgrade your plan to add more
-    providers." A vLLM server routed through Fadenstack counts as one too (see
-    [Existing vLLM servers](../operate/existing-vllm.md)).
-
 ## The provider's key
 
 - The key stays on the server. People using the chat or the API never see it, and the console does not show

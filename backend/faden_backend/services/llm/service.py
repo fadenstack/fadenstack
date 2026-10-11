@@ -237,10 +237,7 @@ class LLMService:
 
                 raise HTTPException(
                     status_code=402,
-                    detail=(
-                        "Resource capacity reached for this deployment. "
-                        "Please upgrade your plan to add more providers."
-                    ),
+                    detail=f"Provider limit reached: this server allows {_lim} remote providers.",
                 )
 
         # Normalise the URL so the gateway proxy does not duplicate /v1.

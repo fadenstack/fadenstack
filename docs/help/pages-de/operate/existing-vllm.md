@@ -60,8 +60,8 @@ Container läuft weiter.
 ??? info "Mehr zu einem gerouteten Container"
     Der Chat bietet ihn an, wenn es ein Chat-Modell ist; ein Embeddings-Modell antwortet unter `/v1/embeddings`, ein
     Bewertungsmodell unter `/v1/rerank`. Eine Anfrage der falschen Art wird abgelehnt, mit einer Meldung, die sagt,
-    wohin sie gehört. Ein gerouteter Container zählt als externer Provider, und Core nimmt davon höchstens drei auf
-    (siehe [Externe Provider](../administer/providers.md)).
+    wohin sie gehört. Ein gerouteter Container steht bei den externen Providern (siehe
+    [Externe Provider](../administer/providers.md)).
 
 ### Wenn der Container stoppt {#when-the-container-stops}
 

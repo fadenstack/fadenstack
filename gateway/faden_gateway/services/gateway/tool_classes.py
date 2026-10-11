@@ -23,7 +23,7 @@ and shown but not acted on yet (``OPEN_WORLD_ENFORCED``).
 
 Ceilings (EE) narrow the mode: ``registry.tool_mode_ceilings``. Core applies
 whatever is registered; with nothing registered the session's mode is the
-mode. See fadenstack-dev ``sdk/07-tool-classes.md``.
+mode.
 """
 
 from __future__ import annotations

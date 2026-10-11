@@ -22,8 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Bake uv into the image so downstream Dockerfiles don't need the
-# --mount=from=uv dance.
+# --mount=from=uv dance. Its image holds only the binary, so its licences
+# (MIT OR Apache-2.0, at UV_VERSION) come from licenses/ here.
 COPY --from=uv /uv /bin/uv
+COPY licenses/uv-LICENSE-MIT licenses/uv-LICENSE-APACHE /usr/share/licenses/uv/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \

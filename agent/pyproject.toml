@@ -43,8 +43,7 @@ faden-agent = "faden_agent.__main__:main"
 # from a runtime-bundle container (the Phase 2/3 path, still supported).
 # RayCoreClient attaches in-process (ray.init address="auto") and RayRuntime
 # drives the *same* packaged CLI for `ray start`/`ray stop`, which guarantees
-# SDK/cluster version parity.  2.58 is the Fadenstack-tested release; see
-# fadenstack-dev/llm_port_ray_migration/ray_sdk_refactor.md.
+# SDK/cluster version parity.  2.58 is the Fadenstack-tested release.
 ray-host = [
   "ray[serve]==2.58.0",
   # Ray 2.58 bug: ray/serve/_private/haproxy.py imports jinja2 at import time,
