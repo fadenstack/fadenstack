@@ -242,3 +242,13 @@ def test_a_source_checkout_is_upgraded_with_git_not_a_newer_cli(tmp_path: Path) 
     text = env.read_text(encoding="utf-8")
     assert "FADEN_CLI_INSTALLER=source" in text
     assert "VERSION=" not in text  # a checkout builds its own images: nothing to pin
+
+
+def test_a_checkout_is_told_git_pull_like_the_console(served: list[str], tmp_path: Path) -> None:
+    checkout = tmp_path / "fadenstack"
+    (checkout / ".git").mkdir(parents=True)
+    (checkout / "shared").mkdir()
+    cfg = FadenConfig(install_dir=str(checkout / "shared"))
+    assert update_check.upgrade_kind(cfg) == "source"
+    text = update_check.message(update_check.refresh(cfg), cfg)
+    assert text is not None and "Upgrade: git pull, then faden upgrade" in text

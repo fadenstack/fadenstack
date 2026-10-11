@@ -67,7 +67,7 @@ def release_rows(cfg: FadenConfig) -> list[tuple[str, str]]:
         rows.append(("Status", f"[{colour}]update available ({found.severity})[/{colour}]"))
         if len(found.path) > 1:
             rows.append(("Path", " -> ".join(found.path)))
-        commands = release_feed.upgrade_commands(update_check.installer(), found)
+        commands = release_feed.upgrade_commands(update_check.upgrade_kind(cfg), found)
         if commands:
             rows.append(("Upgrade", "\n".join(commands)))
         if found.latest and found.latest.notes_url:

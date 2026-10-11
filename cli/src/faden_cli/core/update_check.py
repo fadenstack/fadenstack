@@ -59,6 +59,23 @@ def installer() -> str:
     return "pip"
 
 
+def upgrade_kind(cfg: FadenConfig) -> str:
+    """How the install this CLI looks after moves to a new release: like the console says it.
+
+    An install built from a checkout gets a release by ``git pull`` (``source``), however
+    the CLI itself was installed; any other by a newer CLI, the way this one was installed.
+    """
+    if cfg.install_dir and current_release(cfg) is None:
+        from faden_cli.core.installation import checkout_of  # noqa: PLC0415
+
+        try:
+            if checkout_of(cfg.install_path) is not None:
+                return "source"
+        except OSError:
+            pass
+    return installer()
+
+
 def enabled(cfg: FadenConfig) -> bool:
     """Whether this CLI checks for releases at all."""
     if os.environ.get(ENV_OFF, "").strip().lower() not in ("", "0", "false", "no"):
@@ -180,7 +197,7 @@ def message(feed: release_feed.Feed, cfg: FadenConfig) -> str | None:
         "critical": " -- a critical fix: upgrade now",
         "security": " -- it fixes security problems",
     }.get(assessment.severity, "")
-    steps = release_feed.upgrade_commands(installer(), assessment)
+    steps = release_feed.upgrade_commands(upgrade_kind(cfg), assessment)
     lines = [f"Fadenstack {assessment.latest.version} is available (you have {__version__}){urgency}."]
     if assessment.path and len(assessment.path) > 1:
         lines.append(f"Upgrade one release at a time: {' -> '.join(assessment.path)}.")
