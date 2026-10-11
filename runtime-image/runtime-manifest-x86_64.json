@@ -2,7 +2,7 @@
   "schema_version": "1.1.0",
   "runtime_id": "faden-ray-vllm-x86_64-ray2.58",
   "flavor": "x86_64",
-  "release_tag": "faden-ray-runtime-x86_64:2.58.0",
+  "release_tag": "ghcr.io/fadenstack/ray-runtime-x86_64:2.58.0",
   "image_id": "sha256:9d10f7766d272a1b463cb0b1c3a9ecc7977e2ab6575d85e85e69b841b23d6d49",
   "rootfs_layers": [
     "sha256:a6dc765193a52cbaede3c93a9ff48b9540948dd0774bbe7031fcb5847606f9ac",

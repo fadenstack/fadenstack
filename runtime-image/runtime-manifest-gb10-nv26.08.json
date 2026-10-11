@@ -2,7 +2,7 @@
   "schema_version": "1.1.0",
   "runtime_id": "faden-ray-vllm-gb10-ray2.58-nv26.08",
   "flavor": "gb10",
-  "release_tag": "faden/ray-vllm-gb10:ray2.58-nv26.08",
+  "release_tag": "ghcr.io/fadenstack/ray-runtime-gb10:ray2.58-nv26.08",
   "image_id": "sha256:fdb1ad97152f23a970934961ab739adc002aa4d845e725a404bb5883efba03fa",
   "rootfs_layers": [
     "sha256:646eea22414270d74b0c9e9d6d3b9550701ae62e658a099825d4d15045a3630b",
