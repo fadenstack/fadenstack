@@ -34,12 +34,14 @@ COPYRIGHT = f"Copyright 2026 {COMPANY} and contributors. Apache-2.0."
 
 # The licence travels with the binary.
 #
-# The agent ships its Apache-2.0 LICENSE and NOTICE with every binary.
-# `--license` prints them so users can read the terms and attribution.
+# The agent ships its Apache-2.0 LICENSE and NOTICE with every binary, and
+# the licences of everything bundled with it: build-binary.sh writes
+# build/THIRD-PARTY-NOTICES.txt (third_party_notices.py) before this runs.
+# `faden-agent license` prints the first two, `--third-party` the third.
 _LICENCE_FILES = [
-    (str(HERE / name), ".")
-    for name in ("LICENSE", "NOTICE")
-    if (HERE / name).is_file()
+    (str(path), ".")
+    for path in (HERE / "LICENSE", HERE / "NOTICE", HERE / "build" / "THIRD-PARTY-NOTICES.txt")
+    if path.is_file()
 ]
 
 # Downloading a model on the machine (hf_download.py). huggingface_hub loads
@@ -98,6 +100,18 @@ a = Analysis(
         "pydoc",
         "doctest",
         "test",
+        # Line editing for an interactive prompt. The standard library's code,
+        # rlcompleter and site import it, and so does websockets.cli -- all
+        # inside try/except, none on any path the agent runs -- and with it
+        # PyInstaller bundles libreadline, which is GPL-3.0-or-later.
+        "readline",
+        "rlcompleter",
+        # Installed only because PyInstaller needs it, yet bundled whole: the
+        # huggingface_hub CLI's "import tomli" (Python < 3.11 only) resolves
+        # to setuptools' vendored copy. Nothing the agent runs uses it.
+        "setuptools",
+        "_distutils_hack",
+        "pkg_resources",
     ],
     noarchive=False,
     optimize=1,

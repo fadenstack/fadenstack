@@ -18,9 +18,11 @@
 #   sh build-binary.sh linux-aarch64 --remote sachi@10.250.10.49 \
 #        --ssh-key ~/.ssh/id_dgx_spark
 #
-# The result lands in dist/, named the way /api/install/plan expects:
+# The result lands in dist/, named the way /api/install/plan expects, with
+# the licences of the third-party software bundled in it beside it:
 #
 #   dist/faden-agent-linux-aarch64
+#   dist/faden-agent-linux-aarch64.THIRD-PARTY-NOTICES.txt
 #
 # That is the whole publish step. A backend running from this checkout reads
 # dist/ directly, so every node install -- online or air-gapped -- verifies
@@ -38,7 +40,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --remote) REMOTE="${2:-}"; shift ;;
     --ssh-key) SSH_KEY="${2:-}"; shift ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 2 ;;
     *) PLATFORM="$1" ;;
   esac
@@ -82,9 +84,25 @@ MSYS_NO_PATHCONV=1 docker run --rm --platform "$DOCKER_PLATFORM" -v "\$SRCDIR:/s
     # "On Linux, objdump is required", which is a build-host problem rather
     # than anything to do with the agent.
     apt-get update -qq && apt-get install -y -qq binutils >/dev/null
-    pip install --quiet --no-cache-dir pyinstaller .
+    # The tools that make the binary but are not in it, in a venv of their
+    # own so they and their dependencies stay out of what PyInstaller sees.
+    python -m venv /tmp/tools
+    /tmp/tools/bin/pip install --quiet --no-cache-dir uv==0.10.6 pip-licenses==5.5.5
+    # Exactly what uv.lock pins, hash-checked: the binary is the lock, not
+    # whatever PyPI serves on the day. The agent itself is not installed --
+    # PyInstaller reads it from the source tree.
+    /tmp/tools/bin/uv export --quiet --frozen --no-dev --no-emit-project \\
+      --extra build -o /tmp/build-requirements.txt
+    /tmp/tools/bin/uv export --quiet --frozen --no-dev --no-emit-project \\
+      --no-hashes -o /tmp/requirements.txt
+    pip install --quiet --no-cache-dir --require-hashes -r /tmp/build-requirements.txt
+    # The licences of everything bundled, into the binary and beside it.
+    python third_party_notices.py write /tmp/requirements.txt \\
+      build/THIRD-PARTY-NOTICES.txt --pip-licenses /tmp/tools/bin/pip-licenses
     pyinstaller --clean --noconfirm node_agent.spec
+    python third_party_notices.py check dist/faden-agent /tmp/requirements.txt
     mv dist/faden-agent "dist/$ARTIFACT"
+    cp build/THIRD-PARTY-NOTICES.txt "dist/$ARTIFACT.THIRD-PARTY-NOTICES.txt"
     # Hand the output back to whoever owns the source.
     #
     # The container is root and the source is a bind mount, so everything it
@@ -173,11 +191,13 @@ fi
 
 echo "  fetching artifact"
 mkdir -p "$SRC/dist"
-if ! $SCP "$REMOTE:$REMOTE_DIR/dist/$ARTIFACT" "$SRC/dist/$ARTIFACT"; then
-  echo "ERROR: built on $REMOTE but could not fetch $ARTIFACT." >&2
-  echo "       Left $REMOTE:$REMOTE_DIR in place so it can be copied by hand." >&2
-  exit 1
-fi
+for FILE in "$ARTIFACT" "$ARTIFACT.THIRD-PARTY-NOTICES.txt"; do
+  if ! $SCP "$REMOTE:$REMOTE_DIR/dist/$FILE" "$SRC/dist/$FILE"; then
+    echo "ERROR: built on $REMOTE but could not fetch $FILE." >&2
+    echo "       Left $REMOTE:$REMOTE_DIR in place so it can be copied by hand." >&2
+    exit 1
+  fi
+done
 
 echo "  cleaning up $REMOTE"
 cleanup_remote || true

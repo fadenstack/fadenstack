@@ -192,18 +192,6 @@ wheels = [
 ]
 
 [[package]]
-name = "aiostream"
-version = "0.7.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/65/b9b69695702b76a878c9879f2ee80cefce75bc5cb864fc100460bc1c5380/aiostream-0.7.1.tar.gz", hash = "sha256:272aaa0d8f83beb906f5aa9022bb59046bb7a103fa3770f807c31f918595acf6", size = 44059, upload-time = "2025-10-13T20:02:06.961Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/a0/d7c6ca304140f3f49987d710e15bc164248924a35d8cdfac2f6e87fca041/aiostream-0.7.1-py3-none-any.whl", hash = "sha256:ea8739e9158ee6a606b3feedf3762721c3507344e540d09a10984c5e88a13b37", size = 41416, upload-time = "2025-10-13T20:02:05.535Z" },
-]
-
-[[package]]
 name = "alembic"
 version = "1.18.4"
 source = { registry = "https://pypi.org/simple" }
@@ -869,7 +857,7 @@ requires-dist = [
     { name = "sentry-sdk", specifier = ">=2.19.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.44" },
     { name = "taskiq", specifier = ">=0.11.10" },
-    { name = "taskiq-aio-pika", specifier = ">=0.4.1" },
+    { name = "taskiq-aio-pika", specifier = ">=0.6.1" },
     { name = "taskiq-fastapi", specifier = ">=0.5.0" },
     { name = "taskiq-redis", specifier = ">=1.0.2" },
     { name = "tzdata", specifier = ">=2025.2" },
@@ -3656,16 +3644,16 @@ reload = [
 
 [[package]]
 name = "taskiq-aio-pika"
-version = "0.6.0"
+version = "0.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aio-pika" },
-    { name = "aiostream" },
     { name = "taskiq" },
+    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d5/05/e9f4e5cbc7f9777a09f493e502242922df2d3e3779364d0292313995d68c/taskiq_aio_pika-0.6.0.tar.gz", hash = "sha256:0a4ec304a5e860e205aaea5077d90d2a009a4842f3ee008b5185c29301992ed9", size = 9492, upload-time = "2026-02-28T12:24:20.505Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/69/1b58c2e76bf96405a3e481fe653c9e96fad7b20990501b996f2e856a1005/taskiq_aio_pika-0.6.1.tar.gz", hash = "sha256:9f25fcc78cc4ae13ad771f5adfb4fca2d80d6ab444a9e85625ba74a9e8d570c0", size = 10271, upload-time = "2026-09-16T12:51:01.863Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/57/b06600675ef8ab6352f30632c0ece20d592f922531b3f490a0559ed792ea/taskiq_aio_pika-0.6.0-py3-none-any.whl", hash = "sha256:6bff38b61b24afd7d41b78ea9ffca0702fe9653e82289ca1287b063a53af2145", size = 10789, upload-time = "2026-02-28T12:24:19.654Z" },
+    { url = "https://files.pythonhosted.org/packages/57/ea/c0b76496a5058701da357407ed14cfa880a0b900241d21196f5e10e4f586/taskiq_aio_pika-0.6.1-py3-none-any.whl", hash = "sha256:a807e9bac4da4069c5411323fbe621718cc6e858001d661c2dc84755a410bbb0", size = 11491, upload-time = "2026-09-16T12:51:00.896Z" },
 ]
 
 [[package]]

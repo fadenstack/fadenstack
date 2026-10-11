@@ -184,7 +184,8 @@ jobs:
             their own terms; see LICENSE, NOTICE, and docs/help/pages/operate/third-party.md.
 
             The wheel and standalone binaries are attached to this release; the
-            same version is on PyPI.
+            same version is on PyPI. Each binary's `.THIRD-PARTY-NOTICES.txt` carries
+            the licences of the packages, the Python and the bootloader inside it.
 
             ```bash
             pipx install fadenstack==${{ needs.build.outputs.version }}
@@ -224,18 +225,112 @@ jobs:
       - name: Build executable
         shell: bash
         run: |
-          pip install --upgrade pip pyinstaller
-          pip install dist/*.whl
+          set -euo pipefail
+          pip install --upgrade pip
+          # The report names what the wheel brings: the packages the notices list.
+          pip install --ignore-installed --report "$RUNNER_TEMP/cli-install.json" dist/*.whl
+          pip install pyinstaller
+          # The licences of everything the executable bundles besides our own code.
+          python - "$RUNNER_TEMP/cli-install.json" THIRD-PARTY-NOTICES.txt <<'PY'
+          import json, os, platform, subprocess, sys, venv
+          from importlib import metadata
+          from pathlib import Path
+
+          report, out = Path(sys.argv[1]), Path(sys.argv[2])
+          names = sorted(
+              item["metadata"]["name"]
+              for item in json.loads(report.read_text(encoding="utf-8"))["install"]
+              if item["metadata"]["name"].lower() != "fadenstack"
+          )
+
+          def heading(title):
+              return f"\n\n{title}\n{'=' * len(title)}\n\n"
+
+          def licence_files(dist):
+              return sorted(
+                  (Path(str(dist.locate_file(f))) for f in dist.files or ()
+                   if f.parts[0].endswith(".dist-info")
+                   and any(k in f.name.upper() for k in ("LICEN", "COPYING", "NOTICE", "AUTHORS"))),
+                  key=lambda path: path.name,
+              )
+
+          def text(path):
+              return path.read_text(encoding="utf-8", errors="replace").rstrip() + "\n"
+
+          # pip-licenses from a venv of its own, reading this Python's packages,
+          # so neither it nor its dependencies are listed.
+          tools = Path(os.environ["RUNNER_TEMP"]) / "pip-licenses"
+          venv.create(tools, with_pip=True)
+          tool = tools / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+          subprocess.run([tool, "-m", "pip", "install", "--quiet", "pip-licenses==5.5.5"], check=True)
+          listing = subprocess.run(
+              [tool, "-m", "piplicenses", f"--python={sys.executable}", "--from=mixed",
+               "--with-license-file", "--with-notice-file", "--no-license-path", "--with-urls",
+               # --with-system: else it leaves out wcwidth, which prompt_toolkit needs.
+               "--format=plain-vertical", "--with-system", "--packages", *names],
+              check=True, capture_output=True, encoding="utf-8",
+              env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+          ).stdout
+
+          parts = [
+              "Third-party software in the faden executable\n"
+              "============================================\n\n"
+              "faden itself is licensed under the Apache License, Version 2.0 (LICENSE and\n"
+              "NOTICE, in the release and the source). The executable also contains the\n"
+              "Python packages, the Python and PyInstaller's bootloader below, each under\n"
+              "its own licence.\n",
+              heading("1. Python packages"),
+              listing.rstrip() + "\n",
+          ]
+          # pip-licenses prints one licence file per package. Some ship more:
+          # cryptography and packaging are "Apache-2.0 OR BSD", Pygments names its AUTHORS.
+          for name in names:
+              dist = metadata.distribution(name)
+              if f"\n{dist.metadata['Name']}\n{dist.version}\n" not in "\n" + listing:
+                  sys.exit(f"pip-licenses left out {dist.metadata['Name']} {dist.version}")
+              files = licence_files(dist)
+              if len(files) > 1:
+                  for path in files:
+                      parts += [f"\n--- {dist.metadata['Name']} {dist.version}: {path.name} ---\n\n", text(path)]
+
+          stdlib = Path(os.__file__).parent  # LICENSE.txt sits here, or one up on Windows
+          licence = next(p for d in (stdlib, stdlib.parent) for p in (d / "LICENSE.txt", d / "LICENSE") if p.is_file())
+          parts += [heading(f"2. Python {platform.python_version()}"), text(licence)]
+
+          pyinstaller = metadata.distribution("pyinstaller")
+          parts += [
+              heading("3. PyInstaller's bootloader"),
+              f"The executable starts through the bootloader of PyInstaller {pyinstaller.version},\n"
+              "stock and unmodified. It is licensed under the GNU General Public License,\n"
+              "version 2 or later, with the bootloader exception, which permits distributing\n"
+              "it embedded in another program under that program's terms. PyInstaller's\n"
+              "licence follows.\n\n",
+              *(text(path) for path in licence_files(pyinstaller)),
+          ]
+          out.write_text("".join(parts), encoding="utf-8")
+          print(f"Wrote {out}: {len(names)} packages")
+          PY
+          grep -q 'Mozilla Public License' THIRD-PARTY-NOTICES.txt  # certifi, MPL-2.0
           ENTRY=$(python -c "import faden_cli.cli, sys; print(faden_cli.cli.__file__)")
           # --collect-data: the deployment files are package data.
+          # readline: only the interactive console's line editing, and it would
+          # bundle libreadline, which is GPL-3.0-or-later. setuptools: PyInstaller's
+          # own dependency, which the CLI does not use and the notices do not list.
           pyinstaller --onefile --clean --name "${{ matrix.name }}" \
-            --collect-submodules faden_cli --collect-data faden_cli "$ENTRY"
+            --collect-submodules faden_cli --collect-data faden_cli \
+            --add-data "THIRD-PARTY-NOTICES.txt:." \
+            --exclude-module readline --exclude-module rlcompleter \
+            --exclude-module setuptools --exclude-module _distutils_hack --exclude-module pkg_resources \
+            "$ENTRY"
+          cp THIRD-PARTY-NOTICES.txt "dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: dist/${{ matrix.artifact }}
+          files: |
+            dist/${{ matrix.artifact }}
+            dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt
 
   checksums:
     # One SHA256SUMS for the wheel, the sdist and the executables, so a download can be checked.
