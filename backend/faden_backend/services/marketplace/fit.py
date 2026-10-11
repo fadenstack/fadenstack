@@ -51,6 +51,13 @@ DEFAULT_CONTEXT = 8192
 #: Tensor-parallel sizes vLLM supports well.
 TP_SIZES = (1, 2, 4, 8, 16)
 
+#: Parallel sequences a hybrid model (Mamba or linear-attention layers) is
+#: planned for. vLLM keeps a recurrent-state block per sequence and will not
+#: start when it may run more than its memory holds -- its default is 256, and
+#: Qwen3.8-27B on a 35 % share of a GB10 had room for 148. Suggested as
+#: ``max_num_seqs``, and the state of that many counted in what a copy needs.
+RECURRENT_SEQUENCES = 32
+
 
 @dataclass
 class Gpu:
@@ -108,6 +115,10 @@ class ModelNeeds:
     kv_heads: int | None = None
     #: A picture model runs on one device (or a share of one): no tensor parallelism.
     single_device: bool = False
+    #: A hybrid model: vLLM keeps a recurrent-state block per sequence.
+    recurrent: bool = False
+    #: That state, per sequence, in bytes (``None`` when the config does not say).
+    state_bytes_per_sequence: int | None = None
 
 
 @dataclass
@@ -133,6 +144,8 @@ class Fit:
     suggested_gpu_memory_utilization: float | None = None
     #: A copy of a small model can share an accelerator with others.
     shareable: bool = False
+    #: For a hybrid model, the parallel sequences the plan holds the state of (vLLM's ``max_num_seqs``).
+    max_num_seqs: int | None = None
     #: Machine-readable reasons, for the interface to put into words.
     notes: list[str] = field(default_factory=list)
 
@@ -144,11 +157,13 @@ def _round_up(value: float, step: float = 0.05) -> float:
     return round(math.ceil(value / step - 1e-9) * step, 2)
 
 
-def per_gpu_bytes(needs: ModelNeeds, *, tp: int, context: int, kv_bytes_per_token: int | None) -> int:
-    """Memory one accelerator of a TP-way copy needs at *context* tokens."""
+def per_gpu_bytes(needs: ModelNeeds, *, tp: int, context: int, kv_bytes_per_token: int | None,
+                  sequences: int = 0) -> int:
+    """Memory one accelerator of a TP-way copy needs at *context* tokens, with *sequences* recurrent states."""
     weights = needs.weights_bytes or 0
     kv = (kv_bytes_per_token or 0) * context
-    return math.ceil(weights / tp + kv / tp) + OVERHEAD_BYTES
+    state = (needs.state_bytes_per_sequence or 0) * sequences
+    return math.ceil(weights / tp + kv / tp + state / tp) + OVERHEAD_BYTES
 
 
 def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = None,
@@ -175,11 +190,14 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
 
     gpu_bytes = min(g.total_bytes for g in gpus)
     budget = MAX_UTILIZATION * gpu_bytes
+    # vLLM needs a state block for every sequence it may run before it starts at all.
+    sequences = RECURRENT_SEQUENCES if needs.recurrent else 0
+    state_bytes = (needs.state_bytes_per_sequence or 0) * sequences
 
     def need(tp: int) -> int:
         if kv_per_token is None:
-            return math.ceil(needs.weights_bytes * 1.2 / tp) + OVERHEAD_BYTES
-        return per_gpu_bytes(needs, tp=tp, context=ctx, kv_bytes_per_token=kv_per_token)
+            return math.ceil((needs.weights_bytes * 1.2 + state_bytes) / tp) + OVERHEAD_BYTES
+        return per_gpu_bytes(needs, tp=tp, context=ctx, kv_bytes_per_token=kv_per_token, sequences=sequences)
 
     chosen: int | None = None
     for tp in TP_SIZES:
@@ -207,7 +225,9 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
     # eight 4K conversations, whichever is larger, within the planned ceiling.
     headroom_tokens = max(ctx, 8 * 4096)
     if kv_per_token is not None:
-        wanted = per_gpu_bytes(needs, tp=chosen, context=headroom_tokens, kv_bytes_per_token=kv_per_token)
+        wanted = per_gpu_bytes(
+            needs, tp=chosen, context=headroom_tokens, kv_bytes_per_token=kv_per_token, sequences=sequences,
+        )
     else:
         wanted = needed
     utilization = min(MAX_UTILIZATION, max(MIN_UTILIZATION, _round_up(wanted * 1.1 / gpu_bytes)))
@@ -232,7 +252,7 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
 
     max_context = None
     if kv_per_token:
-        room = MAX_UTILIZATION * gpu_bytes * chosen - needs.weights_bytes - OVERHEAD_BYTES * chosen
+        room = MAX_UTILIZATION * gpu_bytes * chosen - needs.weights_bytes - OVERHEAD_BYTES * chosen - state_bytes
         max_context = max(0, int(room // kv_per_token))
         if needs.max_context:
             max_context = min(max_context, needs.max_context)
@@ -251,6 +271,7 @@ def plan(needs: ModelNeeds, hardware: ClusterHardware, *, context: int | None = 
         kv_bytes_per_token=kv_per_token,
         suggested_gpu_memory_utilization=utilization,
         shareable=shareable,
+        max_num_seqs=sequences or None,
         notes=notes,
     )
 

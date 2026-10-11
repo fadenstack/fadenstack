@@ -2949,6 +2949,7 @@
       "default_cap": "Ein langer Kontext reserviert Speicher für jede Unterhaltung; 32K reichen für die meisten Chats.",
       "fit": "Genug für das Modell und einen brauchbaren Kontextcache.",
       "shared_gpu": "Ein kleines Modell: Der Rest der Karte bleibt für andere Modelle frei.",
+      "recurrent_state": "Ein Hybridmodell hält für jedes gleichzeitig laufende Gespräch einen Zustand; so viele passen in den geplanten Speicher.",
       "embedding_model": "Ein Embedding-Modell: bereitgestellt unter /v1/embeddings.",
       "embedding_from_causal_lm": "Eine Chat-Architektur für Embeddings: vLLM passt sie an.",
       "needs_remote_code": "Dieses Modell bringt eigenen Ladecode mit.",

@@ -327,6 +327,8 @@ async def model_detail(
         attention_heads=arch.get("num_attention_heads"),
         kv_heads=arch.get("num_kv_heads"),
         single_device=detail.get("task") == "images",
+        recurrent=bool(arch.get("recurrent_layers")),
+        state_bytes_per_sequence=arch.get("state_bytes_per_sequence"),
     )
     fits = {c.environment_id: fit_mod.plan(needs, c, context=context).to_dict() for c in hardware}
     # Whether each cluster's runtime can load it at all -- said here, before

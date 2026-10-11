@@ -154,6 +154,12 @@ def suggest(model: dict[str, Any], fit: Fit | None) -> dict[str, Any]:
         config["gpu_memory_utilization"] = fit.suggested_gpu_memory_utilization
         reasons["gpu_memory_utilization"] = "shared_gpu" if fit.shareable else "fit"
 
+    if fit is not None and fit.max_num_seqs:
+        # A hybrid model: vLLM's default of 256 parallel sequences can need
+        # more recurrent state than the copy has, and then it does not start.
+        config["max_num_seqs"] = fit.max_num_seqs
+        reasons["max_num_seqs"] = "recurrent_state"
+
     if model.get("needs_remote_code"):
         # Suggested, never applied silently: it runs the repository's own code.
         reasons["trust_remote_code"] = "needs_remote_code"

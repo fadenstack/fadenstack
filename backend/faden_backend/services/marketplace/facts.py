@@ -255,12 +255,20 @@ class Architecture:
     moe: bool = False
     #: The Transformers the config was saved with: a hint at how new the model type is.
     transformers_version: str | None = None
+    #: A hybrid model's layers that keep a recurrent state instead of a KV cache
+    #: (Mamba, linear attention); ``None`` for a model of attention layers only.
+    recurrent_layers: int | None = None
+    #: Its layers with a KV cache, when it is hybrid.
+    attention_layers: int | None = None
+    #: The recurrent state one sequence holds across those layers, in bytes, when the config says enough.
+    state_bytes_per_sequence: int | None = None
 
     def kv_bytes_per_token(self, dtype_bytes: int = 2) -> int | None:
-        """KV cache bytes one token of context occupies (keys and values, every layer)."""
-        if not (self.num_layers and self.num_kv_heads and self.head_dim):
+        """KV cache bytes one token of context occupies (keys and values, every attention layer)."""
+        layers = self.attention_layers or self.num_layers
+        if not (layers and self.num_kv_heads and self.head_dim):
             return None
-        return 2 * self.num_layers * self.num_kv_heads * self.head_dim * dtype_bytes
+        return 2 * layers * self.num_kv_heads * self.head_dim * dtype_bytes
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -289,10 +297,15 @@ def architecture_from_config(config: dict[str, Any] | None) -> Architecture:
     if head_dim is None and heads and hidden:
         head_dim = int(hidden) // int(heads)
     kv_heads = pick("num_key_value_heads", "num_kv_heads", "multi_query_group_num") or heads
+    num_layers = _int(pick("num_hidden_layers", "n_layer", "num_layers"))
+    attention_layers, recurrent_layers = _layer_kinds(pick("layer_types"), pick("full_attention_interval"), num_layers)
     return Architecture(
         model_type=config.get("model_type"),
         architectures=list(config.get("architectures") or []),
-        num_layers=_int(pick("num_hidden_layers", "n_layer", "num_layers")),
+        num_layers=num_layers,
+        recurrent_layers=recurrent_layers,
+        attention_layers=attention_layers,
+        state_bytes_per_sequence=_state_bytes(pick, recurrent_layers),
         hidden_size=_int(hidden),
         num_attention_heads=_int(heads),
         num_kv_heads=_int(kv_heads),
@@ -302,6 +315,48 @@ def architecture_from_config(config: dict[str, Any] | None) -> Architecture:
         moe=bool(pick("num_experts", "num_local_experts", "n_routed_experts")),
         transformers_version=str(config["transformers_version"]) if config.get("transformers_version") else None,
     )
+
+
+#: ``layer_types`` entries that keep a recurrent state per sequence instead of a KV cache.
+_RECURRENT_LAYERS = frozenset({"linear_attention", "mamba", "mamba2", "gated_delta_net"})
+
+
+def _layer_kinds(layer_types: Any, interval: Any, num_layers: int | None) -> tuple[int | None, int | None]:
+    """(attention layers, recurrent layers) of a hybrid model; (None, None) for one of attention layers only.
+
+    Qwen3.5 and later list them (``layer_types``: 16 ``full_attention``, 48
+    ``linear_attention`` in the 27B); Qwen3-Next says every fourth layer is
+    attention (``full_attention_interval``). Sliding-window layers are attention.
+    """
+    if isinstance(layer_types, list) and layer_types:
+        recurrent = sum(1 for kind in layer_types if str(kind) in _RECURRENT_LAYERS)
+        return (len(layer_types) - recurrent, recurrent) if recurrent else (None, None)
+    every = _int(interval)
+    if every and every > 1 and num_layers:
+        attention = num_layers // every
+        return attention, num_layers - attention
+    return None, None
+
+
+def _state_bytes(pick: Any, recurrent_layers: int | None) -> int | None:
+    """The recurrent state one sequence holds, for gated delta net layers (Qwen3-Next, Qwen3.5 and later).
+
+    Per layer: the state matrix of each value head (``mamba_ssm_dtype``,
+    float32 unless it says otherwise) and the short convolution's window over
+    the query, key and value channels (bfloat16). Other recurrent layers
+    (Mamba2) are not sized here: ``None``.
+    """
+    if not recurrent_layers:
+        return None
+    v_heads, k_heads = _int(pick("linear_num_value_heads")), _int(pick("linear_num_key_heads"))
+    k_dim, v_dim = _int(pick("linear_key_head_dim")), _int(pick("linear_value_head_dim"))
+    if not (v_heads and k_heads and k_dim and v_dim):
+        return None
+    state_dtype_bytes = 2 if str(pick("mamba_ssm_dtype") or "float32") in {"bfloat16", "float16"} else 4
+    kernel = _int(pick("linear_conv_kernel_dim")) or 4
+    state = v_heads * k_dim * v_dim * state_dtype_bytes
+    conv = (2 * k_heads * k_dim + v_heads * v_dim) * max(kernel - 1, 0) * 2
+    return recurrent_layers * (state + conv)
 
 
 def _int(value: Any) -> int | None:

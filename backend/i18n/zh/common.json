@@ -2949,6 +2949,7 @@
       "default_cap": "长上下文会为每个会话预留内存；32K 足够大多数聊天使用。",
       "fit": "足以容纳模型和可用的上下文缓存。",
       "shared_gpu": "小模型：显卡的其余部分留给其他模型。",
+      "recurrent_state": "混合模型为每个同时进行的对话保留一个状态；计划的内存可容纳这么多。",
       "embedding_model": "嵌入模型：通过 /v1/embeddings 提供服务。",
       "embedding_from_causal_lm": "用于嵌入的聊天架构：由 vLLM 进行适配。",
       "needs_remote_code": "此模型自带加载代码。",
