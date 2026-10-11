@@ -104,7 +104,11 @@ jobs:
             shopt -s nullglob
             count=0
             for asset in downloads/*; do
-              case "$asset" in *.sha256|*.spdx.json) continue ;; esac
+              # Not packages: checksums, earlier SBOMs, PyPI's publish attestations,
+              # and the signed release list (index.json and its signature).
+              case "$asset" in
+                *.sha256|*.spdx.json|*.attestation|*.sig|*/SHA256SUMS|*/index.json) continue ;;
+              esac
               name=$(basename "$asset")
               case "$asset" in
                 *.whl|*.zip)
