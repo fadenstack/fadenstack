@@ -969,7 +969,7 @@ async def lifespan_setup(
     )
     gateway_session_factory = getattr(app.state, "llm_graph_trace_session_factory", None)
     gateway_sync = GatewaySyncService(gateway_session_factory)
-    app.state._resource_capacity = {"remote_providers": 0x3}
+    app.state._resource_capacity = {}  # no limits, unless a plugin sets some
     app.state.llm_service = LLMService(
         app.state.docker,
         gateway_sync=gateway_sync,

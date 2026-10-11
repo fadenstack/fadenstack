@@ -260,61 +260,9 @@ def upgrade() -> None:
         ["tenant_id", "user_id", "scope", "status"],
     )
 
-    # --- DB-level row-count guard for chat_project (defense-in-depth) ---
-    # Source: https://stackoverflow.com/a/1743742 by Aleksander Kmetec
-    # License: CC BY-SA 2.5 — Retrieved 2026-03-08
-    op.execute(
-        """
-        CREATE OR REPLACE FUNCTION enforce_chat_project_limit()
-        RETURNS trigger AS $$
-        DECLARE
-            max_count INTEGER := 3;
-            current_count INTEGER := 0;
-            must_check BOOLEAN := false;
-        BEGIN
-            IF TG_OP = 'INSERT' THEN
-                must_check := true;
-            END IF;
-
-            IF TG_OP = 'UPDATE' THEN
-                IF (NEW.tenant_id != OLD.tenant_id OR NEW.user_id != OLD.user_id) THEN
-                    must_check := true;
-                END IF;
-            END IF;
-
-            IF must_check THEN
-                LOCK TABLE chat_project IN EXCLUSIVE MODE;
-
-                SELECT INTO current_count COUNT(*)
-                FROM chat_project
-                WHERE tenant_id = NEW.tenant_id AND user_id = NEW.user_id;
-
-                IF current_count >= max_count THEN
-                    RAISE EXCEPTION
-                        'Project limit reached. '
-                        'Upgrade to Fadenstack Enterprise for unlimited projects.';
-                END IF;
-            END IF;
-
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        """
-    )
-    op.execute(
-        """
-        CREATE TRIGGER trg_enforce_chat_project_limit
-            BEFORE INSERT OR UPDATE ON chat_project
-            FOR EACH ROW EXECUTE PROCEDURE enforce_chat_project_limit();
-        """
-    )
-
 
 def downgrade() -> None:
     """Rollback schema changes."""
-    op.execute("DROP TRIGGER IF EXISTS trg_enforce_chat_project_limit ON chat_project")
-    op.execute("DROP FUNCTION IF EXISTS enforce_chat_project_limit()")
-
     op.drop_index("ix_memory_fact_scope_lookup", table_name="memory_fact")
     op.drop_table("memory_fact")
     op.drop_index("ix_session_summary_session_id", table_name="session_summary")

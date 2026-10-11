@@ -61,10 +61,7 @@ async def create_project(
         if count >= limit:
             raise GatewayError(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                message=(
-                    f"Project limit reached ({limit}). "
-                    "Upgrade to Fadenstack Enterprise for unlimited projects."
-                ),
+                message=f"Project limit reached: this server allows {limit} projects per person.",
                 code="resource_limit_reached",
             )
 
@@ -156,6 +153,33 @@ async def delete_project(
             message="Project not found.",
             code="project_not_found",
         )
+
+
+# ── Capacity ──────────────────────────────────────────────────────
+
+
+# Before the /{session_id} routes, which would otherwise take "capacity" for a session id.
+@router.get("/capacity")
+async def get_capacity(
+    request: Request,
+    auth: AuthContext = Depends(require_chat("chat.projects:read")),
+    dao: SessionDAO = Depends(),
+) -> JSONResponse:
+    """Return project capacity for the current user."""
+    capacity = getattr(request.app.state, "_resource_capacity", {})
+    limit = capacity.get("projects")
+    current = await dao.count_projects(
+        tenant_id=auth.tenant_id, user_id=auth.user_id,
+    )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "projects": {
+                "current": current,
+                "limit": limit,
+            },
+        },
+    )
 
 
 # ── Sessions ──────────────────────────────────────────────────────
@@ -384,29 +408,3 @@ async def get_session_summary(
         return JSONResponse(status_code=200, content={"data": None})
     data = SummaryDTO.model_validate(summary).model_dump(mode="json")
     return JSONResponse(status_code=200, content={"data": data})
-
-
-# ── Capacity ──────────────────────────────────────────────────────
-
-
-@router.get("/capacity")
-async def get_capacity(
-    request: Request,
-    auth: AuthContext = Depends(require_chat("chat.projects:read")),
-    dao: SessionDAO = Depends(),
-) -> JSONResponse:
-    """Return project capacity for the current user."""
-    capacity = getattr(request.app.state, "_resource_capacity", {})
-    limit = capacity.get("projects")
-    current = await dao.count_projects(
-        tenant_id=auth.tenant_id, user_id=auth.user_id,
-    )
-    return JSONResponse(
-        status_code=200,
-        content={
-            "projects": {
-                "current": current,
-                "limit": limit,
-            },
-        },
-    )
