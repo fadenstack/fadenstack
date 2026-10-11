@@ -1,0 +1,44 @@
+# Every Fadenstack release, as the update check tells installs about it.
+#
+# release/update_feed.py turns this file into the signed feed at
+# https://fadenstack.com/updates/v1/index.json, which every install reads once a day
+# (docs/help/pages/operate/upgrading.md, "How you hear about a new release").
+# Add a release's entry BEFORE tagging it: the release workflow refuses a tag without one.
+#
+# Per release:
+#   version       the release (also the CLI's and the images' version)
+#   channel       stable | preview (a pre-release such as 0.5.0rc1 must be preview)
+#   date          YYYY-MM-DD; left empty, the build fills in the day it runs for the release it builds
+#   severity      normal | security (fixes a security problem) | critical (upgrade now)
+#                 Installs are told the most urgent severity of all releases newer than theirs.
+#   summary       one line, English
+#   highlights    optional: what is new, a line each, English (fadenstack.com/releases/ shows them)
+#   notes_url     optional; default: the release on fadenstack.com/releases/
+#   upgrade_from  optional: the oldest release that can upgrade straight to this one. `faden upgrade`
+#                 refuses to skip it and names the release to install first.
+#   fixes         optional: security problems fixed (id, severity, summary), once they may be public
+#   components    versions released with it: agent (the backend's AGENT_VERSION)
+#
+# series: how long a minor series gets fixes. Past the day, its installs are told they are unsupported.
+# Only state a day you mean to keep.
+
+series: []
+
+releases:
+  - version: 0.4.2
+    channel: stable
+    date: ""
+    severity: security
+    summary: >-
+      Security fixes: API tokens expire and can be revoked, the setup token lasts an hour, devices are
+      checked again, and knowledge collections are read only by the people they are open to.
+    highlights:
+      - "Security: sign-in limits, no fixed logins or published secrets, and expired or revoked API tokens refused everywhere."
+      - "Access checks on people search, chat attachments and knowledge collections."
+      - "Ask first rules also hold for an agent's own tools."
+      - "Personal data: tool arguments that cannot be redacted are not sent, and a chat can only make detection stricter."
+      - "Pictures in the chat, sent only to models that take them."
+      - "The console says when a new release is out, with the commands to upgrade."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.7

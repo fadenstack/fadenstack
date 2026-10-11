@@ -77,7 +77,8 @@
     "collapse": "Collapse",
     "agents_group": "Agents",
     "agents": "Agents",
-    "governance": "Governance"
+    "governance": "Governance",
+    "updates": "Updates"
   },
   "auth": {
     "logout": "Logout",
@@ -612,6 +613,34 @@
       "gateway_machine_certificate_expiring": {
         "title": "The gateway's machine certificate runs out in {{days}} days",
         "detail": "On {{until}}. The backend renews it every hour; its log says why it did not (Machine CA)."
+      },
+      "update_available": {
+        "title": "Fadenstack {{version}} is out",
+        "detail": "This server runs {{current}}. The Updates page says how to upgrade."
+      },
+      "update_available_security": {
+        "title": "Security update: Fadenstack {{version}}",
+        "detail": "Releases since {{current}}, which this server runs, fix security problems."
+      },
+      "update_available_critical": {
+        "title": "Critical update: Fadenstack {{version}}",
+        "detail": "Releases since {{current}}, which this server runs, fix a critical problem. Install it soon."
+      },
+      "release_unsupported": {
+        "title": "Fadenstack {{current}} is no longer supported",
+        "detail": "Support ended on {{until}}. Install a newer release."
+      },
+      "update_check_failing": {
+        "title": "The update check is not working",
+        "detail": "{{error}} Turn it off or set a copy of the release list under Settings > Updates."
+      },
+      "agent_update_available": {
+        "title": "Machines with an older agent: {{count}}",
+        "detail": "Agent {{version}} is out. Update each machine by running its install line on it again."
+      },
+      "release_mismatch": {
+        "title": "Parts on another release: {{count}}",
+        "detail": "Not on {{release}}: {{names}}. The Updates page lists what each part runs."
       }
     },
     "integrations": {
@@ -839,7 +868,8 @@
       "database": "Database",
       "llm": "LLM",
       "logging": "Logging",
-      "observability": "Observability"
+      "observability": "Observability",
+      "updates": "Updates"
     },
     "groups": {
       "auth": "Auth",
@@ -859,7 +889,8 @@
       "rag_lite": "RAG Lite",
       "redis": "Redis",
       "skills": "Skills",
-      "data_residency": "Data residency"
+      "data_residency": "Data residency",
+      "update_check": "Update check"
     },
     "current_value": "(current: {{value}})",
     "appearance": {
@@ -3781,6 +3812,104 @@
       "engine": "Engine (vLLM)",
       "agent": "System log",
       "container": "Model containers"
+    }
+  },
+  "updates": {
+    "title": "Updates",
+    "subtitle": "Which Fadenstack release this server runs, what is newer, and how to upgrade.",
+    "release_notes": "Release notes",
+    "nav_badge": "Update available",
+    "summary": {
+      "title": "This server",
+      "runs": "This server runs Fadenstack {{version}}",
+      "check_now": "Check now",
+      "checking": "Checking…",
+      "newest": "Newest release: {{version}}, {{date}}",
+      "channel": "Channel: {{channel}}",
+      "checked": "Last checked {{ago}}",
+      "never_checked": "Not checked yet",
+      "last_success": "Last successful check {{ago}}",
+      "feed_date": "Release list of {{date}}",
+      "feed_uploaded": "Release list of {{date}}, uploaded by hand",
+      "supported_until": "Supported until {{date}}",
+      "unsupported": "Support for Fadenstack {{version}} ended on {{date}}: it gets no more fixes. Install a newer release.",
+      "unsupported_plain": "Fadenstack {{version}} is no longer supported: it gets no more fixes. Install a newer release.",
+      "check_off": "The daily check is off (Settings > Updates). Check now still works.",
+      "check_error": "The last check failed: {{error}}",
+      "failing_hint": "It has not worked for a while. If this server has no internet, turn the check off or set a copy of the release list under Settings > Updates.",
+      "open_settings": "Open settings"
+    },
+    "status": {
+      "up_to_date": "Up to date",
+      "update": "Update available",
+      "security": "Security update",
+      "critical": "Critical update",
+      "unsupported": "No longer supported",
+      "not_checked": "Not checked yet"
+    },
+    "channel": {
+      "stable": "Stable",
+      "preview": "Preview"
+    },
+    "severity": {
+      "normal": "Regular",
+      "security": "Security",
+      "critical": "Critical"
+    },
+    "upgrade": {
+      "title": "How to upgrade",
+      "steps": "Releases must be installed one at a time: {{steps}}. The commands below install {{next}}; come back here for the next step.",
+      "where": "Run these commands on the server where faden is installed. Nothing is installed by itself.",
+      "maintenance": "While faden upgrade runs, the console shows a maintenance page for a short time.",
+      "copy": "Copy commands",
+      "copied": "Copied",
+      "agents": "After the upgrade, machines show an agent update to {{version}}. Update each one by running its install line on it again.",
+      "agents_link": "Machines"
+    },
+    "newer": {
+      "title": "Newer releases"
+    },
+    "parts": {
+      "title": "Parts of this install",
+      "subtitle": "What each part runs, and what this release expects.",
+      "empty": "No parts reported.",
+      "col_part": "Part",
+      "col_name": "Name",
+      "col_running": "Running",
+      "col_expected": "This release expects",
+      "col_status": "Status",
+      "kind": {
+        "service": "Service",
+        "agent": "Machine agent",
+        "cluster": "Cluster runtime",
+        "cli": "CLI"
+      },
+      "status": {
+        "current": "Current",
+        "update": "Update available",
+        "mismatch": "Other release",
+        "unknown": "Unknown",
+        "stopped": "Stopped"
+      }
+    },
+    "offline": {
+      "title": "No internet on this server?",
+      "body": "On a computer with internet, download index.json and index.json.sig from the address below. Copy both files unchanged and upload them here. The signature is checked before the list is used.",
+      "mirror": "Or put both files on a web server in your network and enter its address under Settings > Updates; the daily check then reads them there.",
+      "choose_index": "Choose index.json",
+      "choose_signature": "Choose index.json.sig",
+      "no_file": "No file chosen",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "uploaded": "Release list uploaded."
+    },
+    "banner": {
+      "critical": "A newer release fixes a critical problem: Fadenstack {{version}} is out, this server runs {{current}}. Install it soon.",
+      "security": "A newer release fixes security problems: Fadenstack {{version}} is out, this server runs {{current}}.",
+      "unsupported": "Support for Fadenstack {{current}} ended on {{until}}. Install a newer release.",
+      "unsupported_plain": "Fadenstack {{current}} is no longer supported. Install a newer release.",
+      "open": "See updates",
+      "dismiss": "Hide until the next release"
     }
   }
 }

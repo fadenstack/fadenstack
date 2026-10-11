@@ -630,6 +630,14 @@
       "action_tokens": "为脚本和应用程序创建 API 令牌；每个令牌只显示一次",
       "action_revoke": "撤销令牌；使用该令牌的应用程序会在一分钟内停止工作"
     },
-    "read_more": "在帮助中了解更多"
+    "read_more": "在帮助中了解更多",
+    "updates": {
+      "title": "更新",
+      "description": "此服务器运行的 Fadenstack 版本、更新的版本以及如何升级。此处不会安装任何内容。",
+      "action_check": "立即检查：马上读取版本列表（每日检查位于“设置 > 更新”）",
+      "action_upgrade": "如何升级：在服务器上运行的命令，必要时逐个版本升级",
+      "action_parts": "组成部分：每个服务、机器代理、集群和 CLI 运行的版本，与此版本对比",
+      "action_offline": "无法访问互联网：上传从 fadenstack.com 复制的 index.json 和 index.json.sig"
+    }
   }
 }

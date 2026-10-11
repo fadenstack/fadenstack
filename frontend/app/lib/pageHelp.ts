@@ -336,6 +336,12 @@ const PAGES: PageHelpDef[] = [
   },
 
   {
+    prefix: "/admin/updates",
+    id: "updates",
+    actions: ["check", "upgrade", "parts", "offline"],
+    doc: "operate/upgrading",
+  },
+  {
     prefix: "/admin/settings",
     id: "settings",
     actions: ["general", "modules", "appearance"],

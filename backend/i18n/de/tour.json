@@ -630,6 +630,14 @@
       "action_tokens": "API-Tokens für Skripte und Anwendungen erstellen; jedes wird nur einmal angezeigt",
       "action_revoke": "Ein Token widerrufen; Anwendungen, die es nutzen, hören innerhalb einer Minute auf"
     },
-    "read_more": "Mehr dazu in der Hilfe"
+    "read_more": "Mehr dazu in der Hilfe",
+    "updates": {
+      "title": "Updates",
+      "description": "Welche Fadenstack-Version dieser Server ausführt, was neuer ist und wie Sie aktualisieren. Von hier aus wird nichts installiert.",
+      "action_check": "Jetzt prüfen: die Versionsliste sofort lesen (die tägliche Prüfung steht unter Einstellungen > Updates)",
+      "action_upgrade": "So aktualisieren Sie: die Befehle für den Server, bei Bedarf eine Version nach der anderen",
+      "action_parts": "Bestandteile: was jeder Dienst, Maschinen-Agent, Cluster und die CLI ausführt, verglichen mit dieser Version",
+      "action_offline": "Kein Internet: index.json und index.json.sig von fadenstack.com kopieren und hier hochladen"
+    }
   }
 }

@@ -38,6 +38,7 @@ import { AdminTopbar } from "~/components/AdminTopbar";
 import { ADMIN_NAV_ID, AdminSidebar } from "~/components/AdminSidebar";
 import { MobileNavButton } from "~/components/MobileNavButton";
 import { RootModeDialog } from "~/components/RootModeDialog";
+import { UpdateBanner } from "~/components/UpdateBanner";
 import { PageHelpDrawer } from "~/components/PageHelpDrawer";
 import { GuideRunner } from "~/components/guides/GuideRunner";
 import { HowToDialog } from "~/components/guides/HowToDialog";
@@ -45,6 +46,7 @@ import { GettingStartedDialog } from "~/components/guides/GettingStarted";
 import { GuidesContext, announceGuidesChanged, type GuidesControl } from "~/lib/guidesContext";
 import { guideProgressKeys } from "~/lib/guides";
 import { preferences as preferencesApi } from "~/api/preferences";
+import { setDashboardQueryOwner } from "~/lib/dashboardQuery";
 
 let meAccessInFlight: ReturnType<typeof adminUsers.meAccess> | null = null;
 
@@ -329,6 +331,11 @@ function AdminLayoutInner() {
     );
   }
 
+  // The shared query cache is this user's, before anything here reads it: the
+  // update notice (banner, sidebar) is in it from the first page on. Set only by
+  // the dashboard, it was emptied under the banner on the first visit there.
+  setDashboardQueryOwner(currentUserEmail || "local");
+
   return (
     <GuidesContext.Provider value={guides}>
     <Box
@@ -398,6 +405,9 @@ function AdminLayoutInner() {
           onLogout={handleLogout}
           onOpenNav={isPhone ? () => setMobileNavOpen(true) : undefined}
         />
+
+        {/* A critical or security release, or a release past its support. */}
+        <UpdateBanner isSuperuser={isSuperuser} pathname={location.pathname} />
 
         <RootModeDialog
           open={showRootForm}

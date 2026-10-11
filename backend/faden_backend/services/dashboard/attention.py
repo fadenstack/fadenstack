@@ -567,6 +567,63 @@ async def model_traffic(facts: Facts) -> list[Item]:
     return await facts.on_backend(query)
 
 
+async def releases(facts: Facts) -> list[Item]:
+    """A newer Fadenstack release, a release past its support, parts on another release, old agents.
+
+    The release feed is the one the update check kept (services/updates/check.py); this reads
+    it, it does not fetch it. Each newer release is its own item: muting one does not mute the next.
+    """
+    from faden_backend.services.updates import check, versions  # noqa: PLC0415
+    from faden_backend.web.api.install import AGENT_VERSION  # noqa: PLC0415
+
+    async def query(session: Any) -> tuple[Any, int]:
+        return await check.load_state(session), await versions.outdated_agents(session)
+
+    state, old_agents = await facts.on_backend(query)
+    items: list[Item] = []
+    found = check.assessment(state)
+    link = "/admin/updates"
+    if found is not None and found.update_available and found.latest is not None:
+        version = found.latest.version
+        items.append(Item(
+            f"update_available:{version}",
+            "update_available" if found.severity == "normal" else f"update_available_{found.severity}",
+            {"critical": "critical", "security": "warning"}.get(found.severity, "info"),
+            "platform",
+            {"version": version, "current": found.current},
+            None,
+            link,
+        ))
+    if found is not None and found.unsupported:
+        items.append(Item(
+            f"release_unsupported:{found.current}", "release_unsupported", "warning", "platform",
+            {"current": found.current, "until": str(found.supported_until)}, None, link,
+        ))
+    if settings.updates_check_enabled and check.failing(state, facts.now):
+        items.append(Item(
+            "update_check_failing", "update_check_failing", "info", "platform",
+            {"error": state.error if state else ""}, state.succeeded_at if state else None, link,
+        ))
+    if old_agents:
+        items.append(Item(
+            "agent_update_available", "agent_update_available", "info", "infrastructure",
+            {"count": old_agents, "version": AGENT_VERSION}, None, "/admin/nodes",
+        ))
+    if facts.docker is not None:
+        current = check.current_release()
+        try:
+            parts = await versions.services(facts.docker, current)
+        except Exception:  # Docker out of reach is the containers' rule's to say
+            parts = []
+        other = [p.name for p in parts if p.status == "mismatch"]
+        if other:
+            items.append(Item(
+                "release_mismatch", "release_mismatch", "warning", "platform",
+                {"count": len(other), "names": ", ".join(other), "release": current}, None, link,
+            ))
+    return items
+
+
 RULES: list[Rule] = [
     machines,
     join_requests,
@@ -581,6 +638,7 @@ RULES: list[Rule] = [
     edge_certificate,
     model_traffic,
     agent_apps,
+    releases,
 ]
 
 

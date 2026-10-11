@@ -77,7 +77,8 @@
     "collapse": "Einklappen",
     "agents_group": "Agenten",
     "agents": "Agenten",
-    "governance": "Governance"
+    "governance": "Governance",
+    "updates": "Updates"
   },
   "auth": {
     "logout": "Abmelden",
@@ -612,6 +613,34 @@
       "gateway_machine_certificate_expiring": {
         "title": "Das Maschinenzertifikat des Gateways läuft in {{days}} Tagen ab",
         "detail": "Am {{until}}. Das Backend erneuert es stündlich; sein Log nennt den Grund (Machine CA)."
+      },
+      "update_available": {
+        "title": "Fadenstack {{version}} ist erschienen",
+        "detail": "Dieser Server läuft mit {{current}}. Die Seite Updates zeigt, wie Sie aktualisieren."
+      },
+      "update_available_security": {
+        "title": "Sicherheitsupdate: Fadenstack {{version}}",
+        "detail": "Versionen nach {{current}}, mit der dieser Server läuft, beheben Sicherheitsprobleme."
+      },
+      "update_available_critical": {
+        "title": "Kritisches Update: Fadenstack {{version}}",
+        "detail": "Versionen nach {{current}}, mit der dieser Server läuft, beheben ein kritisches Problem. Installieren Sie es bald."
+      },
+      "release_unsupported": {
+        "title": "Fadenstack {{current}} wird nicht mehr unterstützt",
+        "detail": "Die Unterstützung endete am {{until}}. Installieren Sie eine neuere Version."
+      },
+      "update_check_failing": {
+        "title": "Die Update-Prüfung funktioniert nicht",
+        "detail": "{{error}} Schalten Sie sie aus oder tragen Sie unter Einstellungen > Updates eine Kopie der Versionsliste ein."
+      },
+      "agent_update_available": {
+        "title": "Maschinen mit älterem Agenten: {{count}}",
+        "detail": "Agent {{version}} ist verfügbar. Aktualisieren Sie jede Maschine, indem Sie dort ihre Installationszeile erneut ausführen."
+      },
+      "release_mismatch": {
+        "title": "Bestandteile mit anderer Version: {{count}}",
+        "detail": "Nicht auf {{release}}: {{names}}. Die Seite Updates zeigt, was jeder Bestandteil ausführt."
       }
     },
     "integrations": {
@@ -844,7 +873,8 @@
       "database": "Datenbank",
       "llm": "LLM",
       "logging": "Protokollierung",
-      "observability": "Beobachtbarkeit"
+      "observability": "Beobachtbarkeit",
+      "updates": "Updates"
     },
     "groups": {
       "auth": "Auth",
@@ -864,7 +894,8 @@
       "rag_lite": "RAG Lite",
       "redis": "Redis",
       "skills": "Skills",
-      "data_residency": "Datenresidenz"
+      "data_residency": "Datenresidenz",
+      "update_check": "Update-Prüfung"
     },
     "current_value": "(aktuell: {{value}})",
     "appearance": {
@@ -3783,6 +3814,104 @@
       "engine": "Engine (vLLM)",
       "agent": "Systemprotokoll",
       "container": "Modell-Container"
+    }
+  },
+  "updates": {
+    "title": "Updates",
+    "subtitle": "Welche Fadenstack-Version dieser Server ausführt, was neuer ist und wie Sie aktualisieren.",
+    "release_notes": "Versionshinweise",
+    "nav_badge": "Update verfügbar",
+    "summary": {
+      "title": "Dieser Server",
+      "runs": "Dieser Server läuft mit Fadenstack {{version}}",
+      "check_now": "Jetzt prüfen",
+      "checking": "Wird geprüft…",
+      "newest": "Neueste Version: {{version}} vom {{date}}",
+      "channel": "Kanal: {{channel}}",
+      "checked": "Zuletzt geprüft {{ago}}",
+      "never_checked": "Noch nicht geprüft",
+      "last_success": "Zuletzt erfolgreich {{ago}}",
+      "feed_date": "Versionsliste vom {{date}}",
+      "feed_uploaded": "Versionsliste vom {{date}}, von Hand hochgeladen",
+      "supported_until": "Unterstützt bis {{date}}",
+      "unsupported": "Die Unterstützung für Fadenstack {{version}} endete am {{date}}: Es gibt keine Korrekturen mehr. Installieren Sie eine neuere Version.",
+      "unsupported_plain": "Fadenstack {{version}} wird nicht mehr unterstützt: Es gibt keine Korrekturen mehr. Installieren Sie eine neuere Version.",
+      "check_off": "Die tägliche Prüfung ist ausgeschaltet (Einstellungen > Updates). „Jetzt prüfen“ funktioniert trotzdem.",
+      "check_error": "Die letzte Prüfung ist fehlgeschlagen: {{error}}",
+      "failing_hint": "Sie funktioniert seit einiger Zeit nicht. Hat dieser Server kein Internet, schalten Sie die Prüfung aus oder tragen Sie unter Einstellungen > Updates eine Kopie der Versionsliste ein.",
+      "open_settings": "Einstellungen öffnen"
+    },
+    "status": {
+      "up_to_date": "Aktuell",
+      "update": "Update verfügbar",
+      "security": "Sicherheitsupdate",
+      "critical": "Kritisches Update",
+      "unsupported": "Nicht mehr unterstützt",
+      "not_checked": "Noch nicht geprüft"
+    },
+    "channel": {
+      "stable": "Stabil",
+      "preview": "Vorschau"
+    },
+    "severity": {
+      "normal": "Regulär",
+      "security": "Sicherheit",
+      "critical": "Kritisch"
+    },
+    "upgrade": {
+      "title": "So aktualisieren Sie",
+      "steps": "Versionen müssen nacheinander installiert werden: {{steps}}. Die Befehle unten installieren {{next}}; kommen Sie danach für den nächsten Schritt hierher zurück.",
+      "where": "Führen Sie diese Befehle auf dem Server aus, auf dem faden installiert ist. Von selbst wird nichts installiert.",
+      "maintenance": "Während faden upgrade läuft, zeigt die Konsole kurz eine Wartungsseite.",
+      "copy": "Befehle kopieren",
+      "copied": "Kopiert",
+      "agents": "Nach dem Update zeigen die Maschinen ein Agent-Update auf {{version}}. Aktualisieren Sie jede, indem Sie dort ihre Installationszeile erneut ausführen.",
+      "agents_link": "Maschinen"
+    },
+    "newer": {
+      "title": "Neuere Versionen"
+    },
+    "parts": {
+      "title": "Bestandteile dieser Installation",
+      "subtitle": "Was jeder Bestandteil ausführt und was diese Version erwartet.",
+      "empty": "Keine Bestandteile gemeldet.",
+      "col_part": "Bestandteil",
+      "col_name": "Name",
+      "col_running": "Läuft",
+      "col_expected": "Diese Version erwartet",
+      "col_status": "Status",
+      "kind": {
+        "service": "Dienst",
+        "agent": "Maschinen-Agent",
+        "cluster": "Cluster-Laufzeit",
+        "cli": "CLI"
+      },
+      "status": {
+        "current": "Aktuell",
+        "update": "Update verfügbar",
+        "mismatch": "Andere Version",
+        "unknown": "Unbekannt",
+        "stopped": "Gestoppt"
+      }
+    },
+    "offline": {
+      "title": "Kein Internet auf diesem Server?",
+      "body": "Laden Sie auf einem Rechner mit Internet index.json und index.json.sig von der Adresse unten herunter. Kopieren Sie beide Dateien unverändert und laden Sie sie hier hoch. Vor der Verwendung wird die Signatur geprüft.",
+      "mirror": "Oder legen Sie beide Dateien auf einen Webserver in Ihrem Netz und tragen Sie dessen Adresse unter Einstellungen > Updates ein; die tägliche Prüfung liest sie dann dort.",
+      "choose_index": "index.json auswählen",
+      "choose_signature": "index.json.sig auswählen",
+      "no_file": "Keine Datei ausgewählt",
+      "upload": "Hochladen",
+      "uploading": "Wird hochgeladen…",
+      "uploaded": "Versionsliste hochgeladen."
+    },
+    "banner": {
+      "critical": "Eine neuere Version behebt ein kritisches Problem: Fadenstack {{version}} ist erschienen, dieser Server läuft mit {{current}}. Installieren Sie es bald.",
+      "security": "Eine neuere Version behebt Sicherheitsprobleme: Fadenstack {{version}} ist erschienen, dieser Server läuft mit {{current}}.",
+      "unsupported": "Die Unterstützung für Fadenstack {{current}} endete am {{until}}. Installieren Sie eine neuere Version.",
+      "unsupported_plain": "Fadenstack {{current}} wird nicht mehr unterstützt. Installieren Sie eine neuere Version.",
+      "open": "Zu den Updates",
+      "dismiss": "Bis zur nächsten Version ausblenden"
     }
   }
 }

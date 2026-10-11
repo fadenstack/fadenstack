@@ -58,6 +58,11 @@ def cli(ctx: click.Context, *, verbose: bool, quiet: bool) -> None:
     ctx.obj["verbose"] = verbose
     ctx.obj["quiet"] = quiet
 
+    from faden_cli.core import update_check
+
+    # A newer release: checked while the command runs, said at its end.
+    update_check.start(ctx, quiet=quiet)
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 

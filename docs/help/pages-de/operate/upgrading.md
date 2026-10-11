@@ -10,6 +10,49 @@ nichts aktualisiert sich von selbst.
 | Der Agent einer Maschine | Die Installationszeile auf der Maschine erneut ausführen | Nichts: Der Agent startet neu, die Modelle laufen weiter |
 | Die Runtime eines Clusters | **Laufzeit** auf der Seite des Clusters | Jedes Modell auf diesem Cluster, solange es neu lädt |
 
+## Wie Sie von einem neuen Release erfahren {#how-you-hear-about-a-new-release}
+
+Einmal am Tag liest der Server die öffentliche Liste der Fadenstack-Releases,
+`https://fadenstack.com/updates/v1/index.json`. Über Ihren Server wird dabei nichts gesendet: Die Liste wird wie
+jede Datei abgerufen und auf dem Server verglichen. Ist ein neueres Release erschienen, sehen es die
+Administratoren:
+
+| Wo | Was |
+|---|---|
+| **Updates** in der Konsole | Das Release, mit dem dieser Server läuft, das neueste und was es behebt, die Befehle für diese Installation und was jeder Teil ausführt: die Dienste, der Agent jeder Maschine, die Runtime jedes Clusters |
+| **Handlungsbedarf** im Dashboard | Ein Eintrag für jedes neuere Release; ein Release, das Sicherheitsprobleme behebt, als Warnung |
+| Ein Hinweisbalken auf den Seiten der Konsole | Für ein Release, das Sicherheitsprobleme behebt, und wenn das Release dieses Servers keine Korrekturen mehr bekommt |
+| E-Mail | Eine Nachricht an die Administratoren für ein Release, das Sicherheitsprobleme behebt, wenn E-Mail eingerichtet ist |
+| Der Befehl `faden` | Eine Zeile nach einem Befehl, höchstens einmal am Tag: `Fadenstack <new> is available` |
+
+Nichts wird von selbst installiert: Sie führen die Befehle aus, wie unten beschrieben.
+
+??? info "Mehr zur Update-Prüfung"
+    - `faden deploy` fragt, ob geprüft werden soll; `--update-check` oder `--no-update-check` beantwortet die
+      Frage ohne Rückfrage. Später ändern Sie das in der Konsole unter **Einstellungen**, **Updates** (**Check for
+      new releases**) und für die Kommandozeile mit `update_check: false` in `faden.yaml` oder
+      `FADEN_NO_UPDATE_CHECK=1`.
+    - **Release channel** `preview` meldet auch Release-Kandidaten, um ein Release vor seinem Erscheinen zu
+      testen.
+    - Die Liste ist signiert. Der Server und `faden` nehmen nur eine vom Fadenstack-Projekt signierte Liste an und
+      nie eine ältere als die, die sie schon haben. Eine veränderte Liste kann also weder ein Release verbergen
+      noch eines erfinden.
+    - `faden version` und `faden doctor` prüfen sofort und sagen, wie Sie aktualisieren.
+    - Manche Releases lassen sich nicht überspringen. **Updates** und `faden version` nennen dann die Releases,
+      die nacheinander zu installieren sind, und `faden upgrade` lehnt es ab, eines zu überspringen.
+    - In einer Kommandozeile, die kein Terminal ist (Skripte, der Zeitgeber der Sicherung), sagt `faden` nichts.
+
+### Ein Server ohne Internetzugang {#a-server-without-internet-access}
+
+- **Hinter einem Proxy:** Tragen Sie unter **Einstellungen**, **Updates** den **Proxy for the release list** ein.
+- **Mit einem eigenen Webserver:** Kopieren Sie `index.json` und `index.json.sig` von
+  `https://fadenstack.com/updates/v1/` unverändert dorthin und tragen Sie die Adresse der Kopie als **Release list
+  address** ein.
+- **Mit keinem von beiden:** Laden Sie die beiden Dateien auf einem anderen Rechner herunter und laden Sie sie
+  unter **Updates** bei **Kein Internet auf diesem Server?** hoch.
+
+Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil der Installation ausführt.
+
 ## Bevor Sie beginnen {#before-you-start}
 
 - **Freier Speicherplatz.** Die neuen Images brauchen einige GB, ein neues Runtime-Image bis zu etwa 15 GB pro
@@ -26,6 +69,9 @@ nichts aktualisiert sich von selbst.
     ```bash
     pipx upgrade fadenstack        # oder: uv tool upgrade fadenstack
     ```
+
+    **Updates** in der Konsole zeigt diesen Befehl passend dazu, wie das Werkzeug auf diesem Server installiert
+    wurde, und die genaue Version, wenn sich ein Release nicht überspringen lässt.
 
 2. Sehen Sie sich an, was das Upgrade tun würde:
 
@@ -209,6 +255,8 @@ erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt i
 |---|---|
 | **`These containers have names this installation uses, but it did not create them`** | Ein Container mit einem der Namen von Fadenstack wurde auf andere Weise angelegt, von Hand oder von einem anderen Compose-Projekt. Die Meldung listet diese Container auf, zusammen mit dem Befehl, um sie zu entfernen (`docker rm -f <name>`). Beim Entfernen eines Containers bleiben seine Daten-Volumes erhalten. Führen Sie das Upgrade danach erneut aus. |
 | **`This CLI (<version>) is older than the install (<version>).`** | Das Werkzeug ist älter als das Release, mit dem die Installation läuft. Aktualisieren Sie zuerst das Werkzeug. |
+| **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | Ein Release dazwischen lässt sich nicht überspringen. Installieren Sie das Werkzeug des genannten Releases, führen Sie `faden upgrade` aus, installieren Sie dann das neuere Werkzeug und führen Sie `faden upgrade` erneut aus. Die Meldung nennt die Befehle. |
+| **Updates** meldet, dass die Liste der Releases nicht gelesen werden konnte | Der Server hat kein Internet oder braucht einen Proxy. Siehe [Ein Server ohne Internetzugang](#a-server-without-internet-access). |
 | **`Backup failed — aborting upgrade.`** | Meist eine volle Festplatte oder ein Postgres, das nicht läuft. Schaffen Sie Platz, prüfen Sie `faden status` und führen Sie das Upgrade erneut aus. Verwenden Sie `--no-backup` nur, wenn Sie eine aktuelle Sicherung haben. |
 | **`Backend did not become healthy within 120 s.`** | Die Dienste wurden neu gestartet, aber die Konsolen-API antwortet noch nicht. Lesen Sie `faden logs faden-backend`. Die Wartungsseite wird trotzdem aufgehoben, damit erreichbar ist, was läuft. |
 | **`... this release names a build that is on no registry.`** | Ein Runtime-Image für eine Maschinenart ist nicht veröffentlicht. Das Upgrade ist davon nicht betroffen, und laufende Cluster behalten ihre Images. Eine Maschine dieser Art kann das Image weiterhin von einer anderen Maschine ihres Clusters bekommen, die es hat. |

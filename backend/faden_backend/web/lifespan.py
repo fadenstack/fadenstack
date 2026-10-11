@@ -776,6 +776,37 @@ def _start_machine_tls(app: FastAPI) -> None:
     app.state.machine_tls = asyncio.create_task(_machine_tls_loop(app), name="machine_tls")
 
 
+async def _update_check_loop(app: FastAPI) -> None:
+    """Read the release feed once a day (services/updates/check.py).
+
+    The first look a few minutes after startup, then hourly; ``run_pass``
+    reads the feed only when it is due and lets one worker do it. Off with
+    the setting updates.check_enabled.
+    """
+    import random  # noqa: PLC0415
+
+    from faden_backend.services.updates import check  # noqa: PLC0415
+
+    # Not all at once after a restart of many installs, nor on the backend's busiest minute.
+    await asyncio.sleep(120 + random.uniform(0, 300))  # noqa: S311
+    while True:
+        try:
+            if broker.is_worker_process:
+                return
+            await check.run_pass(app.state.db_session_factory)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Update check failed.")
+        await asyncio.sleep(3600)
+
+
+def _start_update_check(app: FastAPI) -> None:
+    if broker.is_worker_process:
+        return
+    app.state.update_check = asyncio.create_task(_update_check_loop(app), name="update_check")
+
+
 async def _stop_notification_runtime(app: FastAPI) -> None:
     """Stop notification background workers and close shared HTTP client."""
     monitor: GatewayAlertMonitor | None = getattr(app.state, "gateway_alert_monitor", None)
@@ -971,6 +1002,9 @@ async def lifespan_setup(
     # ── Machine CA: model traffic TLS (background) ────────────
     _start_machine_tls(app)
 
+    # ── Update check: the release feed, once a day (background) ──
+    _start_update_check(app)
+
     # ── Export catalogued runtime images for nodes (background) ──
     _start_runtime_image_exports(app)
 
@@ -1054,6 +1088,14 @@ async def lifespan_setup(
         machine_tls_task.cancel()
         try:
             await machine_tls_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    update_check_task = getattr(app.state, "update_check", None)
+    if update_check_task is not None:
+        update_check_task.cancel()
+        try:
+            await update_check_task
         except (asyncio.CancelledError, Exception):
             pass
 

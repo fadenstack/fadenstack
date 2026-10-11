@@ -5,7 +5,8 @@
 # runs the images tagged with its own version. So:
 #
 #   1. Set the version in cli/pyproject.toml and
-#      cli/src/faden_cli/__init__.py (e.g. 0.3.0).
+#      cli/src/faden_cli/__init__.py (e.g. 0.3.0), and add the release to
+#      release/releases.yaml (severity, summary): installs hear about it from there.
 #   2. Tag and push:  git tag v0.3.0 && git push origin v0.3.0
 #      docker-publish.yml builds the images 0.3.0 from the same tag; this
 #      workflow waits until they exist before publishing the CLI, so nobody
@@ -16,6 +17,9 @@
 #
 # Optional: PYPI_API_TOKEN also publishes fadenstack to PyPI. A private GitHub
 # release still works without it and carries the wheel and standalone binaries.
+#
+# Needed: UPDATE_FEED_SIGNING_KEY signs the release feed (job feed). Optional:
+# FEED_DEPLOY_SSH_KEY, FEED_DEPLOY_HOST, FEED_DEPLOY_KNOWN_HOSTS put it on fadenstack.com.
 
 name: Release CLI
 
@@ -39,14 +43,18 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # The deployment files the wheel carries come from shared.
+          # The deployment files the wheel carries come from shared; the release
+          # feed's entry from release/, checked against the backend's agent version.
           sparse-checkout: |
             cli
             shared
+            release
+            backend/faden_backend/web/api/install
 
       - uses: actions/setup-python@v5
         with:
@@ -73,6 +81,23 @@ jobs:
               fi ;;
           esac
           echo "version=$PYPROJECT" >> "$GITHUB_OUTPUT"
+          # 0.5.0rc1, 0.5.0b2, ...: a pre-release, for the preview channel only.
+          if [[ "$PYPROJECT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Installs hear about a release from the feed built out of release/releases.yaml
+      # (job feed). Checked before anything is published: a release without its entry
+      # would reach no install.
+      - name: The release is in release/releases.yaml
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install pyyaml cryptography packaging
+          python release/update_feed.py build --version "${{ steps.version.outputs.version }}" --out "$RUNNER_TEMP/feed"
 
       - name: Build sdist + wheel
         working-directory: ${{ env.CLI_DIR }}
@@ -156,6 +181,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: "Fadenstack ${{ needs.build.outputs.version }}"
+          # A release candidate is a pre-release: /releases/latest and stable installs skip it.
+          prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
           generate_release_notes: true
           body: |
             Fadenstack-authored source and deployment files in this release are
@@ -215,6 +242,88 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: dist/${{ matrix.artifact }}
+
+  checksums:
+    # One SHA256SUMS for the wheel, the sdist and the executables, so a download can be checked.
+    needs: [build, executables]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: SHA256SUMS
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir assets && cd assets
+          gh release download "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+            --pattern 'fadenstack-*' --pattern 'faden-*'
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "${{ github.ref_name }}" SHA256SUMS --repo "${{ github.repository }}" --clobber
+
+  feed:
+    # The release feed installs read once a day (release/update_feed.py): built from
+    # release/releases.yaml, signed with UPDATE_FEED_SIGNING_KEY (the key the CLI and
+    # backend trust), attached to the release, and put on fadenstack.com/updates/v1/.
+    needs: [build, publish]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      UPDATE_FEED_SIGNING_KEY: ${{ secrets.UPDATE_FEED_SIGNING_KEY }}
+      FEED_DEPLOY_SSH_KEY: ${{ secrets.FEED_DEPLOY_SSH_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            release
+            cli/src/faden_cli/core
+            backend/faden_backend/web/api/install
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build, sign and check the feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_FEED_SIGNING_KEY" ]; then
+            echo "::error::UPDATE_FEED_SIGNING_KEY is not set: no install will hear about this release"
+            exit 1
+          fi
+          pip install pyyaml cryptography packaging
+          python release/update_feed.py build --version "${{ needs.build.outputs.version }}" --out feed
+          python release/update_feed.py sign feed
+          python release/update_feed.py verify feed
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            feed/index.json
+            feed/index.json.sig
+
+      # The key can only write the feed's folder on the server (rrsync; fadenstack.com
+      # repository, deploy/SETUP.md, "The release feed"). Without it, publish by hand
+      # with deploy/publish-feed.sh there.
+      - name: Put it on fadenstack.com
+        if: env.FEED_DEPLOY_SSH_KEY != ''
+        shell: bash
+        env:
+          FEED_DEPLOY_HOST: ${{ secrets.FEED_DEPLOY_HOST }}
+          FEED_DEPLOY_KNOWN_HOSTS: ${{ secrets.FEED_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$FEED_DEPLOY_SSH_KEY" > ~/.ssh/feed && chmod 600 ~/.ssh/feed
+          printf '%s\n' "$FEED_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # --delay-updates: both files change together, so no install reads a feed with the old signature.
+          rsync -e "ssh -i $HOME/.ssh/feed -o BatchMode=yes" --delay-updates --chmod=F644 \
+            feed/index.json feed/index.json.sig "$FEED_DEPLOY_HOST:v1/"
+          curl -fsS https://fadenstack.com/updates/v1/index.json | grep -q "\"${{ needs.build.outputs.version }}\""
 
   sbom:
     needs: [build, executables]

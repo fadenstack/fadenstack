@@ -630,6 +630,14 @@
       "action_tokens": "Créer des jetons API pour les scripts et les applications ; chacun n'est affiché qu'une fois",
       "action_revoke": "Révoquer un jeton ; les applications qui l'utilisent s'arrêtent en moins d'une minute"
     },
-    "read_more": "En savoir plus dans l'aide"
+    "read_more": "En savoir plus dans l'aide",
+    "updates": {
+      "title": "Mises à jour",
+      "description": "Quelle version de Fadenstack ce serveur exécute, ce qui est plus récent et comment mettre à jour. Rien n'est installé d'ici.",
+      "action_check": "Vérifier maintenant : lire la liste des versions tout de suite (la vérification quotidienne est dans Paramètres > Mises à jour)",
+      "action_upgrade": "Comment mettre à jour : les commandes à exécuter sur le serveur, une version après l'autre si nécessaire",
+      "action_parts": "Composants : ce qu'exécutent chaque service, agent de machine, cluster et la CLI, comparé à cette version",
+      "action_offline": "Sans internet : importer index.json et index.json.sig copiés depuis fadenstack.com"
+    }
   }
 }

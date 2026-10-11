@@ -153,11 +153,15 @@ def test_a_cli_older_than_the_install_does_not_touch_it(
     assert _env(install / ".env")["VERSION"] == "999.0.0"
 
 
-def test_deploy_pins_a_release_install_to_the_cli_version(tmp_path: Path) -> None:
+def test_deploy_pins_a_release_install_to_the_cli_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from faden_cli.core import update_check  # noqa: PLC0415
+
+    monkeypatch.setattr(update_check, "installer", lambda: "pipx")
     env = tmp_path / ".env"
     env.write_text("POSTGRES_PASSWORD=pgpw\n", encoding="utf-8")
     deploy_module.pin_release(env)
-    assert _env(env) == {"POSTGRES_PASSWORD": "pgpw", "VERSION": __version__}
+    # How the CLI was installed goes along: the console's update notice names the matching command.
+    assert _env(env) == {"POSTGRES_PASSWORD": "pgpw", "VERSION": __version__, "FADEN_CLI_INSTALLER": "pipx"}
 
 
 def test_the_compose_project_is_named_so_volumes_do_not_follow_the_directory() -> None:

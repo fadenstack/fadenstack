@@ -77,7 +77,8 @@
     "collapse": "Replier",
     "agents_group": "Agents",
     "agents": "Agents",
-    "governance": "Gouvernance"
+    "governance": "Gouvernance",
+    "updates": "Mises à jour"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -612,6 +613,34 @@
       "gateway_machine_certificate_expiring": {
         "title": "Le certificat machine de la passerelle expire dans {{days}} jours",
         "detail": "Le {{until}}. Le backend le renouvelle chaque heure ; son journal dit pourquoi il ne l'a pas fait (Machine CA)."
+      },
+      "update_available": {
+        "title": "Fadenstack {{version}} est disponible",
+        "detail": "Ce serveur exécute {{current}}. La page Mises à jour explique comment mettre à jour."
+      },
+      "update_available_security": {
+        "title": "Mise à jour de sécurité : Fadenstack {{version}}",
+        "detail": "Les versions postérieures à {{current}}, celle qu'exécute ce serveur, corrigent des problèmes de sécurité."
+      },
+      "update_available_critical": {
+        "title": "Mise à jour critique : Fadenstack {{version}}",
+        "detail": "Les versions postérieures à {{current}}, celle qu'exécute ce serveur, corrigent un problème critique. Installez-la rapidement."
+      },
+      "release_unsupported": {
+        "title": "Fadenstack {{current}} n'est plus pris en charge",
+        "detail": "La prise en charge a pris fin le {{until}}. Installez une version plus récente."
+      },
+      "update_check_failing": {
+        "title": "La vérification des mises à jour ne fonctionne pas",
+        "detail": "{{error}} Désactivez-la ou indiquez une copie de la liste des versions dans Paramètres > Mises à jour."
+      },
+      "agent_update_available": {
+        "title": "Machines avec un ancien agent : {{count}}",
+        "detail": "L'agent {{version}} est disponible. Mettez chaque machine à jour en y exécutant à nouveau sa ligne d'installation."
+      },
+      "release_mismatch": {
+        "title": "Composants sur une autre version : {{count}}",
+        "detail": "Pas sur {{release}} : {{names}}. La page Mises à jour montre ce que chaque composant exécute."
       }
     },
     "integrations": {
@@ -839,7 +868,8 @@
       "database": "Base de données",
       "llm": "LLM",
       "logging": "Journalisation",
-      "observability": "Observabilité"
+      "observability": "Observabilité",
+      "updates": "Mises à jour"
     },
     "groups": {
       "auth": "Auth",
@@ -859,7 +889,8 @@
       "rag_lite": "RAG Lite",
       "redis": "Redis",
       "skills": "Skills",
-      "data_residency": "Résidence des données"
+      "data_residency": "Résidence des données",
+      "update_check": "Vérification des mises à jour"
     },
     "current_value": "(actuel : {{value}})",
     "appearance": {
@@ -3783,6 +3814,104 @@
       "engine": "Moteur (vLLM)",
       "agent": "Journal système",
       "container": "Conteneurs de modèles"
+    }
+  },
+  "updates": {
+    "title": "Mises à jour",
+    "subtitle": "Quelle version de Fadenstack ce serveur exécute, ce qui est plus récent et comment mettre à jour.",
+    "release_notes": "Notes de version",
+    "nav_badge": "Mise à jour disponible",
+    "summary": {
+      "title": "Ce serveur",
+      "runs": "Ce serveur exécute Fadenstack {{version}}",
+      "check_now": "Vérifier maintenant",
+      "checking": "Vérification…",
+      "newest": "Dernière version : {{version}}, {{date}}",
+      "channel": "Canal : {{channel}}",
+      "checked": "Dernière vérification : {{ago}}",
+      "never_checked": "Pas encore vérifié",
+      "last_success": "Dernière vérification réussie : {{ago}}",
+      "feed_date": "Liste des versions du {{date}}",
+      "feed_uploaded": "Liste des versions du {{date}}, importée à la main",
+      "supported_until": "Prise en charge jusqu'au {{date}}",
+      "unsupported": "La prise en charge de Fadenstack {{version}} a pris fin le {{date}} : plus aucune correction. Installez une version plus récente.",
+      "unsupported_plain": "Fadenstack {{version}} n'est plus pris en charge : plus aucune correction. Installez une version plus récente.",
+      "check_off": "La vérification quotidienne est désactivée (Paramètres > Mises à jour). « Vérifier maintenant » fonctionne quand même.",
+      "check_error": "La dernière vérification a échoué : {{error}}",
+      "failing_hint": "Elle ne fonctionne plus depuis un moment. Si ce serveur n'a pas internet, désactivez la vérification ou indiquez une copie de la liste des versions dans Paramètres > Mises à jour.",
+      "open_settings": "Ouvrir les paramètres"
+    },
+    "status": {
+      "up_to_date": "À jour",
+      "update": "Mise à jour disponible",
+      "security": "Mise à jour de sécurité",
+      "critical": "Mise à jour critique",
+      "unsupported": "Plus pris en charge",
+      "not_checked": "Pas encore vérifié"
+    },
+    "channel": {
+      "stable": "Stable",
+      "preview": "Aperçu"
+    },
+    "severity": {
+      "normal": "Normale",
+      "security": "Sécurité",
+      "critical": "Critique"
+    },
+    "upgrade": {
+      "title": "Comment mettre à jour",
+      "steps": "Les versions doivent être installées l'une après l'autre : {{steps}}. Les commandes ci-dessous installent {{next}} ; revenez ici pour l'étape suivante.",
+      "where": "Exécutez ces commandes sur le serveur où faden est installé. Rien ne s'installe tout seul.",
+      "maintenance": "Pendant faden upgrade, la console affiche brièvement une page de maintenance.",
+      "copy": "Copier les commandes",
+      "copied": "Copié",
+      "agents": "Après la mise à jour, les machines affichent une mise à jour de l'agent vers {{version}}. Mettez chacune à jour en y exécutant à nouveau sa ligne d'installation.",
+      "agents_link": "Machines"
+    },
+    "newer": {
+      "title": "Versions plus récentes"
+    },
+    "parts": {
+      "title": "Composants de cette installation",
+      "subtitle": "Ce que chaque composant exécute et ce que cette version attend.",
+      "empty": "Aucun composant signalé.",
+      "col_part": "Composant",
+      "col_name": "Nom",
+      "col_running": "En cours",
+      "col_expected": "Attendu par cette version",
+      "col_status": "État",
+      "kind": {
+        "service": "Service",
+        "agent": "Agent de machine",
+        "cluster": "Environnement du cluster",
+        "cli": "CLI"
+      },
+      "status": {
+        "current": "À jour",
+        "update": "Mise à jour disponible",
+        "mismatch": "Autre version",
+        "unknown": "Inconnu",
+        "stopped": "Arrêté"
+      }
+    },
+    "offline": {
+      "title": "Pas d'internet sur ce serveur ?",
+      "body": "Sur un ordinateur connecté à internet, téléchargez index.json et index.json.sig depuis l'adresse ci-dessous. Copiez les deux fichiers sans les modifier et importez-les ici. La signature est vérifiée avant que la liste soit utilisée.",
+      "mirror": "Ou placez les deux fichiers sur un serveur web de votre réseau et indiquez son adresse dans Paramètres > Mises à jour ; la vérification quotidienne les y lira.",
+      "choose_index": "Choisir index.json",
+      "choose_signature": "Choisir index.json.sig",
+      "no_file": "Aucun fichier choisi",
+      "upload": "Importer",
+      "uploading": "Importation…",
+      "uploaded": "Liste des versions importée."
+    },
+    "banner": {
+      "critical": "Une version plus récente corrige un problème critique : Fadenstack {{version}} est disponible, ce serveur exécute {{current}}. Installez-la rapidement.",
+      "security": "Une version plus récente corrige des problèmes de sécurité : Fadenstack {{version}} est disponible, ce serveur exécute {{current}}.",
+      "unsupported": "La prise en charge de Fadenstack {{current}} a pris fin le {{until}}. Installez une version plus récente.",
+      "unsupported_plain": "Fadenstack {{current}} n'est plus pris en charge. Installez une version plus récente.",
+      "open": "Voir les mises à jour",
+      "dismiss": "Masquer jusqu'à la prochaine version"
     }
   }
 }

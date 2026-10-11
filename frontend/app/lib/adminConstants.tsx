@@ -69,6 +69,7 @@ import BuildIcon from "@mui/icons-material/Build";
 import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import GavelIcon from "@mui/icons-material/Gavel";
+import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import { AGENTS_PAGE_KEYS } from "~/api/agents";
 
 // ── Drawer sizing ────────────────────────────────────────────────
@@ -176,8 +177,8 @@ export interface NavChild {
   superuserOnly?: boolean;
   /** When set, only show this item when RAG is in the specified mode. */
   ragMode?: "lite" | "pro";
-  /** A live count to show beside the label, looked up by the sidebar. */
-  badge?: "pendingJoins";
+  /** A live count (or, for a yes/no, a dot) to show beside the label, looked up by the sidebar. */
+  badge?: "pendingJoins" | "updateAvailable";
 }
 
 export interface NavGroup {
@@ -346,6 +347,14 @@ export const NAV: NavEntry[] = [
         labelKey: "nav.logs",
         icon: <ReceiptLongIcon />,
         permission: "logs:read",
+      },
+      {
+        to: "/admin/updates",
+        labelKey: "nav.updates",
+        icon: <SystemUpdateAltIcon />,
+        // Its API (/api/admin/updates) is for superusers.
+        superuserOnly: true,
+        badge: "updateAvailable",
       },
     ],
   },
@@ -596,6 +605,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/llm/agent-trace")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/agents")) return t("agents.title");
   if (pathname.startsWith("/admin/governance")) return t("governance.title");
+  if (pathname.startsWith("/admin/updates")) return t("updates.title");
   if (pathname.startsWith("/admin/llm/graph")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/logs")) {
     const tab = new URLSearchParams(search).get("tab");

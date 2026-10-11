@@ -36,6 +36,10 @@ _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
     "agents.access_token_ttl_s": "agent_access_token_ttl_s",
     "agents.refresh_token_ttl_s": "agent_refresh_token_ttl_s",
     "agents.refresh_idle_s": "agent_refresh_idle_s",
+    "updates.check_enabled": "updates_check_enabled",
+    "updates.channel": "updates_channel",
+    "updates.feed_url": "updates_feed_url",
+    "updates.proxy_url": "updates_proxy_url",
 }
 
 _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {

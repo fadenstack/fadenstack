@@ -119,6 +119,20 @@ def upgrade_cmd(
             "  To upgrade, install the newer CLI first: pip install -U fadenstack"
         )
         sys.exit(1)
+    # Some releases cannot be skipped (a data migration the next one builds on): the feed says which.
+    if release is not None and _older(release, __version__):
+        first = _required_first(release)
+        if first is not None:
+            from faden_cli.core.release_feed import cli_install_command  # noqa: PLC0415
+            from faden_cli.core.update_check import installer  # noqa: PLC0415
+
+            error(
+                f"{release} cannot upgrade straight to {__version__}: {first} has to come first.\n"
+                f"    {cli_install_command(installer(), first, latest=False)}\n"
+                "    faden upgrade\n"
+                f"  Then install {__version__} again and run faden upgrade once more."
+            )
+            sys.exit(1)
 
     # Build compose file list (include GPU overlay if present)
     from faden_cli.core.compose import has_nvidia_gpu  # noqa: PLC0415
@@ -144,6 +158,9 @@ def upgrade_cmd(
         console.print(f"  Backup:            {'skip' if no_backup else backup_dir}")
         if release is not None:
             console.print(f"  Release:           {release} -> {__version__} (pull published images)")
+            newer = _newer_than_cli()
+            if newer:
+                console.print(f"  [yellow]Newer release:     {newer}[/yellow]")
         else:
             console.print(f"  Build images:      {'skip' if no_build else 'yes'}")
         console.print(f"  Build cache:       {'no' if no_cache else 'yes'}")
@@ -240,10 +257,12 @@ def upgrade_cmd(
         env_vars = default_env_vars(profiles=list(cfg.profiles))
         env_vars.update(read_env_file(env_path))
         write_env_file(env_path, env_vars)
-        if release is not None:
-            from faden_cli.commands.deploy import pin_release  # noqa: PLC0415
+        from faden_cli.commands.deploy import pin_release, record_installer  # noqa: PLC0415
 
+        if release is not None:
             pin_release(env_path)
+        else:
+            record_installer(env_path, shared_dir)
         success(".env refreshed (existing settings kept).")
         # Sized again, as deploy does: what ``faden tune`` last chose.
         from faden_cli.core.tune import tune_env  # noqa: PLC0415
@@ -411,13 +430,41 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
 
 
 def _older(a: str, b: str) -> bool:
-    """Whether release *a* comes before release *b* (``0.3.0`` < ``0.10.0``)."""
+    """Whether release *a* comes before release *b* (``0.3.0`` < ``0.10.0``, ``0.5.0rc1`` < ``0.5.0``)."""
+    from faden_cli.core.release_feed import is_newer  # noqa: PLC0415
 
-    def parts(v: str) -> tuple[int, ...]:
-        out = []
-        for piece in v.split("."):
-            digits = "".join(ch for ch in piece if ch.isdigit())
-            out.append(int(digits) if digits else 0)
-        return tuple(out)
+    return is_newer(b, a)
 
-    return parts(a) < parts(b)
+
+def _newer_than_cli() -> str | None:
+    """A release newer than this CLI's, from the last update check: the upgrade would stop short of it."""
+    from faden_cli.core import release_feed, update_check  # noqa: PLC0415
+
+    cfg = load_config()
+    feed = update_check.cached_feed() if update_check.enabled(cfg) else None
+    if feed is None:
+        return None
+    found = release_feed.assess(feed, __version__, cfg.update_channel)
+    commands = release_feed.upgrade_commands(update_check.installer(), found)
+    if not found.update_available or found.latest is None or not commands:
+        return None
+    return (
+        f"{found.latest.version} is out; this CLI installs {__version__}. "
+        f"For the newer one first: {commands[0]}"
+    )
+
+
+def _required_first(installed: str) -> str | None:
+    """The release *installed* has to pass through before this CLI's, when the release feed says one."""
+    from faden_cli.core import release_feed, update_check  # noqa: PLC0415
+
+    cfg = load_config()
+    feed = None
+    if update_check.enabled(cfg):
+        try:
+            feed = update_check.refresh(cfg)
+        except Exception:  # offline: the last check, if any
+            feed = update_check.cached_feed()
+    else:
+        feed = update_check.cached_feed()
+    return release_feed.required_first(feed, installed, __version__) if feed is not None else None

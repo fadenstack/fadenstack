@@ -48,6 +48,7 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
 | **HTTPS** | `generate` (Standard): ein auf diesem Server erstelltes Zertifikat für seine Namen und Adressen. `own`: Ihr Zertifikat und Ihr Schlüssel als PEM-Dateien. `off`: einfaches HTTP. |
 | Other names or addresses | Bei `generate`: Namen, unter denen die Konsole erreicht wird und die der Server selbst nicht kennt, z. B. `ai.example.internal`. Durch Kommas getrennt, leer für keine. |
 | A port to use instead | Nur wenn Port 80 oder 443 von etwas anderem belegt ist. |
+| Check for new releases? | Ja (Standard): Einmal am Tag lesen der Server und `faden` die öffentliche Liste der Releases und melden den Administratoren, wenn eines erschienen ist. Über den Server wird nichts gesendet. Siehe [Upgrade](upgrading.md#how-you-hear-about-a-new-release). |
 | Admin email | Die E-Mail-Adresse, mit der sich der erste Administrator anmeldet. |
 | Admin password | Mindestens 8 Zeichen, und nicht die E-Mail-Adresse. Leer lassen, um ein Passwort erzeugen zu lassen. |
 | Save to file? | Speichert die Zugangsdaten in `~/fadenstack/.bootstrap-credentials` (nur für Sie lesbar). |
@@ -58,8 +59,8 @@ Die Zugangsdaten werden nur einmal angezeigt. Bewahren Sie sie in einem Passwort
 ### Ohne Rückfragen {#without-questions}
 
 `faden deploy -y` fragt nichts: HTTPS mit einem hier erstellten Zertifikat, der Administrator `admin@localhost`
-mit einem erzeugten Passwort, gespeichert in `~/fadenstack/.bootstrap-credentials`, und die nächtliche Sicherung
-eingeschaltet. Bewahren Sie die Zugangsdaten an einem sicheren Ort auf und löschen Sie dann diese Datei.
+mit einem erzeugten Passwort, gespeichert in `~/fadenstack/.bootstrap-credentials`, die nächtliche Sicherung und
+die Update-Prüfung eingeschaltet. Bewahren Sie die Zugangsdaten an einem sicheren Ort auf und löschen Sie dann diese Datei.
 
 Die Auswahl lässt sich auch vorab angeben:
 

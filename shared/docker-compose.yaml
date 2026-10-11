@@ -517,6 +517,14 @@ services:
       # Asked for before the first administrator is created (POST /api/bootstrap);
       # `faden deploy` writes it into .env and sends it. Empty: bootstrap is refused.
       FADEN_BACKEND_BOOTSTRAP_TOKEN: ${FADEN_BACKEND_BOOTSTRAP_TOKEN:-}
+      # The update check (Settings > Updates overrides it): `faden deploy` asks whether to read
+      # the public list of releases once a day. The release this install runs and how the CLI
+      # was installed give the console the upgrade commands to show.
+      FADEN_BACKEND_UPDATES_CHECK_ENABLED: ${FADEN_UPDATE_CHECK:-true}
+      # A copy of the release list in your network, for a server without internet (Settings > Updates too).
+      FADEN_BACKEND_UPDATES_FEED_URL: ${FADEN_UPDATE_FEED_URL:-}
+      FADEN_BACKEND_INSTALL_RELEASE: ${VERSION:-}
+      FADEN_BACKEND_CLI_INSTALLER: ${FADEN_CLI_INSTALLER:-}
       # Module enabled flags + service URLs (Docker-internal for health probes)
       FADEN_BACKEND_PII_ENABLED: ${FADEN_BACKEND_PII_ENABLED:-false}
       FADEN_BACKEND_PII_SERVICE_URL: ${FADEN_BACKEND_PII_SERVICE_URL:-http://faden-pii:8000/api}
