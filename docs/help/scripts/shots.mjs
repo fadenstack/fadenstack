@@ -144,6 +144,16 @@ const cardOfHeading = (p, text) =>
 const card = (p, text) =>
   p.getByText(text, { exact: true }).first().locator("xpath=ancestor::*[contains(@class,'MuiPaper-root')][1]");
 
+/** The Updates page as a release install shows it: the install pictures are taken from may be a checkout,
+ *  whose first command is `git pull`; Help's readers installed the CLI with pipx. */
+const asReleaseInstall = (p) =>
+  p.evaluate(() => {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (n.nodeValue.includes("git pull")) n.nodeValue = n.nodeValue.replace("git pull", "pipx upgrade fadenstack");
+    }
+  });
+
 // name: the file under pages/images/; path: where to go; act: what to open first (never a confirm button);
 // clip: a locator to picture instead of the whole window; region: a fixed part of the window.
 const SHOTS = [
@@ -196,6 +206,19 @@ const SHOTS = [
   { name: "operate/containers", path: "/admin/containers" },
   { name: "operate/logs", path: "/admin/logs" },
   { name: "operate/settings", path: "/admin/settings" },
+  // The update check (Upgrading). Only these show the update banner and the sidebar's dot (banner: true); every
+  // other picture hides them, so an install that has a newer release waiting does not show it everywhere.
+  { name: "operate/updates", path: "/admin/updates", banner: true, act: asReleaseInstall, region: { x: 240, y: 0, width: 1200, height: 800 } },
+  {
+    name: "operate/updates-commands", path: "/admin/updates", banner: true, act: asReleaseInstall,
+    clip: (p) => cardOfHeading(p, K("updates.upgrade.title")),
+  },
+  { name: "operate/update-banner", path: "/admin/dashboard", banner: true, clip: (p) => p.locator('[data-testid="update-banner"]') },
+  {
+    name: "operate/update-attention", path: "/admin/dashboard", banner: true,
+    // The item alone: the dashboard card is as tall as its neighbours, mostly empty with one item.
+    clip: (p) => p.locator("li").filter({ hasText: /Fadenstack \d+\.\d+\.\d+/ }),
+  },
 
   // More of the same screens: dialogs opened and steps walked, never confirmed.
   {
@@ -418,6 +441,12 @@ for (const shot of SHOTS) {
   try {
     const path = typeof shot.path === "function" ? shot.path() : shot.path;
     await page.goto(BASE + path, { waitUntil: "domcontentloaded" });
+    if (!shot.banner) {
+      // A newer release's banner, and the dot it puts in the navigation: in the update pictures only.
+      await page.addStyleTag({
+        content: 'div:has(> [data-testid="update-banner"]), nav .MuiBadge-dot { display: none !important; }',
+      });
+    }
     await settle(page);
     if (shot.wait) await page.waitForTimeout(shot.wait);
     if (shot.act) {

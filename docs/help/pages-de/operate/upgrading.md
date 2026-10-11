@@ -27,7 +27,59 @@ Administratoren:
 
 Nichts wird von selbst installiert: Sie führen die Befehle aus, wie unten beschrieben.
 
+![Der Hinweisbalken auf den Seiten der Konsole: Eine neuere Version behebt Sicherheitsprobleme, mit Zu den Updates](../images/operate/update-banner.png)
+
+### Wenn ein Release erschienen ist {#when-a-release-is-out}
+
+1. Ein Hinweisbalken auf den Seiten der Konsole oder ein Eintrag unter **Handlungsbedarf** im Dashboard meldet,
+   dass ein Release erschienen ist. Wählen Sie **Zu den Updates** oder den Eintrag.
+
+    ![Handlungsbedarf im Dashboard mit dem Eintrag Sicherheitsupdate: Fadenstack 0.4.2](../images/operate/update-attention.png)
+
+2. **Updates** zeigt das Release, mit dem dieser Server läuft, das neueste, wie dringend es ist (**Update
+   verfügbar**, **Sicherheitsupdate**, **Kritisches Update**) und was es behebt. **Versionshinweise** öffnet das
+   Release auf [fadenstack.com/releases](https://fadenstack.com/releases/).
+
+    ![Die Seite Updates: Dieser Server läuft mit 0.4.1, 0.4.2 ist ein Sicherheitsupdate, die Befehle zum Aktualisieren und die neueren Versionen](../images/operate/updates.png)
+
+3. Kopieren Sie unter **So aktualisieren Sie** die Befehle und führen Sie sie auf dem Server aus, wie unter
+   [Den Server aktualisieren](#upgrade-the-server) beschrieben. Sie passen dazu, wie `faden` auf diesem Server
+   installiert wurde, und nennen das genaue Release, wenn sich eines nicht überspringen lässt.
+
+    ![So aktualisieren Sie: pipx upgrade fadenstack, faden upgrade --dry-run, faden upgrade -y](../images/operate/updates-commands.png)
+
+4. Ist das Upgrade fertig, zeigt **Updates** **Aktuell**. Bringt das Release einen neueren Agenten für die
+   GPU-Maschinen, sagt **Updates** das, und die Maschinen zeigen **Agent *Version* verfügbar**: siehe
+   [Die Agenten der Maschinen aktualisieren](#update-the-machines-agents).
+
+Einen Hinweisbalken für ein Sicherheitsupdate können Sie bis zum nächsten Release ausblenden (**Bis zur nächsten
+Version ausblenden**, in diesem Browser). Einen Hinweisbalken für ein kritisches Update oder für ein Release, das
+keine Korrekturen mehr bekommt, nicht.
+
+In der Kommandozeile meldet `faden` dasselbe nach einem Befehl, höchstens einmal am Tag:
+
+```text
+$ faden status
+...
+Fadenstack 0.4.2 is available (you have 0.4.1) -- it fixes security problems.
+Upgrade: pipx upgrade fadenstack, then faden upgrade
+```
+
+??? info "Bestandteile dieser Installation"
+    Unter den Releases listet **Updates** auf, was jeder Bestandteil ausführt und was dieses Release erwartet: jeder
+    Dienst, der Agent jeder Maschine, die Runtime jedes Clusters und das Release, das das Kommandozeilenwerkzeug
+    zuletzt installiert hat.
+
+    | Status | Bedeutung |
+    |---|---|
+    | **Aktuell** | Er führt aus, was dieses Release erwartet |
+    | **Update verfügbar** | Ein neuerer liegt bereit: der Agent einer Maschine oder die Runtime eines Clusters (siehe unten) |
+    | **Andere Version** | Ein Dienst läuft mit einem anderen Release als die übrigen. Führen Sie `faden upgrade` erneut aus |
+    | **Unbekannt** | Er sagt nicht, mit welchem Release er läuft: ein Dienst, der auf diesem Server aus dem Quellcode gebaut wurde, oder eine Maschine, die sich nie gemeldet hat |
+    | **Gestoppt** | Der Dienst läuft nicht |
+
 ??? info "Mehr zur Update-Prüfung"
+    - **Jetzt prüfen** auf **Updates** liest die Liste sofort; die tägliche Prüfung braucht niemanden.
     - `faden deploy` fragt, ob geprüft werden soll; `--update-check` oder `--no-update-check` beantwortet die
       Frage ohne Rückfrage. Später ändern Sie das in der Konsole unter **Einstellungen**, **Updates** (**Check for
       new releases**) und für die Kommandozeile mit `update_check: false` in `faden.yaml` oder

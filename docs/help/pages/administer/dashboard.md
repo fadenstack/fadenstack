@@ -90,6 +90,8 @@ in-house share is green. Times follow your browser's time zone.
 | An **MCP server** is in error | Its tools are not available to chats. Open it and select **Test** (see [MCP servers](mcp-servers.md)). |
 | An HTTPS or model certificate runs out soon, or ran out | See [HTTPS and trust](../operate/https.md). |
 | **Model traffic to** a cluster **is not encrypted** | Turn on encryption on the cluster's page; its models load again (see [Clusters](../operate/clusters.md)). |
+| **Fadenstack *version* is out**, a **Security update** or a **Critical update** | Open **Updates** for what it fixes and the commands to run (see [Upgrading](../operate/upgrading.md#when-a-release-is-out)). Muting one release does not mute the next. |
+| Fadenstack *version* **is no longer supported**, **Parts on another release**, **Machines with an older agent**, **The update check is not working** | See [Upgrading](../operate/upgrading.md#how-you-hear-about-a-new-release). |
 
 To put aside a problem you already know about, select **Mute** (the bell beside it). It is muted for every
 administrator. **Show again** brings it back.

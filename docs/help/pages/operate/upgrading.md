@@ -25,7 +25,57 @@ release is out, the administrators see it:
 
 Nothing is installed by itself: you run the commands, as described below.
 
+![The banner on the console's pages: a newer release fixes security problems, with See updates](../images/operate/update-banner.png)
+
+### When a release is out
+
+1. A banner on the console's pages, or an item under **Needs attention** on the dashboard, says that a release is
+   out. Select **See updates**, or the item.
+
+    ![Needs attention on the dashboard with the item Security update: Fadenstack 0.4.2](../images/operate/update-attention.png)
+
+2. **Updates** shows the release this server runs, the newest one, how urgent it is (**Update available**,
+   **Security update**, **Critical update**) and what it fixes. **Release notes** opens the release on
+   [fadenstack.com/releases](https://fadenstack.com/releases/).
+
+    ![The Updates page: this server runs 0.4.1, 0.4.2 is a security update, the commands to upgrade, and the newer releases](../images/operate/updates.png)
+
+3. Under **How to upgrade**, copy the commands and run them on the server, as in
+   [Upgrade the server](#upgrade-the-server). They match how `faden` was installed on this server, and name the exact
+   release when one cannot be skipped.
+
+    ![How to upgrade: pipx upgrade fadenstack, faden upgrade --dry-run, faden upgrade -y](../images/operate/updates-commands.png)
+
+4. When the upgrade is done, **Updates** says **Up to date**. When the release brings a newer agent for the GPU
+   machines, **Updates** says so, and the machines show **Agent *version* available**: see
+   [Update the machines' agents](#update-the-machines-agents).
+
+A banner for a security update can be hidden until the next release (**Hide until the next release**, in this
+browser). A banner for a critical update, or for a release that no longer gets fixes, cannot be hidden.
+
+On the command line, `faden` says the same after a command, at most once a day:
+
+```text
+$ faden status
+...
+Fadenstack 0.4.2 is available (you have 0.4.1) -- it fixes security problems.
+Upgrade: pipx upgrade fadenstack, then faden upgrade
+```
+
+??? info "Parts of this install"
+    Below the releases, **Updates** lists what each part runs against what this release expects: every service,
+    every machine's agent, every cluster's runtime, and the release the command-line tool last installed.
+
+    | Status | Meaning |
+    |---|---|
+    | **Current** | It runs what this release expects |
+    | **Update available** | A newer one is here to take: a machine's agent, or a cluster's runtime (see below) |
+    | **Other release** | A service runs another release than the rest. Run `faden upgrade` again |
+    | **Unknown** | It does not say which release it runs: a service built on this server from source code, or a machine that never reported |
+    | **Stopped** | The service is not running |
+
 ??? info "More about the update check"
+    - **Check now** on **Updates** reads the list at once; the daily check needs no one.
     - `faden deploy` asks whether to check; `--update-check` or `--no-update-check` answers without asking.
       Change it later in the console under **Settings**, **Updates** (**Check for new releases**), and for the
       command line with `update_check: false` in `faden.yaml` or `FADEN_NO_UPDATE_CHECK=1`.

@@ -90,6 +90,8 @@ sind rot, ein größerer interner Anteil ist grün. Zeiten folgen der Zeitzone I
 | **Fehlgeschlagene Dokumentaufnahme** | Versuchen Sie die Dokumente in der Wissensdatenbank erneut. |
 | Ein **MCP-Server** ist fehlerhaft | Seine Tools stehen Chats nicht zur Verfügung. Öffnen Sie ihn und wählen Sie **Testen** (siehe [MCP-Server](mcp-servers.md)). |
 | Ein HTTPS- oder Modell-Zertifikat läuft bald ab oder ist abgelaufen | Siehe [HTTPS und Vertrauen](../operate/https.md). |
+| **Fadenstack *Version* ist erschienen**, ein **Sicherheitsupdate** oder ein **Kritisches Update** | Öffnen Sie **Updates**: Dort steht, was das Release behebt und welche Befehle Sie ausführen (siehe [Upgrade](../operate/upgrading.md#when-a-release-is-out)). Wer ein Release stummschaltet, schaltet das nächste nicht mit stumm. |
+| Fadenstack *Version* **wird nicht mehr unterstützt**, **Bestandteile mit anderer Version**, **Maschinen mit älterem Agenten**, **Die Update-Prüfung funktioniert nicht** | Siehe [Upgrade](../operate/upgrading.md#how-you-hear-about-a-new-release). |
 | **Modellverkehr zu** einem Cluster **ist nicht verschlüsselt** | Schalten Sie die Verschlüsselung auf der Seite des Clusters ein; seine Modelle laden neu (siehe [Cluster](../operate/clusters.md)). |
 
 Um ein Problem beiseitezulegen, das Ihnen schon bekannt ist, wählen Sie **Stummschalten** (die Glocke daneben).
