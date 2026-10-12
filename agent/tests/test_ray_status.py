@@ -285,7 +285,7 @@ def _head_record() -> dict[str, Any]:
 
 
 def test_probe_normalizes_head_and_resources() -> None:
-    import ray as real_ray  # noqa: F401  (packaged with the agent)
+    real_ray = pytest.importorskip("ray", reason="needs ray: install the ray-host extra (uv sync --extra ray-host)")  # noqa: F841
 
     rec = _head_record()
     worker = dict(rec)
@@ -337,7 +337,7 @@ def test_probe_normalizes_head_and_resources() -> None:
 def test_probe_version_mismatch_alive_false(ray_manager: RayManager) -> None:
     """Intended != SDK version → typed RayVersionMismatchError inside probe,
     which folds to alive=False with the detail surfaced (Tier A unaffected)."""
-    import ray as real_ray
+    real_ray = pytest.importorskip("ray", reason="needs ray: install the ray-host extra (uv sync --extra ray-host)")
 
     class _Ray:
         __version__ = real_ray.__version__
@@ -503,7 +503,7 @@ def test_version_mismatch_is_a_kind_of_attach_error() -> None:
 
 def test_probe_idempotent_attach_no_reinit(ray_manager: RayManager) -> None:
     """Repeating the probe must not call ray.init again once attached."""
-    import ray as real_ray
+    real_ray = pytest.importorskip("ray", reason="needs ray: install the ray-host extra (uv sync --extra ray-host)")
 
     init_calls: list[int] = []
 

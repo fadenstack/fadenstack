@@ -1,0 +1,302 @@
+# Checks for pull requests and for main: the tests of every component, the frontend's types and
+# tests, and a lint for errors that would break at run time.
+#
+# Only the components a change touches are tested (the `changes` job); the `ci` job at the end is
+# the one check to require in branch protection: it passes when everything that ran passed.
+#
+# No secrets are used, so pull requests from forks run the same checks. The token is read-only.
+#
+# Run the same locally (from the component's folder; the backend and skills need Postgres, see
+# the service below for the settings):
+#   backend   uv sync --locked && uv run python -m pytest
+#   gateway, mcp, agent (--extra dev), skills   likewise
+#   cli       uv sync && uv run python -m pytest        (the CLI has no uv.lock)
+#   frontend  npm ci && npm run typecheck && npx vitest run
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The version the services run on (their images use 3.13; this is the oldest they support).
+  UV_PYTHON: "3.12"
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read  # paths-filter lists a pull request's files through the API
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      gateway: ${{ steps.filter.outputs.gateway }}
+      cli: ${{ steps.filter.outputs.cli }}
+      agent: ${{ steps.filter.outputs.agent }}
+      mcp: ${{ steps.filter.outputs.mcp }}
+      skills: ${{ steps.filter.outputs.skills }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      python: ${{ steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: filter
+        with:
+          # A change to this file tests everything; so does a manual run (see each job's if).
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'shared/**'
+              - 'agent/**'
+              - 'runtime-image/**'
+              - 'release/**'
+              - '.github/workflows/ci.yml'
+            gateway:
+              - 'gateway/**'
+              - '.github/workflows/ci.yml'
+            cli:
+              - 'cli/**'
+              - 'shared/**'
+              - 'release/**'
+              - '.github/workflows/ci.yml'
+            agent:
+              - 'agent/**'
+              - '.github/workflows/ci.yml'
+            mcp:
+              - 'mcp/**'
+              - '.github/workflows/ci.yml'
+            skills:
+              - 'skills/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - 'docs/help/**'
+              - '.github/workflows/ci.yml'
+            python:
+              - '**/*.py'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        # The same image as the install's database: the backend stores vectors with pgvector.
+        image: pgvector/pgvector:pg17@sha256:f4edd37e75cc7eb0dee5777377166dce41f82cdb822739b32e29b2a5f7fd011d
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The tests create and drop their own database (faden_backend_test, from pyproject.toml),
+      # so the user must be allowed to: the image's superuser.
+      FADEN_BACKEND_ENVIRONMENT: pytest
+      FADEN_BACKEND_DB_HOST: 127.0.0.1
+      FADEN_BACKEND_DB_PORT: "5432"
+      FADEN_BACKEND_DB_USER: postgres
+      FADEN_BACKEND_DB_PASS: postgres
+      PGPASSWORD: postgres
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      # The install's init script does this; the test database is made from template1.
+      - name: Enable pgvector in new databases
+        run: psql -h 127.0.0.1 -U postgres -d template1 -c 'CREATE EXTENSION IF NOT EXISTS vector'
+      - run: uv sync --locked
+      - run: uv run --no-sync python -m pytest -q
+
+  gateway:
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: gateway/uv.lock
+      - run: uv sync --locked
+      - run: uv run --no-sync python -m pytest -q
+
+  cli:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      # The CLI has no uv.lock, so this resolves the newest versions its pyproject allows.
+      - run: uv sync
+      # pyproject.toml sets pythonpath = ["src"]; the tests read the deployment files in ../shared.
+      - run: uv run --no-sync python -m pytest -q
+
+  agent:
+    needs: changes
+    if: needs.changes.outputs.agent == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: agent/uv.lock
+      # Without the ray-host extra three tests of test_ray_status.py skip themselves (they need ray).
+      - run: uv sync --locked --extra dev
+      - run: uv run --no-sync python -m pytest -q
+
+  mcp:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: mcp/uv.lock
+      - run: uv sync --locked
+      - run: uv run --no-sync python -m pytest -q
+
+  skills:
+    needs: changes
+    if: needs.changes.outputs.skills == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17@sha256:f4edd37e75cc7eb0dee5777377166dce41f82cdb822739b32e29b2a5f7fd011d
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The tests recreate their own database (faden_skills_test, from pyproject.toml).
+      FADEN_SKILLS_DB_HOST: 127.0.0.1
+      FADEN_SKILLS_DB_PORT: "5432"
+      FADEN_SKILLS_DB_USER: postgres
+      FADEN_SKILLS_DB_PASS: postgres
+    defaults:
+      run:
+        working-directory: skills
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: skills/uv.lock
+      - run: uv sync --locked
+      - run: uv run --no-sync python -m pytest -q
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npx vitest run
+
+  # Ruff's rules are not enforced across the repository: the components carry a backlog of style
+  # findings (hundreds of them), and a check that fails on all of them would only be switched off.
+  # This runs the rules for code that cannot work: syntax errors, invalid constructs. Tighten it
+  # by adding rules here once a component's backlog is cleared.
+  lint:
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: >-
+          uvx ruff@0.17.0 check --isolated --target-version py312 --select E9,F63,F7
+          agent backend cli gateway mcp pii skills release runtime-image
+
+  # The one check to require: it passes when every job that ran passed (a skipped job is fine).
+  ci:
+    if: always()
+    needs: [changes, backend, gateway, cli, agent, mcp, skills, frontend, lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Everything that ran passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) echo "::error::A check failed or was cancelled"; exit 1 ;;
+          esac

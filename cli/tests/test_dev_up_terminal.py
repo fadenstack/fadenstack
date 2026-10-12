@@ -99,6 +99,8 @@ def test_without_windows_terminal_it_still_starts(
         dev_up, "_which", lambda name: "C:\\fake\\pwsh.exe" if name == "pwsh" else None
     )
     monkeypatch.setattr(dev_up.subprocess, "Popen", recorder)
+    # Windows-only constant: not there when the test runs on Linux or macOS.
+    monkeypatch.setattr(dev_up.subprocess, "CREATE_NEW_CONSOLE", 0x10, raising=False)
 
     assert dev_up._launch_terminal("Backend", tmp_path, "echo hi", headless=False)
     argv = windows = recorder.calls[0]

@@ -1,5 +1,7 @@
+import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
@@ -22,6 +24,28 @@ from faden_backend.services.rabbit.dependencies import get_rmq_channel_pool
 from faden_backend.services.rabbit.lifespan import init_rabbit, shutdown_rabbit
 from faden_backend.settings import settings
 from faden_backend.web.application import get_app
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _run_from_the_repository_root() -> Generator[None]:
+    """
+    Run the tests with the repository root as the working directory.
+
+    The settings' default file paths (``shared/grafana/...``, ``shared/prometheus/...``)
+    are relative to the repository root, where the backend is run from. Started from
+    ``backend/`` the tests that render the Grafana dashboards could not find their template.
+
+    :yield: nothing; the previous directory is restored afterwards.
+    """
+    previous = Path.cwd()
+    os.chdir(REPO_ROOT)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
 
 
 @pytest.fixture(scope="session")

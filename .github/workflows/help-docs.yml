@@ -16,23 +16,42 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # The hub is private and its scrub rules are needed to check the pages. Secrets are not
+      # passed to workflows from forks, so the steps below test this and skip cleanly without it.
+      DOCS_READ_TOKEN: ${{ secrets.DOCS_READ_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - name: The hub token is available
+        id: hub
+        shell: bash
+        run: |
+          if [ -n "$DOCS_READ_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Help check skipped::DOCS_READ_TOKEN is not available (a pull request from a fork gets no secrets), so the private docs hub cannot be read. The Help pages are checked when a maintainer's branch or main runs this."
+          fi
+
+      - if: steps.hub.outputs.available == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           sparse-checkout: docs/help
 
       # The hub keeps the scrub rules; it may be private: DOCS_READ_TOKEN reads its contents.
-      - uses: actions/checkout@v5
+      - if: steps.hub.outputs.available == 'true'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: fadenstack/docs
           path: _hub
           token: ${{ secrets.DOCS_READ_TOKEN }}
           sparse-checkout: scripts
 
-      - uses: actions/setup-python@v6
+      - if: steps.hub.outputs.available == 'true'
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - run: python docs/help/scripts/check.py
+      - if: steps.hub.outputs.available == 'true'
+        run: python docs/help/scripts/check.py
         env:
           FADEN_DOCS_HUB: _hub
           SCRUB_EXTRA: ${{ secrets.SCRUB_EXTRA }}

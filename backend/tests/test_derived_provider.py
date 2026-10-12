@@ -43,6 +43,7 @@ from faden_backend.db.models.llm import (
     ProviderType,
 )
 from faden_backend.db.dao.inference_dao import EndpointDAO
+from faden_backend.settings import settings
 from faden_backend.services.inference.publication import (
     DERIVED_SOURCE_KIND,
     InferencePublicationCoordinator,
@@ -456,6 +457,7 @@ async def test_the_cards_answer_for_a_cluster_backed_provider(
     what ``sync_ray_targets`` writes onto the scrape targets and what the
     cluster dashboard selects on.
     """
+    monkeypatch.setattr(settings, "llm_monitoring_enabled", True)  # off by default; a developer's .env may turn it on
     await _admin(dbsession, fastapi_app)
     deployment = await _deployment(dbsession)
     await _publish(dbsession, deployment)
@@ -500,6 +502,7 @@ async def test_the_cards_are_the_provider_s_own_model_not_the_whole_cluster(
     The model is the one the endpoint serves: the name Serve labels its
     metrics with.
     """
+    monkeypatch.setattr(settings, "llm_monitoring_enabled", True)  # off by default; a developer's .env may turn it on
     await _admin(dbsession, fastapi_app)
     deployment = await _deployment(dbsession)
     endpoint = await EndpointDAO(dbsession).create(
