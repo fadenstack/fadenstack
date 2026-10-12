@@ -188,6 +188,8 @@ async def test_migration_seals_plaintext_and_leaves_ciphertext(
     dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mig = _migration()
+    # An install's own key: the migration refuses the published development one (test below).
+    monkeypatch.setattr(settings, "settings_master_key", "an-installs-own-master-key")
     already = seal_provider_key("sk-already")
     ids = {}
     for label, value in {"plain": KEY, "sealed": already, "null": None, "empty": ""}.items():
@@ -231,3 +233,17 @@ async def test_migration_without_master_key_fails_loudly(
             mig.upgrade()
 
     await conn.run_sync(run)
+
+
+async def test_migration_refuses_the_published_master_key(
+    dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sealing with the key everyone knows would only look like encryption."""
+    mig = _migration()
+    monkeypatch.setattr(settings, "settings_master_key", "dev-settings-master-key-change-me")
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "allow_published_keys", False)
+    with pytest.raises(RuntimeError, match="published development value"):
+        mig._fernet()
+    monkeypatch.setattr(settings, "allow_published_keys", True)  # kept on purpose until a rotation
+    assert mig._fernet() is not None

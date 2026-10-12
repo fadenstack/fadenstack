@@ -41,6 +41,16 @@ def _fernet() -> Fernet:
             "FADEN_BACKEND_SETTINGS_MASTER_KEY is empty: the provider API keys cannot be encrypted. "
             "Set it (it is the key the console's other secrets use) and run the migration again.",
         )
+    from faden_backend.published_secrets import PUBLISHED_MASTER_KEYS
+
+    # The published development key seals nothing: anyone could open it. An install that keeps it on purpose
+    # says so (FADEN_ALLOW_PUBLISHED_KEYS) and changes it later with `faden secrets rotate`.
+    if master_key in PUBLISHED_MASTER_KEYS and settings.environment != "dev" and not settings.allow_published_keys:
+        raise RuntimeError(
+            "FADEN_BACKEND_SETTINGS_MASTER_KEY is the published development value: the provider API keys would "
+            "be sealed with a key anyone knows. Set the install's own key, or FADEN_ALLOW_PUBLISHED_KEYS=true to "
+            "keep it until `faden secrets rotate`.",
+        )
     return Fernet(base64.urlsafe_b64encode(hashlib.sha256(master_key.encode("utf-8")).digest()))
 
 

@@ -68,6 +68,8 @@ def test_resolver_sends_no_auth_for_unreadable_ciphertext() -> None:
 
 def test_migration_seals_plaintext_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     mig = importlib.import_module("faden_gateway.db.migrations.versions.2026-10-12-10-01_pr0vk3yg")
+    # An install's own key: the migration refuses the published development one (test below).
+    monkeypatch.setattr(settings, "settings_master_key", "an-installs-own-master-key")
     engine = sa.create_engine("sqlite://")
     sealed = _seal(settings.settings_master_key, "sk-already")
     with engine.begin() as conn:
@@ -96,4 +98,19 @@ def test_migration_without_master_key_fails_loudly(monkeypatch: pytest.MonkeyPat
         conn.execute(sa.text("INSERT INTO llm_provider_instance VALUES (1, :v)"), {"v": KEY})
         monkeypatch.setattr(mig.op, "get_bind", lambda: conn)
         with pytest.raises(RuntimeError):
+            mig.upgrade()
+
+
+def test_migration_refuses_the_published_master_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sealing with the key everyone knows would only look like encryption."""
+    mig = importlib.import_module("faden_gateway.db.migrations.versions.2026-10-12-10-01_pr0vk3yg")
+    monkeypatch.setattr(settings, "settings_master_key", "dev-settings-master-key-change-me")
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "allow_published_keys", False)
+    engine = sa.create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(sa.text("CREATE TABLE llm_provider_instance (id integer primary key, api_key_encrypted text)"))
+        conn.execute(sa.text("INSERT INTO llm_provider_instance VALUES (1, 'sk-plain')"))
+        monkeypatch.setattr(mig.op, "get_bind", lambda: conn)
+        with pytest.raises(RuntimeError, match="published development value"):
             mig.upgrade()

@@ -365,6 +365,8 @@ services:
       # The migration that seals the provider API keys (pr0vk3yg) uses the backend's master key; without it
       # the migrator used the published development default.
       FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # That migration refuses the published development key unless the install keeps it on purpose.
+      FADEN_GATEWAY_ALLOW_PUBLISHED_KEYS: ${FADEN_ALLOW_PUBLISHED_KEYS:-false}
 
   # -----------------------------
   # faden_gateway (OpenAI-compatible endpoint gateway)
@@ -501,6 +503,8 @@ services:
       # The migration that seals the remote providers' API keys (pr0vk3ys) seals them with this key.
       # Without it the migrator used the published development default, and the backend could not open them.
       FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # That migration refuses the published development key unless the install keeps it on purpose.
+      FADEN_BACKEND_ALLOW_PUBLISHED_KEYS: ${FADEN_ALLOW_PUBLISHED_KEYS:-false}
 
   faden-backend:
     image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
