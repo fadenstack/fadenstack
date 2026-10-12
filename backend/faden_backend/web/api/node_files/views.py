@@ -23,14 +23,19 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dao.llm_dao import ModelDAO
 from faden_backend.db.dao.node_control_dao import NodeControlDAO
+from faden_backend.db.dependencies import get_db_session
+from faden_backend.db.models.llm import LLMRuntime
 from faden_backend.db.models.node_control import InfraNode
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services import edge_trust
 from faden_backend.services.inference import image_cache
+from faden_backend.services.inference.bundles import default_bundle_registry
 from faden_backend.services.nodes import NodeControlService
 from faden_backend.settings import settings
 
@@ -592,6 +597,42 @@ _SAFE_IMAGE_RE = re.compile(
 )
 
 
+#: The repository the model-TLS proxy image is held under (any tag: one per architecture).
+_MODEL_TLS_IMAGE_REPO = "faden/model-tls-nginx"
+
+
+def _with_tag(ref: str) -> str:
+    """*ref* as ``name:tag``, a bare name being ``:latest`` (a registry port is not a tag)."""
+    last = ref.rsplit("/", 1)[-1]
+    return ref if ":" in last else f"{ref}:latest"
+
+
+async def _images_a_node_may_fetch(session: AsyncSession) -> set[str]:
+    """Every image a machine can be told to run, as ``name:tag``.
+
+    The certified runtime images of the catalogue, the vLLM defaults and
+    presets of the settings, and the image of each runtime an operator set up
+    in the console. The model-TLS proxy image is matched by its repository
+    (:data:`_MODEL_TLS_IMAGE_REPO`).
+    """
+    refs = {b.container.image for b in default_bundle_registry.list_bundles()}
+    refs.update((
+        settings.default_vllm_image,
+        settings.default_vllm_rocm_image,
+        settings.default_vllm_nvidia_arm_image,
+        settings.default_vllm_legacy_image,
+    ))
+    try:
+        presets = json.loads(settings.vllm_image_presets or "[]")
+    except ValueError:
+        presets = []
+    refs.update(str(p["image"]) for p in presets if isinstance(p, dict) and p.get("image"))
+    for config in (await session.execute(select(LLMRuntime.provider_config))).scalars():
+        if isinstance(config, dict) and config.get("image"):
+            refs.add(str(config["image"]))
+    return {_with_tag(ref.strip()) for ref in refs if ref and ref.strip()}
+
+
 @router.get(
     "/images/save",
     name="node_image_save",
@@ -603,8 +644,12 @@ async def image_save(
     expect_id: str | None = None,
     expect_rootfs: str | None = None,
     _node: InfraNode = Depends(_authenticate_node),
+    session: AsyncSession = Depends(get_db_session),
 ) -> Response:
     """Hand a node the runtime image as a tar it can ``docker load``.
+
+    Only an image a machine can be told to run: a machine's credential must
+    not export whatever else this server's Docker holds (403).
 
     Served from a one-time export when there is room for one, so the
     transfer has a real length and can be resumed with ``Range``; otherwise
@@ -615,6 +660,8 @@ async def image_save(
     ref = f"{image}:{tag}"
     if not _SAFE_IMAGE_RE.match(ref):
         raise HTTPException(status_code=400, detail="Invalid image reference.")
+    if image != _MODEL_TLS_IMAGE_REPO and ref not in await _images_a_node_may_fetch(session):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Image {ref} is not one a machine may fetch.")
 
     docker: DockerService = request.app.state.docker
 
