@@ -198,6 +198,7 @@ Zufallswert (`openssl rand -base64 48`):
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Zugangsdaten der MCP-Server |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Aufrufe des MCP-Dienstes. Ein Wert für alle drei |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Aufrufe des Skills-Dienstes. Ein Wert für alle drei |
+| `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Aufrufe des PII-Dienstes, der jeden Aufruf ohne ihn ablehnt (nur sein Health-Check ist offen). Ein Wert für alle vier |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 Hex-Zeichen: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Die API-Schlüssel, gespeicherten Schlüssel und Anmeldungen von Langfuse |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana. Grafana liest sein Passwort beim ersten Start; eine spätere Änderung in der `.env` ändert es in Grafana nicht |
 | `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |

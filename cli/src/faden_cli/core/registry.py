@@ -108,12 +108,20 @@ MODULES: dict[str, ModuleInfo] = {
         ),
         dev_dir="pii",
         backend_url_suffix="/api",
+        dev_service_token="dev-pii-service-token",
         # The spaCy model Presidio loads. Not a PyPI package, so the lock
         # file cannot carry it; the image installs the same wheel.
         extra_wheels=((
             "en_core_web_lg",
             "https://github.com/explosion/spacy-models/releases/download/"
             "en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
+        ),),
+        # What the gateway, the backend and MCP present on its routes; it refuses all calls without one.
+        secret_groups=((
+            "FADEN_GATEWAY_PII_SERVICE_TOKEN",
+            "FADEN_BACKEND_PII_SERVICE_TOKEN",
+            "FADEN_MCP_PII_SERVICE_TOKEN",
+            "FADEN_PII_SERVICE_TOKEN",
         ),),
     ),
     "mcp": ModuleInfo(

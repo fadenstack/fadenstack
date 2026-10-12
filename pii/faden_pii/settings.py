@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     # FADEN_BACKEND_INTERNAL_TOKEN. Empty: nothing is sent (dev environment excepted).
     backend_token: str = ""
 
+    # What the gateway, the backend and MCP must present on every route but
+    # health (Bearer). Empty: every call is refused, not accepted.
+    service_token: str = ""
+
     # RabbitMQ settings (used by taskiq worker)
     rabbit_host: str = "127.0.0.1"
     rabbit_port: int = 5672

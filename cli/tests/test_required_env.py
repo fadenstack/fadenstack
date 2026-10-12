@@ -34,6 +34,7 @@ PUBLISHED = (
     "dev-mcp-encryption-key-change-me",
     "dev-mcp-service-token",
     "dev-skills-service-token",
+    "dev-pii-service-token",
     "myredissecret",
     "miniosecret",
     "mysalt",

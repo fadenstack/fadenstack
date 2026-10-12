@@ -48,7 +48,12 @@ from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from faden_gateway.services.gateway.pii_client import PIIClient
 from faden_gateway.services.gateway.session_titles import title_from_message
-from faden_gateway.services.gateway.pii_policy import PIIPolicy, SessionPIIOverride, resolve_session_pii
+from faden_gateway.services.gateway.pii_policy import (
+    PIIPolicy,
+    SessionPIIOverride,
+    resolve_session_pii,
+    tenant_set_policy,
+)
 from faden_gateway.services.gateway.pii_restore import (
     redact_tokens,
     restore_payload,
@@ -319,6 +324,38 @@ def _needs_scan(pii_policy: PIIPolicy | None, candidate: Any) -> bool:
     if _is_cloud(candidate):
         return pii_policy.egress.enabled_for_cloud
     return pii_policy.egress.enabled_for_local
+
+
+#: What a refused request says when a saved PII policy needs a scan and the module is off.
+_PII_MODULE_OFF_MESSAGE = (
+    "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent. "
+    "An administrator can start the PII module, or switch the policy off if it is not needed."
+)
+
+
+class PIIModuleOffError(RuntimeError):
+    """A scan was due and there is no PII client: the module is not switched on."""
+
+    def __init__(self) -> None:
+        super().__init__("The PII module is not running")
+
+
+_default_policy_noted = False
+
+
+def _note_default_policy_unenforced() -> None:
+    """Say once that the system default PII policy is not applied because the module is off.
+
+    The backend seeds that default on every install, so an install that never
+    used PII has it too; blocking its chats would be wrong. The note is for the
+    one that did use PII and switched it off.
+    """
+    global _default_policy_noted  # noqa: PLW0603
+    if not _default_policy_noted:
+        _default_policy_noted = True
+        logger.warning(
+            "The default PII policy scans cloud routes, but the PII module is off: requests go out unscanned",
+        )
 
 
 #: Work started for after the response, kept referenced until it is done
@@ -984,6 +1021,9 @@ class _Prepared:
     decision: RoutingDecision | None = None
     fallback_outcome: str = "not_used"
     pii_policy: PIIPolicy | None = None
+    #: The policy is one an administrator saved for the tenant, not the system
+    #: default. Only then does a missing PII service count as a failed scan.
+    pii_policy_saved: bool = False
     session_id: str | None = None
     group_id: str | None = None  # the user's usage group, for attribution
     project_id: str | None = None  # the session's chat project, for attribution
@@ -2213,9 +2253,13 @@ class GatewayService:
                 req.agent.agent.pii_allow_mode_override if req.agent is not None else None
             ),
         )
+        req.pii_policy_saved = tenant_set_policy(policy)
         scanned, candidates = await self._scan_egress(req, candidates=candidates, request_id=request_id)
         telemetry_payload = None
-        if req.pii_policy and self.pii_client and req.pii_policy.telemetry.enabled:
+        if req.pii_policy and not self.pii_client and req.pii_policy_saved and req.pii_policy.telemetry.enabled:
+            # Same as a failed telemetry scan: no text in the trace.
+            telemetry_payload = {"model": payload.get("model"), "_pii_mode": "fallback"}
+        elif req.pii_policy and self.pii_client and req.pii_policy.telemetry.enabled:
             if scanned is not None and req.pii_policy.telemetry.mode != "metrics_only":
                 # One scan serves both what leaves and what the trace keeps:
                 # the same text was scanned a second time for the trace, which
@@ -2331,20 +2375,26 @@ class GatewayService:
         gets the payload as it was.
         """
         pii_policy = req.pii_policy
-        if (
-            pii_policy is None
-            or self.pii_client is None
-            or not any(_needs_scan(pii_policy, c) for c in candidates)
-        ):
+        if pii_policy is None or not any(_needs_scan(pii_policy, c) for c in candidates):
+            return None, candidates
+        if self.pii_client is None and not req.pii_policy_saved:
+            # Only the system default applies, and the PII module was never switched on
+            # (the backend seeds that default on every install): nothing to enforce.
+            _note_default_policy_unenforced()
             return None, candidates
         try:
+            # A policy someone saved, with the PII module off, fails like a scan that errors:
+            # fail_action decides. It used to send the payload unscanned, without a word.
             return await self._sanitize(req.payload, pii_policy, req), candidates
         except Exception:
             fail_action = pii_policy.egress.fail_action
             if fail_action == "block":
                 raise GatewayError(
                     status_code=502,
-                    message="PII service unavailable and fail_action=block.",
+                    message=(
+                        _PII_MODULE_OFF_MESSAGE if self.pii_client is None
+                        else "PII service unavailable and fail_action=block."
+                    ),
                     error_type="server_error",
                     code="pii_service_unavailable",
                 ) from None
@@ -2378,7 +2428,8 @@ class GatewayService:
     async def _sanitize(
         self, payload: dict[str, Any], pii_policy: PIIPolicy, req: _Prepared | None = None,
     ) -> tuple[dict[str, Any], dict[str, str] | None]:
-        assert self.pii_client is not None  # noqa: S101
+        if self.pii_client is None:
+            raise PIIModuleOffError
         result = await self.pii_client.sanitize(
             payload=payload,
             policy=pii_policy,
@@ -3287,12 +3338,25 @@ class GatewayService:
         search result is the token the question already used for it.
         """
         if (
-            self.pii_client is None
-            or req.decision is None
+            req.decision is None
             or req.pii_policy is None
             or not _needs_scan(req.pii_policy, req.decision.candidate)
         ):
             return answers
+        if self.pii_client is None:
+            if not req.pii_policy_saved:
+                _note_default_policy_unenforced()
+                return answers
+            # A saved policy and no PII module: the same as a service that fails.
+            if req.pii_policy.egress.fail_action == "allow":
+                logger.warning("PII module is off; fail_action=allow, sending tool results as they are")
+                return answers
+            raise GatewayError(
+                status_code=502,
+                message=_PII_MODULE_OFF_MESSAGE,
+                error_type="server_error",
+                code="pii_service_unavailable",
+            )
         # Each text of each answer is scanned apart -- every passage of a
         # search, its query, its sources -- so the PII service's cache, which
         # keeps one analysis per text, knows a passage the next search returns

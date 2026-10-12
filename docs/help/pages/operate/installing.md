@@ -185,6 +185,7 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 | `FADEN_MCP_ENCRYPTION_KEY` | The credentials of MCP servers |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Calls to the MCP service. One value for all three |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Calls to the skills service. One value for all three |
+| `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Calls to the PII service, which refuses every call without it (only its health check is open). One value for all four |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 hex characters: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Langfuse's API keys, stored keys and sign-ins |
 | `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | The stores and Grafana. Grafana reads its password when it first starts, so changing it later in `.env` does not change it in Grafana |
 | `LANGFUSE_INIT_USER_PASSWORD` | The password of Langfuse's first user (the administrator's e-mail). Langfuse reads it once, when it creates the user: change it in Langfuse after that, and note the new one in `.env` |

@@ -7,7 +7,8 @@ what people see when a rule stops something.
 ## Before you start
 
 - For personal data: the **PII / Privacy** module is on (**Settings → Modules**; see
-  [Modules](index.md#modules)). Its pages are under **Privacy (PII)**. Without it, nothing is masked.
+  [Modules](index.md#modules)). Its pages are under **Privacy (PII)**. Without it, nothing is masked, with one
+  exception: see [When the module is off](#when-the-module-is-off).
 - For tool rules: **Agents → Governance**. It needs no module.
 
 ## Personal data
@@ -31,6 +32,22 @@ With the module on, the default policy:
 - **blocks** a request to a cloud provider when the filter cannot run;
 - reads English text, and looks for these types: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
   `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+
+### When the module is off {#when-the-module-is-off}
+
+A policy needs the module to run. What happens without it depends on where the policy comes from:
+
+- **A policy saved for your organisation** (**Settings → Modules → PII / Privacy**, tenant policy): a missing
+  module counts as a filter that cannot run, and **If detection fails** decides. With `block`, the default,
+  chats to the models the policy covers fail with "A PII policy is set for this workspace, but the PII module is
+  not running" and nothing is sent. Start the module, or switch the policy off if you do not need it. With
+  `allow` the request goes out unscanned, and the log says so.
+- **The default policy only** (nobody saved a policy): not applied. Every install has it, including those that
+  never switched the module on, and their chats keep working unmasked.
+
+Switching the module off therefore does not silently remove a policy you saved. Be aware that if you rely on the
+default policy and later switch the module off, requests to cloud providers are no longer masked: save a policy
+for your organisation if that must not happen.
 
 ??? info "More about dates"
     Dates (`DATE_TIME`) are not on the list. Add them if you need dates of birth covered; plain numbers in a
@@ -156,6 +173,7 @@ back.
 | A tool rule denied a tool | The tool line says **Not run**. The model is told, with the rule's message, and carries on without it. |
 | A tool needs approval | "… wants to run", with **Approve** and **Decline**. Without an answer within five minutes, the call is not run (**Expired**). |
 | The personal data filter could not run, and the policy blocks | The reply fails with "PII service unavailable and fail_action=block." Nothing was sent to the model. |
+| A policy you saved applies, but the PII module is not running, and the policy blocks | The reply fails with "A PII policy is set for this workspace, but the PII module is not running, so nothing was sent." |
 | A prompt was refused (content policies, <span class="fs-planned">Planned</span>) | The message is marked **Not sent**, with the policy's message or "This was stopped by your organisation's policy." Nothing is sent to a model or stored. |
 | An answer was refused (content policies, <span class="fs-planned">Planned</span>) | The answer stops and is marked **Answer withheld**. |
 

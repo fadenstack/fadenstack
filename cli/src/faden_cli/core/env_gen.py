@@ -49,6 +49,11 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "FADEN_SKILLS_SERVICE_TOKEN",
     "FADEN_BACKEND_RAG_SERVICE_TOKEN",
     "FADEN_RAG_SERVICE_TOKEN",
+    # The PII service's own routes: what the gateway, the backend and MCP present, and what it expects.
+    "FADEN_GATEWAY_PII_SERVICE_TOKEN",
+    "FADEN_BACKEND_PII_SERVICE_TOKEN",
+    "FADEN_MCP_PII_SERVICE_TOKEN",
+    "FADEN_PII_SERVICE_TOKEN",
     # The PII service reports its scan events to the backend with this.
     "FADEN_BACKEND_INTERNAL_TOKEN",
     "FADEN_PII_BACKEND_TOKEN",
@@ -97,6 +102,10 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
     "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
     "FADEN_SKILLS_SERVICE_TOKEN",
+    "FADEN_GATEWAY_PII_SERVICE_TOKEN",
+    "FADEN_BACKEND_PII_SERVICE_TOKEN",
+    "FADEN_MCP_PII_SERVICE_TOKEN",
+    "FADEN_PII_SERVICE_TOKEN",
 )
 
 #: Keys that seal stored data, with the value the compose file used when ``.env`` had none. They are
@@ -120,6 +129,12 @@ _REFUSED_DATA_KEYS = ("FADEN_BACKEND_SETTINGS_MASTER_KEY", "FADEN_MCP_ENCRYPTION
 _TOKEN_GROUPS: tuple[tuple[str, ...], ...] = (
     ("FADEN_GATEWAY_MCP_SERVICE_TOKEN", "FADEN_BACKEND_MCP_SERVICE_TOKEN", "FADEN_MCP_SERVICE_TOKEN"),
     ("FADEN_GATEWAY_SKILLS_SERVICE_TOKEN", "FADEN_BACKEND_SKILLS_SERVICE_TOKEN", "FADEN_SKILLS_SERVICE_TOKEN"),
+    (
+        "FADEN_GATEWAY_PII_SERVICE_TOKEN",
+        "FADEN_BACKEND_PII_SERVICE_TOKEN",
+        "FADEN_MCP_PII_SERVICE_TOKEN",
+        "FADEN_PII_SERVICE_TOKEN",
+    ),
 )
 
 
@@ -234,11 +249,15 @@ def dev_env_vars(
 
 
 def _dev_module_secrets() -> dict[str, str]:
-    """The MCP and skills tokens and the MCP key a development stack uses."""
+    """The PII, MCP and skills tokens and the MCP key a development stack uses."""
     from faden_cli.core.registry import MODULES  # noqa: PLC0415
 
-    mcp, skills = MODULES["mcp"], MODULES["skills"]
+    mcp, skills, pii = MODULES["mcp"], MODULES["skills"], MODULES["pii"]
     return {
+        "FADEN_GATEWAY_PII_SERVICE_TOKEN": pii.dev_service_token,
+        "FADEN_BACKEND_PII_SERVICE_TOKEN": pii.dev_service_token,
+        "FADEN_MCP_PII_SERVICE_TOKEN": pii.dev_service_token,
+        "FADEN_PII_SERVICE_TOKEN": pii.dev_service_token,
         "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp.dev_service_token,
         "FADEN_BACKEND_MCP_SERVICE_TOKEN": mcp.dev_service_token,
         "FADEN_MCP_SERVICE_TOKEN": mcp.dev_service_token,
@@ -274,6 +293,7 @@ def default_env_vars(
     skills_service_token = _random_secret()
     rag_service_token = _random_secret()
     internal_token = _random_secret()
+    pii_service_token = _random_secret()
 
     env = {
         # Postgres
@@ -325,6 +345,13 @@ def default_env_vars(
         "FADEN_SKILLS_SERVICE_TOKEN": skills_service_token,
         "FADEN_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
         "FADEN_RAG_SERVICE_TOKEN": rag_service_token,
+        # The PII service takes calls on its routes only with this: its own secret, apart from the
+        # internal token, which is what it presents to the backend. It cannot be told which caller
+        # is which, so the gateway, the backend and MCP share one value.
+        "FADEN_GATEWAY_PII_SERVICE_TOKEN": pii_service_token,
+        "FADEN_BACKEND_PII_SERVICE_TOKEN": pii_service_token,
+        "FADEN_MCP_PII_SERVICE_TOKEN": pii_service_token,
+        "FADEN_PII_SERVICE_TOKEN": pii_service_token,
         "FADEN_BACKEND_INTERNAL_TOKEN": internal_token,
         "FADEN_PII_BACKEND_TOKEN": internal_token,
         # Encrypts the credentials MCP stores. Without it the compose file

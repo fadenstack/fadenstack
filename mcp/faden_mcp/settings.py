@@ -62,6 +62,9 @@ class Settings(BaseSettings):
 
     # ── PII Service (optional) ──
     pii_service_url: str = ""
+    #: Presented to the PII service (Bearer): its FADEN_PII_SERVICE_TOKEN. The
+    #: service refuses every call without it.
+    pii_service_token: str = ""
 
     # ── Internal service-to-service auth token ──
     service_token: str = ""

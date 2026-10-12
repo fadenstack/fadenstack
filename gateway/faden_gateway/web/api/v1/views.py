@@ -103,6 +103,7 @@ def get_gateway_service(
         pii_client = PIIClient(
             base_url=pii_url,
             http_client=request.app.state.http_client,
+            service_token=settings.pii_service_token,
         )
 
     # MCP client + cache (optional - when MCP module is enabled in registry)

@@ -117,6 +117,9 @@ def module_env(
         # Empty when the other one is not running: a URL to nothing would
         # make every call wait out a connect timeout instead of skipping.
         env[p + key] = dev_url(by_name[other]) if other in by_name else ""
+        # ... and the token it presents there (PII_SERVICE_URL -> PII_SERVICE_TOKEN).
+        if by_name.get(other) and by_name[other].dev_service_token:
+            env[p + key.removesuffix("_URL") + "_TOKEN"] = service_token(by_name[other], shared)
     return env
 
 

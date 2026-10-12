@@ -189,6 +189,9 @@ class Settings(BaseSettings):
     # Optional module: PII service
     pii_service_url: str | None = None
     pii_enabled: bool = False
+    #: Presented to the PII service (Bearer): its FADEN_PII_SERVICE_TOKEN. The
+    #: service refuses every call without it.
+    pii_service_token: str = ""
     pii_default_policy: dict | None = None
 
     # Optional module: MCP tool registry

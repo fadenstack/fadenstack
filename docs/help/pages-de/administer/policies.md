@@ -7,7 +7,8 @@ Richtlinie für personenbezogene Daten, die Tool-Regeln und das, was Benutzer se
 ## Bevor Sie beginnen {#before-you-start}
 
 - Für personenbezogene Daten: Das Modul **PII / Datenschutz** ist eingeschaltet (**Einstellungen → Module**; siehe
-  [Module](index.md#modules)). Seine Seiten finden Sie unter **Datenschutz (PII)**. Ohne das Modul wird nichts maskiert.
+  [Module](index.md#modules)). Seine Seiten finden Sie unter **Datenschutz (PII)**. Ohne das Modul wird nichts maskiert, mit einer
+  Ausnahme: siehe [Wenn das Modul aus ist](#when-the-module-is-off).
 - Für Tool-Regeln: **Agenten → Governance**. Dafür ist kein Modul nötig.
 
 ## Personenbezogene Daten {#personal-data}
@@ -33,6 +34,24 @@ Bei eingeschaltetem Modul gilt diese Standardrichtlinie:
 - Sie **blockiert** eine Anfrage an einen Cloud-Provider, wenn der Filter nicht laufen kann.
 - Sie liest englischen Text und sucht nach diesen Typen: `PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`,
   `IBAN_CODE`, `IP_ADDRESS`, `US_SSN`, `LOCATION`, `NRP`, `MEDICAL_LICENSE`, `URL`.
+
+### Wenn das Modul aus ist {#when-the-module-is-off}
+
+Eine Richtlinie braucht das Modul, um zu laufen. Was ohne es geschieht, hängt davon ab, woher die Richtlinie kommt:
+
+- **Eine für Ihre Organisation gespeicherte Richtlinie** (**Einstellungen → Module → PII / Datenschutz**,
+  Mandantenrichtlinie): Ein fehlendes Modul gilt als Filter, der nicht laufen kann, und **Wenn die Erkennung fehlschlägt**
+  entscheidet. Bei `block`, dem Standard, schlagen Chats an die Modelle, die die Richtlinie erfasst,
+  fehl mit „A PII policy is set for this workspace, but the PII module is not running“, und es wird nichts
+  gesendet. Starten Sie das Modul, oder schalten Sie die Richtlinie aus, wenn Sie sie nicht brauchen. Bei `allow`
+  geht die Anfrage ungeprüft hinaus, und das Protokoll vermerkt es.
+- **Nur die Standardrichtlinie** (niemand hat eine Richtlinie gespeichert): wird nicht angewendet. Jede
+  Installation hat sie, auch die, die das Modul nie eingeschaltet haben, und deren Chats laufen ohne Maskierung
+  weiter.
+
+Das Ausschalten des Moduls entfernt eine gespeicherte Richtlinie also nicht stillschweigend. Beachten Sie: Wer sich
+auf die Standardrichtlinie verlässt und das Modul später ausschaltet, dessen Anfragen an Cloud-Provider werden
+nicht mehr maskiert. Speichern Sie eine Richtlinie für Ihre Organisation, wenn das nicht passieren darf.
 
 ??? info "Mehr zu Datumsangaben"
     Datumsangaben (`DATE_TIME`) stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst
@@ -164,6 +183,7 @@ zweimal abgelehnt, zeigt denselben Wert, und niemand kann den Text daraus zurüc
 |---|---|
 | Eine Tool-Regel hat ein Tool gesperrt | Die Tool-Zeile zeigt **Nicht ausgeführt**. Das Modell erfährt es, mit der Nachricht der Regel, und macht ohne das Tool weiter. |
 | Ein Tool braucht eine Freigabe | „… möchte ausgeführt werden“, mit **Zulassen** und **Ablehnen**. Kommt innerhalb von fünf Minuten keine Antwort, wird der Aufruf nicht ausgeführt (**Abgelaufen**). |
+| Eine gespeicherte Richtlinie gilt, aber das PII-Modul läuft nicht, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „A PII policy is set for this workspace, but the PII module is not running, so nothing was sent.“ |
 | Der Filter für personenbezogene Daten konnte nicht laufen, und die Richtlinie blockiert | Die Antwort schlägt fehl mit „PII service unavailable and fail_action=block.“ An das Modell wurde nichts gesendet. |
 | Eine Eingabe wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Nachricht wird als **Nicht gesendet** markiert, mit der Nachricht der Richtlinie oder „Dies wurde durch eine Richtlinie Ihrer Organisation gestoppt.“ Nichts wird an ein Modell gesendet oder gespeichert. |
 | Eine Antwort wurde abgelehnt (Inhaltsrichtlinien, <span class="fs-planned">Geplant</span>) | Die Antwort bricht ab und wird als **Antwort zurückgehalten** markiert. |

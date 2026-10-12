@@ -4,6 +4,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from faden_pii.settings import settings
 from faden_pii.web.application import get_app
 
 # No database: the service opens none (its DB layer is unused template code,
@@ -19,6 +20,15 @@ def anyio_backend() -> str:
     :return: backend name.
     """
     return "asyncio"
+
+
+TEST_TOKEN = "test-pii-token"  # noqa: S105
+
+
+@pytest.fixture(autouse=True)
+def _service_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The service refuses calls without its token; tests present this one."""
+    monkeypatch.setattr(settings, "service_token", TEST_TOKEN)
 
 
 @pytest.fixture
@@ -43,5 +53,10 @@ async def client(
     :yield: client for the app.
     """
     transport = ASGITransport(app=fastapi_app)
-    async with AsyncClient(transport=transport, base_url="http://test", timeout=2.0) as ac:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        timeout=2.0,
+        headers={"authorization": f"Bearer {TEST_TOKEN}"},
+    ) as ac:
         yield ac
