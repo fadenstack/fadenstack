@@ -83,7 +83,8 @@ no per-person list of MCP servers. You decide what runs with:
 - **Tool classes** under **Agents → Governance**: say whether a tool only reads, writes or deletes. The
   tool mode people pick in the chat acts on that class. A tool nobody classified always asks before it runs.
 - **An agent's server tools**: each agent gets what a chat gets, only the tools you list (such as
-  `mcp.github.*`), or none (see [Agents and add-ins](agents.md)).
+  `mcp.github.*`), or none (see [Agents and add-ins](agents.md)). The limit holds when a tool runs, not only
+  in what the model is offered: a call to a tool outside it is refused and never reaches the server.
 
 ## How people get the tools in a chat
 

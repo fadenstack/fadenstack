@@ -33,6 +33,7 @@ from typing import Any
 
 import yaml
 
+from faden_skills.services import safe_yaml
 from faden_skills.settings import settings
 
 SKILL_FILE = "SKILL.md"
@@ -160,11 +161,7 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
         if lines[i].strip() in {"---", "..."}:
             raw = "\n".join(lines[1:i])
             body = "\n".join(lines[i + 1 :]).strip()
-            try:
-                data = yaml.safe_load(raw) if raw.strip() else {}
-            except yaml.YAMLError as exc:
-                msg = f"The frontmatter is not valid YAML: {exc}"
-                raise BundleError(msg) from exc
+            data = _load_yaml(raw, "The frontmatter") if raw.strip() else {}
             if data is None:
                 data = {}
             if not isinstance(data, dict):
@@ -206,12 +203,7 @@ def to_markdown(bundle: SkillBundle) -> str:
     """The bundle's ``SKILL.md``."""
     fm: dict[str, Any] = {"name": bundle.name, "description": bundle.description}
     fm.update(bundle.frontmatter)
-    head = yaml.safe_dump(
-        fm,
-        default_flow_style=False,
-        allow_unicode=True,
-        sort_keys=False,
-    ).strip()
+    head = safe_yaml.dump(fm).strip()
     return f"---\n{head}\n---\n\n{bundle.body.strip()}\n"
 
 
@@ -264,12 +256,7 @@ def extension_yaml(bundle: SkillBundle) -> str | None:
     data = {**bundle.catalog, **bundle.manifest}
     if not data:
         return None
-    return yaml.safe_dump(
-        data,
-        default_flow_style=False,
-        allow_unicode=True,
-        sort_keys=False,
-    )
+    return safe_yaml.dump(data)
 
 
 def normalize_manifest(manifest: dict[str, Any] | None) -> dict[str, Any]:
@@ -388,16 +375,24 @@ def _find_root(members: list[str]) -> str:
     return top[: -len(SKILL_FILE)]
 
 
+def _load_yaml(text: str, what: str) -> Any:
+    """The value of the YAML in *text*, read with the limits of :mod:`safe_yaml`; a clear error if it breaks one."""
+    try:
+        return safe_yaml.load(text)
+    except yaml.YAMLError as exc:
+        msg = f"{what} is not valid YAML: {exc}"
+        raise BundleError(msg) from exc
+    except safe_yaml.YamlRefused as exc:
+        msg = f"{what} is not accepted: {exc}"
+        raise BundleError(msg) from exc
+
+
 def _clean_member(name: str) -> str:
     return name.replace("\\", "/")
 
 
 def _load_extension(text: str) -> dict[str, Any]:
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        msg = f"{EXTENSION_FILE} is not valid YAML: {exc}"
-        raise BundleError(msg) from exc
+    data = _load_yaml(text, EXTENSION_FILE)
     if data is None:
         return {}
     if not isinstance(data, dict):

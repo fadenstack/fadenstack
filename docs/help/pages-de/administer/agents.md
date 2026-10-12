@@ -62,6 +62,14 @@ Die Seite des Agenten öffnet sich. Sein Status in der Liste ist **Entwurf**, **
 | **Aktivität** | Nutzung über einen Zeitraum (Anfragen, Fehler, Tokens, Benutzer, Unterhaltungen: nur Zahlen, nie Inhalte), was die Anwendungen gemeldet haben (ausgeführte Tools, Zustimmungen) und **Angemeldete Geräte**. |
 | **Apps** | Was die Anwendungen mitbringen, verglichen mit der Version des Agenten (siehe [Wenn eine Anwendung neue Tools mitbringt](#when-an-application-brings-new-tools)). |
 
+??? info "Mehr zu Server-Tools"
+    **Nur diese** nimmt Namen oder Muster (`mcp.github.*`, `knowledge_search`, `current_time`,
+    `get_available_tools`); **Keine** führt nichts auf. Die Begrenzung gilt für jedes Tool, das das Gateway für den
+    Agenten ausführt: MCP-Tools, die Wissenssuche, an die Unterhaltung angehängte Dateien und die System-Tools. Ein
+    Tool außerhalb davon wird nicht angeboten, von der Tool-Suche nicht gefunden und mit einem Fehler abgelehnt,
+    wenn das Modell (oder Text, den die Anwendung einspeist) es trotzdem nennt. Die eigenen Tools der Anwendung
+    (**Host-Tools**) und die Dateien eines Skills, den der Agent nutzt, bleiben unberührt.
+
 ??? info "Mehr zu lokalen MCP-Servern"
     **Lokale MCP-Server**: **Nicht erlaubt** (die Voreinstellung) beschränkt den Agenten auf die Tools des Servers
     und die Tools der Anwendung, die seine Version unter **Host-Tools** nennt; eine Version, die keine nennt, hält

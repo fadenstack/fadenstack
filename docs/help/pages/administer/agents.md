@@ -59,6 +59,14 @@ The agent's page opens. Its list status is **Draft**, **Published** or **Retired
 | **Activity** | Usage over a time range (requests, errors, tokens, users, conversations: counts only, never content), what the applications reported (tools that ran, approvals), and the **Signed-in devices**. |
 | **Apps** | What the applications bring, compared with the agent's version (see [When an application brings new tools](#when-an-application-brings-new-tools)). |
 
+??? info "More about server tools"
+    **Only these** takes names or patterns (`mcp.github.*`, `knowledge_search`, `current_time`,
+    `get_available_tools`); **None** lists nothing. The limit covers every tool the gateway runs for the agent:
+    MCP tools, knowledge search, files attached to the conversation and the system tools. A tool outside it is
+    not offered, is not found by the tool search, and is refused with an error if the model (or text the
+    application passes in) names it anyway. The application's own tools (**Host tools**) and the files of a
+    skill the agent uses are not affected.
+
 ??? info "More about local MCP servers"
     **Local MCP servers**: **Not allowed** (the default) keeps the agent to the server's tools and the
     application tools its version lists under **Host tools**; a version that lists none holds nothing back, but

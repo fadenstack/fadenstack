@@ -48,6 +48,17 @@ _OPENAI_PARAMS = (
 )
 #: vLLM's field for a chat template's own switches (Qwen's ``enable_thinking``, ...).
 _TEMPLATE_KWARGS = "chat_template_kwargs"
+#: The template switches a client may set. Anything in ``chat_template_kwargs`` is a variable of the model's
+#: Jinja template, so an unlisted key could change what the template renders -- the system prompt, the tool list
+#: or the turn it ends on. These only turn reasoning on, off or down: Qwen's ``enable_thinking`` (what Fadenstack
+#: itself sets for ``reasoning_effort`` "none", and what the .NET SDK's LiveCheck sample sends), DeepSeek and
+#: GLM's ``thinking`` and ``clear_thinking``, Qwen's ``preserve_thinking`` and ``thinking_budget``, gpt-oss's
+#: ``reasoning_effort``.
+_TEMPLATE_SWITCHES = frozenset(
+    {"enable_thinking", "thinking", "thinking_budget", "preserve_thinking", "clear_thinking", "reasoning_effort"},
+)
+#: How long a switch's text value may be ("low", "high", "enabled"): a switch is a word, not a prompt.
+_SWITCH_TEXT_MAX = 32
 #: The ``reasoning_effort`` values vLLM accepts: it validates the field.
 _VLLM_EFFORTS = frozenset({"low", "medium", "high"})
 #: What the body of a direct streamed chat is made of.
@@ -77,6 +88,34 @@ _EFFORT_INSTEAD: dict[tuple[str, str], str] = {}
 _RETRIES = 3
 
 
+def _template_switches(given: Any) -> dict[str, Any]:
+    """The part of a client's ``chat_template_kwargs`` that is a known, harmless switch.
+
+    The rest is dropped (and logged at debug level) rather than refused: a client
+    written for another server may send more than this one takes, and the request
+    is still a good one without it.
+    """
+    if not isinstance(given, dict):
+        return {}
+    kept = {
+        key: value for key, value in given.items()
+        if key in _TEMPLATE_SWITCHES and _is_switch_value(value)
+    }
+    if len(kept) != len(given):
+        logger.debug(
+            "Dropped chat_template_kwargs the gateway does not pass on: %s",
+            sorted(str(key)[:64] for key in given if key not in kept),
+        )
+    return kept
+
+
+def _is_switch_value(value: Any) -> bool:
+    """Whether *value* is a switch's: a flag, a number or a short word, never a structure or a prompt."""
+    if isinstance(value, bool | int | float):
+        return True
+    return isinstance(value, str) and len(value) <= _SWITCH_TEXT_MAX
+
+
 def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str, Any]:
     """How much the model reasons, in the form its server understands.
 
@@ -93,8 +132,7 @@ def _reasoning(payload: dict[str, Any], provider_type: ProviderType) -> dict[str
     effort = effort.lower() if isinstance(effort, str) and effort else None
     if provider_type != ProviderType.VLLM:
         return {"reasoning_effort": effort} if effort else {}
-    given = payload.get(_TEMPLATE_KWARGS)
-    template: dict[str, Any] = dict(given) if isinstance(given, dict) else {}
+    template = _template_switches(payload.get(_TEMPLATE_KWARGS))
     out: dict[str, Any] = {}
     if effort in ("none", "minimal"):
         template.setdefault("enable_thinking", False)
