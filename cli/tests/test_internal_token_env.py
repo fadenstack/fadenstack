@@ -45,7 +45,7 @@ PII_GROUP = (
 
 
 def test_a_new_install_gets_one_pii_service_token_apart_from_the_internal_one() -> None:
-    env = default_env_vars(admin_password="x")
+    env = default_env_vars()
     assert env[PII_GROUP[0]]
     assert len({env[key] for key in PII_GROUP}) == 1, "callers and receiver hold one value"
     assert env[PII_GROUP[0]] != env[BACKEND], "the internal token is the backend's, not the PII service's"
@@ -55,7 +55,7 @@ def test_an_upgrade_adds_the_pii_tokens_and_keeps_them_after(tmp_path: Path) -> 
     from faden_cli.core.env_gen import fill_required_env
 
     path = tmp_path / ".env"
-    values = {k: v for k, v in default_env_vars(admin_password="x").items() if k not in PII_GROUP}
+    values = {k: v for k, v in default_env_vars().items() if k not in PII_GROUP}
     write_env_file(path, values)
 
     fill_required_env(path)
@@ -64,7 +64,7 @@ def test_an_upgrade_adds_the_pii_tokens_and_keeps_them_after(tmp_path: Path) -> 
 
     # A second upgrade, and a regenerated file, keep it.
     fill_required_env(path)
-    write_env_file(path, default_env_vars(admin_password="x"), preserve_secrets=True)
+    write_env_file(path, default_env_vars(), preserve_secrets=True)
     assert {read_env_file(path)[key] for key in PII_GROUP} == {first[PII_GROUP[0]]}
 
 
