@@ -91,7 +91,7 @@ class FakeDocker:
 
     def __init__(self) -> None:
         self.container = True
-        self.mounts = "/srv/faden/models\n"
+        self.mounts = "sha256:oldgateway /srv/faden/models\n"
         self.volumes: set[str] = set()
         self.volume_full = False
         self.calls: list[list[str]] = []
@@ -150,6 +150,8 @@ def test_the_old_containers_files_go_into_the_new_volume(docker: FakeDocker) -> 
     (run,) = docker.runs()
     assert "fadenstack_faden_chat_files:/dst" in run
     assert "ls -A /dst" in run[-1]  # written only into an empty volume
+    # The old gateway's own image writes: on the server already, so an air-gapped one pulls nothing.
+    assert "sha256:oldgateway" in run and "alpine" not in run
 
 
 def test_an_existing_empty_volume_is_used_without_creating_one(docker: FakeDocker) -> None:
@@ -164,7 +166,7 @@ def test_a_volume_with_files_is_left_alone(docker: FakeDocker) -> None:
 
 
 def test_a_container_that_already_has_the_mount_is_not_copied(docker: FakeDocker) -> None:
-    docker.mounts = "/data/faden/chat-files\n"
+    docker.mounts = "sha256:oldgateway /data/faden/chat-files\n"
     assert backup.carry_over_chat_files() == "present"
     assert not docker.runs()
 

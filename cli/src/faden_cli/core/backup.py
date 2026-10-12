@@ -365,13 +365,14 @@ def carry_over_chat_files(data_dir: str = "") -> str:
     """
     docker = _docker_bin()
     proc = subprocess.run(  # noqa: S603
-        [docker, "inspect", "-f", "{{range .Mounts}}{{.Destination}} {{end}}", _GATEWAY_CONTAINER],
+        [docker, "inspect", "-f", "{{.Image}} {{range .Mounts}}{{.Destination}} {{end}}", _GATEWAY_CONTAINER],
         capture_output=True,
         check=False,
     )
     if proc.returncode != 0:
         return "none"
-    if _CHAT_FILES_PATH in proc.stdout.decode("utf-8", errors="replace").split():
+    image, *mounts = proc.stdout.decode("utf-8", errors="replace").split()
+    if _CHAT_FILES_PATH in mounts:
         return "present"
     project = _compose_project(docker) or _DEFAULT_PROJECT
     target = _volume_source(docker, project, "faden_chat_files", data_dir)
@@ -397,12 +398,14 @@ def carry_over_chat_files(data_dir: str = "") -> str:
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
+    # The writer runs the old gateway's own image: it is on the server already (an air-gapped one pulls
+    # nothing) and has sh and tar. As root, to write into the volume whatever user the image runs as.
     writer = subprocess.run(  # noqa: S603
         [
-            docker, "run", "--rm", "-i",
+            docker, "run", "--rm", "-i", "--user", "0:0", "--entrypoint", "sh",
             "-v", f"{target}:/dst",
-            "alpine",
-            "sh", "-c", 'if [ -n "$(ls -A /dst)" ]; then exit 3; fi; tar xf - -C /dst',
+            image,
+            "-c", 'if [ -n "$(ls -A /dst)" ]; then exit 3; fi; tar xf - -C /dst',
         ],
         stdin=reader.stdout,
         capture_output=True,
