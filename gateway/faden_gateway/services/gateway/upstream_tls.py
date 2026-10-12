@@ -24,7 +24,6 @@ under httpx.
 
 from __future__ import annotations
 
-import base64
 import contextlib
 import hashlib
 import logging
@@ -249,14 +248,16 @@ clients = UpstreamClients()
 
 
 def _unseal_client_key(token: str) -> str:
-    from cryptography.fernet import Fernet  # noqa: PLC0415
-    from cryptography.hazmat.primitives import hashes  # noqa: PLC0415
-    from cryptography.hazmat.primitives.kdf.hkdf import HKDF  # noqa: PLC0415
+    from cryptography.fernet import Fernet, MultiFernet  # noqa: PLC0415
 
-    raw = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=_CLIENT_KEY_PURPOSE.encode()).derive(
-        settings.settings_master_key.encode(),
-    )
-    return Fernet(base64.urlsafe_b64encode(raw)).decrypt(token.encode("ascii")).decode("ascii")
+    from faden_gateway.db.crypto import derive_fernet  # noqa: PLC0415
+
+    # The backend sealed it; while a rotation is unfinished it may have done so with the previous key.
+    keys: list[Fernet] = [derive_fernet(settings.settings_master_key, _CLIENT_KEY_PURPOSE)]
+    previous = settings.settings_master_key_previous
+    if previous and previous != settings.settings_master_key:
+        keys.append(derive_fernet(previous, _CLIENT_KEY_PURPOSE))
+    return MultiFernet(keys).decrypt(token.encode("ascii")).decode("ascii")
 
 
 async def _read_backend() -> tuple[list[str], Any] | None:

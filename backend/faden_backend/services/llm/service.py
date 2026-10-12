@@ -1367,7 +1367,7 @@ class LLMService:
         dao = NodeControlDAO(session)
         return NodeControlService(
             dao=dao,
-            pepper=settings.settings_master_key,
+            pepper=settings.machine_pepper,
             enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
             default_command_timeout_sec=settings.node_command_default_timeout_sec,
             gateway_sync=self.gateway_sync,

@@ -794,7 +794,7 @@ async def secret_app(
     await dao.create_credential(
         node_id=node.id,
         credential_id=cred_id,
-        secret_hash=hash_with_pepper(secret, pepper=settings.settings_master_key),
+        secret_hash=hash_with_pepper(secret, pepper=settings.machine_pepper),
     )
     await dbsession.commit()
 

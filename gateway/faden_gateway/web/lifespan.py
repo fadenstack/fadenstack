@@ -273,7 +273,7 @@ async def lifespan_setup(
     from faden_gateway.db.crypto import configure as configure_crypto
 
     app.middleware_stack = None
-    configure_crypto(settings.encryption_key)
+    configure_crypto(settings.encryption_key, settings.encryption_key_previous)
 
     # Configure LiteLLM module defaults
     import litellm as _litellm  # noqa: PLC0415

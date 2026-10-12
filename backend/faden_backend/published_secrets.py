@@ -31,13 +31,18 @@ MASTER_KEY_REFUSED = (
     "faden deploy writes one.\n"
     "  - An install that has already run on it sealed its stored secrets with this key, and no other key reads "
     "them. To keep them, leave the key as it is, set FADEN_ALLOW_PUBLISHED_KEYS=true in .env, and change the "
-    "key later as Help describes (Installing, Secrets in .env)."
+    "key later with `faden secrets rotate` (Help: Rotating the keys)."
+)
+
+ROTATION_UNFINISHED = (
+    "A key rotation is unfinished: the previous settings master key is still set, and values sealed with it "
+    "still open. Run `faden secrets rotate` again to finish it."
 )
 
 MASTER_KEY_KEPT = (
     "This install runs on the published development settings master key (FADEN_ALLOW_PUBLISHED_KEYS=true): "
-    "anyone could read the secrets it stores. Change FADEN_BACKEND_SETTINGS_MASTER_KEY as Help describes "
-    "(Installing, Secrets in .env)."
+    "anyone could read the secrets it stores. Change FADEN_BACKEND_SETTINGS_MASTER_KEY with `faden secrets rotate` "
+    "(Help: Rotating the keys)."
 )
 
 
@@ -73,3 +78,5 @@ def refuse_published_secrets(settings: Settings) -> None:
         raise SystemExit("The backend does not start:\n" + "\n".join(f"* {problem}" for problem in found))
     if settings.environment != "dev" and settings.settings_master_key in PUBLISHED_MASTER_KEYS:
         log.warning(MASTER_KEY_KEPT)
+    if settings.settings_master_key_previous:
+        log.warning(ROTATION_UNFINISHED)

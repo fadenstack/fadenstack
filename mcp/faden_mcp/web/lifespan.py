@@ -166,7 +166,7 @@ async def lifespan_setup(
     app.middleware_stack = None
 
     # Encryption
-    crypto.configure(settings.encryption_key)
+    crypto.configure(settings.encryption_key, settings.encryption_key_previous)
 
     await check_connection_budget(
         engine,

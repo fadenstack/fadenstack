@@ -392,7 +392,7 @@ async def search(
     # As they are now, not as this process last heard: with several workers,
     # a settings change reaches only the one that handled it.
     await refresh_runtime_values(chunk_dao.session, prefix="rag_lite.")
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
     pref_id_str = settings.rag_lite_embedding_provider_id
     pref_id = uuid.UUID(pref_id_str) if pref_id_str else None
 
@@ -721,7 +721,7 @@ async def _get_completion_client(session: Any) -> Any:
     from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
     from faden_backend.settings import settings  # noqa: PLC0415
 
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
     return await CompletionClient.auto_detect(session, crypto=crypto)
 
 
@@ -811,7 +811,7 @@ async def graph_search(
     # As they are now, not as this process last heard: with several workers,
     # a settings change reaches only the one that handled it.
     await refresh_runtime_values(chunk_dao.session, prefix="rag_lite.")
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
     pref_id_str = settings.rag_lite_embedding_provider_id
     pref_id = uuid.UUID(pref_id_str) if pref_id_str else None
 

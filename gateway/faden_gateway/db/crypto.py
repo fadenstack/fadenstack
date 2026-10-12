@@ -38,9 +38,9 @@ import json
 import logging
 from typing import Any, Callable
 
-from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from sqlalchemy import Text
 from sqlalchemy.types import TypeDecorator
 
@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 _key_provider: Callable[[str], bytes] | None = None
 """Return 32 bytes of key material for a given *purpose* label."""
 
+_previous_provider: Callable[[str], bytes] | None = None
+"""The same for the key from before ``faden secrets rotate``, while a rotation is unfinished."""
+
 _FERNET_PREFIX = b"gAAAAA"
 """All Fernet tokens start with this prefix (version byte 0x80 → 'gA')."""
 
@@ -58,11 +61,29 @@ _FERNET_PREFIX = b"gAAAAA"
 # Public API ------------------------------------------------------------
 
 
-def configure(master_key: str) -> None:
+def derive_key(master_key: str, purpose: str) -> bytes:
+    """The 32 bytes of key material HKDF-SHA256 derives from *master_key* for *purpose*."""
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=purpose.encode("utf-8"),
+    ).derive(master_key.encode("utf-8"))
+
+
+def derive_fernet(master_key: str, purpose: str) -> Fernet:
+    """The Fernet for *purpose* under *master_key*."""
+    return Fernet(base64.urlsafe_b64encode(derive_key(master_key, purpose)))
+
+
+def configure(master_key: str, previous_key: str = "") -> None:
     """Derive per-purpose encryption keys from *master_key* via HKDF.
 
     Must be called once during app startup.  If *master_key* is empty,
     encryption is disabled (plaintext passthrough).
+
+    *previous_key* is the key from before a rotation (``faden secrets rotate``): what it sealed still
+    opens, and everything new is sealed with *master_key*.
     """
     if not master_key:
         logger.warning(
@@ -71,31 +92,28 @@ def configure(master_key: str) -> None:
         )
         return
 
-    raw = master_key.encode("utf-8")
-
-    def _derive(purpose: str) -> bytes:
-        return HKDF(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=None,
-            info=purpose.encode("utf-8"),
-        ).derive(raw)
-
-    set_key_provider(_derive)
+    previous = previous_key if previous_key and previous_key != master_key else ""
+    set_key_provider(
+        lambda purpose: derive_key(master_key, purpose),
+        previous=(lambda purpose: derive_key(previous, purpose)) if previous else None,
+    )
 
 
-def set_key_provider(provider: Callable[[str], bytes]) -> None:
+def set_key_provider(provider: Callable[[str], bytes], previous: Callable[[str], bytes] | None = None) -> None:
     """Replace the key provider (used by EE Vault integration)."""
-    global _key_provider  # noqa: PLW0603
+    global _key_provider, _previous_provider  # noqa: PLW0603
     _key_provider = provider
+    _previous_provider = previous
 
 
-def _fernet_for(purpose: str) -> Fernet | None:
-    """Return a Fernet instance keyed for *purpose*, or ``None``."""
+def _fernet_for(purpose: str) -> Fernet | MultiFernet | None:
+    """Return a Fernet instance keyed for *purpose* (opening the previous key's values too), or ``None``."""
     if _key_provider is None:
         return None
-    raw = _key_provider(purpose)
-    return Fernet(base64.urlsafe_b64encode(raw))
+    current = Fernet(base64.urlsafe_b64encode(_key_provider(purpose)))
+    if _previous_provider is None:
+        return current
+    return MultiFernet([current, Fernet(base64.urlsafe_b64encode(_previous_provider(purpose)))])
 
 
 def seal(purpose: str, data: bytes) -> bytes | None:
@@ -251,5 +269,20 @@ def decrypt_provider_key(stored: str) -> str:
 
     if not settings.settings_master_key:
         raise InvalidToken("FADEN_GATEWAY_SETTINGS_MASTER_KEY is empty; cannot decrypt the provider API key")
-    digest = hashlib.sha256(settings.settings_master_key.encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(digest)).decrypt(stored.encode("ascii")).decode("utf-8")
+    return settings_fernet().decrypt(stored.encode("ascii")).decode("utf-8")
+
+
+def settings_fernet_for(master_key: str) -> Fernet:
+    """The Fernet the backend's ``SettingsCrypto`` derives from *master_key*: sha256, no purpose label."""
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(master_key.encode("utf-8")).digest()))
+
+
+def settings_fernet() -> MultiFernet:
+    """Opens what the backend sealed with the settings master key, or with the previous one while a rotation is unfinished."""
+    from faden_gateway.settings import settings  # noqa: PLC0415
+
+    keys = [settings_fernet_for(settings.settings_master_key)]
+    previous = settings.settings_master_key_previous
+    if previous and previous != settings.settings_master_key:
+        keys.append(settings_fernet_for(previous))
+    return MultiFernet(keys)

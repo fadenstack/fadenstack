@@ -60,7 +60,7 @@ async def _authenticate_node(request: Request) -> InfraNode:
         dao = NodeControlDAO(session)
         service = NodeControlService(
             dao=dao,
-            pepper=settings.settings_master_key,
+            pepper=settings.machine_pepper,
             enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
             default_command_timeout_sec=settings.node_command_default_timeout_sec,
         )

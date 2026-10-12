@@ -71,7 +71,7 @@ def _crypto() -> Any:
     from faden_backend.services.system_settings.crypto import SettingsCrypto  # noqa: PLC0415
     from faden_backend.settings import settings  # noqa: PLC0415
 
-    return SettingsCrypto(settings.settings_master_key)
+    return SettingsCrypto.from_settings()
 
 
 def _env_token() -> str | None:

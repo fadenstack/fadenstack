@@ -88,7 +88,7 @@ def get_system_settings_service(
     docker = getattr(request.app.state, "docker", None)
     if docker is None:
         docker = DockerService()
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
     local_executor = LocalApplyExecutor(
         docker,
         compose_file=settings.system_compose_file,
@@ -112,7 +112,7 @@ def get_node_control_service(
     gateway_sync = getattr(llm_service, "gateway_sync", None)
     return NodeControlService(
         dao=dao,
-        pepper=settings.settings_master_key,
+        pepper=settings.machine_pepper,
         enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
         default_command_timeout_sec=settings.node_command_default_timeout_sec,
         gateway_sync=gateway_sync,
@@ -1123,7 +1123,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
     dao = NodeControlDAO(session)
     service = NodeControlService(
         dao=dao,
-        pepper=settings.settings_master_key,
+        pepper=settings.machine_pepper,
         enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
         default_command_timeout_sec=settings.node_command_default_timeout_sec,
         gateway_sync=getattr(getattr(websocket.app.state, "llm_service", None), "gateway_sync", None),
