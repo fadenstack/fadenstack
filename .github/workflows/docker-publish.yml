@@ -44,7 +44,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   REGISTRY: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
@@ -108,6 +107,9 @@ jobs:
   # ── Build base image first ────────────────────────────────────────
   base:
     needs: changes
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: base
@@ -123,6 +125,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'gateway'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: gateway
@@ -140,6 +145,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'backend'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: backend
@@ -159,6 +167,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'frontend'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: frontend
@@ -175,6 +186,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'pii'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: pii
@@ -192,6 +206,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'mcp'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: mcp
@@ -209,6 +226,9 @@ jobs:
       startsWith(github.ref, 'refs/tags/v') ||
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'skills'))
+    permissions:
+      contents: read
+      packages: write  # the reusable workflow pushes to GHCR
     uses: ./.github/workflows/docker-build-reusable.yml
     with:
       service: skills

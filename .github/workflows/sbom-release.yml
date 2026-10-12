@@ -31,12 +31,14 @@ on:
         type: string
 
 permissions:
-  contents: write
-  packages: read
+  contents: read
 
 jobs:
   sbom:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # attaches the SBOMs to the release
+      packages: read   # syft reads the images from GHCR
     steps:
       - name: Validate release identity
         shell: bash
