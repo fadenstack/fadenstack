@@ -352,6 +352,9 @@ services:
       FADEN_GATEWAY_DB_USER: ${POSTGRES_USER:-postgres}
       FADEN_GATEWAY_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_GATEWAY_DB_BASE: faden_gateway
+      # The migration that seals the provider API keys (pr0vk3yg) uses the backend's master key; without it
+      # the migrator used the published development default.
+      FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
 
   # -----------------------------
   # faden_gateway (OpenAI-compatible endpoint gateway)
@@ -392,6 +395,9 @@ services:
       # These two env vars enable that path; no static JWT_SECRET env var is needed.
       FADEN_GATEWAY_BACKEND_DB_BASE: faden_backend
       FADEN_GATEWAY_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # Set only while `faden secrets rotate` is unfinished: values sealed with the old key still open.
+      FADEN_GATEWAY_SETTINGS_MASTER_KEY_PREVIOUS: ${FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS:-}
+      FADEN_GATEWAY_ENCRYPTION_KEY_PREVIOUS: ${FADEN_GATEWAY_ENCRYPTION_KEY_PREVIOUS:-}
       # An install that has stored data under the published development key may
       # keep it, with a warning at every start, until it is changed (Help:
       # Installing, Secrets in .env). Outside development the service refuses it otherwise.
@@ -481,6 +487,9 @@ services:
       FADEN_BACKEND_DB_USER: ${POSTGRES_USER:-postgres}
       FADEN_BACKEND_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
       FADEN_BACKEND_DB_BASE: faden_backend
+      # The migration that seals the remote providers' API keys (pr0vk3ys) seals them with this key.
+      # Without it the migrator used the published development default, and the backend could not open them.
+      FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
 
   faden-backend:
     image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
@@ -532,6 +541,11 @@ services:
       FADEN_BACKEND_RABBIT_VHOST: /
       FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
       FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # Set only while `faden secrets rotate` is unfinished: values sealed with the old key still open.
+      FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS: ${FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS:-}
+      # What the machines' credential hashes are keyed with. Once the master key itself; a rotation
+      # changes the master key and must not change this, or every machine would have to enroll again.
+      FADEN_BACKEND_CREDENTIAL_PEPPER: ${FADEN_BACKEND_CREDENTIAL_PEPPER:?set it in .env, as faden upgrade does (it keeps the machines' credentials valid; Help, Rotating the keys)}
       # An install that has stored data under the published development key may
       # keep it, with a warning at every start, until it is changed (Help:
       # Installing, Secrets in .env). Outside development the service refuses it otherwise.
@@ -650,6 +664,11 @@ services:
       FADEN_BACKEND_RABBIT_VHOST: /
       FADEN_BACKEND_GATEWAY_URL: ${FADEN_BACKEND_GATEWAY_URL:-http://faden-gateway:8000}
       FADEN_BACKEND_SETTINGS_MASTER_KEY: ${FADEN_BACKEND_SETTINGS_MASTER_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      # Set only while `faden secrets rotate` is unfinished: values sealed with the old key still open.
+      FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS: ${FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS:-}
+      # What the machines' credential hashes are keyed with. Once the master key itself; a rotation
+      # changes the master key and must not change this, or every machine would have to enroll again.
+      FADEN_BACKEND_CREDENTIAL_PEPPER: ${FADEN_BACKEND_CREDENTIAL_PEPPER:?set it in .env, as faden upgrade does (it keeps the machines' credentials valid; Help, Rotating the keys)}
       FADEN_BACKEND_LLM_GRAPH_DB_HOST: postgres
       FADEN_BACKEND_LLM_GRAPH_DB_USER: ${POSTGRES_USER:-postgres}
       FADEN_BACKEND_LLM_GRAPH_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
@@ -831,6 +850,7 @@ services:
       FADEN_MCP_PII_SERVICE_URL: ${FADEN_MCP_PII_SERVICE_URL:-http://faden-pii:8000}
       FADEN_MCP_SERVICE_TOKEN: ${FADEN_MCP_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_MCP_ENCRYPTION_KEY: ${FADEN_MCP_ENCRYPTION_KEY:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      FADEN_MCP_ENCRYPTION_KEY_PREVIOUS: ${FADEN_MCP_ENCRYPTION_KEY_PREVIOUS:-}
       # An install that has stored data under the published development key may
       # keep it, with a warning at every start, until it is changed (Help:
       # Installing, Secrets in .env). Outside development the service refuses it otherwise.
