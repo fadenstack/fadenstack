@@ -92,7 +92,7 @@ def test_a_missing_master_key_keeps_the_value_the_install_ran_on(tmp_path: Path)
     assert after["FADEN_BACKEND_SETTINGS_MASTER_KEY"] == "dev-settings-master-key-change-me"
     assert after[ALLOW_PUBLISHED_KEYS] == "true", "or the backend refuses to start on it"
     assert after["HF_CACHE_DIR"] == "/srv/hf", "nothing else changes"
-    assert len(notes) == 1 and "Secrets in .env" in notes[0]
+    assert len(notes) == 1 and "faden secrets rotate" in notes[0]
 
 
 def test_mcp_s_key_is_kept_where_mcp_ran_and_random_where_it_did_not(tmp_path: Path) -> None:
@@ -156,3 +156,49 @@ def test_a_development_env_gets_the_development_values(tmp_path: Path) -> None:
     assert "FADEN_MCP_ENCRYPTION_KEY" not in added and after["FADEN_MCP_ENCRYPTION_KEY"] == "kept-as-it-is"
     assert after["FADEN_MCP_SERVICE_TOKEN"] == "dev-mcp-service-token"
     assert [key for key in REQUIRED_KEYS if not after.get(key)] == []
+
+
+def test_an_older_install_keeps_its_machines_connected_the_pepper_is_the_master_key(tmp_path: Path) -> None:
+    """The machines' credential hashes were keyed with the master key; the new setting must hold that value."""
+    env = _older(tmp_path, "FADEN_BACKEND_CREDENTIAL_PEPPER", FADEN_BACKEND_SETTINGS_MASTER_KEY="this-installs-own-master-key")
+
+    fill_required_env(env)
+
+    assert read_env_file(env)["FADEN_BACKEND_CREDENTIAL_PEPPER"] == "this-installs-own-master-key"
+
+
+def test_an_install_on_the_published_master_key_gets_that_as_its_pepper(tmp_path: Path) -> None:
+    env = _older(tmp_path, "FADEN_BACKEND_SETTINGS_MASTER_KEY", "FADEN_BACKEND_CREDENTIAL_PEPPER")
+
+    fill_required_env(env)
+
+    after = read_env_file(env)
+    assert after["FADEN_BACKEND_CREDENTIAL_PEPPER"] == after["FADEN_BACKEND_SETTINGS_MASTER_KEY"] == (
+        PUBLISHED_DATA_KEYS["FADEN_BACKEND_SETTINGS_MASTER_KEY"]
+    )
+
+
+def test_a_pepper_that_is_set_is_never_replaced(tmp_path: Path) -> None:
+    env = _older(tmp_path, FADEN_BACKEND_CREDENTIAL_PEPPER="the-pepper-from-before")
+
+    fill_required_env(env)
+
+    assert read_env_file(env)["FADEN_BACKEND_CREDENTIAL_PEPPER"] == "the-pepper-from-before"
+
+
+def test_a_new_install_gets_a_pepper_of_its_own() -> None:
+    values = default_env_vars(admin_password="x")
+    assert values["FADEN_BACKEND_CREDENTIAL_PEPPER"] != values["FADEN_BACKEND_SETTINGS_MASTER_KEY"]
+
+
+def test_regenerating_env_keeps_the_pepper(tmp_path: Path) -> None:
+    env = _older(tmp_path, FADEN_BACKEND_CREDENTIAL_PEPPER="the-pepper-from-before")
+    write_env_file(env, default_env_vars(admin_password="x"), preserve_secrets=True)
+    assert read_env_file(env)["FADEN_BACKEND_CREDENTIAL_PEPPER"] == "the-pepper-from-before"
+
+
+def test_a_development_env_gets_the_master_key_as_its_pepper(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    env.write_text("FADEN_BACKEND_SETTINGS_MASTER_KEY=a-dev-stacks-key\n", encoding="utf-8")
+    fill_dev_env(env)
+    assert read_env_file(env)["FADEN_BACKEND_CREDENTIAL_PEPPER"] == "a-dev-stacks-key"
