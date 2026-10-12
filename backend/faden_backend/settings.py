@@ -261,6 +261,9 @@ class Settings(BaseSettings):
     # PII module settings
     pii_enabled: bool = True
     pii_service_url: str = "http://127.0.0.1:8003/api"
+    # Presented to the PII service (Bearer): its FADEN_PII_SERVICE_TOKEN. The
+    # service refuses every call without it.
+    pii_service_token: str = ""
 
     # Mailer module settings
     mailer_enabled: bool = False

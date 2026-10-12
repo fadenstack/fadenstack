@@ -42,9 +42,14 @@ def _entity_types(report: Any) -> dict[str, int]:
 class PIIClient:
     """Async client wrapping PII service HTTP endpoints."""
 
-    def __init__(self, *, base_url: str, http_client: httpx.AsyncClient) -> None:
+    def __init__(self, *, base_url: str, http_client: httpx.AsyncClient, service_token: str = "") -> None:
         self._base = base_url.rstrip("/")
         self._http = http_client
+        # The PII service refuses a call without its token; none set, the call
+        # goes out bare and fails there (which the policy's fail_action handles).
+        self._headers = {"x-pii-source": "gateway"}
+        if service_token:
+            self._headers["Authorization"] = f"Bearer {service_token}"
 
     async def sanitize(
         self,
@@ -90,7 +95,7 @@ class PIIClient:
                 f"{self._base}/api/v1/pii/sanitize",
                 json=body,
                 timeout=10.0,
-                headers={"x-pii-source": "gateway"},
+                headers=self._headers,
             )
             resp.raise_for_status()
             data = resp.json()

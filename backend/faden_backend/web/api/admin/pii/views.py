@@ -154,6 +154,7 @@ async def get_pii_config_options(
     try:
         resp = await _get_pii_client().get(
             f"{_pii_url()}/v1/pii/options",
+            headers={"Authorization": f"Bearer {settings.pii_service_token}"} if settings.pii_service_token else {},
             timeout=8.0,
         )
         resp.raise_for_status()

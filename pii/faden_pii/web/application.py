@@ -3,7 +3,7 @@ from importlib import metadata
 from pathlib import Path
 
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -11,6 +11,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from faden_pii.log import configure_logging
 from faden_pii.settings import settings
+from faden_pii.web.api.auth import verify_service_token
 from faden_pii.web.api.router import api_router
 from faden_pii.web.lifespan import lifespan_setup
 
@@ -65,7 +66,7 @@ def get_app() -> FastAPI:
     # EE plugin routes are included FIRST so they shadow Core 402-gated
     # endpoints with enterprise implementations.
     if pii_plugin is not None:
-        app.include_router(router=pii_plugin.router())
+        app.include_router(router=pii_plugin.router(), dependencies=[Depends(verify_service_token)])
 
     # Main router for the API.
     app.include_router(router=api_router, prefix="/api")

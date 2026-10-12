@@ -59,9 +59,15 @@ class PrivacyProxy:
         *,
         pii_base_url: str,
         http_client: httpx.AsyncClient,
+        service_token: str = "",
     ) -> None:
         self._base = pii_base_url.rstrip("/")
         self._http = http_client
+        # The PII service refuses a call without its token. None set, the call
+        # fails there and is refused here like any other failed check.
+        self._headers = {"x-pii-source": "mcp-proxy"}
+        if service_token:
+            self._headers["Authorization"] = f"Bearer {service_token}"
 
     async def check(
         self,
@@ -121,7 +127,7 @@ class PrivacyProxy:
             f"{self._base}/api/v1/pii/sanitize",
             json=payload,
             timeout=10.0,
-            headers={"x-pii-source": "mcp-proxy"},
+            headers=self._headers,
         )
         resp.raise_for_status()
         data = resp.json()

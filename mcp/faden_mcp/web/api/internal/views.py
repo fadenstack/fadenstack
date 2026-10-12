@@ -87,7 +87,11 @@ def _get_privacy_proxy(request: Request) -> PrivacyProxy:
     from faden_mcp.settings import settings
 
     http_client = request.app.state.http_client
-    return PrivacyProxy(pii_base_url=settings.pii_service_url, http_client=http_client)
+    return PrivacyProxy(
+        pii_base_url=settings.pii_service_url,
+        http_client=http_client,
+        service_token=settings.pii_service_token,
+    )
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────

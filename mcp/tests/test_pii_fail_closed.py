@@ -251,3 +251,28 @@ async def test_an_allow_call_without_the_service_goes_through(
     result = await _call(manager, _answering({}))
     assert not result.is_error
     assert manager.sent == [ARGS]
+
+
+# ── The service token ─────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("token", "header"), [("pii-secret", "Bearer pii-secret"), ("", None)])
+async def test_the_proxy_presents_the_pii_service_token(token: str, header: str | None) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"entities_found": [], "sanitized_payload": {}})
+
+    proxy = PrivacyProxy(pii_base_url="http://pii", http_client=_client(handler), service_token=token)
+    assert (await proxy.check(arguments=ARGS, pii_mode="redact")).allowed
+    assert seen[0].headers.get("authorization") == header
+
+
+@pytest.mark.asyncio
+async def test_a_pii_service_that_refuses_the_token_refuses_the_call() -> None:
+    """Wrong or missing token at the service (401/403/503): the check could not run, so nothing is sent."""
+    for status in (401, 403, 503):
+        proxy = PrivacyProxy(pii_base_url="http://pii", http_client=_answering({"detail": "no"}, status))
+        assert _refused(await proxy.check(arguments=ARGS, pii_mode="redact"))
