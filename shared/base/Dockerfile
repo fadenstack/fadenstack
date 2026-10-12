@@ -40,10 +40,11 @@ ENV LOGURU_DIAGNOSE=NO
 
 WORKDIR /app/src
 
-# Pre-install common platform packages.  Each service's `uv sync --locked`
-# will adjust to its own lock file, but most packages will already be
-# at the right version — making the per-service build layer very small.
+# Pre-install common platform packages: exact versions, every file checked against the sha256
+# hashes in requirements.txt (made from requirements.in by relock.py, which keeps the versions
+# the services' uv.lock files pin). Each service's `uv sync --locked` still adjusts to its own
+# lock file, but most packages are already at the right version, so the per-service layer is small.
 COPY requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --compile-bytecode -r /tmp/requirements.txt \
+    uv pip install --system --compile-bytecode --require-hashes -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
