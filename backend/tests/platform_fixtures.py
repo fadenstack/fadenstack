@@ -24,6 +24,9 @@ DGX_SPARK_PLATFORM: dict[str, Any] = {
     "gpu_count": 1,
     "container_runtime": "docker",
     "docker_available": True,
+    # Where the model store and Ray's session directory live: the runtime
+    # container's /models and /tmp/ray come from these (``_NODE_MOUNT_POINTS``).
+    "paths": {"model_store": "/srv/faden/models", "ray_session": "/var/lib/faden/ray"},
 }
 
 #: An x86_64 workstation with an NVIDIA card. Resolves to the generic bundle.
@@ -34,6 +37,7 @@ X86_NVIDIA_PLATFORM: dict[str, Any] = {
     "gpu_count": 1,
     "container_runtime": "docker",
     "docker_available": True,
+    "paths": {"model_store": "/srv/faden/models", "ray_session": "/var/lib/faden/ray"},
 }
 
 

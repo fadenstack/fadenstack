@@ -1509,9 +1509,12 @@ class RayDeploymentManager:
             # one from the head's own bundle -- not from a bundle pinned on
             # the cluster, which on a mixed cluster belonged to nobody.
             bundle = facts.runtime_bundle
-            if bundle is not None and facts.runtime_mounts:
+            if bundle is not None:
+                # A runtime container sees only what is mounted into it. With
+                # no mount at all (a machine that reports no model store) the
+                # host path would be handed to Ray as it is and fail there.
                 translated = translate_host_path_to_container(
-                    host_root_path, facts.runtime_mounts
+                    host_root_path, facts.runtime_mounts or []
                 )
                 if translated:
                     facts.availability_root_path = translated
