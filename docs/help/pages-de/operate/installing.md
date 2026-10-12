@@ -164,6 +164,20 @@ die Sie in Grafana lesen, liegen in Loki und werden nicht wegrotiert: Alloy lies
 Docker und liest über eine Rotation hinweg weiter. Wählen Sie die Grenzen großzügig, denn Docker behält nur, was
 hineinpasst, und Alloy muss laufen, um eine Zeile zu sammeln.
 
+### Redis-Speicher {#redis-memory}
+
+Redis hält kurzlebige Daten: die laufenden Ereignisse von Chat-Antworten, Zähler für Ratenbegrenzungen, die
+Anwesenheit von Geräten und, bei eingeschaltetem Tracing, die Job-Warteschlangen von Langfuse. Es ist auf 1 GB
+begrenzt, damit ein Fehler nicht den Speicher des Servers füllt. An der Grenze verwirft Redis keine Daten, sondern
+lehnt neue Schreibvorgänge ab: Das Gateway arbeitet dann ohne die gemeinsame Kopie der Ereignisse einer Antwort weiter
+(eine Seite, die mitten in einer Antwort zurückkommt, findet sie vielleicht nicht), und eine Anfrage mit gesetzter
+Ratenbegrenzung kann fehlschlagen, bis wieder Speicher frei ist. Ändern Sie die Grenze in der `.env` und führen Sie
+danach `faden upgrade` oder `faden rebuild` aus:
+
+```bash
+FADEN_REDIS_MAXMEMORY=1gb
+```
+
 Einstellungen, die Sie ändern, gehören in die `.env`. Die anderen Dateien der Installation, z. B.
 `nginx/nginx.conf`, werden beim nächsten Upgrade ersetzt.
 

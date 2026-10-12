@@ -153,6 +153,18 @@ Then run `faden upgrade` or `faden rebuild` so the containers are recreated with
 are kept in Loki and are not rotated away: Alloy reads each container's log through Docker, which carries on across
 a rotation. Keep the limits generous, as Docker keeps only what fits in them and Alloy has to be running to collect a line.
 
+### Redis memory
+
+Redis holds short-lived data: the live events of chat replies, rate-limit counters, device presence, and
+Langfuse's job queues when tracing is on. It is capped at 1 GB so a fault cannot fill the server's memory. At the cap
+Redis does not drop data, it refuses new writes: the gateway then goes on without the shared copy of a reply's events
+(a page that comes back mid-reply may not find them), and a request with a rate limit set may fail until memory is
+free. Change the cap in `.env`, then run `faden upgrade` or `faden rebuild`:
+
+```bash
+FADEN_REDIS_MAXMEMORY=1gb
+```
+
 Settings you change belong in `.env`. The other deployment files, such as `nginx/nginx.conf`, are replaced by the
 next upgrade.
 
