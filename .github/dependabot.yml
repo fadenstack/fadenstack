@@ -1,0 +1,162 @@
+# Dependabot: weekly, one grouped pull request per ecosystem and folder.
+# Security updates are separate and open on their own when an advisory lands.
+version: 2
+
+updates:
+  # ── Workflows: the SHA-pinned actions (the version comment is updated too) ──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /agent
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-agent:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-backend:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /gateway
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-gateway:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-mcp:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /pii
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-pii:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /skills
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-skills:
+        patterns: ["*"]
+
+  # The CLI has a pyproject but no uv.lock.
+  - package-ecosystem: pip
+    directory: /cli
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      python-cli:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+      frontend-major:
+        update-types: [major]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-backend:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-frontend:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /gateway
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-gateway:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-mcp:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /pii
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-pii:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /skills
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-skills:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /shared/base
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-shared-base:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /runtime-image
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      docker-runtime-image:
+        patterns: ["*"]
+
