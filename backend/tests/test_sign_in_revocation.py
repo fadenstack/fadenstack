@@ -124,6 +124,9 @@ async def test_a_password_change_ends_every_sign_in_and_renews_the_browsers(
     assert r.status_code == 204, r.text
     renewed = r.cookies.get("fapiauth")
     assert renewed and renewed != browser, "this browser stays signed in, with a new sign-in"
+    # The client keeps the renewed cookie where it may send it (no Secure flag with
+    # FADEN_BACKEND_COOKIE_SECURE=false); the checks below must see only the sign-in they name.
+    client.cookies.clear()
 
     assert await _me(client, browser, as_cookie=True) == 401
     assert await _me(client, app) == 401
