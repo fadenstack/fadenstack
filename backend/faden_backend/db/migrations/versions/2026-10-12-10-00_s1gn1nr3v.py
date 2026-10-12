@@ -5,7 +5,7 @@ one a logout ended until it would have expired. Sign-ins made before this carry 
 owners sign in again.
 
 Revision ID: s1gn1nr3v
-Revises: n0pr0vc4p
+Revises: pr0vk3ys
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "s1gn1nr3v"
-down_revision = "n0pr0vc4p"
+down_revision = "pr0vk3ys"
 branch_labels = None
 depends_on = None
 
