@@ -50,7 +50,7 @@ may sign.
 
 ## Setting up for development
 
-You need Linux, macOS or Windows with Docker, Python 3.12 or newer with [uv](https://docs.astral.sh/uv/), and Node.js 20
+You need Linux, macOS or Windows with Docker, Python 3.12 or newer with [uv](https://docs.astral.sh/uv/), and Node.js 24
 or newer.
 
 ```bash

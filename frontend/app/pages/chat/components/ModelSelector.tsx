@@ -129,12 +129,13 @@ export default function ModelSelector({
 
   return (
     <FormControl id="model-selector" size={size} sx={{ minWidth: 140 }}>
-      <InputLabel sx={{ fontSize: "0.8rem" }}>
+      <InputLabel id="model-selector-label" sx={{ fontSize: "0.8rem" }}>
         {t("chat.model", { defaultValue: "Model" })}
       </InputLabel>
       <Select
         value={models.some((m) => m.alias === value) ? value : ""}
         onChange={handleChange}
+        labelId="model-selector-label"
         label={t("chat.model", { defaultValue: "Model" })}
         sx={{ fontSize: "0.8rem", height: 32 }}
         MenuProps={{
