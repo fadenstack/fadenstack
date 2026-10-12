@@ -14,6 +14,7 @@ Runs the complete production flow:
 
 from __future__ import annotations
 
+import re
 import secrets
 import sys
 from pathlib import Path
@@ -33,12 +34,35 @@ from faden_cli.core.compose import (
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
-from faden_cli.core.env_gen import default_env_vars, ensure_bootstrap_token, read_env_file, write_env_file
+from faden_cli.core.env_gen import default_env_vars, ensure_bootstrap_token, read_env_file, set_env_values, write_env_file
 from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
 from faden_cli.core.settings import FadenConfig, load_config, save_config
 from faden_cli.core.tune import tune_env
+
+
+def set_deploy_options(
+    env_path: Path, *, data_dir: str | None, log_max_size: str | None, log_max_file: int | None
+) -> None:
+    """Write the data location and the log rotation the operator chose into ``.env``; what is not given stays."""
+    values: dict[str, str] = {}
+    if data_dir is not None:
+        # The path goes into a compose volume line, where ':' separates fields: POSIX style (/srv/x, /c/Users/x).
+        if data_dir and (not data_dir.startswith("/") or ":" in data_dir):
+            raise click.BadParameter(
+                "give an absolute path in POSIX form, e.g. /srv/fadenstack (on Windows /c/data)", param_hint="--data-dir"
+            )
+        values["FADEN_DATA_DIR"] = data_dir
+    if log_max_size is not None:
+        if not re.fullmatch(r"[1-9][0-9]*[kmg]", log_max_size.lower()):
+            raise click.BadParameter("a size such as 50m, 500k or 1g", param_hint="--log-max-size")
+        values["FADEN_LOG_MAX_SIZE"] = log_max_size.lower()
+    if log_max_file is not None:
+        values["FADEN_LOG_MAX_FILE"] = str(log_max_file)
+    if values:
+        set_env_values(env_path, values)
+        info("Set in .env: " + ", ".join(values))
 
 
 def _regenerate_rmq_definitions(
@@ -323,6 +347,23 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     "--https-port", type=click.IntRange(1, 65535), default=None, help="Host port for HTTPS (default 443)."
 )
 @click.option(
+    "--data-dir",
+    default=None,
+    help="Keep the company data (chat attachments) in directories under this absolute path on the host, "
+    "e.g. /srv/fadenstack, instead of Docker named volumes (FADEN_DATA_DIR in .env).",
+)
+@click.option(
+    "--log-max-size",
+    default=None,
+    help="Largest Docker log file per container before it rotates, e.g. 50m (default 50m; FADEN_LOG_MAX_SIZE).",
+)
+@click.option(
+    "--log-max-file",
+    type=click.IntRange(1, 1000),
+    default=None,
+    help="Rotated log files kept per container (default 5; FADEN_LOG_MAX_FILE).",
+)
+@click.option(
     "--tls",
     "tls_mode",
     type=click.Choice(["off", "generate", "own"]),
@@ -419,6 +460,9 @@ def deploy_cmd(
     yes: bool,
     http_port: int | None,
     https_port: int | None,
+    data_dir: str | None,
+    log_max_size: str | None,
+    log_max_file: int | None,
     tls_mode: str | None,
     tls_cert: Path | None,
     tls_key: Path | None,
@@ -596,6 +640,7 @@ def deploy_cmd(
         env_vars = default_env_vars(profiles=sorted(profiles))
         write_env_file(env_path, env_vars, preserve_secrets=not force_env)
         success(f"Environment file written to {env_path}")
+    set_deploy_options(env_path, data_dir=data_dir, log_max_size=log_max_size, log_max_file=log_max_file)
     # The backend creates the first administrator only for whoever sends this; an .env from before it
     # existed gets one, so a deploy that stopped before the administrator was made can finish.
     if ensure_bootstrap_token(env_path):
@@ -753,6 +798,10 @@ def deploy_cmd(
     # everything else.
     _sync_postgres_password(ctx, env_path)
     retire_fixed_logins(env_path)
+    # An install from before the chat files had a volume: they go from the old gateway container into it.
+    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
+
+    keep_chat_files(env_path)
 
     # Start infrastructure services and wait for them to become healthy
     # BEFORE starting application containers.  This avoids a race

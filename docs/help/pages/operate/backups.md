@@ -13,7 +13,7 @@ when you install.
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
 | Migration versions and checksums | Yes | `faden restore` checks the database dumps and the certificate files before it changes anything |
 | Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves |
-| Files attached to chats | No | The text read from them is in the database; the files themselves are not. Keep the originals you need |
+| Files attached to chats | With `--include-volumes` | Without it, only the text read from them is in the database, not the files themselves |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
 | Logs, metrics, traces | With `--include-volumes`, except metrics | They are kept on the server for viewing; a backup without them loses nothing the server needs |
 | Runtime images | No | `faden runtime-images` fetches them again |
@@ -39,7 +39,7 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 | `--output-dir PATH` | Write the backup elsewhere, such as a mounted backup disk. A relative path is taken inside the install directory |
 | `--retain N` | Keep only the N most recent backups in that directory (default 5). Older ones there are deleted |
 | `--db-only` | Databases only, without `.env` and certificate material. Keep a copy of `.env` apart, as private as the backups |
-| `--include-volumes` | Also the files uploaded to the knowledge base, the logs, the traces and Grafana's own data. Not the models |
+| `--include-volumes` | Also the files uploaded to the knowledge base, the files attached to chats, the logs, the traces and Grafana's own data. Not the models |
 | `-y` | Do not ask |
 
 ??? info "How `--retain` counts"
