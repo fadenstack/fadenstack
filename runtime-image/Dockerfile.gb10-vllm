@@ -1,9 +1,9 @@
 # The GB10 (DGX Spark) runtime on vLLM's own image.
 #
 # vLLM publishes a CUDA 13 build for arm64; its kernels (sm_120) run on the
-# GB10 (sm_121), the same Blackwell family. Everything in it is open source or
-# NVIDIA's CUDA libraries, whose terms let them be passed on inside an
-# application.
+# GB10 (sm_121), the same Blackwell family. Besides open source it holds
+# NVIDIA's CUDA packages, as vLLM's image carries them, under NVIDIA's
+# licences (see NOTICE).
 # The release in the tag names the runtime: v0.29.0 makes it vllm0.29.0.
 FROM vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404
 

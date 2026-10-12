@@ -93,9 +93,9 @@ def _from_ref(dockerfile: str) -> str:
 #: The GB10 runtime is named after its vLLM base: ``FROM
 #: vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404`` makes it ``vllm0.29.0``. A new
 #: release is the one edit to that line; its manifest, tag and runtime id
-#: follow, so the runtimes already shipped keep theirs. Everything in it is open
-#: source or NVIDIA's CUDA libraries, whose terms let it be passed on inside an
-#: application.
+#: follow, so the runtimes already shipped keep theirs. What it holds besides
+#: open source -- NVIDIA's CUDA packages, as vLLM's image carries them -- is under
+#: NVIDIA's licences (runtime-image/NOTICE).
 _GB10_VLLM_RELEASE = "vllm" + _from_ref("Dockerfile.gb10-vllm").rsplit(":", 1)[-1].split("-")[0].lstrip("v")
 
 
