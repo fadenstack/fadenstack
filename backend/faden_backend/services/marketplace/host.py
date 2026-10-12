@@ -107,10 +107,14 @@ def _image_spec(request: HostRequest, engine: dict[str, Any], gpus: float) -> di
     return spec
 
 
-async def host(session: Any, llm_service: Any, request: HostRequest) -> dict[str, Any]:
+async def host(
+    session: Any, llm_service: Any, request: HostRequest, *, allow_guarded: bool = False,
+) -> dict[str, Any]:
     """Keep (or reuse) the model, create the deployment; return both ids and what happened.
 
     *llm_service* starts the download (the application's shared ``LLMService``).
+    *allow_guarded*: the caller is a superuser (see ``DeploymentService.create``).
+    The check runs before the download starts, so a refused request fetches nothing.
     """
     from faden_backend.db.dao.llm_dao import DownloadJobDAO, ModelDAO  # noqa: PLC0415
     from faden_backend.services.inference.service import DeploymentService  # noqa: PLC0415
@@ -118,6 +122,7 @@ async def host(session: Any, llm_service: Any, request: HostRequest) -> dict[str
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", request.repo_id or ""):
         raise HostError("Not a Hugging Face repository id.")
     spec = build_spec(request)
+    DeploymentService._guard_spec(spec, previous=None, allow_guarded=allow_guarded)
 
     model_dao = ModelDAO(session)
     kept = await model_dao.find_by_repo(request.repo_id, request.revision)
@@ -134,6 +139,7 @@ async def host(session: Any, llm_service: Any, request: HostRequest) -> dict[str
         model_id=model.id,
         name=request.name.strip() or deployment_name(request.repo_id),
         spec=spec,
+        allow_guarded=allow_guarded,
     )
     return {
         "deployment_id": str(deployment.id),

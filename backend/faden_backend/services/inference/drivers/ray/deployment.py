@@ -99,7 +99,12 @@ from faden_backend.services.inference.drivers.ray.compiler import (
     _sanitize_model_id,
     compile_deployment,
 )
-from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig
+from faden_backend.services.inference.drivers.ray.addresses import machine_addresses
+from faden_backend.services.inference.drivers.ray.schemas import (
+    EnvironmentConfigRefused,
+    RayEnvironmentConfig,
+    check_environment_config,
+)
 from faden_backend.services import machine_tls
 from faden_backend.settings import settings
 
@@ -537,6 +542,9 @@ class _DeploymentFacts:
     #: Ray's resource for the machine every copy is pinned to
     #: (``resources.replica.machine``), ``node:<address>``.
     node_resource: str | None = None
+    #: The cluster pins a ``serve_http_host`` that is not loopback or one of its
+    #: machines' addresses (saved before the API refused it): it is not used.
+    serve_host_refused: bool = False
 
 
 @dataclass
@@ -1419,6 +1427,7 @@ class RayDeploymentManager:
             )
         facts.head_node_id = head
         facts.head_host = await self._host_of(session, head)
+        await self._check_pinned_serve_host(session, facts)
         head_row, facts.runtime_bundle = await node_and_bundle_for(
             session, head, driver="ray", environment=environment
         )
@@ -1732,9 +1741,31 @@ class RayDeploymentManager:
     def _environment_config(self, facts: _DeploymentFacts) -> RayEnvironmentConfig:
         raw = (facts.environment.config_json or {}) if facts.environment else {}
         try:
-            return RayEnvironmentConfig.model_validate(raw)
+            config = RayEnvironmentConfig.model_validate(raw)
         except Exception:  # noqa: BLE001 - a bad env config must not break deploys
             return RayEnvironmentConfig()
+        if getattr(facts, "serve_host_refused", False):
+            config.serve_http_host = None
+        return config
+
+    async def _check_pinned_serve_host(self, session, facts: _DeploymentFacts) -> None:
+        """Ignore a pinned ``serve_http_host`` that is not one of the cluster's own.
+
+        The pin is the address every chat for the cluster's models is sent to.
+        The API refuses a foreign one now; a cluster saved before that keeps it
+        in its config, and this is where it stops being followed.
+        """
+        host = self._environment_config(facts).serve_http_host
+        if not host or facts.environment is None:
+            return
+        try:
+            check_environment_config(
+                {"serve_http_host": host},
+                machine_addresses=await machine_addresses(session, facts.environment),
+            )
+        except EnvironmentConfigRefused as exc:
+            log.warning("Ignoring the cluster's serve_http_host: %s", exc)
+            facts.serve_host_refused = True
 
     def _serve_options(self, facts: _DeploymentFacts) -> dict[str, Any]:
         """Serve HTTP proxy placement for the environment (F13).

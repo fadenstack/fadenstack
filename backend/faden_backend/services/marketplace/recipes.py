@@ -32,6 +32,7 @@ from typing import Any
 
 import httpx
 
+from faden_backend.services.inference.engine_guard import CODE_SETTINGS
 from faden_backend.services.tls import default_httpx_verify
 
 log = logging.getLogger(__name__)
@@ -140,6 +141,12 @@ def args_to_config(argv: list[str]) -> tuple[dict[str, Any], list[str]]:
             i += 1
         name = flag.lstrip("-")
         written = flag if value is None else f"{flag} {value}"
+        if name.replace("-", "_") in CODE_SETTINGS:
+            # A recipe comes from the internet: it may suggest running a model's
+            # own code (--trust-remote-code), never switch it on. Listed with the
+            # other arguments left out, so the person sees it was asked for.
+            dropped.append(written)
+            continue
         if (not flag.startswith("--") or "." in name or name in SHAPE_FLAGS
                 or (value is not None and (value.startswith(("{", "[")) or "/" in value or value.endswith(".jinja")))):
             if name not in SHAPE_FLAGS:

@@ -70,7 +70,11 @@ async def create_deployment(
     _user: User = Depends(require_permission(_DEP, "create")),
     service: DeploymentService = Depends(),
 ) -> DeploymentDTO:
-    """Create an inference deployment from a validated versioned spec."""
+    """Create an inference deployment from a validated versioned spec.
+
+    Engine settings that run code or read node files (``trust_remote_code``,
+    ``allowed_local_media_path`` ...) are a superuser's to set: 403 otherwise.
+    """
     try:
         dep = await service.create(
             environment_id=body.environment_id,
@@ -78,6 +82,7 @@ async def create_deployment(
             name=body.name,
             spec=body.spec,
             description=body.description,
+            allow_guarded=bool(_user.is_superuser),
         )
     except InferenceError as exc:
         raise _map_inference_error(exc)
@@ -108,7 +113,7 @@ async def update_deployment(
     """Patch a deployment. Omitted fields are left unchanged; a new ``spec`` is a full replacement."""
     kwargs = body.model_dump(exclude_unset=True)
     try:
-        dep = await service.update(deployment_id, **kwargs)
+        dep = await service.update(deployment_id, allow_guarded=bool(_user.is_superuser), **kwargs)
     except InferenceError as exc:
         raise _map_inference_error(exc)
     return _dto_from_dep(dep)

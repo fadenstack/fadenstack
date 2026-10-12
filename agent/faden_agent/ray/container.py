@@ -33,6 +33,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from faden_agent.ray.env_policy import without_reserved
 from faden_agent.runtimes import ContainerRuntime, ContainerRuntimeError, detect_runtime
 
 log = logging.getLogger(__name__)
@@ -471,8 +472,11 @@ class RayContainerRuntime:
         from faden_agent.ray import ray_tls as ray_tls_mod  # noqa: PLC0415
 
         handler = self._handler(spec)
-        merged_env = dict(spec.env)
-        merged_env.update(env or {})
+        # Neither the bundle nor the cluster's settings may name Ray's
+        # authentication or TLS: the host path strips the same names, and
+        # ``setdefault`` below used to let whatever came first win.
+        merged_env = without_reserved(spec.env)
+        merged_env.update(without_reserved(env))
         tls_on = ray_tls is not None and ray_tls is not False
         if tls_on:
             merged_env.update(ray_tls_mod.container_env())
@@ -480,8 +484,8 @@ class RayContainerRuntime:
         said = {} if ray_tls is None else {"ray_tls": tls_on}
         # The agent hands the cluster token in by path; the file is bind-mounted
         # so the container reads the same 0600 file the host wrote.
-        merged_env.setdefault("RAY_AUTH_MODE", "token")
-        merged_env.setdefault("RAY_AUTH_TOKEN_PATH", self._token_path)
+        merged_env["RAY_AUTH_MODE"] = "token"
+        merged_env["RAY_AUTH_TOKEN_PATH"] = self._token_path
 
         if await handler.exists(spec.name):
             info = await handler.inspect(spec.name)

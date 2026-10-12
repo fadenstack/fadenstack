@@ -1,6 +1,9 @@
 """Backend-side schemas for Ray driver config and status."""
 
+import ipaddress
+from collections.abc import Iterable
 from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -21,17 +24,121 @@ class RayEnvironmentConfig(BaseModel):
     ray_version: str = "2.58.0"
     head_port: int = 6379
     dashboard_port: int = 8265
+    #: Where Ray's dashboard (and its job API) listens. Loopback, or the address
+    #: of one of the cluster's machines -- see ``check_environment_config``.
     dashboard_host: str = "127.0.0.1"
     object_store_memory: int | None = None
-    extra_ray_start_args: dict[str, str] = {}
+    #: (``extra_ray_start_args`` was here: nothing ever read it. A cluster that
+    #: still stores it loads, the field is ignored.)
     node_env_vars: dict[str, str] = {}
     serve_proxy_location: str = "HeadOnly"
+    #: Pins the interface Serve binds, turns model mTLS off for the cluster and
+    #: becomes the address every chat for its models is sent to. Loopback, or
+    #: the address of one of the cluster's machines -- see
+    #: ``check_environment_config``.
     serve_http_host: str | None = None
     serve_http_port: int = 8000
     #: Ray's own mutual TLS between the cluster's machines (``RAY_USE_TLS``),
     #: with the cluster's CA (services/machine_tls/ray_ca.py). Switching it
     #: restarts the cluster: Ray reads its certificates only when it starts.
+    #:
+    #: Off here, and for a new cluster too, on purpose: switching it on is a
+    #: decision about the machines, and a cluster that has none yet cannot be
+    #: asked. Starting a cluster with TLS on refuses an agent older than 0.1.18
+    #: (``_require_ray_tls``), but a machine that runs Ray on the host instead of
+    #: in the certified runtime container takes the setting without applying it.
     ray_tls: bool = False
+
+
+#: Environment variables a cluster's ``node_env_vars`` may not set: Ray's
+#: authentication and TLS, and the device selection the scheduler hands out.
+#: The agent refuses the same names on the machine
+#: (``faden_agent.ray.env_policy.RESERVED_ENV_KEYS``); refusing them here says so
+#: when the cluster is saved instead of ignoring them later. Keep the two in step.
+RESERVED_ENV_KEYS = frozenset({
+    "RAY_AUTH_MODE",
+    "RAY_AUTH_TOKEN",
+    "RAY_AUTH_TOKEN_PATH",
+    "RAY_USE_TLS",
+    "RAY_TLS_SERVER_CERT",
+    "RAY_TLS_SERVER_KEY",
+    "RAY_TLS_CA_CERT",
+    "CUDA_VISIBLE_DEVICES",
+})
+
+
+class EnvironmentConfigRefused(ValueError):
+    """A cluster setting that is not allowed; the message says which and why."""
+
+
+def _same_address(a: str, b: str) -> bool:
+    a, b = a.strip().lower(), b.strip().lower()
+    try:
+        return ipaddress.ip_address(a) == ipaddress.ip_address(b)
+    except ValueError:
+        return a == b
+
+
+def _is_loopback(value: str) -> bool:
+    text = value.strip().lower()
+    if text == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(text.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def check_environment_config(
+    config: dict[str, Any] | None,
+    *,
+    machine_addresses: Iterable[str],
+    previous: dict[str, Any] | None = None,
+) -> None:
+    """Refuse cluster settings that send traffic or code somewhere they should not go.
+
+    * ``node_env_vars`` may not name ``RESERVED_ENV_KEYS``.
+    * ``serve_http_host`` and ``dashboard_host`` must be loopback or the address
+      of one of the cluster's machines (*machine_addresses*). A Serve host other
+      than the machine's own is the address every chat for the cluster's models
+      is sent to, and pinning it also switches model mTLS off; a wildcard would
+      publish the dashboard's job API to the whole network.
+
+    A value the cluster already has (*previous*) is left alone, so saving other
+    settings of a cluster set up before this check does not fail on it.
+
+    Raises:
+        EnvironmentConfigRefused: naming the setting and the rule.
+    """
+    config = config or {}
+    previous = previous or {}
+    env = config.get("node_env_vars")
+    if env is not None:
+        if not isinstance(env, dict):
+            raise EnvironmentConfigRefused("node_env_vars must be an object of names and values.")
+        reserved = sorted(str(k) for k in env if str(k) in RESERVED_ENV_KEYS)
+        if reserved:
+            raise EnvironmentConfigRefused(
+                f"node_env_vars may not set {', '.join(reserved)}: Ray's authentication, its TLS and the "
+                "devices a machine offers are the agent's to decide, not a cluster setting."
+            )
+    addresses = [str(a) for a in machine_addresses if a]
+    for key in ("serve_http_host", "dashboard_host"):
+        value = config.get(key)
+        if value is None or value == previous.get(key):
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise EnvironmentConfigRefused(f"{key} must be an address.")
+        if _is_loopback(value) or any(_same_address(value, a) for a in addresses):
+            continue
+        raise EnvironmentConfigRefused(
+            f"{key} {value!r} is neither loopback nor the address of one of this cluster's machines. "
+            + (
+                "Every chat for the cluster's models would be sent to it."
+                if key == "serve_http_host"
+                else "Ray's dashboard and job API would listen there."
+            )
+        )
 
 
 class RayProbeResult(BaseModel):
