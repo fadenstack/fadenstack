@@ -1,15 +1,18 @@
 # Build and publish the Ray runtime images: the containers models run in on
 # every machine of a cluster.
 #
-#   gb10     runtime-image/Dockerfile          -> ghcr.io/fadenstack/ray-runtime-gb10:<version>
-#   x86_64   runtime-image/Dockerfile.x86_64   -> ghcr.io/fadenstack/ray-runtime-x86_64:<version>
+#   gb10     runtime-image/Dockerfile.gb10-vllm -> ghcr.io/fadenstack/ray-runtime-gb10:<version>
+#   x86_64   runtime-image/Dockerfile.x86_64    -> ghcr.io/fadenstack/ray-runtime-x86_64:<version>
+#
+# The GB10 image is built on vLLM's own image (--flavor gb10-vllm). The one on
+# NVIDIA's vLLM container (runtime-image/Dockerfile) is never built here: NVIDIA's
+# terms do not allow publishing it.
 #
 # Release: push a tag runtime-v<version> (for example runtime-v2.58.0-1). Or run this by hand
 # (workflow_dispatch) with push off, to check the images still build.
 #
-# Each image is built on a runner of its own architecture -- NVIDIA's vLLM base
-# for the GB10 image exists only for arm64, and emulating a 20 GB build is not
-# an option -- validated inside itself before anything is pushed, then pushed
+# Each image is built on a runner of its own architecture -- the GB10 image is
+# arm64, and emulating a 10 GB build is not an option -- validated inside itself before anything is pushed, then pushed
 # and its manifest minted from the pushed image by the same script developers
 # use (rebuild_runtime_image.py). The manifests are attached to a pre-release.
 #
@@ -20,8 +23,7 @@
 #
 # Runners: the defaults are GitHub's standard ones. The images are large; if a
 # build runs out of disk, point the repository variables RUNTIME_RUNNER_GB10 /
-# RUNTIME_RUNNER_X86_64 at larger runners. A private NGC registry key, if one
-# is ever needed for the base image, goes in the secret NGC_API_KEY.
+# RUNTIME_RUNNER_X86_64 at larger runners.
 
 name: Release Runtime Images
 
@@ -91,8 +93,8 @@ jobs:
             echo "::error::Version must look like 2.58.0 or 2.58.0-1, got '$VERSION'"
             exit 1
           fi
-          GB10="{\"flavor\":\"gb10\",\"runner\":\"$RUNNER_GB10\"}"
-          X86="{\"flavor\":\"x86_64\",\"runner\":\"$RUNNER_X86_64\"}"
+          GB10="{\"flavor\":\"gb10-vllm\",\"image\":\"gb10\",\"runner\":\"$RUNNER_GB10\"}"
+          X86="{\"flavor\":\"x86_64\",\"image\":\"x86_64\",\"runner\":\"$RUNNER_X86_64\"}"
           case "$FLAVORS" in
             gb10)   MATRIX="[$GB10]" ;;
             x86_64) MATRIX="[$X86]" ;;
@@ -114,9 +116,7 @@ jobs:
     timeout-minutes: 240
     env:
       FLAVOR: ${{ matrix.flavor }}
-      TAG: ghcr.io/fadenstack/ray-runtime-${{ matrix.flavor }}:${{ needs.plan.outputs.version }}
-      # Secrets cannot appear in a step's `if`; an env value can.
-      NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+      TAG: ghcr.io/fadenstack/ray-runtime-${{ matrix.image }}:${{ needs.plan.outputs.version }}
     steps:
       - name: Make room for a 20 GB image
         shell: bash
@@ -152,10 +152,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to NGC (only when a key is configured)
-        if: matrix.flavor == 'gb10' && env.NGC_API_KEY != ''
-        run: echo "$NGC_API_KEY" | docker login nvcr.io --username '$oauthtoken' --password-stdin
 
       - name: Build
         working-directory: ${{ env.IMAGE_DIR }}
@@ -210,8 +206,10 @@ jobs:
           name: "Runtime images ${{ needs.plan.outputs.version }}"
           prerelease: true
           body: |
-            The Fadenstack runtime helper is Apache-2.0. NVIDIA base images,
-            Ray, vLLM, and other dependencies retain their own terms.
+            The Fadenstack runtime helper is Apache-2.0. The images are not, as a
+            whole: they contain NVIDIA's CUDA libraries under the CUDA EULA, and
+            Ray, vLLM and the other dependencies keep their own terms (NOTICE and
+            the licence files inside each image).
 
             The Ray runtime images models run in, for this version:
 

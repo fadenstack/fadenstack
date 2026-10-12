@@ -94,8 +94,8 @@ contributors, MIT License; the full text is `docs/theme/assets/licenses/zensical
 - **The console API and gateway images** contain lxml, which links GNU libiconv (LGPL-2.1).
 - **The standalone `faden` and `faden-agent` binaries** bundle their Python dependencies. Each release attaches
   their licence texts next to the binary.
-- **The GPU runtime images** are built on NVIDIA software under NVIDIA's terms, not under Apache-2.0: see
-  [Help, Third-party components](docs/help/pages/operate/third-party.md).
+- **The GPU runtime images** contain NVIDIA's CUDA libraries under NVIDIA's terms (the CUDA EULA), so they
+  are not Apache-2.0 as a whole: see [Help, Third-party components](docs/help/pages/operate/third-party.md).
 
 Help's [Third-party components](docs/help/pages/operate/third-party.md) page describes all of this for people
 running Fadenstack.

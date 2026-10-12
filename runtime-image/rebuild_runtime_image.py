@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build a runtime image and emit its manifest, from the image itself.
 
-Two images, one per platform (see the README):
+Three images, two of them for the DGX Spark (see the README):
 
-    gb10     Dockerfile           aarch64, NVIDIA DGX Spark (GB10)
-    x86_64   Dockerfile.x86_64    generic x86_64 NVIDIA, Turing to Blackwell
+    gb10       Dockerfile            aarch64, NVIDIA DGX Spark (GB10), on NVIDIA's vLLM container
+    gb10-vllm  Dockerfile.gb10-vllm  aarch64, NVIDIA DGX Spark (GB10), on vLLM's own image
+    x86_64     Dockerfile.x86_64     generic x86_64 NVIDIA, Turing to Blackwell
 
 Runs anywhere that can produce the image's platform: natively (a DGX node or
 an arm64 CI runner for ``gb10``, any x86_64 machine for ``x86_64``) or through
@@ -96,6 +97,12 @@ def _from_ref(dockerfile: str) -> str:
 #: runtimes already shipped keep theirs.
 _GB10_RELEASE = "nv" + _from_ref("Dockerfile").rsplit(":", 1)[-1].split("-")[0]
 
+#: The GB10 runtime built on vLLM's own image instead (``Dockerfile.gb10-vllm``):
+#: ``FROM vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404`` makes it ``vllm0.29.0``.
+#: Everything in it is open source or NVIDIA's CUDA libraries, whose terms let it
+#: be passed on inside an application; NVIDIA's own vLLM container may not be.
+_GB10_VLLM_RELEASE = "vllm" + _from_ref("Dockerfile.gb10-vllm").rsplit(":", 1)[-1].split("-")[0].lstrip("v")
+
 
 @dataclass(frozen=True)
 class Flavor:
@@ -115,22 +122,35 @@ class Flavor:
     target_hardware: dict = field(default_factory=dict, compare=False, hash=False)
 
 
+_GB10_HARDWARE = {
+    "platform": "NVIDIA DGX Spark", "gpu": "NVIDIA GB10", "compute_capability": "12.1",
+    "architecture": "aarch64", "interconnect": "200Gb/s direct link",
+}
+
+#: By ``--flavor``. Both GB10 builds are runtimes of the ``gb10`` flavor: the
+#: backend keeps what they share (the machine, mounts, tuning) under that name.
 FLAVORS: dict[str, Flavor] = {
-    flavor.name: flavor
-    for flavor in (
-        Flavor(
+    key: flavor
+    for key, flavor in (
+        ("gb10", Flavor(
             name="gb10",
             dockerfile="Dockerfile",
             manifest=f"runtime-manifest-gb10-{_GB10_RELEASE}.json",
             default_tag=f"faden/ray-vllm-gb10:ray2.58-{_GB10_RELEASE}",
             runtime_id=f"faden-ray-vllm-gb10-ray2.58-{_GB10_RELEASE}",
             hardware_target="NVIDIA DGX Spark / GB10",
-            target_hardware={
-                "platform": "NVIDIA DGX Spark", "gpu": "NVIDIA GB10", "compute_capability": "12.1",
-                "architecture": "aarch64", "interconnect": "200Gb/s direct link",
-            },
-        ),
-        Flavor(
+            target_hardware=dict(_GB10_HARDWARE),
+        )),
+        ("gb10-vllm", Flavor(
+            name="gb10",
+            dockerfile="Dockerfile.gb10-vllm",
+            manifest=f"runtime-manifest-gb10-{_GB10_VLLM_RELEASE}.json",
+            default_tag=f"faden/ray-vllm-gb10:ray2.58-{_GB10_VLLM_RELEASE}",
+            runtime_id=f"faden-ray-vllm-gb10-ray2.58-{_GB10_VLLM_RELEASE}",
+            hardware_target="NVIDIA DGX Spark / GB10",
+            target_hardware=dict(_GB10_HARDWARE),
+        )),
+        ("x86_64", Flavor(
             name="x86_64",
             dockerfile="Dockerfile.x86_64",
             manifest="runtime-manifest-x86_64.json",
@@ -138,7 +158,7 @@ FLAVORS: dict[str, Flavor] = {
             runtime_id="faden-ray-vllm-x86_64-ray2.58",
             hardware_target="generic x86_64 NVIDIA",
             target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},
-        ),
+        )),
     )
 }
 

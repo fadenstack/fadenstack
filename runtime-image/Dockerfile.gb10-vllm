@@ -1,0 +1,93 @@
+# The GB10 (DGX Spark) runtime on vLLM's own image.
+#
+# vLLM publishes a CUDA 13 build for arm64; its kernels (sm_120) run on the
+# GB10 (sm_121), the same Blackwell family. Everything in it is open source or
+# NVIDIA's CUDA libraries, whose terms let them be passed on inside an
+# application; NVIDIA's own vLLM container (Dockerfile) may not be published.
+# The release in the tag names the runtime: v0.29.0 makes it vllm0.29.0.
+FROM vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404
+
+# Air-gapped runtime defaults and telemetry suppression
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_DATASETS_OFFLINE=1 \
+    VLLM_NO_USAGE_STATS=1 \
+    VLLM_DO_NOT_TRACK=1 \
+    RAY_DISABLE_USAGE_STATS=1 \
+    DO_NOT_TRACK=1
+
+# vLLM's image starts `vllm serve`; this one starts nothing by itself (the
+# agent runs the helper's verbs).
+ENTRYPOINT []
+
+# Ray 2.58 with Serve and the per-node metrics stack, held to the base's own
+# versions (constraints), so nothing vLLM ships moves. Ray's [llm] extra pins
+# vLLM 0.26, so the rest of that extra is named here instead: all of it but
+# vllm and nixl (disaggregated serving only); what the base has already stays.
+# What `pip check` already says about the base is kept, so the check below
+# holds our layer to adding nothing to it.
+WORKDIR /opt/llm-port/build
+RUN pip list --format=freeze > base-packages.txt && \
+    { pip check > base-pip-check.txt 2>&1 || true; }
+RUN pip install --no-cache-dir -c base-packages.txt \
+        "ray[serve]==2.58.0" pyarrow aiohttp-cors opencensus opentelemetry-exporter-prometheus \
+        jsonschema jsonref typer hf_transfer pandas ninja pybind11 meson mmh3 smart_open colorful
+RUN { pip check > pip-check.txt 2>&1 || true; } && \
+    if grep -vxFf base-pip-check.txt pip-check.txt | grep -v '^No broken requirements found'; then \
+        echo "our layer added the conflicts above"; exit 1; \
+    fi
+
+# Ray 2.58 imports two vLLM modules from where vLLM 0.29 no longer has them
+# (vllm_compat.py, temporary); then every vLLM module and name Ray Serve LLM
+# imports must resolve, or the build fails here instead of on a node.
+COPY vllm_compat.py check_ray_vllm.py /opt/llm-port/build/
+RUN python3 vllm_compat.py && python3 check_ray_vllm.py && \
+    python3 -c "import ray.serve.llm as s; print('ray serve llm OK:', s.__name__)"
+
+# Fail the build if the per-node metrics path cannot load: the dashboard
+# agent's reporter imports opencensus at module scope, and without it no
+# worker exports metrics (see Dockerfile for the history).
+RUN python3 -c "import aiohttp_cors, opencensus; \
+import ray._private.prometheus_exporter as pe; \
+import ray.dashboard.modules.reporter.reporter_agent as ra; \
+print('metrics stack OK:', opencensus.__name__, aiohttp_cors.__name__, pe.__name__, ra.__name__)"
+
+# Picture models (text to image) run on diffusers beside vLLM: the helper's
+# image app (llm_port_ray_runtime/image.py). Held to the base's versions like
+# the layer above: 0.41 needs a newer Hugging Face Hub than vLLM's, and the
+# base's accelerate stays.
+ARG DIFFUSERS_VERSION=0.40.0
+RUN pip install --no-cache-dir -c base-packages.txt "diffusers==${DIFFUSERS_VERSION}" && \
+    { pip check > pip-check.txt 2>&1 || true; } && \
+    if grep -vxFf base-pip-check.txt pip-check.txt | grep -v '^No broken requirements found'; then \
+        echo "diffusers added the conflicts above"; exit 1; \
+    fi
+
+# Install the Fadenstack runtime helper and validation assets
+WORKDIR /opt/llm-port/runtime
+COPY setup.py /opt/llm-port/runtime/
+COPY LICENSE NOTICE /opt/llm-port/runtime/
+# Only the Fadenstack runtime helper is Apache-2.0; the rest keeps its own terms (NOTICE).
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-NVIDIA-CUDA" \
+      org.opencontainers.image.vendor="Emagin8 UG (haftungsbeschränkt)" \
+      org.opencontainers.image.source="https://github.com/fadenstack/fadenstack"
+COPY llm_port_ray_runtime /opt/llm-port/runtime/llm_port_ray_runtime/
+COPY fixtures.json test_local_validation.py /opt/llm-port/runtime/
+
+RUN pip install --no-cache-dir /opt/llm-port/runtime && \
+    llm-port-ray-runtime versions && \
+    python3 -c "from llm_port_ray_runtime.image import build_image_app, diffusers_without_xformers as d; \
+import accelerate; p = d().ZImagePipeline; \
+print('image app OK:', d().__version__, accelerate.__version__, p.__name__)"
+
+# The helper is the host/runtime control contract: the Node Agent invokes these
+# verbs over `exec` and never imports Ray itself, so the surface is asserted at
+# build time rather than discovered on a node at deploy time.
+RUN for verb in versions probe cluster-status serve-status run-serve-app scale-serve-app delete-serve-app; do \
+        llm-port-ray-runtime "$verb" --help > /dev/null 2>&1 || \
+            { echo "helper is missing verb: $verb"; exit 1; }; \
+    done && echo 'helper control contract OK'
+
+WORKDIR /workspace
+
+CMD ["llm-port-ray-runtime", "versions"]
