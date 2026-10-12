@@ -49,9 +49,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://fadenstack.github.io"
+Homepage = "https://fadenstack.com"
 Repository = "https://github.com/fadenstack/fadenstack"
-Documentation = "https://fadenstack.github.io/docs"
+Documentation = "https://help.fadenstack.com"
 Issues = "https://github.com/fadenstack/fadenstack/issues"
 
 [project.scripts]
