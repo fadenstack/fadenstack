@@ -695,3 +695,26 @@ def test_a_newer_agent_is_announced_for_an_older_machine_only(running: str | Non
     node = NodeDTO(id="n", agent_id="a", host="10.250.10.49", status="healthy", version=running,
                    created_at="2026-09-29T00:00:00Z", updated_at="2026-09-29T00:00:00Z")
     assert node.model_dump()["agent_update"] == (install_api.AGENT_VERSION if announced else None)
+
+
+@pytest.mark.anyio()
+async def test_a_clients_forwarded_host_does_not_reach_the_install_script(
+    client: AsyncClient, fastapi_app: FastAPI
+) -> None:
+    """The script is run as root on a new machine; the address in it is the one the caller reached."""
+    r = await client.get(
+        "/api/install/faden-agent.sh",
+        headers={"Host": "faden.example:8443", "X-Forwarded-Host": "probe.invalid", "X-Forwarded-Proto": "https"},
+    )
+    assert r.status_code == 200
+    assert "probe.invalid" not in r.text
+    assert "https://faden.example:8443" in r.text
+
+
+@pytest.mark.anyio()
+async def test_a_host_that_is_not_a_plain_name_is_not_put_in_the_script(
+    client: AsyncClient, fastapi_app: FastAPI
+) -> None:
+    r = await client.get("/api/install/faden-agent.sh", headers={"Host": 'evil.invalid";touch /x;"'})
+    assert r.status_code == 200
+    assert "evil.invalid" not in r.text
