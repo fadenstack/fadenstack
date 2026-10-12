@@ -1,0 +1,16 @@
+Source: https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+
+This is a notice, not a licence text: Microsoft publishes no open-source
+licence for these files.
+
+The Windows executable contains Microsoft's C and C++ runtime libraries
+(vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll, ucrtbase.dll and the
+api-ms-win-*.dll forwarders of the Universal C Runtime). They are
+redistributable files ("Distributable Code") of Microsoft Visual Studio and
+the Windows SDK, and are distributed here under Microsoft's Software License
+Terms for them, without modification, as the Python distribution from
+python.org distributes them. They are Microsoft's software and not covered
+by the Apache License, Version 2.0 that applies to faden itself.
+
+The terms are in the Visual Studio License Directory:
+https://visualstudio.microsoft.com/license-terms/

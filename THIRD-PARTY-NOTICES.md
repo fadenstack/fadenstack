@@ -92,8 +92,12 @@ contributors, MIT License; the full text is `docs/theme/assets/licenses/zensical
   licence texts are served by the console at `/third-party-licenses.md` (written by the build) and
   `/licenses/supplement.md` (what the build tools add).
 - **The console API and gateway images** contain lxml, which links GNU libiconv (LGPL-2.1).
-- **The standalone `faden` and `faden-agent` binaries** bundle their Python dependencies. Each release attaches
-  their licence texts next to the binary.
+- **The standalone `faden` and `faden-agent` binaries** bundle their Python dependencies, the Python they were
+  built with, PyInstaller's bootloader and native libraries: OpenSSL, libffi, xz, zlib, bzip2, libmpdec, expat,
+  libuuid and others, depending on the platform (the Windows binary also the Microsoft C runtime). Each release
+  attaches their licence texts next to the binary. For the libraries, the Linux builds take the copyright files
+  of the Debian packages they come from; the macOS and Windows builds take the texts in
+  [`release/licenses/`](release/licenses), and the build fails if a bundled library has none.
 - **The GPU runtime images** contain NVIDIA's CUDA libraries under NVIDIA's terms (the CUDA EULA), so they
   are not Apache-2.0 as a whole: see [Help, Third-party components](docs/help/pages/operate/third-party.md).
 
