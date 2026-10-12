@@ -37,8 +37,9 @@ Inside Fadenstack's own images:
 | Console API, gateway, PII | Swagger UI and ReDoc, for the API documentation pages | Swagger UI: Apache License 2.0. ReDoc: MIT. Their licence and notice files ship next to them |
 
 The `faden` tool carries the deployment files; pip installs its Python dependencies, which keep their own
-licences. The standalone `faden` and `faden-agent` binaries bundle their Python dependencies: each release
-attaches their licence texts next to the binary. The images the deployment files name are downloaded separately
+licences. The standalone `faden` and `faden-agent` binaries bundle their Python dependencies, the Python
+itself and the native libraries it uses (OpenSSL, zlib, libffi, xz and others): each release attaches their
+licence texts next to the binary. The images the deployment files name are downloaded separately
 and keep their own terms.
 
 ## On the GPU machines

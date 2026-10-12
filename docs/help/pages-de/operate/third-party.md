@@ -40,7 +40,8 @@ In den eigenen Images von Fadenstack:
 
 Das Werkzeug `faden` enthält die Dateien der Installation; seine Python-Abhängigkeiten installiert pip, und sie
 behalten ihre eigenen Lizenzen. Die eigenständigen Programme `faden` und `faden-agent` bündeln ihre
-Python-Abhängigkeiten: Jedes Release legt deren Lizenztexte neben das Programm. Die Images, die die Dateien der
+Python-Abhängigkeiten, Python selbst und die nativen Bibliotheken, die es nutzt (OpenSSL, zlib, libffi, xz und
+andere): Jedes Release legt deren Lizenztexte neben das Programm. Die Images, die die Dateien der
 Installation nennen, werden separat heruntergeladen und behalten ihre eigenen Bedingungen.
 
 ## Auf den GPU-Maschinen {#on-the-gpu-machines}
