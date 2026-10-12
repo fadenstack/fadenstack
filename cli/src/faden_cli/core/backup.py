@@ -575,10 +575,9 @@ def carry_over_chat_files(data_dir: str = "") -> CarryResult:
 
     info("Reading the chat attachments in the old gateway container…")
     listing = _stream_from_container(docker, image, _HASH_STREAM)
-    if listing is None:
-        return CarryResult("none")  # the old container has no such directory: nothing to carry
-    source = _parse_hashes(listing)
-    if not source:
+    if listing is None or not (source := _parse_hashes(listing)):
+        # No such directory, or an empty one: said, so the line above does not end in silence.
+        info("  No chat attachments there: nothing to carry over.")
         return CarryResult("none")
     size = sum(n for _, n in source.values())
     info(f"  {len(source)} file(s), {_human_size(size)}; copying into the data volume…")
