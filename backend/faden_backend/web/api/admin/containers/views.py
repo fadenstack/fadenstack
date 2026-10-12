@@ -352,16 +352,26 @@ async def create_container(
         for pb in body.ports:
             port_bindings.setdefault(pb.container_port, []).append({"HostIp": "", "HostPort": pb.host_port})
 
-    raw = await docker.create_container(
-        image=body.image,
-        name=body.name or None,
-        cmd=body.cmd or None,
-        env=body.env or None,
-        ports=port_bindings,
-        volumes=body.volumes or None,
-        network=body.network or None,
-        auto_start=body.auto_start,
-    )
+    try:
+        raw = await docker.create_container(
+            image=body.image,
+            name=body.name or None,
+            cmd=body.cmd or None,
+            env=body.env or None,
+            ports=port_bindings,
+            volumes=body.volumes or None,
+            network=body.network or None,
+            auto_start=body.auto_start,
+        )
+    except DockerError as exc:
+        # Docker creates from images it holds; it does not fetch one. That was a bare 500.
+        if exc.status == status.HTTP_404_NOT_FOUND and "no such image" in str(exc.message).lower():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"The image {body.image} is not on this server. Pull it first (Containers, Images), "
+                "then create the container.",
+            ) from exc
+        raise _docker_refused(exc, "Creating the container") from exc
 
     container_id: str = raw.get("Id", "")
     # Determine the name Docker assigned

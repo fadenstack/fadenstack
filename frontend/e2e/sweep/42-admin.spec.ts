@@ -38,6 +38,14 @@ test.describe("the console", () => {
 
   test("a container is created, edited and deleted", async ({ page, baseURL }) => {
     const w = watch(page, baseURL);
+    // Docker creates only from images it holds, and a fresh install holds no node:22-alpine.
+    const pulled = await page.request.post("/api/admin/images/pull", { data: { image: "node", tag: "22-alpine" } });
+    expect(pulled.ok(), await pulled.text()).toBeTruthy();
+    await expect
+      .poll(async () => (await (await page.request.get("/api/admin/images/check?image=node&tag=22-alpine")).json()).exists, {
+        timeout: 120_000,
+      })
+      .toBe(true);
     await page.goto("/admin/containers/new");
     await page.getByLabel(/^Image/).first().fill("node:22-alpine");
     await page.keyboard.press("Escape");

@@ -266,6 +266,20 @@ async def test_a_superuser_creates_an_ordinary_container(
 
 
 @pytest.mark.anyio
+async def test_an_image_the_server_lacks_is_named_not_a_500(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    """Docker creates only from images it holds; the UI sweep on .61 met a bare 500 for node:22-alpine."""
+    from aiodocker.exceptions import DockerError
+
+    docker.create_container = AsyncMock(side_effect=DockerError(404, {"message": "No such image: node:22-alpine"}))
+    app = _as(fastapi_app, await _user(dbsession, superuser=True), docker)
+    r = await client.post(app.url_path_for("create_container"), json=_create())
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert "node:22-alpine is not on this server" in r.json()["detail"]
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("changes", [
     {"volumes": [SOCKET]}, {"volumes": ["/:/host"]}, {"network": "host"},
     {"volumes": ["/srv/data:/data"]}, {"volumes": ["tool_data:/data", "./config:/config:ro"]},
