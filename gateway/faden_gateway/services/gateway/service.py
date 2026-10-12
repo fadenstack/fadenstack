@@ -920,6 +920,33 @@ def _agent_tools(payload: dict[str, Any], req: _Prepared) -> dict[str, Any]:
     return {**payload, "tools": kept}
 
 
+def _agent_refuses(req: _Prepared, name: str) -> bool:
+    """Whether the agent's server-tool limit rules out running the gateway tool *name*.
+
+    ``_agent_tools`` only trims what the model is offered, and a model (or text
+    the app feeds in) can name a tool it was not offered, so the same limit
+    is checked where a tool runs. It covers every tool the gateway runs for the
+    agent -- MCP, knowledge, attachment and system tools -- except a skill's own
+    files, which stay readable. A chat without an agent, or an agent without a
+    limit, refuses nothing.
+    """
+    if req.agent is None or req.agent.agent.server_tools is None:
+        return False
+    if name == skill_files.NAME:
+        return False
+    return (name.startswith(MCP_TOOL_PREFIX) or name in _GATEWAY_TOOLS) and not req.agent.allows_server_tool(name)
+
+
+def _limit_to_agent(req: _Prepared) -> None:
+    """Leave out of what the request may find and switch on the tools the agent's limit rules out.
+
+    What is not findable cannot be found by the tool search, picked for the
+    question, named in the text, or switched on by an earlier choice of the chat.
+    """
+    req.mcp_findable = [t for t in req.mcp_findable if not _agent_refuses(req, t.get("qualified_name", ""))]
+    req.mcp_on = {n for n in req.mcp_on if not _agent_refuses(req, n)}
+
+
 def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
     """The skills a request used, for the audit log.
 
@@ -1848,6 +1875,8 @@ class GatewayService:
         found: dict[str, tuple[str, gov.Verdict]] = {}
         for call in calls:
             name = _mcp_name(req, _tool_name(call))
+            if _agent_refuses(req, name):
+                continue  # refused when it runs: the user is not asked to approve a call that cannot run
             ctx = self._context(
                 req, auth, request_id, gov.GovernanceStage.TOOL, tool_id=name, arguments=_tool_arguments(call),
             )
@@ -2169,6 +2198,7 @@ class GatewayService:
                 t for t in req.mcp_findable if not self._hidden(req, t.get("qualified_name", ""))
             ]
             req.mcp_on = {n for n in req.mcp_on if not self._hidden(req, n)}
+            _limit_to_agent(req)
             picked = {t.get("qualified_name", "") for t in system_tools.picked_for(req.mcp_findable, question)}
             req.mcp_picked = picked - req.mcp_on
             req.mcp_on |= req.mcp_picked
@@ -2843,6 +2873,12 @@ class GatewayService:
         would -- the 0.5B model on the dev stack invented "add_numbers" and
         gave up when told there was no such tool, but never searched.
         """
+        if _agent_refuses(req, name):
+            # Not offered, and not run when named anyway: the agent's limit holds where a tool runs.
+            return json.dumps({
+                "error": f"The tool {name} is not available to this agent. Do not call it again; "
+                "use only the tools you were given.",
+            }), True
         can_find = req.system_tools and bool(req.mcp_findable)
         if name == system_tools.FIND and req.system_tools:
             return self._find_tools(req, arguments)

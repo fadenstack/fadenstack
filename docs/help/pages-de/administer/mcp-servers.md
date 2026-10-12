@@ -86,7 +86,9 @@ Verfügung. Eine Liste von MCP-Servern pro Person gibt es nicht. Was ausgeführt
   Tool-Modus, den Benutzer im Chat wählen, richtet sich nach dieser Klasse. Ein Tool, das niemand eingestuft
   hat, fragt immer, bevor es läuft.
 - **Die Server-Tools eines Agenten**: Jeder Agent erhält, was ein Chat erhält, nur die Tools, die Sie aufführen
-  (z. B. `mcp.github.*`), oder keine (siehe [Agenten und Add-ins](agents.md)).
+  (z. B. `mcp.github.*`), oder keine (siehe [Agenten und Add-ins](agents.md)). Die Begrenzung gilt, wenn ein
+  Tool läuft, nicht nur bei dem, was dem Modell angeboten wird: Ein Aufruf eines Tools außerhalb davon wird
+  abgelehnt und erreicht den Server nie.
 
 ## Wie Benutzer die Tools im Chat erhalten {#how-people-get-the-tools-in-a-chat}
 
