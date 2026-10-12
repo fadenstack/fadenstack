@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from faden_backend.db.models.node_control import InfraNode
 from faden_backend.services.inference.bundles import (  # noqa: PLC0415
+    ContainerMount,
     ContainerSpec,
     RuntimeBundleManifest,
     RuntimeBundleRegistry,
@@ -292,10 +293,12 @@ def test_inject_platform_tuning() -> None:
 def test_container_launch_spec_carries_semantic_requirements() -> None:
     """The agent launch contract passes requirements through, not flags."""
     registry = RuntimeBundleRegistry()
+    spark = _node("spark", machine="aarch64", gpu_vendor="nvidia", paths={"model_store": "/srv/models"})
     spec = registry.container_launch_spec(
         _gb10(),
         name="faden-ray-runtime",
         env={"VLLM_HOST_IP": "10.100.0.1"},
+        node=spark,
     )
     assert spec["image"] == _gb10().container.image
     assert spec["digest"] == _gb10().container.digest
@@ -382,21 +385,39 @@ def test_the_nodes_hf_cache_is_mounted_where_hugging_face_looks_and_only_when_it
         assert by_target["/root/.cache/huggingface/hub"]["mode"] == "ro"
 
 
-def test_a_bundle_that_declares_a_mount_keeps_it() -> None:
-    """A bundle certified for one machine's layout is not overridden."""
+def test_the_gb10_runtime_mounts_the_machines_own_paths() -> None:
+    """No fixed host paths: on .61's Sparks /models came from an empty /srv/faden/models while the store was in ~."""
     registry = RuntimeBundleRegistry()
     node = _node(
         "spark",
         machine="aarch64",
         gpu_vendor="nvidia",
-        paths={"model_store": "/somewhere/else", "ray_session": "/elsewhere"},
+        paths={
+            "model_store": "/home/user/.cache/huggingface",
+            "ray_session": "/var/lib/faden/ray",
+            "hf_cache": "/home/user/.cache/huggingface/hub",
+        },
     )
-    spec = registry.container_launch_spec(
-        _gb10(), name="faden-ray-runtime", node=node
-    )
+    spec = registry.container_launch_spec(_gb10(), name="faden-ray-runtime", node=node)
+    by_target = {m["container_path"]: (m["host_path"], m["mode"]) for m in spec["mounts"]}
+    assert by_target == {
+        "/models": ("/home/user/.cache/huggingface", "ro"),
+        "/tmp/ray": ("/var/lib/faden/ray", "rw"),
+        "/root/.cache/huggingface/hub": ("/home/user/.cache/huggingface/hub", "ro"),
+    }
+
+
+def test_a_bundle_that_declares_a_mount_keeps_it() -> None:
+    """A bundle certified for one machine's layout is not overridden."""
+    registry = RuntimeBundleRegistry()
+    gb10 = _gb10()
+    pinned = gb10.model_copy(update={"container": gb10.container.model_copy(update={"mounts": [
+        ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
+    ]})})
+    node = _node("spark", machine="aarch64", gpu_vendor="nvidia", paths={"model_store": "/somewhere/else"})
+    spec = registry.container_launch_spec(pinned, name="faden-ray-runtime", node=node)
     by_target = {m["container_path"]: m["host_path"] for m in spec["mounts"]}
     assert by_target["/models"] == "/srv/faden/models"
-    assert by_target["/tmp/ray"] == "/var/lib/faden/ray"
 
 
 def test_a_node_with_no_reported_paths_gets_no_invented_ones() -> None:

@@ -447,26 +447,12 @@ _FLAVORS: dict[str, dict[str, Any]] = {
             devices=["/dev/infiniband"],
             capabilities=["IPC_LOCK"],
         ),
-        "mounts": [
-            ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
-            # Ray's session directory, on the host.
-            #
-            # Every Serve replica writes its own log file under
-            # ``session_latest/logs/serve/``, and the runtime container itself
-            # idles on ``sleep infinity`` -- so its console is empty and the only
-            # record of what a replica did lives in these files. Without the
-            # mount the agent has to shell into the container to read them, which
-            # costs an exec per poll and loses the byte offsets that make tailing
-            # cheap. With it they are ordinary files.
-            #
-            # Read-write because Ray owns the directory and writes to it; a
-            # read-only mount would stop the cluster starting at all.
-            ContainerMount(
-                host_path="/var/lib/faden/ray",
-                container_path="/tmp/ray",
-                mode="rw",
-            ),
-        ],
+        # No mounts of its own, as the x86_64 flavor: where the model store, Ray's
+        # session directory and the Hugging Face cache live is the machine's to
+        # say (``_NODE_MOUNT_POINTS``). Fixed host paths here won over what the
+        # agent reported: /models came from an empty /srv/faden/models on .61's
+        # Sparks while their store was ~/.cache/huggingface.
+        "mounts": [],
         "platform_tuning": PlatformTuning(
             ray=RayPlatformTuning(
                 env={
@@ -599,6 +585,11 @@ def _preference(environment: Any, node_id: Any) -> tuple[str, ...]:
 #: to. Anything image-specific stays in the bundle's own mount list.
 _NODE_MOUNT_POINTS: tuple[tuple[str, str, str], ...] = (
     ("model_store", "/models", "ro"),
+    # Ray's session directory: every Serve replica writes its log under
+    # ``session_latest/logs/serve/`` while the container idles on ``sleep
+    # infinity``, so these files are the only record of what a replica did, and
+    # the agent tails them as ordinary files. Read-write: Ray owns it, and a
+    # read-only mount stops the cluster starting.
     ("ray_session", "/tmp/ray", "rw"),
     # The machine's own Hugging Face cache, when the agent found one: mounted
     # at the hub directory Hugging Face and vLLM look in by default
