@@ -1,0 +1,7 @@
+{
+  "version": "0.2.8",
+  "sha256": {
+    "linux-x86_64": "a16902672fbea7066142bb5de1bde521590aafc595d213cfd00a6a5feb577716",
+    "linux-aarch64": "afb0f84b747abbd5b87ee143839a7717eca1a1aa0617e946804361a4eec55520"
+  }
+}

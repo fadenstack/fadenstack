@@ -50,11 +50,11 @@ class TestScript:
         assert "sha256sum" in script
         assert 'ACTUAL" != "$SHA"' in script
 
-    def test_says_so_when_there_is_nothing_to_verify(self) -> None:
-        """A missing digest is not a passed check, and must not read like one."""
+    def test_refuses_to_install_what_it_cannot_verify(self) -> None:
+        """There is no "nothing was verified" path: no valid digest, no install."""
         script = _script()
-        assert "published no digest" in script
-        assert "nothing was verified" in script
+        assert "nothing was verified" not in script
+        assert "Refusing to install" in script
 
     def test_does_not_ask_the_operator_to_pick_an_architecture(self) -> None:
         script = _script()
@@ -83,150 +83,208 @@ class TestScript:
 
 # ── the plan: where the build comes from, and what it hashes to ──────────
 
+PIN = {
+    "linux-aarch64": hashlib.sha256(b"agent 0.2.8 aarch64").hexdigest(),
+    "linux-x86_64": hashlib.sha256(b"agent 0.2.8 x86_64").hexdigest(),
+}
+
+
+@pytest.fixture()
+def pinned(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    monkeypatch.setattr(install_api, "pinned_digest", PIN.get)
+    return PIN
+
+
+async def _plan(client: AsyncClient, platform: str = "linux-aarch64") -> dict[str, str | None]:
+    return (await client.get("/api/install/plan", params={"platform": platform})).json()
+
+
+def test_the_release_pins_the_agent_it_hands_out() -> None:
+    """The tracked agent_release.json is for AGENT_VERSION and names both architectures."""
+    for build in ("linux-x86_64", "linux-aarch64"):
+        digest = install_api.pinned_digest(build)
+        assert digest is not None and len(digest) == 64
+        int(digest, 16)
+
+
+def test_a_pin_for_another_version_pins_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pin = tmp_path / "agent_release.json"
+    pin.write_text(
+        '{"version": "0.0.1", "sha256": {"linux-x86_64": "' + "a" * 64 + '"}}', encoding="utf-8"
+    )
+    monkeypatch.setattr(install_api, "__file__", str(tmp_path / "__init__.py"))
+    assert install_api.pinned_digest("linux-x86_64") is None
+
 
 @pytest.mark.anyio()
-async def test_plan_points_at_the_release_when_there_is_no_local_copy(
+async def test_plan_carries_the_pinned_digest_with_no_local_copy(
+    client: AsyncClient, fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch, pinned: dict[str, str]
+) -> None:
+    """A pip-installed server holds no agent, and still says what it must hash to."""
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: None)
+    body = await _plan(client)
+    assert body["platform"] == "linux-aarch64"
+    assert str(body["url"]).startswith("https://github.com/")
+    assert body["source"] == "release"
+    assert body["sha256"] == pinned["linux-aarch64"]
+
+
+@pytest.mark.anyio()
+async def test_plan_offers_no_build_it_cannot_verify(
     client: AsyncClient, fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(install_api, "local_binary", lambda _build: None)
-    r = await client.get("/api/install/plan", params={"platform": "linux-aarch64"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["platform"] == "linux-aarch64"
-    assert body["url"].startswith("https://github.com/")
-    assert body["source"] == "release"
-    # We have not fetched it, so we do not have its digest -- and claiming one
-    # we did not compute would be worse than admitting we have none.
-    assert body["sha256"] is None
+    monkeypatch.setattr(install_api, "pinned_digest", lambda _build: None)
+    body = await _plan(client)
+    assert body["url"] is None and body["sha256"] is None
+    assert "pins no agent" in str(body["reason"])
 
 
 @pytest.mark.anyio()
-async def test_plan_serves_the_local_copy_when_there_is_one(
+async def test_plan_serves_the_pinned_local_copy_as_a_fallback(
     client: AsyncClient,
     fastapi_app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    pinned: dict[str, str],
 ) -> None:
     """The air-gapped case: the node never needs to reach the internet.
 
     Both sources are offered and the *node* chooses, because whether there is
-    internet is a fact about the node rather than about this server. What
-    matters here is that a node with none has somewhere to fall back to, and
-    that the digest is ours either way -- so a release that is not the build
-    this deployment expects is refused wherever it came from.
+    internet is a fact about the node rather than about this server. The digest
+    is the pinned one either way.
     """
     binary = tmp_path / "faden-agent-linux-aarch64"
-    binary.write_bytes(b"not really a binary, but it hashes")
+    binary.write_bytes(b"agent 0.2.8 aarch64")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
-    monkeypatch.setattr(install_api, "published_digest", _no_published_digest)  # an offline server
-
-    r = await client.get("/api/install/plan", params={"platform": "linux-aarch64"})
-    body = r.json()
+    body = await _plan(client)
     assert body["source"] == "release+backend"
-    assert "/api/install/binary/linux-aarch64" in body["fallback_url"]
-    assert body["url"].startswith("https://github.com/")
-    assert body["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
-
-
-async def _no_published_digest(_build: str) -> None:
-    return None
+    assert "/api/install/binary/linux-aarch64" in str(body["fallback_url"])
+    assert str(body["url"]).startswith("https://github.com/")
+    assert body["sha256"] == pinned["linux-aarch64"]
 
 
 @pytest.mark.anyio()
-async def test_a_local_copy_from_an_older_version_is_set_aside(
+async def test_a_local_copy_that_is_not_the_pinned_build_is_set_aside(
     client: AsyncClient,
     fastapi_app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    pinned: dict[str, str],
 ) -> None:
     """Nothing replaces the server's copy when the server is upgraded.
 
-    The upgraded release VM kept a 0.1.12 build while expecting 0.1.13. The
-    plan pinned the old digest, so the 0.1.13 release failed the install
-    script's check and the update stopped -- and a machine without internet
-    got the 0.1.12 copy from the fallback.
+    A stale copy used to be pinned by its own digest, so the new release failed
+    the install script's check. Now the pin decides: the copy is not offered,
+    not as a fallback and not from the binary endpoint.
     """
     binary = tmp_path / "faden-agent-linux-aarch64"
     binary.write_bytes(b"agent 0.1.12")
-    release = hashlib.sha256(b"agent 0.1.13").hexdigest()
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
-
-    async def _release_digest(_build: str) -> str:
-        return release
-
-    monkeypatch.setattr(install_api, "published_digest", _release_digest)
-    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
-    assert (body["source"], body["sha256"], body["fallback_url"]) == ("release", release, None)
-    assert install_api.AGENT_VERSION in body["reason"]
+    body = await _plan(client)
+    assert (body["source"], body["sha256"], body["fallback_url"]) == (
+        "release", pinned["linux-aarch64"], None,
+    )
+    assert (await client.get("/api/install/binary/linux-aarch64")).status_code == 404
 
 
 @pytest.mark.anyio()
-async def test_a_developers_own_build_is_never_set_aside(
+async def test_the_pinned_local_copy_is_served(
     client: AsyncClient,
     fastapi_app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    pinned: dict[str, str],
+) -> None:
+    binary = tmp_path / "faden-agent-linux-aarch64"
+    binary.write_bytes(b"agent 0.2.8 aarch64")
+    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
+    r = await client.get("/api/install/binary/linux-aarch64")
+    assert r.status_code == 200
+    assert r.content == b"agent 0.2.8 aarch64"
+
+
+@pytest.mark.anyio()
+async def test_a_developers_own_build_carries_its_own_digest(
+    client: AsyncClient,
+    fastapi_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    pinned: dict[str, str],
 ) -> None:
     """A build in the checkout's dist/ differs from the release by construction."""
     binary = tmp_path / "faden-agent-linux-aarch64"
-    binary.write_bytes(b"agent 0.1.13, built just now")
+    binary.write_bytes(b"agent 0.2.8, built just now")
     monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
     monkeypatch.setattr(install_api, "_source_checkout_binary_dir", lambda: tmp_path)
-
-    async def _must_not_ask(_build: str) -> str:
-        raise AssertionError("a developer's build is not compared with the release")
-
-    monkeypatch.setattr(install_api, "published_digest", _must_not_ask)
-    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
-    assert body["source"] == "release+backend"
+    body = await _plan(client)
+    assert body["source"] == "checkout"
+    assert "/api/install/binary/linux-aarch64" in str(body["url"])
+    assert body["fallback_url"] is None
     assert body["sha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
+    assert (await client.get("/api/install/binary/linux-aarch64")).status_code == 200
 
 
-@pytest.mark.anyio()
-async def test_a_local_copy_of_this_version_is_still_served(
-    client: AsyncClient,
-    fastapi_app: FastAPI,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    binary = tmp_path / "faden-agent-linux-aarch64"
-    binary.write_bytes(b"agent 0.1.13")
-    monkeypatch.setattr(install_api, "local_binary", lambda _build: binary)
-
-    async def _same(_build: str) -> str:
-        return hashlib.sha256(b"agent 0.1.13").hexdigest()
-
-    monkeypatch.setattr(install_api, "published_digest", _same)
-    body = (await client.get("/api/install/plan", params={"platform": "linux-aarch64"})).json()
-    assert body["source"] == "release+backend"
-    assert body["fallback_url"]
+# ── the install line refuses what does not match ─────────────────────────
 
 
-@pytest.mark.anyio()
-async def test_the_published_digest_is_read_from_the_release_and_remembered(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    install_api._published_digests.clear()
-    asked: list[str] = []
-    digest = "ab" * 32
+@pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh available")
+class TestInstallLineVerification:
+    """Run the generated script against a stand-in curl that serves a plan and a file."""
 
-    def _handler(request: httpx.Request) -> httpx.Response:
-        asked.append(str(request.url))
-        if "aarch64" in str(request.url):
-            return httpx.Response(200, text=f"{digest}  faden-agent-linux-aarch64\n")
-        raise httpx.ConnectError("no route", request=request)
+    GOOD = b"#!/bin/sh\nexit 0\n"
 
-    real = httpx.AsyncClient
-    monkeypatch.setattr(
-        install_api.httpx, "AsyncClient",
-        lambda **kw: real(transport=httpx.MockTransport(_handler), follow_redirects=True),
-    )
-    assert await install_api.published_digest("linux-aarch64") == digest
-    assert await install_api.published_digest("linux-aarch64") == digest
-    assert len(asked) == 1, "asked once, then remembered"
-    assert asked[0].endswith(f"node-agent-v{install_api.AGENT_VERSION}/faden-agent-linux-aarch64.sha256")
-    assert await install_api.published_digest("linux-x86_64") is None, "an offline server has no answer"
-    install_api._published_digests.clear()
+    def _run(
+        self, tmp_path: Path, plan_sha: str | None, served: bytes
+    ) -> subprocess.CompletedProcess[str]:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (tmp_path / "served").write_bytes(served)
+        sha = f'"sha256": "{plan_sha}",' if plan_sha is not None else ""
+        (tmp_path / "plan.json").write_text(
+            f'{{"url": "https://example.invalid/agent", {sha} "source": "release"}}',
+            encoding="utf-8", newline="\n",
+        )
+        curl = bin_dir / "curl"
+        curl.write_text(
+            "#!/bin/sh\n"
+            'out=""\n'
+            'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift ;; esac; shift; done\n'
+            f'if [ -n "$out" ]; then cat "{tmp_path.as_posix()}/served" > "$out"; '
+            f'else cat "{tmp_path.as_posix()}/plan.json"; fi\n',
+            encoding="utf-8", newline="\n",
+        )
+        curl.chmod(0o755)
+        script = tmp_path / "install.sh"
+        script.write_text(_script(), encoding="utf-8", newline="\n")
+        target = tmp_path / "out" / "faden-agent"
+        return subprocess.run(
+            ["sh", str(script), "--user", "--install-path", str(target), "--backend", ORIGIN],
+            capture_output=True, text=True, timeout=60,
+            env={**os.environ, "PATH": f"{bin_dir.as_posix()}{os.pathsep}{os.environ['PATH']}",
+                 "HOME": str(tmp_path)},
+        )
+
+    def test_a_download_that_does_not_match_is_refused(self, tmp_path: Path) -> None:
+        pin = hashlib.sha256(self.GOOD).hexdigest()
+        result = self._run(tmp_path, pin, b"someone else's binary")
+        assert result.returncode == 1
+        assert "does not match the expected SHA-256" in result.stderr
+        assert pin in result.stderr
+        assert not (tmp_path / "out" / "faden-agent").exists()
+
+    def test_a_plan_with_no_digest_is_refused(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, None, self.GOOD)
+        assert result.returncode == 1
+        assert "Refusing to install" in result.stderr
+        assert not (tmp_path / "out" / "faden-agent").exists()
+
+    def test_a_download_that_matches_is_installed(self, tmp_path: Path) -> None:
+        result = self._run(tmp_path, hashlib.sha256(self.GOOD).hexdigest(), self.GOOD)
+        assert "Verified." in result.stdout, result.stdout + result.stderr
+        assert (tmp_path / "out" / "faden-agent").read_bytes() == self.GOOD
 
 
 @pytest.mark.anyio()
