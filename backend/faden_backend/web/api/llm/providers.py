@@ -36,6 +36,7 @@ from faden_backend.services.llm import remote_health
 from faden_backend.services.llm import residency as residency_mod
 from faden_backend.services.llm.gateway_sync import _normalize_base_url
 from faden_backend.services.llm.monitoring import get_monitoring_provisioner
+from faden_backend.services.llm.provider_keys import seal_provider_key
 from faden_backend.services.llm.service import LLMService
 from faden_backend.services.tls import default_httpx_verify
 from faden_backend.web.api.admin.dependencies import audit_action
@@ -793,7 +794,8 @@ async def update_provider(
         name=body.name,
         capabilities=next_capabilities if capabilities_changed else None,
         endpoint_url=endpoint_url if endpoint_url is not None else ...,
-        api_key_encrypted=body.api_key if body.api_key is not None else ...,
+        # Sealed like on create; an empty key clears it.
+        api_key_encrypted=seal_provider_key(body.api_key) if body.api_key is not None else ...,
         litellm_provider=body.litellm_provider if "litellm_provider" in body.model_fields_set else ...,
         litellm_model=litellm_model_update,
         extra_params=body.extra_params if "extra_params" in body.model_fields_set else ...,

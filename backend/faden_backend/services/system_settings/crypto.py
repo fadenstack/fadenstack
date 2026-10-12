@@ -8,6 +8,9 @@ import hashlib
 from cryptography.fernet import Fernet
 
 
+_FERNET_PREFIX = "gAAAAA"
+
+
 class SettingsCrypto:
     """Encrypt/decrypt helper based on Fernet symmetric crypto."""
 
@@ -23,6 +26,15 @@ class SettingsCrypto:
     def decrypt(self, ciphertext: str) -> str:
         """Decrypt ciphertext into plaintext string."""
         return self._fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+
+    @staticmethod
+    def is_ciphertext(value: str | None) -> bool:
+        """Whether *value* looks like a Fernet token (they all start ``gAAAAA``).
+
+        Lets a migration or a sync tell sealed values from legacy plaintext
+        without trying to decrypt. API keys never start this way.
+        """
+        return bool(value) and value.startswith(_FERNET_PREFIX)
 
     @staticmethod
     def mask(value: str) -> str:

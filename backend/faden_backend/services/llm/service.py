@@ -42,6 +42,7 @@ from faden_backend.services.llm.gateway_sync import GatewaySyncService, _normali
 from faden_backend.services.llm import remote_health
 from faden_backend.services.llm.monitoring import deprovision_for_runtime
 from faden_backend.services.llm.registry import get_adapter
+from faden_backend.services.llm.provider_keys import seal_provider_key
 from faden_backend.services.llm.scanner import scan_model_directory
 from faden_backend.services.nodes import NodeControlService
 from faden_backend.settings import settings
@@ -257,7 +258,7 @@ class LLMService:
             target=target,
             capabilities=capabilities,
             endpoint_url=endpoint_url,
-            api_key_encrypted=api_key,  # TODO: encrypt with SettingsCrypto
+            api_key_encrypted=seal_provider_key(api_key),
             litellm_provider=litellm_provider,
             litellm_model=litellm_model,
             extra_params=extra_params,

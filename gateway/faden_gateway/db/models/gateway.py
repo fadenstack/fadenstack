@@ -179,7 +179,10 @@ class LLMProviderInstance(Base):
     )
     api_key_encrypted: Mapped[str | None] = mapped_column(
         Text, nullable=True,
-        doc="Fernet-encrypted provider API key.",
+        doc=(
+            "Provider API key, SettingsCrypto ciphertext: Fernet under sha256 of the settings "
+            "master key, the value the backend sealed. Opened by crypto.decrypt_provider_key."
+        ),
     )
     # ── Outbound TLS (per provider) ────────────────────────────────
     # One of: "default" (inherit global), "verify" (verify against
