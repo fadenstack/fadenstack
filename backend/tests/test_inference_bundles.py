@@ -361,6 +361,27 @@ def test_a_generic_bundle_takes_its_mounts_from_the_node() -> None:
     assert by_target["/tmp/ray"]["mode"] == "rw"
 
 
+def test_the_nodes_hf_cache_is_mounted_where_hugging_face_looks_and_only_when_it_has_one() -> None:
+    registry = RuntimeBundleRegistry()
+    for machine, bundle in (("aarch64", _gb10()), ("x86_64", None)):
+        bundle = bundle or registry.resolve_for_node(_node("box", machine="x86_64", gpu_vendor="nvidia"))
+        # No flavor names a host path of its own for the cache.
+        assert not any("huggingface" in m.host_path for m in bundle.container.mounts)
+        paths = {"model_store": "/srv/m", "ray_session": "/r"}
+        without = registry.container_launch_spec(
+            bundle, name="n", node=_node("a", machine=machine, gpu_vendor="nvidia", paths=paths)
+        )
+        assert "/root/.cache/huggingface/hub" not in {m["container_path"] for m in without["mounts"]}
+        withit = registry.container_launch_spec(
+            bundle,
+            name="n",
+            node=_node("a", machine=machine, gpu_vendor="nvidia", paths={**paths, "hf_cache": "/data/me/hub"}),
+        )
+        by_target = {m["container_path"]: m for m in withit["mounts"]}
+        assert by_target["/root/.cache/huggingface/hub"]["host_path"] == "/data/me/hub"
+        assert by_target["/root/.cache/huggingface/hub"]["mode"] == "ro"
+
+
 def test_a_bundle_that_declares_a_mount_keeps_it() -> None:
     """A bundle certified for one machine's layout is not overridden."""
     registry = RuntimeBundleRegistry()

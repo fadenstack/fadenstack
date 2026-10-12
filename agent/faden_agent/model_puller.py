@@ -118,6 +118,90 @@ def _link_out_of(blobs_dir: Path, blob_hash: str) -> Path | None:
     return literal
 
 
+def in_hf_cache(hf_cache_root: Path, model_dir_name: str, model_sync: dict[str, Any]) -> bool:
+    """Is the model complete in the machine's own Hugging Face cache?
+
+    Complete means every snapshot the server lists is there with every file
+    present (through its link) at the size the manifest gives, and every ref
+    names the commit the manifest names. A half-downloaded snapshot (missing
+    file, ``.incomplete`` leftover, short blob) is not complete. Sizes are
+    compared, not hashes: hashing tens of GB per request is what this check
+    exists to avoid, and the Hub's own downloads are written atomically.
+    """
+    model_dir = hf_cache_root / model_dir_name
+    sizes = {
+        str(b.get("hash")): int(b.get("size") or 0)
+        for b in model_sync.get("blobs", [])
+        if isinstance(b, dict)
+    }
+    snapshots = model_sync.get("snapshots") or []
+    if not snapshots:
+        return False
+    try:
+        for snap in snapshots:
+            commit = _safe_leaf_name(str(snap.get("commit", "")), field="snapshot commit")
+            snap_dir = model_dir / "snapshots" / commit
+            links = snap.get("links") or []
+            if not links:
+                return False
+            for link in links:
+                rel = Path(str(link.get("path", "")))
+                if rel.is_absolute() or ".." in rel.parts:
+                    return False
+                f = snap_dir / rel
+                if not f.is_file():  # follows the link; a dangling one is not a file
+                    return False
+                expected = sizes.get(str(link.get("blob_hash")), 0)
+                if expected and f.stat().st_size != expected:
+                    return False
+        for ref in model_sync.get("refs") or []:
+            ref_file = model_dir / "refs" / str(ref.get("name", ""))
+            if ref_file.read_text(encoding="utf-8").strip() != str(ref.get("commit", "")).strip():
+                return False
+    except (OSError, ModelPullerError, AttributeError, ValueError):
+        return False
+    return True
+
+
+def adopt_blob(source: Path, dest: Path) -> bool:
+    """Put *source* at *dest* without a second copy on disk where it can be avoided.
+
+    A hard link when both are on one filesystem (the container sees a plain
+    file, and the space is used once), else a copy -- still no download.
+    Returns False when neither works; the caller then downloads as usual.
+    """
+    if dest.exists() or dest.is_symlink():
+        return True
+    try:
+        os.link(source, dest)
+        return True
+    except OSError:
+        pass
+    part = dest.with_name(dest.name + ".part")
+    try:
+        shutil.copyfile(source, part)
+        os.replace(part, dest)
+        return True
+    except OSError:
+        part.unlink(missing_ok=True)
+        return False
+
+
+def _adopt_from_hf_cache(
+    hf_cache_root: Path, model_dir_name: str, model_sync: dict[str, Any], blobs_dir: Path
+) -> int:
+    """Link the manifest's blobs from a complete Hugging Face snapshot into *blobs_dir*."""
+    count = 0
+    for snap in model_sync.get("snapshots") or []:
+        snap_dir = hf_cache_root / model_dir_name / "snapshots" / str(snap.get("commit"))
+        for link in snap.get("links") or []:
+            blob_hash = _safe_leaf_name(str(link.get("blob_hash", "")), field="snapshot blob hash")
+            source = (snap_dir / str(link.get("path"))).resolve(strict=False)
+            if adopt_blob(source, blobs_dir / blob_hash):
+                count += 1
+    return count
+
+
 def _expected_sha256(blob_hash: str) -> str | None:
     h = blob_hash.lower()
     if _SHA256_RE.fullmatch(h):
@@ -165,6 +249,7 @@ async def pull_model(
     credential: str,
     model_sync: dict[str, Any],
     model_store_root: str,
+    machine_hf_cache: str | None = None,
     emit_progress: Callable[[dict[str, Any]], Any] | None = None,
 ) -> Path:
     """Download blobs and reconstruct the HF cache tree for a model.
@@ -181,6 +266,10 @@ async def pull_model(
         ``snapshots``, and ``total_size``.
     model_store_root:
         Local root for model storage (e.g. ``/srv/faden/models``).
+    machine_hf_cache:
+        The machine's own Hugging Face hub cache, when it has one. A model
+        complete there is not downloaded again: the runtime container gets
+        that cache mounted where Hugging Face looks for it.
     emit_progress:
         Optional callback to report download progress.
 
@@ -223,6 +312,18 @@ async def pull_model(
         blobs_dir.mkdir(parents=True, exist_ok=True)
         refs_dir.mkdir(parents=True, exist_ok=True)
         snapshots_dir.mkdir(parents=True, exist_ok=True)
+
+        # The machine already has this model in its own Hugging Face cache:
+        # its blobs are linked into the store below, so the loop finds them
+        # in place and nothing is downloaded or stored twice.
+        if machine_hf_cache and in_hf_cache(Path(machine_hf_cache), model_dir_name, model_sync):
+            adopted = await asyncio.to_thread(
+                _adopt_from_hf_cache, Path(machine_hf_cache), model_dir_name, model_sync, blobs_dir
+            )
+            log.info(
+                "Model %s is complete in the Hugging Face cache %s; reusing %d files",
+                model_sync.get("hf_repo_id", model_id), machine_hf_cache, adopted,
+            )
 
         headers = {"Authorization": f"Bearer {credential}"}
         downloaded = 0
