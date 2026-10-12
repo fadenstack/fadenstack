@@ -5,7 +5,7 @@ Ray Serve LLM 2.58 imports
     vllm.entrypoints.openai.cli_args          (FrontendArgs)
     vllm.entrypoints.openai.engine.protocol   (ErrorInfo, ErrorResponse)
 
-and vLLM 0.29 -- the NVIDIA 26.09 build -- keeps them at
+and vLLM 0.29 keeps them at
 ``vllm.entrypoints.launchers.cli_args`` and
 ``vllm.entrypoints.serve.engine.protocol``. Nothing else Ray imports moved
 (``check_ray_vllm.py`` asserts that after this runs).

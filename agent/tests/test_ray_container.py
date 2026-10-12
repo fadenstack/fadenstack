@@ -33,7 +33,7 @@ OTHER_LAYERS = ["sha256:" + "cc" * 32]
 def _payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "name": "faden-ray-runtime",
-        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
+        "image": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
         "digest": DIGEST,
         "rootfs_digest": ROOTFS_DIGEST,
         "runtime_handler": "docker",
@@ -436,7 +436,7 @@ async def test_a_mismatch_reports_a_code_the_backend_can_act_on() -> None:
 # as faden/ray-vllm-gb10:.... Looked up by name alone, each machine would have
 # loaded 26 GB it already had.
 
-GHCR = "ghcr.io/fadenstack/ray-runtime-gb10:ray2.58-nv26.08"
+GHCR = "ghcr.io/fadenstack/ray-runtime-gb10:ray2.58-vllm0.29.0"
 
 
 class _NamedRuntime(_FakeRuntime):
@@ -464,7 +464,7 @@ class _NamedRuntime(_FakeRuntime):
 
 @pytest.mark.anyio()
 async def test_the_pinned_build_under_its_old_name_is_named_not_loaded() -> None:
-    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-nv26.08": DIGEST})
+    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-vllm0.29.0": DIGEST})
     container = RayContainerRuntime(runtime=runtime)
     spec = RuntimeBundleSpec.from_payload(_payload(image=GHCR))
 
@@ -480,7 +480,7 @@ async def test_the_pinned_build_under_its_old_name_is_named_not_loaded() -> None
 
 @pytest.mark.anyio()
 async def test_a_build_that_cannot_be_named_is_loaded_as_before() -> None:
-    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-nv26.08": DIGEST}, tag_fails=True)
+    runtime = _NamedRuntime({"faden/ray-vllm-gb10:ray2.58-vllm0.29.0": DIGEST}, tag_fails=True)
     container = RayContainerRuntime(runtime=runtime)
     spec = RuntimeBundleSpec.from_payload(_payload(image=GHCR))
 

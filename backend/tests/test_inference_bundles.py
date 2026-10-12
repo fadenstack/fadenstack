@@ -143,9 +143,9 @@ def test_container_requirements_are_semantic_not_cli_flags() -> None:
 def test_bundle_digest_is_mandatory_and_checked() -> None:
     """A bundle that cannot be pinned must not be constructible."""
     with pytest.raises(ValidationError):
-        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-nv26.08")
+        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-vllm0.29.0")
     with pytest.raises(ValidationError):
-        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-nv26.08", digest="0.16.0")
+        ContainerSpec(image="faden/ray-vllm-gb10:ray2.58-vllm0.29.0", digest="0.16.0")
 
 
 def test_bundle_generated_from_runtime_manifest() -> None:

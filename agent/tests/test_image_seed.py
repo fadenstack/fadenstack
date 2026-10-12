@@ -18,7 +18,7 @@ import pytest
 
 from faden_agent import image_loader, image_seed
 
-IMAGE = "faden/ray-vllm-gb10:ray2.58-nv26.08"
+IMAGE = "faden/ray-vllm-gb10:ray2.58-vllm0.29.0"
 BLOB = bytes(range(256)) * 8192  # 2 MiB
 
 
@@ -126,7 +126,7 @@ async def test_a_partial_download_resumes_from_the_peer(tmp_path: Path) -> None:
     serving = await _serve(tmp_path, port)
     recv = tmp_path / "recv"
     recv.mkdir(parents=True)
-    (recv / "faden_ray-vllm-gb10_ray2.58-nv26.08.tar.part").write_bytes(BLOB[:700_000])
+    (recv / "faden_ray-vllm-gb10_ray2.58-vllm0.29.0.tar.part").write_bytes(BLOB[:700_000])
 
     part = await _download(tmp_path, port)
     result = await asyncio.wait_for(serving, timeout=10)

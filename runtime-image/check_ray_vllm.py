@@ -1,7 +1,7 @@
 """Fail the image build if Ray Serve LLM imports anything this vLLM does not have.
 
-Ray's LLM layer is built against one vLLM, and NVIDIA's base images move on
-their own schedule. vLLM 0.29 (NVIDIA 26.09) moved two modules Ray 2.58
+Ray's LLM layer is built against one vLLM, and vLLM's images move on
+their own schedule. vLLM 0.29 moved two modules Ray 2.58
 imports, and the first image built on it had no way of noticing: it built,
 and Ray Serve LLM failed to import on the DGX nodes at deploy time.
 

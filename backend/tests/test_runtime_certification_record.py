@@ -33,11 +33,11 @@ def rebuild():
 
 
 def _manifest(tmp_path: Path, **certification) -> Path:
-    path = tmp_path / "runtime-manifest-gb10-nv26.09.json"
+    path = tmp_path / "runtime-manifest-gb10-vllm0.29.0.json"
     path.write_text(json.dumps({
-        "runtime_id": "faden-ray-vllm-gb10-ray2.58-nv26.09",
+        "runtime_id": "faden-ray-vllm-gb10-ray2.58-vllm0.29.0",
         "flavor": "gb10",
-        "release_tag": "faden/ray-vllm-gb10:ray2.58-nv26.09",
+        "release_tag": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
         "image_id": "sha256:" + "ab" * 32,
         "rootfs_layers": LAYERS,
         "stack_components": {"ray": "2.58.0", "vllm": "0.29.0", "cuda": "13.4"},
@@ -53,7 +53,7 @@ def _report(tmp_path: Path, *, layers=LAYERS, verdict: str | None = "PASSED", pa
     ]
     path = tmp_path / "report.json"
     report = {"target": "NVIDIA DGX Spark Two-Node Pair (GB10)", "timestamp": "2026-09-29T21:00:00Z",
-              "checks": checks, "image": {"tag": "faden/ray-vllm-gb10:ray2.58-nv26.09",
+              "checks": checks, "image": {"tag": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
                                           "rootfs_layers": {"head": layers, "worker": LAYERS}}}
     if verdict:
         report["overall_status"] = verdict
@@ -98,11 +98,11 @@ def test_evidence_that_does_not_fit_is_refused(rebuild, tmp_path: Path, report_k
 
 
 def test_a_build_starts_uncertified_under_the_name_of_its_base(rebuild, tmp_path: Path, monkeypatch) -> None:
-    """The GB10 runtime is named after the Dockerfile's NVIDIA base, so a new base is a new runtime."""
-    monkeypatch.setattr(rebuild, "base_image_of", lambda flavor: {"repository": "nvcr.io/nvidia/vllm", "tag": "26.09-py3"})
-    base = rebuild._from_ref("Dockerfile").rsplit(":", 1)[-1].split("-")[0]
-    flavor = rebuild.FLAVORS["gb10"]
-    assert f"nv{base}" in flavor.runtime_id and f"nv{base}" in flavor.manifest and f"nv{base}" in flavor.default_tag
+    """The GB10 runtime is named after the Dockerfile's vLLM base, so a new base is a new runtime."""
+    monkeypatch.setattr(rebuild, "base_image_of", lambda flavor: {"repository": "vllm/vllm-openai", "tag": "v0.29.0-aarch64-ubuntu2404"})
+    base = rebuild._from_ref("Dockerfile.gb10-vllm").rsplit(":", 1)[-1].split("-")[0].lstrip("v")
+    flavor = rebuild.FLAVORS["gb10-vllm"]
+    assert f"vllm{base}" in flavor.runtime_id and f"vllm{base}" in flavor.manifest and f"vllm{base}" in flavor.default_tag
     written = rebuild.write_manifest(
         tmp_path / "m.json", flavor.default_tag, flavor,
         {"image_id": "sha256:" + "ab" * 32, "rootfs_layers": LAYERS, "repo_digest": None},

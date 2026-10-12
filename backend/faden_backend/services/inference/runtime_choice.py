@@ -4,7 +4,8 @@ This server ships up to three runtimes per flavor of machine
 (``runtime-image/README.md``): the stable one clusters get, a newer one as a
 preview, an older one to go back to. A cluster's machine runs the runtime the
 cluster was switched to, else the one it was started with, else its flavor's
-default (``RuntimeBundleRegistry.resolve_for_node``). So nothing moves a
+default (``RuntimeBundleRegistry.resolve_for_node``); a runtime the catalogue no
+longer holds counts as none of those. So nothing moves a
 cluster to another runtime by itself -- not a restart, not a recovery, not an
 upgrade of this server that ships a newer one.
 
@@ -63,7 +64,12 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
     """What the machines run, whether they are there yet, and whether a newer stable runtime is out."""
     env = await _environment(session, environment_id)
     registry = default_bundle_registry
-    started = started_runtimes(env)
+    # A record of a runtime this server no longer ships (one withdrawn from the
+    # catalogue) names nothing a machine can be given again. It counts as no
+    # record, like a cluster formed before records were kept: the machine's
+    # default is what it gets, and the record is replaced when it next starts.
+    # Counting it as a mismatch would show a restart that nothing is going to do.
+    started = {node: runtime for node, runtime in started_runtimes(env).items() if registry.get_bundle(runtime)}
     offered: dict[str, RuntimeBundleManifest] = {}
     defaults: set[str] = set()
     runs: set[str] = set()

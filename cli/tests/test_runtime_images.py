@@ -137,7 +137,7 @@ def test_a_build_on_no_registry_is_not_asked_of_docker_hub(
     monkeypatch: pytest.MonkeyPatch, docker: FakeDocker,
 ) -> None:
     """Before a runtime release is certified the manifest names a local build."""
-    local = {"runtime-manifest.json": {"release_tag": "faden/ray-vllm-gb10:ray2.58-nv26.08",
+    local = {"runtime-manifest.json": {"release_tag": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
                                        "rootfs_layers": GB10_LAYERS, "base_image": {"architecture": "arm64"}}}
     fake = _use(monkeypatch, FakeDocker(manifests=local))
     report = rt.fetch("backend:x", architectures={"aarch64"})
@@ -172,7 +172,7 @@ def test_a_backend_image_without_manifests_says_so(
 @pytest.mark.parametrize(("ref", "registry"), [
     (GB10, True),
     ("localhost:5000/ray-runtime:1", True),
-    ("faden/ray-vllm-gb10:ray2.58-nv26.08", False),
+    ("faden/ray-vllm-gb10:ray2.58-vllm0.29.0", False),
     ("faden-ray-runtime-x86_64:2.58.0", False),
 ])
 def test_what_counts_as_a_registry(ref: str, registry: bool) -> None:

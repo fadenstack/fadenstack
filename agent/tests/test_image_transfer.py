@@ -25,7 +25,7 @@ from faden_agent import image_loader
 from faden_agent.dispatcher import CommandDispatcher
 from faden_agent.image_loader import ImageLoaderError, _describe, _download_resumable
 
-IMAGE = "faden/ray-vllm-gb10:ray2.58-nv26.08"
+IMAGE = "faden/ray-vllm-gb10:ray2.58-vllm0.29.0"
 BLOB = bytes(range(256)) * 4096  # 1 MiB of recognisable bytes
 
 
@@ -117,7 +117,7 @@ class TestResume:
         self, tmp_path: Path, plenty_of_disk: None
     ) -> None:
         """Even across an agent restart, the bytes already here are not re-sent."""
-        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-nv26.08.tar.part"
+        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-vllm0.29.0.tar.part"
         leftover.write_bytes(BLOB[:500_000])
         handler, calls = _server()
 
@@ -131,7 +131,7 @@ class TestResume:
         self, tmp_path: Path, plenty_of_disk: None
     ) -> None:
         """A 200 to a ranged request is the whole file; appending would corrupt it."""
-        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-nv26.08.tar.part"
+        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-vllm0.29.0.tar.part"
         leftover.write_bytes(b"stale bytes from somewhere else")
 
         def whole_file_only(request: httpx.Request) -> httpx.Response:
@@ -145,7 +145,7 @@ class TestResume:
     async def test_an_already_complete_file_is_not_fetched_again(
         self, tmp_path: Path, plenty_of_disk: None
     ) -> None:
-        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-nv26.08.tar.part"
+        leftover = tmp_path / "faden_ray-vllm-gb10_ray2.58-vllm0.29.0.tar.part"
         leftover.write_bytes(BLOB)
         handler, calls = _server()
 

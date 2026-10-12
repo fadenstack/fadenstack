@@ -36,6 +36,7 @@ from faden_backend.db.models.node_control import (
     NodeCommandType,
 )
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services.inference.bundles import default_bundle_registry
 from faden_backend.services.inference.drivers.ray.compiler import (
     DeploymentValidationError,
     compile_deployment,
@@ -43,6 +44,9 @@ from faden_backend.services.inference.drivers.ray.compiler import (
 from faden_backend.services.inference.drivers.ray.environment import RayEnvironmentManager
 from faden_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
+
+#: The runtime a DGX Spark pair gets: the GB10 flavor's default.
+GB10_RUNTIME = "faden-ray-vllm-gb10-ray2.58-vllm0.29.0"
 
 API = "/api/inference"
 
@@ -310,7 +314,7 @@ async def test_end_to_end_zero_config_multi_node_flow(
     assert len(image_cmds) == 2
     for cmd in image_cmds:
         bundle = cmd["payload"]["runtime_bundle"]
-        assert bundle["image"] == "faden/ray-vllm-gb10:ray2.58-nv26.08"
+        assert bundle["image"] == default_bundle_registry.get_bundle(GB10_RUNTIME).container.image
         assert bundle["digest"].startswith("sha256:")
         assert bundle["requirements"]["network_mode"] == "host"
         assert bundle["requirements"]["ipc_mode"] == "host"

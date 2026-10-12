@@ -3,7 +3,7 @@
 # vLLM publishes a CUDA 13 build for arm64; its kernels (sm_120) run on the
 # GB10 (sm_121), the same Blackwell family. Everything in it is open source or
 # NVIDIA's CUDA libraries, whose terms let them be passed on inside an
-# application; NVIDIA's own vLLM container (Dockerfile) may not be published.
+# application.
 # The release in the tag names the runtime: v0.29.0 makes it vllm0.29.0.
 FROM vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404
 
@@ -46,7 +46,7 @@ RUN python3 vllm_compat.py && python3 check_ray_vllm.py && \
 
 # Fail the build if the per-node metrics path cannot load: the dashboard
 # agent's reporter imports opencensus at module scope, and without it no
-# worker exports metrics (see Dockerfile for the history).
+# worker exports metrics.
 RUN python3 -c "import aiohttp_cors, opencensus; \
 import ray._private.prometheus_exporter as pe; \
 import ray.dashboard.modules.reporter.reporter_agent as ra; \

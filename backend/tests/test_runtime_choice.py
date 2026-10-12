@@ -1,10 +1,11 @@
 """Several runtimes per flavor, and which one a cluster runs.
 
-The GB10 runtime on NVIDIA 26.08 is certified; 26.09 loads models 26.08
-cannot (Qwen3.8's ``qwen4_exp``) but carries a temporary bridge for Ray 2.58,
-so it ships as a preview. A cluster keeps what it was started with until an
-operator switches it -- a recovery after an upgrade that ships a newer
-runtime does not quietly move a production cluster.
+A flavor can ship several runtimes: a certified stable one, a newer one as a
+preview, an older one to go back to. A cluster keeps what it was started with
+until an operator switches it -- a recovery after an upgrade that ships a newer
+runtime does not quietly move a production cluster. The exception is a runtime
+the catalogue no longer holds: that cluster gets the default. The catalogues
+here are built by the tests, not read from ``runtime-image``.
 """
 
 from __future__ import annotations
@@ -29,9 +30,10 @@ from faden_backend.services.inference.bundles import (
     TargetArchitecture,
 )
 
-STABLE = "gb10-nv26.08"
-PREVIEW = "gb10-nv26.09"
-OLDER = "gb10-nv26.07"
+STABLE = "gb10-vllm0.29.0"
+PREVIEW = "gb10-vllm0.30.0"
+OLDER = "gb10-vllm0.28.0"
+WITHDRAWN = "gb10-withdrawn"
 X86 = "x86_64-2.58"
 
 
@@ -154,6 +156,32 @@ async def test_a_cluster_on_an_older_runtime_is_told_an_update_is_out(
     assert offered[PREVIEW]["channel"] == "preview"
 
 
+async def test_a_cluster_recorded_on_a_withdrawn_runtime_gets_the_default(
+    dbsession: AsyncSession, registry: RuntimeBundleRegistry,
+) -> None:
+    """The runtime is gone from the catalogue: no error, no dangling id, nothing pretending to restart."""
+    env, nodes = await _pair(dbsession, started=WITHDRAWN)
+    env.config_json = {**env.config_json, "runtime": WITHDRAWN}  # it was also the operator's choice
+
+    for node in nodes:
+        assert registry.resolve_for_node(node, environment=env).bundle_id == STABLE
+
+    status = await runtime_choice.environment_status(dbsession, env.id)
+    assert status["runs"] == [STABLE]
+    assert WITHDRAWN not in {r["bundle_id"] for r in status["runtimes"]}
+    # Nothing is going to restart it: the record is replaced when it next starts.
+    assert status["applied"] is True and status["restarting"] is False
+    assert status["update"] is None
+
+
+async def test_a_withdrawn_runtime_is_passed_over_for_the_one_the_machine_was_started_with(
+    registry: RuntimeBundleRegistry,
+) -> None:
+    node = _spark()
+    env = InferenceEnvironment(config_json={"runtime": WITHDRAWN}, observed_status_json={"runtime": {str(node.id): OLDER}})
+    assert registry.resolve_for_node(node, environment=env).bundle_id == OLDER
+
+
 async def test_switching_restarts_the_cluster_on_the_chosen_runtime(
     dbsession: AsyncSession, registry: RuntimeBundleRegistry,
 ) -> None:
@@ -203,7 +231,7 @@ async def test_choosing_what_the_machines_already_run_restarts_nothing(
 
 @pytest.mark.parametrize(
     ("runtime_id", "says"),
-    [("gb10-nv99.99", "ships no runtime"), ("gb10-broken", "failed its certification"), (X86, "other hardware")],
+    [("gb10-vllm9.99.9", "ships no runtime"), ("gb10-broken", "failed its certification"), (X86, "other hardware")],
     ids=["unknown", "failed", "other-flavor"],
 )
 async def test_what_cannot_be_chosen(

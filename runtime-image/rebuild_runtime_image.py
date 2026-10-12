@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Build a runtime image and emit its manifest, from the image itself.
 
-Three images, two of them for the DGX Spark (see the README):
+Two images (see the README):
 
-    gb10       Dockerfile            aarch64, NVIDIA DGX Spark (GB10), on NVIDIA's vLLM container
     gb10-vllm  Dockerfile.gb10-vllm  aarch64, NVIDIA DGX Spark (GB10), on vLLM's own image
     x86_64     Dockerfile.x86_64     generic x86_64 NVIDIA, Turing to Blackwell
 
 Runs anywhere that can produce the image's platform: natively (a DGX node or
-an arm64 CI runner for ``gb10``, any x86_64 machine for ``x86_64``) or through
+an arm64 CI runner for ``gb10-vllm``, any x86_64 machine for ``x86_64``) or through
 ``docker buildx`` with binfmt/QEMU (``--platform``). No step needs a GPU:
 nothing compiles against the local CUDA stack, and the build-time assertions
 only *execute* the target architecture, which emulation handles.
@@ -43,15 +42,15 @@ nothing on a machine that has none, which is every CI runner).
 
 Usage
 -----
-    python3 rebuild_runtime_image.py --build                          # gb10, on a DGX node
+    python3 rebuild_runtime_image.py --flavor gb10-vllm --build         # gb10, on a DGX node
     python3 rebuild_runtime_image.py --flavor x86_64 --build          # on any x86_64 box
-    python3 rebuild_runtime_image.py --build --platform linux/arm64   # gb10, off-node
-    python3 rebuild_runtime_image.py --build --distribute sachi@10.250.10.71
+    python3 rebuild_runtime_image.py --flavor gb10-vllm --build --platform linux/arm64   # gb10, off-node
+    python3 rebuild_runtime_image.py --flavor gb10-vllm --build --distribute sachi@10.250.10.71
     python3 rebuild_runtime_image.py --verify-peer sachi@10.250.10.71
 
     # after certifying on the hardware (deploy_and_certify_2node.ps1):
-    python3 rebuild_runtime_image.py --manifest runtime-manifest-gb10-nv26.09.json \
-        --record-certification dgx_spark_2node_certification_report.json --channel preview
+    python3 rebuild_runtime_image.py --manifest runtime-manifest-gb10-vllm0.29.0.json \
+        --record-certification dgx_spark_2node_certification_report.json --channel stable
 
     # CI (.github/workflows/runtime-image-release.yml):
     python3 rebuild_runtime_image.py --flavor x86_64 --build --push \\
@@ -91,16 +90,12 @@ def _from_ref(dockerfile: str) -> str:
     return ref
 
 
-#: The GB10 runtime is named after its NVIDIA base: ``FROM
-#: nvcr.io/nvidia/vllm:26.09-py3`` makes it ``nv26.09``. A new release is the
-#: one edit to that line; its manifest, tag and runtime id follow, so the
-#: runtimes already shipped keep theirs.
-_GB10_RELEASE = "nv" + _from_ref("Dockerfile").rsplit(":", 1)[-1].split("-")[0]
-
-#: The GB10 runtime built on vLLM's own image instead (``Dockerfile.gb10-vllm``):
-#: ``FROM vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404`` makes it ``vllm0.29.0``.
-#: Everything in it is open source or NVIDIA's CUDA libraries, whose terms let it
-#: be passed on inside an application; NVIDIA's own vLLM container may not be.
+#: The GB10 runtime is named after its vLLM base: ``FROM
+#: vllm/vllm-openai:v0.29.0-aarch64-ubuntu2404`` makes it ``vllm0.29.0``. A new
+#: release is the one edit to that line; its manifest, tag and runtime id
+#: follow, so the runtimes already shipped keep theirs. Everything in it is open
+#: source or NVIDIA's CUDA libraries, whose terms let it be passed on inside an
+#: application.
 _GB10_VLLM_RELEASE = "vllm" + _from_ref("Dockerfile.gb10-vllm").rsplit(":", 1)[-1].split("-")[0].lstrip("v")
 
 
@@ -127,20 +122,11 @@ _GB10_HARDWARE = {
     "architecture": "aarch64", "interconnect": "200Gb/s direct link",
 }
 
-#: By ``--flavor``. Both GB10 builds are runtimes of the ``gb10`` flavor: the
-#: backend keeps what they share (the machine, mounts, tuning) under that name.
+#: By ``--flavor``. The GB10 runtimes are of the ``gb10`` flavor: the backend
+#: keeps what they share (the machine, mounts, tuning) under that name.
 FLAVORS: dict[str, Flavor] = {
     key: flavor
     for key, flavor in (
-        ("gb10", Flavor(
-            name="gb10",
-            dockerfile="Dockerfile",
-            manifest=f"runtime-manifest-gb10-{_GB10_RELEASE}.json",
-            default_tag=f"faden/ray-vllm-gb10:ray2.58-{_GB10_RELEASE}",
-            runtime_id=f"faden-ray-vllm-gb10-ray2.58-{_GB10_RELEASE}",
-            hardware_target="NVIDIA DGX Spark / GB10",
-            target_hardware=dict(_GB10_HARDWARE),
-        )),
         ("gb10-vllm", Flavor(
             name="gb10",
             dockerfile="Dockerfile.gb10-vllm",
@@ -429,8 +415,8 @@ def write_manifest(
     """
     manifest = {
         "schema_version": "1.1.0",
-        # The flavor's: carried over from the manifest before it, a 26.09
-        # build went on calling itself the 26.08 runtime.
+        # The flavor's: carried over from the manifest before it, a newer
+        # build went on calling itself the older runtime.
         "runtime_id": flavor.runtime_id,
         "flavor": flavor.name,
         "release_tag": tag,
@@ -529,7 +515,7 @@ def print_summary(manifest: dict) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--flavor", choices=sorted(FLAVORS), default="gb10", help="which runtime image (default gb10)")
+    parser.add_argument("--flavor", choices=sorted(FLAVORS), default="gb10-vllm", help="which runtime image (default gb10-vllm)")
     parser.add_argument("--tag", help="image reference to build/inspect (default: the flavor's local tag)")
     parser.add_argument("--build", action="store_true", help="run docker build first")
     parser.add_argument("--no-cache", action="store_true", help="build without the layer cache")

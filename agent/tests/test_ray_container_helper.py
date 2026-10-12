@@ -266,7 +266,7 @@ def _manager(tmp_path, runtime):
 def _bundle_payload(name: str = DEFAULT_CONTAINER_NAME) -> dict[str, Any]:
     return {
         "name": name,
-        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
+        "image": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
         "digest": "sha256:" + "7d" * 32,
         "requirements": {},
         "mounts": [],

@@ -56,7 +56,7 @@
       "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
     ],
     "tags": [
-      "faden/ray-vllm-gb10:ray2.58-nv26.08"
+      "faden/ray-vllm-gb10:ray2.58-vllm0.29.0"
     ]
   },
   "gpu-02": {
@@ -118,7 +118,7 @@
       "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
     ],
     "tags": [
-      "faden/ray-vllm-gb10:ray2.58-nv26.08"
+      "faden/ray-vllm-gb10:ray2.58-vllm0.29.0"
     ]
   }
 }

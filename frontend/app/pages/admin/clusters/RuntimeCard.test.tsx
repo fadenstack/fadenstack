@@ -13,9 +13,9 @@ import { inferenceApi, type ClusterRuntime, type ClusterRuntimeStatus } from "~/
 import RuntimeCard from "./RuntimeCard";
 
 const ENV = "89ed5f75-078c-4d9a-8ac7-09255fe29db6";
-const OLDER = "faden-ray-vllm-gb10-ray2.58-nv26.07";
-const STABLE = "faden-ray-vllm-gb10-ray2.58-nv26.08";
-const PREVIEW = "faden-ray-vllm-gb10-ray2.58-nv26.09";
+const OLDER = "faden-ray-vllm-gb10-ray2.58-vllm0.26.2";
+const STABLE = "faden-ray-vllm-gb10-ray2.58-vllm0.27.1";
+const PREVIEW = "faden-ray-vllm-gb10-ray2.58-vllm0.29.0";
 
 function runtime(id: string, vllm: string, overrides: Partial<ClusterRuntime> = {}): ClusterRuntime {
   return {

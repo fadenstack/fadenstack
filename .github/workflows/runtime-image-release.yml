@@ -4,9 +4,8 @@
 #   gb10     runtime-image/Dockerfile.gb10-vllm -> ghcr.io/fadenstack/ray-runtime-gb10:<version>
 #   x86_64   runtime-image/Dockerfile.x86_64    -> ghcr.io/fadenstack/ray-runtime-x86_64:<version>
 #
-# The GB10 image is built on vLLM's own image (--flavor gb10-vllm). The one on
-# NVIDIA's vLLM container (runtime-image/Dockerfile) is never built here: NVIDIA's
-# terms do not allow publishing it.
+# The GB10 image is built on vLLM's own image (--flavor gb10-vllm); NVIDIA's own
+# vLLM container is not a base here, as its terms do not allow publishing.
 #
 # Release: push a tag runtime-v<version> (for example runtime-v2.58.0-1). Or run this by hand
 # (workflow_dispatch) with push off, to check the images still build.

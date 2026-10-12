@@ -45,7 +45,7 @@ and keep their own terms.
 
 | Artifact | Built on | Terms |
 |---|---|---|
-| Runtime image for NVIDIA DGX Spark | vLLM's own image (`vllm/vllm-openai`, its CUDA 13 build for arm64), with NVIDIA's CUDA and related packages, plus Ray and added Python packages | vLLM and Ray are Apache-2.0; NVIDIA's CUDA packages are under the [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and their own terms, which are not open source. Their licence files stay in the image. Runtimes built on NVIDIA's own vLLM container (`nvcr.io/nvidia/vllm`, named `...-nv<release>`) fall under the [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) and the [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/), which do not allow publishing them; they are not offered for download |
+| Runtime image for NVIDIA DGX Spark | vLLM's own image (`vllm/vllm-openai`, its CUDA 13 build for arm64), with NVIDIA's CUDA and related packages, plus Ray and added Python packages | vLLM and Ray are Apache-2.0; NVIDIA's CUDA packages are under the [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and their own terms, which are not open source. Their licence files stay in the image. |
 | Runtime image for x86_64 machines | A slim Python base image, operating-system packages, Ray and vLLM from PyPI, and the Python and CUDA packages they pull in | Each component keeps its own licence, including NVIDIA's CUDA, cuDNN and related packages under the [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and their own terms, which are not open source. Their licence files stay in the image; its SBOM is the inventory |
 | Model-TLS proxy | nginx | nginx's licence |
 | The models | Whatever you deploy from Hugging Face or import | Each model's own licence, which the administrator accepts on Hugging Face for gated models |
@@ -59,7 +59,6 @@ The machines get these images from the server.
 
 - [Ray](https://github.com/ray-project/ray)
 - [vLLM](https://github.com/vllm-project/vllm)
-- [NVIDIA vLLM container](https://docs.nvidia.com/deeplearning/frameworks/vllm-release-notes/running.html)
 - [Swagger UI](https://github.com/swagger-api/swagger-ui)
 - [ReDoc](https://github.com/Redocly/redoc)
 - [Sora](https://github.com/sora-xor/sora-font)
@@ -68,5 +67,4 @@ The machines get these images from the server.
 - [Zensical](https://github.com/zensical/zensical)
 - [Lucide](https://github.com/lucide-icons/lucide)
 - [Material Design Icons](https://github.com/Templarian/MaterialDesign)
-- [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) and [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/)
 - [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html)

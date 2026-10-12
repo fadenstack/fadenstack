@@ -65,7 +65,7 @@ def _doc(*, apps: list[dict[str, Any]] | None = None, extra_nodes: list[dict[str
     """The cluster as DESCRIBE_RAY_CLUSTER answers (the DGX pair's)."""
     return {
         "attached": True, "ray_version": "2.58.0", "gcs_address": "10.100.0.2:6379", "errors": [],
-        "container": {"running": True, "image": "faden/ray-vllm-gb10:ray2.58-nv26.08"},
+        "container": {"running": True, "image": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0"},
         "nodes": [
             {"node_id": "ray-head", "ip": "10.100.0.2", "hostname": "gpu-01", "alive": True, "is_head": True, "gpus": 1.0},
             {"node_id": "ray-worker", "ip": "10.100.0.1", "hostname": "gpu-02", "alive": True, "is_head": False, "gpus": 1.0},
