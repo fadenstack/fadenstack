@@ -49,7 +49,8 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$KIND" =~ ^(cli|agent|runtime)$ ]]
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]
+          # 0.4.4, a Python pre-release (0.4.4rc1, 0.5.0b2) or a runtime's suffix (2.58.0-vllm0.29.0).
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+|-[0-9A-Za-z.]+)?$ ]]
           case "$KIND:$TAG" in
             cli:v"$VERSION"|cli:cli-v"$VERSION"|agent:node-agent-v"$VERSION"|runtime:runtime-v"$VERSION") ;;
             *) echo "::error::Tag $TAG does not match $KIND version $VERSION"; exit 1 ;;
