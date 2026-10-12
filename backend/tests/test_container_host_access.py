@@ -506,3 +506,44 @@ async def test_an_operator_still_starts_and_stops_a_container_with_the_socket(
     for action in ("start", "stop", "restart"):
         r = await client.post(app.url_path_for("container_lifecycle", container_id=OLD_ID, action=action))
         assert r.status_code == status.HTTP_204_NO_CONTENT, action
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("address", ["tool", OLD_ID[:12]], ids=["by-name", "by-short-id"])
+async def test_a_locked_container_stays_locked_when_addressed_by_name_or_short_id(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock, address: str,
+) -> None:
+    """The registry is keyed by the full id; a name in the path used to fall back to the unregistered default.
+
+    In Root Mode that default let everything through, which a lock must not.
+    """
+    await ContainerRegistryDAO(dbsession).upsert(
+        container_id=OLD_ID, name="tool", container_class=ContainerClass.TENANT_APP, policy=ContainerPolicy.LOCKED,
+    )
+    docker.inspect_container = AsyncMock(return_value=_raw())  # whatever it is called, it is this container
+    app = _as(fastapi_app, await _user(dbsession, superuser=True), docker, root_mode=True)
+
+    # By the full id: refused (the baseline).
+    r = await client.post(app.url_path_for("container_lifecycle", container_id=OLD_ID, action="stop"))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    r = await client.post(app.url_path_for("container_lifecycle", container_id=address, action="stop"))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    r = await client.put(app.url_path_for("update_container", container_id=address), json=_create())
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    r = await client.delete(app.url_path_for("delete_container", container_id=address))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    docker.stop.assert_not_called()
+    docker.delete.assert_not_called()
+    docker.create_from_config.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_a_container_addressed_by_name_gets_the_class_it_is_registered_with(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    await _registered(dbsession)  # TENANT_APP, free: may be stopped
+    docker.inspect_container = AsyncMock(return_value=_raw())
+    app = _as(fastapi_app, await _user(dbsession, superuser=True), docker)
+    r = await client.post(app.url_path_for("container_lifecycle", container_id="tool", action="stop"))
+    assert r.status_code == status.HTTP_204_NO_CONTENT, r.text
