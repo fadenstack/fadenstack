@@ -249,4 +249,45 @@ describe("CreateClusterWizard", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Incompatible GPU vendor/)).toBeInTheDocument();
   });
+
+  it("says how far each runtime is certified, so an uncertified one is not mistaken for a certified one", async () => {
+    vi.spyOn(inferenceApi, "listRuntimeBundles").mockResolvedValue([
+      { ...BUNDLE, certification_status: "uncertified" },
+    ]);
+    renderWizard();
+    await userEvent.type(screen.getByLabelText("Cluster name"), "dgx-pair");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(await screen.findByLabelText("Use gpu-02"));
+
+    expect(await screen.findByText("Not certified")).toBeInTheDocument();
+  });
+
+  it("does not ask for a network when the cluster is one machine", async () => {
+    const { onCreated } = renderWizard();
+    await userEvent.type(screen.getByLabelText("Cluster name"), "solo");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(await screen.findByLabelText("Use gpu-02"));
+
+    // Two steps for one machine; the button starts the cluster.
+    expect(screen.queryByText("Confirm the network")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Create cluster" }));
+
+    await waitFor(() =>
+      expect(inferenceApi.applyEnvironmentPlan).toHaveBeenCalledWith(ENV_ID, {
+        plan,
+        selected_candidate_id: "cand-roce-1",
+      }),
+    );
+    expect(inferenceApi.reconcileEnvironment).toHaveBeenCalledWith(ENV_ID);
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(ENV_ID));
+  });
+
+  it("still asks for the network when the cluster is two machines", async () => {
+    renderWizard();
+    await walkToNetworkStep();
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(await screen.findByRole("button", { name: "Create cluster" })).toBeInTheDocument();
+    expect(inferenceApi.applyEnvironmentPlan).not.toHaveBeenCalled();
+  });
 });

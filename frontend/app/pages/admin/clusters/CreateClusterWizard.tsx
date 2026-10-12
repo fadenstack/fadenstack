@@ -192,6 +192,17 @@ export function CreateClusterWizard({
       const found = await inferenceApi.planEnvironment(cluster.id);
       setPlan(found);
       setCandidateId(found.recommended_candidate_id);
+      // One machine has no network to choose between machines: take the
+      // recommendation and start, unless the plan is blocked -- then the
+      // network step shows why.
+      if (chosen.length === 1 && found.recommended_candidate_id && found.blockers.length === 0) {
+        await applyAndStart(false, {
+          clusterId: cluster.id,
+          plan: found,
+          candidateId: found.recommended_candidate_id,
+        });
+        return;
+      }
       setStep(2);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -209,31 +220,40 @@ export function CreateClusterWizard({
    * enrols, so the recovery is to re-derive and show the current choice
    * rather than to fail.
    */
-  async function applyAndStart(isRetry = false) {
-    if (!clusterId || !plan) return;
+  async function applyAndStart(
+    isRetry = false,
+    now: { clusterId: string | null; plan: EnvironmentPlan | null; candidateId: string | null } = {
+      clusterId,
+      plan,
+      candidateId,
+    },
+  ) {
+    const { clusterId: id, plan: current, candidateId: currentCandidate } = now;
+    if (!id || !current) return;
     setError(null);
     setNotice(null);
     setWorking(t("clusters.network.applying"));
     try {
-      await inferenceApi.applyEnvironmentPlan(clusterId, {
-        plan,
-        selected_candidate_id: candidateId,
+      await inferenceApi.applyEnvironmentPlan(id, {
+        plan: current,
+        selected_candidate_id: currentCandidate,
       });
       setWorking(t("clusters.network.starting"));
-      await inferenceApi.reconcileEnvironment(clusterId);
-      onCreated(clusterId);
+      await inferenceApi.reconcileEnvironment(id);
+      onCreated(id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const stale = /stale plan/i.test(message);
       if (stale && !isRetry) {
         setWorking(t("clusters.create.working_replan"));
         try {
-          const refreshed = await inferenceApi.planEnvironment(clusterId);
+          const refreshed = await inferenceApi.planEnvironment(id);
           setPlan(refreshed);
+          setStep(2);
           // Keep the operator's choice when the same network is still on
           // offer; otherwise fall back to the new recommendation.
-          const chosenCidr = plan.candidates.find(
-            (c) => c.candidate_id === candidateId,
+          const chosenCidr = current.candidates.find(
+            (c) => c.candidate_id === currentCandidate,
           )?.cidr;
           const sameNetwork = refreshed.candidates.find(
             (c) => c.cidr === chosenCidr,
@@ -252,6 +272,7 @@ export function CreateClusterWizard({
           setWorking("");
         }
       }
+      setStep(2); // a one-machine start that failed is retried from the network step
       setError(message);
     } finally {
       setWorking("");
@@ -260,13 +281,16 @@ export function CreateClusterWizard({
 
   const blocked = (plan?.blockers.length ?? 0) > 0;
   const busy = Boolean(working);
+  // The network step is for choosing between machines; a one-machine cluster
+  // goes straight from the machines to starting.
+  const steps = chosen.length === 1 && step < 2 ? STEPS.slice(0, 2) : STEPS;
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle>{t("clusters.create.title")}</DialogTitle>
       <DialogContent dividers>
         <Stepper activeStep={step} sx={{ mb: 3 }}>
-          {STEPS.map((key) => (
+          {steps.map((key) => (
             <Step key={key}>
               <StepLabel>{t(`clusters.create.step_${key}`)}</StepLabel>
             </Step>
@@ -386,20 +410,24 @@ export function CreateClusterWizard({
                   .filter((node) => bundleByNode.has(node.id))
                   .map((node) => {
                     const bundle = bundleByNode.get(node.id)!;
+                    const status = bundle.certification_status;
                     return (
-                      <Typography
-                        key={node.id}
-                        variant="caption"
-                        color="text.secondary"
-                        component="div"
-                      >
-                        {t("clusters.create.runs_bundle", {
-                          machine: node.agent_id,
-                          bundle: bundle.display_name,
-                          runtime: bundle.runtime_version,
-                          vllm: bundle.vllm_version,
-                        })}
-                      </Typography>
+                      <Stack key={node.id} direction="row" spacing={1} alignItems="center">
+                        <Typography variant="caption" color="text.secondary" component="div">
+                          {t("clusters.create.runs_bundle", {
+                            machine: node.agent_id,
+                            bundle: bundle.display_name,
+                            runtime: bundle.runtime_version,
+                            vllm: bundle.vllm_version,
+                          })}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={status === "passed" ? "success" : status === "failed" ? "error" : "warning"}
+                          label={t(`clusters.runtime.status.${status}`, { defaultValue: status })}
+                        />
+                      </Stack>
                     );
                   })}
               </Box>
@@ -463,7 +491,7 @@ export function CreateClusterWizard({
             disabled={chosen.length === 0 || busy}
             onClick={() => void createAndPlan()}
           >
-            {t("common.next")}
+            {chosen.length === 1 ? t("clusters.create.submit") : t("common.next")}
           </Button>
         )}
         {step === 2 && (
