@@ -27,6 +27,7 @@ from faden_cli.core import backup
 def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
     # The upgrade, deploy and rebuild steps that carry chat files out of the gateway container: none here.
     monkeypatch.setattr(backup, "keep_chat_files", lambda *_a, **_k: None)
+    monkeypatch.setattr(backup, "keep_company_files", lambda *_a, **_k: None)
 
     # Nothing to find...
     monkeypatch.setattr(dev_up.psutil, "process_iter", lambda *_a, **_k: [])

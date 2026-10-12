@@ -22,7 +22,9 @@ def steps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[tuple[str, ob
     monkeypatch.setattr(rebuild, "load_config", lambda: object())
     monkeypatch.setattr(rebuild, "build_context_from_config", lambda _cfg: ctx)
     monkeypatch.setattr(rebuild, "compose_build", lambda *_a, **_k: seen.append(("build", None)) or 0)
-    monkeypatch.setattr(backup, "keep_chat_files", lambda env_file: seen.append(("keep_chat_files", env_file)))
+    monkeypatch.setattr(
+        backup, "keep_company_files", lambda env_file, _ctx=None: seen.append(("keep_company_files", env_file))
+    )
     monkeypatch.setattr(
         "faden_cli.commands.deploy._sync_postgres_password", lambda *_a: seen.append(("password", None)),
     )
@@ -38,11 +40,11 @@ def test_the_gateway_keeps_its_chat_files_before_anything_is_recreated(steps: li
     assert result.exit_code == 0, result.output
     env = steps[0][1]
     names = [name for name, _ in steps[1:]]
-    assert names == ["build", "keep_chat_files", "password", "up"]
-    assert ("keep_chat_files", env) in steps
+    assert names == ["build", "keep_company_files", "password", "up"]
+    assert ("keep_company_files", env) in steps
 
 
 def test_another_service_leaves_the_chat_files_alone(steps: list[tuple[str, object]]) -> None:
     result = CliRunner().invoke(rebuild.rebuild_cmd, ["frontend"])
     assert result.exit_code == 0, result.output
-    assert "keep_chat_files" not in [name for name, _ in steps]
+    assert "keep_company_files" not in [name for name, _ in steps]

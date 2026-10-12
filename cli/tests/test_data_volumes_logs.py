@@ -21,6 +21,7 @@ from faden_cli.commands import upgrade
 from faden_cli.commands.deploy import set_deploy_options
 from faden_cli.core import backup, compose
 from faden_cli.core.backup import keep_chat_files as real_keep_chat_files  # before the conftest replaces it
+from faden_cli.core.backup import keep_company_files as real_keep_company_files
 from faden_cli.core.compose import ComposeContext
 from faden_cli.core.env_gen import DEPLOY_SETTINGS, default_env_vars, fill_required_env, read_env_file
 
@@ -88,7 +89,7 @@ def test_every_service_rotates_its_log_and_the_gateway_mounts_the_chat_files() -
 
 def test_the_backup_takes_the_chat_files() -> None:
     assert "faden_chat_files" in backup.BACKUP_VOLUMES
-    assert backup.DATA_DIR_VOLUMES["faden_chat_files"] == "chat-files"
+    assert backup.DATA_DIR_VOLUMES == {"faden_chat_files": "chat-files", "faden_rag_lite": "knowledge"}
 
 
 def _lines(files: dict[str, bytes]) -> bytes:
@@ -304,7 +305,8 @@ def test_the_upgrade_stops_before_compose_replaces_anything(
     monkeypatch.setattr(compose.shutil, "which", lambda name: name)
     synced: list[object] = []
     monkeypatch.setattr("faden_cli.commands.deploy._sync_postgres_password", lambda *a: synced.append(a))
-    monkeypatch.setattr(backup, "keep_chat_files", real_keep_chat_files)  # the conftest's no-op replaced
+    monkeypatch.setattr(backup, "keep_chat_files", real_keep_chat_files)  # the conftest's no-ops replaced
+    monkeypatch.setattr(backup, "keep_company_files", real_keep_company_files)
 
     def refuse(_data_dir: str = "") -> None:
         raise backup.ChatFilesNotCarried("Chat attachments could not be copied. Free disk space.")

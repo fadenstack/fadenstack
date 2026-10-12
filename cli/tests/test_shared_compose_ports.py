@@ -72,7 +72,8 @@ def test_the_backend_and_its_worker_share_the_knowledge_file_store() -> None:
     services = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]
     store = "/data/faden/rag-lite"
     mounts = {
-        name: next((v.split(":")[0] for v in services[name].get("volumes", []) if v.split(":")[1:2] == [store]), None)
+        # The source may be an expression with colons (${FADEN_DATA_DIR:-faden_rag_lite}...): split off the end.
+        name: next((v.rsplit(":", 1)[0] for v in services[name].get("volumes", []) if v.endswith(f":{store}")), None)
         for name in ("faden-backend", "faden-backend-worker")
     }
     assert mounts["faden-backend"] is not None and mounts["faden-backend"] == mounts["faden-backend-worker"], mounts

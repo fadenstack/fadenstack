@@ -368,10 +368,11 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     # Chat attachments an older release kept inside the gateway container, which the restart below replaces:
     # copied into the volume they now have and verified, while the old container is still there. First of
     # all, before anything is replaced (syncing the password starts Postgres, which compose may recreate): if
-    # they cannot be kept, the command stops here and the old containers keep running.
-    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
+    # they cannot be kept, the command stops here and the old containers keep running. With FADEN_DATA_DIR set,
+    # the files of the named volumes it covers are copied into its folders the same way.
+    from faden_cli.core.backup import keep_company_files  # noqa: PLC0415
 
-    keep_chat_files(env_path)
+    keep_company_files(env_path, ctx)
 
     # Sync postgres password before restarting (same as deploy)
     from faden_cli.commands.deploy import _sync_postgres_password, retire_fixed_logins  # noqa: PLC0415

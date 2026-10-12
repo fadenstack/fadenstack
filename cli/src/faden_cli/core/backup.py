@@ -44,7 +44,12 @@ BACKUP_VOLUMES: list[str] = [
 
 #: The company data volumes docker-compose.yaml can put in a host directory instead: with FADEN_DATA_DIR set in
 #: .env, the volume is that directory plus the subdirectory named here. Mirrors the mounts in the compose file.
-DATA_DIR_VOLUMES: dict[str, str] = {"faden_chat_files": "chat-files"}
+#: This is the whole scope, settled before the first release that ships it: chat attachments and the knowledge
+#: base's files. Never in it, so that setting FADEN_DATA_DIR can never put a volume on an empty folder in a
+#: later release: the database (pg_data), the model store (faden_models) and the observability data. They get
+#: settings of their own. Adding an entry here later would make every install that set FADEN_DATA_DIR mount an
+#: empty folder, and its data would look lost.
+DATA_DIR_VOLUMES: dict[str, str] = {"faden_chat_files": "chat-files", "faden_rag_lite": "knowledge"}
 
 #: Where the gateway keeps chat attachments, and its container: files an older release left in the
 #: container layer are carried into the volume before the container is replaced.
@@ -373,12 +378,17 @@ def _volume_source(docker: str, project: str, name: str, data_dir: str) -> str |
     return _compose_volume(docker, project, name)
 
 
-class ChatFilesNotCarried(RuntimeError):
-    """The chat attachments in the old gateway container could not be copied and verified.
+class FilesNotCarried(RuntimeError):
+    """Company files could not be copied and verified. The message says what failed and what to do. Raised
+    before any container is replaced, so the files are where they were."""
 
-    The message says what failed and what to do. Raised before any container is replaced, so the files are
-    where they were.
-    """
+
+class ChatFilesNotCarried(FilesNotCarried):
+    """The chat attachments in the old gateway container could not be copied and verified."""
+
+
+class DataDirNotMoved(FilesNotCarried):
+    """The files of a named volume could not be copied into the FADEN_DATA_DIR folder and verified."""
 
 
 @dataclass
@@ -420,29 +430,37 @@ _HASH_DIRECTORY = (
 _COPY_STREAM = "tar -x --skip-old-files -f - -C /dst"
 
 
-def _parse_hashes(output: str) -> dict[str, tuple[str, int]]:
+def _parse_hashes(output: str, failure: type[FilesNotCarried] = ChatFilesNotCarried) -> dict[str, tuple[str, int]]:
     """Path (relative) → (SHA-256, size) from the lines :data:`_HASH_MEMBER` prints."""
     found: dict[str, tuple[str, int]] = {}
     for line in output.splitlines():
         parts = line.split("\t", 2)
         if len(parts) != 3 or len(parts[0]) != 64 or not parts[1].isdigit():
-            raise ChatFilesNotCarried(f"The helper container answered something unexpected: {line[:120]!r}.")
+            raise failure(f"The helper container answered something unexpected: {line[:120]!r}.")
         found[parts[2].removeprefix("./")] = (parts[0], int(parts[1]))
     return found
 
 
-def _helper(docker: str, image: str, script: str, *, mount: str | None = None, interactive: bool = False) -> list[str]:
-    """``docker run`` of the old gateway's own image, running *script* as root with *mount* on ``/dst``.
+def _helper(
+    docker: str,
+    image: str,
+    script: str,
+    *,
+    mount: str | None = None,
+    interactive: bool = False,
+    extra_mounts: tuple[str, ...] = (),
+) -> list[str]:
+    """``docker run`` of an image already on the server, running *script* as root with *mount* on ``/dst``.
 
-    The image is on the server already (an air-gapped one pulls nothing) and is Debian with GNU tar and
-    sha256sum. Root, to read and write whatever user the files belong to.
+    The image is the old gateway's or the backend's own (an air-gapped server pulls nothing) and is Debian
+    with GNU tar and sha256sum. Root, to read and write whatever user the files belong to.
     """
     cmd = [docker, "run", "--rm"]
     if interactive:
         cmd.append("-i")
     cmd += ["--user", "0:0", "--entrypoint", "sh"]
-    if mount is not None:
-        cmd += ["-v", mount]
+    for each in (*([mount] if mount is not None else []), *extra_mounts):
+        cmd += ["-v", each]
     return [*cmd, image, "-c", script]
 
 
@@ -612,6 +630,162 @@ def carry_over_chat_files(data_dir: str = "") -> CarryResult:
             )
         _check_destination(source, _hash_destination(docker, image, target), after_copy=True)
     return CarryResult("copied", len(source), size)
+
+
+#: The same lines for the files of a named volume, mounted read-only on /src.
+_HASH_VOLUME = _HASH_DIRECTORY.replace("/dst", "/src")
+#: Volume -> folder without ever replacing a file the folder holds. No ``pipefail`` in dash: a failed read side
+#: shows up as files missing in the check after the copy.
+_MOVE_VOLUME = "tar -c -f - -C /src . | tar -x --skip-old-files -f - -C /dst"
+
+_VOLUME_LEFT = (
+    "Nothing was replaced: the containers still run and the named volume is untouched. Fix the cause named, "
+    "then run the command again."
+)
+
+
+@dataclass
+class MoveResult:
+    """What :func:`move_into_data_dir` did for one volume: ``"moved"``, ``"present"`` (the folder already held
+    every file) or ``"none"`` (no such volume, or it is empty), and how many files and bytes were copied."""
+
+    volume: str
+    status: str
+    folder: str = ""
+    files: int = 0
+    size: int = 0
+
+
+def _helper_image(docker: str, ctx: object | None = None) -> str:
+    """An image already on the server for the helper container: the running gateway's or backend's own,
+    else the backend image the compose file names (an air-gapped server pulls nothing)."""
+    for container in (_GATEWAY_CONTAINER, "faden-backend"):
+        proc = subprocess.run(  # noqa: S603
+            [docker, "inspect", "-f", "{{.Image}}", container], capture_output=True, check=False
+        )
+        image = proc.stdout.decode("utf-8", errors="replace").strip() if proc.returncode == 0 else ""
+        if image:
+            return image
+    if ctx is not None:
+        proc = subprocess.run(  # noqa: S603
+            [*ctx.base_cmd(), "config", "--images"], capture_output=True, text=True, check=False  # type: ignore[attr-defined]
+        )
+        for line in (proc.stdout or "").splitlines():
+            if proc.returncode == 0 and "/backend:" in line.strip():
+                return line.strip()
+    raise DataDirNotMoved(
+        f"No image to copy the files with: neither {_GATEWAY_CONTAINER} nor faden-backend exists and the compose "
+        f"file names no backend image. {_VOLUME_LEFT}"
+    )
+
+
+def _hash_tree(docker: str, image: str, path: str, *, role: str) -> dict[str, tuple[str, int]]:
+    """Path → (SHA-256, size) of every file under *path* (a volume, as ``/src``, or a folder, as ``/dst``)."""
+    script, where = (_HASH_VOLUME, "src") if role == "volume" else (_HASH_DIRECTORY, "dst")
+    proc = subprocess.run(  # noqa: S603
+        _helper(docker, image, script, mount=f"{path}:/{where}:ro"), capture_output=True, check=False
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip()[:300]
+        raise DataDirNotMoved(
+            f"The files in the {role} {path} could not be read to check them "
+            f"({detail or 'the helper failed'}). {_VOLUME_LEFT}"
+        )
+    return _parse_hashes(proc.stdout.decode("utf-8", errors="replace"), DataDirNotMoved)
+
+
+def _move_volume(docker: str, image: str, name: str, volume: str, folder: str) -> MoveResult:
+    """Copy what the named *volume* holds and *folder* lacks into *folder*, then check every file's SHA-256."""
+    source = _hash_tree(docker, image, volume, role="volume")
+    if not source:
+        return MoveResult(name, "none", folder)
+    found = _hash_tree(docker, image, folder, role="folder")
+    differing = [path for path, (digest, _) in source.items() if path in found and found[path][0] != digest]
+    if differing:
+        raise DataDirNotMoved(
+            f"{len(differing)} file(s) of {name} exist in {folder} with other content than in the volume: "
+            f"{_named(differing)}. Nothing was overwritten and nothing was replaced. Compare the two copies, "
+            f"move the one you do not want out of the way, then run the command again."
+        )
+    size = sum(n for _, n in source.values())
+    if all(path in found for path in source):
+        return MoveResult(name, "present", folder)
+    info(f"  {name}: {len(source)} file(s), {_human_size(size)}; copying into {folder}…")
+    proc = subprocess.run(  # noqa: S603
+        _helper(docker, image, _MOVE_VOLUME, mount=f"{folder}:/dst", extra_mounts=(f"{volume}:/src:ro",)),
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip()[:300]
+        raise DataDirNotMoved(
+            f"The files of {name} could not be copied into {folder} ({detail or 'the helper container failed'}). "
+            f"{_VOLUME_LEFT}"
+        )
+    after = _hash_tree(docker, image, folder, role="folder")
+    differing = [p for p, (digest, _) in source.items() if p in after and after[p][0] != digest]
+    if differing:
+        raise DataDirNotMoved(
+            f"{len(differing)} file(s) of {name} differ in {folder} after copying: {_named(differing)}. They "
+            f"changed in the volume while it was copied, or were damaged on the way. {_VOLUME_LEFT}"
+        )
+    missing = [path for path in source if path not in after]
+    if missing:
+        raise DataDirNotMoved(
+            f"{len(missing)} file(s) of {name} are not in {folder} after copying: {_named(missing)}. {_VOLUME_LEFT}"
+        )
+    return MoveResult(name, "moved", folder, len(source), size)
+
+
+def move_into_data_dir(data_dir: str, ctx: object | None = None) -> list[MoveResult]:
+    """With FADEN_DATA_DIR set: copy the files of every named volume in :data:`DATA_DIR_VOLUMES` that still
+    exists into its folder, verified, before a container that mounts the folder is created.
+
+    Switching FADEN_DATA_DIR on would otherwise put an empty folder where the volume's files are. The copy
+    never overwrites (``tar --skip-old-files``); then every file of the volume must be in the folder with the
+    same SHA-256. A file in both with other content is a conflict that stops everything before anything is
+    written. The volume is left as it was. Any failure raises :class:`DataDirNotMoved`; nothing is replaced.
+    Safe to run again: a folder that holds everything is left alone. Switching it off again copies nothing back.
+    """
+    if not data_dir:
+        return []
+    docker = _docker_bin()
+    project = _compose_project(docker) or _DEFAULT_PROJECT
+    results: list[MoveResult] = []
+    image = ""
+    for name, subdirectory in DATA_DIR_VOLUMES.items():
+        volume = _compose_volume(docker, project, name)
+        folder = f"{data_dir}/{subdirectory}"
+        if volume is None:
+            results.append(MoveResult(name, "none", folder))
+            continue
+        image = image or _helper_image(docker, ctx)
+        results.append(_move_volume(docker, image, name, volume, folder))
+    return results
+
+
+def keep_company_files(env_file: object, ctx: object | None = None) -> None:
+    """Before containers are created with this ``.env``: :func:`keep_chat_files`, then, when FADEN_DATA_DIR is
+    set, :func:`move_into_data_dir`.
+
+    The chat files go first: from an old gateway container (0.4.3 and older, no mount) straight into the
+    folder, which creates no named volume; the move after it then finds no volume for them, or one whose files
+    the folder already holds. The two never write the same file differently: both skip files that exist and
+    stop on a conflict. When anything cannot be kept, the command stops here with the reason; nothing is replaced.
+    """
+    keep_chat_files(env_file)
+    try:
+        results = move_into_data_dir(data_dir_of(env_file), ctx)
+    except FilesNotCarried as exc:
+        error(str(exc))
+        sys.exit(1)
+    for result in results:
+        if result.status == "moved":
+            success(
+                f"{result.volume} copied into {result.folder} and verified ({result.files} file(s), "
+                f"{_human_size(result.size)}). The named volume is left as it was: once you are satisfied, "
+                f"remove it with `docker volume rm`."
+            )
 
 
 def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data_dir: str = "") -> list[str]:
