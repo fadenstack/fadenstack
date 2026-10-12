@@ -550,6 +550,31 @@ _ENV_VAR_DENYLIST = frozenset(
         "SYCL_DEVICE_ALLOWLIST",
         "SYCL_DEVICE_FILTER",
     }
+    | {
+        # Where weights and code come from, and the credential for it. An
+        # allowed prefix (HF_, VLLM_) is not an allowed setting: these point
+        # the engine at another hub (HF_ENDPOINT, which also receives the
+        # token), at a cache the spec fills (HF_MODULES_CACHE holds repository
+        # code), at node files or plugins, or put a credential in the stored
+        # spec. The server sets the ones it needs (HF_TOKEN) itself.
+        "HF_ENDPOINT",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "HF_XET_CACHE",
+        "HF_ASSETS_CACHE",
+        "HF_MODULES_CACHE",
+        "HF_DATASETS_CACHE",
+        "HF_TOKEN",
+        "HF_TOKEN_PATH",
+        "VLLM_ALLOWED_LOCAL_MEDIA_PATH",
+        "VLLM_PLUGINS",
+        "VLLM_LOGGING_CONFIG_PATH",
+        "VLLM_TORCH_PROFILER_DIR",
+        "VLLM_CACHE_ROOT",
+        "VLLM_ASSETS_CACHE",
+        "VLLM_CONFIG_ROOT",
+        "VLLM_RPC_BASE_PATH",
+    }
 )
 
 

@@ -37,6 +37,7 @@ from faden_agent.ray.container import (
     RuntimeBundleSpec,
 )
 from faden_agent.ray.core import RayCoreClient
+from faden_agent.ray.env_policy import RESERVED_ENV_KEYS
 from faden_agent.ray.metrics import RayMetricsDiscovery
 from faden_agent.ray.runtime import RayRuntime
 from faden_agent.ray.schemas import (
@@ -232,7 +233,7 @@ class RayManager:
 
     # Auth is the agent's to decide; a bundle or environment must not be able
     # to point ``ray start`` at a different token or turn auth off.
-    _RESERVED_ENV_KEYS = frozenset({"RAY_AUTH_MODE", "RAY_AUTH_TOKEN_PATH", "CUDA_VISIBLE_DEVICES"})
+    _RESERVED_ENV_KEYS = RESERVED_ENV_KEYS  # shared with the container path (env_policy)
     _ALLOWED_ENV_PREFIXES = ("VLLM_", "HF_", "NCCL_", "CUDA_", "RAY_", "UCX_")
 
     def start_env(self, extra_env: dict[str, str] | None = None) -> dict[str, str]:

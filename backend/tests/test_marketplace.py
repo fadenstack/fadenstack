@@ -502,12 +502,14 @@ DEEPSEEK_RECIPE = {
 
 def test_a_recipe_becomes_settings_this_server_can_use() -> None:
     recipe = recipes.parse_recipe(DEEPSEEK_RECIPE)
+    # The recipe asks for --trust-remote-code (the model's own Python code); a recipe never switches
+    # that on -- it is listed with what was left out, for a superuser to turn on knowingly.
     assert recipe.config == {
-        "trust_remote_code": True, "enable_expert_parallel": True, "enable_auto_tool_choice": True,
+        "enable_expert_parallel": True, "enable_auto_tool_choice": True,
         "tool_call_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1",
     }
     # A path into vLLM's source tree is not in the runtime image; the copy's shape is the fit's.
-    assert recipe.dropped == ["--chat-template examples/tool_chat_template_deepseekr1.jinja"]
+    assert recipe.dropped == ["--trust-remote-code", "--chat-template examples/tool_chat_template_deepseekr1.jinja"]
     assert recipe.url == "https://recipes.vllm.ai/deepseek-ai/DeepSeek-R1"
 
 

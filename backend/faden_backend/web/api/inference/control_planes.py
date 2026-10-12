@@ -14,6 +14,7 @@ from starlette import status
 from faden_backend.db.models.users import User
 from faden_backend.services.inference.service import (
     ConflictError,
+    ForbiddenError,
     ControlPlaneService,
     InferenceError,
     NotFoundError,
@@ -35,6 +36,8 @@ def _map_inference_error(exc: InferenceError) -> HTTPException:
         return HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, ConflictError):
         return HTTPException(status.HTTP_409_CONFLICT, detail=exc.detail)
+    if isinstance(exc, ForbiddenError):
+        return HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail)
     return HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 

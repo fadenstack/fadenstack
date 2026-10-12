@@ -131,6 +131,48 @@ async def test_a_command_that_does_not_say_leaves_the_container_as_it_is() -> No
         assert runtime.runs == []
 
 
+@pytest.mark.anyio()
+async def test_settings_cannot_turn_auth_or_tls_off_in_the_container() -> None:
+    """``node_env_vars`` reach the container as the bundle's env or as ``env``.
+
+    The merge ran before ``setdefault``, so a cluster setting of
+    ``RAY_AUTH_MODE=disabled`` won; the host path already stripped it.
+    """
+    hostile = {
+        "RAY_AUTH_MODE": "disabled",
+        "RAY_AUTH_TOKEN_PATH": "/tmp/mine",
+        "RAY_USE_TLS": "1",
+        "RAY_TLS_SERVER_CERT": "/tmp/cert",
+        "CUDA_VISIBLE_DEVICES": "0,1",
+        "NCCL_DEBUG": "INFO",
+    }
+    for how in ("bundle", "env"):
+        runtime = _FakeRuntime()
+        payload = _payload()
+        if how == "bundle":
+            payload["env"] = dict(hostile)
+        spec = RuntimeBundleSpec.from_payload(payload)
+        await _container(runtime).ensure_container(spec, env=dict(hostile) if how == "env" else None, ray_tls=False)
+        env = runtime.runs[-1]["env"]
+        assert env["RAY_AUTH_MODE"] == "token", how
+        assert env["RAY_AUTH_TOKEN_PATH"] == "/var/run/faden/ray/cluster.token", how
+        assert "RAY_USE_TLS" not in env and "RAY_TLS_SERVER_CERT" not in env, how
+        assert "CUDA_VISIBLE_DEVICES" not in env, how
+        assert env["NCCL_DEBUG"] == "INFO", "other tuning still passes"
+
+
+def test_the_host_and_container_paths_refuse_the_same_names() -> None:
+    from faden_agent.ray.env_policy import RESERVED_ENV_KEYS  # noqa: PLC0415
+
+    assert RayManager._RESERVED_ENV_KEYS is RESERVED_ENV_KEYS
+    host = object.__new__(RayManager)
+    host._token_file = Path("/t")
+    env = host.start_env({key: "x" for key in RESERVED_ENV_KEYS} | {"NCCL_DEBUG": "INFO"})
+    assert env["RAY_AUTH_MODE"] == "token"
+    assert env["NCCL_DEBUG"] == "INFO"
+    assert not (set(env) & RESERVED_ENV_KEYS) - {"RAY_AUTH_MODE", "RAY_AUTH_TOKEN_PATH"}
+
+
 # ── what the manager makes of the command ────────────────────────────────
 
 

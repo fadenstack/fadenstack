@@ -422,8 +422,11 @@ async def host_model(
     session: AsyncSession = Depends(get_db_session),
     llm_service: Any = Depends(get_llm_service),
 ) -> dict[str, Any]:
-    """Keep the model on this server (downloading it if needed) and deploy it to a cluster."""
-    from faden_backend.services.inference.service import InferenceError  # noqa: PLC0415
+    """Keep the model on this server (downloading it if needed) and deploy it to a cluster.
+
+    Engine settings that run code or read node files are a superuser's to set (403 otherwise).
+    """
+    from faden_backend.services.inference.service import ForbiddenError, InferenceError  # noqa: PLC0415
 
     if not body.ignore_compatibility:
         await _refuse_if_it_cannot_run(session, body.repo_id.strip(), body.environment_id)
@@ -441,8 +444,10 @@ async def host_model(
             vision=await _sees_pictures(session, body.repo_id.strip()),
             images="images" in capabilities,
             machine=(body.machine or "").strip() or None,
-        ))
+        ), allow_guarded=bool(_can_deploy.is_superuser))
     except HostError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except ForbiddenError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=exc.detail) from exc
     except InferenceError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc

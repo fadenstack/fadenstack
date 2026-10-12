@@ -49,6 +49,7 @@ from faden_backend.db.models.inference import (
     InferenceEndpoint,
     InferenceEnvironment,
 )
+from faden_backend.services.inference import engine_guard
 from faden_backend.services.inference.reconciliation import (
     control_plane_observation,
     deployment_observation,
@@ -78,6 +79,14 @@ class NotFoundError(InferenceError):
 
 class ConflictError(InferenceError):
     """A write violated a uniqueness/consistency constraint (HTTP 409)."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
+
+
+class ForbiddenError(InferenceError):
+    """The caller's role may not make this change (HTTP 403)."""
 
     def __init__(self, detail: str) -> None:
         super().__init__(detail)
@@ -291,6 +300,7 @@ class EnvironmentService:
             # Recorded on the cluster, so clusters made before keep the ports
             # they run on; anything the caller set wins.
             config = {**NEW_CLUSTER_PORTS, **(config or {})}
+            await self._check_ray_config(None, config)
         try:
             return await self.dao.create(
                 control_plane_id=control_plane_id,
@@ -303,6 +313,31 @@ class EnvironmentService:
             )
         except IntegrityError as exc:
             raise ConflictError(f"environment name already exists: {name}") from exc
+
+    async def _check_ray_config(
+        self, environment: InferenceEnvironment | None, config: dict[str, Any],
+    ) -> None:
+        """Refuse a Ray cluster setting that sends traffic or code somewhere it should not go.
+
+        The rules are in ``drivers/ray/schemas.check_environment_config``; a
+        value the cluster already has is not asked again.
+        """
+        from faden_backend.services.inference.drivers.ray.addresses import (  # noqa: PLC0415
+            machine_addresses,
+        )
+        from faden_backend.services.inference.drivers.ray.schemas import (  # noqa: PLC0415
+            EnvironmentConfigRefused,
+            check_environment_config,
+        )
+
+        try:
+            check_environment_config(
+                config,
+                machine_addresses=await machine_addresses(self.session, environment) if environment else [],
+                previous=(environment.config_json or {}) if environment else None,
+            )
+        except EnvironmentConfigRefused as exc:
+            raise ConflictError(str(exc)) from exc
 
     async def get(self, environment_id: uuid.UUID) -> InferenceEnvironment:
         """Fetch an environment or raise :class:`NotFoundError`."""
@@ -332,6 +367,12 @@ class EnvironmentService:
     ) -> InferenceEnvironment:
         """Patch an environment; config/desired-state changes bump ``generation``."""
         wake_reconciler_after_commit(self.session)  # act now, not at the next tick
+        if config is not ... and config is not None:
+            current = await self.dao.get(environment_id)
+            if current is not None:
+                control_plane = await self.control_plane_dao.get(current.control_plane_id)
+                if control_plane is not None and control_plane.driver == "ray":
+                    await self._check_ray_config(current, config)
         ds: EnvironmentDesiredState | None = ...
         if desired_state is not ...:
             if desired_state is None:
@@ -667,8 +708,14 @@ class DeploymentService:
         name: str,
         spec: dict[str, Any],
         description: str | None = None,
+        allow_guarded: bool = False,
     ) -> InferenceDeployment:
-        """Create a deployment from a validated versioned spec."""
+        """Create a deployment from a validated versioned spec.
+
+        *allow_guarded*: the caller is a superuser, who may set the engine
+        settings an operator may not (``engine_guard``). Off unless a caller
+        says so, so a new code path is safe by default.
+        """
         wake_reconciler_after_commit(self.session)  # act now, not at the next tick
         if not await self.environment_dao.get(environment_id):
             raise NotFoundError("environment", environment_id)
@@ -677,6 +724,7 @@ class DeploymentService:
         # Re-validate so the DB only ever holds well-formed documents; any
         # malformed document surfaces as a 409, not a 500.
         self.validate_spec(spec)
+        self._guard_spec(spec, previous=None, allow_guarded=allow_guarded)
         try:
             return await self.dao.create(
                 environment_id=environment_id,
@@ -698,6 +746,31 @@ class DeploymentService:
             return parse_inference_deployment_spec(spec)
         except Exception as exc:  # noqa: BLE001 - map any validation failure
             raise ConflictError(f"invalid deployment spec: {exc}") from exc
+
+    @staticmethod
+    def _guard_spec(
+        spec: dict[str, Any], *, previous: dict[str, Any] | None, allow_guarded: bool,
+    ) -> None:
+        """Refuse what only a superuser may set (engine settings, env vars).
+
+        Env vars are refused for everyone, as the compiler would at the next
+        reconcile -- here the caller hears it at once instead of reading a
+        failed deployment.
+        """
+        from faden_backend.services.inference.drivers.ray.compiler import (  # noqa: PLC0415
+            _extension_env_vars,
+        )
+
+        try:
+            _extension_env_vars(parse_inference_deployment_spec(spec))
+        except Exception as exc:  # noqa: BLE001 - same mapping as validate_spec
+            raise ConflictError(f"invalid deployment spec: {exc}") from exc
+        if allow_guarded:
+            return
+        try:
+            engine_guard.check_spec(spec, previous=previous)
+        except engine_guard.EngineSettingsRefused as exc:
+            raise ForbiddenError(str(exc)) from exc
 
     async def get(self, deployment_id: uuid.UUID) -> InferenceDeployment:
         """Fetch a deployment or raise :class:`NotFoundError`."""
@@ -722,8 +795,13 @@ class DeploymentService:
         spec: dict[str, Any] | None = ...,
         desired_state: str | None = ...,
         description: str | None = ...,
+        allow_guarded: bool = False,
     ) -> InferenceDeployment:
-        """Patch a deployment; spec/desired-state changes bump ``generation``."""
+        """Patch a deployment; spec/desired-state changes bump ``generation``.
+
+        *allow_guarded*: see :meth:`create`. Without it, the guarded settings
+        the deployment already has may stay, but none may be added or changed.
+        """
         wake_reconciler_after_commit(self.session)  # act now, not at the next tick
         dds: DeploymentDesiredState | None = ...
         if desired_state is not ...:
@@ -738,6 +816,12 @@ class DeploymentService:
             if spec is None:
                 raise ConflictError("spec cannot be cleared; omit it to keep the current spec")
             self.validate_spec(spec)
+            current = await self.dao.get(deployment_id)
+            self._guard_spec(
+                spec,
+                previous=dict(current.spec_json or {}) if current is not None else None,
+                allow_guarded=allow_guarded,
+            )
             provided_spec = spec
         try:
             updated = await self.dao.update(
