@@ -26,7 +26,7 @@ Ihre E-Mail-Adresse und was Sie tun dürfen, legt Ihr Administrator fest. Siehe 
 2. Geben Sie das **Neue Passwort** zweimal ein. Es muss mindestens 8 Zeichen lang sein.
 3. Wählen Sie **Passwort ändern**.
 
-Sie sehen **Passwort erfolgreich geändert.**
+Sie sehen **Passwort erfolgreich geändert. Ihre anderen Anmeldungen wurden beendet.** Jeder andere Browser und jede andere App, in der Sie angemeldet sind, muss sich erneut anmelden; dieser Browser bleibt angemeldet. Ihre API-Tokens funktionieren weiter: Widerrufen Sie sie weiter unten, falls jemand anderes eines haben könnte.
 
 ## Passwort vergessen {#forgot-your-password}
 
@@ -45,7 +45,7 @@ Wenn der Server Ihrer Organisation E-Mails versendet, erhalten Sie einen Link, m
 
 ## Wie lange eine Anmeldung gilt {#how-long-a-sign-in-lasts}
 
-Eine Anmeldung gilt sieben Tage, sofern Ihre Organisation keine andere Dauer festgelegt hat. Danach werden Sie gebeten, sich erneut anzumelden. Um sie früher zu beenden, wählen Sie Ihren Avatar und dann **Abmelden**. Melden Sie sich an jedem Computer ab, den auch andere nutzen.
+Eine Anmeldung gilt sieben Tage, sofern Ihre Organisation keine andere Dauer festgelegt hat. Danach werden Sie gebeten, sich erneut anzumelden. Um sie früher zu beenden, wählen Sie Ihren Avatar und dann **Abmelden**: Diese Anmeldung ist sofort beendet, auch für jeden, der sie kopiert hat. Eine Passwortänderung oder ein Administrator, der Ihr Konto sperrt oder Ihnen eine Rolle entzieht, beendet alle Ihre Anmeldungen. Melden Sie sich an jedem Computer ab, den auch andere nutzen.
 
 Anmeldung mit Ihrem Firmenkonto (Single Sign-on) <span class="fs-planned">Geplant</span>
 

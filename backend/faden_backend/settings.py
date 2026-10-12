@@ -391,6 +391,13 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("FADEN_BACKEND_LOGS_ALLOWED_LABELS"),
     )
+    # Sites whose pages may send state-changing requests with the console's cookie, besides the host the
+    # request came to (comma-separated origins). Only for an install behind a proxy that rewrites ``Host`` and
+    # does not send ``X-Forwarded-Host``; the console behind the bundled nginx needs none.
+    trusted_origins_raw: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FADEN_BACKEND_TRUSTED_ORIGINS"),
+    )
     i18n_dir: str = "i18n"
     # The development default; outside the dev environment the backend refuses
     # to start with it (published_secrets.py) unless allow_published_keys is set.
@@ -496,6 +503,11 @@ class Settings(BaseSettings):
             return None
         labels = {chunk.strip().lower() for chunk in self.logs_allowed_labels_raw.split(",") if chunk.strip()}
         return labels or None
+
+    @property
+    def trusted_origins(self) -> list[str]:
+        """The parsed ``trusted_origins_raw``."""
+        return [o.strip() for o in (self.trusted_origins_raw or "").split(",") if o.strip()]
 
     @property
     def i18n_path(self) -> Path:

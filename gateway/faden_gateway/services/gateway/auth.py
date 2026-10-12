@@ -170,11 +170,21 @@ def get_auth_context_from_claims(claims: dict[str, Any], token: str | None = Non
 SIGN_IN_AUDIENCE = "fastapi-users:auth"
 
 
-def _is_outdated_sign_in(claims: dict[str, Any]) -> bool:
-    """A console sign-in from before sign-ins expired: no ``iat``; the CLI's bootstrap token has one."""
+def _is_console_sign_in(claims: dict[str, Any]) -> bool:
+    """A console sign-in (the audience of fastapi-users), not an API or agent token."""
     aud = claims.get("aud")
     audiences = aud if isinstance(aud, list) else [aud]
-    return SIGN_IN_AUDIENCE in audiences and "iat" not in claims
+    return SIGN_IN_AUDIENCE in audiences and claims.get("typ") is None
+
+
+def _is_outdated_sign_in(claims: dict[str, Any]) -> bool:
+    """A console sign-in from before sign-ins expired (no ``iat``) or could end (no ``jti``).
+
+    The CLI's bootstrap token has both.
+    """
+    aud = claims.get("aud")
+    audiences = aud if isinstance(aud, list) else [aud]
+    return SIGN_IN_AUDIENCE in audiences and ("iat" not in claims or not claims.get("jti"))
 
 
 def _is_unrecorded_api_token(claims: dict[str, Any]) -> bool:
@@ -225,6 +235,18 @@ async def check_caller(app: Any, claims: dict[str, Any]) -> str | None:
                 )
             tenant_id = record.tenant_id
         user = await directory.user(user_id)
+        if user is not None and _is_console_sign_in(claims):
+            ended = user.sessions_valid_after
+            # Whole seconds, as in the backend (``sign_in_ended_for_all``): a sign-in made in the second
+            # the others were ended stands.
+            if (ended is not None and int(claims.get("iat", 0)) < int(ended)) or await directory.sign_in_revoked(
+                str(claims.get("jti", "")),
+            ):
+                raise GatewayError(
+                    status_code=401,
+                    message="This sign-in has ended. Sign in again.",
+                    code="sign_in_ended",
+                )
     except AgentLookupError as exc:
         raise GatewayError(
             status_code=503,

@@ -59,6 +59,7 @@ WHERE a.tenant_id = $1 AND (a.slug = $2 OR a.id::text = $2)
 #: The user's flags, and the ``chat.*`` permissions their roles give, their groups' roles included.
 _USER_SQL = """
 SELECT u.is_active, u.is_superuser,
+       extract(epoch FROM u.sessions_valid_after)::float8 AS sessions_valid_after,
        ARRAY(SELECT DISTINCT p.resource || ':' || p.action
              FROM permissions p
              JOIN role_permissions rp ON rp.permission_id = p.id
@@ -78,6 +79,10 @@ _API_TOKEN_SQL = (
     "coalesce(expires_at <= now(), false) AS expired, tenant_id "
     "FROM api_tokens WHERE id = $1::uuid"
 )
+
+
+#: A console sign-in a logout ended (the backend's ``revoked_sign_ins``).
+_SIGN_IN_REVOKED_SQL = "SELECT 1 FROM revoked_sign_ins WHERE jti = $1"
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -163,6 +168,9 @@ class UserFlags:
     is_superuser: bool
     #: The ``chat.*`` permissions (``resource:action``) the user's roles and groups give.
     chat_permissions: frozenset[str] = frozenset()
+    #: Epoch seconds: console sign-ins made before it are over (password change, suspension, a role taken
+    #: away); ``None``: none were ended that way.
+    sessions_valid_after: float | None = None
 
 
 @dataclass(frozen=True)
@@ -271,9 +279,22 @@ class BackendAgents:
             raise AgentLookupError(str(exc)) from exc
         if row is None:
             return None
+        valid_after = row["sessions_valid_after"]
         return UserFlags(
-            bool(row["is_active"]), bool(row["is_superuser"]), frozenset(row["chat_permissions"] or ()),
+            bool(row["is_active"]),
+            bool(row["is_superuser"]),
+            frozenset(row["chat_permissions"] or ()),
+            float(valid_after) if valid_after is not None else None,
         )
+
+    async def sign_in_revoked(self, jti: str) -> bool:
+        """Whether a logout ended the console sign-in with this ``jti``."""
+        try:
+            pool = await self._get_pool()
+            row = await pool.fetchrow(_SIGN_IN_REVOKED_SQL, jti, timeout=self._timeout)
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
+        return row is not None
 
     async def api_token(self, token_id: str) -> ApiTokenRecord | None:
         try:
@@ -317,6 +338,7 @@ class AgentDirectory:
         fetch_agent: Callable[[tuple[str, str]], Awaitable[AgentProfile | None]],
         fetch_user: Callable[[str], Awaitable[UserFlags | None]],
         fetch_api_token: Callable[[str], Awaitable[ApiTokenRecord | None]] | None = None,
+        fetch_sign_in_revoked: Callable[[str], Awaitable[bool]] | None = None,
         ttl_sec: float = 60.0,
         api_token_ttl_sec: float = 30.0,
         close: Callable[[], Awaitable[None]] | None = None,
@@ -326,7 +348,18 @@ class AgentDirectory:
         self._api_tokens: TtlCache[str, ApiTokenRecord | None] | None = (
             TtlCache(fetch_api_token, ttl_sec=api_token_ttl_sec) if fetch_api_token is not None else None
         )
+        # Cached like API tokens: a logout reaches the gateway within ``api_token_ttl_sec``. The cache
+        # is what keeps this to one read per sign-in per half minute rather than one per request.
+        self._sign_ins: TtlCache[str, bool] | None = (
+            TtlCache(fetch_sign_in_revoked, ttl_sec=api_token_ttl_sec) if fetch_sign_in_revoked is not None else None
+        )
         self._close = close
+
+    async def sign_in_revoked(self, jti: str) -> bool:
+        """Whether a logout ended the console sign-in with this ``jti`` (``False`` when it cannot be asked)."""
+        if self._sign_ins is None:
+            return False
+        return await self._sign_ins.get(jti)
 
     @property
     def checks_api_tokens(self) -> bool:
@@ -353,6 +386,8 @@ class AgentDirectory:
         self._users.invalidate()
         if self._api_tokens is not None:
             self._api_tokens.invalidate()
+        if self._sign_ins is not None:
+            self._sign_ins.invalidate()
 
     async def close(self) -> None:
         if self._close is not None:
@@ -373,6 +408,7 @@ def build_agent_directory(settings: object) -> AgentDirectory | None:
         fetch_agent=backend.agent,
         fetch_user=backend.user,
         fetch_api_token=backend.api_token,
+        fetch_sign_in_revoked=backend.sign_in_revoked,
         close=backend.close,
     )
 

@@ -123,7 +123,7 @@ person's own computer. It is for people who build or test tools, and it can end 
 
 | | |
 |---|---|
-| **A sign-in** | lasts 7 days; then people sign in again. |
+| **A sign-in** | lasts 7 days; then people sign in again. **Logout** ends it at once. A password change or reset, a suspension, and a role taken away end all of a person's sign-ins; the gateway notices within half a minute. |
 | **API tokens** | let scripts and applications use the models through the API. Each person makes their own under **Manage Profile** (or **My Profile** in the console), and can revoke it there. |
 | **Every API token expires** | after 90 days unless its maker picks another lifetime, and after a year at most. |
 | **Agents** (the browser agent, the Office add-ins) | have their own sign-ins on each device, shown on an agent's **Activity** tab (see [Agents and add-ins](agents.md)). |
@@ -147,9 +147,11 @@ To change the lifetimes: **Settings → General**, **Sign-in lifetime (s)**, **A
 2. Confirm.
 
 Their sign-ins, API tokens and agents stop working within a minute. Nothing of theirs is deleted: **Let back
-in** in the same place gives them their access back. You cannot suspend yourself, nor the last superuser.
+in** in the same place gives them their access back, but the sign-ins they had stay over: they sign in again.
+You cannot suspend yourself, nor the last superuser.
 
-**Delete** (the bin icon) removes the account and cannot be undone.
+**Delete** (the bin icon) removes the account and cannot be undone. You cannot delete yourself, nor the last
+active superuser.
 
 ## When it does not work
 

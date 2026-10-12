@@ -110,8 +110,9 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
 
     # Both `hashed` (bcrypt output we generated) and `email` (validated
     # above by regex) are safe for SQL string interpolation here.
+    # The sign-ins end with the old password (sessions_valid_after): a reset is often meant to lock someone out.
     sql = (
-        f"UPDATE \"user\" SET hashed_password = '{hashed}' "
+        f"UPDATE \"user\" SET hashed_password = '{hashed}', sessions_valid_after = now() "
         f"WHERE email = '{email}';"
     )
 

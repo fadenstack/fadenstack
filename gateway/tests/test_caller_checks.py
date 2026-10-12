@@ -25,6 +25,7 @@ def _app(
     tokens: dict[str, ApiTokenRecord] | None = None,
     *,
     fail: bool = False,
+    logged_out: frozenset[str] = frozenset(),
 ) -> Any:
     async def fetch_user(user_id: str) -> UserFlags | None:
         if fail:
@@ -39,13 +40,23 @@ def _app(
     async def fetch_agent(key: tuple[str, str]) -> None:
         return None
 
-    directory = AgentDirectory(fetch_agent=fetch_agent, fetch_user=fetch_user, fetch_api_token=fetch_api_token)
+    async def fetch_sign_in_revoked(jti: str) -> bool:
+        if fail:
+            raise AgentLookupError("database down")
+        return jti in logged_out
+
+    directory = AgentDirectory(
+        fetch_agent=fetch_agent,
+        fetch_user=fetch_user,
+        fetch_api_token=fetch_api_token,
+        fetch_sign_in_revoked=fetch_sign_in_revoked,
+    )
     return SimpleNamespace(state=SimpleNamespace(agent_directory=directory))
 
 
-def _login(sub: str = USER) -> dict[str, Any]:
+def _login(sub: str = USER, jti: str = "c0ffee") -> dict[str, Any]:
     now = int(time.time())
-    return {"sub": sub, "aud": ["fastapi-users:auth"], "iat": now, "exp": now + 3600}
+    return {"sub": sub, "aud": ["fastapi-users:auth"], "iat": now, "jti": jti, "exp": now + 3600}
 
 
 def _api(sub: str = USER, jti: str = TOKEN_ID) -> dict[str, Any]:
@@ -122,6 +133,34 @@ async def test_a_sign_in_from_before_sign_ins_expired_is_refused() -> None:
     for claims in ({"sub": USER, "aud": ["fastapi-users:auth"]}, {"sub": USER, "aud": "fastapi-users:auth"}):
         err = await _refused(_app({USER: ACTIVE}), claims)
         assert (err.status_code, err.code) == (401, "sign_in_outdated")
+
+
+@pytest.mark.anyio
+async def test_a_sign_in_without_a_jti_is_refused() -> None:
+    claims = _login()
+    del claims["jti"]
+    err = await _refused(_app({USER: ACTIVE}), claims)
+    assert (err.status_code, err.code) == (401, "sign_in_outdated")
+
+
+@pytest.mark.anyio
+async def test_a_logged_out_sign_in_is_refused_and_the_next_one_is_not() -> None:
+    app = _app({USER: ACTIVE}, logged_out=frozenset({"gone"}))
+    err = await _refused(app, _login(jti="gone"))
+    assert (err.status_code, err.code) == (401, "sign_in_ended")
+    await check_caller(app, _login(jti="another"))
+
+
+@pytest.mark.anyio
+async def test_sign_ins_made_before_the_accounts_were_ended_are_refused() -> None:
+    now = int(time.time())
+    ended = UserFlags(is_active=True, is_superuser=False, sessions_valid_after=float(now))
+    old = {**_login(), "iat": now - 60}
+    err = await _refused(_app({USER: ended}), old)
+    assert (err.status_code, err.code) == (401, "sign_in_ended")
+    # One made since, or in the same second, stands; so does an API token (it has its own row).
+    await check_caller(_app({USER: ended}), {**_login(), "iat": now})
+    await check_caller(_app({USER: ended}, {TOKEN_ID: ApiTokenRecord(USER, revoked=False)}), {**_api(), "iat": now - 60})
 
 
 @pytest.mark.anyio

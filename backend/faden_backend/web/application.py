@@ -16,6 +16,7 @@ from faden_backend.settings import settings
 from faden_backend.web.api.router import api_router
 from faden_backend.web.lifespan import lifespan_setup
 from faden_backend.web.middleware import SecureCookiesMiddleware
+from faden_backend.web.origin import CsrfMiddleware
 
 APP_ROOT = Path(__file__).parent.parent
 
@@ -63,6 +64,8 @@ def get_app() -> FastAPI:
     )
     # The session cookie is Secure whenever the page was served over HTTPS.
     app.add_middleware(SecureCookiesMiddleware)
+    # A page of another site cannot act with the sign-in cookie.
+    app.add_middleware(CsrfMiddleware)
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated
     # endpoints with enterprise implementations.

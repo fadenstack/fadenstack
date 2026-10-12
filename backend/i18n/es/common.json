@@ -1642,7 +1642,7 @@
     "confirm_password": "Confirmar nueva contraseña",
     "password_mismatch": "Las nuevas contraseñas no coinciden.",
     "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
-    "password_changed": "Contraseña cambiada exitosamente.",
+    "password_changed": "Contraseña cambiada exitosamente. Se cerraron sus otras sesiones.",
     "api_token": "Token de API",
     "api_token_desc": "Genere un token Bearer para la puerta de enlace de API LLM.",
     "token_expiry": "Expiración del token",

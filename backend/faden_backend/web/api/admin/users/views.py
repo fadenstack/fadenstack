@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -21,7 +21,14 @@ from faden_backend.db.models.api_tokens import ACCOUNT_TENANT, API_TOKEN_TYPE, A
 from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.groups import Group
 from faden_backend.db.models.rbac import Permission, Role
-from faden_backend.db.models.users import User, current_active_user
+from faden_backend.db.models.users import (
+    User,
+    cookie_transport,
+    current_active_user,
+    end_sign_ins,
+    get_jwt_strategy,
+    set_sign_in_cookie,
+)
 from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
 from faden_backend.web.api.admin.dependencies import require_superuser
@@ -286,7 +293,11 @@ async def set_user_roles(
                 detail=f"Unknown role id: {role_id}",
             )
 
+    had = {role.id for role in await rbac_dao.get_user_roles(user_id)}
     await rbac_dao.set_user_roles(user_id, payload.role_ids)
+    if had - set(payload.role_ids):
+        # A role taken away ends their sign-ins, so what they had open is not carried on from before.
+        end_sign_ins(target_user)
     await session.flush()
 
     return await _build_admin_user_dto(target_user, rbac_dao)
@@ -399,17 +410,36 @@ async def create_user(
     return await _build_admin_user_dto(new_user, rbac_dao)
 
 
+async def _refuse_last_superuser(session: AsyncSession, target: User) -> None:
+    """409 when *target* is the one active superuser left: suspending or deleting it leaves nobody to administer."""
+    if not (target.is_superuser and target.is_active):
+        return
+    others = await session.scalar(
+        select(func.count()).select_from(User).where(
+            User.is_superuser.is_(True), User.is_active.is_(True), User.id != target.id,
+        ),
+    )
+    if not others:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This is the last active superuser; nobody could administer the system.",
+        )
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, name="delete_user")
 async def delete_user(
     user_id: uuid.UUID,
-    _user: Annotated[User, Depends(require_superuser)] = None,  # type: ignore[assignment]
+    admin: Annotated[User, Depends(require_superuser)],
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    """Delete a user by ID."""
+    """Delete a user by ID -- never yourself, and never the last active superuser."""
     result = await session.execute(select(User).where(User.id == user_id))
     target = result.scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot delete yourself.")
+    await _refuse_last_superuser(session, target)
     await session.delete(target)
     await session.flush()
     await forget_principal("user", str(user_id))
@@ -434,19 +464,12 @@ async def set_user_active(
     if not payload.active:
         if target.id == admin.id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot suspend yourself.")
-        if target.is_superuser:
-            others = await session.scalar(
-                select(func.count()).select_from(User).where(
-                    User.is_superuser.is_(True), User.is_active.is_(True), User.id != target.id,
-                ),
-            )
-            if not others:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This is the last active superuser; nobody could administer the system.",
-                )
+        await _refuse_last_superuser(session, target)
     if target.is_active != payload.active:
         target.is_active = payload.active
+        if not payload.active:
+            # Reactivating must not bring back what they had open before: those sign-ins stay over.
+            end_sign_ins(target)
         await session.flush()
         await AuditDAO(session).log(
             action="user.reactivate" if payload.active else "user.suspend",
@@ -465,10 +488,12 @@ async def set_user_active(
 @router.post("/me/change-password", status_code=status.HTTP_204_NO_CONTENT, name="change_password")
 async def change_password(
     payload: ChangePasswordRequest,
+    request: Request,
+    response: Response,
     user: Annotated[User, Depends(current_active_user)],
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    """Change the current user's password."""
+    """Change the current user's password; every sign-in they have ends, this browser's gets a new one."""
     from fastapi_users.password import PasswordHelper  # noqa: PLC0415
 
     password_helper = PasswordHelper()
@@ -482,8 +507,13 @@ async def change_password(
     if problem:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
     user.hashed_password = password_helper.hash(payload.new_password)
+    # The point of changing it can be that someone else got in: their sign-ins end with the old password.
+    end_sign_ins(user)
     session.add(user)
     await session.flush()
+    if request.cookies.get(cookie_transport.cookie_name):
+        # The browser that changed it stays signed in; a new sign-in replaces its cookie.
+        set_sign_in_cookie(response, await get_jwt_strategy().write_token(user))
 
 
 @router.post("/me/api-token", response_model=ApiTokenResponse, name="generate_api_token")

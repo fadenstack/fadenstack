@@ -130,7 +130,7 @@ kann zu einem Zeitpunkt enden, den Sie unter **Endet** festlegen. Lassen Sie ihn
 
 | | |
 |---|---|
-| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. |
+| **Eine Anmeldung** | gilt 7 Tage; danach melden sich die Benutzer erneut an. **Abmelden** beendet sie sofort. Eine Passwortänderung oder ein Zurücksetzen, eine Sperre und eine entzogene Rolle beenden alle Anmeldungen einer Person; das Gateway bemerkt es innerhalb einer halben Minute. |
 | **API-Tokens** | erlauben Skripten und Anwendungen, die Modelle über die API zu nutzen. Jede Person erstellt ihre eigenen unter **Profil verwalten** (oder **Mein Profil** in der Konsole) und kann sie dort widerrufen. |
 | **Jedes API-Token läuft ab** | nach 90 Tagen, sofern die Person, die es erstellt, keine andere Gültigkeitsdauer wählt, und spätestens nach einem Jahr. |
 | **Agenten** (der Browser-Agent, die Office-Add-ins) | haben auf jedem Gerät eigene Anmeldungen, zu sehen auf dem Tab **Aktivität** eines Agenten (siehe [Agenten und Add-ins](agents.md)). |
@@ -155,10 +155,11 @@ lifetime (s)** und **Longest API token lifetime (s)**.
 2. Bestätigen Sie.
 
 Ihre Anmeldungen, API-Tokens und Agenten funktionieren innerhalb einer Minute nicht mehr. Nichts von ihr wird
-gelöscht: **Wieder freigeben** an derselben Stelle gibt ihr den Zugang zurück. Sie können weder sich selbst
-sperren noch den letzten Superuser.
+gelöscht: **Wieder freigeben** an derselben Stelle gibt ihr den Zugang zurück, die bisherigen Anmeldungen bleiben
+aber beendet: Sie meldet sich neu an. Sie können weder sich selbst sperren noch den letzten Superuser.
 
-**Löschen** (das Papierkorb-Symbol) entfernt das Konto und lässt sich nicht rückgängig machen.
+**Löschen** (das Papierkorb-Symbol) entfernt das Konto und lässt sich nicht rückgängig machen. Sie können weder sich
+selbst löschen noch den letzten aktiven Superuser.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

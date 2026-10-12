@@ -26,7 +26,7 @@ Your e-mail address and what you may do are set by your administrator. See [User
 2. Enter the **New Password** twice. It needs at least 8 characters.
 3. Select **Change Password**.
 
-You see **Password changed successfully.**
+You see **Password changed successfully. Your other sign-ins were ended.** Every other browser and app signed in as you has to sign in again; this browser stays signed in. Your API tokens keep working: revoke them below if someone else may have one.
 
 ## Forgot your password
 
@@ -45,7 +45,7 @@ If your organisation's server sends e-mail, a link to set a new password arrives
 
 ## How long a sign-in lasts
 
-A sign-in lasts seven days, unless your organisation set another length. Then you are asked to sign in again. To end it sooner, select your avatar, then **Logout**. Sign out on any computer others use.
+A sign-in lasts seven days, unless your organisation set another length. Then you are asked to sign in again. To end it sooner, select your avatar, then **Logout**: that sign-in is over at once, also for anyone who copied it. Changing your password, or an administrator suspending your account or taking a role away, ends all your sign-ins. Sign out on any computer others use.
 
 Signing in with your company account (single sign-on) <span class="fs-planned">Planned</span>
 
