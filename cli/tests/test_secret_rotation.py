@@ -37,7 +37,7 @@ OWN_CHAT = "own-chat-key-cccccccccccccccccc"
 
 
 def _install(tmp_path: Path, **overrides: str) -> Path:
-    values = default_env_vars(admin_password="x")
+    values = default_env_vars()
     values.update({MASTER: OWN_MASTER, MCP: OWN_MCP, CHAT: OWN_CHAT, CREDENTIAL_PEPPER: "the-pepper-dddddddddddd"})
     values.update(overrides)
     env = tmp_path / ".env"

@@ -188,13 +188,13 @@ def test_a_pepper_that_is_set_is_never_replaced(tmp_path: Path) -> None:
 
 
 def test_a_new_install_gets_a_pepper_of_its_own() -> None:
-    values = default_env_vars(admin_password="x")
+    values = default_env_vars()
     assert values["FADEN_BACKEND_CREDENTIAL_PEPPER"] != values["FADEN_BACKEND_SETTINGS_MASTER_KEY"]
 
 
 def test_regenerating_env_keeps_the_pepper(tmp_path: Path) -> None:
     env = _older(tmp_path, FADEN_BACKEND_CREDENTIAL_PEPPER="the-pepper-from-before")
-    write_env_file(env, default_env_vars(admin_password="x"), preserve_secrets=True)
+    write_env_file(env, default_env_vars(), preserve_secrets=True)
     assert read_env_file(env)["FADEN_BACKEND_CREDENTIAL_PEPPER"] == "the-pepper-from-before"
 
 
