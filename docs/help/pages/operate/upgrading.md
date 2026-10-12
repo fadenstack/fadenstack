@@ -140,11 +140,15 @@ Or switch the check off: **Updates** still shows what each part of the install r
        the host as `faden tune` does. A key that seals stored data and is missing gets the value the install ran
        on, never a new one, and the upgrade says so (see [Secrets in .env](installing.md#secrets-in-env));
     4. pulls the new release's images;
-    5. restarts the services behind the maintenance page; the database migrations run here, and the two Postgres
+    5. behind the maintenance page, first copies the chat attachments that an install from before release 0.4.4 holds
+       inside the gateway container into their volume, and compares every file by its SHA-256 hash. If a file
+       cannot be copied or does not match, the upgrade stops here, before anything is replaced: the old services
+       keep running and the files are untouched (see the table at the end);
+    6. restarts the services; the database migrations run here, and the two Postgres
        logins with fixed passwords that earlier releases made (`llm_user`, `faden_backend`, used by nothing) are
        switched off;
-    6. waits for the console API to answer, then lifts the maintenance page;
-    7. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
+    7. waits for the console API to answer, then lifts the maintenance page;
+    8. fetches the runtime images the new release names. Only what changed is downloaded. A failed pull stops
        nothing: retry it with `faden runtime-images`.
 
 | Option | What it does |
@@ -287,6 +291,7 @@ over instead of creating it again (see [Taking over clusters](taking-over.md)). 
 | **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | A release in between cannot be skipped. Install the tool of the release named, run `faden upgrade`, then install the newer tool and run `faden upgrade` again. The message gives the commands. |
 | **Updates** says the release list could not be read | The server has no internet, or needs a proxy. See [A server without internet access](#a-server-without-internet-access). |
 | **`Backup failed — aborting upgrade.`** | Usually a full disk, or Postgres not running. Free space, check `faden status`, and run it again. Use `--no-backup` only if you have a current backup. |
+| **`Chat attachments could not be copied ...`** or **`... exist in the data volume with other content ...`** | An install from before release 0.4.4 keeps chat attachments inside the gateway container, and the upgrade must copy them into the volume before it replaces the container. It could not, or the volume already holds a file of the same name with other content. Nothing was replaced and no file was overwritten; the old services still run. Free disk space or fix the cause the message names (for a file that differs, move the one you do not want out of the volume), then run `faden upgrade` again. |
 | **`Backend did not become healthy within 120 s.`** | The services were restarted but the console API does not answer yet. Read `faden logs faden-backend`. The maintenance page is lifted anyway, so whatever runs can be reached. |
 | **`... this release names a build that is on no registry.`** | A runtime image for one kind of machine is not published. The upgrade is not affected and running clusters keep their images. A machine of that kind can still get the image from another machine of its cluster that holds it. |
 | The disk is full: Postgres, the log store and the other stores restart over and over | Nothing works until there is space: remove images no container uses (`docker image prune`), move old backups off the server, then run the upgrade again. The dashboard warns earlier: **Disk space low**. |

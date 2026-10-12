@@ -152,11 +152,15 @@ Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil 
        gespeicherte Daten versiegelt, bekommt er den Wert, mit dem die Installation lief, nie einen neuen, und das
        Upgrade sagt es (siehe [Geheimnisse in der .env](installing.md#secrets-in-env));
     4. lädt die Images des neuen Release herunter;
-    5. startet die Dienste hinter der Wartungsseite neu; hier laufen die Datenbankmigrationen, und die beiden
+    5. kopiert hinter der Wartungsseite zuerst die Chat-Anhänge, die eine Installation aus der Zeit vor Release
+       0.4.4 im Gateway-Container hält, in ihr Volume und vergleicht jede Datei anhand ihres SHA-256-Hashs. Lässt
+       sich eine Datei nicht kopieren oder stimmt sie nicht überein, hält das Upgrade hier an, bevor etwas ersetzt
+       wird: Die alten Dienste laufen weiter, und die Dateien bleiben unberührt (siehe die Tabelle am Ende);
+    6. startet die Dienste neu; hier laufen die Datenbankmigrationen, und die beiden
        Postgres-Anmeldungen mit festen Passwörtern, die frühere Releases angelegt haben (`llm_user`,
        `faden_backend`, von nichts genutzt), werden abgeschaltet;
-    6. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
-    7. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
+    7. wartet, bis die Konsolen-API antwortet, und hebt dann die Wartungsseite auf;
+    8. holt die Runtime-Images, die das neue Release nennt. Nur was sich geändert hat, wird heruntergeladen. Ein
        fehlgeschlagener Download hält nichts auf: Wiederholen Sie ihn mit `faden runtime-images`.
 
 | Option | Was sie tut |
@@ -310,6 +314,7 @@ erstellt wurde, läuft auf seinen Maschinen weiter; übernehmen Sie ihn, statt i
 | **`<version> cannot upgrade straight to <version>: <version> has to come first.`** | Ein Release dazwischen lässt sich nicht überspringen. Installieren Sie das Werkzeug des genannten Releases, führen Sie `faden upgrade` aus, installieren Sie dann das neuere Werkzeug und führen Sie `faden upgrade` erneut aus. Die Meldung nennt die Befehle. |
 | **Updates** meldet, dass die Liste der Releases nicht gelesen werden konnte | Der Server hat kein Internet oder braucht einen Proxy. Siehe [Ein Server ohne Internetzugang](#a-server-without-internet-access). |
 | **`Backup failed — aborting upgrade.`** | Meist eine volle Festplatte oder ein Postgres, das nicht läuft. Schaffen Sie Platz, prüfen Sie `faden status` und führen Sie das Upgrade erneut aus. Verwenden Sie `--no-backup` nur, wenn Sie eine aktuelle Sicherung haben. |
+| **`Chat attachments could not be copied ...`** oder **`... exist in the data volume with other content ...`** | Eine Installation aus der Zeit vor Release 0.4.4 hält Chat-Anhänge im Gateway-Container, und das Upgrade muss sie in das Volume kopieren, bevor es den Container ersetzt. Das ging nicht, oder das Volume enthält schon eine Datei gleichen Namens mit anderem Inhalt. Es wurde nichts ersetzt und keine Datei überschrieben; die alten Dienste laufen weiter. Schaffen Sie Platz oder beheben Sie die Ursache, die die Meldung nennt (bei einer abweichenden Datei: verschieben Sie die unerwünschte aus dem Volume), und führen Sie `faden upgrade` erneut aus. |
 | **`Backend did not become healthy within 120 s.`** | Die Dienste wurden neu gestartet, aber die Konsolen-API antwortet noch nicht. Lesen Sie `faden logs faden-backend`. Die Wartungsseite wird trotzdem aufgehoben, damit erreichbar ist, was läuft. |
 | **`... this release names a build that is on no registry.`** | Ein Runtime-Image für eine Maschinenart ist nicht veröffentlicht. Das Upgrade ist davon nicht betroffen, und laufende Cluster behalten ihre Images. Eine Maschine dieser Art kann das Image weiterhin von einer anderen Maschine ihres Clusters bekommen, die es hat. |
 | Die Festplatte ist voll: Postgres, der Log-Speicher und die anderen Speicher starten immer wieder neu | Nichts funktioniert, bis wieder Platz da ist: Entfernen Sie Images, die kein Container verwendet (`docker image prune`), verschieben Sie alte Sicherungen vom Server und führen Sie das Upgrade dann erneut aus. Das Dashboard warnt früher: **Wenig Speicherplatz**. |

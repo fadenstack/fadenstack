@@ -365,18 +365,20 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     step += 1
     console.print(f"\n[bold cyan]Step {step}: Rolling restart…[/bold cyan]")
 
+    # Chat attachments an older release kept inside the gateway container, which the restart below replaces:
+    # copied into the volume they now have and verified, while the old container is still there. First of
+    # all, before anything is replaced (syncing the password starts Postgres, which compose may recreate): if
+    # they cannot be kept, the command stops here and the old containers keep running.
+    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
+
+    keep_chat_files(env_path)
+
     # Sync postgres password before restarting (same as deploy)
     from faden_cli.commands.deploy import _sync_postgres_password, retire_fixed_logins  # noqa: PLC0415
 
     _sync_postgres_password(ctx, env_path)
     # Earlier releases made two logins with fixed passwords on every install.
     retire_fixed_logins(env_path)
-
-    # Chat attachments an older release kept inside the gateway container, which the restart below replaces:
-    # into the volume they now have, while the old container is still there.
-    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
-
-    keep_chat_files(env_path)
 
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the

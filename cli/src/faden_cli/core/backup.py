@@ -17,6 +17,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -342,9 +343,21 @@ def data_dir_of(env_file: object) -> str:
 
 
 def keep_chat_files(env_file: object) -> None:
-    """Before the gateway container is replaced: :func:`carry_over_chat_files` for the install with this ``.env``."""
-    if carry_over_chat_files(data_dir_of(env_file)) == "copied":
-        success("Chat attachments copied from the old gateway container into the data volume.")
+    """Before the gateway container is replaced: :func:`carry_over_chat_files` for the install with this ``.env``.
+
+    When the files cannot be copied and verified, the command stops here with the reason and what to do: the
+    old containers still run and the files are still in the old gateway container.
+    """
+    try:
+        result = carry_over_chat_files(data_dir_of(env_file))
+    except ChatFilesNotCarried as exc:
+        error(str(exc))
+        sys.exit(1)
+    if result.status == "copied":
+        success(
+            f"Chat attachments copied from the old gateway container into the data volume and verified "
+            f"({result.files} file(s), {_human_size(result.size)})."
+        )
 
 
 def _volume_source(docker: str, project: str, name: str, data_dir: str) -> str | None:
@@ -354,14 +367,188 @@ def _volume_source(docker: str, project: str, name: str, data_dir: str) -> str |
     return _compose_volume(docker, project, name)
 
 
-def carry_over_chat_files(data_dir: str = "") -> str:
+class ChatFilesNotCarried(RuntimeError):
+    """The chat attachments in the old gateway container could not be copied and verified.
+
+    The message says what failed and what to do. Raised before any container is replaced, so the files are
+    where they were.
+    """
+
+
+@dataclass
+class CarryResult:
+    """What :func:`carry_over_chat_files` did: ``"copied"``, ``"present"`` (the old container has the mount) or
+    ``"none"`` (nothing to carry), and how many files and bytes were copied and verified."""
+
+    status: str
+    files: int = 0
+    size: int = 0
+
+
+def _human_size(size: int) -> str:
+    """*size* in bytes as the operator reads it: ``12.3 MB``."""
+    value = float(size)
+    for unit in ("bytes", "KB", "MB", "GB"):
+        if value < 1000 or unit == "GB":
+            return f"{size} bytes" if unit == "bytes" else f"{value:.1f} {unit}"
+        value /= 1000
+    return f"{size} bytes"  # unreachable
+
+
+#: Run in the helper container, once per file of the tar stream and with the file on stdin (GNU tar's
+#: ``--to-command``): one line ``<sha256>`` TAB ``<size>`` TAB ``<path>`` per regular file. Nothing is
+#: written anywhere, so the old container's files can be hashed whether it runs or is stopped, and a
+#: tmpfs the size of the attachments is not needed.
+_HASH_MEMBER = (
+    'if [ "$TAR_FILETYPE" = f ]; then '
+    'printf "%s\\t%s\\t%s\\n" "$(sha256sum | cut -c1-64)" "$TAR_SIZE" "$TAR_FILENAME"; fi'
+)
+_HASH_STREAM = f"cd /tmp && tar -x -f - --to-command='{_HASH_MEMBER}'"
+#: The same lines for the files of a directory, read through a read-only mount.
+_HASH_DIRECTORY = (
+    "cd /dst && find . -type f -exec sh -c "
+    "'for f; do printf \"%s\\t%s\\t%s\\n\" \"$(sha256sum < \"$f\" | cut -c1-64)\" \"$(wc -c < \"$f\")\" "
+    "\"${f#./}\"; done' sh {} +"
+)
+#: Copies without ever replacing a file the volume holds.
+_COPY_STREAM = "tar -x --skip-old-files -f - -C /dst"
+
+
+def _parse_hashes(output: str) -> dict[str, tuple[str, int]]:
+    """Path (relative) → (SHA-256, size) from the lines :data:`_HASH_MEMBER` prints."""
+    found: dict[str, tuple[str, int]] = {}
+    for line in output.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) != 3 or len(parts[0]) != 64 or not parts[1].isdigit():
+            raise ChatFilesNotCarried(f"The helper container answered something unexpected: {line[:120]!r}.")
+        found[parts[2].removeprefix("./")] = (parts[0], int(parts[1]))
+    return found
+
+
+def _helper(docker: str, image: str, script: str, *, mount: str | None = None, interactive: bool = False) -> list[str]:
+    """``docker run`` of the old gateway's own image, running *script* as root with *mount* on ``/dst``.
+
+    The image is on the server already (an air-gapped one pulls nothing) and is Debian with GNU tar and
+    sha256sum. Root, to read and write whatever user the files belong to.
+    """
+    cmd = [docker, "run", "--rm"]
+    if interactive:
+        cmd.append("-i")
+    cmd += ["--user", "0:0", "--entrypoint", "sh"]
+    if mount is not None:
+        cmd += ["-v", mount]
+    return [*cmd, image, "-c", script]
+
+
+_NOTHING_LOST = (
+    "Nothing was replaced: the old containers still run and the files are untouched in the old gateway "
+    "container. Free disk space or fix the cause named, then run the command again."
+)
+
+
+def _stream_from_container(docker: str, image: str, script: str, mount: str | None = None) -> str | None:
+    """``docker cp`` of the chat files into a helper container running *script*; its output.
+
+    The tar stream goes from one container to the other, nothing lands on the host, ownership is kept. Works
+    on a stopped container too. ``None`` when the old container has no chat files directory; any other
+    failure of the copy or the helper raises :class:`ChatFilesNotCarried`.
+    """
+    reader = subprocess.Popen(  # noqa: S603
+        [docker, "cp", f"{_GATEWAY_CONTAINER}:{_CHAT_FILES_PATH}/.", "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    helper = _helper(docker, image, script, mount=mount, interactive=True)
+    try:
+        writer = subprocess.run(  # noqa: S603
+            helper, stdin=reader.stdout, capture_output=True, check=False
+        )
+    finally:
+        if reader.stdout is not None:
+            reader.stdout.close()
+    copy_error = reader.stderr.read().decode("utf-8", errors="replace").strip() if reader.stderr else ""
+    if reader.wait() != 0:
+        if any(text in copy_error.lower() for text in ("could not find the file", "no such file or directory")):
+            return None
+        raise ChatFilesNotCarried(
+            f"Chat attachments could not be read from the old gateway container ({_GATEWAY_CONTAINER}): "
+            f"{copy_error[:300] or 'docker cp failed'}. {_NOTHING_LOST}"
+        )
+    if writer.returncode != 0:
+        detail = writer.stderr.decode("utf-8", errors="replace").strip()[:300]
+        raise ChatFilesNotCarried(
+            f"Chat attachments could not be copied ({detail or 'the helper container failed'}). {_NOTHING_LOST}"
+        )
+    return writer.stdout.decode("utf-8", errors="replace")
+
+
+def _hash_destination(docker: str, image: str, target: str) -> dict[str, tuple[str, int]]:
+    """Path → (SHA-256, size) of every file in *target* (volume or host directory), read-only."""
+    proc = subprocess.run(  # noqa: S603
+        _helper(docker, image, _HASH_DIRECTORY, mount=f"{target}:/dst:ro"),
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip()[:300]
+        raise ChatFilesNotCarried(
+            f"The files in the data volume could not be read to check them "
+            f"({detail or 'the helper failed'}). {_NOTHING_LOST}"
+        )
+    return _parse_hashes(proc.stdout.decode("utf-8", errors="replace"))
+
+
+def _named(paths: list[str]) -> str:
+    """The first few of *paths* for a message."""
+    shown = ", ".join(sorted(paths)[:5])
+    return f"{shown} and {len(paths) - 5} more" if len(paths) > 5 else shown
+
+
+def _check_destination(
+    source: dict[str, tuple[str, int]], found: dict[str, tuple[str, int]], *, after_copy: bool
+) -> list[str]:
+    """The source files missing in *found* (after the copy that is a failure, raised); a file in both with
+    another hash is a conflict and raises always -- nothing is ever overwritten."""
+    differing = [path for path, (digest, _) in source.items() if path in found and found[path][0] != digest]
+    if differing and after_copy:
+        raise ChatFilesNotCarried(
+            f"{len(differing)} chat attachment(s) differ from the old gateway container after copying: "
+            f"{_named(differing)}. They changed in the old container while it was copied, or were damaged "
+            f"on the way. {_NOTHING_LOST}"
+        )
+    if differing:
+        raise ChatFilesNotCarried(
+            f"{len(differing)} chat attachment(s) exist in the data volume with other content than in the "
+            f"old gateway container: {_named(differing)}. Nothing was overwritten and nothing was replaced; "
+            "the old containers still run. Compare the two copies, move the one you do not want out of the "
+            "volume (or the old container's file aside), then run the command again."
+        )
+    missing = [path for path in source if path not in found]
+    if missing and after_copy:
+        raise ChatFilesNotCarried(
+            f"{len(missing)} chat attachment(s) are not in the data volume after copying: {_named(missing)}. "
+            f"{_NOTHING_LOST}"
+        )
+    return missing
+
+
+def carry_over_chat_files(data_dir: str = "") -> CarryResult:
     """Copy chat attachments an older release left inside the gateway container into the new volume.
 
     Before that release, ``/data/faden/chat-files`` had no volume: the files lived in the container layer
-    and went when the container was replaced. Run before the upgrade replaces it. Only when the container
-    exists without a mount there and the volume (or the directory under *data_dir*) is empty; whatever the
-    volume holds is never overwritten. Returns ``"copied"``, ``"present"`` (volume already in use or not
-    empty), ``"none"`` (no container) or ``"failed"``; a failure is a warning, the upgrade goes on.
+    and went when the container was replaced. Run before the upgrade replaces it, so a failure of any kind
+    stops the command while nothing is replaced: it raises :class:`ChatFilesNotCarried`.
+
+    The files are hashed (SHA-256) in the old container, copied, and hashed again in the volume (or the
+    directory under *data_dir*), mounted read-only; every file must be there with the same hash. A volume that
+    holds files is no obstacle -- the copy skips files that exist (``tar --skip-old-files``) and a file that
+    exists with other content is a conflict that stops everything before anything is written. Returns
+    ``"copied"``, ``"present"`` (the old container already has the mount) or ``"none"`` (no old container, or
+    it has no chat files).
+
+    The source is hashed by streaming ``docker cp`` into a helper container that hashes each tar member as it
+    passes (GNU tar ``--to-command``): nothing is extracted, so no disk or tmpfs of the attachments' size
+    is needed, and ``docker cp`` reads a stopped container as well as a running one.
     """
     docker = _docker_bin()
     proc = subprocess.run(  # noqa: S603
@@ -370,10 +557,26 @@ def carry_over_chat_files(data_dir: str = "") -> str:
         check=False,
     )
     if proc.returncode != 0:
-        return "none"
+        stderr = proc.stderr.decode("utf-8", errors="replace") if proc.stderr else ""
+        if "no such" in stderr.lower():
+            return CarryResult("none")  # a fresh install: no old container
+        raise ChatFilesNotCarried(
+            f"Docker could not inspect {_GATEWAY_CONTAINER}: {stderr.strip()[:300]}. {_NOTHING_LOST}"
+        )
     image, *mounts = proc.stdout.decode("utf-8", errors="replace").split()
     if _CHAT_FILES_PATH in mounts:
-        return "present"
+        return CarryResult("present")
+
+    info("Reading the chat attachments in the old gateway container…")
+    listing = _stream_from_container(docker, image, _HASH_STREAM)
+    if listing is None:
+        return CarryResult("none")  # the old container has no such directory: nothing to carry
+    source = _parse_hashes(listing)
+    if not source:
+        return CarryResult("none")
+    size = sum(n for _, n in source.values())
+    info(f"  {len(source)} file(s), {_human_size(size)}; copying into the data volume…")
+
     project = _compose_project(docker) or _DEFAULT_PROJECT
     target = _volume_source(docker, project, "faden_chat_files", data_dir)
     if target is None:
@@ -390,37 +593,20 @@ def carry_over_chat_files(data_dir: str = "") -> str:
             check=False,
         )
         if made.returncode != 0:
-            warning("  Could not create the chat files volume; attachments in the old container are not copied")
-            return "failed"
-    # The tar stream goes from one container to the other; nothing lands on the host, ownership is kept.
-    reader = subprocess.Popen(  # noqa: S603
-        [docker, "cp", f"{_GATEWAY_CONTAINER}:{_CHAT_FILES_PATH}/.", "-"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
-    # The writer runs the old gateway's own image: it is on the server already (an air-gapped one pulls
-    # nothing) and has sh and tar. As root, to write into the volume whatever user the image runs as.
-    writer = subprocess.run(  # noqa: S603
-        [
-            docker, "run", "--rm", "-i", "--user", "0:0", "--entrypoint", "sh",
-            "-v", f"{target}:/dst",
-            image,
-            "-c", 'if [ -n "$(ls -A /dst)" ]; then exit 3; fi; tar xf - -C /dst',
-        ],
-        stdin=reader.stdout,
-        capture_output=True,
-        check=False,
-    )
-    if reader.stdout is not None:
-        reader.stdout.close()
-    if reader.wait() != 0:
-        return "none"  # the old container has no such directory: nothing to carry
-    if writer.returncode == 3:
-        return "present"
-    if writer.returncode != 0:
-        warning(f"  Chat files not copied: {writer.stderr.decode('utf-8', errors='replace').strip()[:200]}")
-        return "failed"
-    return "copied"
+            detail = made.stderr.decode("utf-8", errors="replace").strip()[:300]
+            raise ChatFilesNotCarried(
+                f"The chat files volume could not be created ({detail}). {_NOTHING_LOST}"
+            )
+
+    # A conflict is found before anything is written; what the volume lacks is copied.
+    if _check_destination(source, _hash_destination(docker, image, target), after_copy=False):
+        if _stream_from_container(docker, image, _COPY_STREAM, mount=f"{target}:/dst") is None:
+            raise ChatFilesNotCarried(
+                f"The chat attachments vanished from the old gateway container while they were copied. "
+                f"{_NOTHING_LOST}"
+            )
+        _check_destination(source, _hash_destination(docker, image, target), after_copy=True)
+    return CarryResult("copied", len(source), size)
 
 
 def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data_dir: str = "") -> list[str]:
