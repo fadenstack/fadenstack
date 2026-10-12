@@ -796,12 +796,13 @@ def deploy_cmd(
     # different password, migrators will fail with InvalidPasswordError.
     # We boot Postgres alone, ALTER USER to match .env, then start
     # everything else.
-    _sync_postgres_password(ctx, env_path)
-    retire_fixed_logins(env_path)
-    # An install from before the chat files had a volume: they go from the old gateway container into it.
+    # An install from before the chat files had a volume: they go from the old gateway container into it,
+    # verified, before anything is started or replaced (syncing the password starts Postgres).
     from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
 
     keep_chat_files(env_path)
+    _sync_postgres_password(ctx, env_path)
+    retire_fixed_logins(env_path)
 
     # Start infrastructure services and wait for them to become healthy
     # BEFORE starting application containers.  This avoids a race
