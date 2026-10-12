@@ -449,18 +449,6 @@ _FLAVORS: dict[str, dict[str, Any]] = {
         ),
         "mounts": [
             ContainerMount(host_path="/srv/faden/models", container_path="/models", mode="ro"),
-            # Mounted at Hugging Face's own default location rather than nested
-            # under /models.  The previous target, /models/huggingface, sat inside
-            # the read-only bind mount above, and the host source of that mount has
-            # no "huggingface" directory -- so runc could not create the mountpoint
-            # and every container start failed with "read-only file system".
-            # /root/.cache is ordinary image rootfs, so the mountpoint is created
-            # normally, and HF_HOME needs no override because this *is* the default.
-            ContainerMount(
-                host_path="/home/sachi/.cache/huggingface",
-                container_path="/root/.cache/huggingface",
-                mode="ro",
-            ),
             # Ray's session directory, on the host.
             #
             # Every Serve replica writes its own log file under
@@ -523,9 +511,9 @@ _FLAVORS: dict[str, dict[str, Any]] = {
     # Ray 2.58.0 matches the DGX runtime on purpose: Ray refuses to form a
     # cluster across mismatched versions, so the two platforms move together.
     #
-    # It carries no mounts. The DGX flavor's paths are that machine's
-    # (``/home/sachi/.cache/huggingface``), and a generic runtime has no business
-    # guessing where a model store lives -- the agent supplies it.
+    # It carries no mounts. A generic runtime has no business guessing where a
+    # model store or a Hugging Face cache lives -- the agent supplies them
+    # (``_NODE_MOUNT_POINTS``).
     "x86_64": {
         "display_name": "Fadenstack runtime for x86_64 NVIDIA GPUs (generic)",
         "what": "for any mainstream NVIDIA card on x86_64, from Turing (sm_75) to Blackwell (sm_120)",
@@ -612,6 +600,11 @@ def _preference(environment: Any, node_id: Any) -> tuple[str, ...]:
 _NODE_MOUNT_POINTS: tuple[tuple[str, str, str], ...] = (
     ("model_store", "/models", "ro"),
     ("ray_session", "/tmp/ray", "rw"),
+    # The machine's own Hugging Face cache, when the agent found one: mounted
+    # at the hub directory Hugging Face and vLLM look in by default
+    # (``~/.cache/huggingface/hub``, as root), so models already downloaded
+    # there are used in place instead of copied into the model store.
+    ("hf_cache", "/root/.cache/huggingface/hub", "ro"),
 )
 
 

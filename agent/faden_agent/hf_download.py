@@ -145,6 +145,19 @@ async def check_internet(payload: dict[str, Any], *, model_store_root: str | Non
     return result
 
 
+def _adopt_files(hf_cache: Path, model_dir: Path, commit: str, siblings: list[Any]) -> None:
+    """Link files of *commit* that the machine's Hugging Face cache holds in full into *model_dir*'s blobs."""
+    from faden_agent.model_puller import adopt_blob  # noqa: PLC0415
+
+    (model_dir / "blobs").mkdir(parents=True, exist_ok=True)
+    for sibling in siblings:
+        source = (hf_cache / model_dir.name / "snapshots" / commit / sibling.rfilename).resolve(strict=False)
+        size = int(getattr(sibling, "size", 0) or 0)
+        # The blob keeps the name the Hub's client gave it (its etag), which hf_hub_download looks for.
+        if source.is_file() and (not size or source.stat().st_size == size):
+            adopt_blob(source, model_dir / "blobs" / source.name)
+
+
 def download_model(
     *,
     hf_repo_id: str,
@@ -153,6 +166,7 @@ def download_model(
     token: str | None,
     progress: Callable[[int, int, str], None] | None = None,
     cancel: threading.Event | None = None,
+    machine_hf_cache: str | None = None,
 ) -> dict[str, Any]:
     """Download what vLLM reads of *hf_repo_id* into *cache_dir*; blocking, run it in a thread.
 
@@ -161,7 +175,9 @@ def download_model(
     two versions; ``refs/<revision>`` is written at the end. Files already in
     the store are not fetched again, and a file that was partly downloaded
     continues where it stopped. *progress* is called with (bytes done, bytes
-    in all, file) every few seconds.
+    in all, file) every few seconds. A file the machine's own Hugging Face cache
+    (*machine_hf_cache*) already holds at that commit is linked into the store
+    first, so it is neither downloaded nor kept twice.
     """
     from huggingface_hub import HfApi, hf_hub_download  # noqa: PLC0415
 
@@ -181,6 +197,9 @@ def download_model(
     model_dir = Path(cache_dir) / f"models--{hf_repo_id.replace('/', '--')}"
     blobs = model_dir / "blobs"
     log.info("Downloading %d files (%d bytes) of %s at %s from %s", len(siblings), total, hf_repo_id, commit, hub_endpoint())
+
+    if machine_hf_cache:
+        _adopt_files(Path(machine_hf_cache), model_dir, commit, siblings)
 
     done = 0
     current = ""

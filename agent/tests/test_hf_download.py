@@ -8,6 +8,7 @@ over the same link, nine hours, while the Sparks had lines of their own.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -75,6 +76,26 @@ def test_it_downloads_what_vllm_reads_at_one_commit(monkeypatch: pytest.MonkeyPa
     assert result["commit"] == COMMIT and result["total_size"] == 20_020
     assert Path(result["snapshot_dir"]).is_dir()
     assert seen[-1] == (20_020, 20_020)
+
+
+def test_a_file_the_machines_hf_cache_holds_is_linked_not_fetched(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fetched: list[dict[str, Any]] = []
+    _fake_hub(monkeypatch, {"model.safetensors": 5, "config.json": 2}, fetched)
+    hub = tmp_path / "hub"
+    mine = hub / f"models--{REPO.replace('/', '--')}"
+    (mine / "blobs").mkdir(parents=True)
+    (mine / "snapshots" / COMMIT).mkdir(parents=True)
+    (mine / "blobs" / "etag1").write_bytes(b"12345")
+    os.symlink(os.path.join("..", "..", "blobs", "etag1"), mine / "snapshots" / COMMIT / "model.safetensors")
+    (mine / "blobs" / "etag2").write_bytes(b"x")  # config.json is short: half a download
+    os.symlink(os.path.join("..", "..", "blobs", "etag2"), mine / "snapshots" / COMMIT / "config.json")
+
+    hf_download.download_model(
+        hf_repo_id=REPO, revision=None, cache_dir=str(tmp_path / "store"), token=None, machine_hf_cache=str(hub),
+    )
+
+    assert (tmp_path / "store" / mine.name / "blobs" / "etag1").read_bytes() == b"12345"
+    assert not (tmp_path / "store" / mine.name / "blobs" / "etag2").exists()
 
 
 @pytest.mark.asyncio()

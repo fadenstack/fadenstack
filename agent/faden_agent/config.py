@@ -42,6 +42,30 @@ def _default_model_store_root() -> str:
     return str(Path.home() / ".cache" / "huggingface")
 
 
+def detect_hf_cache(model_store_root: str | None = None) -> str | None:
+    """The Hugging Face hub cache already on this machine, or None.
+
+    Order, as ``huggingface_hub`` itself resolves it: ``HF_HUB_CACHE``
+    (``HUGGINGFACE_HUB_CACHE``), then ``$HF_HOME/hub``, then the agent user's
+    ``~/.cache/huggingface/hub``. The first that is an existing directory wins.
+    A cache that is the model store itself is not reported: it is mounted as
+    ``/models`` already.
+    """
+    candidates: list[Path] = []
+    for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        if os.environ.get(var):
+            candidates.append(Path(os.environ[var]))
+    if os.environ.get("HF_HOME"):
+        candidates.append(Path(os.environ["HF_HOME"]) / "hub")
+    candidates.append(Path.home() / ".cache" / "huggingface" / "hub")
+    store = Path(model_store_root).resolve(strict=False) if model_store_root else None
+    for candidate in candidates:
+        if candidate.is_dir():
+            resolved = candidate.resolve(strict=False)
+            return None if resolved == store else str(resolved)
+    return None
+
+
 def _detect_routable_ip(backend_url: str) -> str | None:
     """Determine the local IP that routes to the backend (no traffic sent)."""
     try:

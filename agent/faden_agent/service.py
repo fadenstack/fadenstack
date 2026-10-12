@@ -15,7 +15,7 @@ from httpx import HTTPStatusError
 from websockets.exceptions import InvalidStatus
 
 from faden_agent.backend_client import BackendClient
-from faden_agent.config import AgentConfig
+from faden_agent.config import AgentConfig, detect_hf_cache
 from faden_agent.container_log_forwarder import ContainerLogForwarder
 from faden_agent.dispatcher import CommandDispatcher
 from faden_agent.event_buffer import EventBuffer
@@ -59,6 +59,7 @@ class NodeAgentService:
         self._log_tasks: list[asyncio.Task[None]] = []
         self._ray_manager: Any = None  # typed import is local (optional dep)
         self._model_tls: ModelTls | None = None
+        self._hf_cache: str | None = None
 
     async def run_forever(self) -> None:
         """Run agent forever with reconnect and re-enrollment handling."""
@@ -68,13 +69,21 @@ class NodeAgentService:
         gpu_collector = detect_gpu()
         log.info("Detected GPU collector: %s", gpu_collector.vendor)
 
+        # A Hugging Face cache already on the machine is reused, not copied:
+        # the backend mounts it into the runtime container, and a model that
+        # is complete in it is not downloaded again (model_puller).
+        self._hf_cache = detect_hf_cache(self._config.model_store_root)
+        paths = {
+            "model_store": self._config.model_store_root,
+            "ray_session": self._config.ray_session_dir,
+        }
+        if self._hf_cache:
+            log.info("Using the machine's Hugging Face cache at %s", self._hf_cache)
+            paths["hf_cache"] = self._hf_cache
         static_capabilities = await build_static_capabilities(
             runtime,
             gpu_collector,
-            paths={
-                "model_store": self._config.model_store_root,
-                "ray_session": self._config.ray_session_dir,
-            },
+            paths=paths,
         )
         # This agent can put the model-TLS proxy in front of what it serves
         # (model_tls.py); the backend sends loopback binds only to agents that say so.
@@ -120,6 +129,7 @@ class NodeAgentService:
                 credential=credential,
                 model_sync=model_sync,
                 model_store_root=self._config.model_store_root,
+                machine_hf_cache=self._hf_cache,
                 emit_progress=emit_progress,
             )
 
@@ -162,6 +172,7 @@ class NodeAgentService:
                 cache_dir=self._config.model_store_root,
                 token=token,
                 progress=_progress,
+                machine_hf_cache=self._hf_cache,
             )
 
         async def _load_image(

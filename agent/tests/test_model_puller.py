@@ -269,3 +269,80 @@ async def test_a_dangling_link_is_replaced_by_the_file(tmp_path: Path) -> None:
 
     assert not entry.is_symlink() and entry.read_bytes() == data
     assert not store_file.exists()
+
+
+def _hf_snapshot(hub: Path, data: bytes, *, ref: str = "abc123", write_file: bool = True) -> str:
+    """A Hugging Face hub cache holding models--org--repo at commit abc123."""
+    blob_hash = _sha256(data)
+    model = hub / "models--org--repo"
+    (model / "blobs").mkdir(parents=True)
+    (model / "refs").mkdir()
+    (model / "snapshots" / "abc123").mkdir(parents=True)
+    if write_file:
+        (model / "blobs" / blob_hash).write_bytes(data)
+        os.symlink(os.path.join("..", "..", "blobs", blob_hash), model / "snapshots" / "abc123" / "model.safetensors")
+    (model / "refs" / "main").write_text(ref, encoding="utf-8")
+    return blob_hash
+
+
+async def _pull_with_hf(store: Path, hub: Path, blob_hash: str, data: bytes) -> int:
+    served = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal served
+        served += 1
+        return httpx.Response(200, content=data)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://backend") as client:
+        await pull_model(
+            client=client,
+            credential="c",
+            model_sync={
+                "model_id": "m1",
+                "model_dir_name": "models--org--repo",
+                "blobs": [{"hash": blob_hash, "size": len(data)}],
+                "refs": [{"name": "main", "commit": "abc123"}],
+                "snapshots": [{"commit": "abc123", "links": [{"path": "model.safetensors", "blob_hash": blob_hash}]}],
+                "total_size": len(data),
+            },
+            model_store_root=str(store),
+            machine_hf_cache=str(hub),
+        )
+    return served
+
+
+@pytest.mark.asyncio()
+async def test_a_model_complete_in_the_hf_cache_is_not_downloaded(tmp_path: Path) -> None:
+    data = b"weights"
+    hub = tmp_path / "hub"
+    blob_hash = _hf_snapshot(hub, data)
+
+    assert await _pull_with_hf(tmp_path / "store", hub, blob_hash, data) == 0
+    # The store has the model for the runtime to load, without a second copy of the bytes.
+    model = tmp_path / "store" / "models--org--repo"
+    assert (model / "snapshots" / "abc123" / "model.safetensors").read_bytes() == data
+    assert (model / "refs" / "main").read_text(encoding="utf-8") == "abc123"
+    assert os.path.samefile(model / "blobs" / blob_hash, hub / "models--org--repo" / "blobs" / blob_hash)
+
+
+@pytest.mark.asyncio()
+async def test_a_partial_hf_snapshot_is_not_complete(tmp_path: Path) -> None:
+    data = b"weights"
+    hub = tmp_path / "hub"
+    blob_hash = _hf_snapshot(hub, data, write_file=False)
+
+    assert await _pull_with_hf(tmp_path / "store", hub, blob_hash, data) == 1
+    assert (tmp_path / "store" / "models--org--repo" / "snapshots" / "abc123" / "model.safetensors").is_file()
+
+
+@pytest.mark.asyncio()
+async def test_a_short_blob_or_other_commit_in_the_hf_cache_is_downloaded(tmp_path: Path) -> None:
+    data = b"weights"
+    short = tmp_path / "hub1"
+    blob_hash = _hf_snapshot(short, data)
+    (short / "models--org--repo" / "blobs" / blob_hash).write_bytes(b"wei")
+    assert await _pull_with_hf(tmp_path / "s1", short, blob_hash, data) == 1
+
+    other = tmp_path / "hub2"
+    blob_hash = _hf_snapshot(other, data, ref="def456")
+    assert await _pull_with_hf(tmp_path / "s2", other, blob_hash, data) == 1
