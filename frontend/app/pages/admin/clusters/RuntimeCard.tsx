@@ -95,10 +95,16 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
             </Typography>
           </Stack>
         ))}
+        {/* A runtime this server no longer ships: shown by its id, with the move offered below. */}
+        {(status.withdrawn ?? []).map((id) => (
+          <Typography key={id} variant="body2" fontFamily="monospace" data-testid="runtime-withdrawn">
+            {id}
+          </Typography>
+        ))}
 
         {update && !confirming && (
           <Alert
-            severity="info"
+            severity={status.withdrawn?.length ? "warning" : "info"}
             sx={{ mt: 2 }}
             data-testid="runtime-update"
             action={
@@ -107,7 +113,9 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
               </Button>
             }
           >
-            {t("clusters.runtime.update", { vllm: update.vllm_version })}
+            {status.withdrawn?.length
+              ? t("clusters.runtime.withdrawn", { vllm: update.vllm_version })
+              : t("clusters.runtime.update", { vllm: update.vllm_version })}
           </Alert>
         )}
 

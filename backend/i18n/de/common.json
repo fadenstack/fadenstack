@@ -2731,6 +2731,7 @@
       "recommended": "Empfohlen",
       "applying": "Startet mit der neuen Laufzeit neu",
       "update": "Eine neuere zertifizierte Laufzeit ist verfügbar (vLLM {{vllm}}). Der Cluster behält seine Laufzeit, bis Sie umschalten.",
+      "withdrawn": "Dieser Cluster läuft mit einer Laufzeit, die dieses Release nicht mehr enthält. Wechseln Sie zur zertifizierten (vLLM {{vllm}}): Der Cluster startet damit neu.",
       "choose": "Umschalten auf",
       "switch": "Umschalten",
       "restart_warning": "Das Umschalten auf vLLM {{vllm}} startet den Cluster neu: Der Container jeder Maschine wird aus dem neuen Image neu erstellt, und jedes Modell darauf lädt erneut. Eine Maschine, die das Image noch nicht hat, holt es zuerst.",

@@ -639,6 +639,8 @@ export interface ClusterRuntimeStatus {
   restarting: boolean;
   /** A newer certified stable runtime the cluster does not run. */
   update: string | null;
+  /** Runtimes its machines still run that this server no longer ships (``update`` names the way off). */
+  withdrawn?: string[];
   runtimes: ClusterRuntime[];
 }
 

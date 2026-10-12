@@ -4,10 +4,11 @@ This server ships up to three runtimes per flavor of machine
 (``runtime-image/README.md``): the stable one clusters get, a newer one as a
 preview, an older one to go back to. A cluster's machine runs the runtime the
 cluster was switched to, else the one it was started with, else its flavor's
-default (``RuntimeBundleRegistry.resolve_for_node``); a runtime the catalogue no
-longer holds counts as none of those. So nothing moves a
+default (``RuntimeBundleRegistry.resolve_for_node``). So nothing moves a
 cluster to another runtime by itself -- not a restart, not a recovery, not an
-upgrade of this server that ships a newer one.
+upgrade of this server that ships a newer one, nor one that no longer ships
+the runtime a cluster runs: that cluster is shown on it, with the default
+offered as the update.
 
 Switching restarts the cluster on the new runtime: each machine's container is
 made again from the new image and the deployments load again. That is why it
@@ -64,15 +65,13 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
     """What the machines run, whether they are there yet, and whether a newer stable runtime is out."""
     env = await _environment(session, environment_id)
     registry = default_bundle_registry
-    # A record of a runtime this server no longer ships (one withdrawn from the
-    # catalogue) names nothing a machine can be given again. It counts as no
-    # record, like a cluster formed before records were kept: the machine's
-    # default is what it gets, and the record is replaced when it next starts.
-    # Counting it as a mismatch would show a restart that nothing is going to do.
-    started = {node: runtime for node, runtime in started_runtimes(env).items() if registry.get_bundle(runtime)}
+    started = started_runtimes(env)
+    # The cluster's own choice, when this server still ships it.
+    chosen = registry.get_bundle((env.config_json or {}).get(RUNTIME_KEY) or "")
     offered: dict[str, RuntimeBundleManifest] = {}
     defaults: set[str] = set()
     runs: set[str] = set()
+    withdrawn: set[str] = set()
     applied = True
     update: str | None = None
     for node in await EnvironmentNodeDAO(session).machines(env.id):
@@ -81,6 +80,17 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         default = registry.default_among(fits)
         target = registry.resolve_for_node(node, environment=env)
         if target is None:
+            continue
+        recorded = started.get(str(node.id))
+        if recorded and registry.get_bundle(recorded) is None and (chosen is None or chosen not in fits):
+            # A runtime this server no longer ships (withdrawn from the catalogue): the machine runs it until
+            # its cluster restarts, and nothing moves a cluster by itself. It is shown as what runs, with the
+            # move to the default offered; switching to it restarts the cluster.
+            runs.add(recorded)
+            withdrawn.add(recorded)
+            if default is not None:
+                defaults.add(default.bundle_id)
+                update = default.bundle_id
             continue
         runs.add(target.bundle_id)
         # A machine with no record runs its default: a cluster formed before
@@ -98,6 +108,8 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         # Not there yet, and the cluster is to run: it is restarting.
         "restarting": env.restarting(applied=applied),
         "update": update,
+        # Runtimes the machines still run that this server no longer ships.
+        "withdrawn": sorted(withdrawn),
         "runtimes": [
             _offered(bundle, default=bundle.bundle_id in defaults)
             for bundle in sorted(offered.values(), key=lambda b: b.bundle_id, reverse=True)

@@ -2729,6 +2729,7 @@
       "recommended": "Recommended",
       "applying": "Restarting on the new runtime",
       "update": "A newer certified runtime is available (vLLM {{vllm}}). The cluster keeps its runtime until you switch.",
+      "withdrawn": "This cluster runs a runtime this release no longer ships. Switch to the certified one (vLLM {{vllm}}): the cluster restarts on it.",
       "choose": "Switch to",
       "switch": "Switch",
       "restart_warning": "Switching to vLLM {{vllm}} restarts the cluster: each machine's container is made again from the new image and every model on it loads again. A machine that does not hold the image yet fetches it first.",

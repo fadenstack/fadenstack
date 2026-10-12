@@ -79,6 +79,22 @@ describe("RuntimeCard", () => {
     expect(await screen.findByText("Restarting on the new runtime")).toBeInTheDocument();
   });
 
+  it("names a runtime this release no longer ships and offers the move off it", async () => {
+    const GONE = "faden-ray-vllm-gb10-ray2.58-nv26.08";
+    vi.spyOn(inferenceApi, "runtime").mockResolvedValue(
+      status(GONE, { update: STABLE, withdrawn: [GONE] }),
+    );
+    const switched = vi.spyOn(inferenceApi, "switchRuntime").mockResolvedValue(status(STABLE));
+    render(<RuntimeCard environmentId={ENV} />);
+
+    expect(await screen.findByTestId("runtime-withdrawn")).toHaveTextContent(GONE);
+    const update = screen.getByTestId("runtime-update");
+    expect(update).toHaveTextContent(/no longer ships/);
+    await userEvent.click(within(update).getByRole("button", { name: "Switch" }));
+    await userEvent.click(screen.getByRole("button", { name: "Restart on this runtime" }));
+    expect(switched).toHaveBeenCalledWith(ENV, STABLE);
+  });
+
   it("offers the preview, and says what choosing it means", async () => {
     vi.spyOn(inferenceApi, "runtime").mockResolvedValue(status(STABLE));
     const switched = vi.spyOn(inferenceApi, "switchRuntime").mockResolvedValue(status(PREVIEW));

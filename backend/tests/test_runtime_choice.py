@@ -156,22 +156,40 @@ async def test_a_cluster_on_an_older_runtime_is_told_an_update_is_out(
     assert offered[PREVIEW]["channel"] == "preview"
 
 
-async def test_a_cluster_recorded_on_a_withdrawn_runtime_gets_the_default(
+async def test_a_cluster_still_on_a_withdrawn_runtime_is_shown_on_it_and_offered_the_default(
     dbsession: AsyncSession, registry: RuntimeBundleRegistry,
 ) -> None:
-    """The runtime is gone from the catalogue: no error, no dangling id, nothing pretending to restart."""
+    """The runtime is gone from the catalogue, the machines still run it: say so, offer the move, restart nothing.
+
+    On .61 the cluster read "runs vllm0.29.0, applied" while both machines ran the withdrawn nv26.08 image, and
+    nothing would ever have moved them.
+    """
     env, nodes = await _pair(dbsession, started=WITHDRAWN)
     env.config_json = {**env.config_json, "runtime": WITHDRAWN}  # it was also the operator's choice
 
     for node in nodes:
-        assert registry.resolve_for_node(node, environment=env).bundle_id == STABLE
+        assert registry.resolve_for_node(node, environment=env).bundle_id == STABLE  # what a (re)start gives
 
     status = await runtime_choice.environment_status(dbsession, env.id)
-    assert status["runs"] == [STABLE]
-    assert WITHDRAWN not in {r["bundle_id"] for r in status["runtimes"]}
-    # Nothing is going to restart it: the record is replaced when it next starts.
-    assert status["applied"] is True and status["restarting"] is False
-    assert status["update"] is None
+    assert status["runs"] == [WITHDRAWN]
+    assert status["withdrawn"] == [WITHDRAWN]
+    assert WITHDRAWN not in {r["bundle_id"] for r in status["runtimes"]}  # not offered
+    assert status["update"] == STABLE
+    assert status["applied"] is True and status["restarting"] is False  # nothing pending until switched
+
+
+async def test_switching_off_a_withdrawn_runtime_restarts_the_cluster(
+    dbsession: AsyncSession, registry: RuntimeBundleRegistry,
+) -> None:
+    env, _ = await _pair(dbsession, started=WITHDRAWN)
+    env.config_json = {**env.config_json, "runtime": WITHDRAWN}
+    generation = env.generation
+
+    status = await runtime_choice.switch(dbsession, env.id, STABLE)
+
+    assert env.generation == generation + 1  # the reconciler restarts it on the new runtime
+    assert status["runs"] == [STABLE] and status["withdrawn"] == []
+    assert status["applied"] is False
 
 
 async def test_a_withdrawn_runtime_is_passed_over_for_the_one_the_machine_was_started_with(

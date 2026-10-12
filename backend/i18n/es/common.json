@@ -2731,6 +2731,7 @@
       "recommended": "Recomendado",
       "applying": "Reiniciando con el nuevo entorno",
       "update": "Hay un entorno certificado más reciente (vLLM {{vllm}}). El clúster mantiene el suyo hasta que lo cambie.",
+      "withdrawn": "Este clúster usa un entorno de ejecución que esta versión ya no incluye. Cambie al certificado (vLLM {{vllm}}): el clúster se reinicia con él.",
       "choose": "Cambiar a",
       "switch": "Cambiar",
       "restart_warning": "Cambiar a vLLM {{vllm}} reinicia el clúster: el contenedor de cada máquina se crea de nuevo desde la nueva imagen y cada modelo vuelve a cargarse. Una máquina que aún no tiene la imagen la obtiene primero.",

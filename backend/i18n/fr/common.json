@@ -2731,6 +2731,7 @@
       "recommended": "Recommandé",
       "applying": "Redémarrage sur le nouvel environnement",
       "update": "Un environnement certifié plus récent est disponible (vLLM {{vllm}}). Le cluster garde le sien jusqu'à ce que vous le changiez.",
+      "withdrawn": "Ce cluster utilise un environnement d'exécution que cette version ne fournit plus. Passez à celui qui est certifié (vLLM {{vllm}}) : le cluster redémarre avec lui.",
       "choose": "Passer à",
       "switch": "Changer",
       "restart_warning": "Passer à vLLM {{vllm}} redémarre le cluster : le conteneur de chaque machine est recréé depuis la nouvelle image et chaque modèle se recharge. Une machine qui n'a pas encore l'image la récupère d'abord.",
