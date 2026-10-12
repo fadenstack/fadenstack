@@ -2691,7 +2691,9 @@
       "switch_off": "Switch off",
       "restart_warning": "The cluster restarts on every machine: its models stop, load again and answer again when loaded — minutes for a large model.",
       "restart_confirm": "Restart the cluster",
-      "update_agents": "Encryption between the machines needs agent 0.1.18 or later on every machine. Update {{hosts}} by re-running the install line there."
+      "update_agents": "Encryption between the machines needs agent 0.1.18 or later on every machine. Update {{hosts}} by re-running the install line there.",
+      "host_mode": "Encryption between the machines needs Ray to run in the agent's runtime container. {{hosts}} runs Ray on the machine itself and cannot apply it. Run the agent's runtime container there.",
+      "switch_off_warning": "Ray's traffic between the machines will cross the network unencrypted."
     },
     "model_downloads": {
       "title": "Where the machines get models",

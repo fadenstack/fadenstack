@@ -111,6 +111,11 @@ export default function RayTlsCard({ environmentId, onSwitched }: RayTlsCardProp
             {t("clusters.ray_tls.update_agents", { hosts: status.old_agents.join(", ") })}
           </Alert>
         )}
+        {!status.on && (status.host_mode ?? []).length > 0 && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            {t("clusters.ray_tls.host_mode", { hosts: (status.host_mode ?? []).join(", ") })}
+          </Alert>
+        )}
         {confirming && (
           <RestartConfirm
             confirmLabel={t("clusters.ray_tls.restart_confirm")}
@@ -118,7 +123,9 @@ export default function RayTlsCard({ environmentId, onSwitched }: RayTlsCardProp
             onConfirm={flip}
             onCancel={() => setConfirming(false)}
           >
-            {t("clusters.ray_tls.restart_warning")}
+            {status.on
+              ? `${t("clusters.ray_tls.switch_off_warning")} ${t("clusters.ray_tls.restart_warning")}`
+              : t("clusters.ray_tls.restart_warning")}
           </RestartConfirm>
         )}
         {error && (

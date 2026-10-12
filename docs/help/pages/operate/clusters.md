@@ -221,8 +221,12 @@ again.
 
 ![The Traffic between machines card, Encrypted, with Switch off](../images/operate/cluster-traffic-encrypted.png)
 
-**Traffic between machines**: **Encrypt** turns on TLS for Ray between the cluster's machines. It restarts the
-cluster and its models; every machine needs a recent agent.
+**Traffic between machines**: a new cluster encrypts Ray's traffic between its machines with TLS from the start.
+A cluster created before that shows "not encrypted"; **Encrypt** turns it on, and **Switch off** turns it off
+again, which sends Ray's traffic across the network unencrypted. Either restarts the cluster and its models.
+Every machine needs a recent agent (0.1.18 or later) and has to run Ray in the agent's runtime container. A
+machine that runs Ray on the host instead cannot apply TLS, so the cluster refuses it with a message naming the
+machine: run the agent's runtime container there, or switch TLS off for the cluster on purpose.
 
 Both are explained in [HTTPS and trust](https.md#model-traffic-the-gateway-and-the-machines).
 

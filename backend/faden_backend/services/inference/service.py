@@ -295,11 +295,13 @@ class EnvironmentService:
         if control_plane.driver == "ray":
             from faden_backend.services.inference.drivers.ray.schemas import (  # noqa: PLC0415
                 NEW_CLUSTER_PORTS,
+                NEW_CLUSTER_SETTINGS,
             )
 
             # Recorded on the cluster, so clusters made before keep the ports
-            # they run on; anything the caller set wins.
-            config = {**NEW_CLUSTER_PORTS, **(config or {})}
+            # (and the unencrypted Ray traffic) they run on; anything the
+            # caller set wins.
+            config = {**NEW_CLUSTER_PORTS, **NEW_CLUSTER_SETTINGS, **(config or {})}
             await self._check_ray_config(None, config)
         try:
             return await self.dao.create(
@@ -405,8 +407,9 @@ class EnvironmentService:
         node already belongs to, so joining a cluster is still one decision
         even when the cluster is mixed-vendor.
         """
-        await self.get(environment_id)
+        environment = await self.get(environment_id)
         node_role = _enum(role, EnvironmentNodeRole, what="role")
+        await self._require_ray_tls_member(environment, node_id)
         try:
             member = await self.node_dao.add_node(environment_id, node_id, node_role)
         except IntegrityError as exc:
@@ -422,6 +425,19 @@ class EnvironmentService:
             await ComputePoolCoordinator(self.session).assign(
                 environment_id=environment_id, node=node, member=member
             )
+
+    async def _require_ray_tls_member(self, environment: InferenceEnvironment, node_id: uuid.UUID) -> None:
+        """Refuse a machine that cannot apply the Ray TLS its cluster has switched on."""
+        from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+        from faden_backend.services.inference import ray_tls  # noqa: PLC0415
+        from faden_backend.services.inference.drivers.ray.schemas import RayEnvironmentConfig  # noqa: PLC0415
+
+        if not RayEnvironmentConfig.model_validate(environment.config_json or {}).ray_tls:
+            return
+        node = await NodeControlDAO(self.session).get_node_by_id(node_id)
+        problem = await ray_tls.member_refusal(self.session, environment, node)
+        if problem:
+            raise ConflictError(problem)
 
     async def remove_node(self, environment_id: uuid.UUID, node_id: uuid.UUID) -> None:
         """Remove an infra node from an environment (no-op if absent).

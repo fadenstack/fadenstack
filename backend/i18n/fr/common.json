@@ -2693,7 +2693,9 @@
       "switch_off": "Désactiver",
       "restart_warning": "Le cluster redémarre sur chaque machine : ses modèles s'arrêtent, se rechargent et répondent de nouveau une fois chargés — quelques minutes pour un grand modèle.",
       "restart_confirm": "Redémarrer le cluster",
-      "update_agents": "Le chiffrement entre les machines exige l'agent 0.1.18 ou plus récent sur chaque machine. Mettez à jour {{hosts}} en relançant la ligne d'installation sur place."
+      "update_agents": "Le chiffrement entre les machines exige l'agent 0.1.18 ou plus récent sur chaque machine. Mettez à jour {{hosts}} en relançant la ligne d'installation sur place.",
+      "host_mode": "Le chiffrement entre les machines exige que Ray tourne dans le conteneur d'exécution de l'agent. {{hosts}} exécute Ray directement sur la machine et ne peut pas l'appliquer. Lancez-y le conteneur d'exécution de l'agent.",
+      "switch_off_warning": "Le trafic de Ray entre les machines traversera le réseau sans chiffrement."
     },
     "model_downloads": {
       "title": "D'où les machines obtiennent les modèles",

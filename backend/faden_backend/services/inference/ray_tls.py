@@ -44,6 +44,40 @@ def supported(capabilities: dict | None) -> bool:
         return False
 
 
+async def _runs_on_host(session: AsyncSession, environment: Any, node: InfraNode) -> bool:
+    """Whether no certified runtime covers the machine, so Ray would run on its host."""
+    from faden_backend.services.inference.bundles import node_and_bundle_for  # noqa: PLC0415
+
+    _, bundle = await node_and_bundle_for(session, node.id, driver="ray", environment=environment)
+    return bundle is None
+
+
+async def member_refusal(session: AsyncSession, environment: Any, node: InfraNode | None) -> str | None:
+    """Why this machine cannot run Ray with TLS, or ``None`` when it can.
+
+    Two things stop it. An agent older than 0.1.18 does not know how. And a
+    machine with no certified runtime bundle runs Ray on the host instead of in
+    the runtime container: only the container is started with the cluster's
+    certificates, so the cluster would say TLS is on while that member runs
+    without it, or not form at all.
+    """
+    if node is None:
+        return None  # an unknown machine is refused elsewhere, for that
+    name = str(node.host or node.id)
+    if not supported(node.capabilities_json):
+        return (
+            f"Ray TLS needs agent 0.1.18 or later on every machine of the cluster; update {name} "
+            "(re-run the install line), or switch Ray TLS off for this cluster."
+        )
+    if await _runs_on_host(session, environment, node):
+        return (
+            f"{name} would run Ray on the host, outside the agent's runtime container, and cannot apply "
+            "Ray TLS there. Run the agent's runtime container on it, or switch Ray TLS off for this "
+            "cluster on purpose."
+        )
+    return None
+
+
 def _old_agents(nodes: list[InfraNode]) -> list[str]:
     return sorted(str(node.host or node.id) for node in nodes if not supported(node.capabilities_json))
 
@@ -55,7 +89,8 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         raise RayTlsError("There is no such cluster.")
     nodes = await EnvironmentNodeDAO(session).machines(env.id)
     old = _old_agents(nodes)
-    on = RayEnvironmentConfig.model_validate(env.config_json or {}).ray_tls
+    host_mode = [str(node.host or node.id) for node in nodes if await _runs_on_host(session, env, node)]
+    on =RayEnvironmentConfig.model_validate(env.config_json or {}).ray_tls
     # What each machine's agent said its runtime container runs.
     reported = (env.observed_status_json or {}).get("ray_tls") or {}
     running = {str(node.host or node.id): reported.get(str(node.id)) for node in nodes}
@@ -73,7 +108,9 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         "running": running,
         "machines": len(nodes),
         "old_agents": old,
-        "can_switch_on": bool(nodes) and not old,
+        "can_switch_on": bool(nodes) and not old and not host_mode,
+        # Machines that run Ray on the host, outside the runtime container.
+        "host_mode": host_mode,
     }
 
 
@@ -85,12 +122,16 @@ async def switch(session: AsyncSession, environment_id: Any, *, on: bool) -> dic
     if env is None:
         raise RayTlsError("There is no such cluster.")
     if on:
-        old = _old_agents(await EnvironmentNodeDAO(session).machines(env.id))
+        machines = await EnvironmentNodeDAO(session).machines(env.id)
+        old = _old_agents(machines)
         if old:
             raise RayTlsError(
                 "Ray TLS needs agent 0.1.18 or later on every machine of the cluster; update "
                 + ", ".join(old) + " (re-run the install line on it), then switch it on."
             )
+        host_mode = [p for p in [await member_refusal(session, env, m) for m in machines] if p]
+        if host_mode:
+            raise RayTlsError(" ".join(host_mode))
     config = dict(env.config_json or {})
     if bool(config.get("ray_tls")) != on:
         config["ray_tls"] = on

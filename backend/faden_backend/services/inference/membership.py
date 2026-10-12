@@ -778,8 +778,10 @@ async def candidates(session: AsyncSession, environment_id: uuid.UUID) -> dict[s
             reasons.append(f"It belongs to the cluster {other[node.id]}; remove it there first.")
         if cidr and _fabric_entry(node, cidr) is None:
             reasons.append(f"It has no address on the cluster's network ({cidr}).")
-        if tls and not ray_tls.supported(node.capabilities_json):
-            reasons.append("The cluster runs Ray with TLS, which needs agent 0.1.18 or later on it.")
+        if tls:
+            problem = await ray_tls.member_refusal(session, environment, node)
+            if problem:
+                reasons.append(problem)
         arch = (node.capabilities_json or {}).get("machine")
         head_arch = (head.capabilities_json or {}).get("machine") if head else None
         if arch and head_arch and arch != head_arch:

@@ -172,7 +172,8 @@ over their authenticated connection.
 
 A cluster of several machines runs Ray across them: its control traffic, the data it moves, and the calls into a
 model copy on another machine, prompts included. Ray always authenticates this traffic with the cluster's token.
-To encrypt it too:
+A new cluster also encrypts it from the start. A cluster created before that, or one where it was switched off, can
+be changed:
 
 ![The Traffic between machines card of a cluster, reading Encrypted, with Switch off](../images/operate/cluster-traffic-encrypted.png)
 
@@ -181,7 +182,10 @@ To encrypt it too:
 3. Read the warning and select **Restart the cluster**.
 
 Every machine of the cluster restarts its container, and every model on the cluster loads again. The card shows
-**Encrypted** once all machines run with it. Every machine needs a recent agent; the card names the ones to update.
+**Encrypted** once all machines run with it. Every machine needs a recent agent and has to run Ray in the agent's
+runtime container; the card names the ones to update. A machine that runs Ray on the host cannot apply TLS and is
+refused with a reason. To turn it off on purpose, select **Switch off** on the same card: Ray's traffic then crosses
+the network unencrypted.
 
 ??? info "More about encryption between machines"
     Each cluster has its own certificate authority; each machine's key stays on the machine.

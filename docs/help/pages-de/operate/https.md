@@ -186,7 +186,8 @@ holen ihre über ihre authentifizierte Verbindung ab.
 
 In einem Cluster aus mehreren Maschinen läuft Ray über alle seine Maschinen: der Steuerungsverkehr, die Daten, die
 bewegt werden, und die Aufrufe an eine Modellkopie auf einer anderen Maschine, Prompts eingeschlossen. Ray
-authentifiziert diesen Verkehr immer mit dem Token des Clusters. Um ihn auch zu verschlüsseln:
+authentifiziert diesen Verkehr immer mit dem Token des Clusters. Ein neuer Cluster verschlüsselt ihn außerdem von
+Anfang an. Bei einem Cluster, der vorher angelegt wurde oder bei dem es ausgeschaltet wurde, geht es so:
 
 ![Die Karte Verkehr zwischen den Maschinen eines Clusters mit der Anzeige Verschlüsselt und Ausschalten](../images/operate/cluster-traffic-encrypted.png)
 
@@ -195,8 +196,11 @@ authentifiziert diesen Verkehr immer mit dem Token des Clusters. Um ihn auch zu 
 3. Lesen Sie die Warnung und wählen Sie **Cluster neu starten**.
 
 Jede Maschine des Clusters startet ihren Container neu, und jedes Modell auf dem Cluster lädt neu. Die Karte zeigt
-**Verschlüsselt**, sobald alle Maschinen damit laufen. Jede Maschine braucht einen aktuellen Agent; die Karte nennt
-die Maschinen, deren Agent aktualisiert werden muss.
+**Verschlüsselt**, sobald alle Maschinen damit laufen. Jede Maschine braucht einen aktuellen Agent und muss Ray im
+Runtime-Container des Agenten ausführen; die Karte nennt die Maschinen, die aktualisiert werden müssen. Eine
+Maschine, auf der Ray direkt auf dem Rechner läuft, kann TLS nicht anwenden und wird mit einer Begründung abgewiesen.
+Um es bewusst auszuschalten, wählen Sie auf derselben Karte **Ausschalten**: Rays Verkehr läuft dann unverschlüsselt
+durch das Netzwerk.
 
 ??? info "Mehr zur Verschlüsselung zwischen den Maschinen"
     Jeder Cluster hat seine eigene Zertifizierungsstelle; der Schlüssel jeder Maschine bleibt auf der Maschine.

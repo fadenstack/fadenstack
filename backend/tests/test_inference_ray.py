@@ -675,6 +675,42 @@ async def test_ray_tls_refused_before_anything_starts_when_an_agent_is_too_old(
     assert "Ray TLS" in reason and nodes[1].host in reason and nodes[0].host not in reason
 
 
+async def test_ray_tls_refuses_a_machine_that_would_run_ray_on_the_host(
+    probe_env, dbsession: AsyncSession,
+) -> None:
+    """No runtime bundle covers it, so its Ray would start without the certificates."""
+    _cp, env, nodes = probe_env
+    for node in nodes:
+        node.capabilities_json = {**node.capabilities_json, "ray_tls": 2}
+    nodes[1].capabilities_json = {k: v for k, v in nodes[1].capabilities_json.items() if k != "machine"}
+    env.config_json = {**(env.config_json or {}), "ray_tls": True}
+    await dbsession.flush()
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
+
+    assert fake.issued == []
+    assert env.status is EnvironmentStatus.FAILED
+    reason = env.observed_status_json["observation"]["reason"]
+    assert nodes[1].host in reason and nodes[0].host not in reason
+    assert "runtime container" in reason and "switch Ray TLS off" in reason
+
+
+async def test_ray_tls_off_accepts_a_machine_that_would_run_ray_on_the_host(
+    probe_env, dbsession: AsyncSession,
+) -> None:
+    from faden_backend.services.inference import ray_tls  # noqa: PLC0415
+
+    _cp, env, nodes = probe_env
+    nodes[1].capabilities_json = {k: v for k, v in nodes[1].capabilities_json.items() if k != "machine"}
+    await dbsession.flush()
+    assert await ray_tls.member_refusal(dbsession, env, nodes[1]) is not None  # were TLS on
+    fake = _FakeNodeControl(result_json=_healthy_probe_result())
+    await _ray_driver().environment_manager.reconcile_environment(dbsession, env, node_control=fake)
+    # Refused for its missing runtime, as before, but not for TLS.
+    reason = (env.observed_status_json.get("observation") or {}).get("reason") or ""
+    assert "Ray TLS" not in reason
+
+
 async def test_a_new_cluster_waits_for_its_network_before_starting(probe_env, dbsession: AsyncSession) -> None:
     """Found in an end-to-end run: the console creates the cluster, then asks which network to use.
 
