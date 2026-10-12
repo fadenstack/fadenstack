@@ -39,15 +39,19 @@ listet auf, was er gesichert hat.
 | Option | Was sie tut |
 |---|---|
 | `--output-dir PATH` | Die Sicherung woanders hinschreiben, z. B. auf eine eingehängte Sicherungsplatte. Ein relativer Pfad gilt innerhalb des Installationsverzeichnisses |
-| `--retain N` | Nur die N neuesten Sicherungen in diesem Verzeichnis behalten (Standard 5). Ältere dort werden gelöscht |
+| `--retain N` | Nur die N neuesten Sicherungen dieser Art in diesem Verzeichnis behalten (Standard 5). Ältere derselben Art werden gelöscht |
 | `--db-only` | Nur die Datenbanken, ohne `.env` und Zertifikatsmaterial. Bewahren Sie eine Kopie der `.env` getrennt auf, so vertraulich wie die Sicherungen |
 | `--include-volumes` | Auch die Dateien, die in die Wissensdatenbank hochgeladen wurden, die an Chats angehängten Dateien, die Logs, die Traces und Grafanas eigene Daten. Nicht die Modelle |
 | `-y` | Nicht nachfragen |
 
 ??? info "Wie `--retain` zählt"
-    `--retain` zählt jede Sicherung im Verzeichnis, auch die nächtlichen und die, die Upgrades anlegen. Ein von
-    Hand gestartetes `faden backup` in das Standardverzeichnis behält 5, sofern Sie keine größere Zahl angeben,
-    und jedes `faden upgrade` behält 5.
+    Jede Sicherung vermerkt, wer sie angelegt hat: der nächtliche Timer, Sie mit `faden backup` oder
+    `faden upgrade`. `--retain` zählt und löscht nur Sicherungen der eigenen Art. Ein von Hand gestartetes
+    `faden backup --retain 3` lässt die nächtlichen Sicherungen also in Ruhe, und ein Upgrade verdrängt sie nicht.
+    Eine Sicherung von Hand behält 5, sofern Sie keine andere Zahl angeben, die nächtliche behält 7 (siehe
+    unten), und jedes `faden upgrade` behält 5 eigene. Sicherungen aus früheren Versionen haben keine Art und
+    zählen als von Hand; ein vor dieser Version eingerichteter nächtlicher Timer zählt weiter als von Hand, bis
+    Sie `faden backup schedule` erneut ausführen.
 
 ## Die nächtliche Sicherung {#the-nightly-backup}
 

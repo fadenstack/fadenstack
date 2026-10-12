@@ -239,7 +239,7 @@ def remove_job(unit: str) -> bool:
 
 
 def _backup(*, hour: int, minute: int, retain: int, log: Path) -> Job:
-    return Job(UNIT, "Fadenstack nightly backup", ("backup", "-y", "--retain", str(retain)), hour, minute, log)
+    return Job(UNIT, "Fadenstack nightly backup", ("backup", "-y", "--retain", str(retain), "--kind", "nightly"), hour, minute, log)
 
 
 def entry(*, hour: int, minute: int, retain: int, log: Path, config: Path | None) -> str:

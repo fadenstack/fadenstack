@@ -17,7 +17,7 @@ from pathlib import Path
 
 import click
 
-from faden_cli.core.backup import create_backup
+from faden_cli.core.backup import BACKUP_KINDS, DEFAULT_KIND, create_backup
 from faden_cli.core.compose import build_context_from_config
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.private_files import private_dir
@@ -44,7 +44,14 @@ from faden_cli.core.settings import load_config
     type=int,
     default=5,
     show_default=True,
-    help="Keep only the N most recent backups.",
+    help="Keep only the N most recent backups of this kind (nightly, manual and upgrade backups count apart).",
+)
+@click.option(
+    "--kind",
+    type=click.Choice(BACKUP_KINDS),
+    default=DEFAULT_KIND,
+    hidden=True,
+    help="What the backup is, recorded in it; --retain only counts backups of the same kind. The nightly timer sets it.",
 )
 @click.option(
     "--db-only",
@@ -60,6 +67,7 @@ def backup_cmd(
     output_dir: str,
     include_volumes: bool,
     retain: int,
+    kind: str,
     db_only: bool,
     yes: bool,
 ) -> None:
@@ -88,6 +96,7 @@ def backup_cmd(
         include_volumes=include_volumes,
         db_only=db_only,
         retain=retain,
+        kind=kind,
     )
 
     if not result.ok:
@@ -113,7 +122,7 @@ def backup_cmd(
 
 @backup_cmd.command("schedule")
 @click.option("--at", "at", default="03:00", show_default=True, help="Time of day, HH:MM (server time).")
-@click.option("--retain", type=int, default=7, show_default=True, help="Keep the N most recent backups.")
+@click.option("--retain", type=int, default=7, show_default=True, help="Keep the N most recent nightly backups.")
 @click.option("--off", is_flag=True, default=False, help="Stop the nightly backup.")
 def schedule_cmd(*, at: str, retain: int, off: bool) -> None:
     """Back up every night, keeping the most recent few.

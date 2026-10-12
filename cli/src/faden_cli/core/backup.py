@@ -65,6 +65,12 @@ _MIGRATOR_SERVICES: dict[str, str] = {
 }
 
 
+#: What made a backup, recorded in its manifest. Retention counts each kind apart. A backup without a kind
+#: (an older install's) is manual.
+BACKUP_KINDS = ("manual", "nightly", "upgrade")
+DEFAULT_KIND = "manual"
+
+
 # ── Result types ──────────────────────────────────────────────────
 
 
@@ -775,8 +781,12 @@ def write_manifest(
     volumes: list[str],
     migration_heads: dict[str, str],
     tls_material: list[str] | None = None,
+    kind: str = DEFAULT_KIND,
 ) -> Path:
-    """Write ``manifest.json`` with file checksums and metadata."""
+    """Write ``manifest.json`` with file checksums and metadata.
+
+    *kind* says what made the backup (see :data:`BACKUP_KINDS`), so retention only counts its own kind.
+    """
     db_entries: dict[str, dict] = {}
     for db, dump_file in databases.items():
         dump_path = backup_dir / dump_file
@@ -790,6 +800,7 @@ def write_manifest(
         "version": 1,
         "created_at": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
         "faden_version": __version__,
+        "kind": kind,
         "databases": db_entries,
         "env_snapshot": env_snapshot,
         "volumes": volumes,
@@ -841,8 +852,25 @@ def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
 # ── Retention ─────────────────────────────────────────────────────
 
 
-def rotate_backups(backup_root: Path, *, retain: int = 5) -> int:
-    """Remove oldest backup directories beyond the retention count.
+def _kind_of(backup_dir: Path) -> str | None:
+    """What made the backup in *backup_dir*, or ``None`` when its manifest cannot be read.
+
+    A manifest without a kind is an older install's backup, and counts as manual.
+    """
+    try:
+        manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    kind = manifest.get("kind") if isinstance(manifest, dict) else None
+    return kind if isinstance(kind, str) and kind else DEFAULT_KIND
+
+
+def rotate_backups(backup_root: Path, *, retain: int = 5, kind: str = DEFAULT_KIND) -> int:
+    """Remove the oldest backups *of this kind* beyond the retention count.
+
+    The nightly, manual and upgrade backups share one directory; each kind keeps its own N, so a manual
+    ``--retain 3`` does not cut the nightly set and an upgrade does not push nightly ones out. A backup
+    whose manifest cannot be read is left alone.
 
     Assumes backup directories are named with ISO timestamps so
     lexicographic sort == chronological sort.  Returns the number
@@ -852,7 +880,11 @@ def rotate_backups(backup_root: Path, *, retain: int = 5) -> int:
         return 0
 
     dirs = sorted(
-        [d for d in backup_root.iterdir() if d.is_dir() and (d / "manifest.json").exists()],
+        [
+            d
+            for d in backup_root.iterdir()
+            if d.is_dir() and (d / "manifest.json").exists() and _kind_of(d) == kind
+        ],
         key=lambda d: d.name,
     )
     to_remove = dirs[:-retain] if len(dirs) > retain else []
@@ -871,6 +903,7 @@ def create_backup(
     include_volumes: bool = False,
     db_only: bool = False,
     retain: int = 5,
+    kind: str = DEFAULT_KIND,
 ) -> BackupResult:
     """Full backup orchestration.
 
@@ -881,7 +914,7 @@ def create_backup(
     5. Optionally snapshot volumes
     6. Collect migration heads
     7. Write manifest
-    8. Rotate old backups
+    8. Rotate old backups of the same *kind*
     """
     # Owner-only, the directory and each backup in it: a backup holds every database and secret. A directory
     # of the operator's (--output-dir) that already exists keeps its mode; the backups in it are private.
@@ -937,10 +970,11 @@ def create_backup(
         volumes=result.volumes,
         migration_heads=heads,
         tls_material=result.tls_material,
+        kind=kind,
     )
 
     # 7. Rotate
-    removed = rotate_backups(output_dir, retain=retain)
+    removed = rotate_backups(output_dir, retain=retain, kind=kind)
     if removed:
         info(f"Rotated {removed} old backup(s).")
 

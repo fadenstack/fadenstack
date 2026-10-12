@@ -37,15 +37,18 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 | Option | What it does |
 |---|---|
 | `--output-dir PATH` | Write the backup elsewhere, such as a mounted backup disk. A relative path is taken inside the install directory |
-| `--retain N` | Keep only the N most recent backups in that directory (default 5). Older ones there are deleted |
+| `--retain N` | Keep only the N most recent backups of this kind in that directory (default 5). Older ones of the same kind are deleted |
 | `--db-only` | Databases only, without `.env` and certificate material. Keep a copy of `.env` apart, as private as the backups |
 | `--include-volumes` | Also the files uploaded to the knowledge base, the files attached to chats, the logs, the traces and Grafana's own data. Not the models |
 | `-y` | Do not ask |
 
 ??? info "How `--retain` counts"
-    `--retain` counts every backup in the directory, including the nightly ones and the ones upgrades take. A
-    manual `faden backup` into the default directory keeps 5 unless you pass a larger number, and every
-    `faden upgrade` keeps 5.
+    Each backup records what made it: the nightly timer, you with `faden backup`, or `faden upgrade`. `--retain`
+    counts and deletes only backups of its own kind, so a manual `faden backup --retain 3` leaves the nightly
+    backups alone, and an upgrade does not push them out. A manual backup keeps 5 unless you pass another number,
+    the nightly one keeps 7 (see below), and every `faden upgrade` keeps 5 of its own. Backups made before this
+    release have no kind and count as manual; a nightly timer set up before it keeps counting as manual until you
+    run `faden backup schedule` again.
 
 ## The nightly backup
 
