@@ -65,7 +65,7 @@ def leave(install_dir: Path) -> bool:
 
 
 @contextmanager
-def during(install_dir: Path, *, reason: str) -> Iterator[None]:
+def during(install_dir: Path, *, reason: str, message: str | None = None) -> Iterator[None]:
     """Maintenance for the block, lifted however it ends.
 
     A failed upgrade must not leave the platform answering "maintenance":
@@ -75,7 +75,7 @@ def during(install_dir: Path, *, reason: str) -> Iterator[None]:
     if state(install_dir) is not None:
         yield
         return
-    enter(install_dir, reason=reason)
+    enter(install_dir, reason=reason, message=message)
     try:
         yield
     finally:

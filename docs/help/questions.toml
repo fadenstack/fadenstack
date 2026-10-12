@@ -157,6 +157,13 @@
 "How do I restore a backup?" = "restore"
 "How do I rebuild a lost server?" = "rebuild-a-lost-server"
 
+["operate/rotating-keys.md"]
+"How do I change the encryption keys?" = "rotate"
+"How do I replace the published development keys?" = "when-to-rotate"
+"What if .env has leaked?" = "after-a-leak"
+"Do the GPU machines stay connected when I rotate the keys?" = "what-is-rotated"
+"What do I do when the key rotation stops?" = "if-it-stops"
+
 ["operate/machines.md"]
 "How do I add a GPU machine?" = "add-a-machine"
 "How do I put a machine into maintenance?" = "maintenance-and-draining"

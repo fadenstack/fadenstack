@@ -31,7 +31,7 @@ upgraded; only requests through the gateway wait until the gateway is back.
 5. [Add the GPU machines](machines.md).
 6. [Create a cluster](clusters.md) from them.
 7. Hand over to the administrator, who deploys models and adds people (see [Administer](../administer/index.md)).
-8. Keep [backups](backups.md), and [upgrade](upgrading.md) when a release comes out.
+8. Keep [backups](backups.md), and [upgrade](upgrading.md) when a release comes out. If the install still runs on published keys, or `.env` may have leaked, [rotate the keys](rotating-keys.md).
 
 ## When something goes wrong
 

@@ -221,7 +221,7 @@ async def bootstrap(
             ciphertext = row.scalar_one_or_none()
             if ciphertext:
                 try:
-                    secret = SettingsCrypto(settings.settings_master_key).decrypt(ciphertext).strip()
+                    secret = SettingsCrypto.from_settings().decrypt(ciphertext).strip()
                 except Exception:
                     secret = ""
 

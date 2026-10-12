@@ -7,6 +7,7 @@ The user can then override individual values via ``faden config set``.
 
 from __future__ import annotations
 
+import os
 import secrets
 import string
 from pathlib import Path
@@ -36,6 +37,8 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "FADEN_BACKEND_SETTINGS_MASTER_KEY",
     "FADEN_GATEWAY_ENCRYPTION_KEY",
     "FADEN_MCP_ENCRYPTION_KEY",
+    # What the machines' credential hashes are keyed with: a new value would disconnect every machine.
+    "FADEN_BACKEND_CREDENTIAL_PEPPER",
     "USERS_SECRET",
     # Inter-service auth tokens — each downstream service has one shared
     # value across (api → service), (backend → service), (service receiver).
@@ -95,6 +98,7 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "RABBITMQ_PII_PASS",
     "GRAFANA_ADMIN_PASSWORD",
     "FADEN_BACKEND_SETTINGS_MASTER_KEY",
+    "FADEN_BACKEND_CREDENTIAL_PEPPER",
     "FADEN_MCP_ENCRYPTION_KEY",
     "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
     "FADEN_BACKEND_MCP_SERVICE_TOKEN",
@@ -107,6 +111,13 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "FADEN_MCP_PII_SERVICE_TOKEN",
     "FADEN_PII_SERVICE_TOKEN",
 )
+
+#: What the hashes of the machines' credentials are keyed with. It used to be the settings master key itself,
+#: so a rotation of that key would have disconnected every machine (a hash cannot be re-keyed). Its own
+#: setting lets the master key change: an upgrade copies the master key's value in, and `faden secrets
+#: rotate` never touches it.
+CREDENTIAL_PEPPER = "FADEN_BACKEND_CREDENTIAL_PEPPER"
+SETTINGS_MASTER_KEY = "FADEN_BACKEND_SETTINGS_MASTER_KEY"
 
 #: Keys that seal stored data, with the value the compose file used when ``.env`` had none. They are
 #: published with the source code, and an install that ran on one reads its data only with it: an upgrade
@@ -212,6 +223,8 @@ def dev_env_vars(
         # Must match FADEN_BACKEND_SETTINGS_MASTER_KEY in the backend .env.
         # JWT secrets are seeded automatically in the DB on first startup.
         "FADEN_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
+        # The machines' credential hashes were keyed with the master key; a development stack keeps that.
+        "FADEN_BACKEND_CREDENTIAL_PEPPER": "dev-settings-master-key-change-me",
         "FADEN_GATEWAY_ENCRYPTION_KEY": "dev-encryption-key-change-me",
         # The modules' development tokens and key, the ones `faden dev up` runs them with
         # (registry.MODULES); the compose file requires them although dev mode runs the
@@ -325,6 +338,9 @@ def default_env_vars(
         # Settings master key — used to encrypt/decrypt secrets stored in the DB.
         # JWT secrets are seeded automatically in the DB on first startup.
         "FADEN_BACKEND_SETTINGS_MASTER_KEY": _random_secret(),
+        # Keys the machines' credential hashes. Its own value, so rotating the master key leaves the
+        # machines connected (`faden secrets rotate`).
+        "FADEN_BACKEND_CREDENTIAL_PEPPER": _random_secret(),
         "FADEN_GATEWAY_ENCRYPTION_KEY": _random_secret(),
         "FADEN_GATEWAY_LANGFUSE_ENABLED": "false",
         "FADEN_BACKEND_GATEWAY_URL": "http://faden-gateway:8000",
@@ -506,7 +522,13 @@ def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] =
     for key in REQUIRED_KEYS:
         if current.get(key) or key in added:
             continue
-        if key in PUBLISHED_DATA_KEYS and (key != "FADEN_MCP_ENCRYPTION_KEY" or "mcp" in profiles):
+        if key == CREDENTIAL_PEPPER:
+            # An install from before the pepper had its own setting hashed its machines' credentials with
+            # the master key: that exact value, so they stay valid. Never a random one, and never the value
+            # the master key has after a rotation.
+            master = current.get(SETTINGS_MASTER_KEY) or added.get(SETTINGS_MASTER_KEY)
+            added[key] = master or PUBLISHED_DATA_KEYS[SETTINGS_MASTER_KEY]
+        elif key in PUBLISHED_DATA_KEYS and (key != "FADEN_MCP_ENCRYPTION_KEY" or "mcp" in profiles):
             added[key] = PUBLISHED_DATA_KEYS[key]
             kept.append(key)
         else:
@@ -523,7 +545,7 @@ def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] =
         _put_env(env_path, added, header="Required by the compose file (faden upgrade)")
     return [
         f"{key} was not in .env: this install ran on the published development value, which is now written "
-        "there so the data stored with it stays readable. Change it as Help describes (Installing, Secrets in .env)."
+        "there so the data stored with it stays readable. Change it with `faden secrets rotate` (Help: Rotating the keys)."
         for key in kept
     ]
 
@@ -542,6 +564,8 @@ def fill_dev_env(env_path: Path) -> list[str]:
     current = read_env_file(env_path)
     dev = dev_env_vars()
     added = {key: dev[key] for key in REQUIRED_KEYS if not current.get(key)}
+    if CREDENTIAL_PEPPER in added and current.get(SETTINGS_MASTER_KEY):
+        added[CREDENTIAL_PEPPER] = current[SETTINGS_MASTER_KEY]  # what keyed the hashes before the setting
     if added:
         _put_env(env_path, added, header="Required by the compose file (faden dev up)")
     return list(added)
@@ -561,6 +585,34 @@ def _put_env(env_path: Path, values: dict[str, str], *, header: str) -> None:
         lines += [f"# ── {header} ──", *appended]
     # LF and owner-only, like write_env_file.
     write_private(env_path, ("\n".join(lines) + "\n").encode("utf-8"))
+
+
+def rewrite_env(env_path: Path, *, set_values: dict[str, str], remove: tuple[str, ...] = ()) -> None:
+    """Set and remove keys in an install's ``.env`` in one atomic step, the rest of the file as it is.
+
+    For ``faden secrets rotate``, whose steps each rest on what ``.env`` says: the new file is written
+    owner-only next to the old one and moved over it, so a crash leaves the old file or the new one,
+    never half of either. A key it removes loses its line; a key it sets keeps its place.
+    """
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    where = _key_lines(lines)
+    dropped = {where[key] for key in remove if key in where}
+    for key, value in set_values.items():
+        if key in where:
+            lines[where[key]] = f"{key}={value}"
+    appended = [f"{key}={value}" for key, value in set_values.items() if key not in where]
+    lines = [line for number, line in enumerate(lines) if number not in dropped]
+    if appended:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines += ["# ── Key rotation (faden secrets rotate) ──", *appended]
+    staged = env_path.with_name(env_path.name + ".rotating")
+    try:
+        # LF and owner-only from the first byte, like write_env_file.
+        write_private(staged, ("\n".join(lines) + "\n").encode("utf-8"))
+        os.replace(staged, env_path)
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 def set_module_env(

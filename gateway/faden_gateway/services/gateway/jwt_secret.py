@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-
 import asyncpg
-from cryptography.fernet import Fernet
 from loguru import logger
 
+from faden_gateway.db.crypto import settings_fernet
 from faden_gateway.settings import settings
 
 _JWT_SECRET_KEYS: tuple[str, ...] = (
@@ -50,8 +47,7 @@ async def load_jwt_secret_from_backend_db() -> bool:
         logger.info("JWT secret: no JWT secret keys found in backend DB, using env var fallback.")
         return False
 
-    digest = hashlib.sha256(settings.settings_master_key.encode()).digest()
-    fernet = Fernet(base64.urlsafe_b64encode(digest))
+    fernet = settings_fernet()
 
     for db_key in _JWT_SECRET_KEYS:
         ciphertext = ciphertext_by_key.get(db_key, "")

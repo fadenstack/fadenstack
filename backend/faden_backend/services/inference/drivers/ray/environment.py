@@ -1024,7 +1024,7 @@ class RayEnvironmentManager:
         from faden_backend.settings import settings  # noqa: PLC0415
 
         message = f"image-seed:{environment.id}:{environment.generation}:{node_id}".encode()
-        return hmac.new(settings.settings_master_key.encode(), message, hashlib.sha256).hexdigest()
+        return hmac.new(settings.machine_pepper.encode(), message, hashlib.sha256).hexdigest()
 
     async def _await_final(self, gateway: NodeCommandGateway, command: Any, *, what: str) -> Any:
         """Wait for *command* to finish and return it, failed or not."""

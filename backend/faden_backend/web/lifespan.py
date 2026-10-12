@@ -289,7 +289,7 @@ async def _load_runtime_settings_from_db(app: FastAPI) -> None:  # pragma: no co
             log.warning("SETTINGS_MASTER_KEY is empty – cannot load secret runtime settings from DB.")
             return
 
-        crypto = SettingsCrypto(settings.settings_master_key)
+        crypto = SettingsCrypto.from_settings()
         try:
             runtime_secret_keys = get_runtime_secret_key_map()
             rows = await session.execute(
@@ -381,7 +381,7 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
                 gateway_sync = getattr(llm_service, "gateway_sync", None)
                 service = NodeControlService(
                     dao=dao,
-                    pepper=settings.settings_master_key,
+                    pepper=settings.machine_pepper,
                     enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
                     default_command_timeout_sec=settings.node_command_default_timeout_sec,
                     gateway_sync=gateway_sync,
@@ -1155,7 +1155,7 @@ async def _seed_secrets(app: FastAPI) -> None:  # pragma: no cover
         log.warning("Cannot seed secrets: SETTINGS_MASTER_KEY is empty.")
         return
 
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
 
     # Both keys share the same value so the backend can sign and the API can verify.
     jwt_keys = ("faden_backend.users_secret", "faden_gateway.jwt_secret")

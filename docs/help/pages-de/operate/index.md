@@ -35,7 +35,8 @@ startet oder aktualisiert wird; nur Anfragen über das Gateway warten, bis das G
 7. Übergeben Sie an den Administrator, der Modelle bereitstellt und Personen hinzufügt (siehe
    [Verwalten](../administer/index.md)).
 8. Legen Sie [Sicherungen](backups.md) an, und [aktualisieren](upgrading.md) Sie, wenn ein neues Release
-   erscheint.
+   erscheint. Läuft die Installation noch mit veröffentlichten Schlüsseln oder ist die `.env` womöglich abgeflossen,
+   [erneuern Sie die Schlüssel](rotating-keys.md).
 
 ## Wenn etwas schiefgeht {#when-something-goes-wrong}
 

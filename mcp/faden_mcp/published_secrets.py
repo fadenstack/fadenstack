@@ -38,13 +38,17 @@ ENCRYPTION_KEY_REFUSED = (
     "  - MCP has stored nothing yet: set it in .env to a long random value (openssl rand -base64 48) and start "
     "again. faden deploy and faden module enable mcp write one.\n"
     "  - MCP has stored credentials under it, and no other key reads them. To keep them, leave the key as it is, "
-    "set FADEN_ALLOW_PUBLISHED_KEYS=true in .env, and change the key later as Help describes (Installing, "
-    "Secrets in .env)."
+    "set FADEN_ALLOW_PUBLISHED_KEYS=true in .env, and change the key later with `faden secrets rotate` (Help: "
+    "Rotating the keys)."
+)
+ROTATION_UNFINISHED = (
+    "A key rotation is unfinished: the previous encryption key is still set, and values sealed with it "
+    "still open. Run `faden secrets rotate` again to finish it."
 )
 ENCRYPTION_KEY_KEPT = (
     "This install keeps MCP credentials under the published development encryption key "
-    "(FADEN_ALLOW_PUBLISHED_KEYS=true). Change FADEN_MCP_ENCRYPTION_KEY as Help describes "
-    "(Installing, Secrets in .env)."
+    "(FADEN_ALLOW_PUBLISHED_KEYS=true). Change FADEN_MCP_ENCRYPTION_KEY with `faden secrets rotate` "
+    "(Help: Rotating the keys)."
 )
 
 
@@ -69,3 +73,5 @@ def refuse_published_secrets(settings: Settings) -> None:
         raise SystemExit("The MCP service does not start:\n" + "\n".join(f"* {problem}" for problem in found))
     if settings.environment != "dev" and settings.encryption_key in PUBLISHED_ENCRYPTION_KEYS:
         log.warning(ENCRYPTION_KEY_KEPT)
+    if settings.encryption_key_previous:
+        log.warning(ROTATION_UNFINISHED)

@@ -429,11 +429,20 @@ def run_cmd(
     *,
     capture: bool = False,
     remove: bool = True,
+    no_deps: bool = False,
+    no_tty: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Run ``docker compose run`` (one-off container)."""
+    """Run ``docker compose run`` (one-off container).
+
+    *no_deps* does not start what *service* depends on; *no_tty* is for output read by a program.
+    """
     cmd = ctx.base_cmd() + ["run"]
     if remove:
         cmd.append("--rm")
+    if no_deps:
+        cmd.append("--no-deps")
+    if no_tty:
+        cmd.append("-T")
     cmd.extend([service, *command])
     return _run(cmd, capture=capture)
 

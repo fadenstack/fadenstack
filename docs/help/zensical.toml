@@ -38,6 +38,7 @@ nav = [
     { "Installing" = "operate/installing.md" },
     { "Upgrading" = "operate/upgrading.md" },
     { "Backups" = "operate/backups.md" },
+    { "Rotating the keys" = "operate/rotating-keys.md" },
     { "HTTPS and trust" = "operate/https.md" },
     { "Network and ports" = "operate/network.md" },
     { "GPU machines" = "operate/machines.md" },

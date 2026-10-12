@@ -155,6 +155,13 @@
 "Wie stelle ich eine Sicherung wieder her?" = "restore"
 "Wie baue ich einen verlorenen Server neu auf?" = "rebuild-a-lost-server"
 
+["operate/rotating-keys.md"]
+"Wie ändere ich die Verschlüsselungsschlüssel?" = "rotate"
+"Wie ersetze ich die veröffentlichten Entwicklungsschlüssel?" = "when-to-rotate"
+"Was tun, wenn die .env abgeflossen ist?" = "after-a-leak"
+"Bleiben die GPU-Maschinen verbunden, wenn ich die Schlüssel erneuere?" = "what-is-rotated"
+"Was tun, wenn die Schlüsselerneuerung anhält?" = "if-it-stops"
+
 ["operate/machines.md"]
 "Wie füge ich eine GPU-Maschine hinzu?" = "add-a-machine"
 "Wie versetze ich eine Maschine in die Wartung?" = "maintenance-and-draining"

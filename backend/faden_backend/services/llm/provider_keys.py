@@ -27,7 +27,7 @@ def _crypto() -> SettingsCrypto:
         raise ProviderKeyError(
             "FADEN_BACKEND_SETTINGS_MASTER_KEY is empty: a provider API key cannot be stored without it.",
         )
-    return SettingsCrypto(settings.settings_master_key)
+    return SettingsCrypto.from_settings()
 
 
 def seal_provider_key(api_key: str | None) -> str | None:

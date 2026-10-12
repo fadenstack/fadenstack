@@ -55,6 +55,9 @@ class Settings(BaseSettings):
 
     # ── Encryption ──
     encryption_key: str = ""
+    # The key from before `faden secrets rotate`, set while a rotation is unfinished: what it sealed
+    # still opens, and everything new is sealed with encryption_key.
+    encryption_key_previous: str = ""
     # Start anyway with the published development encryption key: for an
     # install that has already stored credentials with it, until the key is
     # changed (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).

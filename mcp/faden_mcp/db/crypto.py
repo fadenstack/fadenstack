@@ -13,7 +13,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from sqlalchemy import Text
@@ -22,11 +22,32 @@ from sqlalchemy.types import TypeDecorator
 logger = logging.getLogger(__name__)
 
 _key_provider: Callable[[str], bytes] | None = None
+# The key from before `faden secrets rotate`, while a rotation is unfinished.
+_previous_provider: Callable[[str], bytes] | None = None
 _FERNET_PREFIX = b"gAAAAA"
 
 
-def configure(master_key: str) -> None:
-    """Derive per-purpose encryption keys from *master_key* via HKDF."""
+def derive_key(master_key: str, purpose: str) -> bytes:
+    """The 32 bytes of key material HKDF-SHA256 derives from *master_key* for *purpose*."""
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=purpose.encode("utf-8"),
+    ).derive(master_key.encode("utf-8"))
+
+
+def derive_fernet(master_key: str, purpose: str) -> Fernet:
+    """The Fernet for *purpose* under *master_key*."""
+    return Fernet(base64.urlsafe_b64encode(derive_key(master_key, purpose)))
+
+
+def configure(master_key: str, previous_key: str = "") -> None:
+    """Derive per-purpose encryption keys from *master_key* via HKDF.
+
+    *previous_key* is the key from before a rotation (``faden secrets rotate``): what it sealed still
+    opens, and everything new is sealed with *master_key*.
+    """
     if not master_key:
         logger.warning(
             "ENCRYPTION_KEY is not set — MCP secrets stored in plaintext. "
@@ -34,30 +55,27 @@ def configure(master_key: str) -> None:
         )
         return
 
-    raw = master_key.encode("utf-8")
-
-    def _derive(purpose: str) -> bytes:
-        return HKDF(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=None,
-            info=purpose.encode("utf-8"),
-        ).derive(raw)
-
-    set_key_provider(_derive)
+    previous = previous_key if previous_key and previous_key != master_key else ""
+    set_key_provider(
+        lambda purpose: derive_key(master_key, purpose),
+        previous=(lambda purpose: derive_key(previous, purpose)) if previous else None,
+    )
 
 
-def set_key_provider(provider: Callable[[str], bytes]) -> None:
+def set_key_provider(provider: Callable[[str], bytes], previous: Callable[[str], bytes] | None = None) -> None:
     """Replace the key provider."""
-    global _key_provider  # noqa: PLW0603
+    global _key_provider, _previous_provider  # noqa: PLW0603
     _key_provider = provider
+    _previous_provider = previous
 
 
-def _fernet_for(purpose: str) -> Fernet | None:
+def _fernet_for(purpose: str) -> Fernet | MultiFernet | None:
     if _key_provider is None:
         return None
-    raw = _key_provider(purpose)
-    return Fernet(base64.urlsafe_b64encode(raw))
+    current = Fernet(base64.urlsafe_b64encode(_key_provider(purpose)))
+    if _previous_provider is None:
+        return current
+    return MultiFernet([current, Fernet(base64.urlsafe_b64encode(_previous_provider(purpose)))])
 
 
 def _is_ciphertext(value: str) -> bool:

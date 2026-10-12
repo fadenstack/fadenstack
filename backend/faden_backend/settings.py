@@ -405,6 +405,15 @@ class Settings(BaseSettings):
     # The development default; outside the dev environment the backend refuses
     # to start with it (published_secrets.py) unless allow_published_keys is set.
     settings_master_key: str = "dev-settings-master-key-change-me"
+    # The master key this install used before `faden secrets rotate`, set while a rotation is
+    # unfinished: stored values sealed with either key still open (MultiFernet), new ones use
+    # settings_master_key. Empty once every value has been re-sealed.
+    settings_master_key_previous: str = ""
+    # What the hashes of the machines' credentials (and the cluster seed tokens) are keyed
+    # with. It used to be the master key itself, which a rotation cannot change: a hash
+    # cannot be re-keyed, so every machine would have to enroll again. `faden upgrade` copies
+    # the master key's value in; a rotation leaves it alone. Empty falls back to the master key.
+    credential_pepper: str = ""
     # Start anyway with the published development master key: for an install
     # that has already stored its secrets with it, until the key is changed
     # (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).
@@ -465,6 +474,11 @@ class Settings(BaseSettings):
             password=self.db_pass,
             path=f"/{self.db_base}",
         )
+
+    @property
+    def machine_pepper(self) -> str:
+        """The key of the machine credential hashes: its own setting, else the master key (as before)."""
+        return self.credential_pepper or self.settings_master_key
 
     @property
     def rabbit_url(self) -> URL:

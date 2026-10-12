@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from cryptography import x509
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -54,11 +54,27 @@ class AuthorityError(ValueError):
     """A request this CA refuses to sign, or material it cannot read."""
 
 
-def _fernet(master_key: str, purpose: str) -> Fernet:
+def sealing_fernet(master_key: str, purpose: str) -> Fernet:
+    """The Fernet for *purpose*, derived from *master_key* with HKDF (the settings crypto has no label)."""
     raw = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=purpose.encode()).derive(
         master_key.encode(),
     )
     return Fernet(base64.urlsafe_b64encode(raw))
+
+
+def _fernet(master_key: str, purpose: str) -> MultiFernet:
+    """Seals with *master_key*; opens with it, and with the previous key while a rotation is unfinished.
+
+    The previous key belongs to the server's own master key, so it is added only when *master_key* is
+    that key (a test or a restore handing in another one gets only its own).
+    """
+    from faden_backend.settings import settings  # noqa: PLC0415
+
+    keys = [sealing_fernet(master_key, purpose)]
+    previous = settings.settings_master_key_previous
+    if previous and previous != master_key and master_key == settings.settings_master_key:
+        keys.append(sealing_fernet(previous, purpose))
+    return MultiFernet(keys)
 
 
 def seal(pem: bytes, master_key: str, purpose: str) -> str:

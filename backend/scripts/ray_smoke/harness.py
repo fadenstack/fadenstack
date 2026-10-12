@@ -102,7 +102,7 @@ def out(obj: Any) -> None:
 def node_control(session) -> NodeControlService:
     return NodeControlService(
         dao=NodeControlDAO(session),
-        pepper=settings.settings_master_key,
+        pepper=settings.machine_pepper,
         enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
         default_command_timeout_sec=settings.node_command_default_timeout_sec,
     )
@@ -135,7 +135,7 @@ class CommittingNodeControl(NodeControlService):
 def shim_control(session) -> CommittingNodeControl:
     return CommittingNodeControl(
         dao=NodeControlDAO(session),
-        pepper=settings.settings_master_key,
+        pepper=settings.machine_pepper,
         enrollment_ttl_minutes=settings.node_enrollment_ttl_minutes,
         default_command_timeout_sec=settings.node_command_default_timeout_sec,
     )

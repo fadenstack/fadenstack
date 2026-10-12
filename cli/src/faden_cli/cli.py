@@ -98,6 +98,7 @@ def register_core_commands(group: click.Group | None = None) -> None:
     from faden_cli.commands.tls import tls_group
     from faden_cli.commands.ports import ports_cmd
     from faden_cli.commands.maintenance import maintenance_group
+    from faden_cli.commands.secrets import secrets_group
 
     target.add_command(version_cmd, "version")
     target.add_command(doctor_cmd, "doctor")
@@ -120,6 +121,7 @@ def register_core_commands(group: click.Group | None = None) -> None:
     target.add_command(tls_group, "tls")
     target.add_command(ports_cmd, "ports")
     target.add_command(maintenance_group, "maintenance")
+    target.add_command(secrets_group, "secrets")
 
 
 register_core_commands()

@@ -76,7 +76,7 @@ _MAX_PEM_SIZE = 64 * 1024  # 64 KiB is plenty for PEM material
 
 
 def _crypto() -> SettingsCrypto:
-    return SettingsCrypto(settings.settings_master_key)
+    return SettingsCrypto.from_settings()
 
 
 def _normalise_pem(raw: bytes, *, label: str) -> str:

@@ -40,7 +40,7 @@ _SECRET_KEY_PREFIX = "inference.ray_cluster_token/"
 
 
 def _crypto() -> SettingsCrypto:
-    return SettingsCrypto(settings.settings_master_key)
+    return SettingsCrypto.from_settings()
 
 
 def _secret_key(credential_ref: str | None) -> str | None:

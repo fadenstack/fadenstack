@@ -139,12 +139,17 @@ class Settings(BaseSettings):
     # The development default; outside the dev environment the gateway refuses
     # to start with it (published_secrets.py) unless allow_published_keys is set.
     settings_master_key: str = "dev-settings-master-key-change-me"
+    # The master key from before `faden secrets rotate`, set while a rotation is unfinished: sealed
+    # values open with either key (the backend holds the same pair).
+    settings_master_key_previous: str = ""
     # Start anyway with the published development master key, like the backend
     # (FADEN_ALLOW_PUBLISHED_KEYS in the compose file's .env).
     allow_published_keys: bool = False
 
     # Column-level encryption for chat data (empty = disabled / plaintext)
     encryption_key: str = ""
+    # The chat key from before `faden secrets rotate`, set while a rotation is unfinished.
+    encryption_key_previous: str = ""
 
     # Gateway behavior
     http_timeout_sec: float = 30.0

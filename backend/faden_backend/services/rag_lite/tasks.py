@@ -100,7 +100,7 @@ async def _resolve_embedding_client(app, session) -> "EmbeddingClient":
     # This runs in the taskiq worker, which a live settings change does not
     # reach: read RAG Lite's settings as they are now.
     await refresh_runtime_values(session, prefix="rag_lite.")
-    crypto = SettingsCrypto(settings.settings_master_key)
+    crypto = SettingsCrypto.from_settings()
 
     preferred_id_str = settings.rag_lite_embedding_provider_id
     preferred_id = uuid.UUID(preferred_id_str) if preferred_id_str else None

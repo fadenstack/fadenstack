@@ -33,6 +33,7 @@ nav = [
     { "Installation" = "operate/installing.md" },
     { "Upgrade" = "operate/upgrading.md" },
     { "Sicherungen" = "operate/backups.md" },
+    { "Schlüssel erneuern" = "operate/rotating-keys.md" },
     { "HTTPS und Vertrauen" = "operate/https.md" },
     { "Netzwerk und Ports" = "operate/network.md" },
     { "GPU-Maschinen" = "operate/machines.md" },

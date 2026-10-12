@@ -119,7 +119,7 @@ async def _resolve_users_secret(session: AsyncSession) -> str:
     if not ciphertext:
         return ""
     try:
-        secret = SettingsCrypto(backend_settings.settings_master_key).decrypt(ciphertext).strip()
+        secret = SettingsCrypto.from_settings().decrypt(ciphertext).strip()
     except Exception:  # noqa: BLE001
         return ""
     if secret:
