@@ -128,6 +128,8 @@ def rebuild_cmd(
         sys.exit(rc)
     success("Images built.")
 
+    env_path = ctx.env_file
+
     # The gateway's chat files: from an old container into the volume it now has, verified (see core.backup).
     # Before anything is recreated (syncing the password starts Postgres, which compose may recreate).
     if not target_services or any("gateway" in name for name in target_services):
@@ -138,7 +140,6 @@ def rebuild_cmd(
     # Step 1b: Sync Postgres password if .env credentials differ from
     # what the running Postgres volume was initialised with (e.g. after
     # deploy-remote.sh updated the .env or a manual edit).
-    env_path = ctx.env_file
     if env_path and env_path.exists():
         from faden_cli.commands.deploy import _sync_postgres_password  # noqa: PLC0415
 
