@@ -166,7 +166,8 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 | Variable | What it protects |
 |---|---|
 | `POSTGRES_PASSWORD` | The database login every service uses |
-| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores, and the machines' credentials |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores |
+| `FADEN_BACKEND_CREDENTIAL_PEPPER` | The machines' credentials. A value of its own, which `faden secrets rotate` never changes, so the machines stay connected |
 | `FADEN_MCP_ENCRYPTION_KEY` | The credentials of MCP servers |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Calls to the MCP service. One value for all three |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Calls to the skills service. One value for all three |
@@ -187,6 +188,7 @@ which is readable only with the value it was stored under: set them to the old v
 |---|---|
 | `POSTGRES_PASSWORD` | `postgres`, or a new value that you also set in Postgres: `docker exec -i faden-postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new value>'"` |
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | `dev-settings-master-key-change-me` |
+| `FADEN_BACKEND_CREDENTIAL_PEPPER` | The value `FADEN_BACKEND_SETTINGS_MASTER_KEY` has, so the machines' credentials stay valid (`faden upgrade` does this by itself) |
 | `FADEN_MCP_ENCRYPTION_KEY` | `dev-mcp-encryption-key-change-me-32b`, if MCP was on; otherwise a new random value |
 | `LANGFUSE_SALT` | `mysalt` |
 | `LANGFUSE_ENCRYPTION_KEY` | 64 zeros |
@@ -195,10 +197,8 @@ With the old settings master key or MCP key, also set `FADEN_ALLOW_PUBLISHED_KEY
 and MCP then start on it and warn at every start; without it they refuse. `faden upgrade` does the same by itself
 for an install whose `.env` lacks one of these keys.
 
-Changing such a key later makes what is stored under the old one unreadable; there is no re-encryption yet.
-Under a new settings master key, the secrets saved in the console (the Hugging Face token, sign-in providers and
-the like) have to be entered again, everyone signs in again, and the machines have to be added again. Under a
-new MCP key, the MCP servers' credentials have to be entered again. A new install has none of this to do.
+To replace such a key, run `faden secrets rotate` (see [Rotating the keys](rotating-keys.md)): it encrypts what is
+stored under the old key again with a new one, so nothing has to be entered again, and the machines stay connected.
 
 ## Optional modules
 

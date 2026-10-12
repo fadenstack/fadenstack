@@ -177,7 +177,8 @@ Zufallswert (`openssl rand -base64 48`):
 | Variable | Was sie schützt |
 |---|---|
 | `POSTGRES_PASSWORD` | Die Datenbank-Anmeldung aller Dienste |
-| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert, und die Zugangsdaten der Maschinen |
+| `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert |
+| `FADEN_BACKEND_CREDENTIAL_PEPPER` | Die Zugangsdaten der Maschinen. Ein eigener Wert, den `faden secrets rotate` nie ändert, sodass die Maschinen verbunden bleiben |
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Zugangsdaten der MCP-Server |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Aufrufe des MCP-Dienstes. Ein Wert für alle drei |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Aufrufe des Skills-Dienstes. Ein Wert für alle drei |
@@ -199,6 +200,7 @@ sie auf den alten Wert.
 |---|---|
 | `POSTGRES_PASSWORD` | `postgres`, oder ein neuer Wert, den Sie auch in Postgres setzen: `docker exec -i faden-postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<neuer Wert>'"` |
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | `dev-settings-master-key-change-me` |
+| `FADEN_BACKEND_CREDENTIAL_PEPPER` | Der Wert von `FADEN_BACKEND_SETTINGS_MASTER_KEY`, damit die Zugangsdaten der Maschinen gültig bleiben (`faden upgrade` erledigt das selbst) |
 | `FADEN_MCP_ENCRYPTION_KEY` | `dev-mcp-encryption-key-change-me-32b`, wenn MCP eingeschaltet war; sonst ein neuer Zufallswert |
 | `LANGFUSE_SALT` | `mysalt` |
 | `LANGFUSE_ENCRYPTION_KEY` | 64 Nullen |
@@ -208,11 +210,9 @@ Mit dem alten Hauptschlüssel für Einstellungen oder dem alten MCP-Schlüssel s
 diese Einstellung verweigern sie den Start. `faden upgrade` tut das von selbst für eine Installation, deren `.env`
 einer dieser Schlüssel fehlt.
 
-Einen solchen Schlüssel später zu ändern macht unlesbar, was unter dem alten gespeichert ist; eine
-Neuverschlüsselung gibt es noch nicht. Unter einem neuen Hauptschlüssel für Einstellungen müssen die in der
-Konsole gespeicherten Geheimnisse (das Hugging-Face-Token, Anmeldeanbieter und Ähnliches) neu eingegeben werden,
-alle melden sich neu an, und die Maschinen müssen neu hinzugefügt werden. Unter einem neuen MCP-Schlüssel müssen
-die Zugangsdaten der MCP-Server neu eingegeben werden. Eine neue Installation hat nichts davon zu tun.
+Um einen solchen Schlüssel zu ersetzen, führen Sie `faden secrets rotate` aus (siehe [Schlüssel erneuern](rotating-keys.md)):
+Es verschlüsselt, was unter dem alten Schlüssel gespeichert ist, mit einem neuen neu, sodass nichts neu eingegeben
+werden muss, und die Maschinen bleiben verbunden.
 
 ## Optionale Module {#optional-modules}
 
