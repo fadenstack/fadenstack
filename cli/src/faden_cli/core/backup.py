@@ -788,10 +788,22 @@ def keep_company_files(env_file: object, ctx: object | None = None) -> None:
             )
 
 
-def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data_dir: str = "") -> list[str]:
+def _volume_image(docker: str, ctx: object | None) -> str:
+    """The image a volume backup or restore runs in: one already on the server (``_helper_image``), so an
+    air-gapped server pulls nothing; ``alpine`` only where no Fadenstack image is there at all."""
+    try:
+        return _helper_image(docker, ctx)
+    except DataDirNotMoved:
+        return "alpine"
+
+
+def snapshot_volumes(
+    backup_dir: Path, *, volumes: list[str] | None = None, data_dir: str = "", ctx: object | None = None
+) -> list[str]:
     """Tar each named Docker volume into the backup directory.
 
-    Uses a temporary ``alpine`` container to read from the volume mount. The archive carries the compose
+    Uses a temporary container of an image already on the server (``_volume_image``) to read from the
+    volume mount. The archive carries the compose
     name (``minio_data.tar.gz``), so a restore finds the volume on whichever install it runs.
     Returns list of created archive filenames.
 
@@ -803,6 +815,7 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data
     project = _compose_project(docker)
     targets = volumes or list(BACKUP_VOLUMES)
     created: list[str] = []
+    image = ""
 
     for vol in targets:
         source = _volume_source(docker, project, vol, data_dir)
@@ -811,15 +824,11 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data
             continue
         archive = f"{vol}.tar.gz"
         archive_path = backup_dir / archive
+        image = image or _volume_image(docker, ctx)
         info(f"  Snapshotting volume: {vol}")
         with open_private(archive_path) as out:
             proc = subprocess.run(  # noqa: S603
-                [
-                    docker, "run", "--rm",
-                    "-v", f"{source}:/data:ro",
-                    "alpine",
-                    "tar", "czf", "-", "-C", "/data", ".",
-                ],
+                _helper(docker, image, "tar czf - -C /data .", mount=f"{source}:/data:ro"),
                 stdout=out,
                 stderr=subprocess.PIPE,
                 check=False,
@@ -834,7 +843,9 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data
     return created
 
 
-def restore_volumes(backup_dir: Path, manifest: dict, *, data_dir: str = "") -> list[str]:
+def restore_volumes(
+    backup_dir: Path, manifest: dict, *, data_dir: str = "", ctx: object | None = None
+) -> list[str]:
     """Restore volume archives from a backup.
 
     Returns list of volume names that were restored.
@@ -843,6 +854,7 @@ def restore_volumes(backup_dir: Path, manifest: dict, *, data_dir: str = "") -> 
     project = _compose_project(docker)
     archives = manifest.get("volumes", [])
     restored: list[str] = []
+    image = ""
 
     for archive in archives:
         archive_path = backup_dir / archive
@@ -866,17 +878,16 @@ def restore_volumes(backup_dir: Path, manifest: dict, *, data_dir: str = "") -> 
         if target is None:
             warning(f"  No volume {vol} in this install; {archive} not restored")
             continue
+        image = image or _volume_image(docker, ctx)
         info(f"  Restoring volume: {vol}")
         # The archive goes in on the container's input: the backup is its owner's only, which a container's
         # root may not be (user namespaces), and a mount of it is not needed.
         with archive_path.open("rb") as archive_in:
             proc = subprocess.run(  # noqa: S603
-                [
-                    docker, "run", "--rm", "-i",
-                    "-v", f"{target}:/data",
-                    "alpine",
-                    "sh", "-c", "find /data -mindepth 1 -delete && tar xzf - -C /data",
-                ],
+                _helper(
+                    docker, image, "find /data -mindepth 1 -delete && tar xzf - -C /data",
+                    mount=f"{target}:/data", interactive=True,
+                ),
                 stdin=archive_in,
                 capture_output=True,
                 check=False,
@@ -1156,7 +1167,7 @@ def create_backup(
     # 4. Snapshot volumes
     if include_volumes and not db_only:
         console.print("\n[bold cyan]Snapshotting Docker volumes…[/bold cyan]")
-        result.volumes = snapshot_volumes(backup_dir, data_dir=data_dir_of(ctx.env_file))
+        result.volumes = snapshot_volumes(backup_dir, data_dir=data_dir_of(ctx.env_file), ctx=ctx)
 
     # 5. Collect migration heads
     console.print("\n[bold cyan]Collecting migration heads…[/bold cyan]")
@@ -1228,7 +1239,7 @@ def restore_backup(
     # 4. Restore volumes
     if not db_only and manifest.get("volumes"):
         console.print("\n[bold cyan]Restoring Docker volumes…[/bold cyan]")
-        result.volumes_restored = restore_volumes(backup_dir, manifest, data_dir=data_dir_of(ctx.env_file))
+        result.volumes_restored = restore_volumes(backup_dir, manifest, data_dir=data_dir_of(ctx.env_file), ctx=ctx)
 
     # 5. The certificate material, so the machines still trust this server
     if not db_only and manifest.get("tls_material") and ctx.project_dir:

@@ -23,11 +23,14 @@ class FakeDocker:
     def __init__(self) -> None:
         self.mounts: list[str] = []
         self.scripts: list[str] = []
+        self.images: list[str] = []
 
     def __call__(self, cmd: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
         """One ``docker`` call: the project label, a volume lookup or a ``docker run``."""
         out = ""
-        if cmd[1] == "inspect":
+        if cmd[1] == "inspect" and cmd[-1] == "faden-gateway":
+            out = "sha256:gateway"
+        elif cmd[1] == "inspect":
             out = "fadenstack"
         elif cmd[1:3] == ["volume", "ls"]:
             labels = dict(arg.removeprefix("label=").split("=", 1) for arg in cmd if arg.startswith("label="))
@@ -35,7 +38,9 @@ class FakeDocker:
             out = name if name in INSTALLED else ""
         elif cmd[1] == "run":
             self.mounts.append(cmd[cmd.index("-v") + 1])
-            self.scripts.append(" ".join(cmd[cmd.index("alpine") + 1 :]))
+            *_, image, _flag, script = cmd
+            self.images.append(image)
+            self.scripts.append(script)
         return subprocess.CompletedProcess(cmd, 0, stdout=out.encode(), stderr=b"")
 
 
@@ -52,6 +57,8 @@ def test_the_backup_reads_the_installs_own_volumes(docker: FakeDocker, tmp_path:
 
     assert created == ["faden_rag_lite.tar.gz", "minio_data.tar.gz"]
     assert docker.mounts == ["fadenstack_faden_rag_lite:/data:ro", "fadenstack_minio_data:/data:ro"]
+    # An image already on the server: an air-gapped one could not pull alpine.
+    assert docker.images == ["sha256:gateway", "sha256:gateway"]
 
 
 def test_neither_postgres_data_nor_the_models_are_in_the_volume_backup() -> None:
@@ -72,7 +79,8 @@ def test_the_restore_writes_into_the_installs_volumes_not_postgres(
     # pg_data is an older backup's: the dumps restore the databases. loki_data is not in this install.
     assert restored == ["faden_rag_lite", "minio_data"]
     assert docker.mounts == ["fadenstack_faden_rag_lite:/data", "fadenstack_minio_data:/data"]
-    assert all(script.startswith("sh -c find /data -mindepth 1 -delete && ") for script in docker.scripts)
+    assert all(script.startswith("find /data -mindepth 1 -delete && ") for script in docker.scripts)
+    assert docker.images == ["sha256:gateway", "sha256:gateway"]
 
 
 def test_nothing_is_touched_without_an_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
