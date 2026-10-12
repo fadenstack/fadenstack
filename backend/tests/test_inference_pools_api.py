@@ -42,7 +42,7 @@ def _caps(vendor: str, family: str, machine: str) -> dict[str, Any]:
 async def _node(session: AsyncSession, caps: dict[str, Any]) -> uuid.UUID:
     node = InfraNode(
         agent_id=f"agent-{uuid.uuid4().hex[:8]}",
-        host="10.250.10.49",
+        host="192.0.2.49",
         status="healthy",
         capabilities_json=caps,
     )

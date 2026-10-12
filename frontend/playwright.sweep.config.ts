@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * The UI sweep: every page and the main flows, against a running install.
  *
- *   E2E_BASE_URL=http://10.250.10.61 E2E_COOKIE=<fapiauth> npx playwright test -c playwright.sweep.config.ts
+ *   E2E_BASE_URL=http://192.0.2.61 E2E_COOKIE=<fapiauth> npx playwright test -c playwright.sweep.config.ts
  *
  * Unlike the journey suite (playwright.config.ts) it never touches the fleet:
  * no cluster, deployment or node is created, changed or removed. What its

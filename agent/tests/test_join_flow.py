@@ -56,7 +56,7 @@ async def test_the_request_carries_no_secret() -> None:
     client, http = _client([{"id": "r1", "code": "K7M-3QP", "poll_secret": "s", "expires_at": "x"}])
     await client.request_join(
         agent_id="gpu-01",
-        host="10.250.10.71",
+        host="192.0.2.71",
         capabilities={"gpu_count": 3},
         version="0.1.8",
     )
@@ -73,7 +73,7 @@ async def test_the_machine_says_what_it_is_before_being_let_in() -> None:
     client, http = _client([{"id": "r1", "code": "K7M-3QP", "poll_secret": "s", "expires_at": "x"}])
     await client.request_join(
         agent_id="gpu-01",
-        host="10.250.10.71",
+        host="192.0.2.71",
         capabilities={"gpu_count": 3, "gpu": {"vendor": "nvidia", "family": "GB10"}},
         version="0.1.8",
     )
@@ -125,7 +125,7 @@ def test_join_waits_in_human_time() -> None:
 
 
 def test_join_accepts_a_bare_host_and_port() -> None:
-    """`10.250.10.220:8000` is what a person types; it should just work."""
+    """`192.0.2.220:8000` is what a person types; it should just work."""
     from faden_agent import __main__ as cli
     import inspect
 

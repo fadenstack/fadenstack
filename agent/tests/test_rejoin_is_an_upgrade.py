@@ -68,7 +68,7 @@ def test_join_on_an_enrolled_machine_restarts_instead_of_asking(
     monkeypatch.setattr(agent_main, "_banner", lambda: None)
     monkeypatch.setattr(agent_main, "_save_env_file", lambda env: None)
 
-    agent_main.cmd_join("http://10.250.10.220:8000", user=True)
+    agent_main.cmd_join("http://192.0.2.220:8000", user=True)
 
     assert joined == [], "no join request for a machine already in the fleet"
     assert started == [True], "the service restarts on the new build, in the same scope"
@@ -90,6 +90,6 @@ def test_join_on_a_new_machine_still_asks(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(agent_main, "_banner", lambda: None)
     monkeypatch.setattr(agent_main, "_save_env_file", lambda env: None)
 
-    agent_main.cmd_join("http://10.250.10.220:8000", user=True)
+    agent_main.cmd_join("http://192.0.2.220:8000", user=True)
 
     assert joined == [True]

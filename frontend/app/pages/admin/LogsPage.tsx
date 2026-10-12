@@ -19,7 +19,7 @@ import { filterLabels, NO_NAMES, type NameLookups } from "~/pages/admin/logs/lab
 
 type LogsTab = "logs" | "audit";
 
-/** Labels to start with, from the URL: ``/admin/logs?host=10.250.10.71`` is one machine's logs. */
+/** Labels to start with, from the URL: ``/admin/logs?host=192.0.2.71`` is one machine's logs. */
 function labelsFromUrl(params: URLSearchParams): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of params.entries()) {

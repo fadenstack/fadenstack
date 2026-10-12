@@ -61,7 +61,7 @@ async def _deployment(dbsession, *, phase: str, reconciled: bool = True):
     await dbsession.flush()
 
     node = InfraNode(
-        agent_id=f"head-{uuid.uuid4().hex[:8]}", host="10.250.10.71", status="healthy"
+        agent_id=f"head-{uuid.uuid4().hex[:8]}", host="192.0.2.71", status="healthy"
     )
     dbsession.add(node)
     await dbsession.flush()

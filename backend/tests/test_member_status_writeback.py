@@ -114,8 +114,8 @@ async def test_a_live_cluster_stops_reading_as_not_reporting(
     dbsession: AsyncSession,
 ) -> None:
     """The exact case that drew two grey circles on a working cluster."""
-    head = await _node(dbsession, "10.250.10.49")
-    worker = await _node(dbsession, "10.250.10.71")
+    head = await _node(dbsession, "192.0.2.49")
+    worker = await _node(dbsession, "192.0.2.71")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[
@@ -141,8 +141,8 @@ async def test_a_live_cluster_stops_reading_as_not_reporting(
 async def test_a_node_ray_reports_dead_is_recorded_dead(
     dbsession: AsyncSession,
 ) -> None:
-    head = await _node(dbsession, "10.250.10.49")
-    worker = await _node(dbsession, "10.250.10.71")
+    head = await _node(dbsession, "192.0.2.49")
+    worker = await _node(dbsession, "192.0.2.71")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[
@@ -174,8 +174,8 @@ async def test_a_restarted_raylets_dead_record_does_not_hide_the_live_one(
     serving traffic was shown as dropped out. This is the order the live
     cluster returned them in.
     """
-    head = await _node(dbsession, "10.250.10.71")
-    worker = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.71")
+    worker = await _node(dbsession, "192.0.2.49")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[
@@ -205,8 +205,8 @@ async def test_records_from_the_host_sdk_path_are_read_by_state(
 
     Read as ``alive`` alone, every node of such a cluster was dead.
     """
-    head = await _node(dbsession, "10.250.10.71")
-    worker = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.71")
+    worker = await _node(dbsession, "192.0.2.49")
     head_record = _ray_node("10.100.0.2", alive=True, head=True)
     worker_record = _ray_node("10.100.0.1", alive=False)
     for record, state in ((head_record, "ALIVE"), (worker_record, "DEAD")):
@@ -242,10 +242,10 @@ async def test_a_cluster_on_management_addresses_matches_too(
     there is then no binding to bridge through -- so the node's own host has
     to be tried as well, or the whole fleet reads as unknown.
     """
-    head = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.49")
     env, _ = await _environment(
         dbsession,
-        ray_nodes=[_ray_node("10.250.10.49", alive=True, head=True)],
+        ray_nodes=[_ray_node("192.0.2.49", alive=True, head=True)],
         bindings={},
     )
     member = await _member(dbsession, env, head, "head")
@@ -264,8 +264,8 @@ async def test_a_machine_the_cluster_does_not_know_is_unknown_not_dead(
     Calling it dead would put a red ring on a machine that is simply still
     coming up, which is the kind of false alarm that gets a screen ignored.
     """
-    head = await _node(dbsession, "10.250.10.49")
-    stranger = await _node(dbsession, "10.250.10.99")
+    head = await _node(dbsession, "192.0.2.49")
+    stranger = await _node(dbsession, "192.0.2.99")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[_ray_node("10.100.0.2", alive=True, head=True)],
@@ -288,7 +288,7 @@ async def test_an_unobserved_cluster_leaves_the_rows_alone(
     Writing "unknown" here would mean a backend restart made every healthy
     cluster look degraded until the next reconcile.
     """
-    head = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.49")
     env, _ = await _environment(dbsession, ray_nodes=[])
     member = await _member(dbsession, env, head, "head")
     member.member_status = "alive"
@@ -306,7 +306,7 @@ async def test_joining_is_stamped_once_and_not_rewritten(
     dbsession: AsyncSession,
 ) -> None:
     """The reconcile runs continuously; a churning timestamp is not a date."""
-    head = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.49")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[_ray_node("10.100.0.2", alive=True, head=True)],
@@ -326,8 +326,8 @@ async def test_joining_is_stamped_once_and_not_rewritten(
 async def test_a_node_that_never_joined_has_no_join_date(
     dbsession: AsyncSession,
 ) -> None:
-    head = await _node(dbsession, "10.250.10.49")
-    worker = await _node(dbsession, "10.250.10.71")
+    head = await _node(dbsession, "192.0.2.49")
+    worker = await _node(dbsession, "192.0.2.71")
     env, _ = await _environment(
         dbsession,
         ray_nodes=[
@@ -354,7 +354,7 @@ async def test_a_node_that_never_joined_has_no_join_date(
 async def test_a_malformed_observation_does_not_raise(
     dbsession: AsyncSession,
 ) -> None:
-    head = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.49")
     env, _ = await _environment(dbsession, ray_nodes=[])
     env.observed_status_json = {"cluster": {"nodes": ["not a node", None, 7]}}
     await _member(dbsession, env, head, "head")
@@ -381,7 +381,7 @@ async def test_the_fleet_list_carries_each_machines_utilization(
     from faden_backend.db.dao.node_control_dao import NodeControlDAO
     from faden_backend.services.nodes import NodeControlService
 
-    node = await _node(dbsession, "10.250.10.49")
+    node = await _node(dbsession, "192.0.2.49")
     dao = NodeControlDAO(dbsession)
     await dao.upsert_inventory_snapshot(
         node_id=node.id,
@@ -413,7 +413,7 @@ async def test_a_machine_that_has_never_reported_says_so(
     from faden_backend.db.dao.node_control_dao import NodeControlDAO
     from faden_backend.services.nodes import NodeControlService
 
-    node = await _node(dbsession, "10.250.10.71")
+    node = await _node(dbsession, "192.0.2.71")
     service = NodeControlService(
         NodeControlDAO(dbsession),
         pepper="pepper",
@@ -443,7 +443,7 @@ async def test_the_newest_snapshot_wins(dbsession: AsyncSession) -> None:
     from faden_backend.db.models.node_control import InfraNodeInventorySnapshot
     from faden_backend.services.nodes import NodeControlService
 
-    node = await _node(dbsession, "10.250.10.49")
+    node = await _node(dbsession, "192.0.2.49")
     base = datetime.now(timezone.utc)
     # Written oldest-last on purpose: insertion order must not decide this.
     for offset, percent in ((0, 91.0), (-15, 55.0), (-30, 10.0)):
@@ -478,8 +478,8 @@ async def test_each_machine_gets_its_own_snapshot(dbsession: AsyncSession) -> No
     from faden_backend.db.dao.node_control_dao import NodeControlDAO
     from faden_backend.services.nodes import NodeControlService
 
-    head = await _node(dbsession, "10.250.10.49")
-    worker = await _node(dbsession, "10.250.10.71")
+    head = await _node(dbsession, "192.0.2.49")
+    worker = await _node(dbsession, "192.0.2.71")
     dao = NodeControlDAO(dbsession)
     await dao.upsert_inventory_snapshot(
         node_id=head.id, inventory_json={}, utilization_json={"cpu_percent": 5.0}

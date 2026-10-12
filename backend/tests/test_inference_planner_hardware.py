@@ -2,7 +2,7 @@
 
 ``tests/fixtures/dgx_spark_network_inventory.json`` is not hand-written: it is
 the verbatim output of ``summarize_network_inventory()`` executed by agent
-0.1.8 on ``gpu-02`` (10.250.10.49) and ``gpu-01`` (10.250.10.71) on
+0.1.8 on ``gpu-02`` (192.0.2.49) and ``gpu-01`` (192.0.2.71) on
 2026-09-20, with the Tier-2 ``all_interfaces`` block dropped exactly as
 ``record_inventory`` drops it.
 
@@ -154,7 +154,7 @@ async def test_real_docker_bridges_never_become_candidates(
     assert "172.18.0.0/16" in rejected
 
     # Only the two RoCE fabrics and the management LAN survive to candidacy.
-    assert candidate_cidrs == {"10.100.0.0/24", "10.100.1.0/24", "10.250.10.0/24"}
+    assert candidate_cidrs == {"10.100.0.0/24", "10.100.1.0/24", "192.0.2.0/24"}
 
 
 @pytest.mark.anyio()
@@ -165,7 +165,7 @@ async def test_management_lan_is_scored_down_from_the_routing_fact(
     env, _ = await _dgx_environment(dbsession)
     plan = await MultiNodeFabricPlanner(dbsession).plan_environment(env.id, validate=False)
 
-    mgmt = next(c for c in plan.candidates if c.cidr == "10.250.10.0/24")
+    mgmt = next(c for c in plan.candidates if c.cidr == "192.0.2.0/24")
     assert mgmt.is_management is True
     assert mgmt.isolation_level == "shared_management"
     assert mgmt.score < 0

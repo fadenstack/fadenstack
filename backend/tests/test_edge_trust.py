@@ -136,7 +136,7 @@ async def test_a_new_machine_gets_the_authority_and_the_console_its_fingerprint(
 @pytest.mark.skipif(shutil.which("sh") is None, reason="no POSIX sh available")
 def test_the_installer_refuses_an_authority_file_that_is_not_there(tmp_path: Path) -> None:
     script = tmp_path / "install.sh"
-    script.write_text(install_api.render_installer("https://10.250.10.61"), encoding="utf-8", newline="\n")
+    script.write_text(install_api.render_installer("https://192.0.2.61"), encoding="utf-8", newline="\n")
     result = subprocess.run(
         ["sh", str(script), "--join", "--ca-file", str(tmp_path / "missing.crt")],
         capture_output=True, text=True, timeout=30,
@@ -146,7 +146,7 @@ def test_the_installer_refuses_an_authority_file_that_is_not_there(tmp_path: Pat
 
 
 def test_the_installer_verifies_the_backend_and_hands_the_authority_on() -> None:
-    script = install_api.render_installer("https://10.250.10.61")
+    script = install_api.render_installer("https://192.0.2.61")
     assert 'curl --cacert "$CA_FILE" "$@"' in script
     assert 'PLAN=$(backend_curl -fsSL "$BACKEND/api/install/plan' in script
     assert 'set -- --ca-file "$CA_FILE"' in script

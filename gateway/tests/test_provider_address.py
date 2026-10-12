@@ -29,7 +29,7 @@ NAMES = {
     "api.example.com": ["104.18.6.192"],
     "metadata.example.com": ["169.254.169.254"],
     "sneaky.example.com": ["104.18.6.192", "fd00:ec2::254"],
-    "vllm.lan": ["10.250.10.71"],
+    "vllm.lan": ["192.0.2.71"],
     "host.docker.internal": ["192.168.65.254"],
     "localhost": ["127.0.0.1", "::1"],
 }
@@ -82,7 +82,7 @@ async def test_a_link_local_or_metadata_address_is_refused(base_url: str, lookup
     "base_url",
     [
         "https://api.example.com/v1",
-        "http://10.250.10.71:8000/faden-app",  # a machine on the LAN
+        "http://192.0.2.71:8000/faden-app",  # a machine on the LAN
         "http://vllm.lan:8000",
         "http://192.168.1.20:11434",
         "http://127.0.0.1:8000",
@@ -126,7 +126,7 @@ async def test_a_hosts_answer_is_kept_a_minute(lookups: list[str], monkeypatch: 
 @pytest.mark.anyio
 async def test_a_refused_provider_is_left_out_of_the_routes(lookups: list[str]) -> None:
     bad = _route("http://metadata.example.com/v1")
-    good = _route("http://10.250.10.49:8000")
+    good = _route("http://192.0.2.49:8000")
     assert await provider_address.usable([bad, good]) == [good]
 
     # Models on Fadenstack's machines are internal by design: not checked.

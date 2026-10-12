@@ -23,7 +23,7 @@ from faden_cli.core.edge import check_ports, console_url, ports, url_for, verify
 from faden_cli.core.env_gen import read_env_file, write_env_file
 from faden_cli.core.settings import FadenConfig
 
-NAMES = ["localhost", "127.0.0.1", "::1", "box", "10.250.10.61"]
+NAMES = ["localhost", "127.0.0.1", "::1", "box", "192.0.2.61"]
 
 
 @pytest.fixture(autouse=True)
@@ -56,7 +56,7 @@ def test_a_certificate_made_here_names_the_machine_and_is_signed_by_the_installs
     leaf.verify_directly_issued_by(ca)
     assert made.trust_changed, "the machines have an authority to fetch"
     assert made.summary.made_here
-    assert set(made.summary.names) >= {"localhost", "127.0.0.1", "box", "10.250.10.61", "console.example.org"}
+    assert set(made.summary.names) >= {"localhost", "127.0.0.1", "box", "192.0.2.61", "console.example.org"}
     assert tls.material_present(install)
     assert not (install / "tls" / "edge-chain.pem").exists()
     # The authority's key is outside the directory nginx and the backend mount.
@@ -228,7 +228,7 @@ def test_wildcards_cover_one_label() -> None:
     assert tls.covers(["*.example.org"], "box.example.org")
     assert not tls.covers(["*.example.org"], "a.box.example.org")
     assert not tls.covers(["*.example.org"], "example.org")
-    assert tls.covers(["10.250.10.61"], "10.250.10.61")
+    assert tls.covers(["192.0.2.61"], "192.0.2.61")
 
 
 # ── the front door ────────────────────────────────────────────────
@@ -251,7 +251,7 @@ def test_only_this_machine_goes_unverified() -> None:
     assert verify_for("https://127.0.0.1") is False
     assert verify_for("https://[::1]") is False
     assert verify_for("https://console.example.org") is True
-    assert verify_for("https://10.250.10.61") is True
+    assert verify_for("https://192.0.2.61") is True
     assert verify_for("http://localhost") is True
 
 
@@ -358,21 +358,21 @@ def test_the_commands_work_on_the_configured_install(install: Path, monkeypatch:
 
     result = runner.invoke(tls_cmd.tls_group, ["generate", "--no-restart", "-n", "console.example.org"])
     assert result.exit_code == 0, result.output
-    assert "https://10.250.10.61" in result.output
+    assert "https://192.0.2.61" in result.output
     assert "ca.crt" in result.output
 
     result = runner.invoke(ports_cmd_mod.ports_cmd, ["--https", "8443", "--no-restart"])
     assert result.exit_code == 0, result.output
-    assert "https://10.250.10.61:8443" in result.output
+    assert "https://192.0.2.61:8443" in result.output
 
     result = runner.invoke(tls_cmd.tls_group, ["off", "--no-restart"])
     assert result.exit_code == 0, result.output
     assert not tls.material_present(install)
-    assert "http://10.250.10.61" in result.output
+    assert "http://192.0.2.61" in result.output
 
 
 def test_other_machines_are_shown_an_address_they_can_resolve() -> None:
-    assert tls_cmd.reachable_example(["https://fadenstack", "https://10.250.10.61"]) == "https://10.250.10.61"
+    assert tls_cmd.reachable_example(["https://fadenstack", "https://192.0.2.61"]) == "https://192.0.2.61"
     assert tls_cmd.reachable_example(["https://box", "https://box.lan:8443"]) == "https://box.lan:8443"
     assert tls_cmd.reachable_example(["https://box"]) == "https://box"
     assert tls_cmd.reachable_example([]) == "https://<this server>"
@@ -445,7 +445,7 @@ def test_machine_ca_status_and_replace_run_in_the_backend(monkeypatch: pytest.Mo
         "authorities": [{"fingerprint_sha256": "ab" * 32, "not_after": "2031-09-26T14:38:41+00:00",
                          "issuing": True, "issuing_from": "2026-09-27T14:38:41+00:00", "reason": "replaced"}],
         "gateway": {"not_after": "2026-10-27T15:02:08+00:00", "current": True},
-        "machines": {"n": {"not_after": "2026-10-27T15:02:45+00:00", "names": ["10.250.10.71"],
+        "machines": {"n": {"not_after": "2026-10-27T15:02:45+00:00", "names": ["192.0.2.71"],
                            "issued_at": "2026-09-27T15:02:45+00:00", "current": False}},
     }
 
@@ -459,7 +459,7 @@ def test_machine_ca_status_and_replace_run_in_the_backend(monkeypatch: pytest.Mo
     out = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca"])
     assert out.exit_code == 0, out.output
     assert calls[-1][:5] == ["docker", "exec", "-i", "faden-backend", "python"] and calls[-1][-1] == "status"
-    assert "10.250.10.71" in out.output and "renews within a minute" in out.output
+    assert "192.0.2.71" in out.output and "renews within a minute" in out.output
 
     refused = CliRunner().invoke(tls_cmd.tls_group, ["machine-ca", "--replace"], input="n\n")
     assert refused.exit_code != 0 and calls[-1][-1] == "status", "nothing replaced without a yes"

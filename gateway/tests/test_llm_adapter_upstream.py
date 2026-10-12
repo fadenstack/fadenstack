@@ -31,8 +31,8 @@ from faden_gateway.services.gateway.llm_adapter import _upstream_kwargs
         (ProviderType.VLLM, "http://upstream.local:8000/"),
         (ProviderType.TGI, "http://tgi.local:8000"),
         # The bug fixed this session: DB stores /v1 stripped, restore it.
-        (ProviderType.REMOTE_OPENAI, "http://10.250.10.49:8000"),
-        (ProviderType.REMOTE_OPENAI, "http://10.250.10.49:8000/"),
+        (ProviderType.REMOTE_OPENAI, "http://192.0.2.49:8000"),
+        (ProviderType.REMOTE_OPENAI, "http://192.0.2.49:8000/"),
     ],
 )
 def test_v1_prefix_restored_for_openai_compatible(

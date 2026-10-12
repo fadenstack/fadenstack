@@ -454,7 +454,7 @@ async def test_a_protected_vllm_listens_on_loopback_behind_the_proxy(
     proxy = _Proxy()
     manager = RuntimeManager(
         runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
-        advertise_host="10.250.10.49", advertise_scheme="http", model_tls=proxy,
+        advertise_host="192.0.2.49", advertise_scheme="http", model_tls=proxy,
     )
     result = await manager.deploy_workload({
         "runtime_id": "r1", "provider_type": "vllm", "image": "vllm/vllm-openai:latest",
@@ -464,13 +464,13 @@ async def test_a_protected_vllm_listens_on_loopback_behind_the_proxy(
     })
     assert fake_runtime.run_kwargs()["ports"] == ["127.0.0.1:28100:8000"], "never on the network itself"
     assert proxy.routes == {8100: 28100}
-    assert result["endpoint_url"] == "https://10.250.10.49:8100" and result["model_tls"] is True
+    assert result["endpoint_url"] == "https://192.0.2.49:8100" and result["model_tls"] is True
     assert probed[0] == "http://127.0.0.1:28100/health", "readiness is checked on loopback, past the proxy"
 
     # Started again later: still reached through the proxy.
     monkeypatch.setattr(FakeRuntime, "exists", lambda self, name: asyncio.sleep(0, result=True))
     again = await manager.start_workload({"runtime_id": "r1"})
-    assert again["endpoint_url"] == "https://10.250.10.49:8100"
+    assert again["endpoint_url"] == "https://192.0.2.49:8100"
 
     await manager.remove_workload({"runtime_id": "r1"})
     assert proxy.routes == {}
@@ -480,7 +480,7 @@ async def test_a_protected_vllm_listens_on_loopback_behind_the_proxy(
 async def test_without_the_proxy_a_request_for_it_fails_loudly(tmp_path: Path, fake_runtime: FakeRuntime) -> None:
     manager = RuntimeManager(
         runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
-        advertise_host="10.250.10.49",
+        advertise_host="192.0.2.49",
     )
     with pytest.raises(RuntimeManagerError, match="model-TLS"):
         await manager.deploy_workload({
@@ -503,7 +503,7 @@ async def test_a_busy_port_is_refused_before_the_model_starts(tmp_path: Path, fa
     """Found on the DGX pair: an MCP server held 8100; the vLLM had already taken its GPU memory."""
     manager = RuntimeManager(
         runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
-        advertise_host="10.250.10.49", model_tls=_Proxy(busy={8100}),
+        advertise_host="192.0.2.49", model_tls=_Proxy(busy={8100}),
     )
     with pytest.raises(RuntimeManagerError, match="8100 is already in use"):
         await manager.deploy_workload(_protected_vllm("r3"))
@@ -514,7 +514,7 @@ async def test_a_busy_port_is_refused_before_the_model_starts(tmp_path: Path, fa
 async def test_a_model_the_proxy_cannot_serve_is_not_left_running(tmp_path: Path, fake_runtime: FakeRuntime) -> None:
     manager = RuntimeManager(
         runtime=fake_runtime, state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(),
-        advertise_host="10.250.10.49", model_tls=_Proxy(fail=True),
+        advertise_host="192.0.2.49", model_tls=_Proxy(fail=True),
     )
     with pytest.raises(RuntimeError, match="nginx"):
         await manager.deploy_workload(_protected_vllm("r4"))

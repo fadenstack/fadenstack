@@ -80,14 +80,14 @@ def test_scoring_prefers_roce_over_management_lan() -> None:
         NodeFabricBinding(
             node_id="node-1",
             interface="enP7s7",
-            ip="10.250.10.49",
+            ip="192.0.2.49",
             link_type="ethernet",
             is_management=True,
         ),
         NodeFabricBinding(
             node_id="node-2",
             interface="enP7s7",
-            ip="10.250.10.71",
+            ip="192.0.2.71",
             link_type="ethernet",
             is_management=True,
         ),
@@ -132,11 +132,11 @@ async def test_plan_environment_discovers_dgx_roce(dbsession: AsyncSession) -> N
     # 2. Create Node 1 (gpu-02)
     node1 = InfraNode(
         agent_id="gpu-02",
-        host="10.250.10.49",
+        host="192.0.2.49",
         status="healthy",
         capabilities_json={
             "network": {
-                "management_ip": "10.250.10.49",
+                "management_ip": "192.0.2.49",
                 "fabrics": [
                     {
                         "interface": "enp1s0f1np1",
@@ -150,8 +150,8 @@ async def test_plan_environment_discovers_dgx_roce(dbsession: AsyncSession) -> N
                     },
                     {
                         "interface": "enP7s7",
-                        "ip": "10.250.10.49",
-                        "cidr": "10.250.10.0/24",
+                        "ip": "192.0.2.49",
+                        "cidr": "192.0.2.0/24",
                         "speed_gbps": 1.0,
                         "link_type": "ethernet",
                         "mtu": 1500,
@@ -164,11 +164,11 @@ async def test_plan_environment_discovers_dgx_roce(dbsession: AsyncSession) -> N
     # Node 2 (gpu-01)
     node2 = InfraNode(
         agent_id="gpu-01",
-        host="10.250.10.71",
+        host="192.0.2.71",
         status="healthy",
         capabilities_json={
             "network": {
-                "management_ip": "10.250.10.71",
+                "management_ip": "192.0.2.71",
                 "fabrics": [
                     {
                         "interface": "enp1s0f1np1",
@@ -182,8 +182,8 @@ async def test_plan_environment_discovers_dgx_roce(dbsession: AsyncSession) -> N
                     },
                     {
                         "interface": "enP7s7",
-                        "ip": "10.250.10.71",
-                        "cidr": "10.250.10.0/24",
+                        "ip": "192.0.2.71",
+                        "cidr": "192.0.2.0/24",
                         "speed_gbps": 1.0,
                         "link_type": "ethernet",
                         "mtu": 1500,
@@ -364,7 +364,7 @@ async def test_plan_rejects_docker_bridges_and_down_links(dbsession: AsyncSessio
                     {
                         "interface": "enP7s7",
                         "ip": mgmt_ip,
-                        "cidr": "10.250.10.0/24",
+                        "cidr": "192.0.2.0/24",
                         "speed_gbps": 1.0,
                         "link_type": "ethernet",
                         "mtu": 1500,
@@ -376,12 +376,12 @@ async def test_plan_rejects_docker_bridges_and_down_links(dbsession: AsyncSessio
         }
 
     node1 = InfraNode(
-        agent_id="gpu-02", host="10.250.10.49", status="healthy",
-        capabilities_json=_caps("10.100.0.1", "10.250.10.49"),
+        agent_id="gpu-02", host="192.0.2.49", status="healthy",
+        capabilities_json=_caps("10.100.0.1", "192.0.2.49"),
     )
     node2 = InfraNode(
-        agent_id="gpu-01", host="10.250.10.71", status="healthy",
-        capabilities_json=_caps("10.100.0.2", "10.250.10.71"),
+        agent_id="gpu-01", host="192.0.2.71", status="healthy",
+        capabilities_json=_caps("10.100.0.2", "192.0.2.71"),
     )
     dbsession.add_all([node1, node2])
     await dbsession.flush()
@@ -396,7 +396,7 @@ async def test_plan_rejects_docker_bridges_and_down_links(dbsession: AsyncSessio
     cidrs = {c.cidr for c in plan.candidates}
     assert "172.17.0.0/16" not in cidrs, "a Docker bridge must never be a candidate"
     assert "10.100.1.0/24" not in cidrs, "a down link must never be a candidate"
-    assert cidrs == {"10.100.0.0/24", "10.250.10.0/24"}
+    assert cidrs == {"10.100.0.0/24", "192.0.2.0/24"}
 
     rejected = {r.cidr: r.reason for r in plan.rejected}
     assert "172.17.0.0/16" in rejected
@@ -404,7 +404,7 @@ async def test_plan_rejects_docker_bridges_and_down_links(dbsession: AsyncSessio
 
     # The management LAN is identified by the backend from the routing fact,
     # not by a conclusion the agent shipped.
-    mgmt = next(c for c in plan.candidates if c.cidr == "10.250.10.0/24")
+    mgmt = next(c for c in plan.candidates if c.cidr == "192.0.2.0/24")
     assert mgmt.is_management is True
     assert mgmt.isolation_level == "shared_management"
 
@@ -504,9 +504,9 @@ async def test_equal_scoring_fabrics_break_ties_deterministically(
             fabrics.reverse()
         return {"network": {"fabrics": fabrics}}
 
-    n1 = InfraNode(agent_id="gpu-02", host="10.250.10.49", status="healthy",
+    n1 = InfraNode(agent_id="gpu-02", host="192.0.2.49", status="healthy",
                    capabilities_json=_caps(1, reverse=False))
-    n2 = InfraNode(agent_id="gpu-01", host="10.250.10.71", status="healthy",
+    n2 = InfraNode(agent_id="gpu-01", host="192.0.2.71", status="healthy",
                    capabilities_json=_caps(2, reverse=False))
     dbsession.add_all([n1, n2])
     await dbsession.flush()
@@ -564,9 +564,9 @@ async def test_apply_plan_ignores_client_supplied_bindings(dbsession: AsyncSessi
             }
         }
 
-    n1 = InfraNode(agent_id="spark-a", host="10.250.10.49", status="healthy",
+    n1 = InfraNode(agent_id="spark-a", host="192.0.2.49", status="healthy",
                    capabilities_json=_caps("10.100.0.1"))
-    n2 = InfraNode(agent_id="spark-b", host="10.250.10.71", status="healthy",
+    n2 = InfraNode(agent_id="spark-b", host="192.0.2.71", status="healthy",
                    capabilities_json=_caps("10.100.0.2"))
     dbsession.add_all([n1, n2])
     await dbsession.flush()
@@ -581,7 +581,7 @@ async def test_apply_plan_ignores_client_supplied_bindings(dbsession: AsyncSessi
 
     # Tamper with the approved document the way a hostile operator would.
     for binding in plan.candidates[0].node_bindings.values():
-        binding.ip = "10.250.10.200"
+        binding.ip = "192.0.2.200"
         binding.interface = "attacker0"
 
     applied = await planner.apply_plan(env.id, plan)
@@ -634,12 +634,12 @@ async def test_apply_plan_rejects_a_plan_for_another_environment(
 def test_a_vpn_host_address_is_never_recommended_over_the_lan() -> None:
     """Found on a Windows workstation: the Tailscale /32 had no default route, so it scored as an
     isolated fabric and beat the LAN -- a VPN tunnel that no other machine is on as a peer."""
-    lan = [NodeFabricBinding(node_id="n1", interface="eth2", ip="10.250.10.220", link_type="ethernet",
+    lan = [NodeFabricBinding(node_id="n1", interface="eth2", ip="192.0.2.220", link_type="ethernet",
                              is_management=True)]
     vpn = [NodeFabricBinding(node_id="n1", interface="eth9", ip="100.64.0.59", link_type="ethernet")]
     score_lan, *_ = score_fabric_candidate(
         fabric_type="ethernet", speed_gbps=10.0, mtu=1500, is_management=True, bindings=lan,
-        cidr="10.250.10.0/24",
+        cidr="192.0.2.0/24",
     )
     score_vpn, _reason, confidence, isolation, reasons = score_fabric_candidate(
         fabric_type="ethernet", speed_gbps=10.0, mtu=1500, is_management=False, bindings=vpn,

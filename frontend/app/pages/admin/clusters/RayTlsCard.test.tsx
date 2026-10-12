@@ -17,7 +17,7 @@ function status(overrides: Partial<RayTlsStatus> = {}): RayTlsStatus {
     on: true,
     applied: false,
     restarting: true,
-    running: { "10.250.10.49": false, "10.250.10.71": false },
+    running: { "192.0.2.49": false, "192.0.2.71": false },
     machines: 2,
     old_agents: [],
     can_switch_on: true,

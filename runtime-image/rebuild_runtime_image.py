@@ -45,8 +45,8 @@ Usage
     python3 rebuild_runtime_image.py --flavor gb10-vllm --build         # gb10, on a DGX node
     python3 rebuild_runtime_image.py --flavor x86_64 --build          # on any x86_64 box
     python3 rebuild_runtime_image.py --flavor gb10-vllm --build --platform linux/arm64   # gb10, off-node
-    python3 rebuild_runtime_image.py --flavor gb10-vllm --build --distribute sachi@10.250.10.71
-    python3 rebuild_runtime_image.py --verify-peer sachi@10.250.10.71
+    python3 rebuild_runtime_image.py --flavor gb10-vllm --build --distribute admin@spark-1
+    python3 rebuild_runtime_image.py --verify-peer admin@spark-1
 
     # after certifying on the hardware (deploy_and_certify_2node.ps1):
     python3 rebuild_runtime_image.py --manifest runtime-manifest-gb10-vllm0.29.0.json \

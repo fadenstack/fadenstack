@@ -30,7 +30,7 @@ async def test_only_deployments_on_a_cluster_the_machine_is_in(dbsession: AsyncS
     model = LLMModel(display_name="Qwen3.8", source=ModelSource.HUGGINGFACE, status=ModelStatus.AVAILABLE,
                      hf_repo_id=f"nvidia/q-{uuid.uuid4().hex[:6]}")
     spark, workstation = (InfraNode(agent_id=f"a-{uuid.uuid4().hex[:8]}", host=h, status="healthy")
-                          for h in ("10.250.10.49", "10.250.10.20"))
+                          for h in ("192.0.2.49", "192.0.2.20"))
     dbsession.add_all([plane, model, spark, workstation])
     await dbsession.flush()
 

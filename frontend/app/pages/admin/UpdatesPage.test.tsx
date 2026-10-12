@@ -62,7 +62,7 @@ function overview(overrides: Partial<UpdatesOverview> = {}): UpdatesOverview {
       },
       {
         kind: "agent",
-        name: "10.250.10.71",
+        name: "192.0.2.71",
         running: "0.2.6",
         expected: "0.2.7",
         status: "update",
@@ -132,7 +132,7 @@ describe("UpdatesPage", () => {
     expect(within(newer).getByRole("link", { name: "Release notes" })).toHaveAttribute("href", release.notes_url);
 
     const parts = screen.getByRole("region", { name: "Parts of this install" });
-    expect(within(parts).getByRole("link", { name: "10.250.10.71" })).toHaveAttribute("href", "/admin/nodes/5b1c");
+    expect(within(parts).getByRole("link", { name: "192.0.2.71" })).toHaveAttribute("href", "/admin/nodes/5b1c");
     expect(within(parts).getByText("Machine agent")).toBeInTheDocument();
     expect(within(parts).getByText("ghcr.io/fadenstack/backend:0.4.1 (57bc1e09dead)")).toBeInTheDocument();
   });

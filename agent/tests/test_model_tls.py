@@ -171,7 +171,7 @@ def test_the_configuration_puts_tls_and_the_gateway_check_in_front_of_loopback()
 
 @pytest.mark.asyncio
 async def test_a_certificate_is_asked_for_once_and_renewed_for_a_reason(tmp_path: Path) -> None:
-    backend = _Backend(["10.250.10.49"])
+    backend = _Backend(["192.0.2.49"])
     tls = _tls(tmp_path, _Runtime())
     async with _http(backend) as http:
         assert await tls.refresh(http, "cred")
@@ -180,7 +180,7 @@ async def test_a_certificate_is_asked_for_once_and_renewed_for_a_reason(tmp_path
         assert not await tls.refresh(http, "cred"), "nothing changed, nothing asked"
         assert backend.issued == 1
 
-        backend.names = ["10.250.10.50"]  # the machine got another address
+        backend.names = ["192.0.2.50"]  # the machine got another address
         assert await tls.refresh(http, "cred")
         assert backend.issued == 2
 
@@ -231,7 +231,7 @@ async def test_no_route_without_a_certificate(tmp_path: Path) -> None:
 async def test_the_proxy_starts_reloads_and_goes(tmp_path: Path, pinned: list[str]) -> None:
     runtime = _Runtime(images={model_tls.server_image_tag(): pinned})
     tls = _tls(tmp_path, runtime, host_directory="/host/model-tls")
-    backend = _Backend(["10.250.10.49"])
+    backend = _Backend(["192.0.2.49"])
     async with _http(backend) as http:
         await tls.refresh(http, "cred")
         # Asked for before the minute's round: the refresher fetches it now.
@@ -294,7 +294,7 @@ async def test_a_port_another_program_holds_is_refused_and_not_kept(tmp_path: Pa
     """Found on the DGX pair: an MCP server held 8100, nginx could not bind, the model was published there."""
     runtime = _Runtime(images={model_tls.server_image_tag(): pinned})
     tls = _tls(tmp_path, runtime)
-    async with _http(_Backend(["10.250.10.49"])) as http:
+    async with _http(_Backend(["192.0.2.49"])) as http:
         await tls.refresh(http, "cred")
     tls.port_free = lambda port: port != 8100
     # Asked before a model is started for it, too.
@@ -315,7 +315,7 @@ async def test_a_port_nginx_does_not_answer_on_is_rolled_back(tmp_path: Path, pi
     runtime = _Runtime(images={model_tls.server_image_tag(): pinned})
     runtime.log_text = "2026/09/27 [emerg] 1#1: bind() to 0.0.0.0:8120 failed (98: Address in use)\n"
     tls = _tls(tmp_path, runtime)
-    async with _http(_Backend(["10.250.10.49"])) as http:
+    async with _http(_Backend(["192.0.2.49"])) as http:
         await tls.refresh(http, "cred")
     await tls.ensure_route(8010, 28010)
     tls.listening = lambda port: port != 8120  # the new one never answers

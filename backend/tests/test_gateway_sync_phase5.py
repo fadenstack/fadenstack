@@ -63,7 +63,7 @@ async def test_publish_inference_endpoint_first_publish():
 
     inst_id = await service.publish_inference_endpoint(
         deployment_id=dep_id,
-        base_url="http://10.250.10.49:8000/faden-dep1/v1/",
+        base_url="http://192.0.2.49:8000/faden-dep1/v1/",
         alias=alias,
         served_model_name="meta-llama/Meta-Llama-3-8B-Instruct",
         backend_provider_type="vllm",
@@ -83,7 +83,7 @@ async def test_publish_inference_endpoint_first_publish():
     assert params["id"] == expected_inst_id
     assert params["dep_id"] == dep_id
     # Trailing /v1/ stripped
-    assert params["base_url"] == "http://10.250.10.49:8000/faden-dep1"
+    assert params["base_url"] == "http://192.0.2.49:8000/faden-dep1"
     assert params["enabled"] is True
     assert params["weight"] == 2.5
     assert params["max_concurrency"] == 40
@@ -112,7 +112,7 @@ async def test_publish_inference_endpoint_existing_instance():
 
     inst_id = await service.publish_inference_endpoint(
         deployment_id=dep_id,
-        base_url="http://10.250.10.49:8000/faden-dep1",
+        base_url="http://192.0.2.49:8000/faden-dep1",
         alias="llama",
     )
     assert inst_id == existing_uuid

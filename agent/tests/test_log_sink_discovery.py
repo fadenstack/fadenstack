@@ -35,7 +35,7 @@ async def _log_sink_with(status: int, body: dict[str, Any] | None = None) -> str
 
 @pytest.mark.asyncio
 async def test_the_backend_names_the_sink() -> None:
-    assert await _log_sink_with(200, {"loki_url": "http://10.250.10.220:3100"}) == "http://10.250.10.220:3100"
+    assert await _log_sink_with(200, {"loki_url": "http://192.0.2.220:3100"}) == "http://192.0.2.220:3100"
 
 
 @pytest.mark.asyncio
@@ -90,9 +90,9 @@ def no_waiting(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_forwarding_starts_on_the_backend_s_answer(no_waiting: None) -> None:
-    svc = _service(["http://10.250.10.220:3100"])
+    svc = _service(["http://192.0.2.220:3100"])
     await svc._discover_log_sink(runtime=None)
-    assert svc.started == ["http://10.250.10.220:3100"]
+    assert svc.started == ["http://192.0.2.220:3100"]
 
 
 @pytest.mark.asyncio
@@ -154,16 +154,16 @@ async def test_pushes_through_the_backend_carry_the_credential_and_follow_its_ad
         seen.append(request)
         return httpx.Response(204)
 
-    backend = httpx.AsyncClient(base_url="https://10.250.10.61", transport=httpx.MockTransport(handler))
+    backend = httpx.AsyncClient(base_url="https://192.0.2.61", transport=httpx.MockTransport(handler))
     creds = ["cred-1"]
-    loki = LokiClient(loki_url="/api/node-files/logs", labels={"job": "node-agent", "host": "10.250.10.49"},
+    loki = LokiClient(loki_url="/api/node-files/logs", labels={"job": "node-agent", "host": "192.0.2.49"},
                       http=backend, credential=lambda: creds[0])
     assert await loki.push([LogEntry(timestamp_ns=1, line="hello", level="info")])
     creds[0] = "cred-2"  # rotated: the next push carries the new one
     assert await loki.push_streams(labels={"container": "c"}, entries=[(2, "x")])
     await loki.close()  # the backend's client is not the Loki client's to close
     assert not backend.is_closed
-    assert [str(r.url) for r in seen] == ["https://10.250.10.61/api/node-files/logs/loki/api/v1/push"] * 2
+    assert [str(r.url) for r in seen] == ["https://192.0.2.61/api/node-files/logs/loki/api/v1/push"] * 2
     assert [r.headers["authorization"] for r in seen] == ["Bearer cred-1", "Bearer cred-2"]
     await backend.aclose()
 
@@ -172,7 +172,7 @@ def test_show_does_not_call_a_missing_loki_url_a_fault(monkeypatch: pytest.Monke
     """``faden-agent show`` warned "log forwarding disabled" though the backend says where logs go."""
     from faden_agent import __main__ as agent_main
 
-    monkeypatch.setattr(agent_main, "_effective_env", lambda: {"FADEN_NODE_AGENT_BACKEND_URL": "https://10.250.10.61"})
+    monkeypatch.setattr(agent_main, "_effective_env", lambda: {"FADEN_NODE_AGENT_BACKEND_URL": "https://192.0.2.61"})
     monkeypatch.delenv("FADEN_NODE_AGENT_LOKI_URL", raising=False)
     agent_main._show_config()
     out = capsys.readouterr().out

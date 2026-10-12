@@ -413,7 +413,7 @@ async def list_filters(
     streams carry ``app`` / ``deployment`` / ``replica`` and no ``container``
     -- could not be filtered at all. Here the labels come from what is
     actually in the range, and each label's values are narrowed by the *other*
-    selections (``sel=host:10.250.10.71``), so picking a machine leaves only
+    selections (``sel=host:192.0.2.71``), so picking a machine leaves only
     that machine's sources, deployments and levels to choose from.
 
     Loki answers label questions from its index, which is coarser than a

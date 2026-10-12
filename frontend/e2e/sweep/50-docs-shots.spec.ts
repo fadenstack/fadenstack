@@ -16,7 +16,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const IMAGES = "../docs/images";
 const DEPLOYMENT = process.env.DOCS_DEPLOYMENT ?? "qwen-chat";
-const MACHINE_WITH_FOUND_VLLM = process.env.DOCS_FOUND_MACHINE ?? "10.250.10.71";
+const MACHINE_WITH_FOUND_VLLM = process.env.DOCS_FOUND_MACHINE ?? "192.0.2.71";
 const CHAT_PROMPT = "Write a Python function that merges two sorted lists.";
 
 test.skip(process.env.DOCS_SHOTS !== "1", "set DOCS_SHOTS=1 to retake the docs screenshots");

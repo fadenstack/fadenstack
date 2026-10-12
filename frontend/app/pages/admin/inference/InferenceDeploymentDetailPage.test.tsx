@@ -425,7 +425,7 @@ describe("InferenceDeploymentDetailPage", () => {
   });
 
   it("says why a start failed at the top, and takes the reader to the errors", async () => {
-    const cause = "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)";
+    const cause = "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 192.0.2.49)";
     vi.spyOn(inferenceApi, "getDeployment").mockResolvedValue({
       ...deployment,
       phase: "failed",

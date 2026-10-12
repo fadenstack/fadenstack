@@ -48,8 +48,8 @@ async def _ask(
     service: NodeControlService,
     *,
     agent_id: str = "gpu-01",
-    host: str = "10.250.10.71",
-    source_ip: str | None = "10.250.10.71",
+    host: str = "192.0.2.71",
+    source_ip: str | None = "192.0.2.71",
 ) -> dict[str, Any]:
     return await service.request_join(
         agent_id=agent_id,
@@ -106,7 +106,7 @@ async def test_ask_then_approve_then_collect(dbsession: AsyncSession) -> None:
     assert [row.agent_id for row in waiting] == ["gpu-01"]
     # The operator sees what they are approving.
     assert waiting[0].capabilities_json["gpu"]["family"] == "GB10"
-    assert waiting[0].source_ip == "10.250.10.71"
+    assert waiting[0].source_ip == "192.0.2.71"
 
     approver = uuid.uuid4()
     await service.decide_join_request(
@@ -345,7 +345,7 @@ async def test_rejoining_a_known_machine_updates_it_rather_than_duplicating(
         request_id=uuid.UUID(first["id"]), poll_secret=first["poll_secret"]
     )
 
-    second = await _ask(service, host="10.250.10.99", source_ip="10.250.10.99")
+    second = await _ask(service, host="192.0.2.99", source_ip="192.0.2.99")
     await service.decide_join_request(
         request_id=uuid.UUID(second["id"]), approve=True, decided_by=None
     )
@@ -354,7 +354,7 @@ async def test_rejoining_a_known_machine_updates_it_rather_than_duplicating(
     )
 
     assert again["node_id"] == original["node_id"]
-    assert again["host"] == "10.250.10.99"
+    assert again["host"] == "192.0.2.99"
     assert again["credential"] != original["credential"]
 
 

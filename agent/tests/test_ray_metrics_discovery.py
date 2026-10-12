@@ -36,10 +36,10 @@ _LIVE_FILE = json.dumps(
         {
             "labels": {"job": "ray"},
             "targets": [
-                "10.250.10.71:44239",
-                "10.250.10.49:37617",
-                "10.250.10.49:44217",
-                "10.250.10.49:44227",
+                "192.0.2.71:44239",
+                "192.0.2.49:37617",
+                "192.0.2.49:44217",
+                "192.0.2.49:44227",
             ],
         }
     ]
@@ -111,10 +111,10 @@ async def test_every_exporter_is_returned_not_only_the_per_node_ones() -> None:
 
     assert result["enabled"] is True
     assert [(t["address"], t["port"]) for t in result["targets"]] == [
-        ("10.250.10.71", 44239),
-        ("10.250.10.49", 37617),
-        ("10.250.10.49", 44217),
-        ("10.250.10.49", 44227),
+        ("192.0.2.71", 44239),
+        ("192.0.2.49", 37617),
+        ("192.0.2.49", 44217),
+        ("192.0.2.49", 44227),
     ]
 
 
@@ -124,7 +124,7 @@ async def test_several_exporters_on_one_host_all_survive() -> None:
     runtime, _handler = _runtime(discovery=_LIVE_FILE)
 
     targets = (await runtime.get_metrics_targets(DEFAULT_CONTAINER_NAME))["targets"]
-    head = [t for t in targets if t["address"] == "10.250.10.49"]
+    head = [t for t in targets if t["address"] == "192.0.2.49"]
     assert len(head) == 3
     assert len({t["port"] for t in head}) == 3
 
@@ -134,7 +134,7 @@ async def test_targets_carry_a_dialable_url() -> None:
     runtime, _handler = _runtime(discovery=_LIVE_FILE)
 
     first = (await runtime.get_metrics_targets(DEFAULT_CONTAINER_NAME))["targets"][0]
-    assert first["url"] == "http://10.250.10.71:44239/metrics"
+    assert first["url"] == "http://192.0.2.71:44239/metrics"
 
 
 @pytest.mark.anyio()
@@ -177,8 +177,8 @@ async def test_no_file_falls_back_to_the_node_derivation() -> None:
         cluster_status={
             "alive": True,
             "nodes": [
-                {"node_ip": "10.250.10.49", "metrics_export_port": 37617, "alive": True},
-                {"node_ip": "10.250.10.71", "metrics_export_port": 44239, "alive": True},
+                {"node_ip": "192.0.2.49", "metrics_export_port": 37617, "alive": True},
+                {"node_ip": "192.0.2.71", "metrics_export_port": 44239, "alive": True},
             ],
         },
     )
@@ -213,7 +213,7 @@ async def test_an_unusable_file_falls_back_instead_of_raising(body: str) -> None
         discovery=body,
         cluster_status={
             "alive": True,
-            "nodes": [{"node_ip": "10.250.10.49", "metrics_export_port": 37617}],
+            "nodes": [{"node_ip": "192.0.2.49", "metrics_export_port": 37617}],
         },
     )
 

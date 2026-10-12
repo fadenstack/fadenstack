@@ -22,7 +22,7 @@ from httpx import AsyncClient
 
 from faden_backend.web.api import install as install_api
 
-ORIGIN = "http://10.250.10.220:8000"
+ORIGIN = "http://192.0.2.220:8000"
 
 
 def _script() -> str:
@@ -472,8 +472,8 @@ class TestInstallAddress:
             ("127.0.0.1:8000", True),
             ("::1", True),
             ("[::1]:8000", True),
-            ("10.250.10.220", False),
-            ("10.250.10.220:8000", False),
+            ("192.0.2.220", False),
+            ("192.0.2.220:8000", False),
             ("faden.internal", False),
         ],
     )
@@ -494,7 +494,7 @@ class TestInstallAddress:
             "net_if_addrs",
             lambda: {
                 "Loopback": [Addr(_socket.AF_INET, "127.0.0.1")],
-                "Ethernet": [Addr(_socket.AF_INET, "10.250.10.220")],
+                "Ethernet": [Addr(_socket.AF_INET, "192.0.2.220")],
                 # Windows hands out one of these when DHCP fails; it reaches
                 # nothing.
                 "Unplugged": [Addr(_socket.AF_INET, "169.254.10.1")],
@@ -504,7 +504,7 @@ class TestInstallAddress:
 
         urls = [c["url"] for c in install_api.reachable_origins()]
 
-        assert urls == [f"http://10.250.10.220:{install_api.settings.port}"]
+        assert urls == [f"http://192.0.2.220:{install_api.settings.port}"]
 
     def test_ranks_a_real_adapter_above_the_virtual_ones(
         self, monkeypatch: pytest.MonkeyPatch
@@ -521,14 +521,14 @@ class TestInstallAddress:
                 "VirtualBox Host-Only Network": [Addr(_socket.AF_INET, "192.168.56.1")],
                 "vEthernet (Default Switch)": [Addr(_socket.AF_INET, "172.24.224.1")],
                 "Tailscale": [Addr(_socket.AF_INET, "100.64.0.59")],
-                "Wi-Fi 3": [Addr(_socket.AF_INET, "10.250.10.220")],
+                "Wi-Fi 3": [Addr(_socket.AF_INET, "192.0.2.220")],
             },
         )
 
         first = install_api.reachable_origins()[0]
 
         assert first["interface"] == "Wi-Fi 3"
-        assert "10.250.10.220" in first["url"]
+        assert "192.0.2.220" in first["url"]
 
     def test_names_the_interface_so_the_operator_can_choose(
         self, monkeypatch: pytest.MonkeyPatch
@@ -692,6 +692,6 @@ def test_a_newer_agent_is_announced_for_an_older_machine_only(running: str | Non
     """Shown on the machine (NodeDTO.agent_update); updating stays the operator's step."""
     from faden_backend.web.api.admin.system.schema import NodeDTO  # noqa: PLC0415
 
-    node = NodeDTO(id="n", agent_id="a", host="10.250.10.49", status="healthy", version=running,
+    node = NodeDTO(id="n", agent_id="a", host="192.0.2.49", status="healthy", version=running,
                    created_at="2026-09-29T00:00:00Z", updated_at="2026-09-29T00:00:00Z")
     assert node.model_dump()["agent_update"] == (install_api.AGENT_VERSION if announced else None)

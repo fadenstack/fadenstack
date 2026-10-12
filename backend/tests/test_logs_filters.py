@@ -19,7 +19,7 @@ from faden_backend.web.api.logs.views import _selector
 
 LOKI_LABELS = ["__stream_shard__", "container_id", "host", "job", "app", "level"]
 LOKI_VALUES = {
-    "host": ["10.250.10.49", "10.250.10.71"],
+    "host": ["192.0.2.49", "192.0.2.71"],
     "job": ["docker", "node-agent", "ray-serve"],
     "app": ["faden-e783c0c2"],
     "level": ["info", "error"],
@@ -63,9 +63,9 @@ def signed_in(fastapi_app: FastAPI) -> Any:
 
 
 def test_the_selector_leaves_out_the_label_being_listed() -> None:
-    selected = {"host": "10.250.10.71", "job": "ray-serve"}
-    assert _selector(selected, excluding="job") == '{host="10.250.10.71"}'
-    assert _selector(selected) == '{host="10.250.10.71",job="ray-serve"}'
+    selected = {"host": "192.0.2.71", "job": "ray-serve"}
+    assert _selector(selected, excluding="job") == '{host="192.0.2.71"}'
+    assert _selector(selected) == '{host="192.0.2.71",job="ray-serve"}'
     assert _selector({"a": 'x"y'}) == '{a="x\\"y"}'
     assert _selector({}) is None
 
@@ -88,14 +88,14 @@ async def test_choosing_a_machine_narrows_the_others_but_not_itself(
     client: AsyncClient, loki: list, signed_in: Any,
 ) -> None:
     response = await client.get(
-        "/api/logs/filters", params=[("sel", "host:10.250.10.71"), ("sel", "job:ray-serve")],
+        "/api/logs/filters", params=[("sel", "host:192.0.2.71"), ("sel", "job:ray-serve")],
     )
 
     assert response.status_code == 200
     scopes = {path.split("/")[-2]: params.get("query") for path, params in loki if "/label/" in path}
-    assert scopes["level"] == '{host="10.250.10.71",job="ray-serve"}'
+    assert scopes["level"] == '{host="192.0.2.71",job="ray-serve"}'
     assert scopes["host"] == '{job="ray-serve"}', "a machine can still be switched"
-    assert scopes["job"] == '{host="10.250.10.71"}'
+    assert scopes["job"] == '{host="192.0.2.71"}'
 
 
 @pytest.mark.anyio()

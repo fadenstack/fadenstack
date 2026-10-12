@@ -33,7 +33,7 @@ def _service(session: AsyncSession) -> NodeControlService:
 
 
 async def _queued(session: AsyncSession) -> tuple[InfraNode, uuid.UUID]:
-    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="10.250.10.49", status="healthy",
+    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="192.0.2.49", status="healthy",
                      capabilities_json={})
     session.add(node)
     await session.flush()

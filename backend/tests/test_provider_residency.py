@@ -56,8 +56,8 @@ def test_a_cloud_api_is_external_without_any_network() -> None:
 
 def test_an_endpoint_on_an_enrolled_machine_is_on_our_machines() -> None:
     """The DGX route and every found vLLM: they were "cloud"."""
-    ctx = _ctx(machine_addresses={"10.250.10.71": "gpu-01"})
-    found = r.classify(_provider("http://10.250.10.71:8000/v1"), ctx)
+    ctx = _ctx(machine_addresses={"192.0.2.71": "gpu-01"})
+    found = r.classify(_provider("http://192.0.2.71:8000/v1"), ctx)
     assert (found.kind, found.source, found.machine) == (r.MACHINES, "machine", "gpu-01")
 
 
@@ -111,11 +111,11 @@ def test_only_hostnames_that_decide_something_are_looked_up() -> None:
 
 
 def test_a_docker_bridge_names_no_machine() -> None:
-    node = SimpleNamespace(agent_id="gpu-01", host="10.250.10.71", capabilities_json={"network": {"fabrics": [
+    node = SimpleNamespace(agent_id="gpu-01", host="192.0.2.71", capabilities_json={"network": {"fabrics": [
         {"ip": "172.17.0.1", "is_virtual": True},
         {"ip": "10.100.0.2", "is_virtual": False},
     ]}})
-    assert r.machine_addresses([node]) == {"10.250.10.71": "gpu-01", "10.100.0.2": "gpu-01"}
+    assert r.machine_addresses([node]) == {"192.0.2.71": "gpu-01", "10.100.0.2": "gpu-01"}
 
 
 def test_bad_networks_are_skipped() -> None:
@@ -161,9 +161,9 @@ async def test_the_providers_api_says_where_each_one_is(
     client: AsyncClient, fastapi_app: FastAPI, dbsession: AsyncSession,
 ) -> None:
     await _admin(dbsession, fastapi_app)
-    dbsession.add(InfraNode(agent_id=f"spark-{uuid.uuid4().hex[:6]}", host="10.250.10.71", status="healthy"))
+    dbsession.add(InfraNode(agent_id=f"spark-{uuid.uuid4().hex[:6]}", host="192.0.2.71", status="healthy"))
     found = LLMProvider(name=f"found-{uuid.uuid4().hex[:6]}", type=ProviderType.VLLM,
-                        target=ProviderTarget.REMOTE_ENDPOINT, endpoint_url="http://10.250.10.71:8000")
+                        target=ProviderTarget.REMOTE_ENDPOINT, endpoint_url="http://192.0.2.71:8000")
     cloud = LLMProvider(name=f"claude-{uuid.uuid4().hex[:6]}", type=ProviderType.CLOUD,
                         target=ProviderTarget.REMOTE_ENDPOINT, litellm_provider="anthropic")
     dbsession.add_all([found, cloud])

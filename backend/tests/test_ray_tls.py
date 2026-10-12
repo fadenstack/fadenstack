@@ -59,7 +59,7 @@ async def _cluster(session: AsyncSession, *, ray_tls: bool = True, fabric_ip: st
     session.add(cp)
     await session.flush()
     node = InfraNode(
-        id=uuid.uuid4(), agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="10.250.10.49",
+        id=uuid.uuid4(), agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="192.0.2.49",
         capabilities_json={"hostname": "spark-a"},
     )
     session.add(node)
@@ -86,7 +86,7 @@ async def test_a_node_certificate_serves_and_dials_under_every_name_ray_uses(dbs
     env, _ = await _cluster(dbsession)
     issued = await ray_ca.issue(
         dbsession, MASTER, environment_id=env.id, csr_pem=_csr(),
-        names=["192.168.100.10", "10.250.10.49", "", "spark-a", "127.0.0.1", "localhost", "10.250.10.49"],
+        names=["192.168.100.10", "192.0.2.49", "", "spark-a", "127.0.0.1", "localhost", "192.0.2.49"],
         now=NOW,
     )
     cert, ca = _load(issued.cert_pem), _load(issued.ca_pem)
@@ -95,13 +95,13 @@ async def test_a_node_certificate_serves_and_dials_under_every_name_ray_uses(dbs
     assert set(usage) == {ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH}
     san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
     assert san.get_values_for_type(x509.IPAddress) == [
-        ipaddress.ip_address("192.168.100.10"), ipaddress.ip_address("10.250.10.49"), ipaddress.ip_address("127.0.0.1"),
+        ipaddress.ip_address("192.168.100.10"), ipaddress.ip_address("192.0.2.49"), ipaddress.ip_address("127.0.0.1"),
     ]
     # Ray's own generator names the addresses as DNS entries too.
     assert san.get_values_for_type(x509.DNSName) == [
-        "192.168.100.10", "10.250.10.49", "spark-a", "127.0.0.1", "localhost",
+        "192.168.100.10", "192.0.2.49", "spark-a", "127.0.0.1", "localhost",
     ]
-    assert issued.names == ["192.168.100.10", "10.250.10.49", "spark-a", "127.0.0.1", "localhost"]
+    assert issued.names == ["192.168.100.10", "192.0.2.49", "spark-a", "127.0.0.1", "localhost"]
     assert not cert.extensions.get_extension_for_class(x509.BasicConstraints).value.ca
     assert cert.not_valid_after_utc - NOW == timedelta(days=ray_ca.LEAF_DAYS)
 
@@ -175,7 +175,7 @@ async def test_a_member_gets_its_fabric_address_and_its_own(
         )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["names"] == ["192.168.100.10", "10.250.10.49", "spark-a", "127.0.0.1", "localhost"]
+    assert body["names"] == ["192.168.100.10", "192.0.2.49", "spark-a", "127.0.0.1", "localhost"]
     _load(body["certificate_pem"]).verify_directly_issued_by(_load(body["ca_pem"]))
 
 
@@ -185,7 +185,7 @@ async def test_only_members_of_a_cluster_with_ray_tls_on(
 ) -> None:
     monkeypatch.setattr(settings, "settings_master_key", MASTER)
     env, _ = await _cluster(dbsession)
-    stranger = SimpleNamespace(id=uuid.uuid4(), host="10.250.10.99", capabilities_json={})
+    stranger = SimpleNamespace(id=uuid.uuid4(), host="192.0.2.99", capabilities_json={})
     with _as_node(fastapi_app, dbsession, stranger):
         response = await client.post(
             "/api/node-files/ray-tls/certificate", json={"environment_id": str(env.id), "csr_pem": _csr()},
@@ -217,7 +217,7 @@ async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -
 
     state = await ray_tls.switch(dbsession, env.id, on=True)
     assert state["on"] is True and state["applied"] is False and state["restarting"] is True
-    assert state["running"] == {"10.250.10.49": None}, "nothing reported yet"
+    assert state["running"] == {"192.0.2.49": None}, "nothing reported yet"
     env.observed_status_json = {**(env.observed_status_json or {}), "ray_tls": {str(node.id): True}}
     await dbsession.flush()
     assert (await ray_tls.environment_status(dbsession, env.id))["applied"] is True
@@ -256,8 +256,8 @@ async def test_not_on_while_an_agent_cannot(dbsession: AsyncSession) -> None:
     env, _node = await _cluster(dbsession, ray_tls=False)
     before = env.generation
     state = await ray_tls.environment_status(dbsession, env.id)
-    assert state["old_agents"] == ["10.250.10.49"] and state["can_switch_on"] is False
-    with pytest.raises(ray_tls.RayTlsError, match=r"10\.250\.10\.49"):
+    assert state["old_agents"] == ["192.0.2.49"] and state["can_switch_on"] is False
+    with pytest.raises(ray_tls.RayTlsError, match=r"192.0.2.49"):
         await ray_tls.switch(dbsession, env.id, on=True)
     assert env.generation == before
     # Off is always possible.

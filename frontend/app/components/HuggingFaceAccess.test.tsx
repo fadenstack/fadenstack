@@ -16,7 +16,7 @@ const NONE: HFTokenStatus = {
 };
 const SIGNED_IN: HFTokenStatus = {
   configured: true, source: "database", storage_safe: true, check: "ok",
-  username: "sachith", token_name: "fadenstack", role: "read",
+  username: "hf-user", token_name: "fadenstack", role: "read",
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -35,7 +35,7 @@ describe("HuggingFaceTokenPanel", () => {
     await userEvent.click(screen.getByTestId("hf-token-save"));
 
     await waitFor(() => expect(save).toHaveBeenCalledWith(TOKEN));
-    expect(await screen.findByTestId("hf-status-ok")).toHaveTextContent("sachith");
+    expect(await screen.findByTestId("hf-status-ok")).toHaveTextContent("hf-user");
     expect(screen.getByTestId("hf-token-input")).toHaveValue("");
     expect(document.body.innerHTML).not.toContain(TOKEN);
     expect(onChanged).toHaveBeenCalledWith(SIGNED_IN);
@@ -75,7 +75,7 @@ describe("HuggingFaceAccessButton", () => {
   it("says whose access the server uses", async () => {
     vi.spyOn(llmSettings, "getHFToken").mockResolvedValue(SIGNED_IN);
     render(<HuggingFaceAccessButton />);
-    expect(await screen.findByTestId("hf-access-chip")).toHaveTextContent("Hugging Face: sachith");
+    expect(await screen.findByTestId("hf-access-chip")).toHaveTextContent("Hugging Face: hf-user");
   });
 
   it("stays out of the way for someone who may not read the setting", async () => {

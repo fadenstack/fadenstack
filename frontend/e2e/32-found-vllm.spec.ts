@@ -9,7 +9,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const SHOTS = "../docs/images/found";
-const MACHINE = "10.250.10.71";
+const MACHINE = "192.0.2.71";
 const CONTAINER = "spark-llm-Qwen-Qwen3-Embedding-0.6B-8102";
 const GATEWAY = process.env.FADEN_GATEWAY_URL ?? "http://127.0.0.1:8001";
 

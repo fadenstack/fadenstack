@@ -54,7 +54,7 @@ def _machine(name: str, host: str, roce: str, roce2: str) -> InfraNode:
     """A DGX Spark as it reports itself: management, and two RoCE networks."""
     network = {"fabrics": [
         _fabric(roce2, "10.100.1.0/24", "enP2p1s0f1np1", "roce", 200.0),
-        _fabric(host, "10.250.10.0/24", "enP7s7", "ethernet", 1.0, default=True),
+        _fabric(host, "192.0.2.0/24", "enP7s7", "ethernet", 1.0, default=True),
         _fabric(roce, "10.100.0.0/24", "enp1s0f1np1", "roce", 200.0),
     ]}
     return InfraNode(agent_id=f"{name}-{uuid.uuid4().hex[:6]}", host=host, status="healthy",
@@ -114,8 +114,8 @@ class _Machine:
 
 @pytest.fixture()
 async def pair(dbsession: AsyncSession) -> tuple[InfraNode, InfraNode]:
-    head = _machine("gpu-01", "10.250.10.71", "10.100.0.2", "10.100.1.2")
-    worker = _machine("gpu-02", "10.250.10.49", "10.100.0.1", "10.100.1.1")
+    head = _machine("gpu-01", "192.0.2.71", "10.100.0.2", "10.100.1.2")
+    worker = _machine("gpu-02", "192.0.2.49", "10.100.0.1", "10.100.1.1")
     dbsession.add_all([head, worker])
     await dbsession.commit()
     return head, worker
@@ -211,8 +211,8 @@ async def test_found_clusters_are_listed_once_and_silent_machines_apart(
     from faden_backend.db.dao.node_control_dao import NodeControlDAO
 
     head, worker = pair
-    silent = InfraNode(agent_id="old-agent", host="10.250.10.50", status="healthy")
-    idle = InfraNode(agent_id="no-runtime", host="10.250.10.51", status="healthy")
+    silent = InfraNode(agent_id="old-agent", host="192.0.2.50", status="healthy")
+    idle = InfraNode(agent_id="no-runtime", host="192.0.2.51", status="healthy")
     dbsession.add_all([silent, idle])
     await dbsession.flush()
     dao = NodeControlDAO(dbsession)

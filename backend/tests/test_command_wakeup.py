@@ -227,7 +227,7 @@ async def test_issuing_a_command_arms_a_wake_up(dbsession: AsyncSession) -> None
 
     node = InfraNode(
         agent_id=f"agent-{uuid.uuid4().hex[:8]}",
-        host="10.250.10.49",
+        host="192.0.2.49",
         status="healthy",
         capabilities_json={},
     )

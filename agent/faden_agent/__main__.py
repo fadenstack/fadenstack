@@ -1192,7 +1192,7 @@ def cmd_join(backend_url: str | None, user: bool | None = None, ca_file: str | N
         _err("Where is Fadenstack?  Usage: faden-agent join http://<backend-host>:8000")
         sys.exit(1)
     if "://" not in backend:
-        # "10.250.10.220:8000" is what a person types; accept it.
+        # "192.0.2.220:8000" is what a person types; accept it.
         backend = f"http://{backend}"
 
     hostname = socket.gethostname()
@@ -1837,7 +1837,7 @@ def main() -> None:
         "backend",
         nargs="?",
         metavar="BACKEND_URL",
-        help="Where Fadenstack is, e.g. http://10.250.10.220:8000",
+        help="Where Fadenstack is, e.g. http://192.0.2.220:8000",
     )
     p_join.add_argument(
         "--user",

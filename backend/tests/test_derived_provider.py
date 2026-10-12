@@ -102,7 +102,7 @@ async def _publish(
     await dao.create(
         deployment.id,
         name="openai",
-        address="http://10.250.10.71:8000/faden-app",
+        address="http://192.0.2.71:8000/faden-app",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
     )
@@ -398,7 +398,7 @@ async def test_a_hand_made_provider_can_still_be_edited(
         name="hand-made",
         type=ProviderType.VLLM,
         target=ProviderTarget.REMOTE_ENDPOINT,
-        endpoint_url="http://10.250.10.80:8000/v1",
+        endpoint_url="http://192.0.2.80:8000/v1",
     )
     dbsession.add(mine)
     await dbsession.commit()
@@ -505,11 +505,11 @@ async def test_the_cards_are_the_provider_s_own_model_not_the_whole_cluster(
     endpoint = await EndpointDAO(dbsession).create(
         deployment.id,
         name="openai",
-        address="http://10.250.10.71:8000/faden-app",
+        address="http://192.0.2.71:8000/faden-app",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
     )
-    endpoint.published_json = {"model": "Qwen3.8-27B-FP8", "base_url": "http://10.250.10.71:8000/faden-app/v1"}
+    endpoint.published_json = {"model": "Qwen3.8-27B-FP8", "base_url": "http://192.0.2.71:8000/faden-app/v1"}
     await dbsession.flush()
     await _coordinator(dbsession).reconcile_derived_provider(deployment)
     await dbsession.commit()

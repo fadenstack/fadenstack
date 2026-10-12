@@ -58,7 +58,7 @@ def _node(
     caps.update(extra)
     return InfraNode(
         agent_id=f"agent-{uuid.uuid4().hex[:8]}",
-        host="10.250.10.49",
+        host="192.0.2.49",
         status="healthy",
         capabilities_json=caps,
     )

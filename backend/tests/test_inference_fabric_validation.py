@@ -87,9 +87,9 @@ async def _dgx_pair(dbsession: AsyncSession) -> InferenceEnvironment:
             }
         }
 
-    n1 = InfraNode(agent_id="gpu-01", host="10.250.10.71", status="healthy",
+    n1 = InfraNode(agent_id="gpu-01", host="192.0.2.71", status="healthy",
                    capabilities_json=_caps("10.100.0.1"))
-    n2 = InfraNode(agent_id="gpu-02", host="10.250.10.49", status="healthy",
+    n2 = InfraNode(agent_id="gpu-02", host="192.0.2.49", status="healthy",
                    capabilities_json=_caps("10.100.0.2"))
     dbsession.add_all([n1, n2])
     await dbsession.flush()

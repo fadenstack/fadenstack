@@ -28,7 +28,7 @@ function machine(host: string, internet: boolean | null, problem: MachineInterne
 function status(overrides: Partial<ModelDownloadsStatus> = {}): ModelDownloadsStatus {
   return {
     on: false,
-    machines: [machine("10.250.10.71", true), machine("10.250.10.49", true)],
+    machines: [machine("192.0.2.71", true), machine("192.0.2.49", true)],
     can_switch_on: true,
     reason: null,
     ...overrides,
@@ -47,7 +47,7 @@ describe("ModelDownloadsCard", () => {
     await waitFor(() => expect(toggle).toBeEnabled());
     expect(toggle).not.toBeChecked();
     expect(screen.getByText("From this server")).toBeInTheDocument();
-    expect(screen.getByText("10.250.10.49: Reaches Hugging Face")).toBeInTheDocument();
+    expect(screen.getByText("192.0.2.49: Reaches Hugging Face")).toBeInTheDocument();
 
     await userEvent.click(toggle);
 
@@ -59,43 +59,43 @@ describe("ModelDownloadsCard", () => {
   it("stays off, with the machine that cannot named in its tooltip", async () => {
     vi.spyOn(inferenceApi, "modelDownloads").mockResolvedValue(
       status({
-        machines: [machine("10.250.10.71", true), machine("10.250.10.49", false, "no_internet")],
+        machines: [machine("192.0.2.71", true), machine("192.0.2.49", false, "no_internet")],
         can_switch_on: false,
-        reason: "Every machine must reach Hugging Face for this. 10.250.10.49: cannot reach Hugging Face (ConnectTimeout)",
+        reason: "Every machine must reach Hugging Face for this. 192.0.2.49: cannot reach Hugging Face (ConnectTimeout)",
       }),
     );
     const flip = vi.spyOn(inferenceApi, "switchModelDownloads");
     render(<ModelDownloadsCard environmentId={ENV} />);
 
     const toggle = await screen.findByRole("switch", { name: "Machines download models themselves" });
-    await waitFor(() => expect(screen.getByText("10.250.10.49: cannot reach Hugging Face")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("192.0.2.49: cannot reach Hugging Face")).toBeInTheDocument());
     expect(toggle).toBeDisabled();
 
     await userEvent.hover(screen.getByTestId("model-downloads-switch"));
     const tooltip = await screen.findByRole("tooltip");
     expect(tooltip).toHaveTextContent("Every machine must reach Hugging Face to switch this on");
-    expect(tooltip).toHaveTextContent("10.250.10.49: cannot reach Hugging Face");
-    expect(tooltip).not.toHaveTextContent("10.250.10.71");
+    expect(tooltip).toHaveTextContent("192.0.2.49: cannot reach Hugging Face");
+    expect(tooltip).not.toHaveTextContent("192.0.2.71");
     expect(flip).not.toHaveBeenCalled();
   });
 
   it("says which agent is too old", async () => {
     vi.spyOn(inferenceApi, "modelDownloads").mockResolvedValue(
-      status({ machines: [machine("10.250.10.49", null, "old_agent")], can_switch_on: false, reason: "old" }),
+      status({ machines: [machine("192.0.2.49", null, "old_agent")], can_switch_on: false, reason: "old" }),
     );
     render(<ModelDownloadsCard environmentId={ENV} />);
     expect(
-      await screen.findByText("10.250.10.49: agent too old, update it to 0.2.2 or later"),
+      await screen.findByText("192.0.2.49: agent too old, update it to 0.2.2 or later"),
     ).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Machines download models themselves" })).toBeDisabled();
   });
 
   it("can always be switched off, whatever the machines answer now", async () => {
     vi.spyOn(inferenceApi, "modelDownloads").mockResolvedValue(
-      status({ on: true, machines: [machine("10.250.10.49", false, "no_internet")], can_switch_on: false }),
+      status({ on: true, machines: [machine("192.0.2.49", false, "no_internet")], can_switch_on: false }),
     );
     const flip = vi.spyOn(inferenceApi, "switchModelDownloads").mockResolvedValue(
-      status({ on: false, machines: [machine("10.250.10.49", false, "no_internet")], can_switch_on: false }),
+      status({ on: false, machines: [machine("192.0.2.49", false, "no_internet")], can_switch_on: false }),
     );
     render(<ModelDownloadsCard environmentId={ENV} />);
 
@@ -108,7 +108,7 @@ describe("ModelDownloadsCard", () => {
   it("shows the server's refusal and asks the machines again", async () => {
     const load = vi.spyOn(inferenceApi, "modelDownloads").mockResolvedValue(status());
     vi.spyOn(inferenceApi, "switchModelDownloads").mockRejectedValue(
-      new Error("Every machine must reach Hugging Face for this. 10.250.10.49: did not answer"),
+      new Error("Every machine must reach Hugging Face for this. 192.0.2.49: did not answer"),
     );
     render(<ModelDownloadsCard environmentId={ENV} />);
 
@@ -116,7 +116,7 @@ describe("ModelDownloadsCard", () => {
     await waitFor(() => expect(toggle).toBeEnabled());
     await userEvent.click(toggle);
 
-    expect(await screen.findByText(/10\.250\.10\.49: did not answer/)).toBeInTheDocument();
+    expect(await screen.findByText(/192.0.2.49: did not answer/)).toBeInTheDocument();
     await waitFor(() => expect(load).toHaveBeenLastCalledWith(ENV, true));
   });
 

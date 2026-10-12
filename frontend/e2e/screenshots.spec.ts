@@ -34,7 +34,7 @@ test("the diagram on its own", async ({ page }) => {
 
 test("the fleet page", async ({ page }) => {
   await page.goto("/admin/nodes");
-  await page.getByText("10.250.10.49").first().waitFor({ timeout: 30_000 });
+  await page.getByText("192.0.2.49").first().waitFor({ timeout: 30_000 });
   await page.screenshot({ path: `${OUT}/fleet.png`, fullPage: true });
 });
 

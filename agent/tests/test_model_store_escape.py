@@ -4,7 +4,7 @@ The escape that actually happens is not a crafted ``../`` in the payload. It
 is a stale symlink on the node: the DGX pair had
 
     ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-0.5B-Instruct
-      -> /home/sachi/.cache/huggingface/models--Qwen--Qwen2.5-0.5B-Instruct
+      -> /home/user/.cache/huggingface/models--Qwen--Qwen2.5-0.5B-Instruct
 
 left over from an earlier model-store root, one level above the current one.
 The check correctly refused to write through it. The *message* was

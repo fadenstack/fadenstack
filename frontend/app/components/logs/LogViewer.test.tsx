@@ -35,19 +35,19 @@ describe("fromLokiStreams", () => {
   it("reads a Serve line's JSON, names each stream, and puts the oldest first", () => {
     const lines = fromLokiStreams([
       {
-        labels: { job: "ray-serve", source: "engine", host: "10.250.10.71" },
+        labels: { job: "ray-serve", source: "engine", host: "192.0.2.71" },
         entries: [{ ts: "2026-09-30T06:44:12Z", line: "(EngineCore pid=1) ValueError: no" }],
       },
       {
-        labels: { job: "ray-serve", host: "10.250.10.49", level: "unknown" },
+        labels: { job: "ray-serve", host: "192.0.2.49", level: "unknown" },
         entries: [{ ts: "2026-09-30T06:44:00Z", line: '{"levelname": "INFO", "message": "Started"}' }],
       },
-      { labels: { job: "node-agent", host: "10.250.10.49" }, entries: [{ ts: "2026-09-30T06:44:05Z", line: "heartbeat" }] },
+      { labels: { job: "node-agent", host: "192.0.2.49" }, entries: [{ ts: "2026-09-30T06:44:05Z", line: "heartbeat" }] },
     ]);
     expect(lines.map((line) => [line.source, line.host, line.level ?? null, line.message])).toEqual([
-      ["replica", "10.250.10.49", "INFO", "Started"],
-      ["agent", "10.250.10.49", null, "heartbeat"],
-      ["engine", "10.250.10.71", null, "(EngineCore pid=1) ValueError: no"],
+      ["replica", "192.0.2.49", "INFO", "Started"],
+      ["agent", "192.0.2.49", null, "heartbeat"],
+      ["engine", "192.0.2.71", null, "(EngineCore pid=1) ValueError: no"],
     ]);
   });
 });

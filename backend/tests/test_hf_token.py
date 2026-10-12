@@ -64,14 +64,14 @@ async def _stored(dbsession: AsyncSession) -> SystemSettingSecret | None:
 async def test_a_good_token_is_kept_encrypted_and_never_answered_back(
     client: AsyncClient, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="sachith", token_name="fadenstack", role="read"))
+    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="hf-user", token_name="fadenstack", role="read"))
 
     response = await client.put(URL, json={"token": f"  {TOKEN}  "})
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body["configured"] is True
     assert body["source"] == "database"
-    assert body["username"] == "sachith"
+    assert body["username"] == "hf-user"
     assert body["role"] == "read"
     assert TOKEN not in response.text
 
@@ -81,7 +81,7 @@ async def test_a_good_token_is_kept_encrypted_and_never_answered_back(
     assert SettingsCrypto(settings.settings_master_key).decrypt(row.ciphertext) == TOKEN
 
     again = await client.get(URL)
-    assert again.json()["username"] == "sachith"
+    assert again.json()["username"] == "hf-user"
     assert TOKEN not in again.text
 
     events = (await dbsession.execute(
@@ -89,7 +89,7 @@ async def test_a_good_token_is_kept_encrypted_and_never_answered_back(
     )).scalars().all()
     assert len(events) == 1
     assert TOKEN not in (events[0].metadata_json or "")
-    assert json.loads(events[0].metadata_json or "{}")["username"] == "sachith"
+    assert json.loads(events[0].metadata_json or "{}")["username"] == "hf-user"
 
 
 @pytest.mark.anyio
@@ -149,9 +149,9 @@ def test_whoami_reads_the_status_code_not_the_text(monkeypatch: pytest.MonkeyPat
     assert hf_token._whoami_sync(TOKEN).check == "offline"
     hub(401, {"error": "Invalid user token"})
     assert hf_token._whoami_sync(TOKEN).check == "invalid"
-    hub(200, {"name": "sachith", "auth": {"accessToken": {"displayName": "fadenstack", "role": "read"}}})
+    hub(200, {"name": "hf-user", "auth": {"accessToken": {"displayName": "fadenstack", "role": "read"}}})
     assert hf_token._whoami_sync(TOKEN) == hf_token.Identity(
-        check="ok", username="sachith", token_name="fadenstack", role="read",
+        check="ok", username="hf-user", token_name="fadenstack", role="read",
     )
 
 
@@ -201,7 +201,7 @@ async def test_what_cannot_be_a_token_is_refused_without_asking(
 async def test_removing_it_falls_back_to_the_environment(
     client: AsyncClient, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="sachith"))
+    _hub_says(monkeypatch, hf_token.Identity(check="ok", username="hf-user"))
     await client.put(URL, json={"token": TOKEN})
 
     removed = await client.delete(URL)

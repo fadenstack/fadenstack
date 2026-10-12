@@ -177,7 +177,7 @@ describe("what is drawn at all", () => {
       (g) => g.getAttribute("data-address"),
     );
     expect(addresses).toEqual(
-      expect.arrayContaining(["10.250.10.49", "10.250.10.71"]),
+      expect.arrayContaining(["192.0.2.49", "192.0.2.71"]),
     );
   });
 

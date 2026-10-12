@@ -88,7 +88,7 @@ def _agent_inventory(*, roce_ip: str, mgmt_ip: str) -> dict:
                     "interface": "enP7s7",
                     "ip": mgmt_ip,
                     "netmask": "255.255.255.0",
-                    "cidr": "10.250.10.0/24",
+                    "cidr": "192.0.2.0/24",
                     "speed_gbps": 1.0,
                     "speed_mbps": 1000,
                     "link_type": "ethernet",
@@ -115,14 +115,14 @@ async def test_record_inventory_projects_network_into_capabilities(
     dbsession: AsyncSession,
 ) -> None:
     """The Tier-1 summary must land on the column the planner reads."""
-    node = InfraNode(agent_id="gpu-02", host="10.250.10.49", status="healthy")
+    node = InfraNode(agent_id="gpu-02", host="192.0.2.49", status="healthy")
     dbsession.add(node)
     await dbsession.flush()
     assert (node.capabilities_json or {}).get("network") is None
 
     await _service(dbsession).record_inventory(
         node=node,
-        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="10.250.10.49"),
+        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="192.0.2.49"),
         utilization={"cpu_percent": 3.0},
     )
     await dbsession.flush()
@@ -147,7 +147,7 @@ async def test_record_inventory_leaves_other_capabilities_alone(
     """The projection merges; it must not clobber the heartbeat's capabilities."""
     node = InfraNode(
         agent_id=f"spark-{uuid.uuid4().hex[:6]}",
-        host="10.250.10.49",
+        host="192.0.2.49",
         status="healthy",
         capabilities_json={"gpu_count": 1, "gpu_vendor": "nvidia", "machine": "aarch64"},
     )
@@ -156,7 +156,7 @@ async def test_record_inventory_leaves_other_capabilities_alone(
 
     await _service(dbsession).record_inventory(
         node=node,
-        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="10.250.10.49"),
+        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="192.0.2.49"),
         utilization={},
     )
     await dbsession.flush()
@@ -175,12 +175,12 @@ async def test_unchanged_inventory_does_not_rewrite_the_node_row(
     Plan staleness is content-based for the same reason, but a pointless write
     per tick would still be a pointless write.
     """
-    node = InfraNode(agent_id=f"spark-{uuid.uuid4().hex[:6]}", host="10.250.10.49")
+    node = InfraNode(agent_id=f"spark-{uuid.uuid4().hex[:6]}", host="192.0.2.49")
     dbsession.add(node)
     await dbsession.flush()
 
     service = _service(dbsession)
-    inventory = _agent_inventory(roce_ip="10.100.0.1", mgmt_ip="10.250.10.49")
+    inventory = _agent_inventory(roce_ip="10.100.0.1", mgmt_ip="192.0.2.49")
     await service.record_inventory(node=node, inventory=inventory, utilization={})
     await dbsession.flush()
     first = node.capabilities_json
@@ -207,8 +207,8 @@ async def test_planner_sees_candidates_after_real_inventory_ingest(
     )
     dbsession.add(env)
 
-    head = InfraNode(agent_id="gpu-01", host="10.250.10.71", status="healthy")
-    worker = InfraNode(agent_id="gpu-02", host="10.250.10.49", status="healthy")
+    head = InfraNode(agent_id="gpu-01", host="192.0.2.71", status="healthy")
+    worker = InfraNode(agent_id="gpu-02", host="192.0.2.49", status="healthy")
     dbsession.add_all([head, worker])
     await dbsession.flush()
     dbsession.add_all([
@@ -220,12 +220,12 @@ async def test_planner_sees_candidates_after_real_inventory_ingest(
     service = _service(dbsession)
     await service.record_inventory(
         node=head,
-        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="10.250.10.71"),
+        inventory=_agent_inventory(roce_ip="10.100.0.1", mgmt_ip="192.0.2.71"),
         utilization={},
     )
     await service.record_inventory(
         node=worker,
-        inventory=_agent_inventory(roce_ip="10.100.0.2", mgmt_ip="10.250.10.49"),
+        inventory=_agent_inventory(roce_ip="10.100.0.2", mgmt_ip="192.0.2.49"),
         utilization={},
     )
     await dbsession.flush()

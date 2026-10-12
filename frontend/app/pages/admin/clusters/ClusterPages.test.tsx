@@ -306,7 +306,7 @@ describe("ClusterDetailPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "gpu-01, worker" }),
     );
-    expect(await screen.findByText(/Worker · 10\.250\.10\.71/)).toBeInTheDocument();
+    expect(await screen.findByText(/Worker · 192.0.2.71/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove from cluster" }));
     expect(await screen.findByText("Moves to gpu-02.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Remove" }));
@@ -355,8 +355,8 @@ describe("ClusterDetailPage", () => {
       cluster_running: true,
       network: "10.100.0.0/24",
       machines: [
-        { node_id: "n1", machine: "spark-3", host: "10.250.10.80", gpus: 1, can_add: true, reasons: [], warnings: [] },
-        { node_id: "n2", machine: "laptop", host: "10.250.10.90", gpus: 0, can_add: false,
+        { node_id: "n1", machine: "spark-3", host: "192.0.2.80", gpus: 1, can_add: true, reasons: [], warnings: [] },
+        { node_id: "n2", machine: "laptop", host: "192.0.2.90", gpus: 0, can_add: false,
           reasons: ["It has no address on the cluster's network (10.100.0.0/24)."], warnings: [] },
       ],
     });

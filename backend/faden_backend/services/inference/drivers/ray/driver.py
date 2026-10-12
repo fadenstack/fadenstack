@@ -405,7 +405,7 @@ class RayDriver(InferenceDriver):
         address:
 
             http://10.100.0.2:40535/metrics   (fabric)      unreachable
-            http://10.250.10.71:40535/metrics  (management)  200
+            http://192.0.2.71:40535/metrics  (management)  200
 
         So the fabric address is kept in the observation -- it is the truth
         about the cluster -- and translated here, at the one point where the
