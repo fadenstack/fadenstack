@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.users import User
+from faden_backend.db.models.users import RevokedSignIn, User, end_sign_ins
 from faden_backend.settings import settings
 from faden_backend.web.api.logs import views as logs_views
 
@@ -46,9 +46,9 @@ class _Socket:
         self.accepted = True
 
 
-def _token(user: User) -> str:
+def _token(user: User, jti: str | None = None) -> str:
     return jwt.encode(
-        {"sub": str(user.id), "aud": ["fastapi-users:auth"], "iat": 1_700_000_000},
+        {"sub": str(user.id), "aud": ["fastapi-users:auth"], "iat": 1_700_000_000, "jti": jti or uuid.uuid4().hex},
         settings.users_secret,
         algorithm="HS256",
     )
@@ -88,6 +88,22 @@ async def test_user_with_logs_read_is_accepted(dbsession: AsyncSession) -> None:
     assert got is not None
     assert got.id == user.id
     assert ws.closed is None
+
+
+@pytest.mark.anyio
+async def test_a_logged_out_or_ended_sign_in_is_refused(dbsession: AsyncSession) -> None:
+    user = await _user(dbsession, "admin")
+    dbsession.add(RevokedSignIn(jti="logged-out", user_id=user.id, expires_at=None))
+    await dbsession.flush()
+    ws = _Socket(dbsession, _token(user, "logged-out"))
+    assert await logs_views._ws_authenticate(ws) is None  # type: ignore[arg-type]
+    assert ws.closed is not None and ws.closed[0] == 4401
+
+    assert await logs_views._ws_authenticate(_Socket(dbsession, _token(user))) is not None  # type: ignore[arg-type]
+    end_sign_ins(user)  # the sign-in's iat (2023) is before now
+    ws = _Socket(dbsession, _token(user))
+    assert await logs_views._ws_authenticate(ws) is None  # type: ignore[arg-type]
+    assert ws.closed is not None and ws.closed[0] == 4401
 
 
 @pytest.mark.anyio

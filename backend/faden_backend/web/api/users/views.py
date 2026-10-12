@@ -30,11 +30,16 @@ router.include_router(
     tags=["auth"],
 )
 
-router.include_router(
-    api_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
+users_router = api_users.get_users_router(UserRead, UserUpdate)
+# Not the stock PATCH and DELETE of another account (/users/{id}): they can deactivate, demote or delete any
+# account, the administrator's own and the last superuser's included, and cannot tell who is asking. The
+# Users page uses /api/admin/users/*, which guards both; there is no second way to do the same.
+users_router.routes[:] = [
+    route
+    for route in users_router.routes
+    if not (getattr(route, "path", "") == "/{id}" and getattr(route, "methods", set()) & {"PATCH", "DELETE"})
+]
+router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(api_users.get_auth_router(auth_jwt), prefix="/auth/jwt", tags=["auth"])
 router.include_router(api_users.get_auth_router(auth_cookie), prefix="/auth/cookie", tags=["auth"])
 

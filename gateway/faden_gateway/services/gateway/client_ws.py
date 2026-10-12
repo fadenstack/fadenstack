@@ -567,7 +567,7 @@ RECHECK_SEC = 60.0
 
 #: Refusals that mean "this token is no good" (4401); the others say the caller may not (4403).
 _UNAUTHENTICATED = frozenset({
-    "invalid_token", "invalid_token_sub", "missing_authorization", "sign_in_outdated",
+    "invalid_token", "invalid_token_sub", "missing_authorization", "sign_in_outdated", "sign_in_ended",
     "api_token_revoked", "api_token_expired", "api_token_outdated",
 })
 #: Refusals that say nothing about the caller -- the check itself could not be made -- try again next round.

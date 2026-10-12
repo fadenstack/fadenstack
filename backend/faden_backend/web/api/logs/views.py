@@ -22,9 +22,10 @@ from starlette import status
 from starlette.websockets import WebSocketDisconnect
 
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.users import User, is_current_sign_in
+from faden_backend.db.models.users import User, is_current_sign_in, is_sign_in_revoked, sign_in_ended_for_all
 from faden_backend.settings import settings
 from faden_backend.web.api.rbac import require_permission
+from faden_backend.web.origin import origin_is_this_site
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -57,14 +58,7 @@ def _ws_origin_allowed(websocket: WebSocket) -> bool:
     origin = websocket.headers.get("origin")
     if origin is None:
         return True
-    try:
-        origin_host = (urlparse(origin).netloc or "").lower()
-    except ValueError:
-        return False
-    if not origin_host:
-        return False
-    hosts = {websocket.headers.get("host"), websocket.headers.get("x-forwarded-host")}
-    return origin_host in {h.strip().lower() for h in hosts if h}
+    return origin_is_this_site(origin, websocket.headers)
 
 
 async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
@@ -98,6 +92,12 @@ async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
         user = await SQLAlchemyUserDatabase(session, User).get(user_uuid)
         if user is None or not user.is_active:
             raise _WsRefusedError(4403, "User not found or inactive")
+        # The same rules as the HTTP routes: not ended with the account's others, not logged out.
+        if payload.get("typ") != "api" and (
+            sign_in_ended_for_all(payload, user.sessions_valid_after)
+            or await is_sign_in_revoked(session, str(payload["jti"]))
+        ):
+            raise _WsRefusedError(4401, "Invalid token")
         if not user.is_superuser and not await RbacDAO(session).has_permission(user.id, *_WS_LOGS_PERMISSION):
             raise _WsRefusedError(4403, "Permission denied: logs:read")
         return user
