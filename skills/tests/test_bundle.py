@@ -231,3 +231,61 @@ def test_manifest_types_are_checked() -> None:
         fmt.normalize_manifest({"forbidden_tools": [1, 2]})
     with pytest.raises(fmt.BundleError, match="trigger_rules"):
         fmt.normalize_manifest({"trigger_rules": ["x"]})
+
+
+# ── YAML from an author is read with limits ───────────────────────────
+
+
+def _billion_laughs() -> str:
+    """Nine anchors, each a list of ten of the last: a billion strings once expanded."""
+    lines = ['a: &a ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]']
+    for prev, name in zip("abcdefgh", "bcdefghi", strict=True):
+        lines.append(f"{name}: &{name} [" + ", ".join([f"*{prev}"] * 10) + "]")
+    return "\n".join(lines)
+
+
+def test_a_billion_laughs_frontmatter_is_refused_unexpanded() -> None:
+    with pytest.raises(fmt.BundleError, match="anchors"):
+        fmt.from_markdown(f"---\nname: bomb\ndescription: x\n{_billion_laughs()}\n---\nBody")
+
+
+def test_an_alias_is_refused_whatever_defined_it() -> None:
+    with pytest.raises(fmt.BundleError, match="aliases"):
+        fmt.from_markdown("---\nname: a\ndescription: x\nb: *missing\n---\nBody")
+
+
+def test_an_anchor_alone_is_refused_too() -> None:
+    with pytest.raises(fmt.BundleError, match="anchors"):
+        fmt.from_markdown("---\nname: a\ndescription: &d text\n---\nBody")
+
+
+def test_a_deeply_nested_frontmatter_is_refused() -> None:
+    deep = "[" * 5000 + "]" * 5000
+    with pytest.raises(fmt.BundleError, match="nests more than"):
+        fmt.from_markdown(f"---\nname: deep\ndescription: x\nmetadata: {deep}\n---\nBody")
+    nested = "\n".join("  " * i + f"k{i}:" for i in range(12)) + " 1"
+    with pytest.raises(fmt.BundleError, match="nests more than"):
+        fmt.from_markdown(f"---\nname: deep\ndescription: x\n{nested}\n---\nBody")
+
+
+def test_an_oversized_frontmatter_is_refused() -> None:
+    big = "\n".join(f"k{i}: {'x' * 60}" for i in range(600))
+    with pytest.raises(fmt.BundleError, match="larger than 32 KiB"):
+        fmt.from_markdown(f"---\nname: big\ndescription: x\n{big}\n---\nBody")
+
+
+def test_a_billion_laughs_faden_yaml_is_refused() -> None:
+    with pytest.raises(fmt.BundleError, match="faden.yaml is not accepted"):
+        fmt._load_extension(_billion_laughs())  # noqa: SLF001
+
+
+def test_ordinary_nesting_still_reads_and_a_value_used_twice_round_trips() -> None:
+    shared = ["mcp.a", "mcp.b"]
+    bundle = fmt.from_markdown(
+        "---\nname: ok\ndescription: x\nmetadata:\n  tools:\n    - {name: a, args: [1, 2]}\n---\nBody",
+    )
+    assert bundle.frontmatter["metadata"]["tools"][0]["args"] == [1, 2]
+    bundle.frontmatter["one"] = shared
+    bundle.frontmatter["two"] = shared  # the same list twice: safe_dump wrote &id001 / *id001
+    again = fmt.from_markdown(fmt.to_markdown(bundle))
+    assert again.frontmatter["one"] == again.frontmatter["two"] == shared
