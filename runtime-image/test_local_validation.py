@@ -80,9 +80,17 @@ def test_imports() -> None:
 def test_pip_check() -> None:
     print("--> Running pip check...")
     proc = subprocess.run(["pip", "check"], capture_output=True, text=True)
+    # The build records what `pip check` said about the base image before our
+    # layer; only what our layer added counts (as the Dockerfiles hold it to).
+    base_file = "/opt/llm-port/build/base-pip-check.txt"
+    base = set(open(base_file, encoding="utf-8").read().splitlines()) if os.path.exists(base_file) else set()
+    added = [line for line in proc.stdout.splitlines() if line.strip() and line not in base]
     if proc.returncode == 0:
         print("  [OK] pip check clean")
         record("pip check", True, "No broken requirements found.")
+    elif base and not added:
+        print(f"  [OK] pip check: only what the base image already reports:\n{proc.stdout}")
+        record("pip check", True, f"Only the base image's own: {proc.stdout.strip()}")
     else:
         print(f"  [WARN/FAIL] pip check output:\n{proc.stdout}\n{proc.stderr}")
         record("pip check", False, proc.stdout.strip() or proc.stderr.strip())

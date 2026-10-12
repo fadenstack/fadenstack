@@ -18,15 +18,16 @@ kept by the maintainers outside this repository, as it needs a DGX Spark pair.
 
 | | |
 |---|---|
-| `Dockerfile` | aarch64 / GB10 (DGX Spark, sm_121) |
+| `Dockerfile.gb10-vllm` | aarch64 / GB10 (DGX Spark, sm_121) on vLLM's own image (`vllm/vllm-openai`): the GB10 runtime that is published |
+| `Dockerfile` | aarch64 / GB10 on NVIDIA's vLLM container (`nvcr.io/nvidia/vllm`): built and used on our own machines only (see Licence) |
 | `Dockerfile.x86_64` | generic x86_64 NVIDIA, Turing (sm_75) through Blackwell (sm_120) |
 | `llm_port_ray_runtime/` | the helper package baked into the image; provides the `llm-port-ray-runtime` CLI the agent drives, and the image app that serves picture models with diffusers (`image.py`) |
 | `setup.py` | packaging for that helper |
 | `fixtures.json`, `test_local_validation.py` | copied into the image; validate imports, dependencies and `LLMConfig` shapes from inside it |
 | `check_ray_vllm.py` | run by both builds: every vLLM module and name Ray Serve LLM imports must resolve |
-| `vllm_compat.py` | run by the GB10 build, **temporary**: bridges two modules vLLM 0.29 moved away from where Ray 2.58 imports them |
+| `vllm_compat.py` | run by both GB10 builds, **temporary**: bridges two modules vLLM 0.29 moved away from where Ray 2.58 imports them |
 | `runtime-manifest-<flavor>-<release>.json` | the minted identity of each runtime (see below) |
-| `rebuild_runtime_image.py` | builds either image (`--flavor gb10` or `x86_64`), optionally pushes it, emits its manifest, and records its certification |
+| `rebuild_runtime_image.py` | builds any of the images (`--flavor gb10-vllm`, `gb10` or `x86_64`), optionally pushes it, emits its manifest, and records its certification |
 
 ## Runtimes, flavors, channels
 
@@ -77,7 +78,8 @@ fails at deploy time on a node, which is the worst place to find out.
 So a manifest is only ever written by building:
 
 ```bash
-python rebuild_runtime_image.py --build                   # aarch64 / GB10, on a DGX node
+python rebuild_runtime_image.py --flavor gb10-vllm --build  # aarch64 / GB10 on vLLM's image, on a DGX node
+python rebuild_runtime_image.py --build                   # aarch64 / GB10 on NVIDIA's container, on a DGX node
 python rebuild_runtime_image.py --flavor x86_64 --build   # x86_64, on any x86_64 machine
 ```
 
@@ -85,10 +87,12 @@ A build writes `uncertified`, whatever the previous manifest said.
 
 ### A new release of a flavor
 
-For GB10, change the Dockerfile's `FROM`: the runtime is named after its
-NVIDIA base (`nvcr.io/nvidia/vllm:26.09-py3` makes `nv26.09`), and its
-manifest, tag and runtime id follow, so the runtimes already shipped keep
-theirs. For x86_64, change the names in `FLAVORS` with the pins in its
+For GB10, change the `FROM` of `Dockerfile.gb10-vllm` (vLLM's image:
+`v0.29.0-aarch64-ubuntu2404` makes `vllm0.29.0`) or of `Dockerfile` (NVIDIA's:
+`nvcr.io/nvidia/vllm:26.09-py3` makes `nv26.09`); the runtime is named after
+it, and its manifest, tag and runtime id follow, so the runtimes already
+shipped keep theirs. Take vLLM's CUDA 13 build (no `-cu129`): the GB10 needs
+CUDA 13. For x86_64, change the names in `FLAVORS` with the pins in its
 Dockerfile. Build it.
 
 ### Certify, then record
@@ -156,9 +160,11 @@ are published to GHCR and their manifests name the registry.
 ## Licence
 
 The files in this folder are Apache-2.0, like the rest of the repository. The images built from them are not, as
-a whole: only the runtime helper in `/opt/llm-port/runtime` is. The GB10 image is built on NVIDIA's vLLM container
-(`nvcr.io/nvidia/vllm`), governed by the NVIDIA Software License Agreement and the Product-Specific Terms for NVIDIA
-AI Products; the x86_64 image contains NVIDIA's CUDA and cuDNN packages under the CUDA EULA. Those terms stay with
+a whole: only the runtime helper in `/opt/llm-port/runtime` is. The published GB10 image is built on vLLM's own
+image, which, like the x86_64 image, contains NVIDIA's CUDA and cuDNN packages under the CUDA EULA. The GB10 image
+built on NVIDIA's vLLM container (`nvcr.io/nvidia/vllm`) falls under the NVIDIA Software License Agreement and the
+Product-Specific Terms for NVIDIA AI Products, which do not allow publishing it in a public repository, so it is
+built and used on our own machines only. Those terms stay with
 the images: `NOTICE` (copied into each image) says so, the image label
 `org.opencontainers.image.licenses` names them, and Help's
 [Third-party components](../docs/help/pages/operate/third-party.md) page links them.
