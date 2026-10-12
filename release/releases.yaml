@@ -25,6 +25,25 @@
 series: []
 
 releases:
+  - version: 0.4.4rc1
+    channel: preview
+    date: ""
+    severity: security
+    summary: >-
+      Security and reliability: provider keys are encrypted, sign-ins end on logout, MCP's personal-data check
+      fails closed, chat attachments are kept on a volume, and the keys that seal stored data can be rotated.
+    highlights:
+      - "Chat attachments are kept on a volume (or a directory of your choice), copied over and verified on upgrade, and part of the backup."
+      - "Remote providers' API keys are stored encrypted, and `faden secrets rotate` changes the keys that seal stored data."
+      - "Signing out ends that sign-in, and a password change ends all of them."
+      - "An MCP tool call is refused when its personal-data check cannot run."
+      - "Operators can no longer switch on remote code or other code-running engine settings, and an agent's tool limit holds when a tool runs."
+      - "New machines install only the agent build this release pins, checked by its SHA-256."
+      - "Docker's logs rotate, Redis has a memory cap, and backups keep each kind apart and check their volume archives."
+      - "The DGX Spark runtime is built on vLLM's own image, and the console runs on Node.js 24 LTS."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.9
   - version: 0.4.3
     channel: stable
     date: ""
