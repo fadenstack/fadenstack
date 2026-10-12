@@ -2736,7 +2736,12 @@
       "switch": "Changer",
       "restart_warning": "Passer à vLLM {{vllm}} redémarre le cluster : le conteneur de chaque machine est recréé depuis la nouvelle image et chaque modèle se recharge. Une machine qui n'a pas encore l'image la récupère d'abord.",
       "preview_hint": "Un aperçu a réussi sa certification et exécute des modèles que l'environnement recommandé ne peut pas, mais il est récent : choisissez-le pour un cluster qui a besoin de ces modèles.",
-      "restart_confirm": "Redémarrer sur cet environnement"
+      "restart_confirm": "Redémarrer sur cet environnement",
+      "settings_pending": "Cette version démarre l'environnement d'exécution du cluster avec de nouveaux réglages (où les modèles et les caches sont montés). Ils s'appliquent au prochain redémarrage ; d'ici là, le cluster continue de fonctionner tel quel.",
+      "settings_apply": "Appliquer et redémarrer",
+      "settings_warning": "Appliquer les nouveaux réglages redémarre le cluster : le conteneur d'exécution de chaque machine est recréé et chaque modèle qu'il contient est rechargé, ce qui prend plusieurs minutes pour un grand modèle.",
+      "settings_confirm": "Redémarrer et appliquer",
+      "settings_applying": "Redémarrage pour appliquer les nouveaux réglages"
     },
     "drain": {
       "title": "Drainer {{name}}",

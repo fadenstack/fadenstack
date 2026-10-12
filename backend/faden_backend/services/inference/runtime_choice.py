@@ -10,6 +10,12 @@ upgrade of this server that ships a newer one, nor one that no longer ships
 the runtime a cluster runs: that cluster is shown on it, with the default
 offered as the update.
 
+The same goes for the settings a container is started with (where models and
+caches are mounted): a container keeps the ones it was started with, whatever a
+newer release would give it, and the models are loaded with paths that match
+them (``bundles.running_mounts``). The cluster says the new ones are pending
+(``settings_pending``) and applies them when the operator restarts it.
+
 Switching restarts the cluster on the new runtime: each machine's container is
 made again from the new image and the deployments load again. That is why it
 is the operator's decision, taken here and nowhere else. Every agent can
@@ -25,11 +31,14 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.db.dao.inference_dao import EnvironmentNodeDAO
-from faden_backend.db.models.inference import InferenceEnvironment
+from faden_backend.db.models.inference import EnvironmentDesiredState, InferenceEnvironment
 from faden_backend.services.inference.bundles import (
     RUNTIME_KEY,
     RuntimeBundleManifest,
     default_bundle_registry,
+    mount_set,
+    running_mounts,
+    started_launches,
     started_runtimes,
 )
 
@@ -61,6 +70,28 @@ def _offered(bundle: RuntimeBundleManifest, *, default: bool) -> dict[str, Any]:
     }
 
 
+async def _mounts_differ(
+    session: AsyncSession, env: InferenceEnvironment, node: Any, target: RuntimeBundleManifest
+) -> bool:
+    """Whether this machine's running container lacks a mount this release would give it.
+
+    Known from what the backend started it with, else from what its agent
+    reports; a machine whose container is not known is not said to differ.
+    A mount the container has beyond the wanted ones (the token directory, the
+    TLS material) is not a difference, so one that was started with this
+    release's mounts exactly -- or a runtime other than the one that would run
+    now, which a switch restarts -- never shows.
+    """
+    recorded = started_launches(env).get(str(node.id))
+    if isinstance(recorded, dict) and recorded.get("bundle_id") not in (None, target.bundle_id):
+        return False
+    running = await running_mounts(session, env, node.id)
+    if running is None:
+        return False
+    wanted = default_bundle_registry.mounts_for_node(target, node)
+    return not mount_set(wanted) <= mount_set(running)
+
+
 async def environment_status(session: AsyncSession, environment_id: Any) -> dict[str, Any]:
     """What the machines run, whether they are there yet, and whether a newer stable runtime is out."""
     env = await _environment(session, environment_id)
@@ -74,6 +105,7 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
     withdrawn: set[str] = set()
     applied = True
     update: str | None = None
+    settings_pending: list[str] = []
     for node in await EnvironmentNodeDAO(session).machines(env.id):
         fits = registry.runtimes_for(node)
         offered.update((b.bundle_id, b) for b in fits)
@@ -96,15 +128,26 @@ async def environment_status(session: AsyncSession, environment_id: Any) -> dict
         # A machine with no record runs its default: a cluster formed before
         # the record was kept, or one that never started.
         applied &= target.bundle_id == started.get(str(node.id), getattr(default, "bundle_id", None))
+        if "mounts" not in settings_pending and await _mounts_differ(session, env, node, target):
+            settings_pending.append("mounts")
         if default is not None:
             defaults.add(default.bundle_id)
             # On an older stable runtime than its default. A preview was
             # chosen on purpose, and is left to its operator.
             if target is not default and target.certification.channel != "preview":
                 update = default.bundle_id
+    # Only for a cluster that is to run and is not restarting anyway: a pending runtime
+    # switch makes the containers again with this release's settings.
+    pending = bool(settings_pending) and applied and env.desired_state == EnvironmentDesiredState.RUNNING.value
     return {
         "runs": sorted(runs),
         "applied": applied,
+        # The machines' containers were started with other launch settings than this release
+        # gives them (``reasons``); they apply at the next restart, which nothing does by itself.
+        "settings_pending": pending,
+        "settings_reasons": settings_pending if pending else [],
+        # The restart that applies them is under way.
+        "settings_applying": pending and env.observed_generation < env.generation,
         # Not there yet, and the cluster is to run: it is restarting.
         "restarting": env.restarting(applied=applied),
         "update": update,
@@ -145,3 +188,24 @@ async def switch(session: AsyncSession, environment_id: Any, runtime_id: str) ->
         "; the cluster restarts on it" if not status["applied"] else "; its machines already run it",
     )
     return status
+
+
+async def apply_settings(session: AsyncSession, environment_id: Any) -> dict[str, Any]:
+    """Restart the cluster so its machines' containers start with this release's settings.
+
+    The operator's decision, like a switch (see the module docstring): after an
+    upgrade that changes where the containers mount models and caches, the
+    running ones keep the old mounts and serve as they did. Nothing to apply
+    (``settings_pending`` is false) restarts nothing.
+    """
+    from faden_backend.services.inference.wakeup import wake_reconciler_after_commit  # noqa: PLC0415
+
+    env = await _environment(session, environment_id)
+    status = await environment_status(session, env.id)
+    if not status["settings_pending"] or status["settings_applying"]:
+        return status
+    env.generation += 1
+    wake_reconciler_after_commit(session)
+    await session.flush()
+    log.info("Cluster %s: restarts to apply this release's launch settings (%s)", env.name, ", ".join(status["settings_reasons"]))
+    return await environment_status(session, env.id)

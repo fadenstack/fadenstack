@@ -211,10 +211,22 @@ async def runtime_summary(runtime: Any, container_name: str) -> dict[str, Any] |
         return None
     state = info.get("State") or {}
     config = info.get("Config") or {}
+    # Where the container reads from: a server whose release would mount other
+    # paths learns what this one has (``bundles.running_mounts``).
+    mounts = [
+        {
+            "host_path": str(m["Source"]),
+            "container_path": str(m["Destination"]),
+            "mode": "rw" if m.get("RW") else "ro",
+        }
+        for m in (info.get("Mounts") or [])
+        if isinstance(m, dict) and m.get("Source") and m.get("Destination")
+    ]
     return {
         "container": container_name,
         "running": bool(state.get("Running")),
         "started_at": state.get("StartedAt"),
         "image": config.get("Image"),
         "image_id": info.get("Image"),
+        "mounts": mounts,
     }

@@ -2734,7 +2734,12 @@
       "switch": "Switch",
       "restart_warning": "Switching to vLLM {{vllm}} restarts the cluster: each machine's container is made again from the new image and every model on it loads again. A machine that does not hold the image yet fetches it first.",
       "preview_hint": "A preview has passed its certification and runs models the recommended runtime cannot, but it is new: choose it for a cluster that needs those models.",
-      "restart_confirm": "Restart on this runtime"
+      "restart_confirm": "Restart on this runtime",
+      "settings_pending": "This release starts the cluster's runtime with new settings (where models and caches are mounted). They apply at the next restart; until then the cluster keeps serving as it is.",
+      "settings_apply": "Apply and restart",
+      "settings_warning": "Applying the new settings restarts the cluster: each machine's runtime container is made again and every model on it loads again, which takes minutes for a large model.",
+      "settings_confirm": "Restart and apply",
+      "settings_applying": "Restarting to apply the new settings"
     },
     "drain": {
       "title": "Drain {{name}}",

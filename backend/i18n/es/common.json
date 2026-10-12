@@ -2736,7 +2736,12 @@
       "switch": "Cambiar",
       "restart_warning": "Cambiar a vLLM {{vllm}} reinicia el clúster: el contenedor de cada máquina se crea de nuevo desde la nueva imagen y cada modelo vuelve a cargarse. Una máquina que aún no tiene la imagen la obtiene primero.",
       "preview_hint": "Una vista previa ha superado su certificación y ejecuta modelos que el entorno recomendado no puede, pero es nueva: elíjala para un clúster que necesite esos modelos.",
-      "restart_confirm": "Reiniciar con este entorno"
+      "restart_confirm": "Reiniciar con este entorno",
+      "settings_pending": "Esta versión inicia el entorno de ejecución del clúster con ajustes nuevos (dónde se montan los modelos y las cachés). Se aplican en el próximo reinicio; hasta entonces el clúster sigue funcionando como está.",
+      "settings_apply": "Aplicar y reiniciar",
+      "settings_warning": "Aplicar los ajustes nuevos reinicia el clúster: el contenedor de ejecución de cada máquina se crea de nuevo y todos los modelos que contiene se cargan otra vez, lo que tarda minutos con un modelo grande.",
+      "settings_confirm": "Reiniciar y aplicar",
+      "settings_applying": "Reiniciando para aplicar los ajustes nuevos"
     },
     "drain": {
       "title": "Drain de {{name}}",

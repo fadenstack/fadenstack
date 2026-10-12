@@ -2736,7 +2736,12 @@
       "switch": "Umschalten",
       "restart_warning": "Das Umschalten auf vLLM {{vllm}} startet den Cluster neu: Der Container jeder Maschine wird aus dem neuen Image neu erstellt, und jedes Modell darauf lädt erneut. Eine Maschine, die das Image noch nicht hat, holt es zuerst.",
       "preview_hint": "Eine Vorschau hat ihre Zertifizierung bestanden und führt Modelle aus, die die empfohlene Laufzeit nicht kann, ist aber neu: Wählen Sie sie für einen Cluster, der diese Modelle braucht.",
-      "restart_confirm": "Mit dieser Laufzeit neu starten"
+      "restart_confirm": "Mit dieser Laufzeit neu starten",
+      "settings_pending": "Dieses Release startet die Laufzeit des Clusters mit neuen Einstellungen (wo Modelle und Caches eingebunden sind). Sie gelten ab dem nächsten Neustart; bis dahin läuft der Cluster unverändert weiter.",
+      "settings_apply": "Übernehmen und neu starten",
+      "settings_warning": "Das Übernehmen der neuen Einstellungen startet den Cluster neu: Der Laufzeit-Container jeder Maschine wird neu erstellt und jedes Modell darauf wird neu geladen. Bei einem großen Modell dauert das Minuten.",
+      "settings_confirm": "Neu starten und übernehmen",
+      "settings_applying": "Startet neu, um die neuen Einstellungen zu übernehmen"
     },
     "drain": {
       "title": "{{name}} leeren",

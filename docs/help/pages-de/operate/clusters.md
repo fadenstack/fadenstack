@@ -219,6 +219,10 @@ Die Karte **Laufzeit** zeigt das Image, das die Maschinen des Clusters ausführe
 neuere zertifizierte Runtime verfügbar ist. Ein Cluster behält seine Runtime, bis Sie sie wechseln; das startet jedes
 Modell darauf neu. Siehe [Einen Cluster auf eine andere Runtime umstellen](upgrading.md#move-a-cluster-to-another-runtime).
 
+Nach einem Upgrade kann die Karte melden, dass dieses Release die Runtime mit neuen Einstellungen startet, etwa
+dazu, wo Modelle und Caches eingebunden sind. Der Cluster läuft unverändert weiter; wählen Sie **Übernehmen und
+neu starten**, wenn Sie die neuen Einstellungen wollen. Das startet den Cluster neu und lädt jedes Modell wieder.
+
 ## Verschlüsselung {#encryption}
 
 ![Die Karte „Modellverkehr“, „Verschlüsselt“: Das Gateway erreicht die Modelle des Clusters über gegenseitiges TLS](../images/operate/cluster-model-traffic.png)

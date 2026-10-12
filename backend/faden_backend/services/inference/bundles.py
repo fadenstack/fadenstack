@@ -568,6 +568,82 @@ def started_runtimes(environment: Any) -> dict[str, str]:
     return dict((environment.observed_status_json or {}).get(RUNTIME_KEY) or {})
 
 
+#: ``observed_status_json[LAUNCH_KEY][node id]``: what a machine's runtime
+#: container was last started with -- ``{"bundle_id": ..., "mounts": [...]}``,
+#: the mounts as they were sent to the agent. The container keeps them until
+#: the cluster restarts, whatever a newer release would send (``runtime_choice``).
+LAUNCH_KEY = "launch"
+
+
+def launch_record(bundle_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """What to remember of a launch spec sent to a machine: its runtime and mounts."""
+    return {"bundle_id": bundle_id, "mounts": [dict(m) for m in (payload.get("mounts") or [])]}
+
+
+def started_launches(environment: Any) -> dict[str, dict[str, Any]]:
+    """What each of a cluster's machines' runtime container was started with, by node id."""
+    return dict((environment.observed_status_json or {}).get(LAUNCH_KEY) or {})
+
+
+def started_mounts(environment: Any, node_id: Any) -> list[ContainerMount] | None:
+    """The mounts one machine's running runtime container has, or ``None`` when none is recorded.
+
+    No record is a cluster started before this release kept one: its caller
+    uses the mounts a start would give it today.
+    """
+    record = started_launches(environment).get(str(node_id))
+    if not isinstance(record, dict) or not isinstance(record.get("mounts"), list):
+        return None
+    try:
+        return [ContainerMount.model_validate(m) for m in record["mounts"]]
+    except ValueError:
+        return None
+
+
+def reported_mounts(inventory: dict[str, Any] | None) -> list[ContainerMount] | None:
+    """The mounts an agent reports its running runtime container to have, or ``None``.
+
+    ``None`` for an agent that does not report them yet, or a machine without
+    a runtime container.
+    """
+    runtime = (inventory or {}).get("ray_runtime") or {}
+    mounts = runtime.get("mounts")
+    if not runtime.get("running") or not isinstance(mounts, list):
+        return None
+    try:
+        return [ContainerMount.model_validate(m) for m in mounts]
+    except ValueError:
+        return None
+
+
+async def running_mounts(session: Any, environment: Any, node_id: Any) -> list[ContainerMount] | None:
+    """The mounts one machine's running runtime container has, as far as is known; else ``None``.
+
+    What the backend sent when it last started the container (``LAUNCH_KEY``)
+    comes first: it is written the moment the container is made, where the
+    agent's report is up to a minute behind and would show the old container
+    right after a restart. For a cluster started before that record was kept,
+    the agent's report of its container stands in for it.
+    """
+    recorded = started_mounts(environment, node_id)
+    if recorded is not None:
+        return recorded
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO  # noqa: PLC0415
+
+    try:
+        key = node_id if isinstance(node_id, uuid.UUID) else uuid.UUID(str(node_id))
+        snapshots = await NodeControlDAO(session).latest_inventory_snapshots(node_ids=[key])
+    except Exception:  # noqa: BLE001 - what the agent saw is a help, never a reason to stop
+        return None
+    snapshot = snapshots.get(key) if isinstance(snapshots, dict) else None
+    return reported_mounts(getattr(snapshot, "inventory_json", None))
+
+
+def mount_set(mounts: list[ContainerMount]) -> set[tuple[str, str]]:
+    """Mounts as comparable pairs (host path, container path); the order of a list means nothing."""
+    return {(m.host_path.rstrip("/"), m.container_path.rstrip("/")) for m in mounts}
+
+
 def _preference(environment: Any, node_id: Any) -> tuple[str, ...]:
     """The runtimes a cluster's machine runs, first say first (``runtime_choice``)."""
     if environment is None:

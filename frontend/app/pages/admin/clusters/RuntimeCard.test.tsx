@@ -119,6 +119,44 @@ describe("RuntimeCard", () => {
     expect(asked).toHaveBeenCalledTimes(1);
   });
 
+  it("says new launch settings are pending and restarts only after a confirmation", async () => {
+    vi.spyOn(inferenceApi, "runtime").mockResolvedValue(
+      status(STABLE, { settings_pending: true, settings_reasons: ["mounts"] }),
+    );
+    const applied = vi.spyOn(inferenceApi, "applyRuntimeSettings").mockResolvedValue(status(STABLE));
+    const onSwitched = vi.fn();
+    render(<RuntimeCard environmentId={ENV} onSwitched={onSwitched} />);
+
+    const notice = await screen.findByTestId("runtime-settings-pending");
+    expect(notice).toHaveTextContent(/new settings \(where models and caches are mounted\)/);
+    expect(screen.queryByText("Restarting on the new runtime")).not.toBeInTheDocument();
+    expect(applied).not.toHaveBeenCalled();
+
+    await userEvent.click(within(notice).getByRole("button", { name: "Apply and restart" }));
+    expect(applied).not.toHaveBeenCalled(); // asked first
+    expect(screen.getByText(/Applying the new settings restarts the cluster/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByTestId("runtime-settings-pending")).toBeInTheDocument();
+
+    await userEvent.click(within(screen.getByTestId("runtime-settings-pending")).getByRole("button", { name: "Apply and restart" }));
+    vi.mocked(inferenceApi.runtime).mockResolvedValue(
+      status(STABLE, { settings_pending: true, settings_applying: true, settings_reasons: ["mounts"] }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+
+    expect(applied).toHaveBeenCalledWith(ENV);
+    expect(onSwitched).toHaveBeenCalled();
+    expect(await screen.findByText("Restarting to apply the new settings")).toBeInTheDocument();
+    expect(screen.queryByTestId("runtime-settings-pending")).not.toBeInTheDocument();
+  });
+
+  it("shows no notice when the settings match, or a server that does not say", async () => {
+    vi.spyOn(inferenceApi, "runtime").mockResolvedValue(status(STABLE, { settings_pending: false }));
+    render(<RuntimeCard environmentId={ENV} />);
+    await screen.findByTestId("cluster-runtime");
+    expect(screen.queryByTestId("runtime-settings-pending")).not.toBeInTheDocument();
+  });
+
   it("says nothing to an older server that has no runtime choice", async () => {
     vi.spyOn(inferenceApi, "runtime").mockRejectedValue(new Error("Not Found"));
     const { container } = render(<RuntimeCard environmentId={ENV} />);

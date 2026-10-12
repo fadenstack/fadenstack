@@ -276,3 +276,27 @@ def test_an_app_without_the_scaler_reads_as_deployed(fake_ray: Path) -> None:
     ours = next(a for a in _run(fake_ray)["apps"] if a["name"] == APP)
     assert ours["external_scaler"] is False
     assert ours["llm_configs"][0]["deployment_config"]["num_replicas"] == 1
+
+
+@pytest.mark.anyio()
+async def test_the_inventory_says_where_the_container_reads_from() -> None:
+    """A server whose release would mount other paths learns what this container has."""
+
+    class _Mounted(_Runtime):
+        async def inspect(self, name: str, **_: Any) -> dict[str, Any]:
+            return {
+                "State": {"Running": True},
+                "Config": {"Image": "faden/ray"},
+                "Mounts": [
+                    {"Source": "/home/u/.cache/huggingface", "Destination": "/models", "RW": False},
+                    {"Source": "/tmp/ray", "Destination": "/tmp/ray", "RW": True},
+                    {"Destination": "/anonymous"},
+                ],
+            }
+
+    summary = await inspect.runtime_summary(_Mounted(_DOC), DEFAULT_CONTAINER_NAME)
+
+    assert summary["mounts"] == [
+        {"host_path": "/home/u/.cache/huggingface", "container_path": "/models", "mode": "ro"},
+        {"host_path": "/tmp/ray", "container_path": "/tmp/ray", "mode": "rw"},
+    ]

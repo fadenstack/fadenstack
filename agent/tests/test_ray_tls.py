@@ -265,3 +265,38 @@ async def test_no_credential_no_certificate(tmp_path: Path) -> None:
     issuer = ray_tls.RayTls(base_dir=tmp_path, http=httpx.AsyncClient(), credential=lambda: None)
     with pytest.raises(RuntimeError, match="credential"):
         await issuer.issue("env-1")
+
+
+# ── a mount that moved ───────────────────────────────────────────────────
+
+
+def _with_sources(runtime: _FakeRuntime, spec: RuntimeBundleSpec, source: str) -> None:
+    _existing(runtime, spec, tls=False)
+    runtime.containers[spec.name]["Mounts"] = [
+        {"Destination": "/models", "Source": source},
+        {"Destination": "/var/run/faden/ray", "Source": "/var/run/faden/ray"},
+    ]
+
+
+@pytest.mark.anyio()
+async def test_a_container_reading_models_from_another_host_path_is_recreated() -> None:
+    """A release moved where /models comes from; the same destination hid it."""
+    runtime = _FakeRuntime()
+    spec = RuntimeBundleSpec.from_payload(_payload())  # /models <- /srv/faden/models
+    _with_sources(runtime, spec, "/home/user/.cache/huggingface")
+
+    result = await _container(runtime).ensure_container(spec)
+
+    assert result["created"] is True
+
+
+@pytest.mark.anyio()
+async def test_a_container_with_the_same_mount_sources_is_kept() -> None:
+    runtime = _FakeRuntime()
+    spec = RuntimeBundleSpec.from_payload(_payload())
+    _with_sources(runtime, spec, "/srv/faden/models/")  # a trailing slash is the same place
+
+    result = await _container(runtime).ensure_container(spec)
+
+    assert result["created"] is False
+    assert runtime.runs == []
