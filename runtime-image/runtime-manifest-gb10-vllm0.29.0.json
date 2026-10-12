@@ -1558,7 +1558,7 @@
   "certification": {
     "hardware_target": "NVIDIA DGX Spark / GB10",
     "overall_status": "passed",
-    "channel": "preview",
+    "channel": "stable",
     "checks": [
       {
         "name": "Head GPU Detection",
