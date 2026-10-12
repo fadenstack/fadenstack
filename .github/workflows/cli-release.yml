@@ -196,7 +196,8 @@ jobs:
 
             The wheel and standalone binaries are attached to this release; the
             same version is on PyPI. Each binary's `.THIRD-PARTY-NOTICES.txt` carries
-            the licences of the packages, the Python and the bootloader inside it.
+            the licences of the packages, the Python, the native libraries (OpenSSL,
+            libffi, xz ...) and the bootloader inside it.
 
             ```bash
             pipx install fadenstack==${{ needs.build.outputs.version }}
@@ -224,6 +225,10 @@ jobs:
             name: faden-macos-arm64
             artifact: faden-macos-arm64
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: release
+
       - uses: actions/download-artifact@v4
         with:
           name: python-dist
@@ -241,7 +246,8 @@ jobs:
           # The report names what the wheel brings: the packages the notices list.
           pip install --ignore-installed --report "$RUNNER_TEMP/cli-install.json" dist/*.whl
           pip install pyinstaller
-          # The licences of everything the executable bundles besides our own code.
+          # The licences of everything the executable bundles besides our own code
+          # (the native libraries are added after a first build, below).
           python - "$RUNNER_TEMP/cli-install.json" THIRD-PARTY-NOTICES.txt <<'PY'
           import json, os, platform, subprocess, sys, venv
           from importlib import metadata
@@ -288,8 +294,8 @@ jobs:
               "============================================\n\n"
               "faden itself is licensed under the Apache License, Version 2.0 (LICENSE and\n"
               "NOTICE, in the release and the source). The executable also contains the\n"
-              "Python packages, the Python and PyInstaller's bootloader below, each under\n"
-              "its own licence.\n",
+              "Python packages, the Python, PyInstaller's bootloader and the native\n"
+              "libraries (OpenSSL, libffi, xz ...) below, each under its own licence.\n",
               heading("1. Python packages"),
               listing.rstrip() + "\n",
           ]
@@ -323,16 +329,36 @@ jobs:
           PY
           grep -q 'Mozilla Public License' THIRD-PARTY-NOTICES.txt  # certifi, MPL-2.0
           ENTRY=$(python -c "import faden_cli.cli, sys; print(faden_cli.cli.__file__)")
-          # --collect-data: the deployment files are package data.
-          # readline: only the interactive console's line editing, and it would
-          # bundle libreadline, which is GPL-3.0-or-later. setuptools: PyInstaller's
-          # own dependency, which the CLI does not use and the notices do not list.
-          pyinstaller --onefile --clean --name "${{ matrix.name }}" \
-            --collect-submodules faden_cli --collect-data faden_cli \
-            --add-data "THIRD-PARTY-NOTICES.txt:." \
-            --exclude-module readline --exclude-module rlcompleter \
-            --exclude-module setuptools --exclude-module _distutils_hack --exclude-module pkg_resources \
-            "$ENTRY"
+          build() {
+            # --collect-data: the deployment files are package data.
+            # readline: only the interactive console's line editing, and it would
+            # bundle libreadline, which is GPL-3.0-or-later. setuptools: PyInstaller's
+            # own dependency, which the CLI does not use and the notices do not list.
+            pyinstaller --onefile --clean --name "${{ matrix.name }}" \
+              --collect-submodules faden_cli --collect-data faden_cli \
+              --add-data "THIRD-PARTY-NOTICES.txt:." \
+              --exclude-module readline --exclude-module rlcompleter \
+              --exclude-module setuptools --exclude-module _distutils_hack --exclude-module pkg_resources \
+              "$ENTRY"
+          }
+          EXE="dist/${{ matrix.artifact }}"
+          # Which native libraries (OpenSSL, libffi, xz ...) PyInstaller takes from
+          # this machine's Python is known only once it has run. So build, add the
+          # licences of what that build bundled, and build again with them inside.
+          # This fails when a bundled library has no licence text.
+          build
+          python release/binary_notices.py append "$EXE" THIRD-PARTY-NOTICES.txt
+          build
+          python release/binary_notices.py check "$EXE" THIRD-PARTY-NOTICES.txt
+          grep -q '^4. Native libraries' THIRD-PARTY-NOTICES.txt
+          # OpenSSL is in every build: Debian's copyright file on Linux, the
+          # tracked release/licenses/openssl.txt (Apache-2.0) elsewhere.
+          if [ "$RUNNER_OS" = Linux ]; then
+            grep -q '^--- libssl3' THIRD-PARTY-NOTICES.txt
+          else
+            grep -q 'Source: https://github.com/openssl/openssl/' THIRD-PARTY-NOTICES.txt
+            grep -q 'Apache License' THIRD-PARTY-NOTICES.txt
+          fi
           cp THIRD-PARTY-NOTICES.txt "dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt"
 
       - name: Upload to GitHub Release
