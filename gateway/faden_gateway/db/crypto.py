@@ -33,6 +33,7 @@ returns raw 32-byte key material (e.g. from HashiCorp Vault Transit).
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 from typing import Any, Callable
@@ -218,15 +219,37 @@ class EncryptedJSON(TypeDecorator):
         return json.loads(value)
 
 
-def decrypt_value(ciphertext: str, *, purpose: str = "default") -> str:
-    """Decrypt a standalone Fernet-encrypted string.
+_warned_plaintext: set[str] = set()
+"""Fingerprints of plaintext provider keys already warned about."""
 
-    Used by the LLM adapter to decrypt API keys stored on
-    ``LLMProviderInstance.api_key_encrypted``.
+
+def decrypt_provider_key(stored: str) -> str:
+    """The API key in ``LLMProviderInstance.api_key_encrypted``.
+
+    The backend seals the key with ``SettingsCrypto`` (Fernet under
+    ``sha256(settings master key)``, no HKDF purpose) and the sync copies it
+    unchanged, so it is opened with that same key -- not with the chat-column
+    keys above, whose master key (``FADEN_GATEWAY_ENCRYPTION_KEY``) may be
+    empty. ``faden secrets rotate`` finds these values by the column and this key.
+
+    A value that is not a Fernet token is a key from before the migration
+    ``pr0vk3yg`` sealed the column. It is still used, so a gateway started a
+    moment before its migration, or an old row, does not drop auth, but each
+    one is warned about once. Ciphertext that cannot be opened raises.
     """
-    f = _fernet_for(purpose)
-    if f is None:
-        return ciphertext  # encryption disabled — stored as plaintext
-    if not _is_ciphertext(ciphertext):
-        return ciphertext  # plaintext value
-    return f.decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    if not _is_ciphertext(stored):
+        fingerprint = hashlib.sha256(stored.encode("utf-8")).hexdigest()[:12]
+        if fingerprint not in _warned_plaintext:
+            _warned_plaintext.add(fingerprint)
+            logger.warning(
+                "A provider API key is stored unencrypted (fingerprint %s); "
+                "run the gateway migrations or republish the provider from the backend.",
+                fingerprint,
+            )
+        return stored
+    from faden_gateway.settings import settings  # noqa: PLC0415
+
+    if not settings.settings_master_key:
+        raise InvalidToken("FADEN_GATEWAY_SETTINGS_MASTER_KEY is empty; cannot decrypt the provider API key")
+    digest = hashlib.sha256(settings.settings_master_key.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest)).decrypt(stored.encode("ascii")).decode("utf-8")

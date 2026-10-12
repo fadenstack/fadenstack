@@ -27,6 +27,8 @@ from typing import Any, TYPE_CHECKING
 
 from sqlalchemy import text
 
+from faden_backend.services.system_settings.crypto import SettingsCrypto
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -83,6 +85,20 @@ def _normalize_base_url(url: str) -> str:
     """
     url = url.rstrip("/")
     return _V1_SUFFIX.sub("", url)
+
+
+def _require_sealed(api_key_encrypted: str | None) -> None:
+    """Refuse to copy a provider key into the gateway DB unless it is ciphertext.
+
+    The value is written as it is: backend and gateway share the settings
+    master key (``SettingsCrypto``), so the gateway opens what the backend
+    sealed. A plaintext value here means a missed migration; it must stop
+    rather than land in the gateway's table and its backups.
+    """
+    if api_key_encrypted and not SettingsCrypto.is_ciphertext(api_key_encrypted):
+        raise ValueError(
+            "Refusing to publish a provider API key that is not encrypted; run the backend migrations.",
+        )
 
 
 class GatewaySyncService:
@@ -153,6 +169,7 @@ class GatewaySyncService:
         """
         if not self.enabled:
             return
+        _require_sealed(api_key_encrypted)
         if task:
             node_metadata = {**(node_metadata or {}), "task": task}
         if tools is not None:
@@ -436,6 +453,7 @@ class GatewaySyncService:
         """
         if not self.enabled:
             return None
+        _require_sealed(api_key_encrypted)
         gateway_type = _map_provider_type(backend_provider_type, is_remote=False)
         try:
             async with self._sf() as session:  # type: ignore[union-attr]

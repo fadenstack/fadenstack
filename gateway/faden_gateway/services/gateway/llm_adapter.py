@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 import litellm
 
-from faden_gateway.db.crypto import decrypt_value
+from faden_gateway.db.crypto import decrypt_provider_key
 from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import upstream_tls
 from faden_gateway.services.gateway.ssl_helpers import build_ssl_kwargs
@@ -391,11 +391,11 @@ def _build_litellm_model_name(
 
 
 def _resolve_api_key(encrypted_key: str | None) -> str | None:
-    """Decrypt the Fernet-encrypted API key stored in the DB."""
+    """Decrypt the API key stored in the DB (sealed by the backend, see ``decrypt_provider_key``)."""
     if not encrypted_key:
         return None
     try:
-        return decrypt_value(encrypted_key, purpose="provider-api-key")
+        return decrypt_provider_key(encrypted_key)
     except Exception:
         logger.warning("Failed to decrypt provider API key; sending without auth")
         return None

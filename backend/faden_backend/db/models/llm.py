@@ -145,7 +145,10 @@ class LLMProvider(Base):
     api_key_encrypted: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
-        doc="Encrypted API key for remote endpoint auth.",
+        doc=(
+            "API key for remote endpoint auth, sealed with SettingsCrypto "
+            "(settings master key, no purpose); see services/llm/provider_keys.py."
+        ),
     )
     litellm_provider: Mapped[str | None] = mapped_column(
         String(64),
