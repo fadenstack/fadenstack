@@ -35,6 +35,26 @@ def _as_float(value: object) -> float | None:
         return None
 
 
+#: A spreadsheet reads a cell that starts with one of these as a formula.
+_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: object) -> str:
+    """A value as a CSV cell; text that starts like a formula gets a ``'`` in front.
+
+    A request log holds text a caller chose (model name, error code), which a
+    spreadsheet would otherwise evaluate when an operator opens the export, so
+    Excel shows it instead of running it. Numbers are left alone: a negative
+    one is not a formula.
+    """
+    if value is None:
+        return ""
+    cell = str(value)
+    if isinstance(value, str) and cell.startswith(_FORMULA_STARTS):
+        return "'" + cell
+    return cell
+
+
 class ObservabilityService:
     """Aggregation queries against ``llm_gateway_request_log``."""
 
@@ -480,7 +500,7 @@ class ObservabilityService:
         for row in result.mappings():
             buf = io.StringIO()
             writer = csv.writer(buf)
-            writer.writerow([str(row[c]) if row[c] is not None else "" for c in columns])
+            writer.writerow([_csv_cell(row[c]) for c in columns])
             yield buf.getvalue()
 
     # ── Model names ───────────────────────────────────────────────
