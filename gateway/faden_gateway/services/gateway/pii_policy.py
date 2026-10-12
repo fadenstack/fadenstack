@@ -344,6 +344,18 @@ def resolve_floor(
     return floor
 
 
+def tenant_set_policy(tenant_policy: Any | None) -> bool:
+    """Whether the floor comes from a policy an administrator saved for the tenant.
+
+    The system default does not count: the backend seeds one on every install
+    (cloud routes scanned, ``fail_action`` block), including those that never
+    switched the PII module on. A tenant's ``pii_config`` exists only because
+    someone saved it in the PII settings, which need the module.
+    """
+    raw = getattr(tenant_policy, "pii_config", None) if tenant_policy is not None else None
+    return bool(raw) and parse_pii_policy(raw) is not None
+
+
 def _override_of(row: Any) -> SessionPIIOverride:
     if isinstance(row, SessionPIIOverride):
         return row

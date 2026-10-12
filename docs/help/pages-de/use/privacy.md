@@ -99,6 +99,7 @@ Wenn etwas endgültig gelöscht werden muss, z. B. personenbezogene Daten, die S
 
 | Sie sehen | Was Sie tun |
 |---|---|
+| **A PII policy is set for this workspace, but the PII module is not running.** | Die Richtlinie Ihrer Organisation verlangt die Prüfung auf personenbezogene Daten, und das Modul dafür ist ausgeschaltet. Es wurde nichts gesendet. Wenden Sie sich an Ihren Administrator. |
 | **PII service unavailable and fail_action=block.** | Die Prüfung auf personenbezogene Daten konnte nicht laufen, und die Richtlinie Ihrer Organisation sieht vor, ohne sie keine Nachrichten zu senden. Versuchen Sie es später erneut; wenn es immer wieder passiert, wenden Sie sich an Ihren Administrator. |
 | Eine Antwort zeigt `<PERSON>` oder `[PERSON_1]`, wo ein Name stehen sollte | Der Name wurde maskiert, bevor er das Modell erreichte. Bei **Schwärzen** ist das so vorgesehen. Bei **Tokenisierung (reversibel)** sollte der Name wieder erscheinen; wenn nicht, wenden Sie sich an Ihren Administrator. |
 | **Ihr Administrator hat nicht erlaubt, den PII-Modus für diesen Chat zu ändern.** | Ihre Organisation legt den Modus fest. Die anderen Einstellungen unter **Datenschutz** können Sie möglicherweise trotzdem ändern. |
