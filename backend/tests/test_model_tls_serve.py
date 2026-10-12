@@ -22,7 +22,7 @@ from faden_backend.services.inference.drivers.ray import deployment as dep
 def _facts(*, model_tls: bool, config: dict | None = None) -> SimpleNamespace:
     return SimpleNamespace(
         environment=SimpleNamespace(config_json=config or {"serve_http_port": 8010}, address="10.100.0.2:6390"),
-        head_host="10.250.10.49",
+        head_host="192.0.2.49",
         spec_data={},
         model=SimpleNamespace(display_name="Qwen2.5-0.5B-Instruct"),
         model_tls=model_tls,
@@ -92,10 +92,10 @@ async def test_a_model_behind_the_proxy_is_published_https_for_the_gateways_cert
         "serve_http": {"host": "127.0.0.1", "port": 28010},
     }
     update = await _published(monkeypatch, model_tls=True, run=run)
-    assert update["address"] == "https://10.250.10.49:8010/faden-dep1"
+    assert update["address"] == "https://192.0.2.49:8010/faden-dep1"
     assert update["published"]["machine_tls"] is True
     assert update["published"]["model_tls_pending"] is False
-    assert update["published"]["base_url"] == "https://10.250.10.49:8010/faden-dep1/v1"
+    assert update["published"]["base_url"] == "https://192.0.2.49:8010/faden-dep1/v1"
 
 
 @pytest.mark.anyio
@@ -108,7 +108,7 @@ async def test_a_serve_from_before_is_published_where_it_listens_and_marked_to_m
         "serve_http": {"host": "0.0.0.0", "port": 8010},  # noqa: S104
     }
     update = await _published(monkeypatch, model_tls=True, run=run)
-    assert update["address"] == "http://10.250.10.49:8010/faden-dep1"
+    assert update["address"] == "http://192.0.2.49:8010/faden-dep1"
     assert update["published"]["machine_tls"] is False
     assert update["published"]["model_tls_pending"] is True
 
@@ -124,7 +124,7 @@ async def test_a_loopback_only_port_is_never_published(monkeypatch: pytest.Monke
 @pytest.mark.anyio
 async def test_an_older_agent_reports_nothing_and_is_published_as_before(monkeypatch: pytest.MonkeyPatch) -> None:
     update = await _published(monkeypatch, model_tls=False, run={"route_prefix": "/faden-dep1"})
-    assert update["address"] == "http://10.250.10.49:8010/faden-dep1"
+    assert update["address"] == "http://192.0.2.49:8010/faden-dep1"
     assert update["published"]["machine_tls"] is False
     assert update["published"]["model_tls_pending"] is False
 
@@ -153,5 +153,5 @@ async def test_the_agents_report_survives_the_passes_that_wait_for_the_copies(mo
     await _manager()._publish_endpoint(  # noqa: SLF001
         None, deployment, _facts(model_tls=True), "faden-dep1", ready_replicas=2,
     )
-    assert _Endpoints.updates[-1]["address"] == "https://10.250.10.49:8010/faden-dep1"
+    assert _Endpoints.updates[-1]["address"] == "https://192.0.2.49:8010/faden-dep1"
     assert _Endpoints.updates[-1]["published"]["machine_tls"] is True

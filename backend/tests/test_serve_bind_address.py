@@ -30,7 +30,7 @@ from faden_backend.services.inference.drivers.ray.deployment import (
 )
 
 
-def _facts(config: dict | None = None, head_host: str | None = "10.250.10.71"):
+def _facts(config: dict | None = None, head_host: str | None = "192.0.2.71"):
     """Just enough of _DeploymentFacts for the two methods under test."""
     return SimpleNamespace(
         environment=SimpleNamespace(config_json=config or {}, address="10.100.0.2:6379"),
@@ -51,9 +51,9 @@ class TestBindAddress:
         assert _options(_facts())["http_options"]["host"] == _WILDCARD_BIND
 
     def test_never_binds_the_head_management_ip(self) -> None:
-        """The exact regression: 10.250.10.71 as a bind address."""
-        host = _options(_facts(head_host="10.250.10.71"))["http_options"]["host"]
-        assert host != "10.250.10.71"
+        """The exact regression: 192.0.2.71 as a bind address."""
+        host = _options(_facts(head_host="192.0.2.71"))["http_options"]["host"]
+        assert host != "192.0.2.71"
 
     @pytest.mark.parametrize("location", ["HeadOnly", "EveryNode", "Disabled", None])
     def test_is_the_wildcard_wherever_the_proxy_lands(self, location) -> None:
@@ -102,4 +102,4 @@ class TestPublishedAddress:
         # the endpoint clients are given must resolve back to it.
         facts = _facts()
         assert _options(facts)["http_options"]["host"] in _WILDCARD_BINDS
-        assert facts.head_host == "10.250.10.71"
+        assert facts.head_host == "192.0.2.71"

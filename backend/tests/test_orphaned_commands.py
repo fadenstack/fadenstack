@@ -32,7 +32,7 @@ def _service(session: AsyncSession) -> NodeControlService:
 
 
 async def _node(session: AsyncSession, *, continuity: bool = True) -> InfraNode:
-    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="10.250.10.71", status="healthy",
+    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:8]}", host="192.0.2.71", status="healthy",
                      capabilities_json={"command_continuity": 1} if continuity else {})
     session.add(node)
     await session.flush()

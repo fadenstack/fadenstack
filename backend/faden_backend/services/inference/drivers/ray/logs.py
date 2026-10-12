@@ -145,7 +145,7 @@ class RayLogReader:
 class EngineFailure:
     """The last exception vLLM's engine printed, and what it means for another attempt."""
 
-    #: ``ValueError: ... (on 10.250.10.71)``.
+    #: ``ValueError: ... (on 192.0.2.71)``.
     cause: str
     #: The engine said it did not start (not an exception it lived through).
     start_failed: bool

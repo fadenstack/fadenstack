@@ -19,7 +19,7 @@ from faden_backend.services.inference.bundles import (  # noqa: PLC0415
     default_bundle_registry,
 )
 
-_SPARK = InfraNode(agent_id="spark", host="10.250.10.49", capabilities_json={"machine": "aarch64", "gpu_vendor": "nvidia"})
+_SPARK = InfraNode(agent_id="spark", host="192.0.2.49", capabilities_json={"machine": "aarch64", "gpu_vendor": "nvidia"})
 
 
 def _gb10() -> RuntimeBundleManifest:
@@ -231,7 +231,7 @@ def test_node_compatibility_validation() -> None:
     # 1. Compatible node
     good_node = InfraNode(
         agent_id="gpu-02",
-        host="10.250.10.49",
+        host="192.0.2.49",
         capabilities_json={
             "gpu": {
                 "vendor": "nvidia",
@@ -246,7 +246,7 @@ def test_node_compatibility_validation() -> None:
     # 2. Incompatible vendor
     amd_node = InfraNode(
         agent_id="amd-node",
-        host="10.250.10.99",
+        host="192.0.2.99",
         capabilities_json={"gpu": {"vendor": "amd"}},
     )
     ok_amd, reason_amd = registry.validate_node_compatibility(bundle, amd_node)
@@ -256,7 +256,7 @@ def test_node_compatibility_validation() -> None:
     # 3. Incompatible compute capability
     old_node = InfraNode(
         agent_id="v100-node",
-        host="10.250.10.98",
+        host="192.0.2.98",
         capabilities_json={
             "gpu": {
                 "vendor": "nvidia",

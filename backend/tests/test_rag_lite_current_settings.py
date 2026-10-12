@@ -20,7 +20,7 @@ from faden_backend.settings import settings
 
 def test_a_provider_url_with_or_without_v1_reaches_the_api() -> None:
     assert api_base("http://127.0.0.1:7997") == "http://127.0.0.1:7997/v1"
-    assert api_base("http://10.250.10.71:8102/v1") == "http://10.250.10.71:8102/v1"
+    assert api_base("http://192.0.2.71:8102/v1") == "http://192.0.2.71:8102/v1"
     assert api_base("http://h:8000/v1/") == "http://h:8000/v1"
     assert EmbeddingClient(base_url="http://127.0.0.1:7997", model="m").base_url == "http://127.0.0.1:7997/v1"
 

@@ -166,7 +166,7 @@ test.describe("navigation is not blocked by a slow page", () => {
 
     // Straight to another section while that call is still outstanding.
     await page.goto("/admin/nodes");
-    await expect(page.getByText("10.250.10.49").first()).toBeVisible({
+    await expect(page.getByText("192.0.2.49").first()).toBeVisible({
       timeout: 15_000,
     });
   });

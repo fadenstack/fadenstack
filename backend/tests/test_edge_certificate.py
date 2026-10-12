@@ -79,14 +79,14 @@ def test_machines_are_shown_the_hosts_addresses_not_the_containers(
     tls_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tls_dir / "edge.json").write_text(json.dumps(
-        {"hosts": ["fadenstack", "10.250.10.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
+        {"hosts": ["fadenstack", "192.0.2.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
     ))
-    assert edge_trust.host_urls() == ["http://10.250.10.61:8080", "http://fadenstack:8080"], "an address first"
+    assert edge_trust.host_urls() == ["http://192.0.2.61:8080", "http://fadenstack:8080"], "an address first"
     _serve(tls_dir, until=NOW + timedelta(days=90))
-    assert edge_trust.host_urls()[0] == "https://10.250.10.61:8443"
+    assert edge_trust.host_urls()[0] == "https://192.0.2.61:8443"
     # The interfaces are not asked at all: from a container they are the container's.
     monkeypatch.setattr(install_api.psutil, "net_if_addrs", lambda: pytest.fail("asked the interfaces"))
-    assert install_api.reachable_origins()[0] == {"url": "https://10.250.10.61:8443", "interface": "host"}
+    assert install_api.reachable_origins()[0] == {"url": "https://192.0.2.61:8443", "interface": "host"}
 
 
 def test_without_the_note_the_interfaces_are_still_asked(tls_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:

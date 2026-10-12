@@ -190,7 +190,7 @@ describe("CreateClusterWizard", () => {
 
     const row = (await screen.findByText("gpu-02")).closest("div")
       ?.parentElement as HTMLElement;
-    expect(within(row).getByText(/10\.250\.10\.49/)).toBeInTheDocument();
+    expect(within(row).getByText(/192.0.2.49/)).toBeInTheDocument();
   });
 
   it("says which image each machine will run, without asking", async () => {

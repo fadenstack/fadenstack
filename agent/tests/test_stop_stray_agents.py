@@ -60,8 +60,8 @@ class TestMatching:
         name is python.
         """
         cmdline = [
-            "/home/sachi/.local/faden-agent-venv/bin/python3",
-            "/home/sachi/.local/faden-agent-venv/bin/faden-agent",
+            "/home/user/.local/faden-agent-venv/bin/python3",
+            "/home/user/.local/faden-agent-venv/bin/faden-agent",
             "run",
         ]
         _patch_scan(monkeypatch, [_FakeProc(1782905, cmdline)])

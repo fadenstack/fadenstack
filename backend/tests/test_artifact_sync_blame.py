@@ -4,8 +4,8 @@ What happened on the DGX pair: the backend held no copy of the model, built a
 ``model_sync`` payload with no files in it, sent that to both nodes anyway,
 and recorded each rejection against the node:
 
-    Artifact sync failed on node 10.250.10.71: model_sync payload with files is required.
-    Artifact sync failed on node 10.250.10.49: model_sync payload with files is required.
+    Artifact sync failed on node 192.0.2.71: model_sync payload with files is required.
+    Artifact sync failed on node 192.0.2.49: model_sync payload with files is required.
 
 Both machines were healthy and had done exactly the right thing. The operator
 is sent to investigate two nodes for a problem that lives entirely on the

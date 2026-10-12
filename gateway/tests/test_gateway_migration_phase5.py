@@ -25,7 +25,7 @@ async def test_provider_instance_source_metadata_and_uniqueness(db_session: Asyn
     inst1 = LLMProviderInstance(
         id=uuid.uuid4(),
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/faden-app1",
+        base_url="http://192.0.2.49:8000/faden-app1",
         enabled=True,
         health_status=ProviderHealthStatus.HEALTHY,
         source_kind="inference_deployment",
@@ -44,7 +44,7 @@ async def test_provider_instance_source_metadata_and_uniqueness(db_session: Asyn
             inst_duplicate = LLMProviderInstance(
                 id=uuid.uuid4(),
                 type=ProviderType.VLLM,
-                base_url="http://10.250.10.71:8000/faden-app1-dup",
+                base_url="http://192.0.2.71:8000/faden-app1-dup",
                 enabled=True,
                 health_status=ProviderHealthStatus.HEALTHY,
                 source_kind="inference_deployment",
@@ -94,7 +94,7 @@ async def test_gateway_dao_resolves_source_metadata(db_session: AsyncSession) ->
     inst = LLMProviderInstance(
         id=inst_id,
         type=ProviderType.VLLM,
-        base_url="http://10.250.10.49:8000/app",
+        base_url="http://192.0.2.49:8000/app",
         enabled=True,
         health_status=ProviderHealthStatus.HEALTHY,
         source_kind="inference_deployment",

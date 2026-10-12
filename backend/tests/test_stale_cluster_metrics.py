@@ -74,9 +74,9 @@ async def test_the_rebuild_drops_clusters_that_no_longer_exist(
     alive = await _cluster(dbsession, "gpu-pair")
     deleted = uuid.uuid4()
     await prov.sync_ray_targets(environment_id=alive.id, environment_name="gpu-pair",
-                                targets=[{"address": "10.250.10.71", "port": 36061}])
+                                targets=[{"address": "192.0.2.71", "port": 36061}])
     await prov.sync_ray_targets(environment_id=deleted, environment_name="e2e-muaua9sj",
-                                targets=[{"address": "10.250.10.49", "port": 45129}])
+                                targets=[{"address": "192.0.2.49", "port": 45129}])
 
     await prov.rebuild_all(dbsession)
 
@@ -229,7 +229,7 @@ def _nodes_service(session: AsyncSession) -> NodeControlService:
 
 async def _member_cluster(session: AsyncSession) -> tuple[InferenceEnvironment, InfraNode]:
     env = await _cluster(session)
-    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:6]}", host="10.250.10.220",
+    node = InfraNode(agent_id=f"agent-{uuid.uuid4().hex[:6]}", host="192.0.2.220",
                      status="healthy", capabilities_json={})
     session.add(node)
     await session.flush()

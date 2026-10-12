@@ -161,8 +161,8 @@ async def _machine(session: AsyncSession, host: str, *, caps: dict[str, Any] | N
 
 
 async def _cluster(session: AsyncSession, *, status: str = "ready") -> tuple[InferenceEnvironment, InfraNode, InfraNode]:
-    head = await _machine(session, "10.250.10.71")
-    worker = await _machine(session, "10.250.10.49")
+    head = await _machine(session, "192.0.2.71")
+    worker = await _machine(session, "192.0.2.49")
     plane = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:6]}", driver="ray")
     session.add(plane)
     await session.flush()
@@ -399,9 +399,9 @@ async def test_removing_a_machine_from_a_stopped_cluster_is_just_the_record(dbse
 async def test_candidates_say_why_a_machine_cannot_join(dbsession: AsyncSession) -> None:
     env, _head, _worker = await _cluster(dbsession)
     fabric = {"network": {"fabrics": [{"cidr": "10.100.0.0/24", "ip": "10.100.0.3", "interface": "enp1", "is_up": True}]}}
-    ready = await _machine(dbsession, "10.250.10.80", caps=fabric)
-    no_link = await _machine(dbsession, "10.250.10.81")
-    offline = await _machine(dbsession, "10.250.10.82", caps=fabric, status="offline")
+    ready = await _machine(dbsession, "192.0.2.80", caps=fabric)
+    no_link = await _machine(dbsession, "192.0.2.81")
+    offline = await _machine(dbsession, "192.0.2.82", caps=fabric, status="offline")
     listed = {m["node_id"]: m for m in (await membership.candidates(dbsession, env.id))["machines"]}
     assert listed[str(ready.id)]["can_add"] is True
     assert listed[str(no_link.id)]["reasons"] == ["It has no address on the cluster's network (10.100.0.0/24)."]
@@ -418,7 +418,7 @@ async def test_adding_a_machine_binds_it_checks_it_reaches_the_head_and_bumps_th
     env, head, _worker = await _cluster(dbsession)
     fabric = {"network": {"fabrics": [{"cidr": "10.100.0.0/24", "ip": "10.100.0.3", "interface": "enp9",
                                        "is_up": True, "link_type": "roce", "speed_gbps": 200}]}}
-    newcomer = await _machine(dbsession, "10.250.10.80", caps=fabric)
+    newcomer = await _machine(dbsession, "192.0.2.80", caps=fabric)
     probed: list[set[str]] = []
     reachable: list[bool | None] = [False, True]
 
@@ -465,7 +465,7 @@ async def test_a_machine_in_another_cluster_is_refused(dbsession: AsyncSession) 
 
 @pytest.mark.anyio()
 async def test_a_heartbeat_does_not_undo_drain_or_maintenance(dbsession: AsyncSession) -> None:
-    node = await _machine(dbsession, "10.250.10.49")
+    node = await _machine(dbsession, "192.0.2.49")
     dao = NodeControlDAO(dbsession)
     await dao.set_node_draining(node=node, enabled=True)
     await dao.update_node_heartbeat(node, status="healthy")

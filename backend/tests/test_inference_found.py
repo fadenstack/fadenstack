@@ -74,7 +74,7 @@ def answers(monkeypatch: pytest.MonkeyPatch) -> dict[str, dict[str, Any]]:
     return table
 
 
-async def _machine(session: AsyncSession, containers: list[dict[str, Any]], host: str = "10.250.10.220") -> InfraNode:
+async def _machine(session: AsyncSession, containers: list[dict[str, Any]], host: str = "192.0.2.220") -> InfraNode:
     node = InfraNode(agent_id=f"ws-{uuid.uuid4().hex[:6]}", host=host, status="healthy", capabilities_json={})
     session.add(node)
     await session.flush()
@@ -107,11 +107,11 @@ async def test_found_containers_are_listed_with_where_to_reach_them(
     dbsession: AsyncSession, answers: dict,
 ) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
 
     entry = _entry(await found_vllm.found(dbsession), node, "Qwen3-Embed")
 
-    assert entry["base_url"] == "http://10.250.10.220:7997/v1"
+    assert entry["base_url"] == "http://192.0.2.220:7997/v1"
     assert entry["check"]["models"] == ["qwen3-embedding"]
     assert entry["can_route"] is True and entry["reason"] is None
 
@@ -146,7 +146,7 @@ async def test_a_container_that_does_not_answer_says_so(dbsession: AsyncSession,
     node = await _machine(dbsession, [_embed()])
     entry = _entry(await found_vllm.found(dbsession), node, "Qwen3-Embed")
     assert entry["can_route"] is False
-    assert entry["reason"].startswith("No answer from http://10.250.10.220:7997/v1")
+    assert entry["reason"].startswith("No answer from http://192.0.2.220:7997/v1")
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ async def test_routing_publishes_it_under_the_name_and_touches_nothing_else(
     dbsession: AsyncSession, answers: dict,
 ) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     gateway = _Gateway()
 
     adoption = await found_vllm.route(
@@ -168,14 +168,14 @@ async def test_routing_publishes_it_under_the_name_and_touches_nothing_else(
     assert [c[0] for c in gateway.calls] == ["publish"], "a route, and nothing sent to the machine"
     published = gateway.calls[0][1]
     assert published["alias"] == "embeddings"
-    assert published["base_url"] == "http://10.250.10.220:7997/v1"
+    assert published["base_url"] == "http://192.0.2.220:7997/v1"
     assert published["litellm_model"] == "qwen3-embedding", "the name the container answers to"
     assert published["source_kind"] == "found_container" and published["source_id"] == adoption.id
     assert adoption.state == "routed" and adoption.task == "embeddings"
 
     provider = await dbsession.get(LLMProvider, adoption.provider_id)
     assert provider.source_kind == "found_container" and provider.source_id == str(adoption.id)
-    assert provider.endpoint_url == "http://10.250.10.220:7997/v1"
+    assert provider.endpoint_url == "http://192.0.2.220:7997/v1"
     assert provider.capabilities["found_on"] == node.agent_id
 
     entry = _entry(await found_vllm.found(dbsession, check=False), node, "Qwen3-Embed")
@@ -187,7 +187,7 @@ async def test_routing_publishes_it_under_the_name_and_touches_nothing_else(
 
 async def test_a_name_that_routes_to_something_else_is_refused(dbsession: AsyncSession, answers: dict) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     with pytest.raises(found_vllm.FoundError, match="already routes to something else"):
         await found_vllm.route(
             dbsession, _Gateway(taken={"qwen2.5-0.5b-instruct": True}),
@@ -200,7 +200,7 @@ async def test_a_name_that_routes_to_something_else_is_refused(dbsession: AsyncS
 async def test_a_container_that_turns_out_to_want_a_key_is_refused(dbsession: AsyncSession, answers: dict) -> None:
     """The key can be set through its environment, which the agent never reads."""
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": False, "models": [], "needs_key": True, "error": "It asks for an API key."}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": False, "models": [], "needs_key": True, "error": "It asks for an API key."}
     with pytest.raises(found_vllm.FoundError, match="API key"):
         await found_vllm.route(dbsession, _Gateway(), node_id=node.id, container_name="Qwen3-Embed", alias="e")
     rows = await dbsession.execute(select(InferenceAdoption).where(InferenceAdoption.node_id == node.id))
@@ -209,7 +209,7 @@ async def test_a_container_that_turns_out_to_want_a_key_is_refused(dbsession: As
 
 async def test_releasing_takes_the_route_and_the_provider_away(dbsession: AsyncSession, answers: dict) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     gateway = _Gateway()
     adoption = await found_vllm.route(dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb")
     provider_id = adoption.provider_id
@@ -231,7 +231,7 @@ async def test_releasing_takes_the_route_and_the_provider_away(dbsession: AsyncS
 
 async def test_a_routed_container_is_routed_only_while_it_runs(dbsession: AsyncSession, answers: dict) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     gateway = _Gateway()
     adoption = await found_vllm.route(dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb")
     gateway.calls.clear()
@@ -250,7 +250,7 @@ async def test_a_routed_container_is_routed_only_while_it_runs(dbsession: AsyncS
 
 async def test_a_container_that_was_removed_stops_being_routed(dbsession: AsyncSession, answers: dict) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     gateway = _Gateway()
     adoption = await found_vllm.route(dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb")
 
@@ -341,7 +341,7 @@ async def test_a_deployment_declares_itself_a_chat_model() -> None:
 
 async def test_a_found_container_declares_the_kind_it_was_found_as(dbsession: AsyncSession, answers: dict) -> None:
     node = await _machine(dbsession, [_embed()])
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     gateway = _Gateway()
     await found_vllm.route(dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb")
     assert gateway.calls[0][1]["task"] == "embeddings"
@@ -371,7 +371,7 @@ async def test_a_found_container_is_reached_through_the_proxy_where_the_machine_
 
     node = await _machine(dbsession, [_embed()])
     node.capabilities_json = {"model_tls": 1}
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     proxy = _Proxy({"protected": True, "public_port": 27997, "internal_port": 7997})
     monkeypatch.setattr(RayClusterClient, "model_tls_route", proxy)
     gateway = _Gateway()
@@ -381,7 +381,7 @@ async def test_a_found_container_is_reached_through_the_proxy_where_the_machine_
     )
     assert proxy.calls == [{"node_id": node.id, "public_port": 27997, "internal_port": 7997}]
     published = gateway.calls[0][1]
-    assert published["base_url"] == "https://10.250.10.220:27997/v1" and published["machine_tls"] is True
+    assert published["base_url"] == "https://192.0.2.220:27997/v1" and published["machine_tls"] is True
     assert found_vllm.describe(adoption)["machine_tls"] is True
 
     await found_vllm.release(dbsession, gateway, adoption, commands=object())
@@ -395,12 +395,12 @@ async def test_when_the_proxy_cannot_take_it_it_is_routed_as_before_and_says_so(
 
     node = await _machine(dbsession, [_embed()])
     node.capabilities_json = {"model_tls": 1}
-    answers["http://10.250.10.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
+    answers["http://192.0.2.220:7997/v1"] = {"ok": True, "models": ["qwen3-embedding"], "needs_key": False, "error": None}
     monkeypatch.setattr(RayClusterClient, "model_tls_route", _Proxy(None))
     gateway = _Gateway()
     adoption = await found_vllm.route(
         dbsession, gateway, node_id=node.id, container_name="Qwen3-Embed", alias="emb", commands=object(),
     )
-    assert gateway.calls[0][1]["base_url"] == "http://10.250.10.220:7997/v1"
+    assert gateway.calls[0][1]["base_url"] == "http://192.0.2.220:7997/v1"
     assert gateway.calls[0][1]["machine_tls"] is False
     assert "plain HTTP" in found_vllm.describe(adoption)["model_tls_error"]

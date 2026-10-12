@@ -27,8 +27,8 @@ const t = ((key: string, opts?: Record<string, unknown>) => {
 
 const names: NameLookups = {
   machines: new Map([
-    ["10.250.10.71", "gpu-01"],
-    ["10.250.10.49", "gpu-02"],
+    ["192.0.2.71", "gpu-01"],
+    ["192.0.2.49", "gpu-02"],
   ]),
   deployments: new Map([["faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e", "qwen-chat"]]),
 };
@@ -48,7 +48,7 @@ describe("the filters", () => {
 
 describe("label values", () => {
   it("name the machine behind an address", () => {
-    expect(valueTitle("host", "10.250.10.71", names, t)).toBe("gpu-01 (10.250.10.71)");
+    expect(valueTitle("host", "192.0.2.71", names, t)).toBe("gpu-01 (192.0.2.71)");
     expect(valueTitle("host", "172.17.0.9", names, t)).toBe("172.17.0.9");
   });
 
@@ -77,7 +77,7 @@ describe("the table's machine and source", () => {
   it("say where a model's line came from", () => {
     const labels = {
       job: "ray-serve",
-      host: "10.250.10.71",
+      host: "192.0.2.71",
       app: "faden-e783c0c2-cde1-4385-9d2e-08ea4bd2a52e",
       deployment: "OpenAiIngress",
     };
@@ -87,7 +87,7 @@ describe("the table's machine and source", () => {
 
   it("say a machine's journal is its system log", () => {
     // The agent ships the whole journal -- every service on the host.
-    const labels = { job: "node-agent", host: "10.250.10.49", container: "node-gpu-02" };
+    const labels = { job: "node-agent", host: "192.0.2.49", container: "node-gpu-02" };
     expect(machineOf(labels, names)).toBe("gpu-02");
     expect(sourceOf(labels, names, t)).toBe("System log");
   });
@@ -101,6 +101,6 @@ describe("the query with nothing chosen", () => {
   it("matches every stream, not only those with the first filter's label", () => {
     // It was {container=~".+"}, which hid every model log.
     expect(buildLogql({}, "")).toBe('{job=~".+"}');
-    expect(buildLogql({ host: "10.250.10.71" }, "error")).toBe('{host="10.250.10.71"} |= "error"');
+    expect(buildLogql({ host: "192.0.2.71" }, "error")).toBe('{host="192.0.2.71"} |= "error"');
   });
 });

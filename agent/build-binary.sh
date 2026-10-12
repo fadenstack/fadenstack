@@ -14,8 +14,8 @@
 #
 #   sh build-binary.sh                             # this machine's arch
 #   sh build-binary.sh linux-aarch64               # explicit, needs emulation
-#   sh build-binary.sh linux-aarch64 --remote sachi@10.250.10.49
-#   sh build-binary.sh linux-aarch64 --remote sachi@10.250.10.49 \
+#   sh build-binary.sh linux-aarch64 --remote admin@spark-2
+#   sh build-binary.sh linux-aarch64 --remote admin@spark-2 \
 #        --ssh-key ~/.ssh/id_dgx_spark
 #
 # The result lands in dist/, named the way /api/install/plan expects, with

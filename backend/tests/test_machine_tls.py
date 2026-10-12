@@ -67,9 +67,9 @@ def test_the_ca_can_sign_only_end_certificates() -> None:
 
 def test_a_machine_gets_its_recorded_address_whatever_it_asks_for() -> None:
     ca_cert, ca_key = _ca()
-    csr = _csr(["10.250.10.61", "console.example.org"])  # the server's address, for one
-    cert = auth.sign_machine(csr, names=["10.250.10.49"], ca_cert=ca_cert, ca_key=ca_key, now=NOW)
-    assert _names(cert) == ["10.250.10.49"]
+    csr = _csr(["192.0.2.61", "console.example.org"])  # the server's address, for one
+    cert = auth.sign_machine(csr, names=["192.0.2.49"], ca_cert=ca_cert, ca_key=ca_key, now=NOW)
+    assert _names(cert) == ["192.0.2.49"]
     assert _usage(cert) == [ExtendedKeyUsageOID.SERVER_AUTH], "a machine's key must not work as a client"
     cert.verify_directly_issued_by(ca_cert)
     assert cert.not_valid_after_utc - NOW <= timedelta(days=auth.LEAF_DAYS)
@@ -116,7 +116,7 @@ def test_a_sealed_key_opens_only_with_the_same_master_key_and_purpose() -> None:
 # ── its life in the database ─────────────────────────────────────────────
 
 
-async def _node(session: AsyncSession, host: str = "10.250.10.49") -> InfraNode:
+async def _node(session: AsyncSession, host: str = "192.0.2.49") -> InfraNode:
     node = InfraNode(id=uuid.uuid4(), agent_id=f"agent-{uuid.uuid4().hex[:8]}", host=host)
     session.add(node)
     await session.flush()
@@ -144,20 +144,20 @@ async def test_the_first_pass_makes_the_ca_and_the_gateway_certificate(dbsession
 
 @pytest.mark.anyio
 async def test_a_machine_is_issued_for_its_host_and_paced(dbsession: AsyncSession) -> None:
-    node = await _node(dbsession, host="host=10.250.10.49")
+    node = await _node(dbsession, host="host=192.0.2.49")
     issued = await store.issue_for_node(
         dbsession, MASTER, node_id=node.id, host=node.host, csr_pem=_csr(["evil.example"]), now=NOW,
     )
     cert = x509.load_pem_x509_certificate(issued.cert_pem.encode())
-    assert _names(cert) == ["10.250.10.49"] == issued.names
+    assert _names(cert) == ["192.0.2.49"] == issued.names
     with pytest.raises(store.TooSoonError):
         await store.issue_for_node(dbsession, MASTER, node_id=node.id, host=node.host, csr_pem=_csr(["m"]), now=NOW + timedelta(seconds=5))
     # A new address is a reason to issue at once.
     moved = await store.issue_for_node(
-        dbsession, MASTER, node_id=node.id, host="10.250.10.50", csr_pem=_csr(["m"]), now=NOW + timedelta(seconds=6),
+        dbsession, MASTER, node_id=node.id, host="192.0.2.50", csr_pem=_csr(["m"]), now=NOW + timedelta(seconds=6),
     )
-    assert moved.names == ["10.250.10.50"]
-    assert (await store.status(dbsession, NOW))["machines"][str(node.id)]["names"] == ["10.250.10.50"]
+    assert moved.names == ["192.0.2.50"]
+    assert (await store.status(dbsession, NOW))["machines"][str(node.id)]["names"] == ["192.0.2.50"]
 
 
 @pytest.mark.anyio

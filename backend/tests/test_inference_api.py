@@ -599,7 +599,7 @@ async def make_dgx_node(
                     {
                         "interface": "enP7s7",
                         "ip": mgmt_ip,
-                        "cidr": "10.250.10.0/24",
+                        "cidr": "192.0.2.0/24",
                         "speed_gbps": 1.0,
                         "link_type": "ethernet",
                         "mtu": 1500,
@@ -620,8 +620,8 @@ async def test_environment_plan_endpoint(
 ) -> None:
     cp = await make_control_plane(client, name="cp-plan")
     env = await make_environment(client, cp["id"], name="env-plan")
-    n1 = await make_dgx_node(dbsession, "gpu-02", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "gpu-01", "10.250.10.71", "10.100.0.2")
+    n1 = await make_dgx_node(dbsession, "gpu-02", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "gpu-01", "192.0.2.71", "10.100.0.2")
 
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n1.id), "role": "head"})
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n2.id), "role": "worker"})
@@ -644,8 +644,8 @@ async def test_environment_apply_plan_endpoint(
 ) -> None:
     cp = await make_control_plane(client, name="cp-apply")
     env = await make_environment(client, cp["id"], name="env-apply")
-    n1 = await make_dgx_node(dbsession, "gpu-02", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "gpu-01", "10.250.10.71", "10.100.0.2")
+    n1 = await make_dgx_node(dbsession, "gpu-02", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "gpu-01", "192.0.2.71", "10.100.0.2")
 
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n1.id), "role": "head"})
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n2.id), "role": "worker"})
@@ -672,8 +672,8 @@ async def test_environment_apply_plan_stale_detection_409(
 ) -> None:
     cp = await make_control_plane(client, name="cp-stale")
     env = await make_environment(client, cp["id"], name="env-stale")
-    n1 = await make_dgx_node(dbsession, "gpu-02", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "gpu-01", "10.250.10.71", "10.100.0.2")
+    n1 = await make_dgx_node(dbsession, "gpu-02", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "gpu-01", "192.0.2.71", "10.100.0.2")
 
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n1.id), "role": "head"})
     await client.post(f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n2.id), "role": "worker"})
@@ -721,9 +721,9 @@ async def test_environment_apply_plan_rejects_nodes_added_after_planning(
     """
     cp = await make_control_plane(client, name="cp-added")
     env = await make_environment(client, cp["id"], name="env-added")
-    n1 = await make_dgx_node(dbsession, "spark-add-1", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "spark-add-2", "10.250.10.71", "10.100.0.2")
-    n3 = await make_dgx_node(dbsession, "spark-add-3", "10.250.10.72", "10.100.0.3")
+    n1 = await make_dgx_node(dbsession, "spark-add-1", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "spark-add-2", "192.0.2.71", "10.100.0.2")
+    n3 = await make_dgx_node(dbsession, "spark-add-3", "192.0.2.72", "10.100.0.3")
 
     await client.post(
         f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n1.id), "role": "head"}
@@ -756,8 +756,8 @@ async def test_environment_apply_plan_ignores_tampered_bindings(
     """
     cp = await make_control_plane(client, name="cp-tamper")
     env = await make_environment(client, cp["id"], name="env-tamper")
-    n1 = await make_dgx_node(dbsession, "spark-tamper-1", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "spark-tamper-2", "10.250.10.71", "10.100.0.2")
+    n1 = await make_dgx_node(dbsession, "spark-tamper-1", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "spark-tamper-2", "192.0.2.71", "10.100.0.2")
 
     await client.post(
         f"{API}/environments/{env['id']}/nodes", json={"node_id": str(n1.id), "role": "head"}
@@ -795,8 +795,8 @@ async def test_editing_a_cluster_setting_does_not_delete_its_applied_fabric(
     """
     cp = await make_control_plane(client, name="cp-patch")
     env = await make_environment(client, cp["id"], name="env-patch")
-    n1 = await make_dgx_node(dbsession, "gpu-02", "10.250.10.49", "10.100.0.1")
-    n2 = await make_dgx_node(dbsession, "gpu-01", "10.250.10.71", "10.100.0.2")
+    n1 = await make_dgx_node(dbsession, "gpu-02", "192.0.2.49", "10.100.0.1")
+    n2 = await make_dgx_node(dbsession, "gpu-01", "192.0.2.71", "10.100.0.2")
     await client.post(
         f"{API}/environments/{env['id']}/nodes",
         json={"node_id": str(n1.id), "role": "head"},

@@ -26,20 +26,20 @@ If your backend runs on another host, set the API proxy target before starting d
 
 ```bash
 # PowerShell
-$env:VITE_API_PROXY_TARGET="http://192.168.1.6:8000"
+$env:VITE_API_PROXY_TARGET="http://192.0.2.10:8000"
 npm run dev
 ```
 
 For chat-only API override at build/runtime config time, set:
 
 ```bash
-VITE_CHAT_API_BASE=http://192.168.1.6:8000/api/chat
+VITE_CHAT_API_BASE=http://192.0.2.10:8000/api/chat
 ```
 
 Or set a shared API base for all API modules that support it:
 
 ```bash
-VITE_API_BASE=http://192.168.1.6:8000/api
+VITE_API_BASE=http://192.0.2.10:8000/api
 ```
 
 Use one of these when `/api/chat/*` is not reverse-proxied on the frontend origin.

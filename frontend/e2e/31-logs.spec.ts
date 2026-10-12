@@ -49,9 +49,9 @@ test("filters come from the logs, with names people use", async ({ page }) => {
 
 test("a machine's page opens its logs", async ({ page }) => {
   await page.goto("/admin/nodes");
-  await page.getByText("10.250.10.49", { exact: true }).first().click();
+  await page.getByText("192.0.2.49", { exact: true }).first().click();
   await page.getByRole("button", { name: "Open in Logs" }).click();
-  await expect(page).toHaveURL(/\/admin\/logs\?host=10\.250\.10\.49/);
+  await expect(page).toHaveURL(/\/admin\/logs\?host=192.0.2.49/);
   await expect(page.getByTestId("logs-filter-host")).toContainText("gpu-02", { timeout: 30_000 });
   await page.waitForTimeout(2000);
   await page.screenshot({ path: `${SHOTS}/logs-from-machine-page.png` });

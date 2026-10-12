@@ -172,7 +172,7 @@ async def _create_dgx_spark_node(
                     {
                         "interface": "enP7s7",
                         "ip": mgmt_ip,
-                        "cidr": "10.250.10.0/24",
+                        "cidr": "192.0.2.0/24",
                         "speed_gbps": 1.0,
                         "link_type": "ethernet",
                         "mtu": 1500,
@@ -211,13 +211,13 @@ async def test_end_to_end_zero_config_multi_node_flow(
     node_head = await _create_dgx_spark_node(
         dbsession,
         agent_id="spark-head-ts3202",
-        mgmt_ip="10.250.10.49",
+        mgmt_ip="192.0.2.49",
         roce_ip="10.100.0.1",
     )
     node_worker = await _create_dgx_spark_node(
         dbsession,
         agent_id="spark-worker-3201",
-        mgmt_ip="10.250.10.71",
+        mgmt_ip="192.0.2.71",
         roce_ip="10.100.0.2",
     )
 

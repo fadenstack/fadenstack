@@ -53,12 +53,12 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/faden-dep1",
+        address="http://192.0.2.49:8000/faden-dep1",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
         published_json={
             "model": "meta-llama/Meta-Llama-3-8B-Instruct",
-            "base_url": "http://10.250.10.49:8000/faden-dep1/v1",
+            "base_url": "http://192.0.2.49:8000/faden-dep1/v1",
         },
     )
 
@@ -70,7 +70,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
     mock_gateway_sync.publish_inference_endpoint.assert_awaited_once_with(
         deployment_id=dep_id,
         endpoint_id=endpoint.id,
-        base_url="http://10.250.10.49:8000/faden-dep1/v1",
+        base_url="http://192.0.2.49:8000/faden-dep1/v1",
         alias="llama3",
         served_model_name="meta-llama/Meta-Llama-3-8B-Instruct",
         backend_provider_type="vllm",
@@ -93,7 +93,7 @@ async def test_a_deployment_that_says_its_model_sees_pictures_tells_the_gateway(
         ready_replicas=1, total_replicas=1, spec_json={"service": {"alias": "qwen", "path": "/v1", "vision": True}},
     )
     endpoint = InferenceEndpoint(
-        id=uuid.uuid4(), deployment_id=dep_id, name="openai", address="http://10.250.10.49:8000/faden-q", path="/v1",
+        id=uuid.uuid4(), deployment_id=dep_id, name="openai", address="http://192.0.2.49:8000/faden-q", path="/v1",
         status=EndpointStatus.PUBLISHED, published_json={"model": "Qwen/Qwen3-VL-8B-Instruct"},
     )
     coordinator = InferencePublicationCoordinator(mock_session, gateway_sync=mock_gateway_sync)
@@ -121,7 +121,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/faden-dep2",
+        address="http://192.0.2.49:8000/faden-dep2",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
         published_json={"model": "Qwen/Qwen2.5-Coder-1.5B-Instruct"},
@@ -136,7 +136,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
     mock_gateway_sync.publish_inference_endpoint.assert_awaited_once_with(
         deployment_id=dep_id,
         endpoint_id=endpoint.id,
-        base_url="http://10.250.10.49:8000/faden-dep2/v1",
+        base_url="http://192.0.2.49:8000/faden-dep2/v1",
         alias=None,
         served_model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
         backend_provider_type="vllm",
@@ -168,7 +168,7 @@ async def test_reconcile_publication_carries_the_models_wait_for_a_reply(mock_se
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/faden-dep3",
+        address="http://192.0.2.49:8000/faden-dep3",
         path="/v1",
         status=EndpointStatus.PUBLISHED,
         published_json={"model": "Qwen/Qwen3.8-27B-FP8"},
@@ -263,7 +263,7 @@ async def test_reconcile_publication_unhealthy_endpoint_zero_replicas(mock_sessi
         id=uuid.uuid4(),
         deployment_id=dep_id,
         name="openai",
-        address="http://10.250.10.49:8000/app",
+        address="http://192.0.2.49:8000/app",
         status=EndpointStatus.FAILED,
     )
 

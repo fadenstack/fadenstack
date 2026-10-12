@@ -25,7 +25,7 @@ from faden_backend.services.inference.drivers.ray.logs import (
 from faden_backend.services.inference.observability import LogSource
 
 APP = "faden-534e4266-257f-407d-b5b7-b4bb19fad198"
-HOSTS = ["10.250.10.49", "10.250.10.71"]
+HOSTS = ["192.0.2.49", "192.0.2.71"]
 
 
 # ── the selector ───────────────────────────────────────────────────────────
@@ -35,9 +35,9 @@ HOSTS = ["10.250.10.49", "10.250.10.71"]
     ("source", "hosts", "expected"),
     [
         (LogSource.SERVE_REPLICA, HOSTS,
-         '{job="ray-serve", app="%s", source!="engine", host=~"10\\\\.250\\\\.10\\\\.49|10\\\\.250\\\\.10\\\\.71"}' % APP),
-        (LogSource.ENGINE, ["10.250.10.71"], '{job="ray-serve", app="%s", source="engine", host="10.250.10.71"}' % APP),
-        (LogSource.AGENT, ["10.250.10.49"], '{job="node-agent", host="10.250.10.49"}'),
+         '{job="ray-serve", app="%s", source!="engine", host=~"192\\\\.0\\\\.2\\\\.49|192\\\\.0\\\\.2\\\\.71"}' % APP),
+        (LogSource.ENGINE, ["192.0.2.71"], '{job="ray-serve", app="%s", source="engine", host="192.0.2.71"}' % APP),
+        (LogSource.AGENT, ["192.0.2.49"], '{job="node-agent", host="192.0.2.49"}'),
     ],
     ids=["replicas-on-every-machine", "engine-on-one", "agent-of-one"],
 )
@@ -60,12 +60,12 @@ def _loki(*streams: tuple[dict[str, str], list[tuple[int, str]]]) -> dict[str, A
 
 def test_lines_carry_their_machine_and_read_oldest_first() -> None:
     lines = _lines_from_loki(_loki(
-        ({"host": "10.250.10.71", "level": "error"}, [(2_000, "(EngineCore pid=1) ValueError: no")]),
-        ({"host": "10.250.10.49", "level": "info"}, [(1_000, '{"levelname": "INFO", "message": "Started"}')]),
+        ({"host": "192.0.2.71", "level": "error"}, [(2_000, "(EngineCore pid=1) ValueError: no")]),
+        ({"host": "192.0.2.49", "level": "info"}, [(1_000, '{"levelname": "INFO", "message": "Started"}')]),
     ))
     assert [(line.host, line.level, line.message) for line in lines] == [
-        ("10.250.10.49", "INFO", "Started"),
-        ("10.250.10.71", "ERROR", "(EngineCore pid=1) ValueError: no"),
+        ("192.0.2.49", "INFO", "Started"),
+        ("192.0.2.71", "ERROR", "(EngineCore pid=1) ValueError: no"),
     ]
 
 
@@ -83,7 +83,7 @@ def test_lines_that_share_a_timestamp_read_in_the_order_they_were_written() -> N
         "RuntimeError: replica is shutting down",
     ]
     newest_first = [(5_000, line) for line in reversed(written)]
-    lines = _lines_from_loki(_loki(({"host": "10.250.10.71", "source": "engine"}, newest_first)))
+    lines = _lines_from_loki(_loki(({"host": "192.0.2.71", "source": "engine"}, newest_first)))
     assert [line.message for line in lines] == written
 
 
@@ -117,7 +117,7 @@ async def test_the_old_source_name_reads_the_replicas(monkeypatch: pytest.Monkey
 
 
 def _failed_start(*lines: tuple[int, str]) -> dict[str, Any]:
-    return _loki(({"host": "10.250.10.71", "source": "engine"}, list(lines)))
+    return _loki(({"host": "192.0.2.71", "source": "engine"}, list(lines)))
 
 
 NOW_NS = int(datetime.now(tz=UTC).timestamp() * 1_000_000_000)
@@ -141,7 +141,7 @@ async def test_the_root_cause_is_the_engine_s_last_exception_not_serve_s_summary
     failure = await engine_root_cause(APP)
     assert failure is not None and failure.cause == (
         "ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' "
-        "in Qwen4ExpNGramEmbedding (on 10.250.10.71)"
+        "in Qwen4ExpNGramEmbedding (on 192.0.2.71)"
     )
     assert failure.start_failed and failure.recurs, "loading the same weights again fails again"
 
@@ -206,10 +206,10 @@ async def test_an_earlier_run_s_failure_is_not_this_one_s(monkeypatch: pytest.Mo
 def test_the_whole_deployment_is_one_stream_and_each_line_says_where_from() -> None:
     assert log_selector(LogSource.ALL, app_name=APP, hosts=[]) == f'{{job="ray-serve", app="{APP}"}}'
     lines = _lines_from_loki(_loki(
-        ({"host": "10.250.10.71", "source": "engine"}, [(2_000, "vLLM")]),
-        ({"host": "10.250.10.49"}, [(1_000, '{"message": "Serve, shipped before the source label"}')]),
+        ({"host": "192.0.2.71", "source": "engine"}, [(2_000, "vLLM")]),
+        ({"host": "192.0.2.49"}, [(1_000, '{"message": "Serve, shipped before the source label"}')]),
     ))
-    assert [(line.source, line.host) for line in lines] == [("replica", "10.250.10.49"), ("engine", "10.250.10.71")]
+    assert [(line.source, line.host) for line in lines] == [("replica", "192.0.2.49"), ("engine", "192.0.2.71")]
 
 
 @pytest.mark.anyio()

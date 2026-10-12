@@ -40,17 +40,17 @@ def test_collect_network_interfaces_smoke() -> None:
 def test_parse_proc_net_route(tmp_path: Path) -> None:
     """Test parsing /proc/net/route for default gateway."""
     route_file = tmp_path / "route"
-    # Destination 00000000 with gateway 010AA80A (10.168.10.1 in little-endian hex)
-    # 0A = 10, A8 = 168, 0A = 10, 01 = 1 -> 10.250.10.1 would be 010AFA0A
+    # Destination 00000000 with gateway 010200C0 (192.0.2.1 in little-endian hex)
+    # C0 = 192, 00 = 0, 02 = 2, 01 = 1
     route_file.write_text(
         "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\tMTU\tWindow\tIRTT\n"
-        "enP7s7\t00000000\t010AFA0A\t0003\t0\t0\t100\t00000000\t0\t0\t0\n"
+        "enP7s7\t00000000\t010200C0\t0003\t0\t0\t100\t00000000\t0\t0\t0\n"
         "enp1s0f1np1\t0000640A\t00000000\t0001\t0\t0\t0\t00FFFFFF\t0\t0\t0\n",
         encoding="utf-8",
     )
     iface, gw = _parse_proc_net_route(route_file)
     assert iface == "enP7s7"
-    assert gw == "10.250.10.1"
+    assert gw == "192.0.2.1"
 
 
 def test_mock_dgx_spark_sysfs_roce(tmp_path: Path) -> None:
@@ -62,7 +62,7 @@ def test_mock_dgx_spark_sysfs_roce(tmp_path: Path) -> None:
     # Setup proc route: enP7s7 is management default gateway
     proc_route.write_text(
         "Iface\tDestination\tGateway\n"
-        "enP7s7\t00000000\t010AFA0A\n",
+        "enP7s7\t00000000\t010200C0\n",
         encoding="utf-8",
     )
 
@@ -117,7 +117,7 @@ def test_mock_dgx_spark_sysfs_roce(tmp_path: Path) -> None:
         "enP7s7": [
             MockSnicAddr(
                 family=pytest.importorskip("socket").AF_INET,
-                address="10.250.10.49",
+                address="192.0.2.49",
                 netmask="255.255.255.0",
                 broadcast=None,
                 ptp=None,
@@ -156,12 +156,12 @@ def test_mock_dgx_spark_sysfs_roce(tmp_path: Path) -> None:
     assert mgmt_if.link_type == "ethernet"
     assert mgmt_if.rdma_device is None
     assert mgmt_if.has_default_route is True
-    assert mgmt_if.ips[0].ip == "10.250.10.49"
+    assert mgmt_if.ips[0].ip == "192.0.2.49"
 
     # Verify normalized summary
     summary = summarize_network_inventory(interfaces)
     assert summary["default_route_interface"] == "enP7s7"
-    assert summary["default_route_ip"] == "10.250.10.49"
+    assert summary["default_route_ip"] == "192.0.2.49"
     assert len(summary["fabrics"]) == 2
     fabrics_by_if = {f["interface"]: f for f in summary["fabrics"]}
     assert fabrics_by_if["enp1s0f1np1"]["link_type"] == "roce"

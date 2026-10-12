@@ -72,8 +72,8 @@ async def test_fabric_addresses_become_management_addresses(
     dbsession: AsyncSession,
 ) -> None:
     """The exact regression: a target nothing could reach."""
-    head = await _node(dbsession, "10.250.10.71")
-    worker = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.71")
+    worker = await _node(dbsession, "192.0.2.49")
     env = _Env(
         {
             str(head.id): {"ip": "10.100.0.2"},
@@ -86,8 +86,8 @@ async def test_fabric_addresses_become_management_addresses(
     )
 
     assert [(t.address, t.port) for t in targets] == [
-        ("10.250.10.71", 40535),
-        ("10.250.10.49", 44961),
+        ("192.0.2.71", 40535),
+        ("192.0.2.49", 44961),
     ]
     assert all("10.100." not in t.url for t in targets)
 
@@ -97,8 +97,8 @@ async def test_every_node_is_registered_not_only_the_head(
     dbsession: AsyncSession,
 ) -> None:
     """A replica's engine metrics live on the node it runs on, nowhere else."""
-    head = await _node(dbsession, "10.250.10.71")
-    worker = await _node(dbsession, "10.250.10.49")
+    head = await _node(dbsession, "192.0.2.71")
+    worker = await _node(dbsession, "192.0.2.49")
     env = _Env({str(head.id): {"ip": "10.100.0.2"}, str(worker.id): {"ip": "10.100.0.1"}})
 
     targets = await RayDriver()._scrape_targets(
@@ -142,12 +142,12 @@ async def test_sync_writes_entries_the_dashboard_can_select(tmp_path: Path) -> N
     written = await prov.sync_ray_targets(
         environment_id=env_id,
         environment_name="dgx-pair",
-        targets=[{"address": "10.250.10.71", "port": 40535}],
+        targets=[{"address": "192.0.2.71", "port": 40535}],
     )
     assert written == 1
 
     entries = json.loads(targets_file.read_text(encoding="utf-8"))
-    assert entries[0]["targets"] == ["10.250.10.71:40535"]
+    assert entries[0]["targets"] == ["192.0.2.71:40535"]
     labels = entries[0]["labels"]
     assert labels["job"] == "ray"
     assert labels["environment_id"] == str(env_id)
@@ -176,19 +176,19 @@ async def test_syncing_replaces_this_cluster_and_leaves_others_alone(
     await prov.sync_ray_targets(
         environment_id=env_id,
         environment_name="dgx-pair",
-        targets=[{"address": "10.250.10.71", "port": 40535}],
+        targets=[{"address": "192.0.2.71", "port": 40535}],
     )
     # A cluster that lost a node must lose its target, not keep a stale one.
     await prov.sync_ray_targets(
         environment_id=env_id,
         environment_name="dgx-pair",
-        targets=[{"address": "10.250.10.49", "port": 44961}],
+        targets=[{"address": "192.0.2.49", "port": 44961}],
     )
 
     entries = json.loads(targets_file.read_text(encoding="utf-8"))
     ray_entries = [e for e in entries if e["labels"].get("environment_id") == str(env_id)]
     assert len(ray_entries) == 1
-    assert ray_entries[0]["targets"] == ["10.250.10.49:44961"]
+    assert ray_entries[0]["targets"] == ["192.0.2.49:44961"]
     # The legacy runtime entry is untouched.
     assert any(e["labels"].get("runtime_id") == "legacy" for e in entries)
 
@@ -272,7 +272,7 @@ def test_the_serve_panels_select_labels_that_exist() -> None:
     left three selectors that do not survive the move. Each label was checked
     against the live cluster:
 
-        instance    is always host:port -- "10.250.10.71:40535", never a
+        instance    is always host:port -- "192.0.2.71:40535", never a
                     cluster name, so ``instance="<cluster>"`` matched nothing.
         status      does not exist; Serve's label is ``status_code`` and it
                     carries the code itself (200, 404), not a family ("2xx").
@@ -355,8 +355,8 @@ async def test_a_backend_restart_does_not_wipe_a_clusters_targets(
         environment_id=env_id,
         environment_name="dgx-pair",
         targets=[
-            {"address": "10.250.10.71", "port": 40535},
-            {"address": "10.250.10.49", "port": 44961},
+            {"address": "192.0.2.71", "port": 40535},
+            {"address": "192.0.2.49", "port": 44961},
         ],
     )
     await prov.rebuild_all(dbsession)

@@ -1386,8 +1386,8 @@ def _serve_starting(app_name: str) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("cause", "stops"),
     [
-        ("ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 10.250.10.49)", True),
-        ("ValueError: Free memory on device cuda:0 (1.6/121.69 GiB) on startup is less than desired (on 10.250.10.71)",
+        ("ValueError: There is no module or parameter named 'ngram_embedding.weight_scale' (on 192.0.2.49)", True),
+        ("ValueError: Free memory on device cuda:0 (1.6/121.69 GiB) on startup is less than desired (on 192.0.2.71)",
          False),
     ],
     ids=["comes-back-every-time", "can-pass"],

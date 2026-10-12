@@ -1,9 +1,9 @@
 {
   "gpu-01": {
-    "lan_ip": "10.250.10.71",
+    "lan_ip": "192.0.2.71",
     "network": {
       "default_route_interface": "enP7s7",
-      "default_route_ip": "10.250.10.71",
+      "default_route_ip": "192.0.2.71",
       "fabrics": [
         {
           "cidr": "172.18.0.0/16",
@@ -54,10 +54,10 @@
           "speed_mbps": 200000
         },
         {
-          "cidr": "10.250.10.0/24",
+          "cidr": "192.0.2.0/24",
           "has_default_route": true,
           "interface": "enP7s7",
-          "ip": "10.250.10.71",
+          "ip": "192.0.2.71",
           "is_up": true,
           "is_virtual": false,
           "link_type": "ethernet",
@@ -102,15 +102,15 @@
           "speed_mbps": null
         }
       ],
-      "management_ip": "10.250.10.71",
+      "management_ip": "192.0.2.71",
       "omitted_ephemeral_interfaces": 0
     }
   },
   "gpu-02": {
-    "lan_ip": "10.250.10.49",
+    "lan_ip": "192.0.2.49",
     "network": {
       "default_route_interface": "enP7s7",
-      "default_route_ip": "10.250.10.49",
+      "default_route_ip": "192.0.2.49",
       "fabrics": [
         {
           "cidr": "172.19.0.0/16",
@@ -225,10 +225,10 @@
           "speed_mbps": 200000
         },
         {
-          "cidr": "10.250.10.0/24",
+          "cidr": "192.0.2.0/24",
           "has_default_route": true,
           "interface": "enP7s7",
-          "ip": "10.250.10.49",
+          "ip": "192.0.2.49",
           "is_up": true,
           "is_virtual": false,
           "link_type": "ethernet",
@@ -273,7 +273,7 @@
           "speed_mbps": null
         }
       ],
-      "management_ip": "10.250.10.49",
+      "management_ip": "192.0.2.49",
       "omitted_ephemeral_interfaces": 21
     }
   }

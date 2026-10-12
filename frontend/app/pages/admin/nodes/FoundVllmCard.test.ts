@@ -7,7 +7,7 @@ import { suggestName } from "./FoundVllmCard";
 
 function entry(served: string[], model: string | null = "Qwen/Qwen3-Embedding-0.6B"): FoundEntry {
   return {
-    node: { id: "n1", name: "workstation", host: "10.250.10.220", status: "healthy" },
+    node: { id: "n1", name: "workstation", host: "192.0.2.220", status: "healthy" },
     reported_at: null,
     container: {
       name: "Qwen3-Embed", id: "abc", image: "vllm/vllm-openai:v0.8.5", state: "running",
@@ -15,7 +15,7 @@ function entry(served: string[], model: string | null = "Qwen/Qwen3-Embedding-0.
       task: "embeddings", task_from: "flags", api_key_required: false, managed_by: null, gpus: "all",
       settings: {}, args: [],
     },
-    base_url: "http://10.250.10.220:7997/v1",
+    base_url: "http://192.0.2.220:7997/v1",
     adoption: null,
     can_route: true,
     reason: null,

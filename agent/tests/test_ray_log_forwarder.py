@@ -63,7 +63,7 @@ def serve_dir(tmp_path: Path) -> Path:
 
 
 def _forwarder(tmp_path: Path, loki: _Loki) -> RayServeLogForwarder:
-    return RayServeLogForwarder(loki=loki, host="10.250.10.71", session_dir=str(tmp_path))
+    return RayServeLogForwarder(loki=loki, host="192.0.2.71", session_dir=str(tmp_path))
 
 
 def _entry(message: str, level: str = "INFO") -> str:
@@ -241,7 +241,7 @@ async def test_the_stream_is_labelled_for_the_deployment_panel(
     # Its own job: an operator reading a workload's logs should not have to
     # filter the agent's out.
     assert labels["job"] == "ray-serve"
-    assert labels["host"] == "10.250.10.71"
+    assert labels["host"] == "192.0.2.71"
     assert labels["app"] == APP
     assert labels["deployment"] == "LLMServer_Qwen2_5-0_5B-Instruct"
     assert labels["replica"] == "wib8cvxx"

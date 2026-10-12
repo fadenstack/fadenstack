@@ -56,12 +56,12 @@ class _Backend:
 def config(tmp_path: Path) -> SimpleNamespace:
     return SimpleNamespace(
         state_path=tmp_path / "state.json",
-        backend_url="http://10.250.10.220:8100",
+        backend_url="http://192.0.2.220:8100",
         container_runtime=None,
         model_store_root="/srv/faden/models",
         ray_session_dir="/var/lib/faden/ray",
         agent_id="workstation-wsl",
-        advertise_host="10.250.10.220",
+        advertise_host="192.0.2.220",
     )
 
 

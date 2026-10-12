@@ -116,9 +116,9 @@ async def _bound_environment(dbsession: AsyncSession) -> InferenceEnvironment:
     dbsession.add(env)
     await dbsession.flush()
 
-    head = InfraNode(agent_id="spark-a", host="10.250.10.49", status="healthy",
+    head = InfraNode(agent_id="spark-a", host="192.0.2.49", status="healthy",
                      capabilities_json=_caps("10.100.0.1"))
-    worker = InfraNode(agent_id="spark-b", host="10.250.10.71", status="healthy",
+    worker = InfraNode(agent_id="spark-b", host="192.0.2.71", status="healthy",
                        capabilities_json=_caps("10.100.0.2"))
     dbsession.add_all([head, worker])
     await dbsession.flush()
@@ -180,11 +180,11 @@ async def test_rebinding_a_live_head_is_refused(dbsession: AsyncSession) -> None
     # Re-bind the environment to the management LAN while the head is live.
     resolved = dict(env.observed_status_json["resolved_fabric"])
     bindings = {
-        nid: {**b, "ip": "10.250.10.49", "interface": "enP7s7"}
+        nid: {**b, "ip": "192.0.2.49", "interface": "enP7s7"}
         for nid, b in resolved["node_bindings"].items()
     }
     resolved["node_bindings"] = bindings
-    resolved["cidr"] = "10.250.10.0/24"
+    resolved["cidr"] = "192.0.2.0/24"
     observed = dict(env.observed_status_json)
     observed["resolved_fabric"] = resolved
     env.observed_status_json = observed
@@ -219,7 +219,7 @@ async def test_rebinding_is_allowed_once_the_cluster_is_down(
 
     env.desired_state = "running"
     env.generation += 1
-    node_control = _FakeNodeControl(head_ip="10.250.10.49")
+    node_control = _FakeNodeControl(head_ip="192.0.2.49")
     await manager.reconcile_environment(dbsession, env, node_control=node_control)
 
     assert node_control.by_type(NodeCommandType.START_RAY_HEAD.value)

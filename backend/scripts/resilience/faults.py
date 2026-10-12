@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import http.cookiejar
 import json
+import os
 import subprocess
 import sys
 import time
@@ -185,8 +186,10 @@ def main() -> int:
     parser.add_argument("--model", default="qwen2.5-0.5b-instruct", help="name to chat with through the gateway")
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--gateway", default="http://127.0.0.1:8001")
-    parser.add_argument("--head", default="sachi@10.250.10.71")
-    parser.add_argument("--worker", default="sachi@10.250.10.49")
+    parser.add_argument("--head", default=os.environ.get("FADEN_FAULT_HEAD"), required="FADEN_FAULT_HEAD" not in os.environ,
+                        help="ssh target of the head machine, user@host (or env FADEN_FAULT_HEAD)")
+    parser.add_argument("--worker", default=os.environ.get("FADEN_FAULT_WORKER"), required="FADEN_FAULT_WORKER" not in os.environ,
+                        help="ssh target of a worker machine, user@host (or env FADEN_FAULT_WORKER)")
     parser.add_argument("--key", default=str(Path.home() / ".ssh" / "id_dgx_spark"))
     parser.add_argument("--timeout", type=float, default=900)
     parser.add_argument("--settle", type=float, default=120, help="healthy this long ends a no-break run")

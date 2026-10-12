@@ -1619,6 +1619,6 @@
     "checks_passed": 11,
     "checks_total": 11,
     "timestamp": "2026-10-12T12:01:12Z",
-    "detail": "NVIDIA DGX Spark Two-Node Pair (GB10): 10.88.10.49, 10.88.10.71"
+    "detail": "NVIDIA DGX Spark Two-Node Pair (GB10): two DGX Spark machines"
   }
 }

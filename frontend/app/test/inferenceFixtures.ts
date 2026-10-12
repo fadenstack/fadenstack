@@ -52,7 +52,7 @@ export const managedNodes: ManagedNode[] = [
   {
     id: HEAD_NODE_ID,
     agent_id: "gpu-02",
-    host: "10.250.10.49",
+    host: "192.0.2.49",
     status: "healthy",
     version: "0.1.7",
     labels: {},
@@ -67,7 +67,7 @@ export const managedNodes: ManagedNode[] = [
   {
     id: WORKER_NODE_ID,
     agent_id: "gpu-01",
-    host: "10.250.10.71",
+    host: "192.0.2.71",
     status: "healthy",
     version: "0.1.7",
     labels: {},
@@ -413,7 +413,7 @@ export const plan: EnvironmentPlan = {
     {
       candidate_id: "cand-mgmt",
       fabric_type: "ethernet",
-      cidr: "10.250.10.0/24",
+      cidr: "192.0.2.0/24",
       speed_gbps: 10,
       mtu: 1500,
       is_management: true,

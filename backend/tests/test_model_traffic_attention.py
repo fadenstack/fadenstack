@@ -59,8 +59,8 @@ async def _cluster_with(session: AsyncSession, published: dict[str, Any]) -> Inf
 
 
 async def test_a_cluster_still_on_plain_http_is_named(dbsession: AsyncSession) -> None:
-    plain = await _cluster_with(dbsession, {"base_url": "http://10.250.10.49:8010/a/v1", "model_tls_pending": True})
-    await _cluster_with(dbsession, {"base_url": "https://10.250.10.49:8010/b/v1", "machine_tls": True})
+    plain = await _cluster_with(dbsession, {"base_url": "http://192.0.2.49:8010/a/v1", "model_tls_pending": True})
+    await _cluster_with(dbsession, {"base_url": "https://192.0.2.49:8010/b/v1", "machine_tls": True})
     items = await attention.model_traffic(_Facts(dbsession, NOW))  # type: ignore[arg-type]
     unencrypted = [i for i in items if i.code == "model_traffic_unencrypted"]
     assert [i.params["cluster"] for i in unencrypted] == [plain.name]
@@ -69,7 +69,7 @@ async def test_a_cluster_still_on_plain_http_is_named(dbsession: AsyncSession) -
 
 async def test_certificates_that_should_have_renewed(dbsession: AsyncSession) -> None:
     await store.maintain(dbsession, "k", NOW)
-    node = InfraNode(agent_id=f"a-{uuid.uuid4().hex[:6]}", host="10.250.10.71")
+    node = InfraNode(agent_id=f"a-{uuid.uuid4().hex[:6]}", host="192.0.2.71")
     dbsession.add(node)
     await dbsession.flush()
     from cryptography import x509  # noqa: PLC0415
@@ -88,6 +88,6 @@ async def test_certificates_that_should_have_renewed(dbsession: AsyncSession) ->
     assert not [i for i in await attention.model_traffic(_Facts(dbsession, NOW)) if "certificate" in i.code]  # type: ignore[arg-type]
     late = NOW + timedelta(days=27)  # three days left: renewal (at ten) has been failing for a week
     codes = {i.code: i for i in await attention.model_traffic(_Facts(dbsession, late))}  # type: ignore[arg-type]
-    assert codes["machine_certificate_expiring"].params["machine"] == "10.250.10.71"
+    assert codes["machine_certificate_expiring"].params["machine"] == "192.0.2.71"
     assert codes["machine_certificate_expiring"].severity == "warning"
     assert "gateway_machine_certificate_expiring" in codes

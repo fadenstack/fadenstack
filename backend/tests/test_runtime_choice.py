@@ -60,7 +60,7 @@ def _registry(*runtimes: RuntimeBundleManifest) -> RuntimeBundleRegistry:
     return registry
 
 
-def _spark(host: str = "10.250.10.49") -> InfraNode:
+def _spark(host: str = "192.0.2.49") -> InfraNode:
     return InfraNode(id=uuid.uuid4(), agent_id=f"agent-{uuid.uuid4().hex[:8]}", host=host, status="healthy",
                      capabilities_json={"machine": "aarch64", "gpu_vendor": "nvidia"})
 
@@ -128,7 +128,7 @@ async def _pair(session: AsyncSession, *, started: str | None = None) -> tuple[I
     cp = InferenceControlPlane(name=f"cp-{uuid.uuid4().hex[:8]}", driver="ray")
     session.add(cp)
     await session.flush()
-    nodes = [_spark("10.250.10.49"), _spark("10.250.10.71")]
+    nodes = [_spark("192.0.2.49"), _spark("192.0.2.71")]
     session.add_all(nodes)
     await session.flush()
     observed: dict[str, Any] = {"runtime": {str(n.id): started for n in nodes}} if started else {}
@@ -253,7 +253,7 @@ async def test_a_taken_over_cluster_keeps_what_its_machines_run(
     from faden_backend.services.inference import takeover  # noqa: PLC0415
 
     monkeypatch.setattr(takeover, "default_bundle_registry", registry)
-    node, unknown = _spark(), _spark("10.250.10.71")
+    node, unknown = _spark(), _spark("192.0.2.71")
     runs = {node.id: registry.get_bundle(PREVIEW).container.image, unknown.id: "someone/else:1"}
 
     async def latest(self: Any, *, node_ids: list[Any]) -> dict[Any, Any]:

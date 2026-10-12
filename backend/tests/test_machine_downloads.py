@@ -96,8 +96,8 @@ BLOCKED = {"reachable": False, "error": "ConnectTimeout: timed out"}
 
 
 async def test_it_is_off_until_switched_on(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1, "10.250.10.49": 1})
-    machines = _Machines({"10.250.10.71": REACHES, "10.250.10.49": REACHES})
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1, "192.0.2.49": 1})
+    machines = _Machines({"192.0.2.71": REACHES, "192.0.2.49": REACHES})
     for node in nodes:
         machines.know(node)
 
@@ -109,39 +109,39 @@ async def test_it_is_off_until_switched_on(dbsession: AsyncSession) -> None:
 
 
 async def test_a_machine_without_internet_keeps_the_switch_off_and_is_named(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1, "10.250.10.49": 1})
-    machines = _Machines({"10.250.10.71": REACHES, "10.250.10.49": BLOCKED})
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1, "192.0.2.49": 1})
+    machines = _Machines({"192.0.2.71": REACHES, "192.0.2.49": BLOCKED})
     for node in nodes:
         machines.know(node)
 
     status = await machine_downloads.environment_status(dbsession, machines, env.id)
     assert status["can_switch_on"] is False
-    assert "10.250.10.49" in status["reason"] and "ConnectTimeout" in status["reason"]
-    assert {m["host"]: m["problem"] for m in status["machines"]} == {"10.250.10.49": "no_internet", "10.250.10.71": None}
-    assert "10.250.10.71" not in status["reason"]
+    assert "192.0.2.49" in status["reason"] and "ConnectTimeout" in status["reason"]
+    assert {m["host"]: m["problem"] for m in status["machines"]} == {"192.0.2.49": "no_internet", "192.0.2.71": None}
+    assert "192.0.2.71" not in status["reason"]
 
-    with pytest.raises(machine_downloads.MachineDownloadsError, match="10.250.10.49"):
+    with pytest.raises(machine_downloads.MachineDownloadsError, match="192.0.2.49"):
         await machine_downloads.switch(dbsession, machines, env.id, on=True)
     assert machine_downloads.enabled(env) is False
 
 
 async def test_an_old_agent_is_not_asked_and_says_what_to_do(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1, "10.250.10.49": 0})
-    machines = _Machines({"10.250.10.71": REACHES})
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1, "192.0.2.49": 0})
+    machines = _Machines({"192.0.2.71": REACHES})
     for node in nodes:
         machines.know(node)
 
     status = await machine_downloads.environment_status(dbsession, machines, env.id)
 
-    assert machines.asked == ["10.250.10.71"]
+    assert machines.asked == ["192.0.2.71"]
     assert status["can_switch_on"] is False
-    assert "0.2.2" in status["reason"] and "10.250.10.49" in status["reason"]
-    assert {m["host"]: m["problem"] for m in status["machines"]} == {"10.250.10.71": None, "10.250.10.49": "old_agent"}
+    assert "0.2.2" in status["reason"] and "192.0.2.49" in status["reason"]
+    assert {m["host"]: m["problem"] for m in status["machines"]} == {"192.0.2.71": None, "192.0.2.49": "old_agent"}
 
 
 async def test_a_machine_that_does_not_answer_is_not_taken_for_online(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1})
-    machines = _Machines({"10.250.10.71": None})
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1})
+    machines = _Machines({"192.0.2.71": None})
     machines.know(nodes[0])
     status = await machine_downloads.environment_status(dbsession, machines, env.id)
     assert status["machines"][0]["internet"] is None
@@ -149,8 +149,8 @@ async def test_a_machine_that_does_not_answer_is_not_taken_for_online(dbsession:
 
 
 async def test_switching_on_asks_again_and_keeps_the_rest_of_the_config(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1, "10.250.10.49": 1})
-    machines = _Machines({"10.250.10.71": REACHES, "10.250.10.49": REACHES})
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1, "192.0.2.49": 1})
+    machines = _Machines({"192.0.2.71": REACHES, "192.0.2.49": REACHES})
     for node in nodes:
         machines.know(node)
     await machine_downloads.environment_status(dbsession, machines, env.id)  # answers cached
@@ -158,7 +158,7 @@ async def test_switching_on_asks_again_and_keeps_the_rest_of_the_config(dbsessio
 
     status = await machine_downloads.switch(dbsession, machines, env.id, on=True)
 
-    assert sorted(machines.asked) == ["10.250.10.49", "10.250.10.71"], "asked again, not from the cache"
+    assert sorted(machines.asked) == ["192.0.2.49", "192.0.2.71"], "asked again, not from the cache"
     assert status["on"] is True
     assert env.config_json["ray_tls"] is True
     assert env.config_json["artifacts"][machine_downloads.CONFIG_KEY] is True
@@ -168,8 +168,8 @@ async def test_switching_on_asks_again_and_keeps_the_rest_of_the_config(dbsessio
 
 
 async def test_only_a_machine_of_such_a_cluster_gets_the_token(dbsession: AsyncSession) -> None:
-    _env_on, on_nodes = await _cluster(dbsession, {"10.250.10.71": 1}, on=True)
-    _env_off, off_nodes = await _cluster(dbsession, {"10.250.10.220": 1})
+    _env_on, on_nodes = await _cluster(dbsession, {"192.0.2.71": 1}, on=True)
+    _env_off, off_nodes = await _cluster(dbsession, {"192.0.2.220": 1})
     assert await machine_downloads.node_may_download(dbsession, on_nodes[0].id) is True
     assert await machine_downloads.node_may_download(dbsession, off_nodes[0].id) is False
 
@@ -197,7 +197,7 @@ async def test_the_machines_are_told_to_download_it_themselves(
     monkeypatch.setattr(settings, "model_store_root", str(tmp_path))
     started = AsyncMock()
     monkeypatch.setattr(llm_tasks.download_model_task, "kiq", started)
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1, "10.250.10.49": 1}, on=True)
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1, "192.0.2.49": 1}, on=True)
     model = await _model(dbsession)
     blobs = tmp_path / f"models--{model.hf_repo_id.replace('/', '--')}" / "blobs"
     blobs.mkdir(parents=True)
@@ -223,10 +223,10 @@ async def test_the_machines_are_told_to_download_it_themselves(
 
 
 async def test_a_machine_that_reaches_the_hub_but_cannot_write_its_store_keeps_it_off(dbsession: AsyncSession) -> None:
-    env, nodes = await _cluster(dbsession, {"10.250.10.71": 1})
-    machines = _Machines({"10.250.10.71": REACHES | {
-        "store_problem": "/home/sachi/.cache/huggingface/.locks belongs to root and the agent (running as sachi) "
-                         "cannot write to it. Fix it on the machine with: sudo chown -R sachi: /home/sachi/.cache/huggingface/.locks",
+    env, nodes = await _cluster(dbsession, {"192.0.2.71": 1})
+    machines = _Machines({"192.0.2.71": REACHES | {
+        "store_problem": "/home/user/.cache/huggingface/.locks belongs to root and the agent (running as user) "
+                         "cannot write to it. Fix it on the machine with: sudo chown -R user: /home/user/.cache/huggingface/.locks",
     }})
     machines.know(nodes[0])
 
@@ -234,4 +234,4 @@ async def test_a_machine_that_reaches_the_hub_but_cannot_write_its_store_keeps_i
 
     assert status["can_switch_on"] is False
     assert status["machines"][0]["problem"] == "store_not_writable"
-    assert "sudo chown" in status["reason"] and "10.250.10.71" in status["reason"]
+    assert "sudo chown" in status["reason"] and "192.0.2.71" in status["reason"]

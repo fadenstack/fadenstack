@@ -187,13 +187,13 @@ async def test_an_agent_on_https_never_moves_back(tmp_path: Path, monkeypatch: p
 
 
 def test_only_a_move_to_https_on_the_same_host_is_followed() -> None:
-    assert https_target("http://10.250.10.61", "https://10.250.10.61/api/health") == "https://10.250.10.61"
-    assert https_target("http://10.250.10.61:8080", "https://10.250.10.61:8443/x") == "https://10.250.10.61:8443"
+    assert https_target("http://192.0.2.61", "https://192.0.2.61/api/health") == "https://192.0.2.61"
+    assert https_target("http://192.0.2.61:8080", "https://192.0.2.61:8443/x") == "https://192.0.2.61:8443"
     assert https_target("http://Box.lan", "https://box.lan/") == "https://box.lan"
-    assert https_target("http://10.250.10.61", "https://evil.example/api") is None
-    assert https_target("http://10.250.10.61", "http://10.250.10.61:8080/") is None
-    assert https_target("https://10.250.10.61", "https://10.250.10.61:8443/") is None
-    assert https_target("http://10.250.10.61", "/relative") is None
+    assert https_target("http://192.0.2.61", "https://evil.example/api") is None
+    assert https_target("http://192.0.2.61", "http://192.0.2.61:8080/") is None
+    assert https_target("https://192.0.2.61", "https://192.0.2.61:8443/") is None
+    assert https_target("http://192.0.2.61", "/relative") is None
 
 
 @pytest.mark.asyncio

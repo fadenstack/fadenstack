@@ -91,12 +91,12 @@ def test_a_new_address_of_this_machine_gets_a_certificate_that_lists_it(
     install: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     tls.generate(install)
-    monkeypatch.setattr(tls, "machine_names", lambda: [*NAMES, "10.250.10.99"])
+    monkeypatch.setattr(tls, "machine_names", lambda: [*NAMES, "192.0.2.99"])
     result = tls.renew(install)
     assert result.action == "renewed"
-    assert "10.250.10.99" in result.message
+    assert "192.0.2.99" in result.message
     assert result.summary is not None
-    assert "10.250.10.99" in result.summary.names
+    assert "192.0.2.99" in result.summary.names
 
 
 def test_the_operators_renewed_files_are_taken_from_where_they_came(install: Path, tmp_path: Path) -> None:
@@ -150,7 +150,7 @@ def test_a_certificate_close_to_its_end_with_no_renewed_files_warns(install: Pat
 def test_the_backend_is_told_this_hosts_addresses_and_ports(install: Path) -> None:
     tls.write_edge_info(install, http_port=8080, https_port=8443, renews="daily")
     info = json.loads((install / "tls" / "edge.json").read_text())
-    assert info == {"hosts": ["box", "10.250.10.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
+    assert info == {"hosts": ["box", "192.0.2.61"], "http_port": 8080, "https_port": 8443, "renews": "daily"}
 
 
 def test_the_renewal_runs_every_morning_as_a_user_timer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -110,7 +110,7 @@ async def test_sync_model_from_the_hub_answers_like_a_copy_from_the_server(tmp_p
 
     manager = RuntimeManager(
         runtime=_Runtime(),  # type: ignore[arg-type]
-        state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(), advertise_host="10.250.10.71",
+        state_store=StateStore(tmp_path / "state.json"), events=EventBuffer(), advertise_host="192.0.2.71",
         model_store_root=str(tmp_path), model_downloader=downloader,
     )
     progress: list[dict[str, Any]] = []
@@ -249,12 +249,12 @@ def test_a_store_the_agent_cannot_write_is_named_with_the_fix(monkeypatch: pytes
     locks.mkdir()
     real_access = hf_download.os.access
     monkeypatch.setattr(hf_download.os, "access", lambda p, mode: False if Path(p) == locks else real_access(p, mode))
-    monkeypatch.setenv("USER", "sachi")
+    monkeypatch.setenv("USER", "user")
 
     problem = hf_download.store_problem(str(tmp_path), REPO)
 
     assert problem is not None and str(locks) in problem
-    assert "sudo chown -R sachi:" in problem
+    assert "sudo chown -R user:" in problem
     assert hf_download.store_problem(str(tmp_path / "elsewhere")) is None
 
 

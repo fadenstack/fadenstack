@@ -24,8 +24,8 @@ from faden_backend.web.api.node_files.views import agent_log_sink
     ("base", "request_host", "expected"),
     [
         # Development: Loki on the backend's own loopback, published on the host.
-        ("http://127.0.0.1:3100", "10.250.10.220", "http://10.250.10.220:3100"),
-        ("http://localhost:3100", "10.250.10.220", "http://10.250.10.220:3100"),
+        ("http://127.0.0.1:3100", "192.0.2.220", "http://192.0.2.220:3100"),
+        ("http://localhost:3100", "192.0.2.220", "http://192.0.2.220:3100"),
         # The deployment: a compose service name only the backend can resolve.
         ("http://faden-loki:3100", "faden.example.com", "http://faden.example.com:3100"),
         # A Loki the machines can already reach is passed on as it is.
@@ -57,13 +57,13 @@ async def test_the_endpoint_answers_with_the_address_the_agent_used(
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(id="n1")
     try:
         response = await client.get(
-            "/api/node-files/log-sink", headers={"host": "10.250.10.220:8000"},
+            "/api/node-files/log-sink", headers={"host": "192.0.2.220:8000"},
         )
     finally:
         fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
 
     assert response.status_code == 200
-    assert response.json() == {"loki_url": "http://10.250.10.220:3100"}
+    assert response.json() == {"loki_url": "http://192.0.2.220:3100"}
 
 
 @pytest.mark.anyio()
@@ -89,11 +89,11 @@ async def test_an_agent_that_asks_is_sent_to_the_backend_itself(
     fastapi_app.dependency_overrides[views._authenticate_node] = lambda: SimpleNamespace(id="n1")
     try:
         asked = await client.get("/api/node-files/log-sink", params={"via": "backend"})
-        older = await client.get("/api/node-files/log-sink", headers={"host": "10.250.10.61"})
+        older = await client.get("/api/node-files/log-sink", headers={"host": "192.0.2.61"})
     finally:
         fastapi_app.dependency_overrides.pop(views._authenticate_node, None)
     assert asked.json() == {"loki_url": "/api/node-files/logs", "via": "backend"}
-    assert older.json() == {"loki_url": "http://10.250.10.61:3100"}, "an older agent is answered as before"
+    assert older.json() == {"loki_url": "http://192.0.2.61:3100"}, "an older agent is answered as before"
 
 
 @pytest.mark.anyio()
@@ -110,8 +110,8 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
 
     monkeypatch.setattr(settings, "loki_base_url", "http://faden-loki:3100")
     monkeypatch.setattr(views, "_loki_http", httpx.AsyncClient(transport=httpx.MockTransport(loki)))
-    fastapi_app.dependency_overrides[views._push_sender] = lambda: "10.250.10.49"
-    push = {"streams": [{"stream": {"job": "node-agent", "host": "10.250.10.71"}, "values": [["1", "hello"]]}]}
+    fastapi_app.dependency_overrides[views._push_sender] = lambda: "192.0.2.49"
+    push = {"streams": [{"stream": {"job": "node-agent", "host": "192.0.2.71"}, "values": [["1", "hello"]]}]}
     try:
         response = await client.post("/api/node-files/logs/loki/api/v1/push", json=push)
         bad = await client.post("/api/node-files/logs/loki/api/v1/push", json={"lines": ["x"]})
@@ -123,7 +123,7 @@ async def test_a_push_is_forwarded_to_loki_as_the_machine_that_sent_it(
     import json
 
     sent = json.loads(forwarded[0].content)
-    assert sent["streams"][0]["stream"] == {"job": "node-agent", "host": "10.250.10.49"}, "no machine speaks for another"
+    assert sent["streams"][0]["stream"] == {"job": "node-agent", "host": "192.0.2.49"}, "no machine speaks for another"
     assert bad.status_code == 400 and len(forwarded) == 1
 
 
@@ -138,7 +138,7 @@ async def test_a_pushing_machine_is_not_checked_against_the_database_every_time(
 
     async def authenticate(request: Request) -> SimpleNamespace:
         checked.append(request.headers["authorization"])
-        return SimpleNamespace(host="10.250.10.71", agent_id="gpu-01")
+        return SimpleNamespace(host="192.0.2.71", agent_id="gpu-01")
 
     monkeypatch.setattr(views, "_authenticate_node", authenticate)
     monkeypatch.setattr(views, "_push_auth", {})
@@ -146,7 +146,7 @@ async def test_a_pushing_machine_is_not_checked_against_the_database_every_time(
     def request(credential: str) -> Request:
         return Request({"type": "http", "headers": [(b"authorization", f"Bearer {credential}".encode())]})
 
-    assert await views._push_sender(request("a")) == "10.250.10.71"
-    assert await views._push_sender(request("a")) == "10.250.10.71"
+    assert await views._push_sender(request("a")) == "192.0.2.71"
+    assert await views._push_sender(request("a")) == "192.0.2.71"
     await views._push_sender(request("b"))  # another credential is checked on its own
     assert checked == ["Bearer a", "Bearer b"]
