@@ -234,7 +234,7 @@ async def test_end_to_end_zero_config_multi_node_flow(
         json={
             "control_plane_id": cp_data["id"],
             "name": f"env-e2e-{uuid.uuid4().hex[:6]}",
-            "config": {"runtime_bundle_id": "bundle-dgx-spark-gb10-v1"},
+            "config": {"runtime_bundle_id": "bundle-dgx-spark-gb10-v1", "ray_tls": False},
         },
     )
     assert env_resp.status_code == 201

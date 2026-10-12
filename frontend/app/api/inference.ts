@@ -615,6 +615,8 @@ export interface RayTlsStatus {
   machines: number;
   /** Machines whose agent cannot run Ray with TLS yet. */
   old_agents: string[];
+  /** Machines that run Ray on the host, outside the runtime container, which cannot apply TLS. */
+  host_mode?: string[];
   can_switch_on: boolean;
 }
 

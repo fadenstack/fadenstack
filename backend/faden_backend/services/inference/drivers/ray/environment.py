@@ -68,7 +68,7 @@ from faden_backend.services.inference.drivers.ray.status import (
     build_environment_conditions,
     map_cluster_to_environment_status,
 )
-from faden_backend.services.inference.ray_tls import supported as ray_tls_supported
+from faden_backend.services.inference.ray_tls import member_refusal as ray_tls_member_refusal
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -1350,6 +1350,12 @@ class RayEnvironmentManager:
         different architectures, and each gets the image certified for its
         own.
         """
+        # Ray TLS needs it on every member: refuse before any container is touched.
+        # First, so a machine with no runtime is told about TLS and not only
+        # that no bundle covers it.
+        if config.ray_tls:
+            await self._require_ray_tls(session, environment, nodes)
+
         bundles = await self._bundles_for(session, environment, nodes)
         payloads = {
             node.node_id: self._bundle_payload(
@@ -1357,10 +1363,6 @@ class RayEnvironmentManager:
             )
             for node in nodes
         }
-
-        # Ray TLS needs it on every member: refuse before any container is touched.
-        if config.ray_tls:
-            await self._require_ray_tls(session, nodes)
 
         # 2a. The exact OCI digest must be present on every member node
         # before anything tries to run out of it.  The agent verifies the
@@ -1537,18 +1539,23 @@ class RayEnvironmentManager:
         """What a member needs to run Ray with mutual TLS: which cluster to ask a certificate for."""
         return {"environment_id": str(environment.id)}
 
-    async def _require_ray_tls(self, session, nodes) -> None:
-        """Every member's agent must run Ray with TLS, or none can: refuse before starting anything."""
-        old = []
+    async def _require_ray_tls(self, session, environment, nodes) -> None:
+        """Every member must run Ray with TLS, or none can: refuse before starting anything.
+
+        A member that cannot -- an agent older than 0.1.18, or Ray on the host
+        with no runtime container -- is named with what to do about it.
+        """
+        problems = []
         for member in nodes:
             row = await session.get(InfraNode, member.node_id)
-            if row is None or not ray_tls_supported(row.capabilities_json):
-                old.append(getattr(row, "host", None) or str(member.node_id))
-        if old:
-            raise _LifecycleFailed(
-                "Ray TLS needs agent 0.1.18 or later on every machine of the cluster; update "
-                + ", ".join(sorted(old)) + " (re-run the install line), or switch Ray TLS off."
-            )
+            if row is None:
+                problems.append(f"{member.node_id} is not a known machine.")
+                continue
+            problem = await ray_tls_member_refusal(session, environment, row)
+            if problem:
+                problems.append(problem)
+        if problems:
+            raise _LifecycleFailed(" ".join(problems))
 
     @staticmethod
     def _get_resolved_fabric(environment) -> dict[str, Any] | None:

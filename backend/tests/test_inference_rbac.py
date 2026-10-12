@@ -173,7 +173,7 @@ async def test_operator_runs_the_environment_lifecycle(
     # create -> allowed
     r = await client.post(
         f"{API}/environments",
-        json={"control_plane_id": str(cp.id), "name": "op-lifecycle-env"},
+        json={"control_plane_id": str(cp.id), "name": "op-lifecycle-env", "config": {"ray_tls": False}},
     )
     assert r.status_code == 201, r.text
     env_id = r.json()["id"]

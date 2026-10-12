@@ -18,6 +18,13 @@ from pydantic import BaseModel
 #: clusters created before this run on them.
 NEW_CLUSTER_PORTS: dict[str, int] = {"head_port": 6390, "serve_http_port": 8010}
 
+#: Other settings a new cluster is created with. Ray's traffic between its
+#: machines is encrypted from the start: a cluster made with it off keeps
+#: running unencrypted until someone switches it, and a later release changing
+#: the default would not reach it. The model's own default stays off, which is
+#: what the config of a cluster made before this means.
+NEW_CLUSTER_SETTINGS: dict[str, bool] = {"ray_tls": True}
+
 
 class RayEnvironmentConfig(BaseModel):
     """Configuration stored in InferenceEnvironment.config_json."""
@@ -42,11 +49,12 @@ class RayEnvironmentConfig(BaseModel):
     #: with the cluster's CA (services/machine_tls/ray_ca.py). Switching it
     #: restarts the cluster: Ray reads its certificates only when it starts.
     #:
-    #: Off here, and for a new cluster too, on purpose: switching it on is a
-    #: decision about the machines, and a cluster that has none yet cannot be
-    #: asked. Starting a cluster with TLS on refuses an agent older than 0.1.18
-    #: (``_require_ray_tls``), but a machine that runs Ray on the host instead of
-    #: in the certified runtime container takes the setting without applying it.
+    #: Off here, because this is what a stored config without the key means: a
+    #: cluster made before the setting existed runs without TLS, and reading its
+    #: config must not turn it on. A new cluster is created with it on
+    #: (``NEW_CLUSTER_SETTINGS``). A machine that cannot apply it -- an agent
+    #: older than 0.1.18, or Ray on the host instead of in the runtime
+    #: container -- is refused (``ray_tls.member_refusal``).
     ray_tls: bool = False
 
 

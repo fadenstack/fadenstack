@@ -64,9 +64,11 @@ async def make_control_plane(client: AsyncClient, name: str = "cp", driver: str 
 
 
 async def make_environment(client: AsyncClient, control_plane_id, name: str = "env") -> dict:
+    # Ray TLS is on for a new cluster; these tests join bare test machines that
+    # cannot apply it, and are not about it.
     r = await client.post(
         f"{API}/environments",
-        json={"control_plane_id": str(control_plane_id), "name": name},
+        json={"control_plane_id": str(control_plane_id), "name": name, "config": {"ray_tls": False}},
     )
     assert r.status_code == 201, r.text
     return r.json()

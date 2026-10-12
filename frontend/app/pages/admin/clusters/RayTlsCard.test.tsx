@@ -3,7 +3,7 @@
  * and then; a stopped cluster takes the switch when it starts, and the card
  * says so instead of polling until it does.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { inferenceApi, type RayTlsStatus } from "~/api/inference";
@@ -49,5 +49,22 @@ describe("RayTlsCard", () => {
     expect(await screen.findByText("Applies when the cluster starts")).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(15_000);
     expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  it("says why it cannot be switched on while a machine runs Ray on the host", async () => {
+    vi.spyOn(inferenceApi, "rayTls").mockResolvedValue(
+      status({ on: false, applied: true, restarting: false, can_switch_on: false, host_mode: ["192.0.2.71"] }),
+    );
+    render(<RayTlsCard environmentId={ENV} />);
+
+    expect(await screen.findByText(/192\.0\.2\.71 runs Ray on the machine itself/)).toBeInTheDocument();
+  });
+
+  it("says what switching it off means before it restarts the cluster", async () => {
+    vi.spyOn(inferenceApi, "rayTls").mockResolvedValue(status({ applied: true, restarting: false }));
+    render(<RayTlsCard environmentId={ENV} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch off" }));
+    expect(await screen.findByText(/will cross the network unencrypted/)).toBeInTheDocument();
   });
 });

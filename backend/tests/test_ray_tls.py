@@ -37,6 +37,8 @@ from faden_backend.web.api.node_files import views
 
 MASTER = "test-master-key"
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
+#: What a DGX Spark reports, enough for a certified runtime bundle to cover it.
+GB10 = {"machine": "aarch64", "gpu_count": 1, "gpu": {"vendor": "nvidia", "family": "GB10"}}
 
 
 def _csr(key: object | None = None) -> str:
@@ -210,7 +212,7 @@ async def test_switching_on_restarts_the_cluster_once(dbsession: AsyncSession) -
     from faden_backend.services.inference import ray_tls
 
     env, node = await _cluster(dbsession, ray_tls=False)
-    node.capabilities_json = {**node.capabilities_json, "ray_tls": 2}
+    node.capabilities_json = {**node.capabilities_json, **GB10, "ray_tls": 2}
     env.observed_generation = env.generation
     await dbsession.flush()
     before = env.generation

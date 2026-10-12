@@ -2693,7 +2693,9 @@
       "switch_off": "Ausschalten",
       "restart_warning": "Der Cluster startet auf jeder Maschine neu: Seine Modelle halten an, laden neu und antworten wieder, sobald sie geladen sind — Minuten bei einem großen Modell.",
       "restart_confirm": "Cluster neu starten",
-      "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.18 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen."
+      "update_agents": "Verschlüsselung zwischen den Maschinen braucht Agent 0.1.18 oder neuer auf jeder Maschine. Aktualisieren Sie {{hosts}}, indem Sie dort die Installationszeile erneut ausführen.",
+      "host_mode": "Die Verschlüsselung zwischen den Maschinen setzt voraus, dass Ray im Runtime-Container des Agenten läuft. {{hosts}} führt Ray direkt auf der Maschine aus und kann sie nicht anwenden. Starten Sie dort den Runtime-Container des Agenten.",
+      "switch_off_warning": "Rays Datenverkehr zwischen den Maschinen läuft dann unverschlüsselt durch das Netzwerk."
     },
     "model_downloads": {
       "title": "Woher die Maschinen Modelle bekommen",

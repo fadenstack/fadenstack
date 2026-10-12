@@ -233,8 +233,13 @@ seine Modelle hinter TLS, und sie laden neu.
 
 ![Die Karte „Verkehr zwischen den Maschinen“, „Verschlüsselt“, mit „Ausschalten“](../images/operate/cluster-traffic-encrypted.png)
 
-**Verkehr zwischen den Maschinen**: **Verschlüsseln** schaltet TLS für Ray zwischen den Maschinen des Clusters ein.
-Das startet den Cluster und seine Modelle neu; jede Maschine braucht einen aktuellen Agent.
+**Verkehr zwischen den Maschinen**: Ein neuer Cluster verschlüsselt den Ray-Verkehr zwischen seinen Maschinen von
+Anfang an mit TLS. Ein Cluster, der vorher angelegt wurde, zeigt „unverschlüsselt“; **Verschlüsseln** schaltet TLS
+ein, **Ausschalten** wieder aus, und dann läuft Rays Verkehr unverschlüsselt durch das Netzwerk. Beides startet den
+Cluster und seine Modelle neu. Jede Maschine braucht einen aktuellen Agent (0.1.18 oder neuer) und muss Ray im
+Runtime-Container des Agenten ausführen. Eine Maschine, auf der Ray direkt auf dem Rechner läuft, kann TLS nicht
+anwenden; der Cluster weist sie mit einer Meldung ab, die die Maschine nennt: Starten Sie dort den Runtime-Container
+des Agenten, oder schalten Sie TLS für den Cluster bewusst aus.
 
 Beides ist in [HTTPS und Vertrauen](https.md#model-traffic-the-gateway-and-the-machines) erklärt.
 

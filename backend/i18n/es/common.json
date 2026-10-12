@@ -2693,7 +2693,9 @@
       "switch_off": "Desactivar",
       "restart_warning": "El clúster se reinicia en todas las máquinas: sus modelos se detienen, vuelven a cargarse y responden de nuevo al terminar — minutos para un modelo grande.",
       "restart_confirm": "Reiniciar el clúster",
-      "update_agents": "El cifrado entre máquinas necesita el agente 0.1.18 o posterior en cada máquina. Actualice {{hosts}} ejecutando de nuevo allí la línea de instalación."
+      "update_agents": "El cifrado entre máquinas necesita el agente 0.1.18 o posterior en cada máquina. Actualice {{hosts}} ejecutando de nuevo allí la línea de instalación.",
+      "host_mode": "El cifrado entre máquinas necesita que Ray se ejecute en el contenedor de runtime del agente. {{hosts}} ejecuta Ray en la propia máquina y no puede aplicarlo. Ejecute allí el contenedor de runtime del agente.",
+      "switch_off_warning": "El tráfico de Ray entre las máquinas cruzará la red sin cifrar."
     },
     "model_downloads": {
       "title": "De dónde obtienen los modelos las máquinas",
