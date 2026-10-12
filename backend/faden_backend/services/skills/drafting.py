@@ -16,6 +16,8 @@ from typing import Any
 
 import yaml
 
+from faden_backend.services.skills import safe_yaml
+
 NAME_MAX = 64
 DESCRIPTION_MAX = 1024
 #: How much of the conversation the model is shown, newest first.
@@ -161,8 +163,11 @@ def parse_draft(text: str, *, fallback_name: str = "new-skill") -> Draft:
         if end is not None:
             block = lines[start + 1 : end]
             try:
-                loaded = yaml.safe_load("\n".join(block))
-            except yaml.YAMLError:
+                loaded = safe_yaml.load("\n".join(block))
+            except (yaml.YAMLError, safe_yaml.YamlRefused):
+                # Not YAML, or YAML a skill may not use (anchors, aliases, a bomb): either way it is read
+                # a line at a time below, which expands nothing. A draft is a proposal the user reads, so
+                # it is not refused.
                 loaded = None
             if not isinstance(loaded, dict):
                 # A description with a colon in it ("... error code: explain ...") is not YAML, and models
