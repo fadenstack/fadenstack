@@ -78,8 +78,8 @@ Every `faden upgrade` also takes a backup before it changes anything.
 !!! warning "Under testing"
     Restoring is being tested. It puts back the data: the databases, the `.env`, the certificate material, and
     volumes if the backup holds them. It does not put back the deployment files or the release the backup was
-    taken with. While it runs, the services are stopped and the console does not answer: there is no
-    maintenance page yet. Try a restore on a copy of the server before you rely on one.
+    taken with. While it runs, the services are stopped and the console shows the maintenance page (as in an
+    upgrade), which reloads itself once the platform is back. Try a restore on a copy of the server before you rely on one.
 
 ```bash
 faden restore ~/fadenstack/backups/<time>
@@ -92,9 +92,9 @@ It asks for confirmation (`-y` skips it).
     2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one
        does not match;
     3. asks for confirmation (`-y` skips it);
-    4. stops the services, restores every database and, unless told otherwise, the `.env` and the certificate
-       material;
-    5. starts everything again.
+    4. puts up the maintenance page, stops every service except the front door (nginx), restores every database
+       and, unless told otherwise, the `.env` and the certificate material;
+    5. starts everything again and takes the maintenance page down, also when the restore fails.
 
 | Option | What it does |
 |---|---|

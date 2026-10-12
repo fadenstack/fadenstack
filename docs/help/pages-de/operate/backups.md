@@ -82,7 +82,8 @@ Jedes `faden upgrade` legt außerdem eine Sicherung an, bevor es etwas ändert.
     Die Wiederherstellung wird noch getestet. Sie bringt die Daten zurück: die Datenbanken, die `.env`, das
     Zertifikatsmaterial und Volumes, wenn die Sicherung welche enthält. Die Dateien der Installation und das
     Release, mit dem die Sicherung angelegt wurde, bringt sie nicht zurück. Während sie läuft, sind die Dienste
-    gestoppt und die Konsole antwortet nicht: Eine Wartungsseite gibt es noch nicht. Probieren Sie eine
+    gestoppt und die Konsole zeigt die Wartungsseite (wie bei einem Upgrade), die sich neu lädt, sobald die
+    Plattform wieder da ist. Probieren Sie eine
     Wiederherstellung an einer Kopie des Servers aus, bevor Sie sich auf eine verlassen.
 
 ```bash
@@ -96,9 +97,9 @@ Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
     2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
        wenn eine nicht passt;
     3. fragt nach einer Bestätigung (`-y` überspringt sie);
-    4. stoppt die Dienste, stellt jede Datenbank und, sofern nicht anders angegeben, die `.env` und das
-       Zertifikatsmaterial wieder her;
-    5. startet alles wieder.
+    4. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
+       und, sofern nicht anders angegeben, die `.env` und das Zertifikatsmaterial wieder her;
+    5. startet alles wieder und nimmt die Wartungsseite wieder weg, auch wenn die Wiederherstellung fehlschlägt.
 
 | Option | Was sie tut |
 |---|---|
