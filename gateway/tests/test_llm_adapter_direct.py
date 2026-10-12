@@ -119,12 +119,27 @@ async def test_the_engine_is_asked_as_an_openai_server() -> None:
         ({"reasoning_effort": "xhigh"}, {"reasoning_effort": "high"}),
         ({"chat_template_kwargs": {"enable_thinking": False}}, {"chat_template_kwargs": {"enable_thinking": False}}),
         (
-            {"reasoning_effort": "none", "chat_template_kwargs": {"enable_thinking": True, "x": 1}},
-            {"chat_template_kwargs": {"enable_thinking": True, "x": 1}},
+            {"reasoning_effort": "none", "chat_template_kwargs": {"enable_thinking": True}},
+            {"chat_template_kwargs": {"enable_thinking": True}},
         ),
+        (
+            # Unknown keys are dropped, a list or a prompt is no switch, and the request still goes.
+            {"chat_template_kwargs": {
+                "enable_thinking": False, "chat_template": "{{ x }}", "add_generation_prompt": False,
+                "thinking_budget": [1], "thinking": "x" * 100, "preserve_thinking": True,
+            }},
+            {"chat_template_kwargs": {"enable_thinking": False, "preserve_thinking": True}},
+        ),
+        ({"chat_template_kwargs": {"bos_token": "x"}}, {}),
+        ({"reasoning_effort": "none", "chat_template_kwargs": {"bos_token": "x"}},
+         {"chat_template_kwargs": {"enable_thinking": False}}),
+        ({"chat_template_kwargs": "enable_thinking"}, {}),
         ({"reasoning_effort": "unheard-of"}, {}),
     ],
-    ids=["none", "minimal", "high", "xhigh", "template", "template-wins", "unknown"],
+    ids=[
+        "none", "minimal", "high", "xhigh", "template", "template-wins", "filtered", "only-unknown",
+        "unknown-with-effort", "not-a-dict", "unknown",
+    ],
 )
 async def test_how_much_the_model_reasons_reaches_vllm(given: dict[str, Any], sent: dict[str, Any]) -> None:
     """A client's "no thinking" reaches the engine as Qwen's switch; vLLM's own efforts go as they are."""
@@ -133,6 +148,15 @@ async def test_how_much_the_model_reasons_reaches_vllm(given: dict[str, Any], se
         await _stream(LLMAdapter(http_client=http), payload={"model": "qwen", "messages": [{"role": "user", "content": "hi"}], **given})
     body = json.loads(seen[0].content)
     assert {k: body[k] for k in ("reasoning_effort", "chat_template_kwargs") if k in body} == sent
+
+
+def test_a_template_key_that_is_dropped_is_logged_not_refused(caplog: pytest.LogCaptureFixture) -> None:
+    from faden_gateway.services.gateway.llm_adapter import _reasoning  # noqa: PLC0415
+
+    with caplog.at_level("DEBUG", logger="faden_gateway.services.gateway.llm_adapter"):
+        out = _reasoning({"chat_template_kwargs": {"enable_thinking": True, "chat_template": "x"}}, ProviderType.VLLM)
+    assert out == {"chat_template_kwargs": {"enable_thinking": True}}
+    assert "chat_template" in caplog.text
 
 
 @pytest.mark.anyio
