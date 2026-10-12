@@ -197,9 +197,9 @@ def test_a_backup_is_its_owners_only_and_the_volume_archives_too(docker: FakeDoc
     assert (made / "faden_backend.dump").read_bytes() == b"DUMP faden_backend"
     assert (made / "minio_data.tar.gz").read_bytes() == b"TARBALL", "the CLI writes the container's output"
     # The helper container mounts the volume only: it writes no file of its own into the backup.
-    tar_runs = [run for run in docker.runs if "tar" in run]
+    tar_runs = [run for run in docker.runs if run[-1].startswith("tar ")]
     assert tar_runs
-    assert all(run.count("-v") == 1 and "czf" in run and "-" in run for run in tar_runs)
+    assert all(run.count("-v") == 1 and run[-1].startswith("tar czf - ") for run in tar_runs)
     if os.name != "nt":
         assert _mode(install / "backups") == 0o700, "the install's own backups directory is tightened"
         assert _mode(made) == 0o700
