@@ -155,7 +155,9 @@ Oder schalten Sie die Prüfung aus: **Updates** zeigt weiterhin, was jeder Teil 
     5. kopiert hinter der Wartungsseite zuerst die Chat-Anhänge, die eine Installation aus der Zeit vor Release
        0.4.4 im Gateway-Container hält, in ihr Volume und vergleicht jede Datei anhand ihres SHA-256-Hashs. Lässt
        sich eine Datei nicht kopieren oder stimmt sie nicht überein, hält das Upgrade hier an, bevor etwas ersetzt
-       wird: Die alten Dienste laufen weiter, und die Dateien bleiben unberührt (siehe die Tabelle am Ende);
+       wird: Die alten Dienste laufen weiter, und die Dateien bleiben unberührt (siehe die Tabelle am Ende). Ist
+       `FADEN_DATA_DIR` gesetzt, kopiert es ebenso die Dateien der Chat- und Wissens-Volumes in die Datenordner und
+       prüft sie (siehe [Wo die Firmendaten liegen](installing.md#where-the-company-data-is-kept));
     6. startet die Dienste neu; hier laufen die Datenbankmigrationen, und die beiden
        Postgres-Anmeldungen mit festen Passwörtern, die frühere Releases angelegt haben (`llm_user`,
        `faden_backend`, von nichts genutzt), werden abgeschaltet;

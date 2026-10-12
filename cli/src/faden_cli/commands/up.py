@@ -49,6 +49,12 @@ def up_cmd(
 
     console.print("[bold cyan]Starting Fadenstack services…[/bold cyan]")
 
+    # With FADEN_DATA_DIR set in .env, the files of the named volumes it covers go into its folders first,
+    # verified: the containers about to be created mount the (possibly empty) folders (see core.backup).
+    from faden_cli.core.backup import keep_company_files  # noqa: PLC0415
+
+    keep_company_files(ctx.env_file, ctx)
+
     returncode = compose_up(
         ctx,
         detach=detach,

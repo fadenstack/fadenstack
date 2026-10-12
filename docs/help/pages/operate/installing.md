@@ -127,17 +127,36 @@ Before release 0.4.4, chat attachments had no volume: they lived inside the gate
 an upgrade or restore replaced it. `faden upgrade` copies the files the old container holds into the volume before it
 replaces the container, so nothing is lost on that first upgrade.
 
-To keep the chat attachments in a directory of your own, for example on storage your company manages, set it in
+To keep the company's files in a directory of your own, for example on storage your company manages, set it in
 `.env`:
 
 ```bash
 FADEN_DATA_DIR=/srv/fadenstack
 ```
 
-or give it at install time: `faden deploy --data-dir /srv/fadenstack`. The attachments are then in
-`/srv/fadenstack/chat-files` instead of the volume. Use an absolute path in POSIX form (on Windows, `/c/data`).
-Empty, the default, keeps the Docker volume. A change takes effect when the gateway is recreated; files already in
-the volume are not moved, so set this before the first upgrade to this release, or copy the files over yourself.
+or give it at install time: `faden deploy --data-dir /srv/fadenstack`. Use an absolute path in POSIX form (on
+Windows, `/c/data`). Empty, the default, keeps the Docker volumes.
+
+What it covers is fixed, and will not grow in a later release:
+
+| Folder | Holds |
+|---|---|
+| `/srv/fadenstack/chat-files` | The files attached to chats |
+| `/srv/fadenstack/knowledge` | The files uploaded to the knowledge base |
+
+It never covers the databases (`fadenstack_pg_data`), the models (`fadenstack_faden_models`) or the observability
+data (logs, metrics, traces, Grafana). Those stay in Docker volumes, and get settings of their own if they ever move.
+
+**Switching it on copies your files.** When `faden deploy`, `faden upgrade`, `faden rebuild` or `faden up` finds
+`FADEN_DATA_DIR` set and a named volume that still holds files the folder lacks, it copies them into the folder before
+it recreates any container, then compares every file by its SHA-256 hash. Nothing is overwritten: a file that exists
+in both places with different content stops the command, naming the files, with nothing replaced. If a copy or a
+comparison fails, the command stops the same way and the old services keep running. Run it again after you have fixed
+the cause. The named volume is left as it was; once you are satisfied that the folder has everything, you can remove it
+with `docker volume rm`. Running the command again copies nothing that is already there.
+
+**Switching it off again does not copy the files back.** The folder keeps them, and the containers go back to the
+(old or empty) named volumes. To go back, copy the files into the volumes yourself first.
 
 ### Docker logs
 

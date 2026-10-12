@@ -820,10 +820,11 @@ def deploy_cmd(
     # We boot Postgres alone, ALTER USER to match .env, then start
     # everything else.
     # An install from before the chat files had a volume: they go from the old gateway container into it,
-    # verified, before anything is started or replaced (syncing the password starts Postgres).
-    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
+    # verified, before anything is started or replaced (syncing the password starts Postgres). Re-running
+    # deploy on an install that has just set --data-dir copies the files of its named volumes into the folders.
+    from faden_cli.core.backup import keep_company_files  # noqa: PLC0415
 
-    keep_chat_files(env_path)
+    keep_company_files(env_path, ctx)
     _sync_postgres_password(ctx, env_path)
     retire_fixed_logins(env_path)
 

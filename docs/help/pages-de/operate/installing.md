@@ -135,18 +135,38 @@ Vor Release 0.4.4 hatten Chat-Anhänge kein Volume: Sie lagen im Gateway-Contain
 Upgrade oder eine Wiederherstellung ihn ersetzte. `faden upgrade` kopiert die Dateien, die der alte Container
 enthält, in das Volume, bevor es den Container ersetzt; beim ersten Upgrade geht also nichts verloren.
 
-Um die Chat-Anhänge in einem eigenen Verzeichnis zu halten, z. B. auf Speicher, den Ihre Firma verwaltet, tragen Sie
-es in der `.env` ein:
+Um die Dateien Ihrer Firma in einem eigenen Verzeichnis zu halten, z. B. auf Speicher, den Ihre Firma verwaltet,
+tragen Sie es in der `.env` ein:
 
 ```bash
 FADEN_DATA_DIR=/srv/fadenstack
 ```
 
-oder geben Sie es bei der Installation an: `faden deploy --data-dir /srv/fadenstack`. Die Anhänge liegen dann in
-`/srv/fadenstack/chat-files` statt im Volume. Verwenden Sie einen absoluten Pfad in POSIX-Form (unter Windows
-`/c/data`). Leer, der Standard, behält das Docker-Volume. Eine Änderung gilt, sobald das Gateway neu erstellt wird;
-Dateien, die schon im Volume liegen, werden nicht verschoben. Setzen Sie den Wert also vor dem ersten Upgrade auf
-dieses Release, oder kopieren Sie die Dateien selbst um.
+oder geben Sie es bei der Installation an: `faden deploy --data-dir /srv/fadenstack`. Verwenden Sie einen absoluten
+Pfad in POSIX-Form (unter Windows `/c/data`). Leer, der Standard, behält die Docker-Volumes.
+
+Was es abdeckt, steht fest und wächst in einem späteren Release nicht:
+
+| Ordner | Enthält |
+|---|---|
+| `/srv/fadenstack/chat-files` | Die an Chats angehängten Dateien |
+| `/srv/fadenstack/knowledge` | Die in die Wissensdatenbank hochgeladenen Dateien |
+
+Nie abgedeckt sind die Datenbanken (`fadenstack_pg_data`), die Modelle (`fadenstack_faden_models`) und die
+Beobachtungsdaten (Logs, Metriken, Traces, Grafana). Sie bleiben in Docker-Volumes und bekommen eigene Einstellungen,
+falls sie je umziehen.
+
+**Das Einschalten kopiert Ihre Dateien.** Findet `faden deploy`, `faden upgrade`, `faden rebuild` oder `faden up`
+`FADEN_DATA_DIR` gesetzt und ein benanntes Volume, das noch Dateien enthält, die dem Ordner fehlen, kopiert es sie in
+den Ordner, bevor es einen Container neu erstellt, und vergleicht dann jede Datei per SHA-256-Hash. Nichts wird
+überschrieben: Eine Datei, die an beiden Orten mit unterschiedlichem Inhalt existiert, stoppt den Befehl und wird
+genannt; es wurde nichts ersetzt. Scheitert eine Kopie oder ein Vergleich, stoppt der Befehl ebenso, und die alten
+Dienste laufen weiter. Führen Sie ihn nach der Behebung der Ursache erneut aus. Das benannte Volume bleibt unverändert;
+sobald Sie sicher sind, dass der Ordner alles enthält, können Sie es mit `docker volume rm` entfernen. Ein erneuter
+Lauf kopiert nichts, was schon da ist.
+
+**Das Ausschalten kopiert die Dateien nicht zurück.** Der Ordner behält sie, und die Container nutzen wieder die
+(alten oder leeren) benannten Volumes. Um zurückzugehen, kopieren Sie die Dateien zuvor selbst in die Volumes.
 
 ### Docker-Logs {#docker-logs}
 

@@ -143,7 +143,9 @@ Or switch the check off: **Updates** still shows what each part of the install r
     5. behind the maintenance page, first copies the chat attachments that an install from before release 0.4.4 holds
        inside the gateway container into their volume, and compares every file by its SHA-256 hash. If a file
        cannot be copied or does not match, the upgrade stops here, before anything is replaced: the old services
-       keep running and the files are untouched (see the table at the end);
+       keep running and the files are untouched (see the table at the end). With `FADEN_DATA_DIR` set, it
+       likewise copies the files of the chat and knowledge volumes into the data folders and verifies them
+       (see [Where the company data is kept](installing.md#where-the-company-data-is-kept));
     6. restarts the services; the database migrations run here, and the two Postgres
        logins with fixed passwords that earlier releases made (`llm_user`, `faden_backend`, used by nothing) are
        switched off;

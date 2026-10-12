@@ -69,8 +69,9 @@ SECRET_KEYS: frozenset[str] = frozenset({
 #: fallbacks). Rotation of every container's Docker log: the largest file and how many are kept per container,
 #: so 50m x 5 is at most 250 MB each. FADEN_REDIS_MAXMEMORY: the most memory Redis uses; at it Redis refuses
 #: writes (noeviction) rather than the host running out (see the redis service in the compose file).
-#: FADEN_DATA_DIR: empty keeps the company data (chat attachments) in
-#: Docker named volumes; a directory puts it there instead (Help: Installing, Where the data is kept).
+#: FADEN_DATA_DIR: empty keeps the company data (chat attachments and knowledge files, nothing else: see
+#: ``DATA_DIR_VOLUMES``) in Docker named volumes; a directory puts it there instead (Help: Installing, Where the
+#: data is kept).
 DEPLOY_SETTINGS: dict[str, str] = {
     "FADEN_LOG_MAX_SIZE": "50m",
     "FADEN_LOG_MAX_FILE": "5",
