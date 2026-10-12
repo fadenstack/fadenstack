@@ -14,18 +14,23 @@ from pathlib import Path
 
 import click
 
+from faden_cli.core import maintenance
 from faden_cli.core.backup import (
+    RestoreResult,
     read_manifest,
     restore_backup,
     verify_backup,
 )
 from faden_cli.core.compose import (
+    ComposeContext,
     build_context_from_config,
-    down as compose_down,
+    restart as compose_restart,
+    service_names,
+    stop as compose_stop,
     up as compose_up,
 )
 from faden_cli.core.console import console, error, info, success, warning
-from faden_cli.core.settings import load_config
+from faden_cli.core.settings import FadenConfig, load_config
 from faden_cli.commands.deploy import _sync_postgres_password
 
 
@@ -93,13 +98,40 @@ def restore_cmd(
     cfg = load_config()
     ctx = build_context_from_config(cfg)
 
-    # ── Stop application services (keep postgres) ─────────────
+    # Behind the maintenance page for the whole restore, as the upgrade is: the front door stays up and
+    # tells users the platform is being worked on, instead of refusing connections until the end. Lifted
+    # however this ends. nginx holds none of the volumes a restore writes (it mounts the install's nginx/
+    # and tls/ directories, read-only), so it can run through it.
+    with maintenance.during(Path(str(ctx.project_dir)), reason="restore"):
+        result = _restore(ctx, cfg, backup_path, db_only=db_only, skip_env=skip_env)
+
+    console.print()
+    success("Restore complete.")
+    if result.databases_restored:
+        console.print(f"  Databases: {', '.join(result.databases_restored)}")
+    if result.env_restored:
+        console.print("  .env: restored")
+    if result.volumes_restored:
+        console.print(f"  Volumes: {', '.join(result.volumes_restored)}")
+    if result.tls_restored:
+        console.print(f"  Certificate material: {len(result.tls_restored)} file(s); the machines still trust it")
+
+
+#: The front door, which keeps running (and serving the maintenance page) while everything else is restored.
+_FRONT = "nginx"
+
+
+def _restore(
+    ctx: ComposeContext, cfg: FadenConfig, backup_path: Path, *, db_only: bool, skip_env: bool
+) -> RestoreResult:
+    """Stop everything but nginx, restore, and start everything again; exits when the restore fails."""
     console.print("\n[bold cyan]Stopping application services…[/bold cyan]")
-    compose_down(ctx, remove_orphans=False)
-    # Bring postgres back up for the restore
+    names = service_names(ctx)
+    # Stopped, not taken down: nginx is left alone, and the containers keep their volumes and networks.
+    # postgres is stopped with the rest and started again below, so the restore starts from a clean server.
+    compose_stop(ctx, services=[name for name in names if name != _FRONT] or None)
     compose_up(ctx, services=["postgres"], detach=True, wait=True, timeout=60)
 
-    # ── Restore ───────────────────────────────────────────────
     result = restore_backup(
         ctx,
         backup_dir=backup_path,
@@ -126,14 +158,8 @@ def restore_cmd(
     # ── Restart all services ──────────────────────────────────
     console.print("\n[bold cyan]Restarting all services…[/bold cyan]")
     compose_up(ctx, detach=True, wait=True, timeout=120)
-
-    console.print()
-    success("Restore complete.")
-    if result.databases_restored:
-        console.print(f"  Databases: {', '.join(result.databases_restored)}")
-    if result.env_restored:
-        console.print("  .env: restored")
-    if result.volumes_restored:
-        console.print(f"  Volumes: {', '.join(result.volumes_restored)}")
-    if result.tls_restored:
-        console.print(f"  Certificate material: {len(result.tls_restored)} file(s); the machines still trust it")
+    # nginx read the certificate and picked plain HTTP or HTTPS when it started; a restored one is
+    # only served after it starts again.
+    if result.tls_restored and _FRONT in names:
+        compose_restart(ctx, services=[_FRONT])
+    return result

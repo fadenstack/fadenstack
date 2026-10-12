@@ -11,7 +11,7 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
 | Jede Datenbank im Postgres des Servers | Ja | Benutzer, Einstellungen, Provider, Maschinen, Cluster, Bereitstellungen, Chats, das Anfrageprotokoll |
 | `.env` | Ja, außer mit `--db-only` | Sie enthält den Schlüssel, mit dem die Chats verschlüsselt sind, und die Schlüssel, die gespeicherte Geheimnisse verschlüsseln (das Hugging-Face-Token, geheime Einstellungen, die Zugangsdaten der MCP-Server). Eine Datenbank, die ohne ihre `.env` wiederhergestellt wird, enthält Chats und Geheimnisse, die niemand lesen kann |
 | Zertifikatsmaterial (`tls/`, `tls-ca/`) | Ja, außer mit `--db-only` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem privaten Schlüssel. Damit ist ein neu aufgesetzter Server einer, dem die Maschinen weiterhin vertrauen |
-| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps und die Zertifikatsdateien, bevor es etwas ändert |
+| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien, bevor es etwas ändert |
 | Dateien, die in die Wissensdatenbank hochgeladen wurden | Mit `--include-volumes` | Ohne diese Option enthält die Sicherung nur den daraus gelesenen Text, nicht die Dateien selbst |
 | Dateien, die an Chats angehängt wurden | Mit `--include-volumes` | Ohne diese Option liegt nur der daraus gelesene Text in der Datenbank, nicht die Dateien selbst |
 | Modelle | Nein | Sie lassen sich erneut herunterladen. Bewahren Sie eine Kopie der Modelle auf, die Sie importiert statt heruntergeladen haben |
@@ -39,15 +39,19 @@ listet auf, was er gesichert hat.
 | Option | Was sie tut |
 |---|---|
 | `--output-dir PATH` | Die Sicherung woanders hinschreiben, z. B. auf eine eingehängte Sicherungsplatte. Ein relativer Pfad gilt innerhalb des Installationsverzeichnisses |
-| `--retain N` | Nur die N neuesten Sicherungen in diesem Verzeichnis behalten (Standard 5). Ältere dort werden gelöscht |
+| `--retain N` | Nur die N neuesten Sicherungen dieser Art in diesem Verzeichnis behalten (Standard 5). Ältere derselben Art werden gelöscht |
 | `--db-only` | Nur die Datenbanken, ohne `.env` und Zertifikatsmaterial. Bewahren Sie eine Kopie der `.env` getrennt auf, so vertraulich wie die Sicherungen |
 | `--include-volumes` | Auch die Dateien, die in die Wissensdatenbank hochgeladen wurden, die an Chats angehängten Dateien, die Logs, die Traces und Grafanas eigene Daten. Nicht die Modelle |
 | `-y` | Nicht nachfragen |
 
 ??? info "Wie `--retain` zählt"
-    `--retain` zählt jede Sicherung im Verzeichnis, auch die nächtlichen und die, die Upgrades anlegen. Ein von
-    Hand gestartetes `faden backup` in das Standardverzeichnis behält 5, sofern Sie keine größere Zahl angeben,
-    und jedes `faden upgrade` behält 5.
+    Jede Sicherung vermerkt, wer sie angelegt hat: der nächtliche Timer, Sie mit `faden backup` oder
+    `faden upgrade`. `--retain` zählt und löscht nur Sicherungen der eigenen Art. Ein von Hand gestartetes
+    `faden backup --retain 3` lässt die nächtlichen Sicherungen also in Ruhe, und ein Upgrade verdrängt sie nicht.
+    Eine Sicherung von Hand behält 5, sofern Sie keine andere Zahl angeben, die nächtliche behält 7 (siehe
+    unten), und jedes `faden upgrade` behält 5 eigene. Sicherungen aus früheren Versionen haben keine Art und
+    zählen als von Hand; ein vor dieser Version eingerichteter nächtlicher Timer zählt weiter als von Hand, bis
+    Sie `faden backup schedule` erneut ausführen.
 
 ## Die nächtliche Sicherung {#the-nightly-backup}
 
@@ -78,7 +82,8 @@ Jedes `faden upgrade` legt außerdem eine Sicherung an, bevor es etwas ändert.
     Die Wiederherstellung wird noch getestet. Sie bringt die Daten zurück: die Datenbanken, die `.env`, das
     Zertifikatsmaterial und Volumes, wenn die Sicherung welche enthält. Die Dateien der Installation und das
     Release, mit dem die Sicherung angelegt wurde, bringt sie nicht zurück. Während sie läuft, sind die Dienste
-    gestoppt und die Konsole antwortet nicht: Eine Wartungsseite gibt es noch nicht. Probieren Sie eine
+    gestoppt und die Konsole zeigt die Wartungsseite (wie bei einem Upgrade), die sich neu lädt, sobald die
+    Plattform wieder da ist. Probieren Sie eine
     Wiederherstellung an einer Kopie des Servers aus, bevor Sie sich auf eine verlassen.
 
 ```bash
@@ -89,12 +94,12 @@ Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
 
 ??? info "Was die Wiederherstellung tut, der Reihe nach"
     1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-    2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
+    2. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
        wenn eine nicht passt;
     3. fragt nach einer Bestätigung (`-y` überspringt sie);
-    4. stoppt die Dienste, stellt jede Datenbank und, sofern nicht anders angegeben, die `.env` und das
-       Zertifikatsmaterial wieder her;
-    5. startet alles wieder.
+    4. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
+       und, sofern nicht anders angegeben, die `.env` und das Zertifikatsmaterial wieder her;
+    5. startet alles wieder und nimmt die Wartungsseite wieder weg, auch wenn die Wiederherstellung fehlschlägt.
 
 | Option | Was sie tut |
 |---|---|
@@ -110,7 +115,7 @@ Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
 ### Eine Sicherung prüfen {#check-a-backup}
 
 Führen Sie ab und zu `faden restore --verify-only` mit einer Kopie einer Sicherung aus. Der Befehl zeigt Ihnen,
-ob die Datenbank-Dumps und die Zertifikatsdateien vollständig und unverändert sind, ohne die Installation
+ob die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien vollständig und unverändert sind, ohne die Installation
 anzutasten.
 
 ## Einen verlorenen Server neu aufbauen {#rebuild-a-lost-server}

@@ -266,6 +266,18 @@ def down(
     return result.returncode
 
 
+def stop(ctx: ComposeContext, *, services: list[str] | None = None) -> int:
+    """Run ``docker compose stop`` for the given services (all of them when none is named).
+
+    The containers stay, with their volumes and networks; ``down`` would remove them.
+    """
+    cmd = ctx.base_cmd() + ["stop"]
+    if services:
+        cmd.extend(services)
+    result = _run(cmd, stream=True)
+    return result.returncode
+
+
 def restart(ctx: ComposeContext, *, services: list[str] | None = None) -> int:
     """Run ``docker compose restart`` for the given services."""
     cmd = ctx.base_cmd() + ["restart"]

@@ -87,3 +87,55 @@ def test_nothing_is_touched_without_an_install(monkeypatch: pytest.MonkeyPatch, 
 
     assert backup.snapshot_volumes(tmp_path) == []
     assert not [cmd for cmd in calls if cmd[1] == "run"]
+
+
+def _backup_with_archives(tmp_path: Path) -> dict:
+    (tmp_path / "minio_data.tar.gz").write_bytes(b"minio files")
+    (tmp_path / "faden_rag_lite.tar.gz").write_bytes(b"rag files")
+    backup.write_manifest(
+        tmp_path,
+        databases={},
+        env_snapshot="",
+        volumes=["minio_data.tar.gz", "faden_rag_lite.tar.gz"],
+        migration_heads={},
+    )
+    return backup.read_manifest(tmp_path)  # type: ignore[return-value]
+
+
+def test_the_manifest_records_each_volume_archives_checksum(tmp_path: Path) -> None:
+    manifest = _backup_with_archives(tmp_path)
+
+    assert manifest["volume_checksums"] == {
+        "minio_data.tar.gz": backup._sha256(tmp_path / "minio_data.tar.gz"),
+        "faden_rag_lite.tar.gz": backup._sha256(tmp_path / "faden_rag_lite.tar.gz"),
+    }
+    assert len(manifest["volume_checksums"]["minio_data.tar.gz"]) == 64
+    assert backup.verify_backup(tmp_path, manifest) == []
+
+
+def test_a_damaged_or_missing_volume_archive_fails_the_check(tmp_path: Path) -> None:
+    manifest = _backup_with_archives(tmp_path)
+    (tmp_path / "minio_data.tar.gz").write_bytes(b"minio files, damaged")
+    (tmp_path / "faden_rag_lite.tar.gz").unlink()
+
+    assert backup.verify_backup(tmp_path, manifest) == [
+        "Checksum mismatch for minio_data.tar.gz",
+        "Missing volume archive: faden_rag_lite.tar.gz",
+    ]
+
+
+def test_a_manifest_from_before_checksums_is_still_accepted(tmp_path: Path) -> None:
+    (tmp_path / "minio_data.tar.gz").write_bytes(b"minio files")
+
+    assert backup.verify_backup(tmp_path, {"volumes": ["minio_data.tar.gz"]}) == []
+
+
+def test_a_damaged_archive_is_not_written_into_a_volume(docker: FakeDocker, tmp_path: Path) -> None:
+    """The restore empties the volume first: the check has to come before that."""
+    manifest = _backup_with_archives(tmp_path)
+    (tmp_path / "minio_data.tar.gz").write_bytes(b"swapped after the check")
+
+    restored = backup.restore_volumes(tmp_path, manifest)
+
+    assert restored == ["faden_rag_lite"]
+    assert docker.mounts == ["fadenstack_faden_rag_lite:/data"], "the volume of the damaged archive was not touched"

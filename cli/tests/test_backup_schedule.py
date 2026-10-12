@@ -49,7 +49,7 @@ def test_scheduling_adds_one_line_and_keeps_the_rest(
     assert crontab[:2] == ["MAILTO=ops@example.com", "15 * * * * /usr/bin/something-else"]
     line = crontab[2]
     assert line.startswith("30 2 * * * PATH=")
-    assert "backup -y --retain 10" in line
+    assert "backup -y --retain 10 --kind nightly" in line
     assert "FADEN_CONFIG=" in line, "cron must find the same install"
     assert str(install / "backups" / "backup.log").replace("\\", "/") in line.replace("\\", "/")
     assert line.endswith(schedule.MARK)
@@ -126,7 +126,7 @@ def test_with_systemd_a_user_timer_is_installed_and_lingering_switched_on(
     timer = (units / "faden-backup.timer").read_text()
     service = (units / "faden-backup.service").read_text()
     assert "OnCalendar=*-*-* 01:15:00" in timer and "Persistent=true" in timer
-    assert "ExecStart=/home/ops/.local/bin/faden backup -y --retain 4" in service
+    assert "ExecStart=/home/ops/.local/bin/faden backup -y --retain 4 --kind nightly" in service
     assert "FADEN_CONFIG=" in service
     assert f"append:{install / 'backups' / 'backup.log'}" in service
     assert ["systemctl", "--user", "enable", "--now", "faden-backup.timer"] in ran

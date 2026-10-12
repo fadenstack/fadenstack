@@ -230,7 +230,7 @@ def upgrade_cmd(
         if not backup_path.is_absolute():
             backup_path = shared_dir / backup_path
 
-        result = create_backup(ctx, output_dir=backup_path)
+        result = create_backup(ctx, output_dir=backup_path, kind="upgrade")
         if not result.ok:
             for msg in result.errors:
                 error(msg)

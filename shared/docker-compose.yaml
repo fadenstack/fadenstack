@@ -146,12 +146,22 @@ services:
     container_name: faden-redis
     logging: *faden-logging
     restart: unless-stopped
+    # Capped, so a runaway writer fills Redis rather than the host: at the cap Redis refuses writes
+    # (noeviction) and the writers carry on without them (a chat reply's shared log, device presence).
+    # It is not evicting because Langfuse's queues (BullMQ) and the chat replies' live events must not
+    # be dropped silently. Everything the gateway keeps here has a TTL; what it holds is a few tens
+    # of MB (110 MB for 9,500 replies kept 15 minutes in plain text, now 1 minute), so the 1gb default
+    # leaves a Langfuse backlog room. FADEN_REDIS_MAXMEMORY in .env changes it (Help, Installing).
     command: >
-      --requirepass ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)} --maxmemory-policy noeviction
+      --requirepass ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)} --maxmemory ${FADEN_REDIS_MAXMEMORY:-1gb} --maxmemory-policy noeviction
+    environment:
+      # redis-cli reads the password from here: on its command line (-a) it showed in `ps`.
+      REDISCLI_AUTH: ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}", "ping"]
+      # NOAUTH and the like exit 0 as well, so the answer itself is checked.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 3s
       timeout: 10s
       retries: 10

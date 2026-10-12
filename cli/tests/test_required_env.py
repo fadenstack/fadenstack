@@ -56,18 +56,18 @@ def test_the_compose_file_falls_back_to_nothing_published() -> None:
         assert not re.search(r"\$\{" + key + r":-", compose), key
 
 
-@pytest.mark.parametrize("values", [default_env_vars(admin_password="x"), dev_env_vars()], ids=["deploy", "dev"])
+@pytest.mark.parametrize("values", [default_env_vars(), dev_env_vars()], ids=["deploy", "dev"])
 def test_deploy_and_dev_write_every_required_key(values: dict[str, str]) -> None:
     assert [key for key in REQUIRED_KEYS if not values.get(key)] == []
 
 
 def test_deploy_writes_nothing_published() -> None:
-    values = default_env_vars(admin_password="x")
+    values = default_env_vars()
     assert [key for key in REQUIRED_KEYS if any(value in values[key] for value in PUBLISHED)] == []
 
 
 def _older(tmp_path: Path, *missing: str, **extra: str) -> Path:
-    values = {k: v for k, v in default_env_vars(admin_password="x").items() if k not in missing}
+    values = {k: v for k, v in default_env_vars().items() if k not in missing}
     values.update(extra)
     env = tmp_path / ".env"
     write_env_file(env, values)

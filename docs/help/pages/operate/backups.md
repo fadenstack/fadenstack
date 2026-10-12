@@ -11,7 +11,7 @@ when you install.
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
-| Migration versions and checksums | Yes | `faden restore` checks the database dumps and the certificate files before it changes anything |
+| Migration versions and checksums | Yes | `faden restore` checks the database dumps, the volume archives and the certificate files before it changes anything |
 | Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves |
 | Files attached to chats | With `--include-volumes` | Without it, only the text read from them is in the database, not the files themselves |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
@@ -37,15 +37,18 @@ It asks for confirmation (`-y` skips it), then writes `~/fadenstack/backups/<tim
 | Option | What it does |
 |---|---|
 | `--output-dir PATH` | Write the backup elsewhere, such as a mounted backup disk. A relative path is taken inside the install directory |
-| `--retain N` | Keep only the N most recent backups in that directory (default 5). Older ones there are deleted |
+| `--retain N` | Keep only the N most recent backups of this kind in that directory (default 5). Older ones of the same kind are deleted |
 | `--db-only` | Databases only, without `.env` and certificate material. Keep a copy of `.env` apart, as private as the backups |
 | `--include-volumes` | Also the files uploaded to the knowledge base, the files attached to chats, the logs, the traces and Grafana's own data. Not the models |
 | `-y` | Do not ask |
 
 ??? info "How `--retain` counts"
-    `--retain` counts every backup in the directory, including the nightly ones and the ones upgrades take. A
-    manual `faden backup` into the default directory keeps 5 unless you pass a larger number, and every
-    `faden upgrade` keeps 5.
+    Each backup records what made it: the nightly timer, you with `faden backup`, or `faden upgrade`. `--retain`
+    counts and deletes only backups of its own kind, so a manual `faden backup --retain 3` leaves the nightly
+    backups alone, and an upgrade does not push them out. A manual backup keeps 5 unless you pass another number,
+    the nightly one keeps 7 (see below), and every `faden upgrade` keeps 5 of its own. Backups made before this
+    release have no kind and count as manual; a nightly timer set up before it keeps counting as manual until you
+    run `faden backup schedule` again.
 
 ## The nightly backup
 
@@ -75,8 +78,8 @@ Every `faden upgrade` also takes a backup before it changes anything.
 !!! warning "Under testing"
     Restoring is being tested. It puts back the data: the databases, the `.env`, the certificate material, and
     volumes if the backup holds them. It does not put back the deployment files or the release the backup was
-    taken with. While it runs, the services are stopped and the console does not answer: there is no
-    maintenance page yet. Try a restore on a copy of the server before you rely on one.
+    taken with. While it runs, the services are stopped and the console shows the maintenance page (as in an
+    upgrade), which reloads itself once the platform is back. Try a restore on a copy of the server before you rely on one.
 
 ```bash
 faden restore ~/fadenstack/backups/<time>
@@ -86,12 +89,12 @@ It asks for confirmation (`-y` skips it).
 
 ??? info "What the restore does, in order"
     1. shows the backup's date, the tool version it was taken with, and what it holds;
-    2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one
+    2. checks the database dumps, the volume archives and the certificate files against the checksums in the backup, and stops if one
        does not match;
     3. asks for confirmation (`-y` skips it);
-    4. stops the services, restores every database and, unless told otherwise, the `.env` and the certificate
-       material;
-    5. starts everything again.
+    4. puts up the maintenance page, stops every service except the front door (nginx), restores every database
+       and, unless told otherwise, the `.env` and the certificate material;
+    5. starts everything again and takes the maintenance page down, also when the restore fails.
 
 | Option | What it does |
 |---|---|
@@ -106,7 +109,7 @@ It asks for confirmation (`-y` skips it).
 
 ### Check a backup
 
-Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps and the
+Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps, the volume archives and the
 certificate files are complete and unchanged, without touching the install.
 
 ## Rebuild a lost server

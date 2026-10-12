@@ -128,7 +128,7 @@ pipx install fadenstack        # or: uv tool install fadenstack
 faden deploy
 ```
 
-`faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator; Grafana, Langfuse and RabbitMQ's management then sign in with that administrator's password. Then open `https://<server>` and sign in.
+`faden deploy` writes the configuration with a random password for every service, sets up HTTPS, starts the services and creates the first administrator; Grafana, Langfuse and RabbitMQ's management each have a password of their own in `.env`, not the administrator's. Then open `https://<server>` and sign in.
 
 **The GPU machines** run Linux (x86_64, or aarch64 on NVIDIA DGX Spark) with an NVIDIA driver and Docker or Podman. In the console, open **Machines → Add a machine**, run the line it gives you on the machine, and approve the machine's code. Then pick a model in the **model marketplace**. The walk-through is in [GPU machines](docs/help/pages/operate/machines.md) and [Clusters](docs/help/pages/operate/clusters.md).
 

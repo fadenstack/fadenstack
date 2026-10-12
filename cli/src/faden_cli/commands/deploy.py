@@ -34,7 +34,7 @@ from faden_cli.core.compose import (
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
-from faden_cli.core.env_gen import default_env_vars, ensure_bootstrap_token, read_env_file, set_env_values, write_env_file
+from faden_cli.core.env_gen import _random_password, default_env_vars, ensure_bootstrap_token, read_env_file, set_env_values, write_env_file
 from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
@@ -63,6 +63,29 @@ def set_deploy_options(
     if values:
         set_env_values(env_path, values)
         info("Set in .env: " + ", ".join(values))
+
+
+def langfuse_login_env(env_vars: dict[str, str], admin_email: str) -> dict[str, str]:
+    """The .env values that give Langfuse its first user: the administrator's e-mail and a password of its own.
+
+    Grafana, Langfuse and RabbitMQ's management used to be set to the administrator's console password. A
+    password in four places is four places to lose it from, and ``faden admin reset-password`` could not keep
+    them in step. Each service has a random password in ``.env`` instead, which is what the service runs on:
+    Langfuse reads ``LANGFUSE_INIT_USER_PASSWORD`` only when it creates the user, so one already set is kept.
+    """
+    values = {
+        "LANGFUSE_INIT_USER_EMAIL": admin_email,
+        "LANGFUSE_INIT_USER_NAME": "Admin",
+        "LANGFUSE_INIT_PROJECT_NAME": "fadenstack",
+    }
+    if not env_vars.get("LANGFUSE_INIT_USER_PASSWORD"):
+        values["LANGFUSE_INIT_USER_PASSWORD"] = _random_password(24)
+    # Langfuse's first project gets a secret of its own. It was the setup token's first 40
+    # characters -- the JWT header, the same on every install.
+    if not env_vars.get("LANGFUSE_INIT_PROJECT_SECRET_KEY"):
+        values["LANGFUSE_INIT_PROJECT_SECRET_KEY"] = f"sk-lf-{secrets.token_hex(20)}"
+        values["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"] = "pk-lf-faden"
+    return values
 
 
 def _regenerate_rmq_definitions(
@@ -843,48 +866,25 @@ def deploy_cmd(
             cfg.admin_email = creds["email"]
             save_config(cfg)
 
-            # ── Sync credentials to Grafana, Langfuse & RabbitMQ ──
+            # ── Langfuse's first user ──
             from faden_cli.core.compose import up as compose_up_svc  # noqa: PLC0415
 
             env_vars = read_env_file(env_path)
-            env_vars["GRAFANA_ADMIN_USER"] = creds["email"]
-            env_vars["GRAFANA_ADMIN_PASSWORD"] = creds["password"]
-            # Only the management/admin password is synced to the admin
-            # credential.  Per-service AMQP passwords (RABBITMQ_BACKEND_PASS,
-            # etc.) are never overwritten — they are stable random secrets
-            # set during env generation.
-            env_vars["RABBITMQ_ADMIN_PASS"] = creds["password"]
-            env_vars["LANGFUSE_INIT_USER_EMAIL"] = creds["email"]
-            env_vars["LANGFUSE_INIT_USER_PASSWORD"] = creds["password"]
-            env_vars["LANGFUSE_INIT_USER_NAME"] = "Admin"
-            env_vars["LANGFUSE_INIT_PROJECT_NAME"] = "fadenstack"
-            # Langfuse's first project gets a secret of its own. It was the setup token's first 40
-            # characters -- the JWT header, the same on every install.
-            if not env_vars.get("LANGFUSE_INIT_PROJECT_SECRET_KEY"):
-                env_vars["LANGFUSE_INIT_PROJECT_SECRET_KEY"] = f"sk-lf-{secrets.token_hex(20)}"
-                env_vars["LANGFUSE_INIT_PROJECT_PUBLIC_KEY"] = "pk-lf-faden"
-
+            env_vars.update(langfuse_login_env(env_vars, creds["email"]))
             write_env_file(env_path, env_vars)
-            info("Synced admin credentials to Grafana, Langfuse & RabbitMQ.")
+            info("Langfuse's first user is the administrator's e-mail, with a password of its own in .env.")
 
-            # Regenerate definitions.json with the new admin password.
-            _regenerate_rmq_definitions(shared_dir, env_vars, profiles)
-
-            # Force-recreate so containers pick up the new env vars.
-            # RabbitMQ loads definitions.json on startup which now
-            # includes the admin password.  Service workers are NOT
-            # recreated because their per-service passwords have not
-            # changed.
-            recreate_services = ["grafana", "langfuse-web", "faden-rmq"]
+            # Force-recreate so Langfuse picks up the user (it creates it when it starts). Grafana and
+            # RabbitMQ keep the random passwords the .env was generated with: they are not the console's.
             compose_up_svc(
                 ctx,
-                services=recreate_services,
+                services=["langfuse-web"],
                 detach=True,
                 force_recreate=True,
                 wait=True,
                 timeout=60,
             )
-            success("Grafana, Langfuse & RabbitMQ recreated with shared credentials.")
+            success("Langfuse recreated with its first user.")
     else:
         warning("Backend did not become healthy in time — skipping admin setup.")
         console.print(

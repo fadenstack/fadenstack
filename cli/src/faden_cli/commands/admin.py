@@ -51,6 +51,8 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
 
     This bypasses the API and sets the password hash in PostgreSQL.
     The backend container must be running (needed for password hashing).
+    It changes the console sign-in only: Grafana, Langfuse and RabbitMQ
+    have passwords of their own in .env, which it leaves as they are.
     """
     # Validate email early to prevent any injection
     if not _EMAIL_RE.match(email):
@@ -139,6 +141,8 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
         sys.exit(1)
 
     success(f"Password reset for '{email}'.")
+    # Only the console's password: Grafana, Langfuse and RabbitMQ have passwords of their own in .env.
+    info("Grafana, Langfuse and RabbitMQ sign-ins are not touched: their passwords are in .env.")
 
     # ── 3. Display credentials ────────────────────────────────
     from rich.panel import Panel
