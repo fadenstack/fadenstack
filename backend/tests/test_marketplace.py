@@ -572,9 +572,12 @@ async def test_recipes_offline_are_no_recipe(monkeypatch: pytest.MonkeyPatch) ->
 
 # ── whether the cluster's runtime can load it, before the download ──────
 
-QWEN4_EXP_CONFIG = {
-    "model_type": "qwen4_exp", "architectures": ["Qwen4ExpForConditionalGeneration"],
-    "transformers_version": "5.16.0.dev0",
+#: A model type no runtime in the catalogue knows. The real case was ``qwen4_exp`` (saved with Transformers
+#: 5.16.0.dev0) on the nv26.08 runtime's Transformers 5.14.1; the runtimes since know it, and the verdict must
+#: not depend on which runtime is the catalogue's default.
+FUTURE_EXP_CONFIG = {
+    "model_type": "qwen9_exp", "architectures": ["Qwen9ExpForConditionalGeneration"],
+    "transformers_version": "9.0.0.dev0",
     "text_config": {"num_hidden_layers": 48, "hidden_size": 4096, "num_attention_heads": 32, "num_key_value_heads": 4},
 }
 
@@ -588,7 +591,7 @@ async def test_a_model_the_runtime_cannot_load_is_refused_before_any_download(
     from faden_backend.web.api.llm.dependencies import get_llm_service
 
     async def detail(self: Any, repo_id: str) -> dict[str, Any]:
-        arch = facts.architecture_from_config(QWEN4_EXP_CONFIG)
+        arch = facts.architecture_from_config(FUTURE_EXP_CONFIG)
         return {"repo_id": repo_id, "name": repo_id.split("/")[-1], "capabilities": ["chat"], "task": "chat",
                 "runnable": True, "weights_bytes": 132_700_000_000, "architecture_facts": arch.to_dict(),
                 "max_context": 262144, "kv_bytes_per_token": arch.kv_bytes_per_token(), "needs_remote_code": False,
@@ -608,14 +611,15 @@ async def test_a_model_the_runtime_cannot_load_is_refused_before_any_download(
     r = await client.get("/api/llm/marketplace/models/nvidia/Qwen3.8-Flash-Next-NVFP4")
     verdict = r.json()["compatibility"][env_id]
     assert verdict["status"] == "cannot_run" and verdict["code"] == "model_type_unknown"
-    assert "qwen4_exp" in verdict["message"] and "5.16.0.dev0" in verdict["message"]
-    assert verdict["transformers_version"] == "5.14.1"
+    assert "qwen9_exp" in verdict["message"] and "9.0.0.dev0" in verdict["message"]
+    assert verdict["transformers_version"]
+    assert f"Transformers {verdict['transformers_version']}" in verdict["message"]  # the runtime's own
 
     r = await client.post("/api/llm/marketplace/host", json={
         "repo_id": "nvidia/Qwen3.8-Flash-Next-NVFP4", "environment_id": env_id, "name": "qwen3-8-flash-next-nvfp4",
         "copies": 1, "gpus_per_copy": 2, "engine_config": {},
     })
-    assert r.status_code == 409 and "qwen4_exp" in r.json()["detail"]
+    assert r.status_code == 409 and "qwen9_exp" in r.json()["detail"]
     assert started == []
 
 
