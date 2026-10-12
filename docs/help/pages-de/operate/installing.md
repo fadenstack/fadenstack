@@ -38,8 +38,11 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
     `faden deploy` prüft Docker, schreibt die Installation nach `~/fadenstack` (oder in das Verzeichnis, das Sie
     angeben: `faden deploy /opt/faden`), erzeugt eine `.env` mit zufälligen Passwörtern und Schlüsseln, bemisst die
     Dienste für den Host, lädt die Images genau des Release herunter, zu dem das Werkzeug gehört, startet alles und
-    legt den ersten Administrator an. Die Admin-Anmeldungen von Grafana, RabbitMQ und Langfuse erhalten die
-    E-Mail-Adresse und das Passwort des ersten Administrators.
+    legt den ersten Administrator an. Grafana, RabbitMQ
+    und Langfuse behalten je ein eigenes, zufälliges Passwort in der `.env`: Keines davon ist das Konsolen-Passwort
+    des Administrators. Der erste Benutzer von Langfuse ist die E-Mail-Adresse des Administrators mit
+    `LANGFUSE_INIT_USER_PASSWORD`; eine vor diesem Release angelegte Installation hat an diesen drei Stellen das
+    Konsolen-Passwort, mit dem sie eingerichtet wurde, und die `.env` enthält, womit jeder Dienst läuft.
 
 ### Was der Befehl fragt {#what-it-asks}
 
@@ -182,7 +185,8 @@ Zufallswert (`openssl rand -base64 48`):
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Aufrufe des MCP-Dienstes. Ein Wert für alle drei |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Aufrufe des Skills-Dienstes. Ein Wert für alle drei |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` (64 Hex-Zeichen: `openssl rand -hex 32`), `LANGFUSE_NEXTAUTH_SECRET` | Die API-Schlüssel, gespeicherten Schlüssel und Anmeldungen von Langfuse |
-| `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana |
+| `REDIS_AUTH`, `MINIO_ROOT_PASSWORD`, `CLICKHOUSE_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` | Die Speicher und Grafana. Grafana liest sein Passwort beim ersten Start; eine spätere Änderung in der `.env` ändert es in Grafana nicht |
+| `LANGFUSE_INIT_USER_PASSWORD` | Das Passwort des ersten Benutzers von Langfuse (die E-Mail-Adresse des Administrators). Langfuse liest es nur einmal, wenn es den Benutzer anlegt: Ändern Sie es danach in Langfuse und tragen Sie das neue in die `.env` ein |
 | `RABBITMQ_ADMIN_PASS`, `RABBITMQ_BACKEND_PASS`, `RABBITMQ_API_PASS`, `RABBITMQ_PII_PASS` | Den Message-Broker. Seine Benutzer stammen aus `rabbitmq/definitions.json`, die `faden deploy` daraus schreibt |
 
 Außerhalb der Entwicklung starten das Backend, das Gateway sowie der MCP- und der Skills-Dienst nicht mit den
@@ -237,7 +241,7 @@ Mit `faden module disable pii` und anschließend `faden down` und `faden up` ent
 | `faden up` / `faden down` | Die Dienste starten oder stoppen; die Daten bleiben erhalten |
 | `faden doctor` | Host, Ports und Zertifikat prüfen |
 | `faden config show` | Wo die Installation liegt und wie das Werkzeug eingerichtet ist |
-| `faden admin reset-password --email alex@example.com` | Ein neues Passwort für einen Benutzer setzen, der sich nicht anmelden kann |
+| `faden admin reset-password --email alex@example.com` | Ein neues Passwort für einen Benutzer setzen, der sich nicht anmelden kann. Es ändert nur die Anmeldung an der Konsole, nicht Grafana, Langfuse oder RabbitMQ |
 | `faden --help` | Alle Befehle; `faden <command> --help` für die Optionen eines Befehls |
 
 ## Fadenstack entfernen {#removing-fadenstack}

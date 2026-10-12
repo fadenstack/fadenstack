@@ -21,7 +21,7 @@ def test_every_generated_setting_reaches_a_container() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
     unused = sorted(
         key
-        for key in default_env_vars(admin_password="x")
+        for key in default_env_vars()
         if key not in ELSEWHERE and not re.search(r"\$\{" + re.escape(key) + r"[:}-]", compose)
     )
     assert unused == []

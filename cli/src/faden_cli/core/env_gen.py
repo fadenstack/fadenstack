@@ -251,8 +251,6 @@ def _dev_module_secrets() -> dict[str, str]:
 
 def default_env_vars(
     *,
-    admin_email: str = "admin@example.com",
-    admin_password: str = "",
     profiles: list[str] | None = None,
 ) -> dict[str, str]:
     """Build a dict of env vars with generated secrets.
@@ -281,7 +279,7 @@ def default_env_vars(
         "POSTGRES_DB": "postgres",
         # Grafana
         "GRAFANA_ADMIN_USER": "admin",
-        "GRAFANA_ADMIN_PASSWORD": admin_password or _random_password(16),
+        "GRAFANA_ADMIN_PASSWORD": _random_password(16),
         # Langfuse
         "LANGFUSE_NEXTAUTH_SECRET": _random_secret(),
         "LANGFUSE_SALT": _random_secret(32),

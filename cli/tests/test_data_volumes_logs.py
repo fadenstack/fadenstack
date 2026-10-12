@@ -28,7 +28,7 @@ COMPOSE = Path(__file__).resolve().parents[2] / "shared" / "docker-compose.yaml"
 
 
 def test_deploy_writes_the_defaults() -> None:
-    env = default_env_vars(admin_password="x")  # noqa: S106
+    env = default_env_vars()
     assert env["FADEN_LOG_MAX_SIZE"] == "50m"
     assert env["FADEN_LOG_MAX_FILE"] == "5"
     assert env["FADEN_DATA_DIR"] == ""
