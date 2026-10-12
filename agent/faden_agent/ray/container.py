@@ -583,6 +583,24 @@ class RayContainerRuntime:
         if missing:
             return f"missing mounts: {', '.join(sorted(missing))}"
 
+        # The same container path can come from another host directory (a
+        # release that moved where /models is read from). Compared only where
+        # the inspect output names a source, and only for the spec's own
+        # mounts: the container then reads models from the old place.
+        actual_sources = {
+            str(m.get("Destination")): str(m.get("Source")).rstrip("/")
+            for m in (info.get("Mounts") or [])
+            if isinstance(m, dict) and m.get("Destination") and m.get("Source")
+        }
+        moved = sorted(
+            m.container_path
+            for m in spec.mounts
+            if m.container_path in actual_sources
+            and actual_sources[m.container_path] != m.host_path.rstrip("/")
+        )
+        if moved:
+            return f"mounts from another host path: {', '.join(moved)}"
+
         config = info.get("Config") if isinstance(info.get("Config"), dict) else {}
         actual_env = {}
         for entry in config.get("Env") or []:

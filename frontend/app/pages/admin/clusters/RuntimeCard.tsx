@@ -3,6 +3,9 @@
  * the others this server ships for them. A newer certified runtime is only
  * announced; switching restarts the cluster and its models, so it is a
  * button with a confirmation (why: services/inference/runtime_choice.py).
+ * The same goes for new launch settings an upgrade brings (where models and
+ * caches are mounted): the running containers keep theirs, the card says so,
+ * and a button with a confirmation restarts the cluster to apply them.
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,11 +44,12 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
   const [picked, setPicked] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [confirmingSettings, setConfirmingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Look again while the cluster restarts, and only then: a stopped cluster
   // takes the switch when it starts, and waits without being asked.
-  useEffect(() => setRestarting(Boolean(status?.restarting)), [status]);
+  useEffect(() => setRestarting(Boolean(status?.restarting || status?.settings_applying)), [status]);
 
   async function switchTo(runtime: string) {
     setSwitching(true);
@@ -54,6 +58,22 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
       await inferenceApi.switchRuntime(environmentId, runtime);
       setConfirming(false);
       setPicked("");
+      onSwitched?.();
+      await refresh(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t("common.action_failed"));
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  // The new launch settings, applied by a restart of the cluster the operator chooses (never by itself).
+  async function applySettings() {
+    setSwitching(true);
+    setError(null);
+    try {
+      await inferenceApi.applyRuntimeSettings(environmentId);
+      setConfirmingSettings(false);
       onSwitched?.();
       await refresh(true);
     } catch (err: unknown) {
@@ -76,6 +96,9 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
           <Typography variant="subtitle2">{t("clusters.runtime.title")}</Typography>
           {status.restarting && (
             <Chip size="small" color="info" icon={<CircularProgress size={12} />} label={t("clusters.runtime.applying")} />
+          )}
+          {status.settings_applying && (
+            <Chip size="small" color="info" icon={<CircularProgress size={12} />} label={t("clusters.runtime.settings_applying")} />
           )}
           {!status.applied && !status.restarting && (
             <Chip size="small" variant="outlined" label={t("clusters.applies_on_start")} />
@@ -101,6 +124,32 @@ export default function RuntimeCard({ environmentId, onSwitched }: RuntimeCardPr
             {id}
           </Typography>
         ))}
+
+        {status.settings_pending && !status.settings_applying && !confirming && !confirmingSettings && (
+          <Alert
+            severity="info"
+            sx={{ mt: 2 }}
+            data-testid="runtime-settings-pending"
+            action={
+              <Button size="small" color="inherit" onClick={() => setConfirmingSettings(true)}>
+                {t("clusters.runtime.settings_apply")}
+              </Button>
+            }
+          >
+            {t("clusters.runtime.settings_pending")}
+          </Alert>
+        )}
+
+        {confirmingSettings && (
+          <RestartConfirm
+            confirmLabel={t("clusters.runtime.settings_confirm")}
+            busy={switching}
+            onConfirm={() => void applySettings()}
+            onCancel={() => setConfirmingSettings(false)}
+          >
+            {t("clusters.runtime.settings_warning")}
+          </RestartConfirm>
+        )}
 
         {update && !confirming && (
           <Alert

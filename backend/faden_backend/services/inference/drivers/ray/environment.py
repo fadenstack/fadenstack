@@ -53,7 +53,7 @@ from faden_backend.db.models.node_control import (
     NodeCommandType,
     NodeHealthStatus,
 )
-from faden_backend.services.inference.bundles import RUNTIME_KEY
+from faden_backend.services.inference.bundles import LAUNCH_KEY, RUNTIME_KEY, launch_record
 from faden_backend.services.inference.drivers.ray.client import RayClusterClient
 from faden_backend.services.inference.drivers.ray.commands import NodeCommandGateway
 from faden_backend.services.inference.drivers.ray.schemas import (
@@ -1403,6 +1403,28 @@ class RayEnvironmentManager:
         observed["ray_tls"] = reported
         # What each member was started with, which it keeps (runtime_choice).
         observed[RUNTIME_KEY] = {str(node.node_id): bundles[node.node_id][0].bundle_id for node in nodes}
+        # ... and with which mounts: a container keeps them when a newer release
+        # would send others, and the model paths Serve gets must match them.
+        observed[LAUNCH_KEY] = {
+            str(node.node_id): launch_record(bundles[node.node_id][0].bundle_id, payloads[node.node_id])
+            for node in nodes
+        }
+        environment.observed_status_json = observed
+
+    @staticmethod
+    def _remember_launch(environment, launched: "list[tuple[Any, Any, dict[str, Any] | None]]") -> None:
+        """Record what machines' containers were just started with: ``(node id, bundle, launch spec)``.
+
+        For the commands that make a container besides ``ensure_ray_runtime``
+        (a head started again, a worker joined again): the agent recreates a
+        container whose mounts differ, so the record has to follow it.
+        """
+        launches = dict((environment.observed_status_json or {}).get(LAUNCH_KEY) or {})
+        for node_id, bundle, payload in launched:
+            if bundle is not None and payload is not None:
+                launches[str(node_id)] = launch_record(bundle.bundle_id, payload)
+        observed = dict(environment.observed_status_json or {})
+        observed[LAUNCH_KEY] = launches
         environment.observed_status_json = observed
 
     @staticmethod
@@ -1598,6 +1620,7 @@ class RayEnvironmentManager:
             ),
         )
         await self._await_result(gateway, cmd, what=f"start_ray_head on node {head.node_id}")
+        self._remember_launch(environment, [(head.node_id, bundle, bundle_payload)])
 
     async def _join_workers(
         self,
@@ -1616,6 +1639,7 @@ class RayEnvironmentManager:
         node_bindings = (resolved_fabric or {}).get("node_bindings", {})
 
         issued = []
+        launched: list[tuple[Any, Any, dict[str, Any] | None]] = []
         for worker in workers:
             # Per worker: the head may be a DGX and the worker a workstation,
             # and the image each joins with has to be its own.
@@ -1662,8 +1686,10 @@ class RayEnvironmentManager:
                 ),
             )
             issued.append((worker, cmd))
+            launched.append((worker.node_id, bundle, bundle_payload))
         for worker, cmd in issued:
             await self._await_result(gateway, cmd, what=f"join_ray_cluster on node {worker.node_id}")
+        self._remember_launch(environment, launched)
 
     async def _verify_cluster(self, session, environment, head, node_control) -> RayClusterStatus:
         """Step 6: probe the head for authoritative cluster membership.

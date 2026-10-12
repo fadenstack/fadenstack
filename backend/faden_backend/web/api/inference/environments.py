@@ -637,6 +637,21 @@ async def switch_runtime(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
+@router.post("/{environment_id}/runtime/apply-settings")
+async def apply_runtime_settings(
+    environment_id: uuid.UUID,
+    _user: User = Depends(require_permission(_ENV, "update")),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Restart the cluster so its runtime containers start with this release's settings (mounts)."""
+    from faden_backend.services.inference import runtime_choice  # noqa: PLC0415
+
+    try:
+        return await runtime_choice.apply_settings(session, environment_id)
+    except runtime_choice.RuntimeChoiceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 class ModelDownloadsSwitch(BaseModel):
     """Request body for the machines-download switch: on or off."""
 

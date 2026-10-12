@@ -277,7 +277,10 @@ zuerst), und jedes Modell auf dem Cluster lädt neu. Planen Sie ein Zeitfenster 
     können. Ein neuer Cluster bekommt die empfohlene.
 
     Ein Cluster behält die Runtime, mit der er gestartet wurde: über Neustarts hinweg, beim Wiederanlaufen nach
-    einer Störung und bei Server-Upgrades, die eine neuere mitbringen.
+    einer Störung und bei Server-Upgrades, die eine neuere mitbringen. Er behält auch die Einstellungen, mit denen
+    er gestartet wurde, etwa wo Modelle und Caches eingebunden sind. Ändert ein Release sie, sagt die Karte
+    **Laufzeit** das, und die Modelle laufen weiter; **Übernehmen und neu starten** übernimmt die neuen
+    Einstellungen, und nichts startet von selbst neu.
 
     Eine **Vorschau** führt Modelle aus, die die empfohlene Runtime nicht ausführen kann; wählen Sie sie für einen
     Cluster, der diese Modelle braucht. Der Modell-Marktplatz zeigt **Läuft hier nicht** bei einem Modell, das eine

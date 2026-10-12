@@ -207,6 +207,10 @@ The **Runtime** card shows the image the cluster's machines run, Ray and vLLM to
 certified one is available. A cluster keeps its runtime until you switch it, which restarts every model on it.
 See [Move a cluster to another runtime](upgrading.md#move-a-cluster-to-another-runtime).
 
+After an upgrade, the card can say that this release starts the runtime with new settings, such as where models
+and caches are mounted. The cluster keeps serving as it is; select **Apply and restart** when you want the new
+settings, which restarts the cluster and loads every model again.
+
 ## Encryption
 
 ![The Model traffic card, Encrypted: the gateway reaches the cluster's models over mutual TLS](../images/operate/cluster-model-traffic.png)

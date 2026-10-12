@@ -641,6 +641,14 @@ export interface ClusterRuntimeStatus {
   update: string | null;
   /** Runtimes its machines still run that this server no longer ships (``update`` names the way off). */
   withdrawn?: string[];
+  /**
+   * The machines' runtime containers were started with other launch settings than this release gives
+   * them (``settings_reasons``: "mounts"). They apply at the next restart, which nothing does by itself.
+   */
+  settings_pending?: boolean;
+  settings_reasons?: string[];
+  /** The restart that applies them is under way. */
+  settings_applying?: boolean;
   runtimes: ClusterRuntime[];
 }
 
@@ -1084,6 +1092,12 @@ export const inferenceApi = {
     return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime`, {
       method: "POST",
       body: JSON.stringify({ runtime }),
+    });
+  },
+  /** Restarts the cluster so its runtime containers start with this release's settings (where models and caches are mounted). */
+  applyRuntimeSettings(environmentId: string) {
+    return request<ClusterRuntimeStatus>(`/environments/${enc(environmentId)}/runtime/apply-settings`, {
+      method: "POST",
     });
   },
   /** Asks each machine whether it reaches Hugging Face (answers are kept a few minutes unless `fresh`). */

@@ -255,7 +255,9 @@ and every model on the cluster loads again. Plan a window for it.
     and keeps an older one to go back to. A new cluster gets the recommended one.
 
     A cluster keeps the runtime it was started with: through restarts, through recovery after a fault, and through
-    server upgrades that ship a newer one.
+    server upgrades that ship a newer one. It also keeps the settings it was started with, such as where models and
+    caches are mounted. When a release changes them, the **Runtime** card says so and the models keep serving;
+    **Apply and restart** takes the new settings, and nothing restarts by itself.
 
     A **Preview** runs models the recommended runtime cannot; choose it for a cluster that needs those models. The
     model marketplace says **Cannot run here** for a model that needs a newer runtime than the cluster runs (see

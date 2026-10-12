@@ -81,6 +81,7 @@ from faden_backend.services.inference.artifacts import (
 from faden_backend.services.inference.bundles import (
     node_and_bundle_for,
     default_bundle_registry,
+    running_mounts,
     translate_host_path_to_container,
 )
 from faden_backend.services.inference.drivers.ray.logs import (
@@ -1445,8 +1446,20 @@ class RayDeploymentManager:
             # mounts plus the head's paths.  ``_resolve`` keeps it because the
             # model-path translation below reads it, and translating against
             # the bundle alone would miss every mount the node supplied.
-            facts.runtime_mounts = default_bundle_registry.mounts_for_node(
-                facts.runtime_bundle, head_row
+            #
+            # The head's container keeps the mounts it was started with when a
+            # newer release would give it others, until the cluster restarts
+            # (``runtime_choice``). Serve resolves the model inside that
+            # container, so the path is translated with what it has: the
+            # mounts of this release would name a path it does not hold, change
+            # the config hash and re-apply a serving model into a failure.
+            # A cluster started before the record was kept gets what its
+            # agent reports, else today's.
+            running = await running_mounts(session, environment, head)
+            facts.runtime_mounts = (
+                running
+                if running is not None
+                else default_bundle_registry.mounts_for_node(facts.runtime_bundle, head_row)
             )
             facts.runtime_bundle_payload = (
                 default_bundle_registry.container_launch_spec(
