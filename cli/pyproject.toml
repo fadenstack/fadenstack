@@ -10,7 +10,7 @@ packages = ["src/faden_cli"]
 
 [project]
 name = "fadenstack"
-version = "0.4.4rc1"
+version = "0.4.4rc2"
 requires-python = ">=3.12,<4.0"
 description = "CLI installer and management tool for the Fadenstack platform"
 authors = [

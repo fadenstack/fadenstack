@@ -25,6 +25,19 @@
 series: []
 
 releases:
+  - version: 0.4.4rc2
+    channel: preview
+    date: ""
+    severity: security
+    summary: >-
+      Release candidate 2: on a DGX Spark the runtime mounts the machine's own model store again, and a cluster
+      still on a withdrawn runtime is shown on it and can be switched off it.
+    highlights:
+      - "DGX Spark runtimes mount the machine's own model store and Hugging Face cache instead of fixed paths."
+      - "A cluster still running a runtime this release no longer ships says so, and switching restarts it on the certified one."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.9
   - version: 0.4.4rc1
     channel: preview
     date: ""
