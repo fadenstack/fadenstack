@@ -287,6 +287,23 @@ async def _process_oauth_login(
     )
     user = user_result.scalar_one_or_none()
 
+    if user is not None:
+        if not user.is_active:
+            return RedirectResponse("/login?error=account_disabled")
+        # An address is no proof of who owns the account: until its owner has verified it, whoever
+        # holds that address at the provider could sign in as them (and a superuser's account is
+        # one email away). A person this provider already signed in to this account stays in.
+        linked = await session.scalar(
+            select(OAuthAccount.id).where(
+                OAuthAccount.user_id == user.id,
+                OAuthAccount.oauth_name == provider_name,
+                OAuthAccount.account_id == str(account_id),
+            ).limit(1),
+        )
+        if not user.is_verified and linked is None:
+            logger.warning("SSO sign-in refused: %s has an unverified local account", provider_name)
+            return RedirectResponse("/login?error=account_not_verified")
+
     if user is None:
         if not auto_register:
             return RedirectResponse("/login?error=registration_disabled")
