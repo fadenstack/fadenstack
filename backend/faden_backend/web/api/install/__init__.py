@@ -21,24 +21,25 @@ wrong on its face -- whether there is internet is a fact about the node, not
 about this server, so one answer had to serve an air-gapped rack and a
 connected office alike.
 
-Either way the digest comes from here, so the verification is identical and
-the source really is the only difference.  That is also what makes preferring
-the release safe: a download that does not match the build this deployment
-expects is refused, wherever it came from.  The one exception is a local copy
-that is not this version's build at all -- left from before an upgrade -- which
-is set aside for the release when the release's own digest says so.
+Either way the digest is the one this core release pins (agent_release.json,
+written from the ``node-agent-v<version>`` release's ``.sha256`` files), so the
+verification is identical and the source really is the only difference.  A
+download that does not match is refused, wherever it came from, and there is no
+way to install without a digest.  A local copy that is not the pinned build --
+left from before an upgrade -- is not served; machines are sent the release.
+The exception is a developer's own build in a checkout's ``dist/``, which
+carries its own computed digest.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import ipaddress
 import logging
 import socket
-import time
 from pathlib import Path
 
-import httpx
 import psutil
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse, Response
@@ -46,7 +47,6 @@ from packaging.version import InvalidVersion, Version
 from yarl import URL
 
 from faden_backend.services import edge_trust
-from faden_backend.services.tls import default_httpx_verify
 from faden_backend.settings import DEFAULT_AGENT_BINARY_DIR, settings
 
 log = logging.getLogger(__name__)
@@ -144,39 +144,54 @@ def binary_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-#: (version, build) -> (digest or None, monotonic expiry). An answer is kept an
-#: hour, a failure to get one a few minutes: an offline server asks rarely.
-_published_digests: dict[tuple[str, str], tuple[str | None, float]] = {}
-_DIGEST_TTL_SEC = 3600.0
-_NO_DIGEST_TTL_SEC = 300.0
+def _load_pin() -> dict[str, str]:
+    """The pinned digest per build, when the pin is for :data:`AGENT_VERSION`.
 
-
-async def published_digest(build: str) -> str | None:
-    """The digest the release publishes for this version's *build*; None when it cannot be read.
-
-    The release workflow puts ``<binary>.sha256`` beside each binary. Only
-    asked when this server holds its own copy, to find out whether that copy
-    is this version's build (see :func:`install_plan`).
+    A pin for another version is as good as none: handing out its digests
+    for this version's URL would make every install fail, so it is ignored
+    (and :func:`install_plan` says why there is no build).
     """
-    key = (AGENT_VERSION, build)
-    cached = _published_digests.get(key)
-    if cached is not None and cached[1] > time.monotonic():
-        return cached[0]
-    digest: str | None = None
-    url = RELEASE_URL.format(version=AGENT_VERSION, platform=build) + ".sha256"
     try:
-        async with httpx.AsyncClient(
-            verify=default_httpx_verify(), timeout=3.0, follow_redirects=True,
-        ) as client:
-            resp = await client.get(url)
-        if resp.status_code == 200:
-            first = resp.text.split()[0] if resp.text.split() else ""
-            digest = first.lower() if len(first) == 64 else None
-    except httpx.HTTPError:
-        digest = None
-    ttl = _DIGEST_TTL_SEC if digest else _NO_DIGEST_TTL_SEC
-    _published_digests[key] = (digest, time.monotonic() + ttl)
-    return digest
+        pin = json.loads(Path(__file__).with_name("agent_release.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(pin, dict) or pin.get("version") != AGENT_VERSION:
+        return {}
+    digests = pin.get("sha256")
+    if not isinstance(digests, dict):
+        return {}
+    return {
+        build: digest.lower()
+        for build, digest in digests.items()
+        if isinstance(digest, str) and len(digest) == 64 and all(c in "0123456789abcdefABCDEF" for c in digest)
+    }
+
+
+def pinned_digest(build: str) -> str | None:
+    """What *build* of the released agent must hash to; None when this core pins none."""
+    return _load_pin().get(build)
+
+
+def _from_checkout(path: Path) -> bool:
+    """Whether *path* is a developer's own build in the checkout's ``dist/``."""
+    checkout = _source_checkout_binary_dir()
+    return checkout is not None and path.parent == checkout
+
+
+def servable_binary(build: str) -> tuple[Path, str] | None:
+    """This server's copy of *build* and its digest, when it may be handed out.
+
+    The pinned build, or a checkout's own build (which differs from the release
+    by construction and is the one a developer meant to test). Any other copy --
+    left behind by an upgrade, or swapped -- is not served.
+    """
+    local = local_binary(build)
+    if local is None:
+        return None
+    digest = binary_digest(local)
+    if _from_checkout(local) or digest == pinned_digest(build):
+        return local, digest
+    return None
 
 
 def _origin(request: Request) -> str:
@@ -454,22 +469,29 @@ if ! fetch "$TMP/faden-agent" "$URL"; then
   fi
 fi
 
-if [ -n "$SHA" ]; then
-  echo "  Checking it is the build this backend expects..."
-  ACTUAL=$(sha256sum "$TMP/faden-agent" 2>/dev/null | cut -d' ' -f1) \\
-    || ACTUAL=$(shasum -a 256 "$TMP/faden-agent" | cut -d' ' -f1)
-  if [ "$ACTUAL" != "$SHA" ]; then
-    echo "ERROR: the download does not match the expected digest." >&2
-    echo "       expected $SHA" >&2
-    echo "       got      $ACTUAL" >&2
-    exit 1
-  fi
-  echo "  Verified."
-else
-  # Say so rather than implying a check happened.  A missing digest is a
-  # deployment that has not published one, not a passed verification.
-  echo "  NOTE: this backend published no digest, so nothing was verified."
+# No digest, no install: the build this core release hands out is pinned, and
+# an installer that skipped the check would run whatever it was served.
+case "$SHA" in
+  *[!0-9a-fA-F]*|"")
+    echo "ERROR: this backend gave no valid SHA-256 for the agent, so it cannot be verified." >&2
+    echo "       Refusing to install. Plan: $PLAN" >&2
+    exit 1 ;;
+esac
+if [ "${{#SHA}}" -ne 64 ]; then
+  echo "ERROR: this backend gave no valid SHA-256 for the agent, so it cannot be verified." >&2
+  echo "       Refusing to install. Plan: $PLAN" >&2
+  exit 1
 fi
+echo "  Checking it is the build this backend expects..."
+ACTUAL=$(sha256sum "$TMP/faden-agent" 2>/dev/null | cut -d' ' -f1) \\
+  || ACTUAL=$(shasum -a 256 "$TMP/faden-agent" | cut -d' ' -f1)
+if [ "$ACTUAL" != "$SHA" ]; then
+  echo "ERROR: the downloaded agent does not match the expected SHA-256; nothing was installed." >&2
+  echo "       expected $SHA" >&2
+  echo "       got      $ACTUAL" >&2
+  exit 1
+fi
+echo "  Verified."
 
 # -- install ----------------------------------------------------------------
 # Two forms, because the enrol path below passes the configuration through the
@@ -558,66 +580,58 @@ async def install_plan(request: Request, platform: str = "linux-x86_64") -> dict
             "reason": f"No agent build is published for {platform}.",
         }
 
-    local = local_binary(build)
     release_url = RELEASE_URL.format(version=AGENT_VERSION, platform=build)
+    pinned = pinned_digest(build)
+    served = servable_binary(build)
+    fallback_url = f"{_origin(request)}/api/install/binary/{build}"
 
-    if local is None:
-        # Nothing shipped with this deployment, so the release is the only
-        # source -- and we cannot state a digest for bytes we have never
-        # seen. The script says so rather than implying a check happened.
+    if served is not None and _from_checkout(served[0]):
+        # A developer's own build: it differs from the release by construction,
+        # so it is fetched from this server and checked against its own digest.
         return {
             "platform": build,
-            "url": release_url,
+            "url": fallback_url,
             "fallback_url": None,
+            "sha256": served[1],
+            "source": "checkout",
+        }
+
+    if pinned is None:
+        return {
+            "platform": build,
+            "url": None,
             "sha256": None,
-            "source": "release",
+            "reason": f"This Fadenstack pins no agent {AGENT_VERSION} build for {build}, so none can be verified.",
         }
 
-    # Both are available, and the node picks by trying. Whether there is
-    # internet is a fact about the *node*, not about this server, so deciding
-    # here gave one answer to an air-gapped rack and a connected office alike.
-    #
-    # The release goes first because it is a CDN and this is somebody's
-    # server; the fallback is what makes the same command work with no
-    # internet at all.
-    #
-    # The digest is this backend's own copy either way. A release that does
-    # not match it is not the build this deployment expects and the script
-    # refuses it -- which is the point of pinning: the source stops mattering.
-    #
-    # Unless the copy is not this version's build at all. Nothing replaces
-    # it when the server is upgraded, so after an upgrade the pin held
-    # machines on the agent before: the new release failed the check ("does
-    # not match the expected digest") and the update stopped there, and a
-    # machine without internet got the old copy from the fallback. Where the
-    # release's own digest can be read and the copy is not that build, the
-    # copy is set aside. With no internet the copy stays authoritative: it is
-    # all there is.
-    local_digest = binary_digest(local)
-    # A build in a checkout's dist/ is what a developer just made: it differs
-    # from the release by construction, and is the one they meant to test.
-    checkout = _source_checkout_binary_dir()
-    from_checkout = checkout is not None and local.parent == checkout
-    published = None if from_checkout else await published_digest(build)
-    if published is not None and published != local_digest:
-        log.warning(
-            "The agent copy %s is not agent %s's build (sha256 %s, release %s); "
-            "machines are sent the release. Replace it with the release's %s, or delete it.",
-            local, AGENT_VERSION, local_digest[:12], published[:12], build,
-        )
+    if served is None:
+        # Release only. The digest is the pinned one -- the node checks the
+        # download against it and refuses a mismatch.
+        local = local_binary(build)
+        if local is not None:
+            log.warning(
+                "The agent copy %s is not agent %s's pinned build; machines are sent the release. "
+                "Replace it with the release's %s, or delete it.",
+                local, AGENT_VERSION, build,
+            )
         return {
             "platform": build,
             "url": release_url,
             "fallback_url": None,
-            "sha256": published,
+            "sha256": pinned,
             "source": "release",
-            "reason": f"This server's copy of the agent is not {AGENT_VERSION}'s build; using the release.",
         }
+
+    # Both are available, and the node picks by trying: whether there is
+    # internet is a fact about the *node*, not about this server. The release
+    # goes first because it is a CDN and this is somebody's server; the
+    # fallback makes the same command work with no internet at all. The digest
+    # is the pinned one either way.
     return {
         "platform": build,
         "url": release_url,
-        "fallback_url": f"{_origin(request)}/api/install/binary/{build}",
-        "sha256": local_digest,
+        "fallback_url": fallback_url,
+        "sha256": pinned,
         "source": "release+backend",
     }
 
@@ -627,11 +641,11 @@ async def install_binary(build: str) -> Response:
     """Serve this deployment's own copy of the agent, when it has one."""
     if build not in set(PLATFORMS.values()):
         return Response(status_code=404)
-    local = local_binary(build)
-    if local is None:
+    served = servable_binary(build)
+    if served is None:
         return Response(status_code=404)
     return Response(
-        content=local.read_bytes(),
+        content=served[0].read_bytes(),
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="faden-agent-{build}"'},
     )

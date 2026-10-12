@@ -8,6 +8,11 @@
 #      cli/src/faden_cli/__init__.py (e.g. 0.3.0), and add the release to
 #      release/releases.yaml (severity, summary): installs hear about it from there.
 #   2. Tag and push:  git tag v0.3.0 && git push origin v0.3.0
+#      The agent the install line hands out is pinned in
+#      backend/faden_backend/web/api/install/agent_release.json: with the
+#      node-agent-v<AGENT_VERSION> release published, run
+#      `python release/pin_agent.py write` and commit it before tagging. This
+#      workflow refuses to publish when the file differs from that release.
 #      docker-publish.yml builds the images 0.3.0 from the same tag; this
 #      workflow waits until they exist before publishing the CLI, so nobody
 #      can install a CLI whose images are missing.
@@ -98,6 +103,12 @@ jobs:
           set -euo pipefail
           pip install pyyaml cryptography packaging
           python release/update_feed.py build --version "${{ steps.version.outputs.version }}" --out "$RUNNER_TEMP/feed"
+
+      # The install plan pins the agent's SHA-256 from this file. A release whose
+      # pin is not the published agent would hand out a build every machine refuses.
+      - name: The agent pin matches the node-agent release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python release/pin_agent.py check
 
       - name: Build sdist + wheel
         working-directory: ${{ env.CLI_DIR }}
