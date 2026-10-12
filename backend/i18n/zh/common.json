@@ -1789,6 +1789,7 @@
     "registered_not_connected": "\"{{name}}\" 已注册，但无法连接：{{reason}} 请打开它以修正 URL 或凭据。",
     "timeout_sec": "超时（秒）",
     "timeout_help": "连接和每次工具调用允许的最长时间：5 到 600 秒。",
+    "pii_service_off_warning": "PII 服务未运行，无法执行个人数据检查，因此对此服务器工具的每次调用都会被拒绝（不会发送任何内容）。请启动 PII 模块；如果不需要该检查，请将 PII 模式设为“允许”。",
     "headers": "请求头",
     "headers_help": "随发往此服务器的每个请求一起发送，例如 Authorization: Bearer <token>。加密存储，之后不再显示。所有使用此服务器工具的人都共用这些值。",
     "add_header": "添加请求头",

@@ -24,7 +24,9 @@ class RegisterServerRequest(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
     env: dict[str, str] = Field(default_factory=dict)
     tool_prefix: str = Field(min_length=1, max_length=128)
-    pii_mode: str = Field(default="redact", pattern=r"^(allow|redact|block)$")
+    #: Left out, the server gets ``redact`` when the PII service answers and
+    #: ``allow`` when it does not (see ``default_pii_mode``).
+    pii_mode: str | None = Field(default=None, pattern=r"^(allow|redact|block)$")
     timeout_sec: int = Field(default=60, ge=5, le=600)
     heartbeat_interval_sec: int = Field(default=30, ge=5, le=300)
     auto_discover: bool = True

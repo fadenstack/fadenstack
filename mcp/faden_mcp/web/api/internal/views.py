@@ -13,7 +13,11 @@ from faden_mcp.db.session import get_db_session
 from faden_mcp.services.arguments import coerce_to_schema
 from faden_mcp.services.connection_manager import MCPConnectionManager
 from faden_mcp.services.dao import MCPDao
-from faden_mcp.services.privacy_proxy import PrivacyProxy
+from faden_mcp.services.privacy_proxy import (
+    CHECK_UNAVAILABLE,
+    CHECK_UNAVAILABLE_MESSAGE,
+    PrivacyProxy,
+)
 from faden_mcp.web.api.auth import verify_service_token
 
 logger = logging.getLogger(__name__)
@@ -78,12 +82,10 @@ async def _get_catalog_version(request: Request, tenant_id: str) -> int:
         return 0
 
 
-def _get_privacy_proxy(request: Request) -> PrivacyProxy | None:
-    """Build a PrivacyProxy if PII service is configured."""
+def _get_privacy_proxy(request: Request) -> PrivacyProxy:
+    """Build the PrivacyProxy; without a PII service URL it refuses redact/block."""
     from faden_mcp.settings import settings
 
-    if not settings.pii_service_url:
-        return None
     http_client = request.app.state.http_client
     return PrivacyProxy(pii_base_url=settings.pii_service_url, http_client=http_client)
 
@@ -183,24 +185,28 @@ async def call_tool(
     redaction_summary = None
     effective_pii_mode = body.pii_mode_override or server.pii_mode
     proxy = _get_privacy_proxy(request)
-    if proxy is not None:
-        decision = await proxy.check(
-            arguments=arguments,
-            pii_mode=effective_pii_mode,
-        )
-        if not decision.allowed:
-            if decision.redaction_summary.get("reason") == "unredactable":
-                detail = (
-                    "Tool call blocked by privacy policy: the arguments contain "
-                    "personal data that could not be redacted safely, so nothing "
-                    "was sent."
-                )
-            else:
-                detail = "Tool call blocked by privacy policy."
-            raise HTTPException(status_code=451, detail=detail)
-        sanitized_args = decision.sanitized_args
-        if decision.redaction_summary:
-            redaction_summary = decision.redaction_summary
+    decision = await proxy.check(
+        arguments=arguments,
+        pii_mode=effective_pii_mode,
+    )
+    if not decision.allowed:
+        reason = decision.redaction_summary.get("reason")
+        if reason == CHECK_UNAVAILABLE:
+            # The gateway hands this detail to the model as the tool's
+            # error, and the chat shows it; 503, not a crash.
+            raise HTTPException(status_code=503, detail=CHECK_UNAVAILABLE_MESSAGE)
+        if reason == "unredactable":
+            detail = (
+                "Tool call blocked by privacy policy: the arguments contain "
+                "personal data that could not be redacted safely, so nothing "
+                "was sent."
+            )
+        else:
+            detail = "Tool call blocked by privacy policy."
+        raise HTTPException(status_code=451, detail=detail)
+    sanitized_args = decision.sanitized_args
+    if decision.redaction_summary:
+        redaction_summary = decision.redaction_summary
 
     # Execute the tool call via the upstream MCP server; once more on a new
     # connection when the server no longer knew the session (it restarted).

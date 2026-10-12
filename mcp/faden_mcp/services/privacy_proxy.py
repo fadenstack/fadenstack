@@ -25,12 +25,33 @@ class PrivacyDecision:
     redaction_summary: dict[str, Any] = field(default_factory=dict)
 
 
+#: Why the check could not run (``redaction_summary["reason"]``).
+CHECK_UNAVAILABLE = "check_unavailable"
+
+#: What a refused tool call says, for the operator and the model.
+CHECK_UNAVAILABLE_MESSAGE = (
+    "The personal-data check for this tool could not run, so the call was "
+    "not made and nothing was sent. An administrator can start the PII "
+    "service (the 'pii' module), or, if the check is not needed, set this "
+    "MCP server's PII mode to Allow."
+)
+
+
+def _refused_unavailable() -> PrivacyDecision:
+    return PrivacyDecision(
+        allowed=False,
+        sanitized_args={},
+        redaction_summary={"action": "blocked", "reason": CHECK_UNAVAILABLE},
+    )
+
+
 class PrivacyProxy:
     """Enforces PII scanning before outbound MCP tool calls.
 
-    When the PII service is unavailable, the proxy falls back to
-    ``allow`` mode — it will not block tool calls but will log a
-    warning.
+    Fails closed: in ``redact`` and ``block`` mode a call is refused when
+    the PII service is not configured, cannot be reached, errors or sends
+    an answer that cannot be read.  Passing the original arguments on
+    would send exactly the personal data the mode promises to keep back.
     """
 
     def __init__(
@@ -55,8 +76,12 @@ class PrivacyProxy:
             ``redact`` — scan and replace PII with redaction markers
             ``block``  — scan and reject if PII is detected
         """
-        if pii_mode == "allow" or not self._base:
+        if pii_mode == "allow":
             return PrivacyDecision(allowed=True, sanitized_args=arguments)
+
+        if not self._base:
+            logger.warning("PII service not configured — refusing tool call")
+            return _refused_unavailable()
 
         try:
             return await self._call_pii_service(
@@ -65,10 +90,10 @@ class PrivacyProxy:
             )
         except Exception:
             logger.warning(
-                "PII service unreachable — falling back to allow",
+                "PII check could not run — refusing tool call",
                 exc_info=True,
             )
-            return PrivacyDecision(allowed=True, sanitized_args=arguments)
+            return _refused_unavailable()
 
     async def _call_pii_service(
         self,
@@ -100,8 +125,10 @@ class PrivacyProxy:
         )
         resp.raise_for_status()
         data = resp.json()
+        if not isinstance(data, dict) or "entities_found" not in data:
+            raise ValueError("PII service answer has no entities_found")
 
-        raw_entities = data.get("entities_found", [])
+        raw_entities = data["entities_found"]
         entities_found: list[dict[str, Any]]
         entities_count: int
 
@@ -112,8 +139,9 @@ class PrivacyProxy:
             entities_found = []
             entities_count = max(raw_entities, 0)
         else:
-            entities_found = []
-            entities_count = 0
+            # Neither a list nor a count: no way to tell whether the
+            # arguments hold personal data.
+            raise ValueError("PII service answer has an unusable entities_found")
 
         pii_detected = entities_count > 0
 
@@ -150,6 +178,34 @@ class PrivacyProxy:
             )
 
         return PrivacyDecision(allowed=True, sanitized_args=arguments)
+
+
+async def default_pii_mode(
+    *,
+    configured: str,
+    pii_base_url: str,
+    http_client: httpx.AsyncClient,
+) -> str:
+    """The PII mode a new server gets when the request names none.
+
+    ``configured`` (``FADEN_MCP_DEFAULT_PII_MODE``) wins when set.  Otherwise
+    ``redact`` if the PII service answers its health check, ``allow`` if it
+    does not: without the service every ``redact`` call would be refused, and
+    an install that never started the optional ``pii`` module would get a
+    server that cannot be used.  Saved servers keep their mode.
+    """
+    if configured in ("allow", "redact", "block"):
+        return configured
+    base = pii_base_url.rstrip("/")
+    if not base:
+        return "allow"
+    try:
+        resp = await http_client.get(f"{base}/api/health", timeout=3.0)
+        resp.raise_for_status()
+    except Exception:
+        logger.info("PII service not reachable — new MCP server gets PII mode allow")
+        return "allow"
+    return "redact"
 
 
 def _args_to_text(arguments: dict[str, Any]) -> str:

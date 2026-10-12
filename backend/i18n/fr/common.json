@@ -1980,6 +1980,7 @@
     "registered_not_connected": "\"{{name}}\" est enregistré, mais la connexion a échoué : {{reason}} Ouvrez-le pour corriger l'URL ou les identifiants.",
     "timeout_sec": "Délai d'attente (secondes)",
     "timeout_help": "Durée maximale de la connexion et de chaque appel d'outil : de 5 à 600 secondes.",
+    "pii_service_off_warning": "Le service PII n'est pas démarré : la vérification des données personnelles ne peut pas s'exécuter et chaque appel aux outils de ce serveur est refusé (rien n'est envoyé). Démarrez le module PII ou, si la vérification n'est pas nécessaire, réglez le mode PII sur Autoriser.",
     "headers": "En-têtes",
     "headers_help": "Envoyés avec chaque requête vers ce serveur, p. ex. Authorization: Bearer <token>. Stockés chiffrés et jamais réaffichés. Toute personne qui utilise les outils de ce serveur les utilise.",
     "add_header": "Ajouter un en-tête",

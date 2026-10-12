@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { DataTable, type ColumnDef } from "~/components/DataTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { FormDialog } from "~/components/FormDialog";
+import { useServices } from "~/lib/ServicesContext";
 import { useAsyncData } from "~/lib/useAsyncData";
 import {
   listServers,
@@ -22,6 +23,7 @@ import {
   toSecretMap,
   type SecretEdits,
 } from "./SecretPairsEditor";
+import { PiiServiceWarning } from "./PiiServiceWarning";
 import { isHttp, splitCommand } from "./serverForm";
 
 import Alert from "@mui/material/Alert";
@@ -68,6 +70,7 @@ const STATUS_COLOR: Record<
 export default function MCPServersPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { isModuleEnabled } = useServices();
 
   const {
     data: servers,
@@ -132,7 +135,8 @@ export default function MCPServersPage() {
     setNewPrefix("");
     setNewUrl("");
     setNewCommand("");
-    setNewPiiMode("redact");
+    // What the service would pick: Redact needs the PII service to run.
+    setNewPiiMode(isModuleEnabled("pii") ? "redact" : "allow");
     setNewTimeout(60);
     setNewHeaders(NO_EDITS);
     setNewEnv(NO_EDITS);
@@ -523,6 +527,7 @@ export default function MCPServersPage() {
             <MenuItem value="redact">{t("mcp.pii_redact")}</MenuItem>
             <MenuItem value="block">{t("mcp.pii_block")}</MenuItem>
           </TextField>
+          <PiiServiceWarning mode={newPiiMode} />
           <TextField
             label={t("mcp.timeout_sec")}
             type="number"

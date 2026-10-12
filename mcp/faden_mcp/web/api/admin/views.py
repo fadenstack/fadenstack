@@ -14,6 +14,7 @@ from faden_mcp.db.session import get_db_session
 from faden_mcp.services.connection_manager import MCPConnectionManager
 from faden_mcp.services.dao import MCPDao
 from faden_mcp.services.discovery import discover_tools
+from faden_mcp.services.privacy_proxy import default_pii_mode
 from faden_mcp.services.transport.base import MCPConnectError, describe_failure
 from faden_mcp.web.api.admin.schemas import (
     DiscoveredServer,
@@ -201,6 +202,14 @@ async def register_server(
             detail=f"Tool prefix '{body.tool_prefix}' already exists for tenant.",
         )
 
+    from faden_mcp.settings import settings
+
+    pii_mode = body.pii_mode or await default_pii_mode(
+        configured=settings.default_pii_mode,
+        pii_base_url=settings.pii_service_url,
+        http_client=request.app.state.http_client,
+    )
+
     server = await dao.create_server(
         tenant_id=body.tenant_id,
         name=body.name,
@@ -212,7 +221,7 @@ async def register_server(
         headers_json_encrypted=body.headers or None,
         env_json_encrypted=body.env or None,
         tool_prefix=body.tool_prefix,
-        pii_mode=body.pii_mode,
+        pii_mode=pii_mode,
         enabled=body.enabled,
         status="registering",
         timeout_sec=body.timeout_sec,

@@ -73,7 +73,9 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""
 
     # ── MCP defaults ──
-    default_pii_mode: str = "redact"
+    # PII mode of a new server that names none. Empty: "redact" when the PII
+    # service answers, "allow" when it does not.
+    default_pii_mode: str = ""
     default_timeout_sec: int = 60
     default_heartbeat_interval_sec: int = 30
     max_tool_loop_depth: int = 5
