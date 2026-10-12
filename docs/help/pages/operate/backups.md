@@ -11,7 +11,7 @@ when you install.
 | Every database on the server's Postgres | Yes | Users, settings, providers, machines, clusters, deployments, chats, the request log |
 | `.env` | Yes, unless `--db-only` | It holds the key the chats are encrypted with and the keys that seal stored secrets (the Hugging Face token, secret settings, the MCP servers' credentials). A database restored without its `.env` has chats and secrets nobody can read |
 | Certificate material (`tls/`, `tls-ca/`) | Yes, unless `--db-only` | The served certificate and the server's own certificate authority with its private key. With them, a rebuilt server is one the machines still trust |
-| Migration versions and checksums | Yes | `faden restore` checks the database dumps and the certificate files before it changes anything |
+| Migration versions and checksums | Yes | `faden restore` checks the database dumps, the volume archives and the certificate files before it changes anything |
 | Files uploaded to the knowledge base | With `--include-volumes` | Without it, only the text read from them is in the backup, not the files themselves |
 | Files attached to chats | With `--include-volumes` | Without it, only the text read from them is in the database, not the files themselves |
 | Models | No | They can be downloaded again. Keep a copy of models you imported rather than downloaded |
@@ -89,7 +89,7 @@ It asks for confirmation (`-y` skips it).
 
 ??? info "What the restore does, in order"
     1. shows the backup's date, the tool version it was taken with, and what it holds;
-    2. checks the database dumps and the certificate files against the checksums in the backup, and stops if one
+    2. checks the database dumps, the volume archives and the certificate files against the checksums in the backup, and stops if one
        does not match;
     3. asks for confirmation (`-y` skips it);
     4. puts up the maintenance page, stops every service except the front door (nginx), restores every database
@@ -109,7 +109,7 @@ It asks for confirmation (`-y` skips it).
 
 ### Check a backup
 
-Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps and the
+Run `faden restore --verify-only` on a copy of a backup now and then. It tells you whether the database dumps, the volume archives and the
 certificate files are complete and unchanged, without touching the install.
 
 ## Rebuild a lost server

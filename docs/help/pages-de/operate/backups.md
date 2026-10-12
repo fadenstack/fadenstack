@@ -11,7 +11,7 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
 | Jede Datenbank im Postgres des Servers | Ja | Benutzer, Einstellungen, Provider, Maschinen, Cluster, Bereitstellungen, Chats, das Anfrageprotokoll |
 | `.env` | Ja, außer mit `--db-only` | Sie enthält den Schlüssel, mit dem die Chats verschlüsselt sind, und die Schlüssel, die gespeicherte Geheimnisse verschlüsseln (das Hugging-Face-Token, geheime Einstellungen, die Zugangsdaten der MCP-Server). Eine Datenbank, die ohne ihre `.env` wiederhergestellt wird, enthält Chats und Geheimnisse, die niemand lesen kann |
 | Zertifikatsmaterial (`tls/`, `tls-ca/`) | Ja, außer mit `--db-only` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem privaten Schlüssel. Damit ist ein neu aufgesetzter Server einer, dem die Maschinen weiterhin vertrauen |
-| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps und die Zertifikatsdateien, bevor es etwas ändert |
+| Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien, bevor es etwas ändert |
 | Dateien, die in die Wissensdatenbank hochgeladen wurden | Mit `--include-volumes` | Ohne diese Option enthält die Sicherung nur den daraus gelesenen Text, nicht die Dateien selbst |
 | Dateien, die an Chats angehängt wurden | Mit `--include-volumes` | Ohne diese Option liegt nur der daraus gelesene Text in der Datenbank, nicht die Dateien selbst |
 | Modelle | Nein | Sie lassen sich erneut herunterladen. Bewahren Sie eine Kopie der Modelle auf, die Sie importiert statt heruntergeladen haben |
@@ -94,7 +94,7 @@ Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
 
 ??? info "Was die Wiederherstellung tut, der Reihe nach"
     1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-    2. prüft die Datenbank-Dumps und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
+    2. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
        wenn eine nicht passt;
     3. fragt nach einer Bestätigung (`-y` überspringt sie);
     4. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
@@ -115,7 +115,7 @@ Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
 ### Eine Sicherung prüfen {#check-a-backup}
 
 Führen Sie ab und zu `faden restore --verify-only` mit einer Kopie einer Sicherung aus. Der Befehl zeigt Ihnen,
-ob die Datenbank-Dumps und die Zertifikatsdateien vollständig und unverändert sind, ohne die Installation
+ob die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien vollständig und unverändert sind, ohne die Installation
 anzutasten.
 
 ## Einen verlorenen Server neu aufbauen {#rebuild-a-lost-server}

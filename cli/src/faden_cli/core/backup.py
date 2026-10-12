@@ -676,6 +676,14 @@ def restore_volumes(backup_dir: Path, manifest: dict, *, data_dir: str = "") -> 
         if not archive_path.exists():
             warning(f"  Volume archive missing: {archive}")
             continue
+        # Checked here as well as when the backup is verified: the volume is emptied before the archive is
+        # written in, so an archive that changed since must not get that far.
+        recorded = (manifest.get("volume_checksums") or {}).get(archive)
+        if recorded:
+            problem = _volume_archive_error(backup_dir, archive, recorded)
+            if problem:
+                warning(f"  {problem}; {archive} not restored")
+                continue
         # Derive volume name from archive filename (e.g. "minio_data.tar.gz" → "minio_data")
         vol = archive.removesuffix(".tar.gz")
         if vol in _NEVER_RESTORED:
@@ -804,6 +812,11 @@ def write_manifest(
         "databases": db_entries,
         "env_snapshot": env_snapshot,
         "volumes": volumes,
+        # By archive name, like the dumps and certificate files: a restore empties a volume before it writes
+        # the archive in, so a damaged archive has to be found first.
+        "volume_checksums": {
+            archive: _sha256(backup_dir / archive) for archive in volumes if (backup_dir / archive).is_file()
+        },
         "tls_material": {
             rel: _sha256(backup_dir / _TLS_BACKUP_DIR / rel) for rel in (tls_material or [])
         },
@@ -822,10 +835,21 @@ def read_manifest(backup_dir: Path) -> dict | None:
     return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
-def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
-    """Verify database dump checksums against the manifest.
+def _volume_archive_error(backup_dir: Path, archive: str, expected: str) -> str | None:
+    """Why the volume archive *archive* does not match its recorded checksum, or ``None`` when it does."""
+    path = backup_dir / archive
+    if not path.is_file():
+        return f"Missing volume archive: {archive}"
+    if _sha256(path) != expected:
+        return f"Checksum mismatch for {archive}"
+    return None
 
-    Returns a list of error messages (empty if all OK).
+
+def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
+    """Verify the database dumps, volume archives and certificate files against the manifest's checksums.
+
+    Returns a list of error messages (empty if all OK). A manifest from before the volume archives had
+    checksums lists none, and those archives are not checked.
     """
     errors: list[str] = []
     for db, meta in manifest.get("databases", {}).items():
@@ -840,6 +864,10 @@ def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
         actual = _sha256(dump_path)
         if actual != expected:
             errors.append(f"Checksum mismatch for {dump_file}: expected {expected[:12]}… got {actual[:12]}…")
+    for archive, expected in (manifest.get("volume_checksums") or {}).items():
+        error_text = _volume_archive_error(backup_dir, archive, expected)
+        if error_text:
+            errors.append(error_text)
     for rel, expected in (manifest.get("tls_material") or {}).items():
         path = backup_dir / _TLS_BACKUP_DIR / rel
         if not path.is_file():
