@@ -49,19 +49,6 @@ class LifecycleAction(str):
     UNPAUSE = "unpause"
 
 
-class ExecTokenRequest(BaseModel):
-    """Request body for creating an exec session token."""
-
-    cmd: list[str] = Field(default=["/bin/sh"], description="Command to execute.")
-    workdir: str = "/"
-
-
-class ExecTokenDTO(BaseModel):
-    """Exec session token to be used by a websocket client."""
-
-    exec_id: str
-
-
 class RegisterContainerRequest(BaseModel):
     """Body for manually registering/classifying a container."""
 

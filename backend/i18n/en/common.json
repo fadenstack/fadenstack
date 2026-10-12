@@ -963,20 +963,13 @@
   "container_detail": {
     "failed_load": "Failed to load container.",
     "error_loading_logs": "Error loading logs",
-    "exec_denied": "Exec denied.",
     "tabs": {
       "overview": "Overview",
-      "logs": "Logs",
-      "exec": "Exec"
+      "logs": "Logs"
     },
     "status": "Status",
     "last_lines": "Last 300 lines",
     "no_logs": "No logs yet.",
-    "exec_not_permitted": "Exec is not permitted for {{cls}} containers without Root Mode.",
-    "exec_created": "Exec session created.",
-    "exec_id_label": "Exec ID (use with your websocket client):",
-    "exec_help": "Create an exec session into this container. The returned exec ID can be used with a terminal websocket client.",
-    "start_exec": "Start Exec (/bin/sh)",
     "page_title": "Container Details",
     "edit": "Edit"
   },

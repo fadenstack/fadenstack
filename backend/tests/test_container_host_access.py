@@ -223,7 +223,6 @@ def docker() -> MagicMock:
     mock.inspect_image = AsyncMock(return_value={"Config": {}})
     mock.list_containers = AsyncMock(return_value=[])
     mock.create_from_config = AsyncMock(return_value=NEW_ID)
-    mock.create_exec = AsyncMock(return_value="exec-1")
     for name in ("rename", "connect_with_endpoint", "start", "stop", "restart", "pause", "unpause", "delete"):
         setattr(mock, name, AsyncMock())
     return mock
@@ -460,52 +459,6 @@ async def test_a_locked_system_container_is_unlocked_only_in_root_mode(
     )
     assert r.status_code == status.HTTP_403_FORBIDDEN
     assert "policy from locked" in r.json()["detail"]
-
-
-@pytest.mark.anyio
-async def test_commands_in_a_container_with_root_on_the_host_run_only_in_root_mode(
-    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
-) -> None:
-    """A TENANT_APP container may be exec'd into, but not one that binds the socket: whatever its class."""
-    await _registered(dbsession)
-    user = await _user(dbsession, superuser=True)
-    url = fastapi_app.url_path_for("container_exec", container_id=OLD_ID)
-    body = {"cmd": ["/bin/sh"], "workdir": "/"}
-
-    _as(fastapi_app, user, docker)
-    r = await client.post(url, json=body)  # an ordinary one
-    assert r.status_code == status.HTTP_200_OK, r.text
-
-    docker.create_exec.reset_mock()
-    docker.inspect_container = AsyncMock(return_value=_socket_raw("tool"))
-    r = await client.post(url, json=body)
-    assert r.status_code == status.HTTP_403_FORBIDDEN
-    detail = r.json()["detail"]
-    assert "/var/run/docker.sock" in detail and "Activate Root Mode to run commands in" in detail
-    docker.create_exec.assert_not_called()
-
-    _as(fastapi_app, user, docker, root_mode=True)
-    r = await client.post(url, json=body)
-    assert r.status_code == status.HTTP_200_OK, r.text
-    docker.create_exec.assert_awaited_once()
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize("raw", [
-    {**_raw(), "Mounts": [{"Type": "bind", "Source": "/home/admin", "Destination": "/home", "RW": True}]},
-    _raw(Privileged=True),
-    _raw(NetworkMode="host"),
-    _raw(VolumesFrom=["faden-backend-worker"]),
-])
-async def test_exec_looks_at_everything_the_container_runs_with(
-    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock, raw: dict[str, Any],
-) -> None:
-    await _registered(dbsession)
-    docker.inspect_container = AsyncMock(return_value=raw)
-    app = _as(fastapi_app, await _user(dbsession, superuser=True), docker)
-    r = await client.post(app.url_path_for("container_exec", container_id=OLD_ID), json={"cmd": ["id"]})
-    assert r.status_code == status.HTTP_403_FORBIDDEN
-    docker.create_exec.assert_not_called()
 
 
 @pytest.mark.anyio

@@ -36,7 +36,7 @@ Die Liste **Handlungsbedarf** im Dashboard meldet Container, die immer wieder ne
 
 Die Klasse eines Containers legt fest, was die Konsole mit ihm zulässt, gleich für wen:
 
-| Klasse | Für | Ansehen, Logs | Starten, neu starten | Stoppen | Pausieren, Exec, Löschen |
+| Klasse | Für | Ansehen, Logs | Starten, neu starten | Stoppen | Pausieren, Löschen |
 |---|---|---|---|---|---|
 | `SYSTEM_CORE` | Postgres, Redis, der Proxy, RabbitMQ, die Speicher für Logs und Metriken | ja | ja | nein | nein |
 | `SYSTEM_AUX` | Die eigenen Dienste und Module von Fadenstack | ja | ja | ja | nein |
@@ -115,7 +115,6 @@ Ohne ihn darf nur die Zeitzone schreibgeschützt eingebunden werden (`/etc/local
       dessen Geräte nutzt (GPUs ausgenommen) oder die Volumes eines anderen Containers übernimmt. Die meisten
       eigenen Container von Fadenstack binden Dateien der Installation ein; sie zu bearbeiten, braucht daher den
       Root-Modus.
-    - **Exec** in einem Container mit einem der genannten Punkte braucht den Root-Modus, gleich welcher Klasse.
     - **Klasse**: Die Klasse eines Containers mit einem der genannten Punkte oder eines `SYSTEM_CORE`- oder
       `SYSTEM_AUX`-Containers zu ändern, braucht den Root-Modus; ebenso das Entsperren eines gesperrten
       Systemcontainers.
@@ -123,15 +122,14 @@ Ohne ihn darf nur die Zeitzone schreibgeschützt eingebunden werden (`/etc/local
 
 ## Mit einem Container arbeiten {#work-with-a-container}
 
-![Die Seite eines Containers: Name, Klasse und ID, die Tabs Übersicht, Logs und Exec, Status und Netzwerke, und Bearbeiten](../images/operate/container.png)
+![Die Seite eines Containers: Name, Klasse und ID, die Tabs Übersicht und Logs, Status und Netzwerke, und Bearbeiten](../images/operate/container.png)
 
-Seine Seite hat drei Tabs:
+Seine Seite hat zwei Tabs:
 
 | Tab | Was er tut |
 |---|---|
 | **Übersicht** | Status, Image, Netzwerke |
 | **Logs** | **Letzte 300 Zeilen**, zum Aktualisieren oder Herunterladen |
-| **Exec** | Bereitet eine Shell-Sitzung im Container vor und zeigt ihre ID. Ein Terminal gibt es auf der Seite nicht, und noch verbindet sich nichts in der Konsole mit der Sitzung. Exec braucht die Klasse `TENANT_APP` oder den Root-Modus; in einem Container mit Root-Rechten auf dem Server (ein eingebundener Host-Pfad, der Docker-Socket, ...) braucht es den Root-Modus |
 
 Stoppen Sie einen Container, bevor Sie ihn löschen: Ein laufender Container wird nicht gelöscht. Vor dem Löschen
 fragt die Konsole nach einer Bestätigung; das Image bleibt unter **Images** erhalten.

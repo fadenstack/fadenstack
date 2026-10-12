@@ -35,7 +35,7 @@ The dashboard's **Needs attention** list reports containers that keep restarting
 
 A container's class decides what the console lets anyone do with it:
 
-| Class | For | View, logs | Start, restart | Stop | Pause, exec, delete |
+| Class | For | View, logs | Start, restart | Stop | Pause, delete |
 |---|---|---|---|---|---|
 | `SYSTEM_CORE` | Postgres, Redis, the proxy, RabbitMQ, the logs and metrics stores | yes | yes | no | no |
 | `SYSTEM_AUX` | Fadenstack's own services and modules | yes | yes | yes | no |
@@ -108,22 +108,20 @@ no Root Mode. Only the time zone may be mounted read-only without it (`/etc/loca
       container runs privileged, shares the server's processes or memory, uses its devices (GPUs aside) or takes
       another container's volumes. Most of Fadenstack's own containers mount files of the install, so an edit of
       one needs Root Mode.
-    - **Exec** in a container that has any of the above needs Root Mode, whatever its class.
     - **Class**: changing the class of a container that has any of the above, or of a `SYSTEM_CORE` or
       `SYSTEM_AUX` container, needs Root Mode; so does unlocking a locked system container.
     - Start, stop and restart need no Root Mode: they run nothing new in the container.
 
 ## Work with a container
 
-![A container's page: its name, class and ID, the Overview, Logs and Exec tabs, its status and networks, and Edit](../images/operate/container.png)
+![A container's page: its name, class and ID, the Overview and Logs tabs, its status and networks, and Edit](../images/operate/container.png)
 
-Its page has three tabs:
+Its page has two tabs:
 
 | Tab | What it does |
 |---|---|
 | **Overview** | State, image, networks |
 | **Logs** | The **Last 300 lines**, to refresh or download |
-| **Exec** | Prepares a shell session in the container and shows its ID. There is no terminal on the page, and nothing in the console connects to the session yet. Exec needs the `TENANT_APP` class, or Root Mode; in a container with root on the server (a host path mounted, the Docker socket, ...) it needs Root Mode |
 
 Stop a container before you delete it: a running one is not deleted. Deleting asks for confirmation; the image stays
 under **Images**.

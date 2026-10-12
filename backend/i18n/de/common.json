@@ -968,20 +968,13 @@
   "container_detail": {
     "failed_load": "Container konnte nicht geladen werden.",
     "error_loading_logs": "Fehler beim Laden der Logs",
-    "exec_denied": "Exec verweigert.",
     "tabs": {
       "overview": "Übersicht",
-      "logs": "Logs",
-      "exec": "Exec"
+      "logs": "Logs"
     },
     "status": "Status",
     "last_lines": "Letzte 300 Zeilen",
     "no_logs": "Noch keine Logs.",
-    "exec_not_permitted": "Exec ist für {{cls}}-Container ohne Root-Modus nicht erlaubt.",
-    "exec_created": "Exec-Sitzung erstellt.",
-    "exec_id_label": "Exec-ID (für Websocket-Client):",
-    "exec_help": "Erstellt eine Exec-Sitzung in diesem Container. Die Exec-ID kann mit einem Terminal-Websocket-Client genutzt werden.",
-    "start_exec": "Exec starten (/bin/sh)",
     "page_title": "Container-Details",
     "edit": "Bearbeiten"
   },

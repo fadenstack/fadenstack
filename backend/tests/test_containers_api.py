@@ -74,7 +74,6 @@ def _mock_docker(extra: dict[str, Any] | None = None) -> MagicMock:
     docker.pause = AsyncMock()
     docker.unpause = AsyncMock()
     docker.delete = AsyncMock()
-    docker.create_exec = AsyncMock(return_value="exec-id-123")
     if extra:
         for k, v in extra.items():
             setattr(docker, k, v)
@@ -174,51 +173,8 @@ async def test_tenant_app_lifecycle_start_allowed(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Lifecycle: SYSTEM_CORE — exec denied without root mode
+# Lifecycle: SYSTEM_CORE — stop denied without root mode
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-async def test_exec_reaches_the_container(
-    authed_app: FastAPI,
-    client: AsyncClient,
-    dbsession: AsyncSession,
-    mock_docker: MagicMock,
-) -> None:
-    """POST .../exec was taken by the lifecycle route and answered 400 "Unknown action 'exec'"."""
-    reg_url = authed_app.url_path_for("register_container", container_id=_FAKE_ID)
-    await client.put(
-        reg_url,
-        json={
-            "container_class": ContainerClass.TENANT_APP.value,
-            "owner_scope": "ws-1",
-            "policy": ContainerPolicy.FREE.value,
-        },
-    )
-    exec_url = authed_app.url_path_for("container_exec", container_id=_FAKE_ID)
-    resp = await client.post(exec_url, json={"cmd": ["/bin/sh"], "workdir": "/"})
-    assert resp.status_code == status.HTTP_200_OK, resp.text
-    assert resp.json()["exec_id"] == "exec-id-123"
-    mock_docker.create_exec.assert_awaited_once_with(_FAKE_ID, cmd=["/bin/sh"], workdir="/")
-
-
-async def test_system_core_exec_denied_without_root(
-    authed_app: FastAPI,
-    client: AsyncClient,
-    dbsession: AsyncSession,
-) -> None:
-    # Register as SYSTEM_CORE
-    reg_url = authed_app.url_path_for("register_container", container_id=_FAKE_ID)
-    await client.put(
-        reg_url,
-        json={
-            "container_class": ContainerClass.SYSTEM_CORE.value,
-            "owner_scope": "platform",
-            "policy": ContainerPolicy.FREE.value,
-        },
-    )
-    exec_url = authed_app.url_path_for("container_exec", container_id=_FAKE_ID)
-    resp = await client.post(exec_url, json={"cmd": ["/bin/sh"], "workdir": "/"})
-    assert resp.status_code == status.HTTP_403_FORBIDDEN
 
 
 async def test_system_core_stop_denied_without_root(

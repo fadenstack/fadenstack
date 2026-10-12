@@ -1,14 +1,13 @@
 /**
  * Admin → Container Detail page.
- * Shows inspect data, live logs, and exec terminal token.
+ * Shows inspect data and live logs.
  */
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams, useOutletContext } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   containers,
   canEdit,
-  canExec,
   type ContainerDetail,
 } from "~/api/admin";
 import { ClassChip } from "~/components/Chips";
@@ -28,17 +27,11 @@ import Divider from "@mui/material/Divider";
 
 import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import TerminalIcon from "@mui/icons-material/Terminal";
-
-interface AdminContext {
-  rootModeActive: boolean;
-}
 
 export default function ContainerDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { rootModeActive } = useOutletContext<AdminContext>();
   const [detail, setDetail] = useState<ContainerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +40,6 @@ export default function ContainerDetailPage() {
   const [logError, setLogError] = useState<string | null>(null);
   const [logLoading, setLogLoading] = useState(false);
   const logLines = useMemo(() => fromText(logs), [logs]);
-  const [execId, setExecId] = useState<string | null>(null);
-  const [execError, setExecError] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
@@ -85,17 +76,6 @@ export default function ContainerDetailPage() {
   useEffect(() => {
     if (tab === 1) fetchLogs();
   }, [tab]);
-
-  async function handleCreateExec() {
-    if (!id) return;
-    setExecError(null);
-    try {
-      const token = await containers.exec(id, ["/bin/sh"]);
-      setExecId(token.exec_id);
-    } catch (e: unknown) {
-      setExecError(e instanceof Error ? e.message : t("container_detail.exec_denied"));
-    }
-  }
 
   if (loading) {
     return (
@@ -139,7 +119,6 @@ export default function ContainerDetailPage() {
           <Tabs value={tab} onChange={(_, v) => setTab(v)}>
             <Tab label={t("container_detail.tabs.overview")} />
             <Tab label={t("container_detail.tabs.logs")} />
-            <Tab label={t("container_detail.tabs.exec")} />
           </Tabs>
         </Paper>
       </Box>
@@ -241,56 +220,6 @@ export default function ContainerDetailPage() {
               downloadName={`${detail.name}.log`}
             />
           </Box>
-        )}
-
-        {/* Exec */}
-        {tab === 2 && (
-          <Paper variant="outlined" sx={{ p: 4 }}>
-            {!canExec(cls, rootModeActive) ? (
-                <Alert severity="warning">
-                {t("container_detail.exec_not_permitted", { cls })}
-              </Alert>
-            ) : execId ? (
-              <Box>
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  {t("container_detail.exec_created")}
-                </Alert>
-                <Typography variant="caption" color="text.secondary">
-                  {t("container_detail.exec_id_label")}
-                </Typography>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 1.5,
-                    mt: 0.5,
-                    fontFamily: "monospace",
-                    fontSize: "0.8rem",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  {execId}
-                </Paper>
-              </Box>
-            ) : (
-              <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {t("container_detail.exec_help")}
-                </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<TerminalIcon />}
-                  onClick={handleCreateExec}
-                >
-                  {t("container_detail.start_exec")}
-                </Button>
-                {execError && (
-                  <Alert severity="error" sx={{ mt: 2 }}>
-                    {execError}
-                  </Alert>
-                )}
-              </Box>
-            )}
-          </Paper>
         )}
       </Box>
     </Box>
