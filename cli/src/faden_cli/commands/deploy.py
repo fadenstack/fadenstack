@@ -377,12 +377,12 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
 @click.option(
     "--local-node-workdir",
     default="",
-    help="Install directory for node-agent repo on target host.",
+    help="Install directory for the core checkout on the target host (development installs).",
 )
 @click.option(
     "--local-node-branch",
     default="",
-    help="Git branch for faden-node-agent (default: config dev.branch).",
+    help="Core git branch checked out on a remote host (default: config dev.branch).",
 )
 @click.option(
     "--local-node-backend-url",
@@ -884,6 +884,11 @@ def deploy_cmd(
 
         # Default to the resolved backend URL (via nginx) if not explicitly set.
         node_backend = local_node_backend_url.strip() or backend_url
+        # On HTTPS the machine is handed what the install publishes for machines to trust.
+        from faden_cli.core.tls import CA_PUBLIC_FILE, TLS_DIR  # noqa: PLC0415
+
+        published_ca = shared_dir / TLS_DIR / CA_PUBLIC_FILE
+        node_ca = published_ca if node_backend.startswith("https://") and published_ca.is_file() else None
 
         ok = provision_local_node_agent(
             workspace=workspace_for_node,
@@ -896,6 +901,7 @@ def deploy_cmd(
             method=method,
             github_token=github_token,
             workdir_override=local_node_workdir.strip() or None,
+            ca_file=node_ca,
         )
         if not ok:
             error("Local-node provisioning failed.")

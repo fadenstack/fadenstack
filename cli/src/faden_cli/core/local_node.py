@@ -15,9 +15,10 @@ import httpx
 
 from faden_cli.core.console import error, info, success, warning
 from faden_cli.core.private_files import write_private
-from faden_cli.core.registry import CORE_REPO, core_repo_clone_url, repo_clone_url
+from faden_cli.core.edge import verify_for
+from faden_cli.core.registry import CORE_REPO, core_repo_clone_url
 
-_NODE_AGENT_REPO = "faden-node-agent"
+# The agent lives in the core repository, under agent/.
 _NODE_AGENT_DIR = "agent"
 
 
@@ -131,14 +132,24 @@ def _build_env_lines(
     return lines
 
 
-def _find_agent_binary(workspace: Path) -> Path | None:
-    """Locate a pre-built node agent binary in the workspace."""
-    candidates = [
-        workspace / _NODE_AGENT_DIR / "dist" / "faden-agent",
-        workspace / _NODE_AGENT_DIR / "dist" / "faden-agent.exe",
-        workspace / "dist" / "faden-agent",
-        workspace / "dist" / "faden-agent.exe",
-    ]
+def core_agent_dir(workspace: Path) -> Path | None:
+    """The agent's source in a core checkout, if there is one.
+
+    *workspace* is the development workspace (``faden dev up``: the checkout is
+    ``<workspace>/fadenstack``) or the checkout itself (``faden deploy`` run in
+    it). A release install has neither, and takes the released agent from its
+    server instead (see :func:`_provision_release`). The agent's
+    ``pyproject.toml`` is what tells a checkout from a directory of that name.
+    """
+    for agent_dir in (workspace / CORE_REPO / _NODE_AGENT_DIR, workspace / _NODE_AGENT_DIR):
+        if (agent_dir / "pyproject.toml").is_file():
+            return agent_dir
+    return None
+
+
+def _find_agent_binary(agent_dir: Path) -> Path | None:
+    """Locate a pre-built node agent binary in the core checkout's agent/dist."""
+    candidates = [agent_dir / "dist" / "faden-agent", agent_dir / "dist" / "faden-agent.exe"]
     for path in candidates:
         if path.is_file():
             return path
@@ -157,23 +168,37 @@ def provision_local_node_agent(
     method: str = "https",
     github_token: str = "",
     workdir_override: str | None = None,
+    ca_file: Path | None = None,
 ) -> bool:
-    """Clone/update and install the node agent on local or remote host."""
-    # Prefer monorepo clone; fall back to standalone repo
-    monorepo_agent_dir = workspace / CORE_REPO / _NODE_AGENT_DIR
-    if monorepo_agent_dir.is_dir():
-        repo_url = core_repo_clone_url(method=method, token=github_token)
-    else:
-        repo_url = repo_clone_url(_NODE_AGENT_REPO, method=method, token=github_token)
+    """Install the node agent on this or a remote host.
+
+    From a core checkout (the development case) the agent is built from that
+    checkout's own source; the checkout is never cloned over, switched or
+    pulled. Without one (a release install) the released agent is fetched
+    through the running backend's install line, which checks it against the
+    SHA-256 this core release pins. *ca_file* is the install's ``tls/ca.crt``
+    for a backend on HTTPS: the line fetches from the backend through it, and
+    the agent keeps it.
+    """
+    agent_dir = core_agent_dir(workspace)
     branch = branch.strip() or "main"
     backend_url = backend_url.strip() or "http://127.0.0.1:8000"
     advertise_host = advertise_host.strip()
     enrollment_token = enrollment_token.strip()
 
     if remote_host:
+        if agent_dir is None:
+            return _provision_remote_release(
+                remote_host=remote_host,
+                backend_url=backend_url,
+                advertise_host=advertise_host,
+                enrollment_token=enrollment_token,
+                use_sudo=use_sudo,
+                ca_file=ca_file,
+            )
         return _provision_remote(
             remote_host=remote_host,
-            repo_url=repo_url,
+            repo_url=core_repo_clone_url(method=method, token=github_token),
             branch=branch,
             backend_url=backend_url,
             advertise_host=advertise_host,
@@ -182,12 +207,21 @@ def provision_local_node_agent(
             workdir_override=workdir_override,
         )
 
-    # Try binary-first: if a pre-built executable exists, skip clone/venv.
-    binary = _find_agent_binary(workspace)
+    if agent_dir is None:
+        return _provision_release(
+            backend_url=backend_url,
+            advertise_host=advertise_host,
+            enrollment_token=enrollment_token,
+            use_sudo=use_sudo,
+            ca_file=ca_file,
+        )
+
+    # Try binary-first: if a pre-built executable exists, skip the venv.
+    binary = _find_agent_binary(agent_dir)
     if binary:
         return _provision_local_binary(
             binary=binary,
-            workspace=workspace,
+            agent_dir=agent_dir,
             backend_url=backend_url,
             advertise_host=advertise_host,
             enrollment_token=enrollment_token,
@@ -195,9 +229,7 @@ def provision_local_node_agent(
         )
 
     return _provision_local(
-        workspace=workspace,
-        repo_url=repo_url,
-        branch=branch,
+        repo_dir=agent_dir,
         backend_url=backend_url,
         advertise_host=advertise_host,
         enrollment_token=enrollment_token,
@@ -205,21 +237,131 @@ def provision_local_node_agent(
     )
 
 
+def _provision_release(
+    *,
+    backend_url: str,
+    advertise_host: str,
+    enrollment_token: str,
+    use_sudo: bool,
+    ca_file: Path | None = None,
+) -> bool:
+    """Install the released agent through the backend's own install line (Linux).
+
+    The line downloads the build this core release pins and refuses it unless
+    it hashes to the pinned SHA-256, so what runs here is what was released.
+    """
+    if platform.system() != "Linux":
+        error(
+            "No core checkout found, and the released agent is a Linux binary. "
+            "Install the agent on this machine from the console's install line, "
+            "or run from a development workspace."
+        )
+        return False
+    script = _fetch_install_line(backend_url)
+    if script is None:
+        return False
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".sh", newline="\n") as handle:
+        handle.write(script)
+        path = Path(handle.name)
+    try:
+        env = {**os.environ}
+        for line in _build_env_lines(backend_url, advertise_host, enrollment_token):
+            key, _, value = line.partition("=")
+            env[key] = value
+        args = _install_line_args(backend_url, enrollment_token, use_sudo, str(ca_file) if ca_file else None)
+        info("Installing the released node agent through the backend's install line.")
+        proc = subprocess.run(["sh", str(path), *args], env=env)  # noqa: S603, S607
+    finally:
+        path.unlink(missing_ok=True)
+    if proc.returncode != 0:
+        error("Installing the released node agent failed.")
+        return False
+    success("Released node agent installed.")
+    return True
+
+
+def _install_line_args(backend_url: str, enrollment_token: str, use_sudo: bool, ca_file: str | None) -> list[str]:
+    args = ["--token", enrollment_token, "--backend", backend_url] if enrollment_token else ["--join", backend_url]
+    if ca_file:
+        args += ["--ca-file", ca_file]
+    return args if use_sudo else [*args, "--user"]
+
+
+def _fetch_install_line(backend_url: str) -> str | None:
+    url = f"{backend_url.rstrip('/')}/api/install/faden-agent.sh"
+    try:
+        resp = httpx.get(url, timeout=30, verify=verify_for(backend_url), follow_redirects=True)
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        error(f"Could not fetch the install line from {url}: {exc}")
+        return None
+    return resp.text
+
+
+def _provision_remote_release(
+    *,
+    remote_host: str,
+    backend_url: str,
+    advertise_host: str,
+    enrollment_token: str,
+    use_sudo: bool,
+    ca_file: Path | None = None,
+) -> bool:
+    """Run the backend's install line on *remote_host*, which checks the pinned SHA-256.
+
+    With *ca_file* the install's authority goes along in the script itself: the
+    remote host fetches the line through it, and the agent keeps it.
+    """
+    ssh = shutil.which("ssh")
+    if not ssh:
+        error("ssh is not installed or not on PATH.")
+        return False
+    q = shlex.quote
+    env = " ".join(
+        f"{q(key)}={q(value)}"
+        for key, _, value in (line.partition("=") for line in _build_env_lines(backend_url, advertise_host, enrollment_token))
+    )
+    ca_pem = ca_file.read_text(encoding="ascii").strip() if ca_file else ""
+    args = " ".join(q(a) for a in _install_line_args(backend_url, enrollment_token, use_sudo, None))
+    line_url = q(backend_url.rstrip("/") + "/api/install/faden-agent.sh")
+    if ca_pem:
+        trust = f"""CA=$(mktemp)
+trap 'rm -f "$TMP" "$CA"' EXIT
+cat > "$CA" <<'FADEN_CA'
+{ca_pem}
+FADEN_CA
+curl -fsSL --cacert "$CA" -o "$TMP" {line_url}
+"""
+        args += ' --ca-file "$CA"'
+    else:
+        trust = f'curl -fsSL -o "$TMP" {line_url}\n'
+    script = f"""set -eu
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+{trust}env {env} sh "$TMP" {args}
+"""
+    info(f"Installing the released node agent on remote host '{remote_host}'")
+    proc = subprocess.run([ssh, remote_host, "bash -s"], input=script, text=True, capture_output=True)  # noqa: S603
+    if proc.returncode != 0:
+        error("Remote node-agent provisioning failed.")
+        detail = (proc.stderr or proc.stdout or "").strip()
+        if detail:
+            error(detail)
+        return False
+    success(f"Remote node agent installed on {remote_host}.")
+    return True
+
+
 def _provision_local(
     *,
-    workspace: Path,
-    repo_url: str,
-    branch: str,
+    repo_dir: Path,
     backend_url: str,
     advertise_host: str,
     enrollment_token: str,
     use_sudo: bool,
 ) -> bool:
-    repo_dir = workspace / _NODE_AGENT_DIR
-    info(f"Provisioning local node agent in {repo_dir}")
-    if not _clone_or_update_repo(repo_dir=repo_dir, repo_url=repo_url, branch=branch):
-        return False
-
+    """Run the agent from the core checkout's own ``agent/`` (no clone, no pull)."""
+    info(f"Provisioning local node agent from {repo_dir}")
     if not _install_agent_dependencies(repo_dir):
         return False
 
@@ -269,7 +411,7 @@ def _provision_local(
 def _provision_local_binary(
     *,
     binary: Path,
-    workspace: Path,
+    agent_dir: Path,
     backend_url: str,
     advertise_host: str,
     enrollment_token: str,
@@ -298,7 +440,7 @@ def _provision_local_binary(
             temp_env = Path(handle.name)
 
         # Install systemd service (use the template from workspace if available)
-        service_src = workspace / _NODE_AGENT_DIR / "deploy" / "systemd" / "faden-agent.service"
+        service_src = agent_dir / "deploy" / "systemd" / "faden-agent.service"
         if not service_src.exists():
             # Write a minimal service file inline
             with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".service") as sf:
@@ -529,9 +671,9 @@ if [ -d "$WORKDIR/.git" ] && [ -n "$BRANCH" ]; then
 fi
 
 if command -v uv >/dev/null 2>&1; then
-  (cd "$WORKDIR" && uv sync)
+  (cd "$WORKDIR/agent" && uv sync)
 else
-  python3 -m pip install --user -e "$WORKDIR"
+  python3 -m pip install --user -e "$WORKDIR/agent"
 fi
 
 if [ "$USE_SUDO" != "1" ]; then
@@ -575,8 +717,8 @@ USER_ENV_FILE="$CONFIG_DIR/agent.env"
 
 # Find the agent binary for ExecStart
 AGENT_BIN=""
-if [ -x "$WORKDIR/.venv/bin/faden-agent" ]; then
-  AGENT_BIN="$WORKDIR/.venv/bin/faden-agent"
+if [ -x "$WORKDIR/agent/.venv/bin/faden-agent" ]; then
+  AGENT_BIN="$WORKDIR/agent/.venv/bin/faden-agent"
 elif command -v faden-agent >/dev/null 2>&1; then
   AGENT_BIN="$(command -v faden-agent)"
 else
@@ -590,7 +732,7 @@ sed -e "s|@@USER@@|$SVC_USER|g" \
     -e "s|@@READ_WRITE_PATHS@@|$RW_PATHS|g" \
     -e "s|@@USER_ENV_FILE@@|$USER_ENV_FILE|g" \
     -e "s|^ExecStart=.*|ExecStart=$AGENT_BIN run|" \
-    "$WORKDIR/deploy/systemd/faden-agent.service" > "$TMP_SVC"
+    "$WORKDIR/agent/deploy/systemd/faden-agent.service" > "$TMP_SVC"
 
 if [ -n "$SUDO_BIN" ]; then
   $SUDO_BIN install -m 0644 "$TMP_SVC" /etc/systemd/system/faden-agent.service
@@ -640,33 +782,6 @@ rm -f "$TMP_ENV"
 
 echo "Node agent service installed and started."
 """
-
-
-def _clone_or_update_repo(*, repo_dir: Path, repo_url: str, branch: str) -> bool:
-    git = shutil.which("git")
-    if not git:
-        error("git is not installed or not on PATH.")
-        return False
-
-    repo_dir.parent.mkdir(parents=True, exist_ok=True)
-    if (repo_dir / ".git").exists():
-        # Repo already cloned — try to fetch latest, but don't abort
-        # if it fails (the existing code is sufficient to run).
-        if _run([git, "-C", str(repo_dir), "fetch", "--all", "--prune"], check=False) != 0:
-            warning("git fetch failed — continuing with existing source.")
-    elif repo_dir.exists() and any(repo_dir.iterdir()):
-        # Directory exists but is not a git repo (e.g. rsynced without .git/).
-        # Use the existing source tree as-is — no clone needed.
-        info("Directory exists without .git — using existing source.")
-    else:
-        if _run([git, "clone", repo_url, str(repo_dir)]) != 0:
-            return False
-
-    if (repo_dir / ".git").exists():
-        if _run([git, "-C", str(repo_dir), "checkout", branch], check=False) != 0:
-            _run([git, "-C", str(repo_dir), "checkout", "-b", branch, f"origin/{branch}"], check=False)
-        _run([git, "-C", str(repo_dir), "pull", "--ff-only", "origin", branch], check=False)
-    return True
 
 
 def _install_agent_dependencies(repo_dir: Path) -> bool:

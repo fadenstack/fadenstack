@@ -1039,12 +1039,12 @@ def _stop_old_workers() -> None:
 @click.option(
     "--local-node-workdir",
     default="",
-    help="Install directory for node-agent repo on target host.",
+    help="Install directory for the core checkout on the target host.",
 )
 @click.option(
     "--local-node-branch",
     default="",
-    help="Git branch for faden-node-agent (default: config dev.branch).",
+    help="Core git branch checked out on a remote host (default: config dev.branch).",
 )
 @click.option(
     "--local-node-backend-url",
