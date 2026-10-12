@@ -1789,6 +1789,7 @@
     "registered_not_connected": "\"{{name}}\" ist registriert, konnte aber nicht verbunden werden: {{reason}} Öffnen Sie den Server, um die URL oder die Zugangsdaten zu korrigieren.",
     "timeout_sec": "Zeitlimit (Sekunden)",
     "timeout_help": "Wie lange der Verbindungsaufbau und jeder Tool-Aufruf dauern dürfen: 5 bis 600 Sekunden.",
+    "pii_service_off_warning": "Der PII-Dienst läuft nicht, daher kann die Prüfung auf personenbezogene Daten nicht stattfinden, und jeder Aufruf der Tools dieses Servers wird abgelehnt (es wird nichts gesendet). Starten Sie das PII-Modul oder stellen Sie, falls die Prüfung nicht nötig ist, den PII-Modus auf Zulassen.",
     "headers": "Header",
     "headers_help": "Werden mit jeder Anfrage an diesen Server gesendet, z.B. Authorization: Bearer <token>. Verschlüsselt gespeichert und nie wieder angezeigt. Alle, die die Tools dieses Servers nutzen, verwenden sie.",
     "add_header": "Header hinzufügen",

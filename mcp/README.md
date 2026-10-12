@@ -6,8 +6,11 @@ Registers MCP-compliant servers (stdio, SSE and streamable HTTP), discovers tool
 automatically, converts them to OpenAI-compatible tool definitions, and routes all
 tool invocations through a Privacy Proxy: it checks each call's arguments with the
 PII service (Presidio-based) and redacts or blocks per the server's PII mode.
-Without a PII service, in `allow` mode, or while the service is unreachable, calls
-pass unscanned.
+In `allow` mode calls pass unscanned. In `redact` and `block` mode a call is refused
+(HTTP 503, with advice the gateway hands on as the tool's error) when there is no PII
+service, it is unreachable or its answer is unusable: the check fails closed. A new
+server without a stated mode gets `redact` if the PII service answers, else `allow`
+(`FADEN_MCP_DEFAULT_PII_MODE` overrides).
 
 ## Quick Start
 

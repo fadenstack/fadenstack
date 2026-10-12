@@ -38,6 +38,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ScienceIcon from "@mui/icons-material/Science";
 
 import { MCPSettingsPanel } from "./MCPSettingsPanel";
+import { PiiServiceWarning } from "./PiiServiceWarning";
 import { NO_EDITS, SecretPairsEditor } from "./SecretPairsEditor";
 import { commandLine, isHttp, serverPatch, type EditForm } from "./serverForm";
 
@@ -273,6 +274,8 @@ export default function MCPServerDetailPage() {
         </Alert>
       )}
 
+      {server && <PiiServiceWarning mode={server.pii_mode} sx={{ mb: 2 }} />}
+
       {/* ── Header ── */}
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
         <Button
@@ -478,6 +481,7 @@ export default function MCPServerDetailPage() {
               <MenuItem value="redact">{t("mcp.pii_redact")}</MenuItem>
               <MenuItem value="block">{t("mcp.pii_block")}</MenuItem>
             </TextField>
+            <PiiServiceWarning mode={editForm.piiMode} />
             {http ? (
               <SecretPairsEditor
                 label={t("mcp.headers")}

@@ -114,8 +114,13 @@ before a model sees it. What a tool then receives depends on its server's **PII 
 | **Redact (remove personal data)** | The placeholders; personal data found in the call's arguments is removed as well. |
 | **Block (reject if personal data is found)** | Nothing: the call is refused when its arguments contain personal data. |
 
-Choose **Redact** or **Block** for a server outside your organisation. If the PII module is off or cannot be
-reached, the call goes through as it is.
+Choose **Redact** or **Block** for a server outside your organisation. These two modes need the PII module: if it
+is off or cannot be reached, the call is refused, nothing is sent, and the chat shows that the personal-data check
+could not run. Start the PII module, or, if the check is not needed for this server, set its PII mode to **Allow**.
+The server's page and the Register and Edit dialogs show a warning while the module is off.
+
+A server you register while the PII module is off starts on **Allow**, and on **Redact** while it runs. Servers
+that already exist keep their mode.
 
 ## When it does not work
 

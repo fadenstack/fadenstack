@@ -1789,6 +1789,7 @@
     "registered_not_connected": "\"{{name}}\" está registrado, pero no se pudo conectar: {{reason}} Ábralo para corregir la URL o las credenciales.",
     "timeout_sec": "Tiempo de espera (segundos)",
     "timeout_help": "Cuánto pueden tardar la conexión y cada llamada a una herramienta: de 5 a 600 segundos.",
+    "pii_service_off_warning": "El servicio PII no está en marcha, por lo que no se puede comprobar si hay datos personales y se rechaza cada llamada a las herramientas de este servidor (no se envía nada). Inicie el módulo PII o, si la comprobación no es necesaria, ponga el modo PII en Permitir.",
     "headers": "Encabezados",
     "headers_help": "Se envían con cada solicitud a este servidor, p. ej. Authorization: Bearer <token>. Se guardan cifrados y no se vuelven a mostrar. Todos los que usan las herramientas de este servidor los usan.",
     "add_header": "Añadir encabezado",

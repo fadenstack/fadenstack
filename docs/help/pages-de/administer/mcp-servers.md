@@ -119,8 +119,14 @@ Servers ab:
 | **Schwärzen (personenbezogene Daten entfernen)** | Die Platzhalter; personenbezogene Daten, die in den Argumenten des Aufrufs gefunden werden, werden ebenfalls entfernt. |
 | **Blockieren (ablehnen, wenn personenbezogene Daten gefunden werden)** | Nichts: Der Aufruf wird abgelehnt, wenn seine Argumente personenbezogene Daten enthalten. |
 
-Wählen Sie für einen Server außerhalb Ihrer Organisation **Schwärzen** oder **Blockieren**. Ist das PII-Modul
-ausgeschaltet oder nicht erreichbar, geht der Aufruf unverändert durch.
+Wählen Sie für einen Server außerhalb Ihrer Organisation **Schwärzen** oder **Blockieren**. Diese beiden Modi
+brauchen das PII-Modul: Ist es ausgeschaltet oder nicht erreichbar, wird der Aufruf abgelehnt, es wird nichts
+gesendet, und der Chat zeigt, dass die Prüfung auf personenbezogene Daten nicht laufen konnte. Starten Sie das
+PII-Modul oder stellen Sie, falls die Prüfung für diesen Server nicht nötig ist, seinen PII-Modus auf **Zulassen**.
+Die Seite des Servers und die Dialoge Registrieren und Bearbeiten zeigen eine Warnung, solange das Modul aus ist.
+
+Ein Server, den Sie bei ausgeschaltetem PII-Modul registrieren, startet mit **Zulassen**, bei laufendem Modul mit
+**Schwärzen**. Bestehende Server behalten ihren Modus.
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

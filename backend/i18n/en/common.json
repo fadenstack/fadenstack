@@ -1978,6 +1978,7 @@
     "registered_not_connected": "\"{{name}}\" is registered but could not be connected: {{reason}} Open it to correct the URL or credentials.",
     "timeout_sec": "Timeout (seconds)",
     "timeout_help": "How long connecting and each tool call may take: 5 to 600 seconds.",
+    "pii_service_off_warning": "The PII service is not running, so the personal-data check cannot run and every call to this server's tools is refused (nothing is sent). Start the PII module, or, if the check is not needed, set the PII mode to Allow.",
     "headers": "Headers",
     "headers_help": "Sent with every request to this server, e.g. Authorization: Bearer <token>. Stored encrypted and never shown again. Everyone who uses this server's tools uses these.",
     "add_header": "Add header",
