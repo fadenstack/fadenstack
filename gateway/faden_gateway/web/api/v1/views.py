@@ -65,11 +65,16 @@ async def public_health_check() -> None:
 
 
 @router.get("/v1/services")
-async def list_services(request: Request) -> JSONResponse:
+async def list_services(
+    request: Request,
+    _auth: AuthContext = Depends(get_auth_context),
+) -> JSONResponse:
     """Return the manifest of optional service modules.
 
-    The frontend uses this to discover which features (PII, Auth, RAG, ...)
-    are available and healthy so it can show/hide UI sections accordingly.
+    Clients (the SDKs) use this to discover which features (PII, Auth, RAG, ...)
+    are available and healthy. Signed-in callers only, like the other /v1
+    routes: it runs a health check against every enabled module, and it tells
+    anyone which modules this install runs.
     """
     registry = request.app.state.service_registry
     # Run async health checks against enabled services
