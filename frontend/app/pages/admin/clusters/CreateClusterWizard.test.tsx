@@ -26,7 +26,7 @@ const BUNDLE = {
   bundle_id: "bundle-dgx-spark-gb10-v1",
   display_name: "NVIDIA DGX Spark GB10 Runtime",
   description: "",
-  image: "faden/ray-vllm-gb10:ray2.58-nv26.08",
+  image: "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
   cpu_architecture: "aarch64",
   accelerator_vendor: "nvidia",
   runtime_version: "2.58.0",

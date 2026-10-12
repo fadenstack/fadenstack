@@ -1,8 +1,8 @@
 """Image identity against the real DGX Spark images (Phase 4B, F-05).
 
-``tests/fixtures/dgx_spark_image_identity.json`` is the verbatim output of
-``docker image inspect faden/ray-vllm-gb10:ray2.58-nv26.08`` on both nodes
-on 2026-09-20.  It records the situation digest pinning exists to catch, and
+``tests/fixtures/dgx_spark_image_identity.json`` is the output of
+``docker image inspect faden/ray-vllm-gb10:ray2.58-vllm0.29.0`` on both nodes
+on 2026-09-20 (only the image tag renamed since).  It records the situation digest pinning exists to catch, and
 the one it must not mistake for it:
 
     gpu-02 (head)   .Id sha256:7dc13b9a...   50 layers
@@ -59,7 +59,7 @@ class _RecordedRuntime:
 
 def _spec(**overrides: Any) -> RuntimeBundleSpec:
     payload: dict[str, Any] = {
-        "image": "faden/ray-vllm-gb10:ray2.58-nv26.08",
+        "image": "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
         "digest": BUNDLE_DIGEST,
         "rootfs_digest": BUNDLE_ROOTFS,
         "requirements": {},

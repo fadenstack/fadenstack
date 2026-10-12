@@ -573,7 +573,7 @@ async def test_recipes_offline_are_no_recipe(monkeypatch: pytest.MonkeyPatch) ->
 # ── whether the cluster's runtime can load it, before the download ──────
 
 #: A model type no runtime in the catalogue knows. The real case was ``qwen4_exp`` (saved with Transformers
-#: 5.16.0.dev0) on the nv26.08 runtime's Transformers 5.14.1; the runtimes since know it, and the verdict must
+#: 5.16.0.dev0) on a runtime with Transformers 5.14.1; the runtimes since know it, and the verdict must
 #: not depend on which runtime is the catalogue's default.
 FUTURE_EXP_CONFIG = {
     "model_type": "qwen9_exp", "architectures": ["Qwen9ExpForConditionalGeneration"],

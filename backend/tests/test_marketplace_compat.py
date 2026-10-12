@@ -13,8 +13,7 @@ QWEN4 = {"model_type": "qwen4_exp", "architectures": ["Qwen4ExpForConditionalGen
 QWEN3 = {"model_type": "qwen3", "architectures": ["Qwen3ForCausalLM"], "transformers_version": "4.51.0",
          "needs_remote_code": False}
 
-GB10 = "faden-ray-vllm-gb10-ray2.58-nv26.08"
-GB10_PREVIEW = "faden-ray-vllm-gb10-ray2.58-nv26.09"
+GB10 = "faden-ray-vllm-gb10-ray2.58-vllm0.29.0"
 X86 = "faden-ray-vllm-x86_64-ray2.58"
 
 
@@ -25,14 +24,17 @@ def _runtime(runtime_id: str) -> RuntimeSupport:
                           architectures=frozenset(matrix.supported_architectures))
 
 
-def test_the_dgx_runtime_cannot_load_qwen4_exp() -> None:
-    verdict = compat.check(QWEN4, _runtime(GB10))
+def test_a_runtime_that_does_not_list_qwen4_exp_cannot_load_it() -> None:
+    """An older stack: its lists are what they were when Transformers 5.14 shipped, without the model."""
+    older = RuntimeSupport(vllm_version="0.27.1", transformers_version="5.14.1",
+                           model_types=frozenset({"qwen3"}), architectures=frozenset({"Qwen3ForCausalLM"}))
+    verdict = compat.check(QWEN4, older)
     assert verdict.status == compat.CANNOT_RUN and verdict.code == "model_type_unknown"
 
 
-def test_the_dgx_preview_runtime_runs_qwen4_exp() -> None:
-    """Why it ships: NVIDIA 26.09's vLLM 0.29 and Transformers 5.16 know Qwen3.8."""
-    assert compat.check(QWEN4, _runtime(GB10_PREVIEW)).status == compat.RUNS
+def test_the_dgx_runtime_runs_qwen4_exp() -> None:
+    """Why it moved on: vLLM 0.29 and Transformers 5.16 know Qwen3.8."""
+    assert compat.check(QWEN4, _runtime(GB10)).status == compat.RUNS
 
 
 def test_the_x86_runtime_reads_qwen4_exp_but_has_no_implementation_of_it() -> None:
@@ -41,7 +43,7 @@ def test_the_x86_runtime_reads_qwen4_exp_but_has_no_implementation_of_it() -> No
     assert verdict.status == compat.MAY_NOT_RUN and verdict.code == "architecture_not_native"
 
 
-@pytest.mark.parametrize("runtime_id", [GB10, GB10_PREVIEW, X86])
+@pytest.mark.parametrize("runtime_id", [GB10, X86])
 def test_every_runtime_runs_qwen3(runtime_id: str) -> None:
     assert compat.check(QWEN3, _runtime(runtime_id)).status == compat.RUNS
 

@@ -26,7 +26,7 @@ REAL_IMAGES = [
     *RuntimeManager._DEFAULT_IMAGES.values(),
     "nvcr.io/nvidia/vllm:26.03-py3",
     "vllm/vllm-openai:v0.6.6",
-    "faden/ray-vllm-gb10:ray2.58-nv26.09-images",
+    "faden/ray-vllm-gb10:ray2.58-vllm0.29.0-images",
     "faden-ray-runtime-x86_64:2.58.0",
     "localhost:5000/faden/ray-vllm-gb10:ray2.58",
     f"ghcr.io/fadenstack/runtime@{DIGEST}",

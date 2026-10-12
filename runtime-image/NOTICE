@@ -18,16 +18,10 @@
    helper in /opt/llm-port/runtime is. The rest keeps its own terms,
    which travel with it:
 
-   - A GB10 image named "-vllm<release>" is built on vLLM's own image
-     (vllm/vllm-openai, Apache-2.0), which contains NVIDIA's CUDA
-     libraries under the CUDA EULA and their own licences; their licence
-     files are in their site-packages folders.
-   - A GB10 image named "-nv<release>" is built on NVIDIA's vLLM
-     container (nvcr.io/nvidia/vllm), which is governed by the NVIDIA
-     Software License Agreement and the Product-Specific Terms for
-     NVIDIA AI Products (/workspace/license.txt). Among other things,
-     NVIDIA's software in it is licensed to run only on NVIDIA platforms,
-     and it is not published.
+   - The GB10 image is built on vLLM's own image (vllm/vllm-openai,
+     Apache-2.0), which contains NVIDIA's CUDA libraries under the CUDA
+     EULA and their own licences; their licence files are in their
+     site-packages folders.
    - The x86_64 image contains NVIDIA's CUDA, cuDNN and related Python
      packages under the CUDA EULA and their own licences; their licence
      files are in their site-packages folders.

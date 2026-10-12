@@ -33,7 +33,7 @@ def checkout(tmp_path: Path) -> Path:
     (repo / "runtime-image" / "runtime-manifest.json").write_text(
         json.dumps(
             {
-                "runtime_id": "faden-ray-vllm-gb10-ray2.58-nv26.09",
+                "runtime_id": "faden-ray-vllm-gb10-ray2.58-vllm0.29.0",
                 "certification": {"overall_status": "passed", "channel": "preview"},
             }
         ),
@@ -62,7 +62,7 @@ def test_a_build_is_recorded_and_shown(checkout: Path) -> None:
     assert rows["Images built from"].startswith("v0.4.1, ")
     assert "moved" not in rows["Images built from"]
     assert rows["Machine agent"].startswith("0.2.7")
-    assert rows["Runtimes"] == "faden-ray-vllm-gb10-ray2.58-nv26.09 (passed, preview)"
+    assert rows["Runtimes"] == "faden-ray-vllm-gb10-ray2.58-vllm0.29.0 (passed, preview)"
 
 
 def test_a_checkout_that_moved_after_the_build_says_so(checkout: Path) -> None:

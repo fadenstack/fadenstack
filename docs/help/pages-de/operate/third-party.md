@@ -47,7 +47,7 @@ Installation nennen, werden separat heruntergeladen und behalten ihre eigenen Be
 
 | Artefakt | Basiert auf | Bedingungen |
 |---|---|---|
-| Runtime-Image für NVIDIA DGX Spark | Das eigene Image von vLLM (`vllm/vllm-openai`, sein CUDA-13-Build für arm64), mit CUDA und verwandten Paketen von NVIDIA, dazu Ray und zusätzliche Python-Pakete | vLLM und Ray stehen unter Apache-2.0; die CUDA-Pakete von NVIDIA unter der [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) und ihren eigenen Bedingungen, die nicht Open Source sind. Ihre Lizenzdateien bleiben im Image. Runtimes auf Basis des vLLM-Containers von NVIDIA (`nvcr.io/nvidia/vllm`, benannt `...-nv<Release>`) fallen unter das [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) und die [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/), die ihre Veröffentlichung nicht erlauben; sie werden nicht zum Download angeboten |
+| Runtime-Image für NVIDIA DGX Spark | Das eigene Image von vLLM (`vllm/vllm-openai`, sein CUDA-13-Build für arm64), mit CUDA und verwandten Paketen von NVIDIA, dazu Ray und zusätzliche Python-Pakete | vLLM und Ray stehen unter Apache-2.0; die CUDA-Pakete von NVIDIA unter der [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) und ihren eigenen Bedingungen, die nicht Open Source sind. Ihre Lizenzdateien bleiben im Image. |
 | Runtime-Image für x86_64-Maschinen | Ein schlankes Python-Basis-Image, Betriebssystempakete, Ray und vLLM aus PyPI und die Python- und CUDA-Pakete, die diese nachziehen | Jede Komponente behält ihre eigene Lizenz, auch CUDA, cuDNN und verwandte Pakete von NVIDIA unter der [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) und ihren eigenen Bedingungen, die nicht Open Source sind. Ihre Lizenzdateien bleiben im Image; die SBOM ist das Verzeichnis |
 | Modell-TLS-Proxy | nginx | Die Lizenz von nginx |
 | Die Modelle | Was Sie von Hugging Face bereitstellen oder importieren | Die eigene Lizenz jedes Modells, die der Administrator bei zugangsbeschränkten Modellen auf Hugging Face akzeptiert |
@@ -62,7 +62,6 @@ Die Maschinen erhalten diese Images vom Server.
 
 - [Ray](https://github.com/ray-project/ray)
 - [vLLM](https://github.com/vllm-project/vllm)
-- [vLLM-Container von NVIDIA](https://docs.nvidia.com/deeplearning/frameworks/vllm-release-notes/running.html)
 - [Swagger UI](https://github.com/swagger-api/swagger-ui)
 - [ReDoc](https://github.com/Redocly/redoc)
 - [Sora](https://github.com/sora-xor/sora-font)
@@ -71,5 +70,4 @@ Die Maschinen erhalten diese Images vom Server.
 - [Zensical](https://github.com/zensical/zensical)
 - [Lucide](https://github.com/lucide-icons/lucide)
 - [Material Design Icons](https://github.com/Templarian/MaterialDesign)
-- [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) und [Product-Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/)
 - [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html)

@@ -17,7 +17,7 @@ const HEAD = "11111111-1111-1111-1111-111111111111";
 const CLUSTER: FoundCluster = {
   address: "10.100.0.2:6379",
   runtime_version: "2.58.0",
-  image: "faden/ray-vllm-gb10:ray2.58-nv26.08",
+  image: "faden/ray-vllm-gb10:ray2.58-vllm0.29.0",
   head: {
     ip: "10.100.0.2", hostname: "gpu-01", role: "head", gpus: 1,
     runtime_node_id: "ray-head", node_id: HEAD, name: "gpu-01",
