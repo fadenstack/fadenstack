@@ -154,6 +154,9 @@ def _adopt_files(hf_cache: Path, model_dir: Path, commit: str, siblings: list[An
         source = (hf_cache / model_dir.name / "snapshots" / commit / sibling.rfilename).resolve(strict=False)
         size = int(getattr(sibling, "size", 0) or 0)
         # The blob keeps the name the Hub's client gave it (its etag), which hf_hub_download looks for.
+        # A snapshot holding plain files instead of links (a copied cache) has no such name: left to download.
+        if source.parent.name != "blobs":
+            continue
         if source.is_file() and (not size or source.stat().st_size == size):
             adopt_blob(source, model_dir / "blobs" / source.name)
 
