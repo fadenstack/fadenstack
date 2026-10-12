@@ -12,6 +12,17 @@ refuses a key the CLI does not ship; ``verify`` reads the result the way an inst
 The feed's format and its checks are the CLI's (cli/src/faden_cli/core/release_feed.py), so what
 is published here is what installs can read.
 
+Keys: installs trust the keys their release ships (TRUSTED_KEYS, the same in the CLI and the backend):
+the signing key, whose private half is the secret UPDATE_FEED_SIGNING_KEY, and a backup key whose
+private half is kept offline and signs nothing while the signing key is usable. When the signing key
+is lost or leaked:
+  1. keygen a new pair; add its public key to TRUSTED_KEYS in both copies, and drop the old one if it
+     leaked;
+  2. sign the feed that announces that release with the BACKUP key (--key-file): every install trusts
+     it, also those whose CLI never saw the new key;
+  3. once installs run the release, sign with the new key, and keygen a new backup pair the same way.
+A key must ship in a release before anything is signed with it.
+
 Needs: pyyaml, cryptography, packaging.
 """
 

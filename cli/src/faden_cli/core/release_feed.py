@@ -33,6 +33,10 @@ FEED_URL = "https://fadenstack.com/updates/v1/index.json"
 #: ships here in a release before anything is signed with it.
 TRUSTED_KEYS: dict[str, str] = {
     "fadenstack-2026-10": "F87bn6AH1s5Lrw0bUKebHzxWO23vv8A6Hh9/+cxHjyo=",
+    # The backup key: its private half is kept offline and signs nothing while the key above is usable. A key
+    # an install trusts can only come with a release, so without it a lost or leaked signing key would leave
+    # every install unable to trust a feed again until someone upgraded it by hand.
+    "fadenstack-backup-2026-10": "4X1SvMFK7tO+04Ua+y0w7TC/GaW43tlqzr3vUoxFVWU=",
 }
 
 #: Least to most urgent. "none": nothing newer.
