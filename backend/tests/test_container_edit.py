@@ -8,6 +8,7 @@ deleted and made again by hand.
 from __future__ import annotations
 
 import json
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -340,6 +341,12 @@ def test_a_named_volume_stays_a_volume() -> None:
     from faden_backend.services.docker.client import resolve_binds  # noqa: PLC0415
 
     assert resolve_binds(["fadenstack_loki_data:/loki:rw"]) == ["fadenstack_loki_data:/loki:rw"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="a drive letter is a Windows path; on Linux 'C:/models' is a relative one")
+def test_a_drive_letter_is_not_a_volume_named_c() -> None:
+    from faden_backend.services.docker.client import resolve_binds  # noqa: PLC0415
+
     (drive,) = resolve_binds(["C:/models:/models"])  # a Windows path, not a volume named "C"
     assert drive.endswith(":/models")
     assert drive[1] == ":"
