@@ -119,6 +119,48 @@ Als Nächstes: [die GPU-Maschinen hinzufügen](machines.md).
 
 Die Daten liegen in Docker-Volumes namens `fadenstack_*`, z. B. `fadenstack_pg_data`.
 
+### Wo die Firmendaten liegen {#where-the-company-data-is-kept}
+
+| Daten | Wo | In einer Sicherung |
+|---|---|---|
+| Datenbanken (Benutzer, Chats, Einstellungen) | `fadenstack_pg_data` | Als Dumps |
+| An Chats angehängte Dateien | `fadenstack_faden_chat_files` | Mit `--include-volumes` |
+| In die Wissensdatenbank hochgeladene Dateien | `fadenstack_faden_rag_lite` | Mit `--include-volumes` |
+| Modelle | `fadenstack_faden_models` | Nein |
+
+Vor Release 0.4.4 hatten Chat-Anhänge kein Volume: Sie lagen im Gateway-Container und gingen verloren, wenn ein
+Upgrade oder eine Wiederherstellung ihn ersetzte. `faden upgrade` kopiert die Dateien, die der alte Container
+enthält, in das Volume, bevor es den Container ersetzt; beim ersten Upgrade geht also nichts verloren.
+
+Um die Chat-Anhänge in einem eigenen Verzeichnis zu halten, z. B. auf Speicher, den Ihre Firma verwaltet, tragen Sie
+es in der `.env` ein:
+
+```bash
+FADEN_DATA_DIR=/srv/fadenstack
+```
+
+oder geben Sie es bei der Installation an: `faden deploy --data-dir /srv/fadenstack`. Die Anhänge liegen dann in
+`/srv/fadenstack/chat-files` statt im Volume. Verwenden Sie einen absoluten Pfad in POSIX-Form (unter Windows
+`/c/data`). Leer, der Standard, behält das Docker-Volume. Eine Änderung gilt, sobald das Gateway neu erstellt wird;
+Dateien, die schon im Volume liegen, werden nicht verschoben. Setzen Sie den Wert also vor dem ersten Upgrade auf
+dieses Release, oder kopieren Sie die Dateien selbst um.
+
+### Docker-Logs {#docker-logs}
+
+Das Docker-Log jedes Containers rotiert: höchstens 5 Dateien zu je 50 MB pro Container, die älteste wird verworfen.
+Ohne Grenze füllen die Logs die Festplatte. Ändern Sie die Grenze in der `.env` oder mit
+`faden deploy --log-max-size 100m --log-max-file 10`:
+
+```bash
+FADEN_LOG_MAX_SIZE=50m
+FADEN_LOG_MAX_FILE=5
+```
+
+Führen Sie danach `faden upgrade` oder `faden rebuild` aus, damit die Container damit neu erstellt werden. Die Logs,
+die Sie in Grafana lesen, liegen in Loki und werden nicht wegrotiert: Alloy liest das Log jedes Containers über
+Docker und liest über eine Rotation hinweg weiter. Wählen Sie die Grenzen großzügig, denn Docker behält nur, was
+hineinpasst, und Alloy muss laufen, um eine Zeile zu sammeln.
+
 Einstellungen, die Sie ändern, gehören in die `.env`. Die anderen Dateien der Installation, z. B.
 `nginx/nginx.conf`, werden beim nächsten Upgrade ersetzt.
 

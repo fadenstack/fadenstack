@@ -13,7 +13,7 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
 | Zertifikatsmaterial (`tls/`, `tls-ca/`) | Ja, außer mit `--db-only` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem privaten Schlüssel. Damit ist ein neu aufgesetzter Server einer, dem die Maschinen weiterhin vertrauen |
 | Migrationsversionen und Prüfsummen | Ja | `faden restore` prüft die Datenbank-Dumps und die Zertifikatsdateien, bevor es etwas ändert |
 | Dateien, die in die Wissensdatenbank hochgeladen wurden | Mit `--include-volumes` | Ohne diese Option enthält die Sicherung nur den daraus gelesenen Text, nicht die Dateien selbst |
-| Dateien, die an Chats angehängt wurden | Nein | Der daraus gelesene Text liegt in der Datenbank, die Dateien selbst nicht. Bewahren Sie die Originale auf, die Sie brauchen |
+| Dateien, die an Chats angehängt wurden | Mit `--include-volumes` | Ohne diese Option liegt nur der daraus gelesene Text in der Datenbank, nicht die Dateien selbst |
 | Modelle | Nein | Sie lassen sich erneut herunterladen. Bewahren Sie eine Kopie der Modelle auf, die Sie importiert statt heruntergeladen haben |
 | Logs, Metriken, Traces | Mit `--include-volumes`, außer Metriken | Sie werden zum Ansehen auf dem Server aufbewahrt; eine Sicherung ohne sie verliert nichts, was der Server braucht |
 | Runtime-Images | Nein | `faden runtime-images` holt sie erneut |
@@ -41,7 +41,7 @@ listet auf, was er gesichert hat.
 | `--output-dir PATH` | Die Sicherung woanders hinschreiben, z. B. auf eine eingehängte Sicherungsplatte. Ein relativer Pfad gilt innerhalb des Installationsverzeichnisses |
 | `--retain N` | Nur die N neuesten Sicherungen in diesem Verzeichnis behalten (Standard 5). Ältere dort werden gelöscht |
 | `--db-only` | Nur die Datenbanken, ohne `.env` und Zertifikatsmaterial. Bewahren Sie eine Kopie der `.env` getrennt auf, so vertraulich wie die Sicherungen |
-| `--include-volumes` | Auch die Dateien, die in die Wissensdatenbank hochgeladen wurden, die Logs, die Traces und Grafanas eigene Daten. Nicht die Modelle |
+| `--include-volumes` | Auch die Dateien, die in die Wissensdatenbank hochgeladen wurden, die an Chats angehängten Dateien, die Logs, die Traces und Grafanas eigene Daten. Nicht die Modelle |
 | `-y` | Nicht nachfragen |
 
 ??? info "Wie `--retain` zählt"

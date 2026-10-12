@@ -57,6 +57,16 @@ SECRET_KEYS: frozenset[str] = frozenset({
 
 #: What the backend asks for before it creates the first administrator (``POST /api/bootstrap``), sent by
 #: ``faden deploy``. Without it bootstrap is refused: the first admin went to whoever asked first.
+#: Settings deploy writes with their defaults and upgrade adds to an older .env (the compose file has the same
+#: fallbacks). Rotation of every container's Docker log: the largest file and how many are kept per container,
+#: so 50m x 5 is at most 250 MB each. FADEN_DATA_DIR: empty keeps the company data (chat attachments) in
+#: Docker named volumes; a directory puts it there instead (Help: Installing, Where the data is kept).
+DEPLOY_SETTINGS: dict[str, str] = {
+    "FADEN_LOG_MAX_SIZE": "50m",
+    "FADEN_LOG_MAX_FILE": "5",
+    "FADEN_DATA_DIR": "",
+}
+
 BOOTSTRAP_TOKEN_KEY = "FADEN_BACKEND_BOOTSTRAP_TOKEN"  # noqa: S105 - the variable's name
 
 #: What the compose file has no fallback for (``${NAME:?...}``): compose stops on any of them missing, for
@@ -303,6 +313,7 @@ def default_env_vars(
         "FADEN_MCP_ENVIRONMENT": "production",
         "FADEN_SKILLS_ENVIRONMENT": "production",
         "USERS_SECRET": _random_secret(),
+        **DEPLOY_SETTINGS,
         # Inter-service auth tokens (see comment above). Each pair of
         # caller env vars must equal the receiver's env var.
         "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp_service_token,
@@ -472,6 +483,9 @@ def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] =
             kept.append(key)
         else:
             added[key] = defaults[key]
+    # Not secrets: the settings a release introduced, written with their defaults. A key the operator
+    # set, even to nothing, stays as it is.
+    added.update({key: value for key, value in DEPLOY_SETTINGS.items() if key not in current})
     if "POSTGRES_PASSWORD" in added and current.get("LANGFUSE_DATABASE_URL"):
         user = current.get("POSTGRES_USER") or "postgres"
         added["LANGFUSE_DATABASE_URL"] = f"postgresql://{user}:{added['POSTGRES_PASSWORD']}@postgres:5432/langfuse"
@@ -484,6 +498,11 @@ def fill_required_env(env_path: Path, *, profiles: list[str] | tuple[str, ...] =
         "there so the data stored with it stays readable. Change it as Help describes (Installing, Secrets in .env)."
         for key in kept
     ]
+
+
+def set_env_values(env_path: Path, values: dict[str, str]) -> None:
+    """Set *values* in the install's ``.env``, the rest of the file as it is."""
+    _put_env(env_path, values, header="Set by faden deploy")
 
 
 def fill_dev_env(env_path: Path) -> list[str]:

@@ -11,6 +11,16 @@
 # unpacks the release into (~/fadenstack by default).
 name: fadenstack
 
+# Docker's own log of every container (what `docker logs` and Alloy read) rotates:
+# at most FADEN_LOG_MAX_FILE files of FADEN_LOG_MAX_SIZE each per container, the
+# oldest dropped. Without it the json-file driver grows until the disk is full.
+# Set in .env (faden deploy --log-max-size / --log-max-file; Help: Installing).
+x-logging: &faden-logging
+  driver: json-file
+  options:
+    max-size: ${FADEN_LOG_MAX_SIZE:-50m}
+    max-file: "${FADEN_LOG_MAX_FILE:-5}"
+
 services:
   # -----------------------------
   # Platform base image (build-only, no runtime container)
@@ -28,6 +38,7 @@ services:
   nginx:
     image: nginx:1-alpine
     container_name: faden-nginx
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       - "${FADEN_HTTP_PORT:-80}:80"
@@ -67,6 +78,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     container_name: faden-postgres
+    logging: *faden-logging
     restart: unless-stopped
     # Parallel index builds (pgvector HNSW) work in shared memory; Docker's
     # default 64 MB /dev/shm fails them ("could not resize shared memory
@@ -106,6 +118,7 @@ services:
     # CLICKHOUSE_IMAGE=clickhouse/clickhouse-server:<tag>
     image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.10}
     container_name: faden-clickhouse
+    logging: *faden-logging
     restart: unless-stopped
     user: "101:101"
     environment:
@@ -131,6 +144,7 @@ services:
   redis:
     image: redis:7.2
     container_name: faden-redis
+    logging: *faden-logging
     restart: unless-stopped
     command: >
       --requirepass ${REDIS_AUTH:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)} --maxmemory-policy noeviction
@@ -145,6 +159,7 @@ services:
   minio:
     image: cgr.dev/chainguard/minio:latest
     container_name: faden-minio
+    logging: *faden-logging
     restart: unless-stopped
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
@@ -169,6 +184,7 @@ services:
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:3
     container_name: faden-worker
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       postgres:
@@ -219,6 +235,7 @@ services:
   langfuse-web:
     image: docker.io/langfuse/langfuse:3
     container_name: faden-web
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       # LLM observability UI (traces / evals / datasets), plain HTTP: on this
@@ -288,6 +305,7 @@ services:
   faden-rmq:
     image: rabbitmq:4.2.1-management-alpine
     container_name: faden-rmq
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       - "127.0.0.1:5672:5672"
@@ -322,6 +340,7 @@ services:
   faden-gateway-migrator:
     image: ${REGISTRY:-ghcr.io/fadenstack}/gateway:${VERSION:-latest}
     container_name: faden-gateway-migrator
+    logging: *faden-logging
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
@@ -346,6 +365,7 @@ services:
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-gateway
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       postgres:
@@ -431,6 +451,12 @@ services:
       FADEN_GATEWAY_DB_MAX_OVERFLOW: ${FADEN_GATEWAY_DB_MAX_OVERFLOW:-5}
       FADEN_GATEWAY_RABBIT_POOL_SIZE: ${FADEN_GATEWAY_RABBIT_POOL_SIZE:-2}
       FADEN_GATEWAY_RABBIT_CHANNEL_POOL_SIZE: ${FADEN_GATEWAY_RABBIT_CHANNEL_POOL_SIZE:-10}
+    volumes:
+      # Chat attachments (chat_file_store_root). In the container layer until this release: every upgrade
+      # and restore replaced the container and lost them. With FADEN_DATA_DIR set in .env the source is
+      # that directory plus /chat-files on the host (a company's own storage); empty, the named volume
+      # below. `faden upgrade` copies what the old container holds into it first.
+      - ${FADEN_DATA_DIR:-faden_chat_files}${FADEN_DATA_DIR:+/chat-files}:/data/faden/chat-files
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s
@@ -443,6 +469,7 @@ services:
   faden-backend-migrator:
     image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
     container_name: faden-backend-migrator
+    logging: *faden-logging
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
@@ -467,6 +494,7 @@ services:
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-backend
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       postgres:
@@ -588,6 +616,7 @@ services:
   faden-backend-worker:
     image: ${REGISTRY:-ghcr.io/fadenstack}/backend:${VERSION:-latest}
     container_name: faden-backend-worker
+    logging: *faden-logging
     restart: unless-stopped
     command:
       - taskiq
@@ -666,6 +695,7 @@ services:
       additional_contexts:
         docs: ../docs
     container_name: faden-frontend
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       faden-backend:
@@ -691,6 +721,7 @@ services:
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-pii
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       faden-rmq:
@@ -721,6 +752,7 @@ services:
     profiles: ["pii"]
     image: ${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}
     container_name: faden-pii-worker
+    logging: *faden-logging
     restart: unless-stopped
     command:
       - taskiq
@@ -750,6 +782,7 @@ services:
     profiles: ["mcp"]
     image: ${REGISTRY:-ghcr.io/fadenstack}/mcp:${VERSION:-latest}
     container_name: faden-mcp-migrator
+    logging: *faden-logging
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
@@ -772,6 +805,7 @@ services:
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-mcp
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       postgres:
@@ -820,6 +854,7 @@ services:
     profiles: ["skills"]
     image: ${REGISTRY:-ghcr.io/fadenstack}/skills:${VERSION:-latest}
     container_name: faden-skills-migrator
+    logging: *faden-logging
     restart: on-failure:5
     command: ["sh", "-c", "sleep 5 && alembic upgrade head"]
     depends_on:
@@ -842,6 +877,7 @@ services:
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-skills
+    logging: *faden-logging
     restart: unless-stopped
     depends_on:
       postgres:
@@ -885,6 +921,7 @@ services:
     # compose-private.
     image: prom/prometheus:v2.53.0
     container_name: faden-prometheus
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       # Not 9090 on the host: MinIO's API is published there in this stack,
@@ -910,6 +947,7 @@ services:
   loki:
     image: grafana/loki:3.0.0
     container_name: faden-loki
+    logging: *faden-logging
     restart: unless-stopped
     # Loki has no authentication — it must never be reachable from the
     # network. Default to the loopback interface only; set LOKI_BIND
@@ -930,6 +968,7 @@ services:
     # back needs the backup the upgrade makes.
     image: grafana/grafana:12.4.12@sha256:a3b504df900c24db125e5ec0646f3ac3428db38161302d69f05d0db70a330a90
     container_name: faden-grafana
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       # Dashboards, anonymous read-only (login form disabled), plain HTTP. The
@@ -970,6 +1009,7 @@ services:
     # last. --disable-reporting: no usage reports to Grafana Labs.
     image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
     container_name: faden-alloy
+    logging: *faden-logging
     restart: unless-stopped
     ports:
       - "127.0.0.1:12345:12345"
@@ -996,3 +1036,4 @@ volumes:
   prom_data:
   faden_models:
   faden_rag_lite:
+  faden_chat_files:

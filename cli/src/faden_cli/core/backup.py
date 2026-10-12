@@ -33,12 +33,23 @@ from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
 # which can be downloaded again and run to hundreds of gigabytes.
 BACKUP_VOLUMES: list[str] = [
     "faden_rag_lite",
+    "faden_chat_files",
     "minio_data",
     "ch_data",
     "ch_logs",
     "loki_data",
     "grafana_data",
 ]
+
+#: The company data volumes docker-compose.yaml can put in a host directory instead: with FADEN_DATA_DIR set in
+#: .env, the volume is that directory plus the subdirectory named here. Mirrors the mounts in the compose file.
+DATA_DIR_VOLUMES: dict[str, str] = {"faden_chat_files": "chat-files"}
+
+#: Where the gateway keeps chat attachments, and its container: files an older release left in the
+#: container layer are carried into the volume before the container is replaced.
+_GATEWAY_CONTAINER = "faden-gateway"
+_CHAT_FILES_PATH = "/data/faden/chat-files"
+_DEFAULT_PROJECT = "fadenstack"
 
 #: Never written back by a restore, whatever an older backup holds.
 _NEVER_RESTORED = frozenset({"pg_data"})
@@ -321,7 +332,95 @@ def _compose_volume(docker: str, project: str, name: str) -> str | None:
     return found[0] if proc.returncode == 0 and len(found) == 1 else None
 
 
-def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> list[str]:
+def data_dir_of(env_file: object) -> str:
+    """FADEN_DATA_DIR from the install's .env: where the data volumes live on the host, or ``""`` for named volumes."""
+    if not env_file or not Path(str(env_file)).exists():
+        return ""
+    from faden_cli.core.env_gen import read_env_file  # noqa: PLC0415
+
+    return read_env_file(Path(str(env_file))).get("FADEN_DATA_DIR", "").strip().rstrip("/\\")
+
+
+def keep_chat_files(env_file: object) -> None:
+    """Before the gateway container is replaced: :func:`carry_over_chat_files` for the install with this ``.env``."""
+    if carry_over_chat_files(data_dir_of(env_file)) == "copied":
+        success("Chat attachments copied from the old gateway container into the data volume.")
+
+
+def _volume_source(docker: str, project: str, name: str, data_dir: str) -> str | None:
+    """What ``docker run -v`` mounts for the compose volume *name*: its host directory, or the named volume."""
+    if data_dir and name in DATA_DIR_VOLUMES:
+        return f"{data_dir}/{DATA_DIR_VOLUMES[name]}"
+    return _compose_volume(docker, project, name)
+
+
+def carry_over_chat_files(data_dir: str = "") -> str:
+    """Copy chat attachments an older release left inside the gateway container into the new volume.
+
+    Before that release, ``/data/faden/chat-files`` had no volume: the files lived in the container layer
+    and went when the container was replaced. Run before the upgrade replaces it. Only when the container
+    exists without a mount there and the volume (or the directory under *data_dir*) is empty; whatever the
+    volume holds is never overwritten. Returns ``"copied"``, ``"present"`` (volume already in use or not
+    empty), ``"none"`` (no container) or ``"failed"``; a failure is a warning, the upgrade goes on.
+    """
+    docker = _docker_bin()
+    proc = subprocess.run(  # noqa: S603
+        [docker, "inspect", "-f", "{{range .Mounts}}{{.Destination}} {{end}}", _GATEWAY_CONTAINER],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return "none"
+    if _CHAT_FILES_PATH in proc.stdout.decode("utf-8", errors="replace").split():
+        return "present"
+    project = _compose_project(docker) or _DEFAULT_PROJECT
+    target = _volume_source(docker, project, "faden_chat_files", data_dir)
+    if target is None:
+        # Not made yet: made the way compose makes it, so compose adopts it without a warning.
+        target = f"{project}_faden_chat_files"
+        made = subprocess.run(  # noqa: S603
+            [
+                docker, "volume", "create",
+                "--label", f"com.docker.compose.project={project}",
+                "--label", "com.docker.compose.volume=faden_chat_files",
+                target,
+            ],
+            capture_output=True,
+            check=False,
+        )
+        if made.returncode != 0:
+            warning("  Could not create the chat files volume; attachments in the old container are not copied")
+            return "failed"
+    # The tar stream goes from one container to the other; nothing lands on the host, ownership is kept.
+    reader = subprocess.Popen(  # noqa: S603
+        [docker, "cp", f"{_GATEWAY_CONTAINER}:{_CHAT_FILES_PATH}/.", "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    writer = subprocess.run(  # noqa: S603
+        [
+            docker, "run", "--rm", "-i",
+            "-v", f"{target}:/dst",
+            "alpine",
+            "sh", "-c", 'if [ -n "$(ls -A /dst)" ]; then exit 3; fi; tar xf - -C /dst',
+        ],
+        stdin=reader.stdout,
+        capture_output=True,
+        check=False,
+    )
+    if reader.stdout is not None:
+        reader.stdout.close()
+    if reader.wait() != 0:
+        return "none"  # the old container has no such directory: nothing to carry
+    if writer.returncode == 3:
+        return "present"
+    if writer.returncode != 0:
+        warning(f"  Chat files not copied: {writer.stderr.decode('utf-8', errors='replace').strip()[:200]}")
+        return "failed"
+    return "copied"
+
+
+def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None, data_dir: str = "") -> list[str]:
     """Tar each named Docker volume into the backup directory.
 
     Uses a temporary ``alpine`` container to read from the volume mount. The archive carries the compose
@@ -338,7 +437,7 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> l
     created: list[str] = []
 
     for vol in targets:
-        source = _compose_volume(docker, project, vol)
+        source = _volume_source(docker, project, vol, data_dir)
         if source is None:
             warning(f"  No volume {vol} in this install; skipped")
             continue
@@ -367,7 +466,7 @@ def snapshot_volumes(backup_dir: Path, *, volumes: list[str] | None = None) -> l
     return created
 
 
-def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
+def restore_volumes(backup_dir: Path, manifest: dict, *, data_dir: str = "") -> list[str]:
     """Restore volume archives from a backup.
 
     Returns list of volume names that were restored.
@@ -387,7 +486,7 @@ def restore_volumes(backup_dir: Path, manifest: dict) -> list[str]:
         if vol in _NEVER_RESTORED:
             warning(f"  {vol} skipped: the databases come back from their dumps")
             continue
-        target = _compose_volume(docker, project, vol)
+        target = _volume_source(docker, project, vol, data_dir)
         if target is None:
             warning(f"  No volume {vol} in this install; {archive} not restored")
             continue
@@ -634,7 +733,7 @@ def create_backup(
     # 4. Snapshot volumes
     if include_volumes and not db_only:
         console.print("\n[bold cyan]Snapshotting Docker volumes…[/bold cyan]")
-        result.volumes = snapshot_volumes(backup_dir)
+        result.volumes = snapshot_volumes(backup_dir, data_dir=data_dir_of(ctx.env_file))
 
     # 5. Collect migration heads
     console.print("\n[bold cyan]Collecting migration heads…[/bold cyan]")
@@ -705,7 +804,7 @@ def restore_backup(
     # 4. Restore volumes
     if not db_only and manifest.get("volumes"):
         console.print("\n[bold cyan]Restoring Docker volumes…[/bold cyan]")
-        result.volumes_restored = restore_volumes(backup_dir, manifest)
+        result.volumes_restored = restore_volumes(backup_dir, manifest, data_dir=data_dir_of(ctx.env_file))
 
     # 5. The certificate material, so the machines still trust this server
     if not db_only and manifest.get("tls_material") and ctx.project_dir:

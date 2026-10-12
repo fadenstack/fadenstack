@@ -111,6 +111,45 @@ Next: [add the GPU machines](machines.md).
 
 The data lives in Docker volumes named `fadenstack_*`, such as `fadenstack_pg_data`.
 
+### Where the company data is kept
+
+| Data | Where | In a backup |
+|---|---|---|
+| Databases (users, chats, settings) | `fadenstack_pg_data` | As dumps |
+| Files attached to chats | `fadenstack_faden_chat_files` | With `--include-volumes` |
+| Files uploaded to the knowledge base | `fadenstack_faden_rag_lite` | With `--include-volumes` |
+| Models | `fadenstack_faden_models` | No |
+
+Before release 0.4.4, chat attachments had no volume: they lived inside the gateway container and were lost when
+an upgrade or restore replaced it. `faden upgrade` copies the files the old container holds into the volume before it
+replaces the container, so nothing is lost on that first upgrade.
+
+To keep the chat attachments in a directory of your own, for example on storage your company manages, set it in
+`.env`:
+
+```bash
+FADEN_DATA_DIR=/srv/fadenstack
+```
+
+or give it at install time: `faden deploy --data-dir /srv/fadenstack`. The attachments are then in
+`/srv/fadenstack/chat-files` instead of the volume. Use an absolute path in POSIX form (on Windows, `/c/data`).
+Empty, the default, keeps the Docker volume. A change takes effect when the gateway is recreated; files already in
+the volume are not moved, so set this before the first upgrade to this release, or copy the files over yourself.
+
+### Docker logs
+
+Each container's Docker log rotates: at most 5 files of 50 MB per container, the oldest dropped. Without a limit
+the logs fill the disk. Change it in `.env`, or with `faden deploy --log-max-size 100m --log-max-file 10`:
+
+```bash
+FADEN_LOG_MAX_SIZE=50m
+FADEN_LOG_MAX_FILE=5
+```
+
+Then run `faden upgrade` or `faden rebuild` so the containers are recreated with it. The logs you read in Grafana
+are kept in Loki and are not rotated away: Alloy reads each container's log through Docker, which carries on across
+a rotation. Keep the limits generous, as Docker keeps only what fits in them and Alloy has to be running to collect a line.
+
 Settings you change belong in `.env`. The other deployment files, such as `nginx/nginx.conf`, are replaced by the
 next upgrade.
 

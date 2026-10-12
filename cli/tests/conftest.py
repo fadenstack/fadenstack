@@ -20,10 +20,14 @@ from __future__ import annotations
 import pytest
 
 from faden_cli.commands.dev import dev_up
+from faden_cli.core import backup
 
 
 @pytest.fixture(autouse=True)
 def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The upgrade, deploy and rebuild steps that carry chat files out of the gateway container: none here.
+    monkeypatch.setattr(backup, "keep_chat_files", lambda *_a, **_k: None)
+
     # Nothing to find...
     monkeypatch.setattr(dev_up.psutil, "process_iter", lambda *_a, **_k: [])
     monkeypatch.setattr(dev_up.psutil, "net_connections", lambda *_a, **_k: [])
@@ -44,6 +48,12 @@ def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
         # (faden-postgres, ...) has the same container names as an install.
         if isinstance(args, (list, tuple)) and isinstance(first, str) and "docker" in first.lower() and "exec" in args:
             pytest.fail(f"a test reached a real `docker exec`: {args!r}")
+        # Nor one that copies out of, or creates a volume next to, the developer's own containers (the chat
+        # files carry-over of an upgrade: patched below, and refused here should a test get past that).
+        if isinstance(args, (list, tuple)) and isinstance(first, str) and "docker" in first.lower() and (
+            "cp" in args[1:2] or list(args[1:3]) == ["volume", "create"]
+        ):
+            pytest.fail(f"a test reached a real `docker cp` or `docker volume create`: {args!r}")
         return real_run(args, *rest, **kwargs)
 
     monkeypatch.setattr(dev_up.subprocess, "run", guarded_run)

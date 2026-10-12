@@ -372,6 +372,12 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
     # Earlier releases made two logins with fixed passwords on every install.
     retire_fixed_logins(env_path)
 
+    # Chat attachments an older release kept inside the gateway container, which the restart below replaces:
+    # into the volume they now have, while the old container is still there.
+    from faden_cli.core.backup import keep_chat_files  # noqa: PLC0415
+
+    keep_chat_files(env_path)
+
     # The front door first, on its own: recreated with this release's config
     # it serves the maintenance page while the rest restarts -- even on the
     # first upgrade to a release that has one. Then everything else, so it
