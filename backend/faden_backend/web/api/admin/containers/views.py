@@ -29,8 +29,6 @@ from faden_backend.web.api.admin.containers.schema import (
     ContainerSettingsDTO,
     ContainerSummaryDTO,
     CreateContainerRequest,
-    ExecTokenDTO,
-    ExecTokenRequest,
     PortBinding,
     RegisterContainerRequest,
 )
@@ -635,65 +633,6 @@ async def update_container(
             "Container %s was replaced by %s; its registry entry was not moved", raw["Id"][:12], new_id[:12],
         )
     return _container_summary_from_docker(new, entry.container_class, entry.policy, entry.owner_scope)
-
-
-# Before the lifecycle route: POST /{container_id}/{action} matches
-# /{container_id}/exec too, and registered first it answered every exec
-# with 400 "Unknown action 'exec'".
-@router.post("/{container_id}/exec", response_model=ExecTokenDTO, name="container_exec")
-async def container_exec(
-    container_id: str,
-    body: ExecTokenRequest,
-    user: User = Depends(require_permission("containers", "exec")),
-    docker: DockerService = Depends(get_docker),
-    entry: Any = Depends(get_registry_entry),
-    enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
-    root_mode: bool = Depends(get_root_mode_active),
-    audit_dao: AuditDAO = Depends(),
-) -> ExecTokenDTO:
-    """
-    Create an exec session and return its ID.
-
-    The client should use the returned exec_id with a websocket connection.
-    A command in a container with root on the host is root on the host,
-    whatever the container's class: it runs only in Root Mode.
-    """
-    try:
-        enforcer.enforce(Action.EXEC, entry.container_class, entry.policy, root_mode)
-    except HTTPException:
-        await audit_action(
-            action="container.exec",
-            target_type="container",
-            target_id=container_id,
-            result=AuditResult.DENY,
-            actor_id=user.id,
-            severity=_severity(root_mode),
-            audit_dao=audit_dao,
-        )
-        raise
-    try:
-        raw = await docker.inspect_container(container_id)
-    except DockerError as exc:
-        raise _docker_refused(exc, "The container could not be read") from None
-    await _refuse_host_access(
-        host_access.container_reasons(raw), root_mode=root_mode, doing="run commands in",
-        audit="container.exec", target_id=container_id, user=user, audit_dao=audit_dao,
-    )
-
-    exec_id = await docker.create_exec(container_id, cmd=body.cmd, workdir=body.workdir)
-
-    await audit_action(
-        action="container.exec",
-        target_type="container",
-        target_id=container_id,
-        result=AuditResult.ALLOW,
-        actor_id=user.id,
-        severity="high",  # exec is always high-severity
-        audit_dao=audit_dao,
-        metadata_json=json.dumps({"cmd": body.cmd}),
-    )
-
-    return ExecTokenDTO(exec_id=exec_id)
 
 
 @router.post(

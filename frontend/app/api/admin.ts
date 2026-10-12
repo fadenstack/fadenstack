@@ -80,10 +80,6 @@ export interface ContainerSettings {
   backend_runs_here: boolean;
 }
 
-export interface ExecToken {
-  exec_id: string;
-}
-
 export interface ImageSummary {
   id: string;
   repo_tags: string[];
@@ -326,12 +322,6 @@ export const containers = {
   fetchLogs(id: string, tail = 200): Promise<Response> {
     return fetch(`${BASE}/containers/${id}/logs?tail=${tail}`, {
       credentials: "include",
-    });
-  },
-  exec(id: string, cmd: string[], workdir = "/") {
-    return request<ExecToken>(`/containers/${id}/exec`, {
-      method: "POST",
-      body: JSON.stringify({ cmd, workdir }),
     });
   },
   delete(id: string, force = false) {
@@ -926,11 +916,6 @@ export const adminAuthProviders = {
 /** Every class can be edited (the container is replaced); a locked policy cannot. */
 export function canEdit(policy: ContainerPolicy): boolean {
   return policy !== "locked";
-}
-
-export function canExec(cls: ContainerClass, rootModeActive: boolean): boolean {
-  if (cls === "TENANT_APP") return true;
-  return rootModeActive;
 }
 
 export function canStop(cls: ContainerClass, rootModeActive: boolean): boolean {

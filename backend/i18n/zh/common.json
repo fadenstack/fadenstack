@@ -968,20 +968,13 @@
   "container_detail": {
     "failed_load": "加载容器失败。",
     "error_loading_logs": "加载日志出错",
-    "exec_denied": "Exec 被拒绝。",
     "tabs": {
       "overview": "概览",
-      "logs": "日志",
-      "exec": "Exec"
+      "logs": "日志"
     },
     "status": "状态",
     "last_lines": "最近 300 行",
     "no_logs": "暂无日志。",
-    "exec_not_permitted": "未启用 Root 模式时，不允许对 {{cls}} 容器执行 Exec。",
-    "exec_created": "已创建 Exec 会话。",
-    "exec_id_label": "Exec ID（用于 websocket 客户端）：",
-    "exec_help": "为该容器创建一个 Exec 会话。返回的 Exec ID 可用于终端 websocket 客户端。",
-    "start_exec": "启动 Exec (/bin/sh)",
     "page_title": "容器详情",
     "edit": "编辑"
   },

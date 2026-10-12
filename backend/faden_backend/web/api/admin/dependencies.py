@@ -6,6 +6,7 @@ import hmac
 import uuid
 from typing import Annotated
 
+from aiodocker.exceptions import DockerError
 from fastapi import Depends, HTTPException, Request
 from starlette import status
 
@@ -89,9 +90,22 @@ async def get_root_mode_active(
 async def get_registry_entry(
     container_id: str,
     registry_dao: ContainerRegistryDAO = Depends(),
+    docker: DockerService = Depends(get_docker),
 ) -> ContainerRegistry:
-    """Fetch a container registry entry or return a default UNTRUSTED entry."""
+    """Fetch a container registry entry or return a default UNTRUSTED entry.
+
+    The registry is keyed by the full container id. A container addressed by
+    its name or a short id is resolved to the full id first, so its lock
+    holds whichever way it is named in the path.
+    """
     entry = await registry_dao.get(container_id)
+    if entry is None:
+        try:
+            full_id = (await docker.inspect_container(container_id)).get("Id")
+        except DockerError:
+            full_id = None  # not a container (any more): nothing to look up
+        if full_id and full_id != container_id:
+            entry = await registry_dao.get(full_id)
     if entry is None:
         # Unknown containers are treated as UNTRUSTED with restricted policy
         return ContainerRegistry(

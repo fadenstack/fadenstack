@@ -335,26 +335,6 @@ class DockerService:
             for line in lines:
                 yield line
 
-    async def create_exec(
-        self,
-        container_id: str,
-        cmd: list[str],
-        workdir: str = "/",
-        env: list[str] | None = None,
-    ) -> str:
-        """Create an exec instance and return its ID."""
-        c = await self.client.containers.get(container_id)
-        exec_id = await c.exec(
-            cmd=cmd,
-            workdir=workdir,
-            environment=env or [],
-            stdin=True,
-            stdout=True,
-            stderr=True,
-            tty=True,
-        )
-        return exec_id._id  # noqa: SLF001
-
     # ------------------------------------------------------------------
     # Images
     # ------------------------------------------------------------------

@@ -359,7 +359,7 @@ class LLMService:
         # within the configured model store root.
         resolved = Path(path).resolve()
         store_root = Path(settings.model_store_root).resolve()
-        if not str(resolved).startswith(str(store_root)):
+        if not resolved.is_relative_to(store_root):
             msg = f"Path '{path}' resolves outside the model store root '{settings.model_store_root}'."
             raise ValueError(msg)
 

@@ -963,20 +963,13 @@
   "container_detail": {
     "failed_load": "Échec du chargement du conteneur.",
     "error_loading_logs": "Erreur de chargement des journaux",
-    "exec_denied": "Exécution refusée.",
     "tabs": {
       "overview": "Aperçu",
-      "logs": "Journaux",
-      "exec": "Exec"
+      "logs": "Journaux"
     },
     "status": "Statut",
     "last_lines": "300 dernières lignes",
     "no_logs": "Aucun journal pour le moment.",
-    "exec_not_permitted": "L'exécution n'est pas autorisée pour les conteneurs {{cls}} sans le mode Root.",
-    "exec_created": "Session d'exécution créée.",
-    "exec_id_label": "ID d'exécution (utilisez avec votre client websocket) :",
-    "exec_help": "Créer une session d'exécution dans ce conteneur. L'ID retourné peut être utilisé avec un client terminal websocket.",
-    "start_exec": "Démarrer Exec (/bin/sh)",
     "page_title": "Détails du conteneur",
     "edit": "Modifier"
   },
