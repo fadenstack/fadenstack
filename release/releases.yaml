@@ -25,6 +25,21 @@
 series: []
 
 releases:
+  - version: 0.4.5
+    channel: stable
+    date: ""
+    severity: normal
+    summary: >-
+      Fixes before the launch: a switched-off module's containers stop, every service shows the release's version,
+      and operators see the engine settings only an administrator may change as read-only.
+    highlights:
+      - "`faden up` stops and removes the containers of a module you switched off; its data is kept."
+      - "The Updates page shows the release's version for every service."
+      - "Operators see code-running engine settings read-only, with a note, instead of a refusal when they save."
+      - "A release's page on GitHub starts with what is new."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.10
   - version: 0.4.4
     channel: stable
     date: "2026-10-13"
