@@ -25,9 +25,30 @@
 series: []
 
 releases:
+  - version: 0.4.4
+    channel: stable
+    date: "2026-10-13"
+    severity: security
+    summary: >-
+      Security and reliability: provider keys are encrypted, sign-ins end on logout, MCP's personal-data check
+      fails closed, company files are copied and verified across upgrades, and new clusters encrypt their Ray traffic.
+    highlights:
+      - "Remote providers' API keys are stored encrypted, and `faden secrets rotate` changes the keys that seal stored data."
+      - "Signing out ends that sign-in, and a password change ends all of them."
+      - "An MCP tool call is refused when its personal-data check cannot run."
+      - "Operators can no longer switch on remote code or other code-running engine settings, and an agent's tool limit holds when a tool runs."
+      - "Chat attachments and, with a data folder, the knowledge base's files are copied and verified on upgrade; a conflict stops the upgrade instead of overwriting."
+      - "New clusters encrypt their Ray traffic (Ray TLS) from the start."
+      - "After an upgrade that changes a runtime's mounts, a cluster keeps serving and offers the new settings as Apply and restart."
+      - "New machines install only the agent build this release pins, checked by its SHA-256."
+      - "Docker's logs rotate, Redis has a memory cap, and backups and restores need no image from the internet."
+      - "The DGX Spark runtime is built on vLLM's own image and mounts the machine's own model store and Hugging Face cache; the console runs on Node.js 24 LTS."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.10
   - version: 0.4.4rc2
     channel: preview
-    date: ""
+    date: "2026-10-12"
     severity: security
     summary: >-
       Release candidate 2: on a DGX Spark the runtime mounts the machine's own model store again, and a cluster
@@ -40,7 +61,7 @@ releases:
       agent: 0.2.9
   - version: 0.4.4rc1
     channel: preview
-    date: ""
+    date: "2026-10-12"
     severity: security
     summary: >-
       Security and reliability: provider keys are encrypted, sign-ins end on logout, MCP's personal-data check
@@ -59,7 +80,7 @@ releases:
       agent: 0.2.9
   - version: 0.4.3
     channel: stable
-    date: ""
+    date: "2026-10-11"
     severity: normal
     summary: >-
       The machines' runtime images come with the release, a model a machine already holds is used where it is,
