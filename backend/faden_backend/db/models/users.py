@@ -334,7 +334,8 @@ class SignInStrategy(JWTStrategy):
 
         Refused: a sign-in from before sign-ins expired (no ``iat``) or could end (no ``jti``), one that
         was ended with the account's others, and one that was logged out. An API token (``typ`` ``api``)
-        has its own row and revoke, and stays out of both.
+        has its own row and revoke, and stays out of both; it carries no console audience and fails the
+        decode above, so this is a second guard should that change.
         """
         if token is None:
             return None
