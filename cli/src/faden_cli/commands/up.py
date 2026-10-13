@@ -6,7 +6,7 @@ import sys
 
 import click
 
-from faden_cli.core.compose import build_context_from_config, up as compose_up
+from faden_cli.core.compose import build_context_from_config, report_inactive_modules, up as compose_up
 from faden_cli.core.console import console, success, error
 from faden_cli.core.env_gen import write_env_file, default_env_vars
 from faden_cli.core.settings import load_config
@@ -65,6 +65,9 @@ def up_cmd(
 
     if returncode == 0:
         success("Services started successfully.")
+        # Only when everything was started: naming services is a partial start.
+        if not services:
+            report_inactive_modules(ctx)
     else:
         error(f"docker compose up exited with code {returncode}.")
         sys.exit(returncode)

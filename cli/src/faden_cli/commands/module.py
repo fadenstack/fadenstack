@@ -108,6 +108,7 @@ def module_disable(modules: tuple[str, ...]) -> None:
     save_config(cfg)
     _write_env(cfg, enable=[], disable=disabled)
     console.print(
-        "\n[dim]Run [bold]faden down && faden up[/bold] to apply changes "
+        "\n[dim]Run [bold]faden up[/bold] to apply changes: it stops and removes the containers "
+        "of a disabled module and keeps its data "
         "(or [bold]faden dev up[/bold] in a dev workspace).[/dim]",
     )
