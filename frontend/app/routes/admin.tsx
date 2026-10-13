@@ -46,6 +46,7 @@ import { GettingStartedDialog } from "~/components/guides/GettingStarted";
 import { GuidesContext, announceGuidesChanged, type GuidesControl } from "~/lib/guidesContext";
 import { guideProgressKeys } from "~/lib/guides";
 import { preferences as preferencesApi } from "~/api/preferences";
+import { applyUserLanguage } from "~/lib/userLanguage";
 import { setDashboardQueryOwner } from "~/lib/dashboardQuery";
 
 let meAccessInFlight: ReturnType<typeof adminUsers.meAccess> | null = null;
@@ -151,6 +152,8 @@ function AdminLayoutInner() {
         return;
       }
       applyAccessState(access);
+      // The language the user picked in an agent or on another device.
+      void applyUserLanguage();
     } catch {
       clearCachedAccess();
       navigate(

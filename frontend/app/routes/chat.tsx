@@ -11,6 +11,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { auth, type AuthUser } from "~/api/auth";
 import { accessKeys, adminUsers } from "~/api/admin";
 import { servicesApi } from "~/api/services";
+import { applyUserLanguage } from "~/lib/userLanguage";
 
 export default function ChatLayout() {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ export default function ChatLayout() {
         const u = await auth.me();
         if (cancelled) return;
         setUser(u);
+        // The language the user picked in an agent or on another device.
+        void applyUserLanguage(["common", "chat"]);
 
         // Module check — fetch services directly (no context dependency)
         try {

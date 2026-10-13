@@ -68,9 +68,23 @@ SELECT u.is_active, u.is_superuser,
                                   UNION
                                   SELECT gr.role_id FROM group_roles gr
                                   JOIN user_groups ug ON ug.group_id = gr.group_id
-                                  WHERE ug.user_id = u.id)) AS chat_permissions
+                                  WHERE ug.user_id = u.id)) AS chat_permissions,
+       (SELECT up.preferences->>'language' FROM user_preference up WHERE up.user_id = u.id) AS language
 FROM "user" u
 WHERE u.id = $1::uuid
+"""
+
+#: The user's language in their preferences (the console's too): set, or removed for ``None``. Only this key
+#: is touched; the row is made when the user has none yet.
+_SAVE_LANGUAGE_SQL = """
+INSERT INTO user_preference (id, user_id, preferences, created_at, updated_at)
+VALUES (gen_random_uuid(), $1::uuid,
+        CASE WHEN $2::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('language', $2::text) END,
+        now(), now())
+ON CONFLICT (user_id) DO UPDATE
+SET preferences = CASE WHEN $2::text IS NULL THEN user_preference.preferences - 'language'
+                       ELSE user_preference.preferences || jsonb_build_object('language', $2::text) END,
+    updated_at = now()
 """
 
 #: A query, not a secret; S105 only sees "TOKEN" in the name.
@@ -171,6 +185,9 @@ class UserFlags:
     #: Epoch seconds: console sign-ins made before it are over (password change, suspension, a role taken
     #: away); ``None``: none were ended that way.
     sessions_valid_after: float | None = None
+    #: The language the user picked for every client (a BCP 47 tag, from their preferences); ``None``: each
+    #: client follows its host's.
+    language: str | None = None
 
 
 @dataclass(frozen=True)
@@ -285,7 +302,16 @@ class BackendAgents:
             bool(row["is_superuser"]),
             frozenset(row["chat_permissions"] or ()),
             float(valid_after) if valid_after is not None else None,
+            row["language"] or None,
         )
+
+    async def save_language(self, user_id: str, language: str | None) -> None:
+        """Keeps the language the user picked in a client in their preferences, for all clients."""
+        try:
+            pool = await self._get_pool()
+            await pool.execute(_SAVE_LANGUAGE_SQL, user_id, language, timeout=self._timeout)
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
 
     async def sign_in_revoked(self, jti: str) -> bool:
         """Whether a logout ended the console sign-in with this ``jti``."""
@@ -339,6 +365,7 @@ class AgentDirectory:
         fetch_user: Callable[[str], Awaitable[UserFlags | None]],
         fetch_api_token: Callable[[str], Awaitable[ApiTokenRecord | None]] | None = None,
         fetch_sign_in_revoked: Callable[[str], Awaitable[bool]] | None = None,
+        save_language: Callable[[str, str | None], Awaitable[None]] | None = None,
         ttl_sec: float = 60.0,
         api_token_ttl_sec: float = 30.0,
         close: Callable[[], Awaitable[None]] | None = None,
@@ -354,6 +381,15 @@ class AgentDirectory:
             TtlCache(fetch_sign_in_revoked, ttl_sec=api_token_ttl_sec) if fetch_sign_in_revoked is not None else None
         )
         self._close = close
+        self._save_language = save_language
+
+    async def set_language(self, user_id: str, language: str | None) -> bool:
+        """Keeps the user's language (``False`` when it cannot be kept here); their next read sees it."""
+        if self._save_language is None:
+            return False
+        await self._save_language(user_id, language)
+        self._users.forget(user_id)
+        return True
 
     async def sign_in_revoked(self, jti: str) -> bool:
         """Whether a logout ended the console sign-in with this ``jti`` (``False`` when it cannot be asked)."""
@@ -409,6 +445,7 @@ def build_agent_directory(settings: object) -> AgentDirectory | None:
         fetch_user=backend.user,
         fetch_api_token=backend.api_token,
         fetch_sign_in_revoked=backend.sign_in_revoked,
+        save_language=backend.save_language,
         close=backend.close,
     )
 

@@ -1,8 +1,9 @@
-"""User preferences endpoints — profile selection and tour progress."""
+"""User preferences endpoints — profile selection, tour progress and the user's language."""
 
 from __future__ import annotations
 
 import copy
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,6 +33,23 @@ async def _get_or_create(session: AsyncSession, user_id) -> UserPreference:
     session.add(pref)
     await session.flush()
     return pref
+
+
+#: The language the user picked, for the console and every agent of theirs (the gateway serves it to SDKs).
+LANGUAGE_KEY = "language"
+
+#: A BCP 47 language tag, as the console and the SDKs write them: "de", "de-AT", "zh-Hans".
+_LANGUAGE_TAG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8}){0,3}$")
+
+
+def _language_error(patch: dict) -> str | None:
+    """Why the language in *patch* cannot be kept; ``None`` when it can, is removed, or is not there."""
+    if LANGUAGE_KEY not in patch or patch[LANGUAGE_KEY] is None:
+        return None
+    value = patch[LANGUAGE_KEY]
+    if isinstance(value, str) and _LANGUAGE_TAG.match(value):
+        return None
+    return "language must be a language tag such as de, de-AT or zh-Hans, or null."
 
 
 def _deep_merge(base: dict, patch: dict) -> dict:
@@ -81,6 +99,9 @@ async def update_preferences(
             status_code=422,
             detail="The dashboard layout is saved through /api/admin/dashboard/layout.",
         )
+    language_error = _language_error(payload.preferences)
+    if language_error is not None:
+        raise HTTPException(status_code=422, detail=language_error)
     pref = await _get_or_create(session, user.id)
     pref.preferences = _deep_merge(pref.preferences, payload.preferences)
     await session.commit()

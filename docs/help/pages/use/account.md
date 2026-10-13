@@ -40,8 +40,10 @@ If your organisation's server sends e-mail, a link to set a new password arrives
 
 | To change | Use |
 |---|---|
-| **Language** | The button with the translation symbol in the top bar. English, German, Spanish, French and Chinese are available. The choice changes the console's labels, not the language the model answers in, and is kept in this browser. |
+| **Language** | The button with the translation symbol in the top bar. English, German, Spanish, French and Chinese are available. The choice changes the console's labels, not the language the model answers in. It is kept for your account: the console on your other computers, the browser agent and the Office add-ins follow it. |
 | **Light or dark** | The sun or moon button in the top bar. |
+
+A language you pick in the settings of the browser agent or an Office add-in is kept the same way, so the console follows it too. In those panels, **Automatic** goes back to the language of the browser or of Office. If your organisation set a language, the panels show it with **Set by your organisation** and you cannot change it there.
 
 ## How long a sign-in lasts
 

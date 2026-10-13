@@ -61,7 +61,7 @@ export default function ChatPage() {
   const agentsAllowed = agentRights(can).open;
   const skillsModule = useSkillsModule();
   const navigate = useNavigate();
-  const { t } = useTranslation("chat");
+  const { t, i18n } = useTranslation("chat");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
@@ -73,7 +73,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [languages, setLanguages] = useState<UiLanguage[]>([]);
-  const [language, setLanguage] = useState<string>("en");
+  const [language, setLanguage] = useState<string>(i18n.resolvedLanguage || i18n.language || "en");
   const [profileOpen, setProfileOpen] = useState(false);
   const [toolDrawerOpen, setToolDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState(0);
@@ -270,6 +270,13 @@ export default function ChatPage() {
   const handleLanguageChange = useCallback((code: string) => {
     setLanguage(code);
   }, []);
+
+  // The menu shows the language the console is in, also when it follows the user's saved one.
+  useEffect(() => {
+    const follow = (code: string) => setLanguage(code);
+    i18n.on("languageChanged", follow);
+    return () => i18n.off("languageChanged", follow);
+  }, [i18n]);
 
   const handleSessionUpdated = useCallback((updated: ChatSession) => {
     setSessions((prev) => withSession(prev, updated));
