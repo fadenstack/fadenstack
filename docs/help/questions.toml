@@ -37,11 +37,13 @@
 "Can the assistant read or summarise a web page or PDF?" = "ask-about-a-page"
 "What does the browser agent ask before it acts?" = "what-it-asks-first"
 "Which browser permissions does it need?" = "permissions-it-asks-for"
+"How do I change the language of the browser panel?" = "language-and-settings"
 
 ["use/office-add-ins.md"]
 "How do I use the assistant in Word, Excel, PowerPoint or Outlook?" = "open-the-agent-and-sign-in"
 "What can it do in each Office application?" = "what-it-can-do-in-each-application"
 "Where does my data from Office go?" = "where-your-data-goes"
+"How do I change the language of the Office pane?" = "language-and-settings"
 
 ["use/privacy.md"]
 "Who can see my chats?" = "who-can-see-what"

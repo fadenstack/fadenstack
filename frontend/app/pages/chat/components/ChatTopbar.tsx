@@ -31,7 +31,7 @@ import { useNavigate } from "react-router";
 import type { UiLanguage } from "~/api/i18n";
 import { NavLogoButton } from "~/components/NavLogoButton";
 import { UserMenuButton } from "~/components/UserMenuButton";
-import i18n from "~/i18n";
+import { pickLanguage } from "~/lib/userLanguage";
 import { useThemeMode } from "~/theme-mode";
 import { useChatShell } from "../ChatShellContext";
 
@@ -127,9 +127,7 @@ export default function ChatTopbar({
               selected={language === lang.code}
               onClick={() => {
                 onLanguageChange(lang.code);
-                void i18n
-                  .reloadResources([lang.code], ["common", "chat"])
-                  .then(() => i18n.changeLanguage(lang.code));
+                pickLanguage(lang.code, ["common", "chat"]);
                 setLangMenuAnchor(null);
               }}
             >

@@ -1,8 +1,8 @@
-"""User preferences merge: nested keys merge, and ``None`` removes a key (how guides are reset)."""
+"""User preferences merge: nested keys merge, ``None`` removes a key (how guides are reset), a language is a tag."""
 
 from __future__ import annotations
 
-from faden_backend.web.api.admin.users.preferences import _deep_merge
+from faden_backend.web.api.admin.users.preferences import _deep_merge, _language_error
 
 
 def test_nested_keys_merge() -> None:
@@ -21,3 +21,10 @@ def test_none_removes_a_key_at_any_depth() -> None:
 
 def test_removing_a_missing_key_is_harmless() -> None:
     assert _deep_merge({}, {"getting_started": None}) == {}
+
+
+def test_only_a_language_tag_is_kept_as_the_language() -> None:
+    for kept in ({"language": "de"}, {"language": "de-AT"}, {"language": "zh-Hans"}, {"language": None}, {"profile": "x"}):
+        assert _language_error(kept) is None, kept
+    for refused in ({"language": "Deutsch"}, {"language": "de_DE"}, {"language": ""}, {"language": 7}, {"language": {}}):
+        assert _language_error(refused) is not None, refused

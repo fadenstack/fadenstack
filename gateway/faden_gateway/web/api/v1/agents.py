@@ -309,6 +309,28 @@ async def agent_images(
     return await serve_images(request, auth=auth, service=service, agent=agent)
 
 
+#: A BCP 47 language tag, as the SDKs and the console write them: "de", "de-AT", "zh-Hans".
+_LANGUAGE_TAG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8}){0,3}$")
+
+
+async def _user_language(request: Request, user_id: str) -> str | None:
+    """The language the user picked for every client; ``None``: none picked, or it cannot be read now."""
+    try:
+        user = await request.app.state.agent_directory.user(user_id)
+    except AgentLookupError:
+        return None
+    return user.language if user is not None else None
+
+
+class UserSettings(BaseModel):
+    """What a client may change about its user: what every client of theirs shares."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: The language the user picked in a client's settings; ``None``: each client follows its host's.
+    language: str | None = Field(default=None, max_length=35)
+
+
 @router.get("/v1/agents/{agent}/profile")
 async def agent_profile(
     request: Request,
@@ -318,6 +340,7 @@ async def agent_profile(
     """What the SDK caches about the agent: never its instructions, only their hash."""
     auth, agent = caller
     profile = agent.agent
+    language = await _user_language(request, auth.user_id)
     tenant_policy = await dao.get_tenant_policy(auth.tenant_id)
     tenant_allows = bool(getattr(tenant_policy, "allow_mode_override", False)) if tenant_policy else False
     groups: tuple[str, ...] = ()
@@ -365,6 +388,8 @@ async def agent_profile(
             ),
         },
         "ui": profile.ui,
+        # The signed-in user's own settings every client shares: the language they picked (or ``None``).
+        "user": {"language": language},
         "extensions": profile.extensions,
         "required_client_modules": registry.client_modules(profile.extensions),
         "edition": registry.edition,
@@ -494,6 +519,53 @@ async def agent_events(
     ])
     await dao.session.commit()
     return JSONResponse({"accepted": len(batch.events)}, status_code=status.HTTP_202_ACCEPTED)
+
+
+# -- the user's settings ---------------------------------------------------------------
+
+
+@router.patch("/v1/agents/{agent}/user", response_model=None)
+async def agent_user(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+) -> Response:
+    """Keep the user's own settings that every client shares: the language they picked in a panel's settings.
+
+    The user's, from their own token: it goes into their preferences, where the console keeps its language
+    too. ``{"language": null}`` forgets it (each client follows its host's again); a body without it changes
+    nothing.
+    """
+    auth, _agent = caller
+    try:
+        update = UserSettings.model_validate_json(await request.body() or b"{}")
+    except ValidationError as exc:
+        return error_response(
+            status_code=400,
+            message=str(exc),
+            error_type="invalid_request_error",
+            code="invalid_user_settings",
+        )
+    directory = request.app.state.agent_directory
+    if "language" in update.model_fields_set:
+        if update.language is not None and not _LANGUAGE_TAG.match(update.language):
+            return error_response(
+                status_code=400,
+                message="language must be a language tag such as de, de-AT or zh-Hans, or null.",
+                error_type="invalid_request_error",
+                code="invalid_language",
+            )
+        try:
+            kept = await directory.set_language(auth.user_id, update.language)
+        except AgentLookupError:
+            kept = False
+        if not kept:
+            return error_response(
+                status_code=503,
+                message="The language could not be kept right now; it still holds on this device.",
+                error_type="server_error",
+                code="user_settings_unavailable",
+            )
+    return JSONResponse({"object": "agent.user", "language": await _user_language(request, auth.user_id)})
 
 
 # -- what the app brings --------------------------------------------------------------

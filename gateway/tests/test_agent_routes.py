@@ -11,6 +11,7 @@ and conversation -- nothing of the conversation itself is kept.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import time
 import uuid
@@ -108,6 +109,7 @@ class _Backend:
         }
         self.groups: dict[str, tuple[str, ...]] = {}
         self.agent_reads = 0
+        self.user_reads = 0
         self.fail = False
 
     def put(self, profile: AgentProfile) -> None:
@@ -121,7 +123,13 @@ class _Backend:
         return profile if profile is not None and profile.tenant_id == key[0] else None
 
     async def user(self, user_id: str) -> UserFlags | None:
+        self.user_reads += 1
         return self.users.get(user_id)
+
+    async def save_language(self, user_id: str, language: str | None) -> None:
+        if self.fail:
+            raise AgentLookupError("backend database down")
+        self.users[user_id] = dataclasses.replace(self.users[user_id], language=language)
 
     async def memberships(self, user_id: str) -> tuple[str, ...]:
         return self.groups.get(user_id, ())
@@ -131,7 +139,9 @@ class _Backend:
 def backend(fastapi_app: FastAPI) -> _Backend:
     fake = _Backend()
     fake.put(_profile())
-    fastapi_app.state.agent_directory = AgentDirectory(fetch_agent=fake.agent, fetch_user=fake.user)
+    fastapi_app.state.agent_directory = AgentDirectory(
+        fetch_agent=fake.agent, fetch_user=fake.user, save_language=fake.save_language,
+    )
     fastapi_app.state.group_membership_resolver = UsageGroupResolver(fake.memberships, ttl_sec=60.0)
     fastapi_app.state.gateway_observability = _Observability()
     return fake
@@ -836,6 +846,53 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["local_mcp"] == {"mode": "disable", "developer_mode": True}
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
+    assert profile["user"] == {"language": None}
+
+
+# -- the user's settings ------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_language_picked_in_one_client_is_in_every_profile(client: AsyncClient, backend: _Backend) -> None:
+    r = await client.patch("/v1/agents/eplan-assistant/user", headers=_headers(), json={"language": "de-AT"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"object": "agent.user", "language": "de-AT"}
+    # Kept for the user, not the agent or the device: another agent's profile has it at once (no stale cache).
+    other = str(uuid.uuid4())
+    backend.put(_profile(slug="other-agent", id=other))
+    r = await client.get("/v1/agents/other-agent/profile", headers=_headers(_agent_token(other)))
+    assert r.status_code == 200, r.text
+    assert r.json()["user"] == {"language": "de-AT"}
+
+
+@pytest.mark.anyio
+async def test_a_null_language_forgets_it_and_an_empty_body_changes_nothing(
+    client: AsyncClient, backend: _Backend,
+) -> None:
+    backend.users[USER] = dataclasses.replace(backend.users[USER], language="fr")
+    r = await client.patch("/v1/agents/eplan-assistant/user", headers=_headers(), json={})
+    assert r.status_code == 200 and r.json()["language"] == "fr"
+    r = await client.patch("/v1/agents/eplan-assistant/user", headers=_headers(), json={"language": None})
+    assert r.status_code == 200 and r.json()["language"] is None
+    assert backend.users[USER].language is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("body", [
+    {"language": "Deutsch"}, {"language": "de_DE"}, {"language": "<script>"}, {"language": 7}, {"theme": "dark"},
+])
+async def test_only_a_language_tag_is_kept(client: AsyncClient, backend: _Backend, body: dict[str, Any]) -> None:
+    r = await client.patch("/v1/agents/eplan-assistant/user", headers=_headers(), json=body)
+    assert r.status_code == 400, r.text
+    assert backend.users[USER].language is None
+
+
+@pytest.mark.anyio
+async def test_a_language_that_cannot_be_kept_says_so(client: AsyncClient, backend: _Backend) -> None:
+    backend.fail = True
+    r = await client.patch("/v1/agents/eplan-assistant/user", headers=_headers(), json={"language": "de"})
+    assert r.status_code == 503
+    assert r.json()["error"]["code"] in {"user_settings_unavailable", "agent_lookup_failed"}
 
 
 @pytest.mark.anyio

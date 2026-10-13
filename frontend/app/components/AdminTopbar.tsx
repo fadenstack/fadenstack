@@ -39,6 +39,7 @@ import AgentAvatar from "~/components/AgentAvatar";
 import { NavLogoButton } from "~/components/NavLogoButton";
 import { UserMenuButton } from "~/components/UserMenuButton";
 import { helpUrl } from "~/lib/pageHelp";
+import { pickLanguage } from "~/lib/userLanguage";
 
 export interface AdminTopbarProps {
   mode: "light" | "dark";
@@ -226,9 +227,7 @@ export function AdminTopbar({
               selected={language === lang.code}
               onClick={() => {
                 onLanguageChange(lang.code);
-                void i18n
-                  .reloadResources([lang.code], ["common"])
-                  .then(() => i18n.changeLanguage(lang.code));
+                pickLanguage(lang.code);
                 onLanguageMenuClose();
               }}
             >

@@ -24,6 +24,12 @@ Wenn Ihre IT-Abteilung Server und Agent für Sie eingestellt hat, melden Sie sic
     - **Server**: Ihr Fadenstack-Server, z. B. `https://ai.example.internal`.
     - **Agent**: seine Adresse, wie die Konsole sie unter **Agenten** zeigt; `browser-assistant`, sofern man Ihnen nichts anderes gesagt hat.
 
+## Sprache und Einstellungen {#language-and-settings}
+
+Die Seitenleiste zeigt sich in der Sprache Ihres Browsers. Um eine andere zu wählen, wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**) und dann unter **Sprache** eine Sprache: Die ganze Seitenleiste wechselt sofort, auch die Unterhaltung. **Automatisch** kehrt zur Sprache des Browsers zurück. Die Sprache wird für Ihr Konto gespeichert, sodass die Konsole und die Office-Add-ins ihr folgen, auf diesem und auf Ihren anderen Computern. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Einstellungen sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie nicht ändern.
+
+Unter den Sprachen zeigen die **Einstellungen**, welchen Agenten Sie auf welchem Server nutzen, mit **Sign out on this device** und **Change server or agent**. Die eigenen Texte der Seitenleiste, etwa die Anmeldung und diese beiden Einträge, sind vorerst auf Englisch.
+
 ## Fragen zu einer Seite stellen {#ask-about-a-page}
 
 Geben Sie Ihre Frage in der Seitenleiste ein, z. B. „Fasse diese Seite zusammen“ oder „Was sagt dieser Vertrag über Kündigungsfristen?“. Die Leiste über dem Nachrichtenfeld nennt die Seite, mit der der Agent arbeitet.
@@ -89,7 +95,7 @@ Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffne
 - Was Sie fragen und was der Agent liest, um zu antworten (die Seite, Tabs, PDF-Seiten), geht an den Server Ihrer Organisation und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
 - PDFs werden in Ihrem Browser gelesen.
 - Ihre Unterhaltungen bleiben in diesem Browser. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
-- Ihre Anmeldung wird in diesem Browser gespeichert und ist dort nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie das Fadenstack-Logo oben in der Seitenleiste, dann **Sign out on this device**.
+- Ihre Anmeldung wird in diesem Browser gespeichert und ist dort nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**), dann **Sign out on this device**.
 
 Mehr dazu, was gespeichert wird und wer es sieht: [Ihre Daten und Datenschutz](privacy.md).
 

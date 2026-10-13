@@ -102,6 +102,9 @@ Konsole brauchen sie nicht.
 { "serverUrl": "https://ai.example.internal", "agent": "browser-assistant" }
 ```
 
+Mit `"language": "de"` legen Sie die Sprache der Seitenleiste für alle fest; ohne wählt jede Person sie in den
+Einstellungen der Seitenleiste, und **Automatisch** ist die Sprache des Browsers.
+
 Chrome nutzt den Zertifikatspeicher des Betriebssystems: Die Computer müssen dem Zertifikat des Servers
 vertrauen (siehe [HTTPS und Vertrauen](../operate/https.md)).
 
@@ -122,6 +125,11 @@ Add-ins nicht aus. Die IT gibt Server und Agenten in der Computerrichtlinie
   "trustedCaCertificate": null
 }
 ```
+
+Mit `"language": "de"` legen Sie die Sprache der Bereiche für alle fest; ohne wählt jede Person sie in den
+Einstellungen des Bereichs, und **Automatisch** ist die Anzeigesprache von Office. Die Add-ins bringen Englisch,
+Deutsch, Französisch, Spanisch und vereinfachtes Chinesisch mit: Verteilen Sie die Ordner `de`, `fr`, `es` und
+`zh-Hans` neben dem Add-in, sonst bleiben die Bereiche auf Englisch.
 
 Eine Anmeldung gilt für alle Office-Add-ins auf einem Computer.
 

@@ -24,6 +24,12 @@ If your IT department set the server and agent, you only sign in.
     - **Server**: your Fadenstack server, for example `https://ai.example.internal`.
     - **Agent**: its address, as the console shows it under **Agents**; `browser-assistant` unless you were told otherwise.
 
+## Language and settings
+
+The panel shows itself in your browser's language. To pick another, select the gear (**Settings**) at the top of the panel, then a language under **Language**: the whole panel changes at once, the conversation too. **Automatic** goes back to the browser's language. The language is kept for your account, so the console and the Office add-ins follow it, on this and your other computers. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it.
+
+Below the languages, **Settings** shows which agent you use on which server, with **Sign out on this device** and **Change server or agent**. The panel's own words, such as the sign-in and these two items, are in English for now.
+
 ## Ask about a page
 
 Type your question in the panel, for example "Summarise this page" or "What does this contract say about notice periods?". The bar above the message box names the page the agent works with.
@@ -89,7 +95,7 @@ At installation, Chrome lets the extension open its side panel, keep its setting
 - What you ask, and what the agent reads to answer (the page, tabs, PDF pages), goes to your organisation's server and to the model your administrator chose for the agent.
 - PDFs are read inside your browser.
 - Your conversations stay in this browser. The server records which tools ran and how long they took, not what they read.
-- Your sign-in is kept in this browser and is not encrypted there. On a computer others use, sign out when you are done: select the Fadenstack mark at the top of the panel, then **Sign out on this device**.
+- Your sign-in is kept in this browser and is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**.
 
 More on what is kept and who sees it: [Your data and privacy](privacy.md).
 

@@ -40,8 +40,10 @@ Wenn der Server Ihrer Organisation E-Mails versendet, erhalten Sie einen Link, m
 
 | Um zu ändern | Verwenden Sie |
 |---|---|
-| **Sprache** | Die Schaltfläche mit dem Übersetzungssymbol in der oberen Leiste. Verfügbar sind Englisch, Deutsch, Spanisch, Französisch und Chinesisch. Die Auswahl ändert die Beschriftungen der Konsole, nicht die Sprache, in der das Modell antwortet, und wird in diesem Browser gespeichert. |
+| **Sprache** | Die Schaltfläche mit dem Übersetzungssymbol in der oberen Leiste. Verfügbar sind Englisch, Deutsch, Spanisch, Französisch und Chinesisch. Die Auswahl ändert die Beschriftungen der Konsole, nicht die Sprache, in der das Modell antwortet. Sie wird für Ihr Konto gespeichert: Die Konsole auf Ihren anderen Computern, der Browser-Agent und die Office-Add-ins folgen ihr. |
 | **Hell oder dunkel** | Die Schaltfläche mit Sonne oder Mond in der oberen Leiste. |
+
+Eine Sprache, die Sie in den Einstellungen des Browser-Agenten oder eines Office-Add-ins wählen, wird genauso gespeichert, und die Konsole folgt ihr ebenfalls. In diesen Bereichen kehrt **Automatisch** zur Sprache des Browsers oder von Office zurück. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Bereiche sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie dort nicht ändern.
 
 ## Wie lange eine Anmeldung gilt {#how-long-a-sign-in-lasts}
 

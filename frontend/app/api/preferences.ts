@@ -1,6 +1,6 @@
 /**
- * User preferences API client — the dashboard's default profile, guide progress
- * and the getting-started list.
+ * User preferences API client — the dashboard's default profile, guide progress,
+ * the getting-started list and the user's language.
  *
  * Endpoints:
  *   GET   /api/admin/users/me/preferences
@@ -52,6 +52,11 @@ export interface UserPreferences {
   getting_started?: { dismissed?: boolean; chat_opened?: boolean } | null;
   /** The chat's first-run tips. */
   chat_tips?: { dismissed?: boolean } | null;
+  /**
+   * The language the user picked (a language tag such as "de" or "zh-Hans"), for the console and
+   * every agent of theirs; null forgets it.
+   */
+  language?: string | null;
 }
 
 export interface UserPreferencesResponse {
