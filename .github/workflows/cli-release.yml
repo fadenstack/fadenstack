@@ -102,6 +102,14 @@ jobs:
           set -euo pipefail
           pip install pyyaml cryptography packaging
           python release/update_feed.py build --version "${{ steps.version.outputs.version }}" --out "$RUNNER_TEMP/feed"
+          # The release's summary and highlights head its GitHub release (job publish).
+          python release/update_feed.py notes --version "${{ steps.version.outputs.version }}" --out release-notes.md
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: release-notes
+          path: release-notes.md
 
       # The install plan pins the agent's SHA-256 from this file. A release whose
       # pin is not the published agent would hand out a build every machine refuses.
@@ -178,10 +186,42 @@ jobs:
           name: python-dist
           path: dist
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+          path: notes
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist/
+
+      # What is new (from release/releases.yaml), then how to install it and the licences.
+      - name: The release's text
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          {
+            cat notes/release-notes.md
+            cat <<EOF
+
+          \`\`\`bash
+          pipx install fadenstack==${VERSION}
+          faden deploy
+          \`\`\`
+          Runs the images \`${REGISTRY}/*:${VERSION}\`.
+          Upgrading an install: install this CLI, then \`faden upgrade\`.
+
+          The wheel and standalone binaries are attached to this release; the
+          same version is on PyPI. Each binary's \`.THIRD-PARTY-NOTICES.txt\` carries
+          the licences of the packages, the Python, the native libraries (OpenSSL,
+          libffi, xz ...) and the bootloader inside it.
+
+          Fadenstack-authored source and deployment files in this release are
+          licensed under Apache-2.0. Third-party packages and images retain
+          their own terms; see LICENSE, NOTICE, and docs/help/pages/operate/third-party.md.
+          EOF
+          } > release-body.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -191,22 +231,7 @@ jobs:
           # A release candidate is a pre-release: /releases/latest and stable installs skip it.
           prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
           generate_release_notes: true
-          body: |
-            Fadenstack-authored source and deployment files in this release are
-            licensed under Apache-2.0. Third-party packages and images retain
-            their own terms; see LICENSE, NOTICE, and docs/help/pages/operate/third-party.md.
-
-            The wheel and standalone binaries are attached to this release; the
-            same version is on PyPI. Each binary's `.THIRD-PARTY-NOTICES.txt` carries
-            the licences of the packages, the Python, the native libraries (OpenSSL,
-            libffi, xz ...) and the bootloader inside it.
-
-            ```bash
-            pipx install fadenstack==${{ needs.build.outputs.version }}
-            faden deploy
-            ```
-            Runs the images `${{ env.REGISTRY }}/*:${{ needs.build.outputs.version }}`.
-            Upgrading an install: install this CLI, then `faden upgrade`.
+          body_path: release-body.md
           files: dist/*
 
   executables:

@@ -4,6 +4,7 @@
     UPDATE_FEED_SIGNING_KEY=... python release/update_feed.py sign dist/feed
     python release/update_feed.py verify dist/feed
     python release/update_feed.py keygen <folder>        # a new key pair, for a key change
+    python release/update_feed.py notes --version 0.4.2 --out notes.md   # the GitHub release's text
 
 ``build`` turns release/releases.yaml into ``index.json``; ``sign`` writes ``index.json.sig`` with
 the private key (raw Ed25519, base64: the secret UPDATE_FEED_SIGNING_KEY, or --key-file) and
@@ -145,6 +146,19 @@ def build(source: dict, *, version: str | None, agent: str | None, today: date) 
     return feed
 
 
+def notes(feed: dict, version: str) -> str:
+    """The top of the GitHub release's text for *version*: its summary and highlights, as the feed has them."""
+    wanted = release_feed.parse_version(version)
+    entry = next((r for r in feed["releases"] if release_feed.parse_version(r["version"]) == wanted), None)
+    if entry is None:
+        raise BuildError(f"release/releases.yaml has no entry for {version}")
+    lines = [entry["summary"], ""]
+    if entry["highlights"]:
+        lines += ["**What's new**", ""] + [f"- {h}" for h in entry["highlights"]] + [""]
+    lines.append(f"Release notes: {entry['notes_url']}")
+    return "\n".join(lines) + "\n"
+
+
 def sign(index: bytes, private_key_b64: str) -> dict:
     """The signature file for *index*, naming the trusted key the private key belongs to."""
     key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(private_key_b64.strip()))
@@ -174,6 +188,10 @@ def main(argv: list[str] | None = None) -> int:
     p_verify.add_argument("folder", type=Path)
     p_keygen = sub.add_parser("keygen", help="a new key pair (private.key, public.txt)")
     p_keygen.add_argument("folder", type=Path)
+    p_notes = sub.add_parser("notes", help="the release's summary and highlights, as Markdown for its GitHub release")
+    p_notes.add_argument("--version", required=True)
+    p_notes.add_argument("--out", type=Path, required=True)
+    p_notes.add_argument("--source", type=Path, default=RELEASES)
     args = parser.parse_args(argv)
 
     try:
@@ -197,6 +215,11 @@ def main(argv: list[str] | None = None) -> int:
             feed = release_feed.verify((args.folder / INDEX).read_bytes(), (args.folder / SIG).read_bytes())
             latest = release_feed.offered(feed, "stable")
             print(f"valid: {len(feed.releases)} releases, newest stable {latest[0].version if latest else '-'}")
+        elif args.cmd == "notes":
+            source = yaml.safe_load(args.source.read_text(encoding="utf-8")) or {}
+            feed = build(source, version=args.version, agent=None, today=datetime.now(UTC).date())
+            args.out.write_text(notes(feed, args.version), encoding="utf-8", newline="\n")
+            print(f"{args.out}: notes for {args.version}")
         elif args.cmd == "keygen":
             key = Ed25519PrivateKey.generate()
             raw = key.private_bytes(

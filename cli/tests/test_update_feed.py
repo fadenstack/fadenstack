@@ -41,6 +41,22 @@ def test_a_release_gets_its_notes_page_highlights_and_the_build_date() -> None:
     assert feed["channels"] == {"stable": "0.4.2", "preview": "0.4.2"}
 
 
+def test_the_github_release_text_has_the_summary_highlights_and_notes_page() -> None:
+    feed = update_feed.build(
+        {"releases": [entry("0.4.2", highlights=["One line.", "Another."]), entry("0.4.1")]},
+        version="0.4.2",
+        agent=None,
+        today=TODAY,
+    )
+    assert update_feed.notes(feed, "0.4.2") == (
+        "Fixes.\n\n**What's new**\n\n- One line.\n- Another.\n\n"
+        "Release notes: https://fadenstack.com/releases/#v0.4.2\n"
+    )
+    assert "What's new" not in update_feed.notes(feed, "0.4.1")
+    with pytest.raises(update_feed.BuildError, match=r"no entry for 0.4.9"):
+        update_feed.notes(feed, "0.4.9")
+
+
 def test_a_tag_without_an_entry_is_refused() -> None:
     with pytest.raises(update_feed.BuildError, match=r"no entry for 0.4.3"):
         update_feed.build({"releases": [entry("0.4.2")]}, version="0.4.3", agent=None, today=TODAY)
