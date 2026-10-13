@@ -97,6 +97,9 @@ sign in and cannot change them:
 { "serverUrl": "https://ai.example.internal", "agent": "browser-assistant" }
 ```
 
+Add `"language": "de"` to fix the panel's language for everyone; without it, each person picks one in the panel's
+settings, and **Automatic** is the browser's language.
+
 Chrome uses the operating system's certificate store: the computers must trust the server's certificate (see
 [HTTPS and trust](../operate/https.md)).
 
@@ -117,6 +120,11 @@ it sets, people cannot change:
   "trustedCaCertificate": null
 }
 ```
+
+Add `"language": "de"` to fix the panes' language for everyone; without it, each person picks one in the pane's
+settings, and **Automatic** is Office's display language. The add-ins bring English, German, French, Spanish and
+Simplified Chinese: deploy the `de`, `fr`, `es` and `zh-Hans` folders beside the add-in, or the panes stay
+in English.
 
 One sign-in serves all the Office add-ins on a computer.
 
