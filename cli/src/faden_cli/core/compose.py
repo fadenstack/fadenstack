@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from faden_cli.core.console import console, error, info
+from faden_cli.core.console import console, error, info, warning
 
 
 # ── GPU detection ─────────────────────────────────────────────────
@@ -280,6 +280,10 @@ def stop_inactive_modules(ctx: ComposeContext) -> list[tuple[str, list[str]]]:
     failed = stop(everything, services=names)
     failed = failed or _run(everything.base_cmd() + ["rm", "-f", *names], stream=True).returncode
     if failed:
+        # Not fatal for the command that called it: the active services run. Said, so it is not missed.
+        containers = ", ".join(sorted(present.values()))
+        warning(f"The containers of switched-off modules could not be stopped and removed: {containers}. "
+                f"Run `faden up` again, or remove them with `docker rm -f {' '.join(sorted(present.values()))}`.")
         return []
     cleaned: dict[str, list[str]] = {}
     for service, container in sorted(present.items()):

@@ -114,3 +114,18 @@ def test_up_with_named_services_does_not_stop_modules(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(compose, "stop_inactive_modules", boom)
     assert CliRunner().invoke(up_command.up_cmd, ["backend"]).exit_code == 0
+
+
+def test_a_failed_stop_is_said_not_swallowed(fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    f = fake(["postgres", "faden-pii"])
+    real = f.run
+
+    def failing(cmd: list[str], **kw):
+        done = real(cmd, **kw)
+        return subprocess.CompletedProcess(cmd, 1, "", "boom") if "stop" in cmd else done
+
+    monkeypatch.setattr(compose, "_run", failing)
+    said: list[str] = []
+    monkeypatch.setattr(compose, "warning", said.append)
+    assert compose.stop_inactive_modules(ComposeContext(profiles=[])) == []
+    assert len(said) == 1 and "faden-pii" in said[0] and "docker rm -f faden-pii" in said[0]
