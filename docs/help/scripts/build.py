@@ -90,6 +90,10 @@ def _title_admonitions(docs: Path, lang: str) -> None:
         if titled != text:
             page.write_text(titled, encoding="utf-8")
 
+#: The IndexNow key of the Fadenstack sites (public by design): the public Help serves it at /<key>.txt, so
+#: search engines accept its pages when a deploy submits them (fadenstack.com repository, deploy/indexnow.mjs).
+INDEXNOW_KEY = "c60415486c9a45d5b65688c12bff17ba"
+
 #: Where each target's Help lives, and its other links.
 TARGETS: dict[str, dict[str, object]] = {
     "public": {"base": "https://help.fadenstack.com/", "site_url": True, "instant": True, "home": "https://fadenstack.com/"},
@@ -340,6 +344,7 @@ def main() -> int:
             base = TARGETS["public"]["base"]
             maps = "".join(f"Sitemap: {base}{LANGS[lang]['prefix']}sitemap.xml\n" for lang in langs)
             (site / "robots.txt").write_text("User-agent: *\nAllow: /\n\n" + maps, encoding="utf-8", newline="\n")
+            (site / f"{INDEXNOW_KEY}.txt").write_text(INDEXNOW_KEY, encoding="utf-8", newline="\n")
         print(f"built {site}")
     return 0
 
