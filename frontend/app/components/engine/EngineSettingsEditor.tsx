@@ -16,7 +16,7 @@
  * cluster deployment and a legacy container runtime: the adapters in
  * `~/lib/engine` store it either way.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import Accordion from "@mui/material/Accordion";
@@ -47,6 +47,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchIcon from "@mui/icons-material/Search";
 
+import { auth } from "~/api/auth";
 import {
   CATALOG,
   PRESETS,
@@ -63,6 +64,7 @@ import {
   type FlagDef,
   type HardwareFacts,
   type ModelFacts,
+  isSuperuserOnly,
   type PresetId,
 } from "~/lib/engine";
 
@@ -81,6 +83,8 @@ export interface EngineSettingsEditorProps {
   hardware?: HardwareFacts;
   suggested?: EngineSuggestion;
   disabled?: boolean;
+  /** Whether the user may set what only a superuser may; looked up when not given. */
+  isSuperuser?: boolean;
 }
 
 /** The memory share a cluster uses when none is chosen (the compiler's default). */
@@ -108,8 +112,24 @@ export function EngineSettingsEditor({
   hardware,
   suggested,
   disabled = false,
+  isSuperuser,
 }: EngineSettingsEditorProps) {
   const { t } = useTranslation();
+  // Unknown counts as not a superuser: the setting stays locked until the answer is in.
+  const [fetchedSuperuser, setFetchedSuperuser] = useState(false);
+  useEffect(() => {
+    if (isSuperuser !== undefined) return;
+    let live = true;
+    auth.me().then(
+      (u) => live && setFetchedSuperuser(u.is_superuser),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [isSuperuser]);
+  const superuser = isSuperuser ?? fetchedSuperuser;
+  const locked = (key: string) => !superuser && isSuperuserOnly(key);
   const [preset, setPreset] = useState<PresetId | null>(null);
   const [search, setSearch] = useState("");
   const [onlyChanged, setOnlyChanged] = useState(true);
@@ -510,9 +530,10 @@ export function EngineSettingsEditor({
             <Row
               label={t("engine.remote.label")}
               help={model?.needsRemoteCode ? t("engine.remote.help_needed") : t("engine.remote.help")}
+              note={locked("trust_remote_code") ? t("engine.admin_only") : undefined}
             >
               <Switch
-                disabled={disabled}
+                disabled={disabled || locked("trust_remote_code")}
                 color="warning"
                 checked={value.trust_remote_code === true}
                 onChange={(_, on) => set("trust_remote_code", on ? true : undefined)}
@@ -540,6 +561,7 @@ export function EngineSettingsEditor({
             onOnlyChanged={setOnlyChanged}
             onSet={set}
             disabled={disabled}
+            locked={locked}
           />
           <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
@@ -636,10 +658,12 @@ function Row({
   label,
   help,
   chip,
+  note,
   children,
 }: {
   label: string;
   help?: string;
+  note?: string;
   chip?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -655,6 +679,11 @@ function Row({
       {help && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5, lineHeight: 1.35 }}>
           {help}
+        </Typography>
+      )}
+      {note && (
+        <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5, lineHeight: 1.35 }}>
+          {note}
         </Typography>
       )}
     </Box>
@@ -709,6 +738,7 @@ function AllFlags({
   onOnlyChanged,
   onSet,
   disabled,
+  locked,
 }: {
   value: EngineConfig;
   target: EngineTarget;
@@ -718,6 +748,7 @@ function AllFlags({
   onOnlyChanged: (v: boolean) => void;
   onSet: (key: string, v: EngineValue | undefined) => void;
   disabled?: boolean;
+  locked: (key: string) => boolean;
 }) {
   const { t } = useTranslation();
   const q = search.trim().toLowerCase();
@@ -757,7 +788,7 @@ function AllFlags({
         </Typography>
       )}
       {shown.slice(0, 80).map((def) => (
-        <FlagRow key={def.key} def={def} value={value[def.key]} onSet={onSet} disabled={disabled} />
+        <FlagRow key={def.key} def={def} value={value[def.key]} onSet={onSet} disabled={disabled} locked={locked(def.key)} />
       ))}
       {shown.length > 80 && (
         <Typography variant="caption" color="text.secondary">
@@ -772,14 +803,17 @@ function FlagRow({
   def,
   value,
   onSet,
-  disabled,
+  disabled: disabledProp,
+  locked,
 }: {
   def: FlagDef;
   value: EngineValue | undefined;
   onSet: (key: string, v: EngineValue | undefined) => void;
   disabled?: boolean;
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
+  const disabled = disabledProp || locked;
   const defaultText = def.default !== undefined ? String(def.default) : t("engine.auto");
   let control: React.ReactNode;
   if (def.type === "boolean") {
@@ -868,6 +902,11 @@ function FlagRow({
         {def.help && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.35 }}>
             {def.help}
+          </Typography>
+        )}
+        {locked && (
+          <Typography variant="caption" color="warning.main" sx={{ display: "block", lineHeight: 1.35 }}>
+            {t("engine.admin_only")}
           </Typography>
         )}
       </Box>

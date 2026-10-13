@@ -12,7 +12,15 @@ const SUGGESTED: EngineSuggestion = {
   reasons: { tool_call_parser: "model_family", reasoning_parser: "model_family", max_model_len: "default_cap" },
 };
 
-function Harness({ initial = {} as EngineConfig, onValue }: { initial?: EngineConfig; onValue?: (v: EngineConfig) => void }) {
+function Harness({
+  initial = {} as EngineConfig,
+  onValue,
+  isSuperuser = true,
+}: {
+  initial?: EngineConfig;
+  onValue?: (v: EngineConfig) => void;
+  isSuperuser?: boolean;
+}) {
   const [value, setValue] = useState<EngineConfig>(initial);
   const [extra, setExtra] = useState("");
   return (
@@ -23,6 +31,7 @@ function Harness({ initial = {} as EngineConfig, onValue }: { initial?: EngineCo
       model={{ repoId: "Qwen/Qwen3-8B", maxContext: 40960, capabilities: ["tools", "reasoning"], kvBytesPerToken: 147456 }}
       hardware={{ gpuBytes: 130_663_055_360, tensorParallel: 1, maxContextThatFits: 40960 }}
       suggested={SUGGESTED}
+      isSuperuser={isSuperuser}
       onChange={(v, e) => {
         setValue(v);
         setExtra(e);
@@ -74,5 +83,31 @@ describe("EngineSettingsEditor", () => {
     await userEvent.click(within(row).getByRole("combobox"));
     await userEvent.click(screen.getByRole("option", { name: "On" }));
     expect(last).toEqual({ async_scheduling: true });
+  });
+
+  it("shows an operator a superuser-only setting as it is, locked, with the reason", async () => {
+    render(<Harness initial={{ trust_remote_code: true }} isSuperuser={false} />);
+    const toggle = screen.getByLabelText("Run the model's own code");
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getAllByText("Only an administrator can change this.").length).toBeGreaterThan(0);
+  });
+
+  it("locks the same setting in the all-flags list for an operator", async () => {
+    render(<Harness initial={{ scheduler_cls: "a.B" }} isSuperuser={false} />);
+    await userEvent.click(screen.getByText(/All vLLM settings/));
+    const row = await screen.findByTestId("engine-flag-scheduler-cls");
+    expect(within(row).getByRole("textbox")).toBeDisabled();
+    expect(within(row).getByText("Only an administrator can change this.")).toBeInTheDocument();
+  });
+
+  it("lets a superuser change it", async () => {
+    let last: EngineConfig = {};
+    render(<Harness isSuperuser onValue={(v) => (last = v)} />);
+    const toggle = screen.getByLabelText("Run the model's own code");
+    expect(toggle).toBeEnabled();
+    expect(screen.queryByText("Only an administrator can change this.")).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(last).toEqual({ trust_remote_code: true });
   });
 });

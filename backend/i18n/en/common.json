@@ -3019,6 +3019,7 @@
       "label": "Skip graph capture",
       "help": "Starts faster and uses less memory, but generates more slowly. Needed on some older GPUs."
     },
+    "admin_only": "Only an administrator can change this.",
     "remote": {
       "label": "Run the model's own code",
       "help": "Only for models that need it: it runs Python from the model's repository on your machines.",

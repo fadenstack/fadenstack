@@ -3021,6 +3021,7 @@
       "label": "Ignorer la capture de graphes",
       "help": "Démarre plus vite et utilise moins de mémoire, mais génère plus lentement. Nécessaire sur certains GPU anciens."
     },
+    "admin_only": "Seul un administrateur peut modifier ceci.",
     "remote": {
       "label": "Exécuter le code du modèle",
       "help": "Seulement pour les modèles qui en ont besoin : du Python du dépôt du modèle s'exécute sur vos machines.",

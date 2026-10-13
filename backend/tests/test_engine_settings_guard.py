@@ -9,6 +9,7 @@ redirects every chat, environment variables that switch Ray's security off.
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -28,6 +29,7 @@ from faden_backend.services.inference.drivers.ray.schemas import (
     check_environment_config,
 )
 from faden_backend.services.marketplace import recipes
+from tests.conftest import REPO_ROOT
 from tests.test_inference_api import good_spec, make_model
 
 API = "/api/inference"
@@ -351,3 +353,9 @@ async def test_a_pinned_host_that_is_not_the_clusters_is_not_followed_at_deploy_
     assert facts.serve_host_refused is True
     assert manager._environment_config(facts).serve_http_host is None
     assert manager._serve_options(facts)["http_options"]["host"] == dep._WILDCARD_BIND
+
+
+def test_console_lists_the_same_superuser_only_settings():
+    """The console locks these for an operator from its own copy; it must not drift from the guard."""
+    listed = json.loads((REPO_ROOT / "frontend/app/lib/engine/superuserOnly.json").read_text(encoding="utf-8"))
+    assert sorted(listed) == sorted(engine_guard.CODE_SETTINGS)
