@@ -3021,6 +3021,7 @@
       "label": "Omitir captura de grafos",
       "help": "Arranca más rápido y usa menos memoria, pero genera más despacio. Necesario en algunas GPU antiguas."
     },
+    "admin_only": "Solo un administrador puede cambiar esto.",
     "remote": {
       "label": "Ejecutar el código propio del modelo",
       "help": "Solo para modelos que lo necesitan: ejecuta Python del repositorio del modelo en sus máquinas.",

@@ -3021,6 +3021,7 @@
       "label": "Graph-Erfassung überspringen",
       "help": "Startet schneller und braucht weniger Speicher, erzeugt aber langsamer. Auf manchen älteren GPUs nötig."
     },
+    "admin_only": "Das kann nur ein Administrator ändern.",
     "remote": {
       "label": "Eigenen Code des Modells ausführen",
       "help": "Nur für Modelle, die es brauchen: Es führt Python aus dem Repository des Modells auf Ihren Maschinen aus.",

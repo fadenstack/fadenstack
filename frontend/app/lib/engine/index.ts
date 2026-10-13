@@ -12,6 +12,7 @@
  * vLLM's own, not a hand-kept copy that drifts.
  */
 import catalogJson from "./vllmFlags.json";
+import superuserOnlyJson from "./superuserOnly.json";
 
 export type EngineValue = string | number | boolean;
 export type EngineConfig = Record<string, EngineValue>;
@@ -64,6 +65,17 @@ export function jsonProblem(value: EngineValue | undefined): string | null {
 
 const BY_KEY = new Map(CATALOG.flags.map((f) => [f.key, f]));
 const BY_FLAG = new Map(CATALOG.flags.map((f) => [f.flag, f]));
+
+/**
+ * Settings only a superuser may change: they run code or reach files and
+ * credentials on the machines. The backend refuses them from anyone else
+ * (`engine_guard.CODE_SETTINGS`); a backend test keeps this list equal to it.
+ */
+export const SUPERUSER_ONLY_KEYS: ReadonlySet<string> = new Set(superuserOnlyJson);
+
+export function isSuperuserOnly(key: string): boolean {
+  return SUPERUSER_ONLY_KEYS.has(key.replace(/^-+/, "").replace(/-/g, "_"));
+}
 
 export function flagDef(key: string): FlagDef | undefined {
   return BY_KEY.get(key) ?? BY_FLAG.get(key.replace(/_/g, "-"));
