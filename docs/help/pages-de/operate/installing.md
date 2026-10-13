@@ -265,7 +265,7 @@ faden module enable pii mcp skills
 faden up
 ```
 
-Mit `faden module disable pii` und anschließend `faden down` und `faden up` entfernen Sie ein Modul wieder.
+Mit `faden module disable pii` und anschließend `faden up` entfernen Sie ein Modul wieder. `faden up` stoppt und entfernt die Container des Moduls. Seine Daten bleiben erhalten.
 
 ## Befehle für den Alltag {#everyday-commands}
 

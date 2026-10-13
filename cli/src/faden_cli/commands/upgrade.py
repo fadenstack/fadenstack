@@ -405,6 +405,9 @@ def _restart_and_check(ctx: ComposeContext, shared_dir: Path, env_path: Path, st
         error(f"docker compose up failed (exit code {rc}).")
         sys.exit(rc)
     success("All services restarted.")
+    from faden_cli.core.compose import report_inactive_modules  # noqa: PLC0415
+
+    report_inactive_modules(ctx)
 
     # ClickHouse's diagnostic logs are off from this release; what they hold
     # stays until dropped (41 GB of trace_log filled one install's disk).

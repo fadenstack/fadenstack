@@ -248,7 +248,7 @@ faden module enable pii mcp skills
 faden up
 ```
 
-`faden module disable pii`, then `faden down` and `faden up`, takes one away again.
+`faden module disable pii`, then `faden up`, takes one away again. `faden up` stops and removes the module's containers. Its data is kept.
 
 ## Everyday commands
 

@@ -846,6 +846,9 @@ def deploy_cmd(
         error(f"docker compose up failed (exit code {rc}).")
         sys.exit(rc)
     success("All services started.")
+    from faden_cli.core.compose import report_inactive_modules  # noqa: PLC0415
+
+    report_inactive_modules(ctx)
 
     # ── 6. Initial admin setup ────────────────────────────────────
     console.print("\n[bold cyan]Step 6: Initial admin setup…[/bold cyan]")

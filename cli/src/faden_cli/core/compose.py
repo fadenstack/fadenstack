@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from faden_cli.core.console import console, error
+from faden_cli.core.console import console, error, info
 
 
 # ── GPU detection ─────────────────────────────────────────────────
@@ -240,6 +240,58 @@ def service_names(ctx: ComposeContext) -> list[str]:
     if result.returncode != 0:
         return []
     return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+
+
+def stop_inactive_modules(ctx: ComposeContext) -> list[tuple[str, list[str]]]:
+    """Stop and remove the containers of modules that are switched off.
+
+    ``compose up`` only starts the services of active profiles; it never stops
+    those of a profile that was switched off, so ``module disable`` left them
+    running. Only services whose profiles are all module profiles and none of
+    them active are touched (core services have no profile). Volumes stay.
+    Returns ``(module, container names)`` for each module it cleaned up.
+    """
+    from dataclasses import replace  # noqa: PLC0415
+
+    from faden_cli.core.registry import MODULES  # noqa: PLC0415
+
+    # "*" makes compose see every profile, so the services of inactive ones are listed too.
+    everything = replace(ctx, profiles=["*"])
+    config = _run(everything.base_cmd() + ["config", "--format", "json"], capture=True)
+    if config.returncode != 0:
+        return []
+    try:
+        spec = json.loads(config.stdout or "{}")
+    except ValueError:
+        return []
+    by_profile = {m.profile: name for name, m in MODULES.items()}
+    active = set(ctx.profiles)
+    owner: dict[str, str] = {}
+    for service, body in (spec.get("services") or {}).items():
+        profiles = set(body.get("profiles") or []) if isinstance(body, dict) else set()
+        if profiles and profiles <= set(by_profile) and not profiles & active:
+            owner[service] = by_profile[sorted(profiles)[0]]
+    if not owner:
+        return []
+    present = {row.service: row.name for row in ps(everything) if row.service in owner}
+    if not present:
+        return []
+    names = sorted(present)
+    failed = stop(everything, services=names)
+    failed = failed or _run(everything.base_cmd() + ["rm", "-f", *names], stream=True).returncode
+    if failed:
+        return []
+    cleaned: dict[str, list[str]] = {}
+    for service, container in sorted(present.items()):
+        cleaned.setdefault(owner[service], []).append(container or service)
+    return sorted(cleaned.items())
+
+
+def report_inactive_modules(ctx: ComposeContext) -> None:
+    """Run :func:`stop_inactive_modules` and print one line per module it stopped."""
+    for module, containers in stop_inactive_modules(ctx):
+        label = module.upper() if len(module) <= 3 else module.capitalize()
+        info(f"{label} is switched off: stopped and removed {', '.join(containers)} (their data is kept).")
 
 
 def down(
