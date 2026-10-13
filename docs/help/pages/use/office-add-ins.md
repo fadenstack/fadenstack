@@ -13,7 +13,7 @@ The Office add-ins put a Fadenstack agent in a pane beside your document in Word
 
 ## Open the agent and sign in
 
-1. On the **Home** tab (in a message opened in its own window: the **Message** tab), select **Agent** in the **Agent** group. The pane opens beside the document.
+1. On the **Home** tab (in a message opened in its own window: the **Message** tab), select **Agent** in the **Fadenstack** group. The pane opens beside the document. With no document open, a blank one opens with it (in PowerPoint, a presentation with one slide).
 2. The first time, in **Sign in to your agent**, enter your **E-mail** and **Password** (your Fadenstack account), and the **Server** if IT has not set it.
 3. Select **Sign in**.
 
@@ -87,7 +87,7 @@ This signs you out of all four applications on this computer.
 | You see | What to do |
 |---|---|
 | The **Agent** button is greyed out | The document is open in Protected View. Select **Enable Editing**, then **Agent**. |
-| There is no **Agent** group in Outlook | You are in the new Outlook for Windows. Switch back to classic Outlook. |
+| There is no **Fadenstack** group in Outlook | You are in the new Outlook for Windows. Switch back to classic Outlook. |
 | **The e-mail or password is not right.** | Check them, and sign in again. Forgot your password? See [Your account](account.md#forgot-your-password). |
 | **You have no access to this agent.** | Your administrator has not given it to you yet, or the agent's address set for this application is wrong. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Leave the cell, or close the dialog, and ask again. |

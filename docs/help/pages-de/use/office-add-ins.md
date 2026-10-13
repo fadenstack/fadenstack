@@ -13,7 +13,7 @@ Die Office-Add-ins bringen einen Fadenstack-Agenten in einen Aufgabenbereich neb
 
 ## Agent öffnen und anmelden {#open-the-agent-and-sign-in}
 
-1. Wählen Sie auf der Registerkarte **Start** (in einer Nachricht, die in einem eigenen Fenster geöffnet ist: auf der Registerkarte **Nachricht**) in der Gruppe **Agent** die Schaltfläche **Agent**. Der Aufgabenbereich öffnet sich neben dem Dokument.
+1. Wählen Sie auf der Registerkarte **Start** (in einer Nachricht, die in einem eigenen Fenster geöffnet ist: auf der Registerkarte **Nachricht**) in der Gruppe **Fadenstack** die Schaltfläche **Agent**. Der Aufgabenbereich öffnet sich neben dem Dokument. Ist kein Dokument geöffnet, öffnet sich mit ihm ein leeres (in PowerPoint eine Präsentation mit einer Folie).
 2. Geben Sie beim ersten Mal in **Sign in to your agent** Ihre **E-mail** und Ihr **Password** (Ihr Fadenstack-Konto) ein, und den **Server**, falls die IT ihn nicht eingestellt hat.
 3. Wählen Sie **Sign in**.
 
@@ -87,7 +87,7 @@ Damit melden Sie sich auf diesem Computer in allen vier Anwendungen ab.
 | Sie sehen | Was Sie tun |
 |---|---|
 | Die Schaltfläche **Agent** ist ausgegraut | Das Dokument ist in der geschützten Ansicht geöffnet. Wählen Sie **Bearbeitung aktivieren**, dann **Agent**. |
-| In Outlook gibt es keine Gruppe **Agent** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
+| In Outlook gibt es keine Gruppe **Fadenstack** | Sie verwenden das neue Outlook für Windows. Wechseln Sie zum klassischen Outlook zurück. |
 | **The e-mail or password is not right.** | Prüfen Sie beides und melden Sie sich erneut an. Passwort vergessen? Siehe [Ihr Konto](account.md#forgot-your-password). |
 | **You have no access to this agent.** | Ihr Administrator hat ihn Ihnen noch nicht freigegeben, oder die für diese Anwendung eingestellte Adresse des Agenten ist falsch. |
 | **Office is busy (a cell may be in edit mode, or a dialog is open). Finish that and try again.** | Verlassen Sie die Zelle oder schließen Sie das Dialogfeld, und fragen Sie erneut. |
