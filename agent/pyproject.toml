@@ -21,7 +21,7 @@ authors = [{ name = "Emagin8 UG (haftungsbeschränkt)" }]
 dependencies = [
   "httpx>=0.27,<1.0",
   "psutil>=5.9,<8.0",
-  "websockets>=12,<16",
+  "websockets>=12,<18",
   # Imported at module scope by faden_agent.ray.models, which
   # __main__ pulls in on every invocation -- so a clean install without it
   # cannot even print --help, let alone run.  Undeclared until 0.1.9.
@@ -32,7 +32,7 @@ dependencies = [
   # A cluster whose machines download models themselves fetches them from the
   # Hub here (hf_download.py); hf-xet, which it brings on x86_64 and aarch64,
   # is what makes a large download fast.
-  "huggingface-hub>=0.32,<2",
+  "huggingface-hub>=0.32,<3",
 ]
 
 [project.scripts]
@@ -45,19 +45,19 @@ faden-agent = "faden_agent.__main__:main"
 # drives the *same* packaged CLI for `ray start`/`ray stop`, which guarantees
 # SDK/cluster version parity.  2.58 is the Fadenstack-tested release.
 ray-host = [
-  "ray[serve]==2.58.0",
+  "ray[serve]==2.59.0",
   # Ray 2.58 bug: ray/serve/_private/haproxy.py imports jinja2 at import time,
   # but the `serve` extra does not declare it.  Declared explicitly so
   # `from ray import serve` works in a clean agent environment.
   "jinja2>=3.1,<4",
 ]
 llm = [
-  "ray[serve,llm]==2.58.0",
+  "ray[serve,llm]==2.59.0",
   "jinja2>=3.1,<4",
 ]
 # In the base dependencies since 0.2.2; kept so `faden-agent[hf]` still installs.
 hf = [
-  "huggingface-hub>=0.32,<2",
+  "huggingface-hub>=0.32,<3",
 ]
 build = [
   "pyinstaller>=6.0,<7.0",
