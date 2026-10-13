@@ -335,6 +335,11 @@ def main() -> int:
         for lang in langs:
             build(args.out / lang)
             shutil.copytree(args.out / lang / "site", site / LANGS[lang]["prefix"], dirs_exist_ok=True)
+        if args.target == "public":
+            # Each language has its own sitemap; crawlers find them through robots.txt.
+            base = TARGETS["public"]["base"]
+            maps = "".join(f"Sitemap: {base}{LANGS[lang]['prefix']}sitemap.xml\n" for lang in langs)
+            (site / "robots.txt").write_text("User-agent: *\nAllow: /\n\n" + maps, encoding="utf-8", newline="\n")
         print(f"built {site}")
     return 0
 
