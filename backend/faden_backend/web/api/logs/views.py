@@ -93,6 +93,7 @@ async def _ws_verify(websocket: WebSocket, token: str | None) -> User:
         if user is None or not user.is_active:
             raise _WsRefusedError(4403, "User not found or inactive")
         # The same rules as the HTTP routes: not ended with the account's others, not logged out.
+        # API tokens carry no console audience and fail the decode above; the ``typ`` test is a second guard.
         if payload.get("typ") != "api" and (
             sign_in_ended_for_all(payload, user.sessions_valid_after)
             or await is_sign_in_revoked(session, str(payload["jti"]))
