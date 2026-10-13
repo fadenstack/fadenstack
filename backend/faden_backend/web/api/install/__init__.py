@@ -56,7 +56,7 @@ router = APIRouter(prefix="/install", tags=["install"])
 
 #: Agent version this backend expects.  Bumping it here is what makes a fleet
 #: converge, because every fresh install reads it from the running backend.
-AGENT_VERSION = "0.2.9"
+AGENT_VERSION = "0.2.10"
 
 
 def newer_agent_version(running: str | None) -> str | None:
