@@ -74,6 +74,9 @@ FROM "user" u
 WHERE u.id = $1::uuid
 """
 
+#: The user's language as it is now (the user cache may hold another worker's older read).
+_LANGUAGE_SQL = "SELECT preferences->>'language' AS language FROM user_preference WHERE user_id = $1::uuid"
+
 #: The user's language in their preferences (the console's too): set, or removed for ``None``. Only this key
 #: is touched; the row is made when the user has none yet.
 _SAVE_LANGUAGE_SQL = """
@@ -305,6 +308,17 @@ class BackendAgents:
             row["language"] or None,
         )
 
+    async def user_language(self, user_id: str) -> str | None:
+        """The language in the user's preferences now, read past every cache."""
+        try:
+            pool = await self._get_pool()
+            row = await pool.fetchrow(_LANGUAGE_SQL, user_id, timeout=self._timeout)
+        except (ValueError, asyncpg.DataError):
+            return None  # not a user id
+        except Exception as exc:
+            raise AgentLookupError(str(exc)) from exc
+        return (row["language"] or None) if row is not None else None
+
     async def save_language(self, user_id: str, language: str | None) -> None:
         """Keeps the language the user picked in a client in their preferences, for all clients."""
         try:
@@ -366,6 +380,7 @@ class AgentDirectory:
         fetch_api_token: Callable[[str], Awaitable[ApiTokenRecord | None]] | None = None,
         fetch_sign_in_revoked: Callable[[str], Awaitable[bool]] | None = None,
         save_language: Callable[[str, str | None], Awaitable[None]] | None = None,
+        fetch_language: Callable[[str], Awaitable[str | None]] | None = None,
         ttl_sec: float = 60.0,
         api_token_ttl_sec: float = 30.0,
         close: Callable[[], Awaitable[None]] | None = None,
@@ -382,6 +397,15 @@ class AgentDirectory:
         )
         self._close = close
         self._save_language = save_language
+        self._fetch_language = fetch_language
+
+    async def user_language(self, user_id: str) -> str | None:
+        """The language the user picked, as it is now. Read past the user cache: each gateway worker has its own,
+        and a change made through another worker, or in the console, would read stale there for up to its TTL."""
+        if self._fetch_language is not None:
+            return await self._fetch_language(user_id)
+        user = await self._users.get(user_id)
+        return user.language if user is not None else None
 
     async def set_language(self, user_id: str, language: str | None) -> bool:
         """Keeps the user's language (``False`` when it cannot be kept here); their next read sees it."""
@@ -446,6 +470,7 @@ def build_agent_directory(settings: object) -> AgentDirectory | None:
         fetch_api_token=backend.api_token,
         fetch_sign_in_revoked=backend.sign_in_revoked,
         save_language=backend.save_language,
+        fetch_language=backend.user_language,
         close=backend.close,
     )
 

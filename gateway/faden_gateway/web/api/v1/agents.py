@@ -316,10 +316,9 @@ _LANGUAGE_TAG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8}){0,3}$")
 async def _user_language(request: Request, user_id: str) -> str | None:
     """The language the user picked for every client; ``None``: none picked, or it cannot be read now."""
     try:
-        user = await request.app.state.agent_directory.user(user_id)
+        return await request.app.state.agent_directory.user_language(user_id)
     except AgentLookupError:
         return None
-    return user.language if user is not None else None
 
 
 class UserSettings(BaseModel):

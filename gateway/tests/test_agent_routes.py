@@ -131,6 +131,10 @@ class _Backend:
             raise AgentLookupError("backend database down")
         self.users[user_id] = dataclasses.replace(self.users[user_id], language=language)
 
+    async def user_language(self, user_id: str) -> str | None:
+        user = self.users.get(user_id)
+        return user.language if user is not None else None
+
     async def memberships(self, user_id: str) -> tuple[str, ...]:
         return self.groups.get(user_id, ())
 
@@ -866,6 +870,22 @@ async def test_a_language_picked_in_one_client_is_in_every_profile(client: Async
 
 
 @pytest.mark.anyio
+async def test_a_language_change_reaches_every_worker_at_once(backend: _Backend) -> None:
+    """Each gateway worker caches users for a minute. The language is read past that cache, so what one worker
+    (or the console) just saved is what the next profile says on every worker (seen stale on .61, 2 workers)."""
+    workers = [
+        AgentDirectory(fetch_agent=backend.agent, fetch_user=backend.user, save_language=backend.save_language,
+                       fetch_language=backend.user_language)
+        for _ in range(2)
+    ]
+    for worker in workers:
+        assert (await worker.user(USER)).language is None  # both caches hold the old read
+    assert await workers[0].set_language(USER, "de") is True
+    assert [await w.user_language(USER) for w in workers] == ["de", "de"]
+    assert await workers[1].set_language(USER, None) is True
+    assert [await w.user_language(USER) for w in workers] == [None, None]
+
+
 async def test_a_null_language_forgets_it_and_an_empty_body_changes_nothing(
     client: AsyncClient, backend: _Backend,
 ) -> None:
