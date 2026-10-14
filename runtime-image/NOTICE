@@ -19,13 +19,42 @@
    which travel with it:
 
    - The GB10 image is built on vLLM's own image (vllm/vllm-openai,
-     Apache-2.0), which contains NVIDIA's CUDA libraries under the CUDA
-     EULA and their own licences; their licence files are in their
-     site-packages folders.
-   - The x86_64 image contains NVIDIA's CUDA, cuDNN and related Python
-     packages under the CUDA EULA and their own licences; their licence
-     files are in their site-packages folders.
+     Apache-2.0). The x86_64 image is built on a Python base image, with
+     vLLM, PyTorch and Ray installed from PyPI.
+   - Both contain NVIDIA software as their upstream projects and NVIDIA's
+     own Python packages distribute it:
+     * CUDA libraries and related Python packages (nvidia-*), under the
+       CUDA EULA and their own licences;
+     * NVIDIA developer tools (ptxas, nvcc, nvdisasm, cuobjdump), which
+       vLLM's base image, PyTorch, Triton and NVIDIA's Python packages
+       include to compile GPU code while models run, under the CUDA EULA;
+     * the NVIDIA CUTLASS DSL (nvidia-cutlass-dsl), a dependency of vLLM,
+       under its own licence, the NVIDIA CUTLASS DSL EULA.
+     Their licence files are in their site-packages folders and, in the
+     GB10 image, under /usr/local/cuda*.
    - Ray, vLLM and the other open-source packages keep their licences;
      their files are in their site-packages folders.
+
+   Under review: NVIDIA's terms do not expressly grant redistribution of
+   some of these components. The CUDA EULA's list of distributable files
+   (Attachment A) does not name the developer tools above, and the CUTLASS
+   DSL's licence grants distribution of its Python source files only.
+   Large open-source inference projects distribute these components in
+   the same way, and the question has been raised publicly without an
+   answer from NVIDIA so far (for example
+   https://github.com/triton-lang/triton/issues/1618).
+
+   Based on the information available, we are reviewing this and will
+   seek clarification from NVIDIA. If the review confirms that a
+   component may not be redistributed in this image, we will remove it
+   from future images and change how it reaches the GPU machines, for
+   example by having them download it from NVIDIA directly. Fadenstack is
+   pre-1.0 software in active testing. Rights holders who have concerns
+   about a component in this image can write to contact@emagin8.de; we
+   will respond promptly.
+
+   Your use of NVIDIA software is subject to NVIDIA's terms. This notice
+   is provided for transparency; it is not legal advice and does not
+   change the terms of any component.
 
    Fadenstack is not affiliated with or endorsed by NVIDIA.

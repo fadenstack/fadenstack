@@ -98,8 +98,10 @@ contributors, MIT License; the full text is `docs/theme/assets/licenses/zensical
   attaches their licence texts next to the binary. For the libraries, the Linux builds take the copyright files
   of the Debian packages they come from; the macOS and Windows builds take the texts in
   [`release/licenses/`](release/licenses), and the build fails if a bundled library has none.
-- **The GPU runtime images** contain NVIDIA's CUDA libraries under NVIDIA's terms (the CUDA EULA), so they
-  are not Apache-2.0 as a whole: see [Help, Third-party components](docs/help/pages/operate/third-party.md).
+- **The GPU runtime images** contain NVIDIA software under NVIDIA's terms: CUDA libraries and developer tools
+  (the CUDA EULA) and the CUTLASS DSL (its own EULA), so they are not Apache-2.0 as a whole. Whether NVIDIA's terms
+  allow redistributing some of these is under review: see [Help, Third-party components](docs/help/pages/operate/third-party.md#nvidia-components)
+  and [runtime-image/NOTICE](runtime-image/NOTICE).
 
 Help's [Third-party components](docs/help/pages/operate/third-party.md) page describes all of this for people
 running Fadenstack.

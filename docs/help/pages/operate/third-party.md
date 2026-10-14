@@ -46,8 +46,8 @@ and keep their own terms.
 
 | Artifact | Built on | Terms |
 |---|---|---|
-| Runtime image for NVIDIA DGX Spark | vLLM's own image (`vllm/vllm-openai`, its CUDA 13 build for arm64), with NVIDIA's CUDA and related packages, plus Ray and added Python packages | vLLM and Ray are Apache-2.0; NVIDIA's CUDA packages are under the [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and their own terms, which are not open source. Their licence files stay in the image. |
-| Runtime image for x86_64 machines | A slim Python base image, operating-system packages, Ray and vLLM from PyPI, and the Python and CUDA packages they pull in | Each component keeps its own licence, including NVIDIA's CUDA, cuDNN and related packages under the [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and their own terms, which are not open source. Their licence files stay in the image; its SBOM is the inventory |
+| Runtime image for NVIDIA DGX Spark | vLLM's own image (`vllm/vllm-openai`, its CUDA 13 build for arm64), with NVIDIA's CUDA and related packages, plus Ray and added Python packages | vLLM and Ray are Apache-2.0. NVIDIA's software in it (CUDA libraries, developer tools, the CUTLASS DSL) is under NVIDIA's terms, which are not open source: see [NVIDIA components](#nvidia-components). Their licence files stay in the image. |
+| Runtime image for x86_64 machines | A slim Python base image, operating-system packages, Ray and vLLM from PyPI, and the Python and CUDA packages they pull in | Each component keeps its own licence. NVIDIA's software in it (CUDA, cuDNN and related packages, developer tools, the CUTLASS DSL) is under NVIDIA's terms, which are not open source: see [NVIDIA components](#nvidia-components). Their licence files stay in the image; its SBOM is the inventory |
 | Model-TLS proxy | nginx | nginx's licence |
 | The models | Whatever you deploy from Hugging Face or import | Each model's own licence, which the administrator accepts on Hugging Face for gated models |
 
@@ -55,6 +55,37 @@ The machines get these images from the server.
 
 !!! note
     If you redistribute a runtime image outside your organisation, check the exact terms of its base image first.
+
+## NVIDIA components in the runtime images {#nvidia-components}
+
+Both runtime images contain NVIDIA software as their upstream projects (vLLM, PyTorch, Triton) and NVIDIA's own
+Python packages distribute it:
+
+| Component | Where it comes from | Terms |
+|---|---|---|
+| CUDA libraries (runtime, cuBLAS, cuDNN, NCCL and others) | NVIDIA's Python packages (`nvidia-*`); in the DGX Spark image also vLLM's base image | [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) and each package's own licence |
+| Developer tools: `ptxas`, `nvcc`, `nvdisasm`, `cuobjdump` | vLLM's base image, PyTorch, Triton and NVIDIA's Python packages, which use them to compile GPU code while models run | [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html) |
+| CUTLASS DSL (`nvidia-cutlass-dsl`) | A dependency of vLLM | [NVIDIA CUTLASS DSL EULA](https://docs.nvidia.com/cutlass/4.6.0/media/docs/pythonDSL/license.html) |
+
+### Under review
+
+NVIDIA's terms do not expressly grant redistribution of some of these components: the CUDA EULA's list of
+distributable files (Attachment A) does not name the developer tools, and the CUTLASS DSL's licence grants
+distribution of its Python source files only. Large open-source inference projects distribute these components in
+the same way, and the question has been raised publicly, for example in
+[triton-lang/triton#1618](https://github.com/triton-lang/triton/issues/1618), without an answer from NVIDIA so far.
+
+Based on the information available, we are reviewing this and will seek clarification from NVIDIA. If the review
+confirms that a component may not be redistributed in our images, we will remove it from future images and change
+how it reaches your GPU machines, for example by having the machines download it from NVIDIA directly, with a
+download step for installations without internet access. Until then, the images contain these components as their
+upstream projects distribute them.
+
+Fadenstack is pre-1.0 software in active testing. Rights holders who have concerns about a component in our images
+can contact us through [emagin8.de/contact](https://emagin8.de/contact?subject=Fadenstack); we will respond promptly.
+
+Your use of NVIDIA software is subject to NVIDIA's terms. This page is provided for transparency; it is not legal
+advice and does not change the terms of any component.
 
 ## Sources
 
@@ -69,3 +100,4 @@ The machines get these images from the server.
 - [Lucide](https://github.com/lucide-icons/lucide)
 - [Material Design Icons](https://github.com/Templarian/MaterialDesign)
 - [CUDA EULA](https://docs.nvidia.com/cuda/eula/index.html)
+- [NVIDIA CUTLASS DSL EULA](https://docs.nvidia.com/cutlass/4.6.0/media/docs/pythonDSL/license.html)
