@@ -238,16 +238,30 @@ def get_migration_heads(ctx: ComposeContext) -> dict[str, str]:
     Runs ``alembic current`` inside each migrator service.  Returns a
     mapping of *database name* → *revision hash* (or empty string if
     the head could not be determined).
+
+    Only the migrators of the services this install runs: a module that is switched off has nothing to read,
+    and its image need not be on the server. ``--pull never``: a backup never downloads an image (0.4.5 pulled
+    the switched-off mcp and skills images, 1.9 GB, and a server without registry access would wait on them).
     """
     docker = _docker_bin()
     heads: dict[str, str] = {}
+    listed = subprocess.run(  # noqa: S603
+        [docker, "compose", *_compose_flags(ctx), "config", "--services"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    active = set(listed.stdout.split()) if listed.returncode == 0 else set(_MIGRATOR_SERVICES)
 
     for service, db in _MIGRATOR_SERVICES.items():
+        if service not in active:
+            heads[db] = ""
+            continue
         proc = subprocess.run(  # noqa: S603
             [
                 docker, "compose",
                 *_compose_flags(ctx),
-                "run", "--rm", "--no-deps", service,
+                "run", "--rm", "--no-deps", "--pull", "never", service,
                 "alembic", "current",
             ],
             capture_output=True,
