@@ -390,13 +390,20 @@ jobs:
           fi
           cp THIRD-PARTY-NOTICES.txt "dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt"
 
+      # The release exists (job publish). A runner that loses api.github.com for a moment tries again rather than
+      # failing the release (0.4.5's macOS upload hit a 10 s connect timeout).
       - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            dist/${{ matrix.artifact }}
-            dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3 4; do
+            gh release upload "${{ github.ref_name }}" --repo "${{ github.repository }}" --clobber \
+              "dist/${{ matrix.artifact }}" "dist/${{ matrix.name }}.THIRD-PARTY-NOTICES.txt" && exit 0
+            echo "::warning::upload attempt $attempt failed; trying again"
+            sleep $((attempt * 20))
+          done
+          exit 1
 
   checksums:
     # One SHA256SUMS for the wheel, the sdist and the executables, so a download can be checked.
