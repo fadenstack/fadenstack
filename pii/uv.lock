@@ -806,7 +806,7 @@ wheels = [
 
 [[package]]
 name = "faden-pii"
-version = "0.4.5"
+version = "0.4.5rc1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

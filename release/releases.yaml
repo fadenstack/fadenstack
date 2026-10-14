@@ -25,14 +25,15 @@
 series: []
 
 releases:
-  - version: 0.4.5
-    channel: stable
-    date: ""
+  - version: 0.4.5rc1
+    channel: preview
+    date: "2026-10-14"
     severity: normal
     summary: >-
-      Fixes before the launch: a switched-off module's containers stop, every service shows the release's version,
-      and operators see the engine settings only an administrator may change as read-only.
+      Release candidate: a user's language follows them to every client, a switched-off module's containers stop,
+      every service shows the release's version, and operators see admin-only engine settings as read-only.
     highlights:
+      - "A language picked once, in the console or in an agent's settings, is the user's in every client and agent."
       - "`faden up` stops and removes the containers of a module you switched off; its data is kept."
       - "The Updates page shows the release's version for every service."
       - "Operators see code-running engine settings read-only, with a note, instead of a refusal when they save."

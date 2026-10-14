@@ -1,6 +1,6 @@
 [project]
 name = "faden_skills"
-version = "0.4.5"
+version = "0.4.5rc1"
 description = "Centralized Skills Registry — reasoning playbooks for Fadenstack"
 readme = "README.md"
 license = "Apache-2.0"
