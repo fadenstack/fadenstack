@@ -50,7 +50,7 @@ from faden_gateway.services.gateway.auth import (
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
-from faden_gateway.services.gateway.skills_client import SkillsUnavailable
+from faden_gateway.services.gateway.skills_client import SkillsUnavailableError
 from faden_gateway.web.api.v1.views import (
     get_gateway_service,
     serve_chat_completions,
@@ -393,7 +393,7 @@ async def agent_profile(
             ),
         },
         "ui": profile.ui,
-        # Whether this server runs the Skills module: the SDK offers a skill picker (GET .../skills) only then.
+        # Whether the Skills module runs here: the SDK shows a skill picker (GET .../skills) only then.
         "skills": skills_client_for(request) is not None,
         # The signed-in user's own settings every client shares: the language they picked (or ``None``).
         "user": {"language": language},
@@ -465,10 +465,10 @@ async def agent_skills(
     request: Request,
     caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
 ) -> dict[str, Any]:
-    """The skills its person may pick in the agent's chats (the ``skills`` of a chat request), for a picker.
+    """The skills its person may pick in the agent's chats (a chat request's ``skills``), for a picker.
 
     What the console chat's picker lists for them -- their own, the tenant's, those shared with them or one
-    of their groups; published and switched on -- and only what a picker shows, never a skill's instructions.
+    of their groups; published and switched on -- and only what a picker shows, never their instructions.
     ``q`` searches, ``limit`` (1-100, 50) bounds the list. With no Skills module on this server the list is
     empty and ``available`` false.
     """
@@ -483,7 +483,7 @@ async def agent_skills(
         found = await client.list_usable(
             tenant_id=auth.tenant_id, user_id=auth.user_id, group_ids=groups, query=query, limit=limit,
         )
-    except SkillsUnavailable as exc:
+    except SkillsUnavailableError as exc:
         logger.warning("Could not list the skills of user %s for agent %s: %s", auth.user_id, agent.id, exc)
         raise GatewayError(
             status_code=502 if exc.reached else 503,

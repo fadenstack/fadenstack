@@ -183,7 +183,7 @@ def get_gateway_service(
 
 
 def skills_client_for(request: Request) -> SkillsClient | None:
-    """The skills service's client; ``None`` when the Skills module is off or the gateway has no token for it."""
+    """The skills service's client; ``None`` with the Skills module off or no service token for it."""
     skills_url = service_registry.get_url("skills")
     if not skills_url or not settings.skills_service_token:
         return None

@@ -65,7 +65,7 @@ class UsableSkill:
     activation: str
 
 
-class SkillsUnavailable(Exception):
+class SkillsUnavailableError(Exception):
     """The skills service gave no list: it could not be reached, or it failed (``reached``)."""
 
     def __init__(self, message: str, *, reached: bool) -> None:
@@ -173,7 +173,7 @@ class SkillsClient:
         Calls ``GET /api/skills?usable=true`` as that user -- their id and groups in the headers the service
         believes next to its token -- with no capabilities. None is needed to see a skill, and a chat is never
         resolved as an administrator: listed with ``admin``, the picker would offer other people's private
-        skills, which no chat of theirs gets. Raises ``SkillsUnavailable`` when the service gives no list.
+        skills, which no chat of theirs gets. Raises ``SkillsUnavailableError`` when there is no list.
         """
         params: dict[str, str | int] = {"usable": "true", "limit": limit}
         if query:
@@ -186,11 +186,15 @@ class SkillsClient:
             HEADER_CAPS: "",
         }
         try:
-            resp = await self._http.get(f"{self._base}/api/skills", params=params, headers=headers, timeout=10.0)
+            resp = await self._http.get(
+                f"{self._base}/api/skills", params=params, headers=headers, timeout=10.0,
+            )
         except httpx.HTTPError as exc:
-            raise SkillsUnavailable(f"The skills service could not be reached: {exc!r}", reached=False) from exc
+            raise SkillsUnavailableError(
+                f"The skills service could not be reached: {exc!r}", reached=False,
+            ) from exc
         if resp.status_code >= 400:
-            raise SkillsUnavailable(f"The skills service answered {resp.status_code}.", reached=True)
+            raise SkillsUnavailableError(f"The skills service answered {resp.status_code}.", reached=True)
         try:
             return [
                 UsableSkill(
@@ -203,7 +207,7 @@ class SkillsClient:
                 for s in resp.json().get("items") or []
             ]
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
-            raise SkillsUnavailable("The skills service's list could not be read.", reached=True) from exc
+            raise SkillsUnavailableError("The skills list could not be read.", reached=True) from exc
 
     async def read_file(
         self,
