@@ -1,4 +1,4 @@
-"""HTTP client for RAG Lite on the backend: search, and read a passage.
+"""HTTP client for RAG Lite on the backend: search, read a passage, ask whether there is anything to search.
 
 Used by the knowledge tools the model calls (``knowledge.py``), as the user
 who asked.
@@ -53,6 +53,19 @@ class RagLiteClient:
         )
         resp.raise_for_status()
         return resp.json().get("results", [])
+
+    async def searchable(self, *, api_token: str | None = None) -> bool:
+        """Call ``GET /api/admin/rag/searchable``: whether the reader has anything to search.
+
+        No also when the backend says they may not read the knowledge base at all (403). Raises on any other
+        failure: the caller decides what an unknown answer means.
+        """
+        headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
+        resp = await self._http.get(f"{self._base}/api/admin/rag/searchable", timeout=5.0, headers=headers)
+        if resp.status_code == 403:
+            return False
+        resp.raise_for_status()
+        return bool(resp.json().get("searchable"))
 
     async def passage(
         self,

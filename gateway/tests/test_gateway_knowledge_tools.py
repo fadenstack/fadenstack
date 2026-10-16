@@ -10,8 +10,10 @@ them, as the user, between rounds of the model's answer.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from collections.abc import AsyncIterator
+from types import SimpleNamespace
 from typing import Any
 
 import jwt as pyjwt
@@ -22,10 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import ProviderType
 from faden_gateway.services.gateway import knowledge as knowledge_mod
+from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
 from faden_gateway.services.gateway.rag_lite_client import RagLiteClient
+from faden_gateway.services.gateway.service import GatewayService, _Prepared
 from faden_gateway.settings import settings
+from tests.test_agent_routes import _profile
 from tests.test_gateway_pipeline_combined import (
     ALIAS,
     _history,
@@ -103,20 +108,31 @@ async def _stream(kind: str, value: Any) -> AsyncIterator[bytes]:
 
 
 class _Knowledge:
-    """RAG Lite on the backend, as the tools reach it."""
+    """RAG Lite on the backend, as the tools reach it; *searchable*: what the caller has to search."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch, *, fails: bool = False) -> None:
+    def __init__(
+        self, monkeypatch: pytest.MonkeyPatch, *, fails: bool = False, searchable: bool | Exception = True,
+        results: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.searches: list[dict[str, Any]] = []
         self.passages: list[dict[str, Any]] = []
+        self.checks: list[dict[str, Any]] = []
         monkeypatch.setattr(settings, "rag_lite_enabled", True)
         monkeypatch.setattr(settings, "rag_enabled", False)
+        knowledge_mod.forget_searchable()
         knowledge = self
 
         async def search(self: RagLiteClient, **kwargs: Any) -> list[dict[str, Any]]:
             knowledge.searches.append(kwargs)
             if fails:
                 raise RuntimeError("401 Unauthorized")
-            return [HIT]
+            return [HIT] if results is None else results
+
+        async def check(self: RagLiteClient, **kwargs: Any) -> bool:
+            knowledge.checks.append(kwargs)
+            if isinstance(searchable, Exception):
+                raise searchable
+            return searchable
 
         async def passage(self: RagLiteClient, **kwargs: Any) -> dict[str, Any]:
             knowledge.passages.append(kwargs)
@@ -126,6 +142,7 @@ class _Knowledge:
 
         monkeypatch.setattr(RagLiteClient, "search", search)
         monkeypatch.setattr(RagLiteClient, "passage", passage)
+        monkeypatch.setattr(RagLiteClient, "searchable", check)
 
 
 def _tool_names(payload: dict[str, Any]) -> list[str]:
@@ -201,6 +218,145 @@ async def test_not_offered_when_rag_lite_is_off_or_tools_are_ruled_out(
     monkeypatch.setattr(settings, "rag_lite_enabled", False)
     await _ask(client)
     assert [_tool_names(p) for p in model.sent] == [[], ["current_time"]]
+
+
+# ── Nothing to search ─────────────────────────────────────────────
+
+
+@pytest.mark.anyio
+async def test_not_offered_to_someone_with_nothing_to_search_and_asked_once_a_minute(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Not for someone who may read no document, or an agent whose collections hold none.
+
+    They got the tools anyway, and the model's first call was a search that failed (seen recording the
+    browser agent video).
+    """
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    knowledge = _Knowledge(monkeypatch, searchable=False)
+    model = _Model(monkeypatch, _say("a"), _say("b"))
+
+    await _ask(client)
+    await _ask(client)
+    assert [_tool_names(p) for p in model.sent] == [["current_time"], ["current_time"]]
+    assert len(knowledge.checks) == 1, "kept a minute: not a call on every turn"
+    assert _reads_as_user_1(knowledge.checks[0]["api_token"]), "asked as the person"
+
+
+@pytest.mark.anyio
+async def test_a_knowledge_tool_called_with_nothing_to_search_is_answered_not_failed(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    knowledge = _Knowledge(monkeypatch, searchable=False)
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("There is nothing to search."))
+
+    assert (await _ask(client)).status_code == 200
+    assert knowledge.searches == [], "nothing to search: not searched"
+    told = json.loads(model.sent[1]["messages"][-1]["content"])
+    assert told == {"results": [], "note": "There is nothing in the knowledge base to search."}
+
+
+@pytest.mark.anyio
+async def test_a_search_that_finds_nothing_says_so_and_is_no_error(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    _Knowledge(monkeypatch, results=[])
+    model = _Model(monkeypatch, _call("knowledge_search", {"query": "launch"}), _say("Nothing found."))
+
+    await _ask(client)
+    told = json.loads(model.sent[1]["messages"][-1]["content"])
+    assert told == {"query": "launch", "results": [], "note": "Nothing in the knowledge base matched this search."}
+
+
+@pytest.mark.anyio
+async def test_a_check_that_fails_offers_the_tools_as_before(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unknown answer is not a no: the tools are offered, and a search that then fails tells the model so."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None, node_metadata=CAN_CALL_TOOLS)
+    fastapi_app.state.gateway_observability = _Observability()
+    _Knowledge(monkeypatch, searchable=RuntimeError("backend down"))
+    model = _Model(monkeypatch, _say("On 5 May."))
+
+    assert (await _ask(client)).status_code == 200
+    assert "knowledge_search" in _tool_names(model.sent[0])
+
+
+@pytest.mark.anyio
+async def test_the_answer_is_kept_a_minute_per_person_and_collections(monkeypatch: pytest.MonkeyPatch) -> None:
+    knowledge = _Knowledge(monkeypatch, searchable=False)
+    rag = RagLiteClient(base_url="http://backend", http_client=None)  # type: ignore[arg-type]  # not called
+    person = AuthContext(user_id="user-1", tenant_id="tenant-a", raw_claims={})
+    agent = dataclasses.replace(person, knowledge=("c-1",))
+    ask = knowledge_mod.has_something_to_search
+
+    assert await ask(rag, person, now=100.0) is False
+    assert await ask(rag, person, now=159.0) is False
+    assert await ask(rag, agent, now=159.0) is False
+    assert len(knowledge.checks) == 2, "an agent's collections are asked apart from its person's own"
+    assert _reads_as_user_1(knowledge.checks[1]["api_token"], ["c-1"])
+    assert await ask(rag, person, now=161.0) is False
+    assert len(knowledge.checks) == 3, "asked again after a minute"
+
+    failing = _Knowledge(monkeypatch, searchable=RuntimeError("backend down"))
+    assert await ask(rag, person, now=0.0) is True
+    assert await ask(rag, person, now=14.0) is True and len(failing.checks) == 1
+    assert await ask(rag, person, now=16.0) is True and len(failing.checks) == 2, "a failed check is asked sooner"
+
+
+@pytest.mark.anyio
+async def test_not_asked_when_the_tools_could_not_be_offered_anyway(monkeypatch: pytest.MonkeyPatch) -> None:
+    knowledge = _Knowledge(monkeypatch)
+    service = object.__new__(GatewayService)
+    service.rag_lite_client = RagLiteClient(base_url="http://backend", http_client=None)  # type: ignore[arg-type]
+    auth = AuthContext(user_id="user-1", tenant_id="tenant-a", raw_claims={})
+    calls = SimpleNamespace(node_metadata={"tools": True})
+    no_calls = SimpleNamespace(node_metadata={"tools": False})
+
+    async def asked(payload: dict[str, Any], candidates: list[Any], agent: AgentRequest | None = None) -> Any:
+        req = _Prepared(payload=payload, agent=agent)
+        return await service._knowledge_to_search(req, auth, payload, candidates)  # noqa: SLF001
+
+    assert await asked({"tool_choice": "none"}, [calls]) is None
+    assert await asked({}, [no_calls]) is None, "no route the request may take calls tools"
+    assert await asked({}, [calls], AgentRequest(agent=_profile(server_tools=()))) is None, "the agent allows none"
+    assert knowledge.checks == []
+    assert await asked({}, [no_calls, calls]) is True
+    assert len(knowledge.checks) == 1
+
+
+@pytest.mark.anyio
+async def test_the_check_client_reads_yes_no_and_a_refusal_as_no() -> None:
+    import httpx  # noqa: PLC0415
+
+    answers = iter([
+        httpx.Response(200, json={"searchable": True}),
+        httpx.Response(200, json={"searchable": False}),
+        httpx.Response(403, json={"detail": "Permission denied: rag.search:read"}),
+        httpx.Response(500),
+    ])
+    asked: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return next(answers)
+
+    reader = "a-knowledge-token"
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as http:
+        rag = RagLiteClient(base_url="http://backend/", http_client=http)
+        assert await rag.searchable(api_token=reader) is True
+        assert await rag.searchable(api_token=reader) is False
+        assert await rag.searchable(api_token=reader) is False, "may read no knowledge at all"
+        with pytest.raises(httpx.HTTPStatusError):
+            await rag.searchable(api_token=reader)
+    assert {(r.method, r.url.path, r.headers["authorization"]) for r in asked} == {
+        ("GET", "/api/admin/rag/searchable", f"Bearer {reader}"),
+    }
 
 
 # ── Run by the gateway ────────────────────────────────────────────
