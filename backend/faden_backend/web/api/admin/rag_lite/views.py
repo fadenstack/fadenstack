@@ -7,6 +7,7 @@ knowledge-base experience.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Annotated, Any
 
@@ -58,6 +59,7 @@ from faden_backend.web.api.admin.rag_lite.schema import (
     RagLiteJobEventDTO,
     RagLitePassageChunk,
     RagLitePassageResponse,
+    RagLiteSearchableResponse,
     RagLiteSearchRequest,
     RagLiteSearchResponse,
     RagLiteSearchResult,
@@ -67,6 +69,7 @@ from faden_backend.web.api.admin.rag_lite.schema import (
 from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 #: Who reads: a sign-in with rag.search:read, or the gateway's knowledge token (services/knowledge_access.py).
 Reader = Annotated[KnowledgeReader, Depends(knowledge_reader)]
@@ -382,6 +385,13 @@ async def search(
     chunk_dao: RagLiteChunkDAO = Depends(),
     request: Request = None,  # type: ignore[assignment]
 ) -> RagLiteSearchResponse:
+    session = chunk_dao.session
+    scope = await search_scope(session, reader)
+    # Nothing to search finds nothing; it is not an error. The query was embedded first, and an install whose
+    # knowledge base was never set up has no embedding model: every search of it was a 500.
+    if not await chunk_dao.any_searchable(body.collection_ids, scope):
+        return RagLiteSearchResponse(query=body.query, results=[])
+
     rag_service = request.app.state.rag_lite_service
 
     # Resolve embedding client at request time
@@ -396,18 +406,25 @@ async def search(
     pref_id_str = settings.rag_lite_embedding_provider_id
     pref_id = uuid.UUID(pref_id_str) if pref_id_str else None
 
-    session = chunk_dao.session
     # The app's client: its connections to the embedding and reranking
     # servers stay open from one search to the next.
     http_client = getattr(request.app.state, "http_client", None)
-    embedding_client = await EmbeddingClient.auto_detect(
-        session,
-        preferred_provider_id=pref_id,
-        model_override=settings.rag_lite_embedding_model or None,
-        dim=settings.rag_lite_embedding_dim,
-        crypto=crypto,
-        http_client=http_client,
-    )
+    try:
+        embedding_client = await EmbeddingClient.auto_detect(
+            session,
+            preferred_provider_id=pref_id,
+            model_override=settings.rag_lite_embedding_model or None,
+            dim=settings.rag_lite_embedding_dim,
+            crypto=crypto,
+            http_client=http_client,
+        )
+    except ValueError as exc:
+        # There is something to search and no model to search it with: say so, rather than a bare 500.
+        log.warning("Knowledge search without an embedding model: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The knowledge base has no embedding model to search with; an administrator sets one up.",
+        ) from exc
 
     from faden_backend.services.rag_lite.rerank import RerankClient  # noqa: PLC0415
 
@@ -425,7 +442,7 @@ async def search(
         hybrid=hybrid,
         reranker=reranker,
         candidates=settings.rag_lite_rerank_candidates,
-        scope=await search_scope(session, reader),
+        scope=scope,
     )
     return RagLiteSearchResponse(
         query=body.query,
@@ -440,6 +457,20 @@ async def search(
             for r in results
         ],
     )
+
+
+@router.get("/searchable", response_model=RagLiteSearchableResponse)
+async def searchable(
+    reader: Reader,
+    chunk_dao: RagLiteChunkDAO = Depends(),
+) -> RagLiteSearchableResponse:
+    """Whether the reader has anything to search; an agent reads only what is in its collections.
+
+    The gateway asks before it offers a chat the knowledge tools, once a minute per person and agent: someone
+    who may read no document is not offered a search that can find nothing.
+    """
+    scope = await search_scope(chunk_dao.session, reader)
+    return RagLiteSearchableResponse(searchable=await chunk_dao.any_searchable(scope=scope))
 
 
 # -----------------------------------------------------------------------

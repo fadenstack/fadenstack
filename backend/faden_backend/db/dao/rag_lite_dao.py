@@ -390,6 +390,20 @@ class RagLiteChunkDAO:
         result = await self.session.execute(stmt)
         return result.rowcount  # type: ignore[return-value]
 
+    async def any_searchable(
+        self,
+        collection_ids: list[uuid.UUID] | None = None,
+        scope: CollectionScope | None = None,
+    ) -> bool:
+        """Whether a search within *scope* (and *collection_ids*) has any chunk to find; one row at most."""
+        filters = ""
+        params: dict[str, Any] = {}
+        searched = _scope_of(collection_ids, scope)
+        if searched is not None:
+            filters, params, _key = searched.where()
+        sql = text(f"SELECT EXISTS (SELECT 1 FROM rag_lite_chunks c WHERE c.embedding IS NOT NULL {filters})")
+        return bool((await self.session.execute(sql, params)).scalar_one())
+
     async def search_similar(
         self,
         query_vector: list[float],

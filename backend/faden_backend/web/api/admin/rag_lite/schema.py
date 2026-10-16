@@ -75,6 +75,12 @@ class RagLiteSearchResponse(BaseModel):
     query: str
 
 
+class RagLiteSearchableResponse(BaseModel):
+    """Whether the reader has anything in the knowledge base to search."""
+
+    searchable: bool
+
+
 class RagLitePassageChunk(BaseModel):
     chunk_index: int
     text: str
