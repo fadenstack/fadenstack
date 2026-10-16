@@ -42,6 +42,7 @@
 "Can the assistant improve text I wrote in a web form?" = "quick-actions"
 "How do I send a screenshot to the assistant?" = "ask-about-a-page"
 "How do I use a skill in the browser panel?" = "skills"
+"Can the assistant in Chrome search the web?" = "web-search"
 "Why did the answer stop when I closed the panel?" = "what-it-asks-first"
 
 ["use/office-add-ins.md"]

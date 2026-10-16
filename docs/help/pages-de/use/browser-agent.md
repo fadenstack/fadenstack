@@ -73,6 +73,15 @@ Schnellaktionen fragen den Agenten sofort, in Ihrer Sprache. Sie stehen im Menü
 
 Skills sind Arbeitsweisen, die Ihre Organisation eingerichtet hat, etwa „In unserem Stil antworten“ oder „Einen Vertrag gegen unsere Checkliste prüfen“. Um einen für eine Nachricht zu nutzen, geben Sie im Nachrichtenfeld `$` ein (oder `/` am Anfang) und wählen den Skill aus der Liste: Tippen Sie ein paar Buchstaben, um sie einzugrenzen, und drücken Sie die Eingabetaste. Der Skill steht dann über dem Nachrichtenfeld und gilt nur für diese Nachricht. Siehe [Skills](skills.md).
 
+## Websuche {#web-search}
+
+Der Agent kann mit der Suchmaschine von Chrome im Web suchen, also mit der, die in Chrome eingestellt ist. Das ist aus, bis Sie es einschalten: Wählen Sie das Zahnrad (**Einstellungen**) und dann **Mit Chrome im Web suchen**. Hat Ihre Organisation das für Sie entschieden, zeigt der Eintrag **Von Ihrer Organisation festgelegt**.
+
+Im Tool-Modus **Nachfragen** fragt jede Suche zuerst, und die Karte zeigt die Suchanfrage. Die Suche läuft in einem Tab im Hintergrund, und der Agent liest die Ergebnisse wie eine Seite; beim ersten Mal braucht Fadenstack deshalb Ihre Erlaubnis für die Website der Suchmaschine: Wählen Sie **… erlauben** über dem Nachrichtenfeld und fragen Sie dann erneut. Danach öffnet er ein oder zwei Ergebnisse und nennt Ihnen ihre Links.
+
+??? info "Wohin eine Suche geht"
+    Die Suchanfrage geht an die in Chrome eingestellte Suchmaschine, nicht über den Server Ihrer Organisation, so wie eine Suche, die Sie in die Adressleiste tippen. Der Agent ist angewiesen, nie personenbezogene Daten oder Text von der Seite in eine Suchanfrage zu schreiben, es sei denn, Sie haben genau darum gebeten; lesen Sie die Suchanfrage auf der Karte, bevor Sie sie erlauben.
+
 ## Was er sonst noch kann {#what-else-it-can-do}
 
 | Bitten Sie ihn | Was er tut |
@@ -92,7 +101,7 @@ Der **Tool-Modus** oben in der Seitenleiste legt fest, was ohne Nachfrage ausgef
 | Was | Aus | Nur lesen | Nachfragen (Standard) | Automatisch |
 |---|---|---|---|---|
 | Seite, Tabs, PDFs und Markierung lesen; suchen; zeigen, wo etwas steht | nein | läuft | läuft | läuft |
-| Ein Feld ausfüllen, in einen Editor schreiben, Ihre Markierung ersetzen, in die Zwischenablage kopieren, eine Seite öffnen | nein | nein | fragt | läuft |
+| Ein Feld ausfüllen, in einen Editor schreiben, Ihre Markierung ersetzen, in die Zwischenablage kopieren, eine Seite öffnen, im Web suchen | nein | nein | fragt | läuft |
 | Eine Schaltfläche drücken oder einem Link folgen | nein | nein | fragt, jedes Mal | fragt, jedes Mal |
 
 ![Eine Karte mit der Frage Run copy_to_clipboard?, die die zu kopierende Tabelle zeigt, mit den Schaltflächen Allow, Allow for this chat und Deny](../images/use/browser-agent-approval.png)
@@ -114,11 +123,12 @@ Wenn Sie die Seitenleiste schließen, während der Agent antwortet, hält die An
 
 ## Berechtigungen, die er anfordert {#permissions-it-asks-for}
 
-Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffnen, ihre Einstellungen und Ihre Anmeldung zu speichern, ihre Einträge zum Kontextmenü (Rechtsklick) hinzuzufügen, Titel und Adressen Ihrer Tabs zu lesen, und Seiten zu lesen und darauf zu handeln, aber nur auf Websites, die Sie erlauben. Wenn Sie das Tastenkürzel für die Markierung oder **Zu einem Screenshot dieser Seite fragen** nutzen, lässt Chrome sie dieses eine Mal in diesen Tab. Gesondert fragt sie nach dem Zugriff auf Ihren Fadenstack-Server (wenn Sie **Verbinden** wählen) und nach jeder Website, die Sie erlauben. Sie können die Erlaubnis für jede Website in den Einstellungen von Chrome für die Erweiterung wieder zurücknehmen.
+Bei der Installation erlaubt Chrome der Erweiterung, ihre Seitenleiste zu öffnen, ihre Einstellungen und Ihre Anmeldung zu speichern, ihre Einträge zum Kontextmenü (Rechtsklick) hinzuzufügen, Titel und Adressen Ihrer Tabs zu lesen, mit der Suchmaschine von Chrome zu suchen, wenn Sie die Websuche einschalten, und Seiten zu lesen und darauf zu handeln, aber nur auf Websites, die Sie erlauben. Wenn Sie das Tastenkürzel für die Markierung oder **Zu einem Screenshot dieser Seite fragen** nutzen, lässt Chrome sie dieses eine Mal in diesen Tab. Gesondert fragt sie nach dem Zugriff auf Ihren Fadenstack-Server (wenn Sie **Verbinden** wählen) und nach jeder Website, die Sie erlauben. Sie können die Erlaubnis für jede Website in den Einstellungen von Chrome für die Erweiterung wieder zurücknehmen.
 
 ## Wohin Ihre Daten gehen {#where-your-data-goes}
 
 - Was Sie fragen und was der Agent liest, um zu antworten (die Seite, Tabs, PDF-Seiten, Bilder, die Sie hinzufügen), geht an den Server Ihrer Organisation und an das Modell, das Ihr Administrator für den Agenten ausgewählt hat.
+- Mit eingeschalteter Websuche geht eine Suche, die Sie erlauben, an die in Chrome eingestellte Suchmaschine.
 - PDFs werden in Ihrem Browser gelesen. Bilder werden in Ihrem Browser verkleinert, bevor sie gesendet werden.
 - Ihre Unterhaltungen bleiben in diesem Browser. Der Server protokolliert, welche Tools liefen und wie lange sie dauerten, nicht, was sie gelesen haben.
 - Ihre Anmeldung wird in diesem Browser gespeichert und ist dort nicht verschlüsselt. Melden Sie sich auf einem Computer, den auch andere nutzen, ab, wenn Sie fertig sind: Wählen Sie oben in der Seitenleiste das Zahnrad (**Einstellungen**), dann **Auf diesem Gerät abmelden**.

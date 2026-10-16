@@ -100,6 +100,10 @@ sign in and cannot change them:
 Add `"language": "de"` to fix the panel's language for everyone; without it, each person picks one in the panel's
 settings, and **Automatic** is the browser's language.
 
+Add `"webSearch": true` to switch web search on for everyone, or `false` to keep it off; without it, each person
+decides in the panel's settings, and it is off until they do. Searches go to the search engine set in Chrome, not
+through Fadenstack; Chrome's `DefaultSearchProviderSearchURL` policy can point it at your own search service.
+
 To keep the agent off some sites (online banking, HR systems), block them for the extension with Chrome's
 `ExtensionSettings` policy (`runtime_blocked_hosts` under the extension's ID): Chrome then lets it neither read nor
 act on those sites, whatever a person allows.

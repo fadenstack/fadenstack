@@ -73,6 +73,15 @@ Quick actions ask the agent at once, in your language. They are in the panel's *
 
 Skills are ways of working your organisation set up, such as "Reply in our style" or "Check a contract against our checklist". To use one for a message, type `$` in the message box (or `/` at its start), and pick the skill from the list: type a few letters to narrow it, then press Enter. The skill shows above the message box and goes with that message only. See [Skills](skills.md).
 
+## Web search
+
+The agent can search the web with Chrome's own search engine, the one set in Chrome. It is off until you switch it on: select the gear (**Settings**), then **Search the web with Chrome**. If your organisation decided for you, the item shows **Set by your organisation**.
+
+In the **Ask** tool mode, every search asks first, and the card shows the query. The search runs in a tab in the background, and the agent reads the results like a page, so the first time Fadenstack needs your permission for the search engine's site: select **Allow …** above the message box, then ask again. It then opens a result or two and gives you their links.
+
+??? info "Where a search goes"
+    The query goes to the search engine set in Chrome, not through your organisation's server, as a search you typed into the address bar would. The agent is told never to put personal data or text from the page into a query unless you asked for exactly that; read the query on the card before you allow it.
+
 ## What else it can do
 
 | Ask it to | What it does |
@@ -92,7 +101,7 @@ The **Tool mode** at the top of the panel decides what runs without asking:
 | What | Off | Read only | Ask (default) | Auto |
 |---|---|---|---|---|
 | Read the page, tabs, PDFs, the selection; search; show where | no | runs | runs | runs |
-| Fill a field, write into an editor, replace your selection, copy to the clipboard, open a page | no | no | asks | runs |
+| Fill a field, write into an editor, replace your selection, copy to the clipboard, open a page, search the web | no | no | asks | runs |
 | Press a button or follow a link | no | no | asks, every time | asks, every time |
 
 ![A card asking Run copy_to_clipboard?, showing the table it will copy, with the Allow, Allow for this chat and Deny buttons](../images/use/browser-agent-approval.png)
@@ -114,11 +123,12 @@ If you close the panel while the agent answers, the answer stops: the agent work
 
 ## Permissions it asks for
 
-At installation, Chrome lets the extension open its side panel, keep its settings and your sign-in, add its right-click items, read the titles and addresses of your tabs, and read and act on pages, but only on sites you allow. When you use the selection shortcut or **Ask about a screenshot of this page**, Chrome lets it into that tab that once. It asks separately to reach your Fadenstack server (when you select **Connect**) and for each site you allow. You can take any site back in Chrome's settings for the extension.
+At installation, Chrome lets the extension open its side panel, keep its settings and your sign-in, add its right-click items, read the titles and addresses of your tabs, search with Chrome's search engine when you switch web search on, and read and act on pages, but only on sites you allow. When you use the selection shortcut or **Ask about a screenshot of this page**, Chrome lets it into that tab that once. It asks separately to reach your Fadenstack server (when you select **Connect**) and for each site you allow. You can take any site back in Chrome's settings for the extension.
 
 ## Where your data goes
 
 - What you ask, and what the agent reads to answer (the page, tabs, PDF pages, pictures you add), goes to your organisation's server and to the model your administrator chose for the agent.
+- With web search switched on, a search you allow goes to the search engine set in Chrome.
 - PDFs are read inside your browser. Pictures are made smaller in your browser before they go.
 - Your conversations stay in this browser. The server records which tools ran and how long they took, not what they read.
 - Your sign-in is kept in this browser and is not encrypted there. On a computer others use, sign out when you are done: select the gear (**Settings**) at the top of the panel, then **Sign out on this device**.

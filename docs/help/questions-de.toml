@@ -40,6 +40,7 @@
 "Kann der Assistent Text verbessern, den ich in ein Webformular geschrieben habe?" = "quick-actions"
 "Wie schicke ich dem Assistenten einen Screenshot?" = "ask-about-a-page"
 "Wie nutze ich einen Skill in der Seitenleiste des Browsers?" = "skills"
+"Kann der Assistent in Chrome im Web suchen?" = "web-search"
 "Warum hat die Antwort angehalten, als ich die Seitenleiste geschlossen habe?" = "what-it-asks-first"
 
 ["use/office-add-ins.md"]

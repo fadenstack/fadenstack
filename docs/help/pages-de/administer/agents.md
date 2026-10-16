@@ -105,6 +105,11 @@ Konsole brauchen sie nicht.
 Mit `"language": "de"` legen Sie die Sprache der Seitenleiste für alle fest; ohne wählt jede Person sie in den
 Einstellungen der Seitenleiste, und **Automatisch** ist die Sprache des Browsers.
 
+Mit `"webSearch": true` schalten Sie die Websuche für alle ein, mit `false` lassen Sie sie aus; ohne die Angabe
+entscheidet jede Person in den Einstellungen der Seitenleiste, und bis dahin ist sie aus. Suchanfragen gehen an die
+in Chrome eingestellte Suchmaschine, nicht über Fadenstack; die Chrome-Richtlinie `DefaultSearchProviderSearchURL`
+kann sie auf Ihren eigenen Suchdienst richten.
+
 Um den Agenten von bestimmten Websites fernzuhalten (Onlinebanking, Personalsysteme), sperren Sie sie für die
 Erweiterung mit der Chrome-Richtlinie `ExtensionSettings` (`runtime_blocked_hosts` unter der ID der Erweiterung):
 Chrome lässt sie diese Websites dann weder lesen noch darauf handeln, was immer eine Person erlaubt.
