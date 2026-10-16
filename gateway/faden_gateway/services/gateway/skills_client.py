@@ -1,7 +1,8 @@
 """HTTP client for the Skills micro-service.
 
 Used by the gateway pipeline to resolve matching skills for a
-request context via the Skills service's internal API.
+request context via the Skills service's internal API, and by an agent's
+route to list the skills its person may pick.
 """
 
 from __future__ import annotations
@@ -13,6 +14,12 @@ from typing import Any
 import httpx
 
 logger = logging.getLogger(__name__)
+
+#: Who a call to the skills API acts for; the service believes them next to its token (its web/api/auth.py).
+HEADER_USER = "x-faden-user"
+HEADER_GROUPS = "x-faden-groups"
+HEADER_CAPS = "x-faden-caps"
+HEADER_TENANT = "x-faden-tenant"
 
 
 @dataclass(slots=True)
@@ -45,6 +52,25 @@ class SkillResolveResult:
     """Result of a skill resolution call."""
 
     skills: list[ResolvedSkill] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class UsableSkill:
+    """A skill a chat can be given, as a picker shows it: never its instructions."""
+
+    id: str
+    slug: str
+    name: str
+    description: str
+    activation: str
+
+
+class SkillsUnavailable(Exception):
+    """The skills service gave no list: it could not be reached, or it failed (``reached``)."""
+
+    def __init__(self, message: str, *, reached: bool) -> None:
+        super().__init__(message)
+        self.reached = reached
 
 
 class SkillsClient:
@@ -132,6 +158,52 @@ class SkillsClient:
         except Exception:
             logger.exception("Skills resolve failed")
             return SkillResolveResult()
+
+    async def list_usable(
+        self,
+        *,
+        tenant_id: str,
+        user_id: str,
+        group_ids: list[str] | tuple[str, ...] = (),
+        query: str | None = None,
+        limit: int = 50,
+    ) -> list[UsableSkill]:
+        """The skills *user_id* may be given in a chat: what the chat's skill picker lists.
+
+        Calls ``GET /api/skills?usable=true`` as that user -- their id and groups in the headers the service
+        believes next to its token -- with no capabilities. None is needed to see a skill, and a chat is never
+        resolved as an administrator: listed with ``admin``, the picker would offer other people's private
+        skills, which no chat of theirs gets. Raises ``SkillsUnavailable`` when the service gives no list.
+        """
+        params: dict[str, str | int] = {"usable": "true", "limit": limit}
+        if query:
+            params["q"] = query
+        headers = {
+            **self._headers,
+            HEADER_TENANT: tenant_id,
+            HEADER_USER: user_id,
+            HEADER_GROUPS: ",".join(group_ids),
+            HEADER_CAPS: "",
+        }
+        try:
+            resp = await self._http.get(f"{self._base}/api/skills", params=params, headers=headers, timeout=10.0)
+        except httpx.HTTPError as exc:
+            raise SkillsUnavailable(f"The skills service could not be reached: {exc!r}", reached=False) from exc
+        if resp.status_code >= 400:
+            raise SkillsUnavailable(f"The skills service answered {resp.status_code}.", reached=True)
+        try:
+            return [
+                UsableSkill(
+                    id=str(s["id"]),
+                    slug=str(s["slug"]),
+                    name=str(s["name"]),
+                    description=str(s.get("description") or ""),
+                    activation=str(s.get("activation") or ""),
+                )
+                for s in resp.json().get("items") or []
+            ]
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise SkillsUnavailable("The skills service's list could not be read.", reached=True) from exc
 
     async def read_file(
         self,
