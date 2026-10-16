@@ -100,6 +100,13 @@ sign in and cannot change them:
 Add `"language": "de"` to fix the panel's language for everyone; without it, each person picks one in the panel's
 settings, and **Automatic** is the browser's language.
 
+To keep the agent off some sites (online banking, HR systems), block them for the extension with Chrome's
+`ExtensionSettings` policy (`runtime_blocked_hosts` under the extension's ID): Chrome then lets it neither read nor
+act on those sites, whatever a person allows.
+
+An agent made from the Chrome template gets the knowledge search and the time as its **Server tools**; add others,
+such as web search, in its **Definition**. Screenshots and pictures go to it only when its **Model** sees pictures.
+
 Chrome uses the operating system's certificate store: the computers must trust the server's certificate (see
 [HTTPS and trust](../operate/https.md)).
 
