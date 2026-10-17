@@ -71,6 +71,9 @@ const CLASS_OPTIONS: ContainerClass[] = [
 ];
 const POLICY_OPTIONS: ContainerPolicy[] = ["free", "restricted", "locked"];
 
+/** How the backend writes a hidden value (secret_redaction.MASK): sent back as it is, the value stays. */
+const HIDDEN_MARK = "•".repeat(8);
+
 /** A command as the form's field shows it: an argument with spaces in quotes. */
 function joinCommand(cmd: string[] | null): string {
   return (cmd ?? [])
@@ -130,6 +133,10 @@ export default function CreateContainerPage() {
 
   // ── Editing: what the container was created with ────────────────────────
   const [settings, setSettings] = useState<ContainerSettings | null>(null);
+  /** The backend hides secret values with bullets; such a row is shown as a password field until retyped. */
+  const isHiddenValue = (row: { key: string; value: string }) =>
+    Boolean(settings?.hidden_env.includes(row.key)) && row.value.includes(HIDDEN_MARK);
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -352,7 +359,11 @@ export default function CreateContainerPage() {
                       placeholder='/bin/sh -c "echo hello"'
                       value={cmdRaw}
                       onChange={(e) => setCmdRaw(e.target.value)}
-                      helperText={t("create_container.command_override_help")}
+                      helperText={
+                        settings?.cmd_hidden
+                          ? `${t("create_container.command_override_help")} ${t("create_container.command_hidden")}`
+                          : t("create_container.command_override_help")
+                      }
                       inputProps={{ style: { fontFamily: "monospace", fontSize: "0.85rem" } }}
                     />
                   </Stack>
@@ -445,6 +456,8 @@ export default function CreateContainerPage() {
                             placeholder="localhost"
                             value={row.value}
                             onChange={(e) => updateEnv(i, "value", e.target.value)}
+                            type={isHiddenValue(row) ? "password" : "text"}
+                            helperText={isHiddenValue(row) ? t("create_container.hidden_value") : undefined}
                             sx={{ flex: 2 }}
                             inputProps={{ style: { fontFamily: "monospace" } }}
                           />

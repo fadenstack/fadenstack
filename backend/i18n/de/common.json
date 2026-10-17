@@ -762,6 +762,8 @@
     "container_name_placeholder": "mein-service (leer für Docker-Namen)",
     "command_override": "Befehl überschreiben",
     "command_override_help": "Optionaler Shell-Befehl zum Überschreiben des Standard-CMD.",
+    "command_hidden": "Geheime Werte im Befehl sind verborgen. Unverändert bleiben sie erhalten.",
+    "hidden_value": "Verborgen. Unverändert bleibt der Wert erhalten; einen neuen eingeben, um ihn zu ersetzen.",
     "no_port_bindings": "Keine Port-Bindings. Mit Hinzufügen Ports freigeben.",
     "host_port": "Host-Port",
     "container_port": "Container-Port",

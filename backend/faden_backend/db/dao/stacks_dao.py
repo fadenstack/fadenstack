@@ -47,6 +47,10 @@ class StackRevisionDAO:
             created_by=created_by,
         )
         self.session.add(record)
+        # Its time comes from the database: without it the revision could not be answered (a 500 on every
+        # deploy, update and rollback).
+        await self.session.flush()
+        await self.session.refresh(record)
         return record
 
     async def list_revisions(self, stack_id: str) -> list[StackRevision]:

@@ -8,7 +8,6 @@ node is contacted.
 from __future__ import annotations
 
 import uuid
-
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -18,14 +17,26 @@ from starlette import status
 
 from faden_backend.db.dependencies import get_db_session
 from faden_backend.db.models.users import User
+from faden_backend.services import secret_redaction
 from faden_backend.services.inference import takeover
 from faden_backend.services.inference.artifacts import ArtifactReadiness
+from faden_backend.services.inference.observability import (
+    EnvironmentMetrics,
+    ObservabilityUnsupported,
+)
 from faden_backend.services.inference.planner import InferenceEnvironmentPlan
 from faden_backend.services.inference.service import (
     EnvironmentService,
     InferenceError,
 )
+from faden_backend.services.nodes.service import NodeControlService
 from faden_backend.web.api.inference.control_planes import _map_inference_error
+from faden_backend.web.api.inference.found_clusters import _gateway as _command_gateway
+from faden_backend.web.api.inference.observability import (
+    get_node_control_service,
+    resolve_driver_for_environment,
+    unsupported,
+)
 from faden_backend.web.api.inference.schema import (
     ApplyPlanRequest,
     ComputePoolDTO,
@@ -35,17 +46,6 @@ from faden_backend.web.api.inference.schema import (
     EnvironmentNodeDTO,
     EnvironmentUpdate,
 )
-from faden_backend.services.inference.observability import (
-    EnvironmentMetrics,
-    ObservabilityUnsupported,
-)
-from faden_backend.services.nodes.service import NodeControlService
-from faden_backend.web.api.inference.observability import (
-    get_node_control_service,
-    resolve_driver_for_environment,
-    unsupported,
-)
-from faden_backend.web.api.inference.found_clusters import _gateway as _command_gateway
 from faden_backend.web.api.rbac import require_permission
 
 router = APIRouter()
@@ -88,7 +88,7 @@ async def create_environment(
             runtime_version=body.runtime_version,
             head_node_id=body.head_node_id,
             address=body.address,
-            config=body.config,
+            config=_restored_config(body.config, None),
         )
     except InferenceError as exc:
         raise _map_inference_error(exc)
@@ -121,6 +121,12 @@ async def update_environment(
 ) -> EnvironmentDTO:
     """Patch environment fields. Omitted fields are left unchanged."""
     kwargs = body.model_dump(exclude_unset=True)
+    if isinstance(kwargs.get("config"), dict):
+        try:
+            stored = (await service.get(environment_id)).config_json
+        except InferenceError as exc:
+            raise _map_inference_error(exc) from exc
+        kwargs["config"] = _restored_config(kwargs["config"], stored)
     try:
         env = await service.update(environment_id, **kwargs)
     except InferenceError as exc:
@@ -450,7 +456,26 @@ async def get_environment_artifact_readiness(
 
 
 def _dto_from_env(env) -> EnvironmentDTO:
-    return EnvironmentDTO.model_validate(env)
+    dto = EnvironmentDTO.model_validate(env)
+    env_vars = (dto.config or {}).get("node_env_vars")
+    if isinstance(env_vars, dict):
+        # The machines' environment may carry tokens: hidden in what the console sees.
+        dto.config = {**dto.config, "node_env_vars": secret_redaction.mask_mapping(env_vars)}
+    return dto
+
+
+def _restored_config(config: dict | None, stored: dict | None) -> dict | None:
+    """A config as sent, with node environment values sent back hidden put back from *stored*."""
+    if not config or not isinstance(config.get("node_env_vars"), dict):
+        return config
+    before = (stored or {}).get("node_env_vars")
+    try:
+        env_vars = secret_redaction.restore_mapping(
+            config["node_env_vars"], before if isinstance(before, dict) else None,
+        )
+    except secret_redaction.HiddenValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from None
+    return {**config, "node_env_vars": env_vars}
 
 
 @router.get("/{environment_id}/metrics", response_model=EnvironmentMetrics)

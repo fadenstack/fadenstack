@@ -38,6 +38,8 @@ const EVERYTHING: ContainerSettings = {
   name: "mcp-everything",
   cmd: ["npx", "-y", "@modelcontextprotocol/server-everything", "streamableHttp"],
   env: ["PORT=3001", "GREETING=hello world"],
+  hidden_env: [],
+  cmd_hidden: false,
   ports: [],
   volumes: ["/srv/data:/data:ro"],
   network: "fadenstack_default",
@@ -88,6 +90,31 @@ describe("editing a container", () => {
       env: ["PORT=3001", "GREETING=hello world"],
       volumes: ["/srv/data:/data:ro"],
       network: "fadenstack_default",
+    });
+  });
+
+  it("shows hidden values as passwords and sends them back unchanged, so they stay", async () => {
+    api.update.mockResolvedValue({ id: "new-id" } as admin.ContainerSummary);
+    const user = userEvent.setup();
+    const hidden = "•".repeat(8);
+    editPage({
+      ...EVERYTHING,
+      env: ["PORT=3001", `API_TOKEN=${hidden}`],
+      hidden_env: ["API_TOKEN"],
+      cmd: ["redis-server", "--requirepass", hidden],
+      cmd_hidden: true,
+    });
+
+    expect(await screen.findByText(/Left as it is, the value stays/)).toBeInTheDocument();
+    expect(screen.getByText(/Secret values in the command are hidden/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(hidden)).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Save and replace" }));
+    await user.click(await screen.findByRole("button", { name: "Replace" }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledOnce());
+    expect(api.update.mock.calls[0][1]).toMatchObject({
+      env: ["PORT=3001", `API_TOKEN=${hidden}`],
+      cmd: ["redis-server", "--requirepass", hidden],
     });
   });
 

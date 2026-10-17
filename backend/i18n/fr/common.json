@@ -757,6 +757,8 @@
     "container_name_placeholder": "mon-service (laisser vide pour un nom généré par Docker)",
     "command_override": "Remplacement de commande",
     "command_override_help": "Commande de type shell pour remplacer le CMD par défaut de l'image (optionnel).",
+    "command_hidden": "Les valeurs secrètes de la commande sont masquées. Laissées telles quelles, elles sont conservées.",
+    "hidden_value": "Masquée. Laissée telle quelle, la valeur est conservée ; saisissez-en une nouvelle pour la remplacer.",
     "no_port_bindings": "Aucune liaison de port. Cliquez sur Ajouter pour exposer des ports.",
     "host_port": "Port hôte",
     "container_port": "Port conteneur",

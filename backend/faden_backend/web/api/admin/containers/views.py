@@ -20,6 +20,7 @@ from faden_backend.db.models.containers import (
     ContainerPolicy,
 )
 from faden_backend.db.models.users import User, current_active_user
+from faden_backend.services import secret_redaction
 from faden_backend.services.docker import recreate
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services.policy.enforcement import Action, PolicyEnforcer
@@ -72,6 +73,29 @@ _NORMAL_SEVERITY = "normal"
 
 def _severity(root_mode: bool) -> str:
     return _ROOT_MODE_SEVERITY if root_mode else _NORMAL_SEVERITY
+
+
+#: Classes whose containers hold the platform's own keys: looking at them is recorded at high severity.
+_SYSTEM_CLASSES = (ContainerClass.SYSTEM_CORE, ContainerClass.SYSTEM_AUX)
+
+
+async def _record_view(
+    action: str, container_id: str, container_class: ContainerClass, user: User, audit_dao: AuditDAO,
+) -> None:
+    """Who looked at a container's detail or settings: those are where its environment shows."""
+    await audit_action(
+        action=action,
+        target_type="container",
+        target_id=container_id,
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        severity=_ROOT_MODE_SEVERITY if container_class in _SYSTEM_CLASSES else _NORMAL_SEVERITY,
+        audit_dao=audit_dao,
+    )
+
+
+def _hidden_value_refused(exc: secret_redaction.HiddenValueError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
 
 
 async def _lifecycle_user(
@@ -345,6 +369,12 @@ async def create_container(
         reasons, root_mode=root_mode, doing="create", audit="container.create",
         target_id=body.name or body.image, user=user, audit_dao=audit_dao,
     )
+    # A new container has no stored value for a hidden one to stand for.
+    try:
+        secret_redaction.restore_env(body.env, [])
+        secret_redaction.restore_cmd(body.cmd, [])
+    except secret_redaction.HiddenValueError as exc:
+        raise _hidden_value_refused(exc) from None
     # Build Docker port binding config: {"80/tcp": [{"HostIp": "", "HostPort": "8080"}]}
     port_bindings: dict[str, list[dict[str, str]]] | None = None
     if body.ports:
@@ -458,12 +488,14 @@ async def get_container(
     container_id: str,
     docker: DockerService = Depends(get_docker),
     entry: Any = Depends(get_registry_entry),
-    _user: User = Depends(require_permission("containers", "read")),
+    user: User = Depends(require_permission("containers", "read")),
     enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
     root_mode: bool = Depends(get_root_mode_active),
+    audit_dao: AuditDAO = Depends(),
 ) -> ContainerDetailDTO:
-    """Return full inspect data for a single container."""
+    """A single container: state, image, ports and networks; not its environment or command line."""
     enforcer.enforce(Action.VIEW, entry.container_class, entry.policy, root_mode)
+    await _record_view("container.view", container_id, entry.container_class, user, audit_dao)
     raw = await docker.inspect_container(container_id)
     raw_state = raw.get("State", {})
     raw_config = raw.get("Config", {})
@@ -489,7 +521,6 @@ async def get_container(
         container_class=entry.container_class,
         policy=entry.policy,
         owner_scope=entry.owner_scope,
-        raw=raw,
     )
 
 
@@ -498,12 +529,14 @@ async def container_settings(
     container_id: str,
     docker: DockerService = Depends(get_docker),
     entry: Any = Depends(get_registry_entry),
-    _user: User = Depends(require_permission("containers", "read")),
+    user: User = Depends(require_permission("containers", "read")),
     enforcer: PolicyEnforcer = Depends(get_policy_enforcer),
     root_mode: bool = Depends(get_root_mode_active),
+    audit_dao: AuditDAO = Depends(),
 ) -> ContainerSettingsDTO:
-    """What the container was created with, for its edit form."""
+    """What the container was created with, for its edit form, with secret values hidden."""
     enforcer.enforce(Action.VIEW, entry.container_class, entry.policy, root_mode)
+    await _record_view("container.settings.view", container_id, entry.container_class, user, audit_dao)
     try:
         raw = await docker.inspect_container(container_id)
     except DockerError as exc:
@@ -513,8 +546,10 @@ async def container_settings(
     return ContainerSettingsDTO(
         image=own.image,
         name=own.name,
-        cmd=own.cmd,
-        env=own.env,
+        cmd=secret_redaction.mask_cmd(own.cmd),
+        env=secret_redaction.mask_env(own.env),
+        hidden_env=secret_redaction.hidden_names(own.env),
+        cmd_hidden=secret_redaction.mask_cmd(own.cmd) != own.cmd,
         ports=[
             PortBinding(host_port=b.get("HostPort", ""), container_port=port)
             for port, binds in own.ports.items() for b in binds
@@ -590,11 +625,17 @@ async def update_container(
     )
     image = await _image_of(docker, raw)
     old = recreate.own_settings(raw, image)
+    # The form got secret values hidden: one sent back hidden keeps what the container has.
+    try:
+        env = secret_redaction.restore_env(body.env, old.env)
+        cmd = secret_redaction.restore_cmd(body.cmd, old.cmd)
+    except secret_redaction.HiddenValueError as exc:
+        raise _hidden_value_refused(exc) from None
     edit = recreate.ContainerEdit(
         image=body.image,
         name=(body.name or old.name).lstrip("/"),
-        cmd=body.cmd or None,
-        env=body.env,
+        cmd=cmd or None,
+        env=env,
         ports=_bindings(body.ports, old.ports),
         volumes=body.volumes,
         network=body.network or "",

@@ -762,6 +762,8 @@
     "container_name_placeholder": "my-service（留空则使用 Docker 自动名）",
     "command_override": "覆盖命令",
     "command_override_help": "可选：使用 shell 风格命令覆盖镜像默认 CMD。",
+    "command_hidden": "命令中的机密值已隐藏。保持不变则保留原值。",
+    "hidden_value": "已隐藏。保持不变则保留原值；输入新值即可替换。",
     "no_port_bindings": "暂无端口映射。点击新增以暴露端口。",
     "host_port": "主机端口",
     "container_port": "容器端口",

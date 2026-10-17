@@ -92,8 +92,10 @@ A container starts from an image on the server; creating one does not pull it.
     - **Networks**: without one, the container joins Docker's default bridge.
 
 !!! note
-    Environment variables are visible to anyone who can see the container. Do not put secrets there that those
-    people should not see.
+    The console hides values that look secret: variables named like a password, key, token or secret, the
+    password in a URL, and the value after a flag such as `--requirepass`. The edit form shows them as dots; left
+    as they are, they stay. Each look at a system container's detail or settings is recorded in the audit log.
+    Values the console does not recognise as secret are shown, so name secrets as such.
 
 Only a superuser creates, edits or reclassifies containers. A container that would have root on the server needs
 **Root Mode**: one that mounts a folder or file of the server (a host path such as `/srv/data`, `./config` or

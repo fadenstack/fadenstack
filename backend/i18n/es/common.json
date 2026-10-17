@@ -762,6 +762,8 @@
     "container_name_placeholder": "my-service (leave blank for Docker-generated name)",
     "command_override": "Command Override",
     "command_override_help": "Shell-style command to override the image's default CMD (optional).",
+    "command_hidden": "Los valores secretos del comando están ocultos. Si no los cambia, se conservan.",
+    "hidden_value": "Oculto. Si no lo cambia, se conserva; escriba un valor nuevo para reemplazarlo.",
     "no_port_bindings": "No port bindings. Click Add to expose ports.",
     "host_port": "Host Port",
     "container_port": "Container Port",

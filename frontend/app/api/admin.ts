@@ -38,9 +38,8 @@ export interface ContainerSummary {
   owner_scope: string;
 }
 
-export interface ContainerDetail extends ContainerSummary {
-  raw: Record<string, unknown>;
-}
+/** A container's detail page: no environment or command line (they hold the platform's keys). */
+export type ContainerDetail = ContainerSummary;
 
 export interface PortBinding {
   host_port: string;
@@ -65,8 +64,14 @@ export interface CreateContainerPayload {
 export interface ContainerSettings {
   image: string;
   name: string;
+  /** Secret flag values hidden. */
   cmd: string[] | null;
+  /** KEY=VALUE; secret values hidden. Sent back unchanged, a hidden value is kept. */
   env: string[];
+  /** Names in `env` whose value (or a URL's password) is hidden. */
+  hidden_env: string[];
+  /** A value in `cmd` is hidden. */
+  cmd_hidden: boolean;
   ports: PortBinding[];
   volumes: string[];
   network: string;

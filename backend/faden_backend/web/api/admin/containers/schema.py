@@ -34,9 +34,11 @@ class ContainerSummaryDTO(BaseModel):
 
 
 class ContainerDetailDTO(ContainerSummaryDTO):
-    """Full detail of a container including config."""
+    """A container's detail page.
 
-    raw: dict = Field(default_factory=dict)  # raw Docker inspect output
+    Not Docker's inspect output: that holds the environment and command line, with the platform's keys and
+    passwords in them. What the edit form needs comes from ``/settings``, with secret values hidden.
+    """
 
 
 class LifecycleAction(str):
@@ -69,8 +71,15 @@ class ContainerSettingsDTO(BaseModel):
 
     image: str
     name: str
-    cmd: list[str] | None = None
-    env: list[str] = Field(default_factory=list, description="KEY=VALUE strings.")
+    cmd: list[str] | None = Field(None, description="Secret flag values hidden (secret_redaction.MASK).")
+    env: list[str] = Field(
+        default_factory=list,
+        description="KEY=VALUE strings; secret values hidden. Sent back unchanged, a hidden value is kept.",
+    )
+    #: Names in ``env`` whose value (or a URL's password) is hidden.
+    hidden_env: list[str] = Field(default_factory=list)
+    #: Whether a value in ``cmd`` is hidden.
+    cmd_hidden: bool = False
     ports: list[PortBinding] = Field(default_factory=list)
     volumes: list[str] = Field(default_factory=list)
     network: str = ""

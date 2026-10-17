@@ -31,7 +31,7 @@ from faden_backend.db.models.llm import (
     ProviderType,
 )
 from faden_backend.db.models.users import User
-from faden_backend.services import outbound
+from faden_backend.services import outbound, secret_redaction
 from faden_backend.services.llm import remote_health
 from faden_backend.services.llm import residency as residency_mod
 from faden_backend.services.llm.gateway_sync import _normalize_base_url
@@ -179,6 +179,14 @@ def sees_pictures(capabilities: dict | None) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _extra_params(submitted: dict | None, stored: dict | None) -> dict | None:
+    """Extra parameters to store: a value sent back hidden keeps the stored one."""
+    try:
+        return secret_redaction.restore_mapping(submitted, stored)
+    except secret_redaction.HiddenValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
 def _provider_to_dto(
     provider: LLMProvider,
     owners: "dict[str, ManagedByDTO] | None" = None,
@@ -186,6 +194,8 @@ def _provider_to_dto(
     """Serialize a provider including derived remote_model metadata."""
     dto = ProviderDTO.model_validate(provider)
     update: dict[str, Any] = {
+        # Extra headers and parameters may carry keys: hidden, as the API key is never shown.
+        "extra_params": secret_redaction.mask_mapping(provider.extra_params),
         "remote_model": _extract_remote_model(provider.capabilities),
         "calls_tools": calls_tools(provider.capabilities),
         "sees_pictures": sees_pictures(provider.capabilities),
@@ -477,7 +487,7 @@ async def create_provider(
         remote_model=body.remote_model,
         litellm_provider=body.litellm_provider,
         litellm_model=body.litellm_model,
-        extra_params=body.extra_params,
+        extra_params=_extra_params(body.extra_params, None),
     )
 
     # Commit eagerly so the provider is visible to the follow-up
@@ -798,7 +808,8 @@ async def update_provider(
         api_key_encrypted=seal_provider_key(body.api_key) if body.api_key is not None else ...,
         litellm_provider=body.litellm_provider if "litellm_provider" in body.model_fields_set else ...,
         litellm_model=litellm_model_update,
-        extra_params=body.extra_params if "extra_params" in body.model_fields_set else ...,
+        extra_params=_extra_params(body.extra_params, existing.extra_params)
+        if "extra_params" in body.model_fields_set else ...,
     )
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")

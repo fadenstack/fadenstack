@@ -97,8 +97,11 @@ Sie zuerst einen **Testlauf**.
     - **Netzwerke**: Ohne Netzwerk kommt der Container in die Standard-Bridge von Docker.
 
 !!! note
-    Umgebungsvariablen sind für jeden sichtbar, der den Container sehen kann. Legen Sie dort keine Geheimnisse ab,
-    die diese Personen nicht sehen sollen.
+    Die Konsole verbirgt Werte, die geheim aussehen: Variablen, deren Name auf Passwort, Schlüssel, Token oder
+    Geheimnis lautet, das Passwort in einer URL und den Wert nach einem Schalter wie `--requirepass`. Das
+    Bearbeitungsformular zeigt sie als Punkte; unverändert bleiben sie erhalten. Jeder Blick auf die Details oder
+    Einstellungen eines Systemcontainers wird im Audit-Protokoll festgehalten. Werte, die die Konsole nicht als
+    geheim erkennt, werden angezeigt; benennen Sie Geheimnisse daher als solche.
 
 Container erstellen, bearbeiten und neu klassifizieren kann nur ein Superuser. Ein Container, der Root-Rechte auf dem
 Server hätte, braucht den **Root-Modus**: einer, der einen Ordner oder eine Datei des Servers einbindet (einen
