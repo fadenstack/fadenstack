@@ -29,7 +29,7 @@ Es listet die Variablen und ihren Zustand auf, nie die Schlüssel selbst.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert (das Hugging-Face-Token, der TLS-Schlüssel, Geheimnisse der Wissensdatenbank, die Tokens der Ray-Cluster), die API-Schlüssel externer Provider und die privaten Schlüssel der Zertifizierungsstelle für die Maschinen |
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Header und die Umgebung der MCP-Server: Bearer-Tokens und API-Schlüssel. Nur, wo das MCP-Modul eingeschaltet ist |
-| `FADEN_GATEWAY_ENCRYPTION_KEY` | Die Chats: Nachrichten, Titel, Gedächtnis und Anhangsnotizen. Nur, wo Chats verschlüsselt sind (der Schlüssel ist gesetzt) |
+| `FADEN_GATEWAY_ENCRYPTION_KEY` | Die Chats: Nachrichten, Titel, Gedächtnis und Anhangsnotizen. Nach dem Erneuern dieses Schlüssels werden unverschlüsselt gespeicherte Chats mit dem neuen versiegelt (siehe unten) |
 
 Nicht erneuert werden:
 
@@ -38,6 +38,20 @@ Nicht erneuert werden:
 | `FADEN_BACKEND_CREDENTIAL_PEPPER` | Er hält die Zugangsdaten der Maschinen gültig. Ein Zugangsdatum liegt als Hash vor, und ein Hash lässt sich ohne das Geheimnis der Maschine nicht neu bilden; eine Änderung würde jede Maschine trennen. `faden upgrade` trägt ihn in die `.env` ein, mit dem Wert, den der Hauptschlüssel bis dahin hatte |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` | Langfuse verschlüsselt damit seine eigenen Daten und kann sie nicht neu verschlüsseln. `faden secrets status` meldet trotzdem, wenn es veröffentlichte Werte sind |
 | Passwörter und Tokens, die nichts verschlüsseln (`POSTGRES_PASSWORD`, die Dienst-Tokens) | Nichts Gespeichertes hängt von ihnen ab. Ändern Sie sie in der `.env` und starten Sie neu; `faden deploy` zeigt, welche zusammengehören |
+
+## Unverschlüsselt gespeicherte Chats {#chats-stored-in-plain-text}
+
+Installationen vor dem 2. Oktober 2026 haben ihre Chats unverschlüsselt gespeichert, ebenso eine Installation ohne
+Chat-Schlüssel. `faden upgrade` schreibt einen Chat-Schlüssel, wo keiner gesetzt ist, und versiegelt diese Chats
+danach, während die Plattform weiterläuft. Sie können es jederzeit selbst ausführen; es beendet, was ein
+abgebrochener Lauf übrig ließ:
+
+```bash
+faden secrets seal
+```
+
+Es meldet, wie viele Werte es versiegelt hat. Ein Wert, der versiegelt aussieht, sich aber mit keinem Schlüssel
+der Installation öffnen lässt, wird gezählt und bleibt, wie er ist.
 
 ## Erneuern {#rotate}
 

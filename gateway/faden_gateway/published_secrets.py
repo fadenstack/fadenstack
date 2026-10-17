@@ -17,6 +17,19 @@ log = logging.getLogger(__name__)
 PUBLISHED_MASTER_KEYS = frozenset({"dev-settings-master-key-change-me"})
 PUBLISHED_MCP_TOKENS = frozenset({"dev-mcp-service-token", "dev-mcp-service-token-change-me"})
 PUBLISHED_SKILLS_TOKENS = frozenset({"dev-skills-service-token", "dev-skills-service-token-change-me"})
+PUBLISHED_CHAT_KEYS = frozenset({"dev-encryption-key-change-me"})
+
+CHAT_KEY_MISSING = (
+    "FADEN_GATEWAY_ENCRYPTION_KEY is empty: chats would be stored readable in the database. "
+    "`faden upgrade` writes one into .env; an install started by hand sets it to a long random value "
+    "(openssl rand -base64 48). Chats written without a key stay readable and are sealed by "
+    "`faden secrets seal`. Keep the key with the backups: chats sealed with it open with no other."
+)
+CHAT_KEY_REFUSED = (
+    "FADEN_GATEWAY_ENCRYPTION_KEY is the development default published with Fadenstack's source code: "
+    "anyone could read the chats sealed with it. To keep them, set FADEN_ALLOW_PUBLISHED_KEYS=true in .env "
+    "and change the key with `faden secrets rotate --only chat` (Help: Rotating the keys)."
+)
 
 MASTER_KEY_REFUSED = (
     "FADEN_GATEWAY_SETTINGS_MASTER_KEY (the backend's FADEN_BACKEND_SETTINGS_MASTER_KEY) is the development "
@@ -64,6 +77,10 @@ def problems(settings: Settings) -> list[str]:
         found.append(token_refused("MCP", "MCP"))
     if settings.skills_enabled and settings.skills_service_token in PUBLISHED_SKILLS_TOKENS:
         found.append(token_refused("skills", "SKILLS"))
+    if not settings.encryption_key:
+        found.append(CHAT_KEY_MISSING)
+    elif settings.encryption_key in PUBLISHED_CHAT_KEYS and not settings.allow_published_keys:
+        found.append(CHAT_KEY_REFUSED)
     return found
 
 

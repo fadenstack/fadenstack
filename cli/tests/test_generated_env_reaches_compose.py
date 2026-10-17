@@ -29,7 +29,8 @@ def test_every_generated_setting_reaches_a_container() -> None:
 
 def test_the_chat_encryption_key_reaches_the_gateway() -> None:
     gateway = COMPOSE.read_text(encoding="utf-8").split("\n  faden-gateway:\n", 1)[1].split("\n  faden-", 1)[0]
-    assert "FADEN_GATEWAY_ENCRYPTION_KEY: ${FADEN_GATEWAY_ENCRYPTION_KEY:-}" in gateway
+    # Required: compose refuses to start without it, as the gateway does (faden upgrade writes one).
+    assert "FADEN_GATEWAY_ENCRYPTION_KEY: ${FADEN_GATEWAY_ENCRYPTION_KEY:?" in gateway
 
 
 def test_the_previous_keys_and_the_pepper_reach_the_services_that_read_them() -> None:

@@ -28,7 +28,7 @@ It lists the variables and their state, never the keys themselves.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores (the Hugging Face token, the TLS key, secrets of the knowledge base, the tokens of Ray clusters), the API keys of remote providers, and the private keys of the machine certificate authority |
 | `FADEN_MCP_ENCRYPTION_KEY` | The headers and environment of MCP servers: bearer tokens and API keys. Only where the MCP module is on |
-| `FADEN_GATEWAY_ENCRYPTION_KEY` | The chats: messages, titles, memory and attachment notes. Only where chats are encrypted (the key is set) |
+| `FADEN_GATEWAY_ENCRYPTION_KEY` | The chats: messages, titles, memory and attachment notes. After a rotation of this key, chats stored in plain text are sealed with the new one (see below) |
 
 These are not rotated:
 
@@ -37,6 +37,19 @@ These are not rotated:
 | `FADEN_BACKEND_CREDENTIAL_PEPPER` | It keeps the machines' credentials valid. A credential is stored as a hash, and a hash cannot be re-made without the machine's secret, so changing it would disconnect every machine. `faden upgrade` adds it to `.env`, with the value the master key had until then |
 | `LANGFUSE_SALT`, `LANGFUSE_ENCRYPTION_KEY` | Langfuse seals its own data with them and cannot re-encrypt it. `faden secrets status` still says when they are published values |
 | Passwords and tokens that seal nothing (`POSTGRES_PASSWORD`, the service tokens) | Nothing stored depends on them. Change them in `.env` and restart; `faden deploy` shows which belong together |
+
+## Chats stored in plain text
+
+Installs from before 2 October 2026 stored their chats unencrypted, and an install without a chat key did too.
+`faden upgrade` writes a chat key where none is set and then seals those chats, while the platform is in use.
+Run it yourself at any time; it finishes what a run that stopped left:
+
+```bash
+faden secrets seal
+```
+
+It reports how many values it sealed. A value that looks sealed but opens with no key the install has is
+counted and left as it is.
 
 ## Rotate
 

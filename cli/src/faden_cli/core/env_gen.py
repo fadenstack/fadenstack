@@ -111,6 +111,9 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "FADEN_BACKEND_PII_SERVICE_TOKEN",
     "FADEN_MCP_PII_SERVICE_TOKEN",
     "FADEN_PII_SERVICE_TOKEN",
+    # Chats are sealed with it; an install from before it reached the gateway (2 October 2026) gets one here, and
+    # `faden secrets seal` seals what was written in plain text (features/admin-guardrails.md, phase 3).
+    "FADEN_GATEWAY_ENCRYPTION_KEY",
 )
 
 #: What the hashes of the machines' credentials are keyed with. It used to be the settings master key itself,

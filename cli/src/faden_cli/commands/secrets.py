@@ -144,5 +144,23 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
 
     record_event("secrets.rotate", "install", "keys", metadata={"scopes": [s.name for s in plan.scopes]})
+    if any(scope.name == "chat" for scope in plan.scopes):
+        # A rotation re-seals what was sealed; what was stored in plain text is sealed with the new key now.
+        from faden_cli.core.sealing import seal_and_report  # noqa: PLC0415
+
+        seal_and_report()
     if plan.deferred:
         info("Not yet rotated: " + ", ".join(s.name for s in plan.deferred) + " (run faden secrets rotate again).")
+
+
+@secrets_group.command("seal")
+def seal_cmd() -> None:
+    """Seal the chats stored in plain text: from before the install had a key, or before a column was sealed.
+
+    Runs while the platform is in use, in batches; run it again to finish a run that stopped. Values that look
+    sealed but open with no key are counted and left as they are.
+    """
+    from faden_cli.core.sealing import seal_and_report  # noqa: PLC0415
+
+    if not seal_and_report():
+        sys.exit(1)

@@ -355,6 +355,12 @@ def upgrade_cmd(
 
     run_step(cfg, value=runtime_images)
 
+    # ── Chats stored in plain text: sealed now that the gateway has its key (an install from before
+    # 2 October 2026 stored them so). While the platform is in use; a warning, never an abort.
+    from faden_cli.core.sealing import seal_and_report  # noqa: PLC0415
+
+    seal_and_report()
+
     # ── Done ──────────────────────────────────────────────────
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
 

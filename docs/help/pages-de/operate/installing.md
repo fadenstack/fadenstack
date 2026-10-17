@@ -216,6 +216,7 @@ Zufallswert (`openssl rand -base64 48`):
 | `POSTGRES_PASSWORD` | Die Datenbank-Anmeldung aller Dienste |
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert |
 | `FADEN_BACKEND_CREDENTIAL_PEPPER` | Die Zugangsdaten der Maschinen. Ein eigener Wert, den `faden secrets rotate` nie ändert, sodass die Maschinen verbunden bleiben |
+| `FADEN_GATEWAY_ENCRYPTION_KEY` | Die Chats: Nachrichten, Titel, Gedächtnis, Notizen zu Anhängen. Erforderlich: Ohne ihn startet das Gateway nicht. Bewahren Sie ihn bei den Sicherungen auf, denn damit versiegelte Chats öffnet kein anderer Schlüssel |
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Zugangsdaten der MCP-Server |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Aufrufe des MCP-Dienstes. Ein Wert für alle drei |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Aufrufe des Skills-Dienstes. Ein Wert für alle drei |

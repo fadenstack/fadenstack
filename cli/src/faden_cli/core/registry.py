@@ -331,6 +331,8 @@ GATEWAY_DEV_ENV: dict[str, str] = {
     "FADEN_GATEWAY_RABBIT_PORT": "5672",
     "FADEN_GATEWAY_RAG_LITE_BACKEND_URL": "http://127.0.0.1:8000",
     "FADEN_GATEWAY_CHAT_FILE_STORE_ROOT": "~/.faden-dev/chat-files",
+    # A development gateway: it starts on the published development keys, which an install refuses.
+    "FADEN_GATEWAY_ENVIRONMENT": "dev",
 }
 
 # ── Dev process patterns (for status checks) ─────────────────────

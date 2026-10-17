@@ -203,6 +203,7 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores |
 | `FADEN_BACKEND_CREDENTIAL_PEPPER` | The machines' credentials. A value of its own, which `faden secrets rotate` never changes, so the machines stay connected |
 | `FADEN_MCP_ENCRYPTION_KEY` | The credentials of MCP servers |
+| `FADEN_GATEWAY_ENCRYPTION_KEY` | The chats: messages, titles, memory, attachment notes. Required: the gateway does not start without it. Keep it with the backups, since chats sealed with it open with no other key |
 | `FADEN_GATEWAY_MCP_SERVICE_TOKEN`, `FADEN_BACKEND_MCP_SERVICE_TOKEN`, `FADEN_MCP_SERVICE_TOKEN` | Calls to the MCP service. One value for all three |
 | `FADEN_GATEWAY_SKILLS_SERVICE_TOKEN`, `FADEN_BACKEND_SKILLS_SERVICE_TOKEN`, `FADEN_SKILLS_SERVICE_TOKEN` | Calls to the skills service. One value for all three |
 | `FADEN_GATEWAY_PII_SERVICE_TOKEN`, `FADEN_BACKEND_PII_SERVICE_TOKEN`, `FADEN_MCP_PII_SERVICE_TOKEN`, `FADEN_PII_SERVICE_TOKEN` | Calls to the PII service, which refuses every call without it (only its health check is open). One value for all four |

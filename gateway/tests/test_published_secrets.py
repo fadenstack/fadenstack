@@ -17,6 +17,7 @@ def _settings(**values: object) -> Settings:
     base: dict[str, object] = {
         "environment": "production",
         "settings_master_key": OWN,
+        "encryption_key": "a-chat-key-of-this-install-0123456789",
         "mcp_enabled": False,
         "skills_enabled": False,
         "allow_published_keys": False,
@@ -45,6 +46,18 @@ def test_published_tokens_are_refused_for_the_modules_in_use() -> None:
     assert problems(_settings(mcp_enabled=True, mcp_service_token="dev-mcp-service-token-change-me"))
     assert problems(_settings(skills_enabled=True, skills_service_token="dev-skills-service-token-change-me"))
     assert problems(_settings(skills_enabled=False, skills_service_token="dev-skills-service-token")) == []
+
+
+def test_without_a_chat_key_the_gateway_does_not_start() -> None:
+    """Chats would be stored readable; faden upgrade writes a key, an install started by hand sets one."""
+    with pytest.raises(SystemExit) as stopped:
+        refuse_published_secrets(_settings(encryption_key=""))
+    assert "FADEN_GATEWAY_ENCRYPTION_KEY is empty" in str(stopped.value)
+
+
+def test_the_published_chat_key_is_refused_unless_kept_on_purpose() -> None:
+    assert problems(_settings(encryption_key="dev-encryption-key-change-me"))
+    assert problems(_settings(encryption_key="dev-encryption-key-change-me", allow_published_keys=True)) == []
 
 
 def test_development_keeps_its_defaults() -> None:
