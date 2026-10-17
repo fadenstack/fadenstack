@@ -624,6 +624,9 @@ services:
       # directory plus /knowledge on the host; empty, the named volume. The CLI copies the volume's files
       # into the folder before the container is created.
       - ${FADEN_DATA_DIR:-faden_rag_lite}${FADEN_DATA_DIR:+/knowledge}:/data/faden/rag-lite
+      # The audit trail's file copy (services/audit/chain.py): one line per event, never deleted, in every
+      # backup. Someone who edits the audit table cannot edit this from the database.
+      - faden_audit:/data/faden/audit
       # Runtime monitoring — shared with the prometheus + grafana
       # services (see their mounts). The backend generates
       # prometheus/targets.json and dashboards/*.json here; grafana
@@ -721,6 +724,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - faden_models:/srv/faden/models
       - ${FADEN_DATA_DIR:-faden_rag_lite}${FADEN_DATA_DIR:+/knowledge}:/data/faden/rag-lite
+      - faden_audit:/data/faden/audit
 
   # -----------------------------
   # frontend (React admin console)
@@ -1081,3 +1085,4 @@ volumes:
   faden_models:
   faden_rag_lite:
   faden_chat_files:
+  faden_audit:

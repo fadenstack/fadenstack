@@ -67,7 +67,7 @@ def _remember(request: Any, session: AsyncSession) -> None:
 
 
 def commit_before_responding(app: Any) -> None:
-    """Commit each request's database session before its response is sent.
+    """Commit each request's database session before its response is sent, and record privileged requests.
 
     FastAPI ends a ``yield`` dependency after the response has been sent,
     so :func:`get_db_session` committed once the client already had its
@@ -77,23 +77,63 @@ def commit_before_responding(app: Any) -> None:
     order, but the login machinery (fastapi-users) holds the same session
     in a dependency FastAPI will not let depend on a function-scoped one.
 
-    So every route's handler is wrapped: the endpoint returns its response,
-    the request's sessions are committed, then the response is sent. A
-    failing commit fails the request (500) instead of passing unnoticed.
-    Call it once every router is included.
+    So the innermost middleware (:class:`RequestBoundary`) commits the request's sessions when the response
+    starts, before its status line leaves; a failing commit turns the answer into a 500 instead of passing
+    unnoticed. It used to wrap each route's handler, which FastAPI 0.141 no longer calls for included routers
+    (it builds their routes anew), so nothing was committed early any more. The same place records privileged
+    requests in the audit trail (services/audit/recorder.py), refused ones included. Call it once, last.
     """
-    from fastapi.routing import APIRoute, request_response  # noqa: PLC0415
+    from starlette.middleware import Middleware  # noqa: PLC0415
 
-    for route in app.router.routes:
-        if not isinstance(route, APIRoute) or getattr(route, "commits_before_response", False):
-            continue
-        handler = route.get_route_handler()
+    if any(m.cls is RequestBoundary for m in app.user_middleware):
+        return
+    # Appended, not added: innermost, inside every other middleware, outside FastAPI's exception handling.
+    app.user_middleware.append(Middleware(RequestBoundary))
 
-        async def committing(request: Request, _handler: Any = handler) -> Any:
-            response = await _handler(request)
-            for session in getattr(request.state, "db_sessions", None) or ():
-                await session.commit()
-            return response
 
-        route.app = request_response(committing)
-        route.commits_before_response = True
+class RequestBoundary:
+    """Commits a request's sessions as its response starts, and records the request when it is privileged."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        """Run the request; commit as its response starts; record it."""
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        from faden_backend.services.audit.recorder import record_request  # noqa: PLC0415
+
+        state = scope.setdefault("state", {})
+        status = {"code": 500, "started": False, "swallow": False}
+
+        async def committing_send(message: dict[str, Any]) -> None:
+            if status["swallow"]:
+                return
+            if message["type"] == "http.response.start" and not status["started"]:
+                status["started"] = True
+                status["code"] = int(message.get("status", 500))
+                if status["code"] < 400:
+                    try:
+                        for session in state.get("db_sessions") or ():
+                            await session.commit()
+                    except Exception:
+                        logger.exception("The request's writes could not be committed")
+                        status["code"], status["swallow"] = 500, True
+                        await send({
+                            "type": "http.response.start", "status": 500,
+                            "headers": [(b"content-type", b"application/json")],
+                        })
+                        await send({
+                            "type": "http.response.body",
+                            "body": b'{"detail":"The change could not be saved."}',
+                        })
+                        return
+            await send(message)
+
+        try:
+            await self.app(scope, receive, committing_send)
+        except Exception:
+            await record_request(Request(scope), 500)
+            raise
+        await record_request(Request(scope), status["code"])

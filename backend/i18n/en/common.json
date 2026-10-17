@@ -960,6 +960,23 @@
       "action": "API tokens",
       "title": "API tokens of {{email}}",
       "none": "No API tokens."
+    },
+    "rights": {
+      "action": "Rights",
+      "title": "Rights of {{email}}",
+      "administrator": "Administrator",
+      "auditor": "Auditor",
+      "has": "Has it",
+      "has_not": "Does not have it",
+      "grant": "Make administrator",
+      "remove": "Remove administrator right",
+      "hand_over": "Hand over",
+      "right": "Right",
+      "to": "To",
+      "reason": "Reason",
+      "reason_help": "At least 10 characters. Needs Root Mode; recorded in the audit log with both names and the reason.",
+      "hand_over_help": "The one who has the right loses it, the other gets it, in one step.",
+      "failed": "Not done: {{error}}"
     }
   },
   "container_detail": {
@@ -2925,7 +2942,20 @@
     "severity": "Severity",
     "actor": "Actor",
     "empty": "No events.",
-    "search": "Search action, target or actor…"
+    "search": "Search action, target or actor…",
+    "person": "Person (e-mail)",
+    "source": "Source",
+    "client_ip": "Address",
+    "from": "From",
+    "to": "To",
+    "any": "Any",
+    "export": "Export CSV",
+    "result_allow": "Allowed",
+    "result_deny": "Refused",
+    "severity_high": "High",
+    "severity_normal": "Normal",
+    "chain_ok": "Intact: every event is as it was written ({{count}} events).",
+    "chain_broken": "Changed after it was written: {{problem}}"
   },
   "engine": {
     "preset_label": "Tuned for",

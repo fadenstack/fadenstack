@@ -21,6 +21,8 @@ vi.mock("~/api/admin", async (importOriginal) => {
       list: vi.fn(),
       listRoles: vi.fn().mockResolvedValue([]),
       setActive: vi.fn(),
+      setAdministrator: vi.fn(),
+      handOver: vi.fn(),
     },
     adminGroups: { ...actual.adminGroups, list: vi.fn().mockResolvedValue([]) },
   };
@@ -70,5 +72,45 @@ describe("suspending an account", () => {
 
     await userEvent.click(container.querySelector("[data-user-reactivate='u-1']") as HTMLElement);
     await waitFor(() => expect(users.setActive).toHaveBeenCalledWith("u-1", true));
+  });
+});
+
+describe("rights: administrator and auditor", () => {
+  beforeEach(() => {
+    users.setAdministrator.mockReset().mockResolvedValue(person({ is_superuser: true }));
+    users.handOver.mockReset().mockResolvedValue(person({ id: "u-2", is_superuser: true }));
+  });
+
+  it("grants the administrator right only with a reason", async () => {
+    users.list.mockResolvedValue([person()]);
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("pat@example.com");
+
+    await userEvent.click(container.querySelector("[data-user-rights='u-1']") as HTMLElement);
+    const grant = await screen.findByRole("button", { name: "Make administrator" });
+    expect(grant).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/Reason/), "Taking over the night shift");
+    await userEvent.click(grant);
+    await waitFor(() =>
+      expect(users.setAdministrator).toHaveBeenCalledWith("u-1", true, "Taking over the night shift"),
+    );
+  });
+
+  it("hands the administrator right to someone else in one step", async () => {
+    users.list.mockResolvedValue([
+      person({ is_superuser: true }),
+      person({ id: "u-2", email: "sam@example.com" }),
+    ]);
+    const { container } = renderPage(<UsersPage />);
+    await screen.findByText("sam@example.com");
+
+    await userEvent.click(container.querySelector("[data-user-rights='u-1']") as HTMLElement);
+    await userEvent.type(await screen.findByLabelText(/Reason/), "Pat leaves the company");
+    await userEvent.click(screen.getByLabelText("To"));
+    await userEvent.click(await screen.findByRole("option", { name: "sam@example.com" }));
+    await userEvent.click(screen.getByRole("button", { name: "Hand over" }));
+    await waitFor(() =>
+      expect(users.handOver).toHaveBeenCalledWith("u-1", "administrator", "u-2", "Pat leaves the company"),
+    );
   });
 });

@@ -965,6 +965,23 @@
       "action": "Tokens de API",
       "title": "Tokens de API de {{email}}",
       "none": "No hay tokens de API."
+    },
+    "rights": {
+      "action": "Derechos",
+      "title": "Derechos de {{email}}",
+      "administrator": "Administrador",
+      "auditor": "Auditor",
+      "has": "Lo tiene",
+      "has_not": "No lo tiene",
+      "grant": "Hacer administrador",
+      "remove": "Quitar el derecho de administrador",
+      "hand_over": "Traspasar",
+      "right": "Derecho",
+      "to": "A",
+      "reason": "Motivo",
+      "reason_help": "Al menos 10 caracteres. Requiere el modo root; se registra en el registro de auditoría con ambos nombres y el motivo.",
+      "hand_over_help": "Quien tiene el derecho lo pierde y la otra persona lo recibe, en un solo paso.",
+      "failed": "No realizado: {{error}}"
     }
   },
   "container_detail": {
@@ -2927,7 +2944,20 @@
     "severity": "Gravedad",
     "actor": "Actor",
     "empty": "No hay eventos.",
-    "search": "Buscar acción, objetivo o actor…"
+    "search": "Buscar acción, objetivo o actor…",
+    "person": "Persona (correo)",
+    "source": "Origen",
+    "client_ip": "Dirección",
+    "from": "Desde",
+    "to": "Hasta",
+    "any": "Todos",
+    "export": "Exportar CSV",
+    "result_allow": "Permitido",
+    "result_deny": "Rechazado",
+    "severity_high": "Alta",
+    "severity_normal": "Normal",
+    "chain_ok": "Intacto: cada evento es tal como se escribió ({{count}} eventos).",
+    "chain_broken": "Modificado después de escribirse: {{problem}}"
   },
   "engine": {
     "preset_label": "Ajustado para",

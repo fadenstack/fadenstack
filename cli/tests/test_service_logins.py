@@ -7,7 +7,6 @@ instead, and the reset touches the console only.
 
 from __future__ import annotations
 
-import subprocess
 from typing import Any
 
 import pytest
@@ -45,19 +44,23 @@ def test_a_langfuse_password_already_set_is_kept() -> None:
     assert "LANGFUSE_INIT_PROJECT_SECRET_KEY" not in values
 
 
-def test_reset_password_changes_the_console_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    ran: list[list[str]] = []
+def test_reset_password_goes_through_the_backend_and_changes_the_console_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The backend sets it, ends the sign-ins and records it in the audit trail; the password goes on stdin."""
+    from faden_cli.core import backend_tool  # noqa: PLC0415
 
-    def fake_run(cmd: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
-        ran.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="$2b$hash\nUPDATE 1\n", stderr="")
+    calls: list[tuple[list[str], str | None]] = []
 
-    monkeypatch.setattr(admin.shutil, "which", lambda name: "docker")
-    monkeypatch.setattr(admin.subprocess, "run", fake_run)
+    def fake_tool(args: list[str], *, stdin: str | None = None, **_: Any) -> dict[str, Any]:
+        calls.append((args, stdin))
+        return {"ok": True, "user_id": "u1"}
+
+    monkeypatch.setattr(backend_tool, "run_backend_tool", fake_tool)
 
     result = CliRunner().invoke(admin.admin_group, ["reset-password", "-y", "--password", "a-long-enough-password"])
 
     assert result.exit_code == 0, result.output
-    touched = {name for cmd in ran for name in cmd if name.startswith("faden-")}
-    assert touched == {"faden-backend", "faden-postgres"}, "no other container is touched"
+    assert calls == [(["reset-password", "--email", "admin@localhost"], "a-long-enough-password\n")]
+    assert "a-long-enough-password" not in " ".join(calls[0][0]), "never on the command line"
     assert "are not touched" in result.output.replace("\n", " ")

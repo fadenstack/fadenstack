@@ -106,6 +106,13 @@ def backup_cmd(
 
     console.print()
     success(f"Backup created: {result.backup_dir}")
+    from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
+
+    record_event(
+        "backup.create", "install", Path(str(result.backup_dir)).name,
+        metadata={"kind": kind, "databases": len(result.databases), "volumes": list(result.volumes or [])},
+        severity="normal",
+    )
     console.print(f"  Databases: {', '.join(result.databases)}")
     if result.env_snapshot:
         console.print(f"  .env snapshot: {result.env_snapshot}")

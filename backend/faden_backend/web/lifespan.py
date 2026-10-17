@@ -950,6 +950,16 @@ async def lifespan_setup(
         )
     await _ensure_api_secret_read_grants(app)
 
+    # The audit trail: events committed on their own, chained, copied to the audit folder; the chain begins
+    # once, covering the events written before it.
+    from faden_backend.services.audit import chain as audit_chain  # noqa: PLC0415
+
+    audit_chain.configure(app.state.db_session_factory, settings.audit_dir or None)
+    try:
+        await audit_chain.start_chain(app.state.db_session_factory)
+    except Exception:  # never keep the console from starting over it
+        log.exception("The audit chain could not be started; events are written, the chain begins later.")
+
     # Load DB-backed runtime settings before services that need them
     await _load_runtime_settings_from_db(app)
 

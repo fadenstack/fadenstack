@@ -1,4 +1,5 @@
 # type: ignore
+import json
 import logging
 import time
 import uuid
@@ -124,6 +125,75 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = settings.users_secret
     verification_token_secret = settings.users_secret
 
+    async def _audit(
+        self,
+        action: str,
+        user: User | None,
+        *,
+        result: Any = None,
+        actor_id: uuid.UUID | None = None,
+        metadata: dict[str, Any] | None = None,
+        severity: str = "high",
+        target: str | None = None,
+    ) -> None:
+        """One sign-in or account event in the audit trail; a failure to write it is logged, never raised."""
+        from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+        from faden_backend.services.audit import chain  # noqa: PLC0415
+
+        session = getattr(self.user_db, "session", None)
+        try:
+            await chain.append(
+                chain.NewEvent(
+                    action=action,
+                    target_type="user",
+                    target_id=target or (str(user.id) if user else ""),
+                    result=result or AuditResult.ALLOW,
+                    actor_id=actor_id,
+                    severity=severity,
+                    metadata_json=json.dumps(metadata) if metadata else None,
+                    actor_email=user.email if user is not None and actor_id == user.id else None,
+                ),
+                request_session=session if isinstance(session, AsyncSession) else None,
+            )
+        except Exception:
+            log.exception("Could not record %s in the audit trail", action)
+
+    async def authenticate(self, credentials: Any) -> User | None:
+        """Sign-in by password; a refused one is recorded with the address that was tried."""
+        user = await super().authenticate(credentials)
+        if user is None:
+            from faden_backend.db.models.containers import AuditResult  # noqa: PLC0415
+
+            tried = str(getattr(credentials, "username", "") or "")[:320]
+            await self._audit(
+                "auth.sign_in.failed", None, result=AuditResult.DENY, target=tried, metadata={"email": tried},
+            )
+        return user
+
+    async def on_after_login(
+        self, user: User, request: Request | None = None, response: Any = None,
+    ) -> None:
+        """A sign-in, recorded."""
+        await self._audit("auth.sign_in", user, actor_id=user.id, severity="normal")
+
+    async def on_after_update(
+        self, user: User, update_dict: dict[str, Any], request: Request | None = None,
+    ) -> None:
+        """Changes to an account that matter for who can get in: recorded (by whom: the request's person)."""
+        from faden_backend.services.audit import context as request_context  # noqa: PLC0415
+
+        watched = {"password", "email", "is_active", "is_superuser", "is_verified"}
+        changed = sorted(key for key in update_dict if key in watched)
+        if changed:
+            await self._audit(
+                "user.account.update", user, actor_id=request_context.current().actor_id,
+                metadata={"changed": changed},
+            )
+
+    async def on_after_reset_password(self, user: User, request: Request | None = None) -> None:
+        """A password set through a reset link, recorded."""
+        await self._audit("auth.password.reset", user)
+
     async def validate_password(self, password: str, user: UserCreate | User) -> None:
         """The password rule (services/password_policy.py), for a reset and a change through /api/users/me."""
         problem = password_problem(password, getattr(user, "email", None))
@@ -238,6 +308,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         except Exception:
             # Keep forgot-password response enumeration-safe even if enqueue fails.
             log.exception("Failed to enqueue forgot-password notification.")
+        await self._audit("auth.password.reset_requested", user, severity="normal")
 
 
 async def get_user_db(
@@ -437,4 +508,12 @@ def set_sign_in_cookie(response: Response, token: str) -> None:
 
 api_users = FastAPIUsers[User, uuid.UUID](get_user_manager, backends)
 
-current_active_user = api_users.current_user(active=True)
+_signed_in_active_user = api_users.current_user(active=True)
+
+
+async def current_active_user(user: User = Depends(_signed_in_active_user)) -> User:
+    """The signed-in, active person; noted as the request's actor for the audit trail."""
+    from faden_backend.services.audit.context import remember_actor  # noqa: PLC0415
+
+    remember_actor(user.id, user.email)
+    return user

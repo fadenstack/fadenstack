@@ -20,11 +20,13 @@ from __future__ import annotations
 import pytest
 
 from faden_cli.commands.dev import dev_up
-from faden_cli.core import backup
+from faden_cli.core import backend_tool, backup
 
 
 @pytest.fixture(autouse=True)
 def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The CLI's events in the audit trail go through `docker exec faden-backend`: answered here, never sent.
+    monkeypatch.setattr(backend_tool, "run_backend_tool", lambda *_a, **_k: {"ok": True})
     # The upgrade, deploy and rebuild steps that carry chat files out of the gateway container: none here.
     monkeypatch.setattr(backup, "keep_chat_files", lambda *_a, **_k: None)
     monkeypatch.setattr(backup, "keep_company_files", lambda *_a, **_k: None)

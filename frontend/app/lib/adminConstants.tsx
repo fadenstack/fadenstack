@@ -346,7 +346,8 @@ export const NAV: NavEntry[] = [
         to: "/admin/logs",
         labelKey: "nav.logs",
         icon: <ReceiptLongIcon />,
-        permission: "logs:read",
+        // An auditor reads the audit trail here without the logs.
+        permission: ["logs:read", "audit:read"],
       },
       {
         to: "/admin/updates",

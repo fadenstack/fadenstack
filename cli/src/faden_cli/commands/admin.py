@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import re
 import secrets
-import shutil
 import string
-import subprocess
 import sys
 
 import click
@@ -47,10 +45,9 @@ def admin_group() -> None:
     help="Skip confirmation prompt.",
 )
 def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
-    """Reset a user's password directly via the database.
+    """Reset a user's password, recorded in the audit trail; the account's sign-ins end.
 
-    This bypasses the API and sets the password hash in PostgreSQL.
-    The backend container must be running (needed for password hashing).
+    The backend container must be running: it applies the password rule and the hashing.
     It changes the console sign-in only: Grafana, Langfuse and RabbitMQ
     have passwords of their own in .env, which it leaves as they are.
     """
@@ -66,11 +63,6 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
         error(f"The password needs at least {MIN_PASSWORD_LENGTH} characters (or leave out --password).")
         sys.exit(1)
 
-    docker = shutil.which("docker")
-    if not docker:
-        error("docker not found on PATH")
-        sys.exit(1)
-
     new_password = password or _generate_password()
 
     if not yes:
@@ -79,65 +71,16 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
             abort=True,
         )
 
-    # ── 1. Hash the password inside the backend container ─────
-    info("Hashing new password…")
-    hash_script = (
-        "from fastapi_users.password import PasswordHelper; "
-        "print(PasswordHelper().hash(input()))"
-    )
+    # The backend sets it (its password rule, its hashing), ends the account's sign-ins -- a reset is often
+    # meant to lock someone out -- and records the reset in the audit trail. It used to be an UPDATE in psql,
+    # which nobody could see afterwards.
+    info("Setting the new password…")
+    from faden_cli.core.backend_tool import run_backend_tool  # noqa: PLC0415
 
-    hash_result = subprocess.run(  # noqa: S603
-        [
-            docker, "exec", "-i", "faden-backend",
-            "python", "-c", hash_script,
-        ],
-        input=new_password,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if hash_result.returncode != 0:
-        error("Failed to hash password — is the backend container running?")
-        if hash_result.stderr.strip():
-            error(f"  {hash_result.stderr.strip()}")
-        sys.exit(1)
-
-    hashed = hash_result.stdout.strip()
-    if not hashed:
-        error("Password hashing returned empty result.")
-        sys.exit(1)
-
-    # ── 2. Update the password in PostgreSQL ──────────────────
-    info("Updating password in database…")
-
-    # Both `hashed` (bcrypt output we generated) and `email` (validated
-    # above by regex) are safe for SQL string interpolation here.
-    # The sign-ins end with the old password (sessions_valid_after): a reset is often meant to lock someone out.
-    sql = (
-        f"UPDATE \"user\" SET hashed_password = '{hashed}', sessions_valid_after = now() "
-        f"WHERE email = '{email}';"
-    )
-
-    pg_result = subprocess.run(  # noqa: S603
-        [
-            docker, "exec", "faden-postgres",
-            "psql", "-U", "postgres", "-d", "faden_backend",
-            "-c", sql,
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    if pg_result.returncode != 0:
-        error("Database update failed — is the postgres container running?")
-        if pg_result.stderr.strip():
-            error(f"  {pg_result.stderr.strip()}")
-        sys.exit(1)
-
-    # Check if a row was actually updated
-    if "UPDATE 0" in pg_result.stdout:
-        warning(f"No user found with email '{email}'.")
+    outcome = run_backend_tool(["reset-password", "--email", email], stdin=new_password + "\n")
+    if not outcome.get("ok"):
+        error(f"The password was not reset: {outcome.get('error', 'unknown error')}")
+        error("  Is the backend running? (faden status)")
         sys.exit(1)
 
     success(f"Password reset for '{email}'.")
@@ -164,3 +107,33 @@ def reset_password_cmd(*, email: str, password: str | None, yes: bool) -> None:
             padding=(1, 2),
         )
     )
+
+
+@admin_group.command("grant-admin")
+@click.option("--email", required=True, help="The account to make administrator.")
+@click.option("--reason", required=True, help="Why (recorded in the audit trail).")
+@click.option("-y", "--yes", is_flag=True, help="Skip confirmation prompt.")
+def grant_admin_cmd(*, email: str, reason: str, yes: bool) -> None:
+    """Make an account administrator from the server: the way back for an organisation locked out of the console.
+
+    In the console, an administrator grants the right or hands it over (Users, Root Mode). Recorded in the
+    audit trail with the reason.
+    """
+    if not _EMAIL_RE.match(email):
+        error(f"Invalid email address: {email}")
+        sys.exit(1)
+    if len(reason.strip()) < 10:
+        error("Give a reason of at least 10 characters: it is recorded in the audit trail.")
+        sys.exit(1)
+    if not yes:
+        click.confirm(f"Make '{email}' an administrator?", abort=True)
+    from faden_cli.core.backend_tool import run_backend_tool  # noqa: PLC0415
+
+    outcome = run_backend_tool(["grant-admin", "--email", email, "--reason", reason])
+    if not outcome.get("ok"):
+        error(f"Not done: {outcome.get('error', 'unknown error')}")
+        sys.exit(1)
+    if outcome.get("already"):
+        info(f"'{email}' is an administrator already.")
+    else:
+        success(f"'{email}' is an administrator now; recorded in the audit trail.")

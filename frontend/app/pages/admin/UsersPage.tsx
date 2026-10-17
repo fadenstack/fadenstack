@@ -6,6 +6,8 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { UserApiTokensDialog } from "./UserApiTokensDialog";
 import { FormDialog } from "~/components/FormDialog";
 import { DeveloperModeDialog } from "~/components/users/DeveloperModeDialog";
+import { RightsDialog } from "~/components/users/RightsDialog";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { formatDateTime } from "~/lib/dates";
 import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { useAsyncData } from "~/lib/useAsyncData";
@@ -59,6 +61,7 @@ export default function UsersPage() {
   const [developerModeOf, setDeveloperModeOf] = useState<AdminUser | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<AdminUser | null>(null);
   const [tokensOf, setTokensOf] = useState<AdminUser | null>(null);
+  const [rightsOf, setRightsOf] = useState<AdminUser | null>(null);
   const [suspending, setSuspending] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedUsageGroupId, setSelectedUsageGroupId] = useState<string>("");
@@ -284,6 +287,11 @@ export default function UsersPage() {
               <CodeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title={t("users.rights.action")}>
+            <IconButton size="small" data-user-rights={u.id} onClick={() => setRightsOf(u)}>
+              <AdminPanelSettingsIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={t("users.tokens.action")}>
             <IconButton size="small" data-user-tokens={u.id} onClick={() => setTokensOf(u)}>
               <KeyIcon fontSize="small" />
@@ -478,6 +486,7 @@ export default function UsersPage() {
       </FormDialog>
 
       <UserApiTokensDialog user={tokensOf} onClose={() => setTokensOf(null)} />
+      <RightsDialog user={rightsOf} users={users} onClose={() => setRightsOf(null)} onChanged={() => void load()} />
 
       {/* ── Suspend user dialog ── */}
       <ConfirmDialog

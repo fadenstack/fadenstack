@@ -356,6 +356,9 @@ def upgrade_cmd(
     run_step(cfg, value=runtime_images)
 
     # ── Done ──────────────────────────────────────────────────
+    from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
+
+    record_event("system.upgrade", "install", __version__)
     console.print()
     success("Upgrade complete.")
 

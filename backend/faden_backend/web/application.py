@@ -11,6 +11,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from faden_backend.db.dependencies import commit_before_responding
 from faden_backend.log import configure_logging
+from faden_backend.services.audit.context import AuditContextMiddleware
 from faden_backend.services.extensions import load_plugin
 from faden_backend.settings import settings
 from faden_backend.web.api.router import api_router
@@ -66,6 +67,8 @@ def get_app() -> FastAPI:
     app.add_middleware(SecureCookiesMiddleware)
     # A page of another site cannot act with the sign-in cookie.
     app.add_middleware(CsrfMiddleware)
+    # Who asks from where, for the audit trail (services/audit/context.py).
+    app.add_middleware(AuditContextMiddleware)
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated
     # endpoints with enterprise implementations.

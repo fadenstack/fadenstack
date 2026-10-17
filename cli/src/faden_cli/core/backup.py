@@ -33,6 +33,7 @@ from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
 # not consistent, and writing one back under the Postgres a restore runs would break it; and the models,
 # which can be downloaded again and run to hundreds of gigabytes.
 BACKUP_VOLUMES: list[str] = [
+    "faden_audit",
     "faden_rag_lite",
     "faden_chat_files",
     "minio_data",
@@ -41,6 +42,9 @@ BACKUP_VOLUMES: list[str] = [
     "loki_data",
     "grafana_data",
 ]
+
+#: Volumes in every backup, with or without ``--include-volumes``.
+ALWAYS_BACKED_UP: tuple[str, ...] = ("faden_audit",)
 
 #: The company data volumes docker-compose.yaml can put in a host directory instead: with FADEN_DATA_DIR set in
 #: .env, the volume is that directory plus the subdirectory named here. Mirrors the mounts in the compose file.
@@ -1178,10 +1182,16 @@ def create_backup(
             count = len(result.tls_material)
             console.print(f"\n[bold cyan]Certificate material:[/bold cyan] {count} file(s)")
 
-    # 4. Snapshot volumes
+    # 4. Snapshot volumes. The audit trail's file copy always: it is small, and an audit trail kept as long as
+    # the system lives has to survive a restore (features/admin-guardrails.md, D-B).
     if include_volumes and not db_only:
         console.print("\n[bold cyan]Snapshotting Docker volumes…[/bold cyan]")
         result.volumes = snapshot_volumes(backup_dir, data_dir=data_dir_of(ctx.env_file), ctx=ctx)
+    elif not db_only:
+        console.print("\n[bold cyan]Snapshotting the audit trail…[/bold cyan]")
+        result.volumes = snapshot_volumes(
+            backup_dir, volumes=list(ALWAYS_BACKED_UP), data_dir=data_dir_of(ctx.env_file), ctx=ctx,
+        )
 
     # 5. Collect migration heads
     console.print("\n[bold cyan]Collecting migration heads…[/bold cyan]")

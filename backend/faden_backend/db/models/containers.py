@@ -5,8 +5,10 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    BigInteger,
     DateTime,
     ForeignKey,
+    Identity,
     String,
     Text,
     func,
@@ -144,6 +146,20 @@ class AuditEvent(Base):
     )
     severity: Mapped[str] = mapped_column(String(32), nullable=False, default="normal")
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Order of writing: the chain follows it (times can be equal).
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=False), nullable=False, unique=True)
+    #: Who acted, as written: ``actor_id`` turns NULL when the account is deleted, this does not.
+    actor_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    #: ``console``, ``api``, ``cli`` or ``system``.
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="console", server_default="console",
+    )
+    #: The hash chain (services/audit/chain.py); NULL on events written before it began.
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class RootSession(Base):

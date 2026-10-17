@@ -321,6 +321,9 @@ class Settings(BaseSettings):
     agent_refresh_token_ttl_s: int = 30 * 24 * 3600
     agent_refresh_idle_s: int = 7 * 24 * 3600
 
+    #: Where the audit trail's file copy goes (a volume of its own, in every backup); empty: no file copy.
+    audit_dir: str = "/data/faden/audit"
+
     # RAG Lite module settings (embedded pgvector-based RAG)
     rag_lite_enabled: bool = False
     rag_lite_file_store_root: str = "/data/faden/rag-lite"

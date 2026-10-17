@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -79,6 +80,21 @@ class MeAccessDTO(BaseModel):
     permissions: list[PermissionDTO] = Field(default_factory=list)
     #: Maintains at least one agent: a right on those agents, not an RBAC permission.
     maintains_agents: bool = False
+
+
+class SetAdministratorRequest(BaseModel):
+    """Grant (``true``) or remove (``false``) the administrator right; recorded with the reason."""
+
+    administrator: bool
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class HandOverRequest(BaseModel):
+    """Move a right from one person to another in one step; recorded with both names and the reason."""
+
+    right: Literal["administrator", "auditor"]
+    to_user_id: uuid.UUID
+    reason: str = Field(min_length=10, max_length=500)
 
 
 class UpdateUserRolesRequest(BaseModel):

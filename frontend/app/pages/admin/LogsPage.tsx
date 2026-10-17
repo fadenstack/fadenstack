@@ -13,6 +13,7 @@ import { inferenceApi } from "~/api/inference";
 import { logsApi, type LogStream } from "~/api/logs";
 import { nodesApi } from "~/api/nodes";
 import AuditLogsTab from "~/pages/admin/AuditLogsTab";
+import { useCan } from "~/lib/useCan";
 import LogsFilters, { type TimePreset } from "~/pages/admin/logs/LogsFilters";
 import LogsTable from "~/pages/admin/logs/LogsTable";
 import { filterLabels, NO_NAMES, type NameLookups } from "~/pages/admin/logs/labelMeta";
@@ -130,11 +131,37 @@ function parseTailPayload(raw: string): LogStream[] {
   }));
 }
 
+/**
+ * Logs and the audit trail. An auditor reads the trail without the logs (audit:read, no logs:read); viewers and
+ * operators read the logs without the trail, which holds e-mail and IP addresses.
+ */
 export default function LogsPage() {
+  const can = useCan();
+  const mayLogs = can("logs:read");
+  const mayAudit = can("audit:read");
+  if (!mayLogs) return <AuditOnly />;
+  return <LogsAndAudit mayAudit={mayAudit} />;
+}
+
+function AuditOnly() {
+  const { t } = useTranslation();
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, height: "100%" }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>
+        {t("logs.tab_audit")}
+      </Typography>
+      <Box sx={{ minHeight: 0, display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <AuditLogsTab />
+      </Box>
+    </Box>
+  );
+}
+
+function LogsAndAudit({ mayAudit }: { mayAudit: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tab = getTab(searchParams.get("tab"));
+  const tab = mayAudit ? getTab(searchParams.get("tab")) : "logs";
 
   const [preset, setPreset] = useState<TimePreset>("15m");
   const [customStart, setCustomStart] = useState("");
@@ -316,7 +343,7 @@ export default function LogsPage() {
       </Typography>
       <Tabs value={tab} onChange={onTabChange} sx={{ mb: 2 }}>
         <Tab value="logs" label={t("logs.tab_logs")} />
-        <Tab value="audit" label={t("logs.tab_audit")} />
+        {mayAudit && <Tab value="audit" label={t("logs.tab_audit")} />}
       </Tabs>
 
       {tab === "logs" && (

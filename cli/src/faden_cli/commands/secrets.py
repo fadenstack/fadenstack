@@ -141,5 +141,8 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     for line in rotation.summary_lines(results):
         console.print(line)
     success("Keys rotated. Machines stay connected; the old keys are gone from .env.")
+    from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
+
+    record_event("secrets.rotate", "install", "keys", metadata={"scopes": [s.name for s in plan.scopes]})
     if plan.deferred:
         info("Not yet rotated: " + ", ".join(s.name for s in plan.deferred) + " (run faden secrets rotate again).")

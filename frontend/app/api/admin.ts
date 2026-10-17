@@ -175,12 +175,40 @@ export interface AuditEvent {
   id: string;
   time: string;
   actor_id: string | null;
+  /** Who acted, as written at the time (kept when the account is deleted). */
+  actor_email: string | null;
   action: string;
   target_type: string;
   target_id: string;
   result: "allow" | "deny";
   severity: string;
   metadata_json: string | null;
+  client_ip: string | null;
+  request_id: string | null;
+  user_agent: string | null;
+  /** console, api, cli or system. */
+  source: string;
+  hash: string | null;
+}
+
+/** Whether the audit trail is as it was written (its hash chain and file copy). */
+export interface AuditChain {
+  ok: boolean;
+  events: number;
+  legacy_rows: number;
+  intact_until: string | null;
+  problems: string[];
+}
+
+export interface AuditFilters {
+  actor_email?: string;
+  action?: string;
+  target_id?: string;
+  since?: string;
+  until?: string;
+  result?: "allow" | "deny";
+  severity?: string;
+  source?: string;
 }
 
 export interface DashboardTopUser {
@@ -554,24 +582,27 @@ export const networks = {
 // Audit log
 // ─────────────────────────────────────────────────────────────────────────────
 
+function auditQuery(params: AuditFilters & { actor_id?: string; limit?: number; offset?: number } = {}): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") qs.set(key, String(value));
+  }
+  return qs.toString();
+}
+
 export const audit = {
-  list(params?: {
-    actor_id?: string;
-    action?: string;
-    target_id?: string;
-    since?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    const qs = new URLSearchParams();
-    if (params?.actor_id) qs.set("actor_id", params.actor_id);
-    if (params?.action) qs.set("action", params.action);
-    if (params?.target_id) qs.set("target_id", params.target_id);
-    if (params?.since) qs.set("since", params.since);
-    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
-    if (params?.offset !== undefined) qs.set("offset", String(params.offset));
-    const q = qs.toString();
+  list(params?: AuditFilters & { actor_id?: string; limit?: number; offset?: number }) {
+    const q = auditQuery(params);
     return request<AuditEvent[]>(`/audit/${q ? `?${q}` : ""}`);
+  },
+  /** Whether every event is as it was written. */
+  chain() {
+    return request<AuditChain>("/audit/chain");
+  },
+  /** The address of the CSV export for these filters (the export itself is recorded). */
+  exportUrl(params?: AuditFilters) {
+    const q = auditQuery(params);
+    return `/api/admin/audit/export.csv${q ? `?${q}` : ""}`;
   },
 };
 
@@ -702,6 +733,20 @@ export const adminUsers = {
   /** Suspend an account (`false`) or let it back in (`true`); nothing of the person's is deleted. */
   setActive(userId: string, active: boolean) {
     return request<AdminUser>(`/users/${userId}/active`, { method: "PUT", body: JSON.stringify({ active }) });
+  },
+  /** Grant or remove the administrator right (Root Mode; recorded with the reason). */
+  setAdministrator(userId: string, administrator: boolean, reason: string) {
+    return request<AdminUser>(`/users/${userId}/administrator`, {
+      method: "PUT",
+      body: JSON.stringify({ administrator, reason }),
+    });
+  },
+  /** Move the administrator right or the auditor role from this account to another, in one step. */
+  handOver(userId: string, right: "administrator" | "auditor", toUserId: string, reason: string) {
+    return request<AdminUser>(`/users/${userId}/hand-over`, {
+      method: "POST",
+      body: JSON.stringify({ right, to_user_id: toUserId, reason }),
+    });
   },
   changePassword(currentPassword: string, newPassword: string) {
     return request<void>("/users/me/change-password", {

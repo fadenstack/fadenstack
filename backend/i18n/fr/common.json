@@ -960,6 +960,23 @@
       "action": "Jetons d'API",
       "title": "Jetons d'API de {{email}}",
       "none": "Aucun jeton d'API."
+    },
+    "rights": {
+      "action": "Droits",
+      "title": "Droits de {{email}}",
+      "administrator": "Administrateur",
+      "auditor": "Auditeur",
+      "has": "L'a",
+      "has_not": "Ne l'a pas",
+      "grant": "Nommer administrateur",
+      "remove": "Retirer le droit d'administrateur",
+      "hand_over": "Transmettre",
+      "right": "Droit",
+      "to": "À",
+      "reason": "Motif",
+      "reason_help": "Au moins 10 caractères. Nécessite le mode root ; consigné dans le journal d'audit avec les deux noms et le motif.",
+      "hand_over_help": "Celui qui a le droit le perd, l'autre le reçoit, en une seule étape.",
+      "failed": "Non effectué : {{error}}"
     }
   },
   "container_detail": {
@@ -2927,7 +2944,20 @@
     "severity": "Gravité",
     "actor": "Acteur",
     "empty": "Aucun événement.",
-    "search": "Rechercher une action, une cible ou un acteur…"
+    "search": "Rechercher une action, une cible ou un acteur…",
+    "person": "Personne (e-mail)",
+    "source": "Origine",
+    "client_ip": "Adresse",
+    "from": "Du",
+    "to": "Au",
+    "any": "Tous",
+    "export": "Exporter en CSV",
+    "result_allow": "Autorisé",
+    "result_deny": "Refusé",
+    "severity_high": "Élevée",
+    "severity_normal": "Normale",
+    "chain_ok": "Intact : chaque événement est tel qu'il a été écrit ({{count}} événements).",
+    "chain_broken": "Modifié après son écriture : {{problem}}"
   },
   "engine": {
     "preset_label": "Optimisé pour",

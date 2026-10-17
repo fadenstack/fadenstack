@@ -153,6 +153,57 @@ You cannot suspend yourself, nor the last superuser.
 **Delete** (the bin icon) removes the account and cannot be undone. You cannot delete yourself, nor the last
 active superuser.
 
+## Administrators and auditors
+
+Two rights are about trust rather than work, and each can be given, taken back and handed over:
+
+- An **administrator** (superuser) may do everything in the console.
+- An **auditor** (the built-in role `auditor`) reads the audit log and changes nothing. Administrators read it
+  too; viewers and operators do not, because it holds e-mail and IP addresses.
+
+To change them, start **Root Mode** first, then open **Access Control → Users** and select **Rights** (the
+shield icon) in the person's row:
+
+- **Make administrator** or **Remove administrator right** for that person.
+- **Hand over**: the right (administrator or auditor) moves from this person to the one you choose, in one
+  step. The person who had it loses it and is signed out.
+
+Each change needs a reason of at least 10 characters. It is recorded in the audit log with both names and the
+reason. The last administrator keeps the right.
+
+If nobody can sign in as an administrator any more, someone with access to the server makes an account
+administrator again (recorded too):
+
+```bash
+faden admin grant-admin --email person@example.com --reason "The only administrator left the company"
+```
+
+## The audit log
+
+**Logs → Audit** (or **Audit** alone, for an auditor) lists who did what: every change in the
+administration areas, refused attempts included, sign-ins and failed sign-ins, password changes and resets,
+rights given and handed over, and reads of other people's things or of secrets: the chat overview, the
+observability pages, the log viewer and the audit log itself. Each entry has the person's e-mail as it was
+then, where the request came from (the address, and whether the console, the API, the CLI or the system), and
+the time.
+
+- **Filters**: person, action (a name, or a prefix ending in a dot, such as `user.`), result, severity, source
+  and a time range.
+- **Export CSV** downloads what the filters show (at most 100,000 entries); the export is recorded.
+- The line above the table says whether the log is **intact**: every entry carries the hash of the one before
+  it, so an entry changed, inserted or deleted afterwards breaks the chain where it happened. A copy of each
+  entry is also kept in a file of its own, which every backup takes, and in the server's logs.
+
+From the server, the same check:
+
+```bash
+faden audit verify
+```
+
+The CLI's own changes are recorded as well: backups, restores, key rotations, upgrades and password resets with
+`faden admin reset-password`. The audit log is never deleted by Fadenstack; it survives upgrades, backups and
+restores.
+
 ## When it does not work
 
 | You see | What to do |

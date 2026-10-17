@@ -107,6 +107,12 @@ def restore_cmd(
 
     console.print()
     success("Restore complete.")
+    from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
+
+    record_event(
+        "backup.restore", "install", Path(str(backup_path)).name,
+        metadata={"databases": list(result.databases_restored or []), "db_only": db_only},
+    )
     if result.databases_restored:
         console.print(f"  Databases: {', '.join(result.databases_restored)}")
     if result.env_restored:

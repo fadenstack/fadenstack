@@ -43,7 +43,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "images": ["read", "pull", "prune"],
         "networks": ["create", "read", "delete"],
         "stacks": ["read", "deploy", "update", "rollback"],
-        "audit": ["read"],
+        "audit": ["read", "export"],
         "logs": ["read"],
         "root_mode": ["start", "stop", "read"],
         "system.settings": ["read", "update"],
@@ -94,7 +94,8 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "images": ["read"],
         "networks": ["read"],
         "stacks": ["read"],
-        "audit": ["read"],
+        # The audit trail holds e-mail and IP addresses: administrators and auditors read it
+        # (taken from existing installs by 4ud1tch41n).
         "logs": ["read"],
         "root_mode": ["read"],
         "system.settings": ["read"],
@@ -131,7 +132,8 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "images": ["read"],
         "networks": ["read"],
         "stacks": ["read"],
-        "audit": ["read"],
+        # The audit trail holds e-mail and IP addresses: administrators and auditors read it
+        # (taken from existing installs by 4ud1tch41n).
         "logs": ["read"],
         "root_mode": ["read"],
         "system.settings": [],
@@ -174,6 +176,11 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["read"],
         "rag.jobs": ["read"],
         "rag.search": ["read"],
+    },
+    # Reads the audit trail and changes nothing; assigned and handed over like the administrator right
+    # (features/admin-guardrails.md 2.6, 2.7).
+    "auditor": {
+        "audit": ["read", "export"],
     },
     "default_user": {
         "chat.projects": ["create", "read", "update", "delete"],

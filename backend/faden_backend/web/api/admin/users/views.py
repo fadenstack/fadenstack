@@ -31,7 +31,7 @@ from faden_backend.db.models.users import (
 )
 from faden_backend.services.password_policy import password_problem
 from faden_backend.services.skills.client import forget_principal
-from faden_backend.web.api.admin.dependencies import require_superuser
+from faden_backend.web.api.admin.dependencies import get_root_mode_active, require_superuser
 from faden_backend.web.api.admin.users.preferences import (
     router as preferences_router,
 )
@@ -43,9 +43,11 @@ from faden_backend.web.api.admin.users.schema import (
     CreateRoleRequest,
     CreateUserRequest,
     GenerateApiTokenRequest,
+    HandOverRequest,
     MeAccessDTO,
     PermissionDTO,
     RoleDTO,
+    SetAdministratorRequest,
     SetUserActiveRequest,
     UpdateRoleRequest,
     UpdateUserRolesRequest,
@@ -293,12 +295,26 @@ async def set_user_roles(
                 detail=f"Unknown role id: {role_id}",
             )
 
-    had = {role.id for role in await rbac_dao.get_user_roles(user_id)}
+    before = await rbac_dao.get_user_roles(user_id)
+    had = {role.id for role in before}
     await rbac_dao.set_user_roles(user_id, payload.role_ids)
     if had - set(payload.role_ids):
         # A role taken away ends their sign-ins, so what they had open is not carried on from before.
         end_sign_ins(target_user)
     await session.flush()
+    await AuditDAO(session).log(
+        action="user.roles.set",
+        target_type="user",
+        target_id=str(user_id),
+        result=AuditResult.ALLOW,
+        actor_id=_user.id,
+        severity="high",
+        metadata_json=json.dumps({
+            "email": target_user.email,
+            "before": sorted(role.name for role in before),
+            "after": sorted(role.name for role in await rbac_dao.get_user_roles(user_id)),
+        }),
+    )
 
     return await _build_admin_user_dto(target_user, rbac_dao)
 
@@ -407,6 +423,19 @@ async def create_user(
             await rbac_dao.assign_role(new_user.id, default_role.id)
             await session.flush()
 
+    await AuditDAO(session).log(
+        action="user.create",
+        target_type="user",
+        target_id=str(new_user.id),
+        result=AuditResult.ALLOW,
+        actor_id=_user.id,
+        severity="high",
+        metadata_json=json.dumps({
+            "email": new_user.email,
+            "administrator": new_user.is_superuser,
+            "roles": sorted(role.name for role in await rbac_dao.get_user_roles(new_user.id)),
+        }),
+    )
     return await _build_admin_user_dto(new_user, rbac_dao)
 
 
@@ -440,9 +469,120 @@ async def delete_user(
     if target.id == admin.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot delete yourself.")
     await _refuse_last_superuser(session, target)
+    email, was_admin = target.email, target.is_superuser
     await session.delete(target)
     await session.flush()
     await forget_principal("user", str(user_id))
+    await AuditDAO(session).log(
+        action="user.delete",
+        target_type="user",
+        target_id=str(user_id),
+        result=AuditResult.ALLOW,
+        actor_id=admin.id,
+        severity="high",
+        metadata_json=json.dumps({"email": email, "administrator": was_admin}),
+    )
+
+
+async def _require_root_mode(root_mode: bool, what: str) -> None:
+    if not root_mode:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Start Root Mode first: {what} is recorded with its reason.",
+        )
+
+
+@router.put("/{user_id}/administrator", response_model=AdminUserDTO, name="set_user_administrator")
+async def set_user_administrator(
+    user_id: uuid.UUID,
+    payload: SetAdministratorRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    root_mode: Annotated[bool, Depends(get_root_mode_active)],
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminUserDTO:
+    """Grant or remove the administrator right (Root Mode, a reason); never from the last administrator."""
+    await _require_root_mode(root_mode, "granting or removing the administrator right")
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if payload.administrator and not target.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A suspended account cannot be made administrator.",
+        )
+    if not payload.administrator:
+        await _refuse_last_superuser(session, target)
+    if target.is_superuser != payload.administrator:
+        target.is_superuser = payload.administrator
+        if not payload.administrator:
+            end_sign_ins(target)
+        await session.flush()
+        await AuditDAO(session).log(
+            action="user.administrator.grant" if payload.administrator else "user.administrator.remove",
+            target_type="user",
+            target_id=str(target.id),
+            result=AuditResult.ALLOW,
+            actor_id=admin.id,
+            severity="high",
+            metadata_json=json.dumps({"email": target.email, "reason": payload.reason}),
+        )
+    return await _build_admin_user_dto(target, RbacDAO(session))
+
+
+@router.post("/{user_id}/hand-over", response_model=AdminUserDTO, name="hand_over_right")
+async def hand_over_right(
+    user_id: uuid.UUID,
+    payload: HandOverRequest,
+    admin: Annotated[User, Depends(require_superuser)],
+    root_mode: Annotated[bool, Depends(get_root_mode_active)],
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminUserDTO:
+    """Move the administrator right or the auditor role from one person to another in one step.
+
+    The one who gets it must be an active account; the one who had it loses it (and their sign-ins, for the
+    administrator right). Root Mode and a reason, recorded with both people named. Returns the new holder.
+    """
+    await _require_root_mode(root_mode, "handing over a right")
+    giver = await session.get(User, user_id)
+    taker = await session.get(User, payload.to_user_id)
+    if giver is None or taker is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if giver.id == taker.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Choose someone else to hand it to.")
+    if not taker.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="The account to hand it to is suspended.",
+        )
+    rbac_dao = RbacDAO(session)
+    if payload.right == "administrator":
+        if not giver.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="This account is not an administrator.",
+            )
+        taker.is_superuser = True
+        giver.is_superuser = False
+        end_sign_ins(giver)
+    else:
+        auditor = await rbac_dao.get_role_by_name("auditor")
+        if auditor is None or auditor.id not in {role.id for role in await rbac_dao.get_user_roles(giver.id)}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="This account is not an auditor.",
+            )
+        await rbac_dao.assign_role(taker.id, auditor.id)
+        await rbac_dao.remove_role(giver.id, auditor.id)
+        end_sign_ins(giver)
+    await session.flush()
+    await AuditDAO(session).log(
+        action="user.right.hand_over",
+        target_type="user",
+        target_id=str(taker.id),
+        result=AuditResult.ALLOW,
+        actor_id=admin.id,
+        severity="high",
+        metadata_json=json.dumps({
+            "right": payload.right, "from": giver.email, "to": taker.email, "reason": payload.reason,
+        }),
+    )
+    return await _build_admin_user_dto(taker, rbac_dao)
 
 
 @router.put("/{user_id}/active", response_model=AdminUserDTO, name="set_user_active")

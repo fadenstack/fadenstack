@@ -161,6 +161,59 @@ aber beendet: Sie meldet sich neu an. Sie können weder sich selbst sperren noch
 **Löschen** (das Papierkorb-Symbol) entfernt das Konto und lässt sich nicht rückgängig machen. Sie können weder sich
 selbst löschen noch den letzten aktiven Superuser.
 
+## Administratoren und Prüfer {#administrators-and-auditors}
+
+Zwei Rechte betreffen Vertrauen statt Arbeit; jedes lässt sich vergeben, entziehen und übergeben:
+
+- Ein **Administrator** (Superuser) darf in der Konsole alles.
+- Ein **Prüfer** (die eingebaute Rolle `auditor`) liest das Audit-Protokoll und ändert nichts. Administratoren
+  lesen es auch; Betrachter und Operatoren nicht, weil es E-Mail- und IP-Adressen enthält.
+
+Starten Sie dafür zuerst den **Root-Modus**, öffnen Sie **Zugriffskontrolle → Benutzer** und wählen Sie in der
+Zeile der Person **Rechte** (das Schild-Symbol):
+
+- **Zum Administrator machen** oder **Administratorrecht entziehen** für diese Person.
+- **Übergeben**: Das Recht (Administrator oder Prüfer) geht in einem Schritt von dieser Person an die Person,
+  die Sie wählen. Wer es hatte, verliert es und wird abgemeldet.
+
+Jede Änderung braucht eine Begründung von mindestens 10 Zeichen. Sie wird mit beiden Namen und der Begründung im
+Audit-Protokoll festgehalten. Der letzte Administrator behält das Recht.
+
+Kann sich niemand mehr als Administrator anmelden, macht jemand mit Zugang zum Server ein Konto wieder zum
+Administrator (auch das wird festgehalten):
+
+```bash
+faden admin grant-admin --email person@example.com --reason "Der einzige Administrator hat das Unternehmen verlassen"
+```
+
+## Das Audit-Protokoll {#the-audit-log}
+
+**Protokolle → Audit** (für einen Prüfer nur **Audit**) zeigt, wer was getan hat: jede Änderung in den
+Verwaltungsbereichen, abgelehnte Versuche eingeschlossen, Anmeldungen und fehlgeschlagene Anmeldungen,
+Passwortänderungen und -zurücksetzungen, vergebene und übergebene Rechte sowie das Lesen fremder Dinge oder
+geheimer Werte: die Chat-Übersicht, die Observability-Seiten, die Protokollansicht und das Audit-Protokoll
+selbst. Jeder Eintrag nennt die E-Mail-Adresse der Person, wie sie damals lautete, woher die Anfrage kam (die
+Adresse und ob Konsole, API, CLI oder das System) und die Zeit.
+
+- **Filter**: Person, Aktion (ein Name oder ein Präfix mit Punkt am Ende, etwa `user.`), Ergebnis, Schweregrad,
+  Quelle und ein Zeitraum.
+- **Als CSV exportieren** lädt herunter, was die Filter zeigen (höchstens 100.000 Einträge); der Export wird
+  festgehalten.
+- Die Zeile über der Tabelle sagt, ob das Protokoll **unverändert** ist: Jeder Eintrag trägt den Hash des
+  vorherigen, sodass ein nachträglich geänderter, eingefügter oder gelöschter Eintrag die Kette an dieser Stelle
+  bricht. Eine Kopie jedes Eintrags liegt außerdem in einer eigenen Datei, die jede Sicherung mitnimmt, und in
+  den Protokollen des Servers.
+
+Vom Server aus dieselbe Prüfung:
+
+```bash
+faden audit verify
+```
+
+Auch die eigenen Änderungen der CLI werden festgehalten: Sicherungen, Wiederherstellungen, Schlüsselrotationen,
+Upgrades und Passwortzurücksetzungen mit `faden admin reset-password`. Fadenstack löscht das Audit-Protokoll
+nie; es übersteht Upgrades, Sicherungen und Wiederherstellungen.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 | Sie sehen | Was Sie tun |

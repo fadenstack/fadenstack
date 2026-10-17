@@ -965,6 +965,23 @@
       "action": "API-Tokens",
       "title": "API-Tokens von {{email}}",
       "none": "Keine API-Tokens."
+    },
+    "rights": {
+      "action": "Rechte",
+      "title": "Rechte von {{email}}",
+      "administrator": "Administrator",
+      "auditor": "Prüfer",
+      "has": "Hat es",
+      "has_not": "Hat es nicht",
+      "grant": "Zum Administrator machen",
+      "remove": "Administratorrecht entziehen",
+      "hand_over": "Übergeben",
+      "right": "Recht",
+      "to": "An",
+      "reason": "Begründung",
+      "reason_help": "Mindestens 10 Zeichen. Erfordert den Root-Modus; wird mit beiden Namen und der Begründung im Audit-Protokoll festgehalten.",
+      "hand_over_help": "Wer das Recht hat, verliert es, die andere Person erhält es, in einem Schritt.",
+      "failed": "Nicht ausgeführt: {{error}}"
     }
   },
   "container_detail": {
@@ -2927,7 +2944,20 @@
     "severity": "Schweregrad",
     "actor": "Akteur",
     "empty": "Keine Ereignisse.",
-    "search": "Aktion, Ziel oder Akteur suchen…"
+    "search": "Aktion, Ziel oder Akteur suchen…",
+    "person": "Person (E-Mail)",
+    "source": "Quelle",
+    "client_ip": "Adresse",
+    "from": "Von",
+    "to": "Bis",
+    "any": "Alle",
+    "export": "Als CSV exportieren",
+    "result_allow": "Erlaubt",
+    "result_deny": "Abgelehnt",
+    "severity_high": "Hoch",
+    "severity_normal": "Normal",
+    "chain_ok": "Unverändert: jedes Ereignis ist so, wie es geschrieben wurde ({{count}} Ereignisse).",
+    "chain_broken": "Nach dem Schreiben geändert: {{problem}}"
   },
   "engine": {
     "preset_label": "Optimiert für",
