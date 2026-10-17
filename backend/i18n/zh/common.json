@@ -1745,7 +1745,10 @@
     "scope_session": "会话",
     "scope_project": "项目",
     "col_chat": "对话",
-    "chat_id_hint": "对话 {{id}}。其标题和消息归用户本人所有，此处不显示。"
+    "chat_id_hint": "对话 {{id}}。其标题和消息归用户本人所有，此处不显示。",
+    "col_attachment": "附件",
+    "project_id_hint": "项目 {{id}}。其名称和内容属于其用户，此处不显示。",
+    "attachment_id_hint": "附件 {{id}}。其名称和内容属于其用户，此处不显示。"
   },
   "mcp": {
     "servers_title": "MCP 服务器",

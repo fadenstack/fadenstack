@@ -14,8 +14,43 @@ from typing import Protocol, runtime_checkable
 
 import aiofiles
 import aiofiles.os
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 log = logging.getLogger(__name__)
+
+#: How a sealed file starts; a file without it is from before files were sealed and is read as it is.
+SEALED_MAGIC = b"FDNENC1"
+_NONCE = 12
+
+
+class FileSealError(ValueError):
+    """A sealed file that no key the gateway holds opens."""
+
+
+def seal_bytes(data: bytes, key: bytes) -> bytes:
+    """*data* sealed with AES-256-GCM under *key*: magic, nonce, ciphertext and tag."""
+    nonce = os.urandom(_NONCE)
+    return SEALED_MAGIC + nonce + AESGCM(key).encrypt(nonce, data, SEALED_MAGIC)
+
+
+def is_sealed(raw: bytes) -> bool:
+    """Whether *raw* is a sealed file."""
+    return raw.startswith(SEALED_MAGIC)
+
+
+def open_bytes(raw: bytes, keys: list[bytes]) -> bytes:
+    """What :func:`seal_bytes` sealed, with the first of *keys* that opens it; a plain file as it is."""
+    if not is_sealed(raw):
+        return raw
+    nonce = raw[len(SEALED_MAGIC):len(SEALED_MAGIC) + _NONCE]
+    body = raw[len(SEALED_MAGIC) + _NONCE:]
+    for key in keys:
+        try:
+            return AESGCM(key).decrypt(nonce, body, SEALED_MAGIC)
+        except InvalidTag:
+            pass  # sealed with another key: try the next one
+    raise FileSealError("The file is sealed with a key the gateway does not hold.")
 
 
 @runtime_checkable
@@ -81,3 +116,32 @@ class LocalFileStore:
     async def exists(self, key: str) -> bool:
         path = self._resolve(key)
         return await aiofiles.os.path.exists(path)
+
+
+class SealedFileStore:
+    """A file store whose files are sealed at rest with the chat key (purpose ``chat-files``).
+
+    Attachments and pictures were the one part of a chat stored readable: the messages, titles and the text
+    read from files were sealed, the files themselves not. Files from before are read as they are and sealed
+    by ``faden secrets seal``; while the chat key is off (development), files are stored as they are.
+    """
+
+    def __init__(self, inner: FileStore) -> None:
+        self.inner = inner
+
+    async def put_bytes(self, key: str, data: bytes) -> str:
+        from faden_gateway.db.crypto import file_keys  # noqa: PLC0415 - crypto is configured at start
+
+        keys = file_keys()
+        return await self.inner.put_bytes(key, seal_bytes(data, keys[0]) if keys else data)
+
+    async def get_bytes(self, key: str) -> bytes:
+        from faden_gateway.db.crypto import file_keys  # noqa: PLC0415
+
+        return open_bytes(await self.inner.get_bytes(key), file_keys())
+
+    async def delete(self, key: str) -> bool:
+        return await self.inner.delete(key)
+
+    async def exists(self, key: str) -> bool:
+        return await self.inner.exists(key)

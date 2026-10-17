@@ -152,6 +152,18 @@ _PII_TOKENIZE_SYSTEM_PROMPT = (
 )
 
 
+def tool_error_kind(content: str) -> str:
+    """What kind of failure a tool's answer is, for the console: never its text, which may quote someone."""
+    text = content.lower()
+    if text.startswith("tool call failed:"):
+        return "failed"
+    if "timed out" in text or "timeout" in text:
+        return "timeout"
+    if any(word in text for word in ("not allowed", "refused", "denied", "forbidden", "permission")):
+        return "refused"
+    return "error"
+
+
 @dataclass(slots=True, frozen=True)
 class GatewayResponse:
     """Structured non-streaming gateway output."""
@@ -3307,6 +3319,7 @@ class GatewayService:
             row.update(
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 is_error=is_error,
+                error_kind=tool_error_kind(content) if is_error else None,
                 error_message=content[:500] if is_error else None,
             )
             if req.faden_events:

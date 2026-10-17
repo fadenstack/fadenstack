@@ -116,7 +116,9 @@ class ChatAttachmentService:
         # Store file
         scope_id = str(session_id or project_id or "unscoped")
         file_id = uuid.uuid4().hex
-        storage_key = f"{tenant_id}/{scope_id}/{file_id}/{filename}"
+        # No file name in the path: the name is sealed in the database, and the folder is readable to whoever
+        # holds the server. Files stored before keep their path.
+        storage_key = f"{tenant_id}/{scope_id}/{file_id}"
         await self.file_store.put_bytes(storage_key, file_bytes)
 
         # Extract text

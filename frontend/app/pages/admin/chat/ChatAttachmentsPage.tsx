@@ -84,12 +84,14 @@ export default function ChatAttachmentsPage() {
 
   const columns: ColumnDef<ChatAttachment>[] = [
     {
-      key: "filename",
-      label: t("chat_admin.col_filename"),
-      sortable: true,
-      sortValue: (r) => r.filename,
-      searchValue: (r) => r.filename,
-      render: (r) => r.filename,
+      key: "id",
+      label: t("chat_admin.col_attachment"),
+      searchValue: (r) => r.id,
+      render: (r) => (
+        <Tooltip title={t("chat_admin.attachment_id_hint", { id: r.id })}>
+          <span>{r.id.slice(0, 8)}</span>
+        </Tooltip>
+      ),
     },
     {
       key: "user_id",
@@ -194,7 +196,7 @@ export default function ChatAttachmentsPage() {
         open={!!deleteTarget}
         title={t("chat_admin.delete_attachment_title")}
         message={t("chat_admin.delete_attachment_message", {
-          name: deleteTarget?.filename,
+          name: deleteTarget?.id.slice(0, 8),
         })}
         confirmLabel={t("common.delete")}
         confirmColor="error"

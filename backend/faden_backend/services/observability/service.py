@@ -432,11 +432,11 @@ class ObservabilityService:
     # ── Tool call detail ──────────────────────────────────────────
 
     async def get_tool_calls(self, request_id: str) -> list[dict]:
-        """Return MCP tool call logs for a given request."""
+        """Return MCP tool call logs for a given request: the kind of a failure, never its text (sealed)."""
         q = text("""
             SELECT
                 id, request_id, iteration, tool_name, mcp_server,
-                latency_ms, is_error, error_message, created_at
+                latency_ms, is_error, error_kind, created_at
             FROM llm_tool_call_log
             WHERE request_id = :request_id
             ORDER BY iteration, created_at

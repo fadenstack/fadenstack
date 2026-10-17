@@ -53,7 +53,9 @@ async def list_projects(
     try:
         result = await gw.execute(
             text(
-                "SELECT id, tenant_id, user_id, name, description, "
+                # Not its name or description: what people call their projects is theirs, as their chats
+                # are (sealed in the gateway; features/admin-guardrails.md, D-D).
+                "SELECT id, tenant_id, user_id, "
                 "model_alias, created_at, updated_at "
                 "FROM chat_project ORDER BY created_at DESC"
             ),
@@ -161,8 +163,9 @@ async def list_attachments(
     project_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     q = (
+        # Not the file name: it is the user's own (sealed in the gateway).
         "SELECT id, tenant_id, user_id, session_id, project_id, "
-        "filename, content_type, size_bytes, extraction_status, "
+        "content_type, size_bytes, extraction_status, "
         "scope, page_count, truncated, created_at "
         "FROM chat_attachment"
     )

@@ -134,6 +134,16 @@ def unseal(purpose: str, token: bytes) -> bytes:
     return f.decrypt(token)
 
 
+def file_keys(purpose: str = "chat-files") -> list[bytes]:
+    """The 32-byte keys files are sealed with: the current one first, then the previous one; none when off."""
+    if _key_provider is None:
+        return []
+    keys = [_key_provider(purpose)]
+    if _previous_provider is not None:
+        keys.append(_previous_provider(purpose))
+    return keys
+
+
 def _is_ciphertext(value: str) -> bool:
     """Heuristic: does *value* look like a Fernet token?"""
     try:

@@ -82,7 +82,20 @@ async def run(scope: str, *, skip_unreadable: bool, engine: AsyncEngine | None =
     finally:
         if own:
             await engine.dispose()
-    return {"ok": True, "columns": report.as_dict()}
+    outcome: dict = {"ok": True, "columns": report.as_dict()}
+    if scope == "chat":
+        # The attachment files, while the previous key is still here to open them (the CLI drops it after).
+        from faden_gateway.tools.seal_plaintext import seal_files  # noqa: PLC0415 - imports this module
+
+        files = seal_files(
+            settings.chat_file_store_root, settings.encryption_key, settings.encryption_key_previous,
+        )
+        outcome["files"] = {
+            "sealed": files.sealed, "resealed": files.resealed, "unreadable": files.unreadable,
+        }
+        if files.unreadable and not skip_unreadable:
+            return {"ok": False, "error": f"{files.unreadable} attachment file(s) open with neither key."}
+    return outcome
 
 
 def main(argv: list[str] | None = None) -> int:

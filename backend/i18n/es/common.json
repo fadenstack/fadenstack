@@ -1745,7 +1745,10 @@
     "scope_session": "sesión",
     "scope_project": "proyecto",
     "col_chat": "Chat",
-    "chat_id_hint": "Chat {{id}}. Su título y sus mensajes son de su usuario y no se muestran aquí."
+    "chat_id_hint": "Chat {{id}}. Su título y sus mensajes son de su usuario y no se muestran aquí.",
+    "col_attachment": "Adjunto",
+    "project_id_hint": "Proyecto {{id}}. Su nombre y su contenido son de su usuario y no se muestran aquí.",
+    "attachment_id_hint": "Adjunto {{id}}. Su nombre y su contenido son de su usuario y no se muestran aquí."
   },
   "mcp": {
     "servers_title": "Servidores MCP",

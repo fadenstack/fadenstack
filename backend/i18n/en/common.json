@@ -1886,7 +1886,10 @@
     "scope_session": "session",
     "scope_project": "project",
     "col_chat": "Chat",
-    "chat_id_hint": "Chat {{id}}. Its title and messages are its user's own and are not shown here."
+    "chat_id_hint": "Chat {{id}}. Its title and messages are its user's own and are not shown here.",
+    "col_attachment": "Attachment",
+    "project_id_hint": "Project {{id}}. Its name and contents are its user's own and are not shown here.",
+    "attachment_id_hint": "Attachment {{id}}. Its name and contents are its user's own and are not shown here."
   },
   "chat": {
     "title": "Chat",

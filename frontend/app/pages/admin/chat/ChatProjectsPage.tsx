@@ -43,12 +43,14 @@ export default function ChatProjectsPage() {
 
   const columns: ColumnDef<ChatProject>[] = [
     {
-      key: "name",
-      label: t("chat_admin.col_name"),
-      sortable: true,
-      sortValue: (r) => r.name,
-      searchValue: (r) => r.name,
-      render: (r) => r.name,
+      key: "id",
+      label: t("chat_admin.col_project"),
+      searchValue: (r) => r.id,
+      render: (r) => (
+        <Tooltip title={t("chat_admin.project_id_hint", { id: r.id })}>
+          <span>{r.id.slice(0, 8)}</span>
+        </Tooltip>
+      ),
     },
     {
       key: "user_id",
@@ -109,7 +111,7 @@ export default function ChatProjectsPage() {
         open={!!deleteTarget}
         title={t("chat_admin.delete_project_title")}
         message={t("chat_admin.delete_project_message", {
-          name: deleteTarget?.name,
+          name: deleteTarget?.id.slice(0, 8),
         })}
         confirmLabel={t("common.delete")}
         confirmColor="error"

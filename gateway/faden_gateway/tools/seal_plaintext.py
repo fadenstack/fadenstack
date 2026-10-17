@@ -1,7 +1,7 @@
 """Seal what was written in plain text: chats stored without a chat key, or before a column was sealed.
 
 Run by ``faden secrets seal`` and once by ``faden upgrade`` after its health check, in the gateway's
-container::
+container. Attachment files are sealed too (:func:`seal_files`)::
 
     python -m faden_gateway.tools.seal_plaintext
 
@@ -22,11 +22,14 @@ import asyncio
 import json
 import sys
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from cryptography.fernet import InvalidToken
 from sqlalchemy import column, not_, select, table, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from faden_gateway.db.crypto import derive_key
+from faden_gateway.services.gateway.file_store import FileSealError, is_sealed, open_bytes, seal_bytes
 from faden_gateway.settings import settings
 from faden_gateway.tools.key_rotation import FERNET_PREFIX, Target
 from faden_gateway.tools.rotate_keys import chat_targets
@@ -90,7 +93,55 @@ async def _seal_column(engine: AsyncEngine, target: Target) -> Sealed:
     return counts
 
 
-async def run(engine: AsyncEngine | None = None) -> dict:
+@dataclass
+class SealedFiles:
+    """What the attachment folder had."""
+
+    sealed: int = 0
+    already: int = 0
+    resealed: int = 0
+    unreadable: int = 0
+
+
+def seal_files(root: str | Path, current: str, previous: str = "") -> SealedFiles:
+    """Seal every plain attachment file under *root* with *current*; re-seal those *previous* sealed.
+
+    Each file is written beside itself and moved over it, so a stop leaves the old file or the new one, never
+    half of one. Also run by the chat-key rotation, while it holds the previous key.
+    """
+    counts = SealedFiles()
+    folder = Path(root)
+    if not current or not folder.is_dir():
+        return counts
+    new_key = derive_key(current, "chat-files")
+    old_key = derive_key(previous, "chat-files") if previous and previous != current else None
+    for path in sorted(p for p in folder.rglob("*") if p.is_file() and not p.name.endswith(".sealing")):
+        raw = path.read_bytes()
+        if is_sealed(raw):
+            try:
+                open_bytes(raw, [new_key])
+                counts.already += 1
+                continue
+            except FileSealError:
+                if old_key is None:
+                    counts.unreadable += 1
+                    continue
+            try:
+                plain = open_bytes(raw, [old_key])
+            except FileSealError:
+                counts.unreadable += 1
+                continue
+            counts.resealed += 1
+        else:
+            plain = raw
+            counts.sealed += 1
+        temporary = path.with_name(path.name + ".sealing")
+        temporary.write_bytes(seal_bytes(plain, new_key))
+        temporary.replace(path)
+    return counts
+
+
+async def run(engine: AsyncEngine | None = None, files_root: str | Path | None = None) -> dict:
     """Seal every plain value of every sealed column; returns the JSON document the command prints."""
     if not settings.encryption_key:
         return {"ok": False, "error": "FADEN_GATEWAY_ENCRYPTION_KEY is empty: there is no key to seal with."}
@@ -103,7 +154,12 @@ async def run(engine: AsyncEngine | None = None) -> dict:
     finally:
         if own:
             await engine.dispose()
-    return {"ok": True, "columns": report}
+    files = seal_files(
+        files_root if files_root is not None else settings.chat_file_store_root,
+        settings.encryption_key,
+        settings.encryption_key_previous,
+    )
+    return {"ok": True, "columns": report, "files": asdict(files)}
 
 
 def main(argv: list[str] | None = None) -> int:

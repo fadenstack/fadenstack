@@ -341,6 +341,7 @@ class GatewayDAO:
                 mcp_server=tc.get("mcp_server"),
                 latency_ms=tc.get("latency_ms"),
                 is_error=tc.get("is_error", False),
+                error_kind=tc.get("error_kind"),
                 error_message=tc.get("error_message"),
             )
             self.session.add(row)

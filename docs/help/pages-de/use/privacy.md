@@ -13,7 +13,7 @@ Auf dem Server Ihrer Organisation:
 - Ihre Skills;
 - Nutzungsdaten: wann Sie welches Modell genutzt haben, wie viel Text hinein- und herausging und welche Tools liefen. Sie enthalten nicht, was gesagt wurde.
 
-Bei einer Standardinstallation werden die Nachrichten, die Antworten, die Chat-Titel, die Projektanweisungen und der aus Ihren Dateien gelesene Text verschlüsselt gespeichert; Ihr Administrator kann bestätigen, dass das bei Ihnen so eingerichtet ist. Projektnamen, Dateinamen und die angehängten Dateien selbst werden so gespeichert, wie sie sind. Das Nachdenken eines Modells wird gar nicht gespeichert.
+Die Nachrichten, die Antworten, die Chat-Titel, Projektnamen, -beschreibungen und -anweisungen, Dateinamen, die angehängten Dateien und der aus ihnen gelesene Text werden verschlüsselt gespeichert. Ohne den Schlüssel, mit dem sie verschlüsselt sind, startet der Server nicht. Chats aus der Zeit vor dem Upgrade Ihrer Organisation auf diese Version verschlüsselt das Upgrade. Das Nachdenken eines Modells wird gar nicht gespeichert.
 
 Auf Ihrem eigenen Computer:
 
@@ -30,7 +30,7 @@ Fadenstack bewahrt Ihre Chats auf, bis sie gelöscht werden. Siehe [Löschen](#d
 |---|---|
 | Sie | Ihre Chats, Projekte, Dateien und Skills |
 | Kolleginnen und Kollegen | Keinen Ihrer Chats und keine Ihrer Dateien. Skills, die Sie mit ihnen teilen. Die Wissensdatenbank der Organisation teilen sich alle |
-| Administratoren, in der Konsole | Dass ein Chat existiert (wer, wann, in welchem Projekt), nicht seinen Titel oder seine Nachrichten. Projektnamen. Namen, Größen und Typen Ihrer Dateien, nicht ihren Inhalt. Ihre Nutzung. Welche Tools liefen. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private |
+| Administratoren, in der Konsole | Dass ein Chat, ein Projekt oder eine Datei existiert (wer, wann), nicht Titel, Namen oder Inhalt. Größen und Typen Ihrer Dateien. Ihre Nutzung. Welche Tools liefen und die Art eines Fehlers, nicht die Antwort des Tools. Wie oft personenbezogene Daten gefunden wurden, nicht die Daten selbst. Jeden Skill, auch private. Was sie sich in der Konsole ansehen, wird im Audit-Protokoll festgehalten |
 
 Die Konsole zeigt Administratoren Ihre Unterhaltungen nicht. Die Personen, die den Server betreiben, haben jedoch den Schlüssel, mit dem die Chats verschlüsselt sind. Nutzen Sie den Chat deshalb wie die E-Mail Ihrer Organisation: privat gegenüber Kolleginnen und Kollegen, aber innerhalb der IT Ihrer Organisation.
 

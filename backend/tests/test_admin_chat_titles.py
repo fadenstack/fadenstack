@@ -61,3 +61,24 @@ async def test_chats_are_listed_by_id_without_their_titles(fastapi_app: FastAPI,
     assert len(rows) == 2 and all(uuid.UUID(r["id"]) for r in rows)
     assert all("title" not in r for r in rows)
     assert "title" not in gateway.asked[0]
+
+
+async def test_projects_and_files_are_listed_without_their_names(fastapi_app: FastAPI, client: AsyncClient) -> None:
+    """What people call their projects and files is theirs too (sealed in the gateway since 18 October 2026)."""
+    gateway = _Gateway([_row()])
+
+    async def gateway_session() -> Any:
+        yield gateway
+
+    fastapi_app.dependency_overrides[chat_admin._get_gateway_session] = gateway_session  # noqa: SLF001
+    fastapi_app.dependency_overrides[current_active_user] = lambda: User(
+        id=uuid.uuid4(), email="admin@example.com", hashed_password="x",  # noqa: S106
+        is_active=True, is_verified=True, is_superuser=True,
+    )
+
+    assert (await client.get("/api/admin/chat/projects")).status_code == 200
+    assert (await client.get("/api/admin/chat/attachments")).status_code == 200
+
+    projects, attachments = gateway.asked[0], gateway.asked[1]
+    assert "name" not in projects.replace("model_alias", "") and "description" not in projects
+    assert "filename" not in attachments

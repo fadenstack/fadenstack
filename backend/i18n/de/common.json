@@ -1745,7 +1745,10 @@
     "scope_session": "Sitzung",
     "scope_project": "Projekt",
     "col_chat": "Chat",
-    "chat_id_hint": "Chat {{id}}. Titel und Nachrichten gehören der Person, die ihn führt, und werden hier nicht gezeigt."
+    "chat_id_hint": "Chat {{id}}. Titel und Nachrichten gehören der Person, die ihn führt, und werden hier nicht gezeigt.",
+    "col_attachment": "Anhang",
+    "project_id_hint": "Projekt {{id}}. Name und Inhalt gehören seiner Person und werden hier nicht gezeigt.",
+    "attachment_id_hint": "Anhang {{id}}. Name und Inhalt gehören seiner Person und werden hier nicht gezeigt."
   },
   "mcp": {
     "servers_title": "MCP-Server",

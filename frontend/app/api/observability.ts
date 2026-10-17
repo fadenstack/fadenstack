@@ -114,7 +114,8 @@ export interface ToolCallLog {
   mcp_server: string | null;
   latency_ms: number;
   is_error: boolean;
-  error_message: string | null;
+  /** failed, timeout, refused or error; a failure's text is sealed and not shown. */
+  error_kind: string | null;
   created_at: string;
 }
 

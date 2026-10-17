@@ -13,7 +13,7 @@ On your organisation's server:
 - your skills;
 - usage records: when you used which model, how much text went in and out, and which tools ran. They do not contain what was said.
 
-On a standard installation, the messages, the replies, chat titles, project instructions and the text read from your files are stored encrypted; your administrator can confirm that yours is set up this way. Project names, file names and the attached files themselves are stored as they are. A model's thinking is not saved at all.
+The messages, the replies, chat titles, project names, descriptions and instructions, file names, the files you attach and the text read from them are stored encrypted. The server does not start without the key they are encrypted with. Chats from before your organisation's upgrade to this release are encrypted by the upgrade. A model's thinking is not saved at all.
 
 On your own computer:
 
@@ -30,7 +30,7 @@ Fadenstack keeps your chats until they are deleted. See [Deleting](#deleting).
 |---|---|
 | You | Your chats, projects, files and skills |
 | Colleagues | None of your chats or files. Skills you share with them. The organisation's knowledge base is shared by everyone |
-| Administrators, in the console | That a chat exists (who, when, in which project), not its title or messages. Project names. The names, sizes and types of your files, not their content. Your usage. Which tools ran. How often personal data was found, not the data itself. Every skill, including private ones |
+| Administrators, in the console | That a chat, a project or a file exists (who, when), not its title, name or content. The sizes and types of your files. Your usage. Which tools ran and the kind of a failure, not what the tool answered. How often personal data was found, not the data itself. Every skill, including private ones. What they look at in the console is recorded in the audit log |
 
 The console does not show administrators your conversations. The people who run the server do hold the key the chats are encrypted with, so use the chat as you would your organisation's e-mail: private from colleagues, but within your organisation's IT.
 

@@ -24,7 +24,7 @@ from prometheus_fastapi_instrumentator.instrumentation import (
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from faden_gateway.db.connection_budget import check_connection_budget
-from faden_gateway.services.gateway.file_store import LocalFileStore
+from faden_gateway.services.gateway.file_store import LocalFileStore, SealedFileStore
 from faden_gateway.services.gateway.observability import GatewayObservability
 from faden_gateway.services.gateway.pricing import PricingService
 from faden_gateway.services.gateway.proxy import create_shared_http_client
@@ -339,7 +339,8 @@ async def lifespan_setup(
     app.state._resource_capacity = resource_capacity(gateway_plugin)
     # Chat file store
     if settings.sessions_enabled:
-        app.state.chat_file_store = LocalFileStore(settings.chat_file_store_root)
+        # Sealed at rest with the chat key, as the messages are (features/admin-guardrails.md, 4.3).
+        app.state.chat_file_store = SealedFileStore(LocalFileStore(settings.chat_file_store_root))
     else:
         app.state.chat_file_store = None
     setup_opentelemetry(app)

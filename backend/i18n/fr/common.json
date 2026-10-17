@@ -1888,7 +1888,10 @@
     "scope_session": "session",
     "scope_project": "projet",
     "col_chat": "Discussion",
-    "chat_id_hint": "Discussion {{id}}. Son titre et ses messages appartiennent à son utilisateur et ne sont pas affichés ici."
+    "chat_id_hint": "Discussion {{id}}. Son titre et ses messages appartiennent à son utilisateur et ne sont pas affichés ici.",
+    "col_attachment": "Pièce jointe",
+    "project_id_hint": "Projet {{id}}. Son nom et son contenu appartiennent à son utilisateur et ne sont pas affichés ici.",
+    "attachment_id_hint": "Pièce jointe {{id}}. Son nom et son contenu appartiennent à son utilisateur et ne sont pas affichés ici."
   },
   "chat": {
     "title": "Conversation",

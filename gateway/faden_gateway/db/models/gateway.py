@@ -454,7 +454,10 @@ class LLMToolCallLog(Base):
     mcp_server: Mapped[str | None] = mapped_column(String(128), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_error: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: What kind of failure (``failed``, ``timeout``, ``refused``, ``error``): what the console shows.
+    error_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    #: The start of a failed tool's answer: it may quote what someone asked, so it is sealed.
+    error_message: Mapped[str | None] = mapped_column(EncryptedText("chat-content"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
@@ -515,13 +518,14 @@ class ChatProject(Base):
     )
     tenant_id: Mapped[str] = mapped_column(String(128), nullable=False)
     user_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    name: Mapped[str] = mapped_column(String(256), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # What people named and described their project: sealed like what they wrote in it.
+    name: Mapped[str] = mapped_column(EncryptedText("chat-content"), nullable=False)
+    description: Mapped[str | None] = mapped_column(EncryptedText("chat-content"), nullable=True)
     system_instructions: Mapped[str | None] = mapped_column(
         EncryptedText("chat-content"), nullable=True,
     )
     model_alias: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("chat-content"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
@@ -563,7 +567,7 @@ class ChatSession(Base):
         nullable=False,
         default=SessionStatus.ACTIVE,
     )
-    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("chat-content"), nullable=True)
     execution_mode: Mapped[ExecutionMode] = mapped_column(
         SAEnum(
             ExecutionMode,
@@ -849,7 +853,8 @@ class ChatAttachment(Base):
         ForeignKey("chat_message.id", ondelete="SET NULL"),
         nullable=True,
     )
-    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    #: The name the file had: sealed. New files are stored without it in their path (``storage_key``).
+    filename: Mapped[str] = mapped_column(EncryptedText("chat-attachments"), nullable=False)
     content_type: Mapped[str] = mapped_column(String(128), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)

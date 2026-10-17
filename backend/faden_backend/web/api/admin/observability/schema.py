@@ -118,7 +118,8 @@ class ToolCallLogDTO(BaseModel):
     mcp_server: str | None = None
     latency_ms: int
     is_error: bool = False
-    error_message: str | None = None
+    #: ``failed``, ``timeout``, ``refused`` or ``error``; the failure's text is sealed and not shown here.
+    error_kind: str | None = None
     created_at: datetime
 
 
