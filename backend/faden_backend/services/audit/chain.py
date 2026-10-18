@@ -74,12 +74,15 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def canonical(event: AuditEvent, *, with_chain: bool = True) -> dict[str, Any]:
-    """The fields an event's hash covers, as plain values."""
+    """The fields an event's hash covers, as plain values.
+
+    Not ``actor_id``: the database sets it to NULL when that account is deleted, which must not read as a
+    change. ``actor_email``, as written, says who acted.
+    """
     result = event.result.value if isinstance(event.result, AuditResult) else event.result
     body: dict[str, Any] = {
         "id": str(event.id),
         "time": _iso(event.time),
-        "actor_id": str(event.actor_id) if event.actor_id else None,
         "actor_email": event.actor_email,
         "action": event.action,
         "target_type": event.target_type,

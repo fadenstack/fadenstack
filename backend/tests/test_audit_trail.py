@@ -184,7 +184,7 @@ async def test_reading_the_audit_trail_is_recorded_once_per_ten_minutes(
 async def test_an_admin_write_without_an_event_of_its_own_is_recorded(
     recorded_app: tuple[FastAPI, User], _engine: AsyncEngine,
 ) -> None:
-    app, admin = recorded_app
+    app, _admin = recorded_app
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.put(f"/api/admin/users/{uuid.uuid4()}/roles", json={"role_ids": []})
     writes = [e for e in await _events(_engine) if e.action == "api.put"]
@@ -208,3 +208,47 @@ async def test_a_failed_sign_in_is_recorded_with_the_address_tried(
     failed = [e for e in await _events(_engine) if e.action == "auth.sign_in.failed"]
     assert len(failed) == 1 and failed[0].target_id == "nobody@example.com"
     assert failed[0].result == AuditResult.DENY
+
+
+@pytest.mark.anyio
+async def test_deleting_an_account_does_not_break_the_chain(dbsession: AsyncSession) -> None:
+    """The database empties actor_id when the account goes; the e-mail as written still names who acted."""
+    person = await _user(dbsession)
+    email = person.email
+    await chain.start_chain_in(dbsession)
+    await AuditDAO(dbsession).log("thing.make", "thing", "1", AuditResult.ALLOW, actor_id=person.id)
+    await dbsession.execute(text('DELETE FROM "user" WHERE id = :id'), {"id": person.id})
+    dbsession.expire_all()
+    event = (await dbsession.execute(select(AuditEvent).where(AuditEvent.action == "thing.make"))).scalar_one()
+    assert event.actor_id is None and event.actor_email == email
+    assert (await chain.verify(dbsession)).ok
+
+
+@pytest.mark.anyio
+async def test_the_database_refuses_changes_to_events_but_an_accounts_deletion(dbsession: AsyncSession) -> None:
+    """The append-only trigger (installed by migration 4pp3nd0n1y, here in the test's transaction)."""
+    import importlib
+
+    from sqlalchemy.exc import DBAPIError
+
+    migration = importlib.import_module("faden_backend.db.migrations.versions.2026-10-18-16-00_4pp3nd0n1y")
+    await dbsession.execute(text(migration.FUNCTION))
+    for trigger in migration.TRIGGERS:
+        await dbsession.execute(text(trigger))
+    person = await _user(dbsession)
+    await AuditDAO(dbsession).log("thing.make", "thing", "1", AuditResult.ALLOW, actor_id=person.id)
+
+    for change in (
+        "UPDATE audit_events SET metadata_json = 'forged'",
+        "UPDATE audit_events SET actor_id = NULL, severity = 'low'",
+        "DELETE FROM audit_events",
+        "TRUNCATE audit_events",
+    ):
+        savepoint = await dbsession.begin_nested()
+        with pytest.raises(DBAPIError, match="append-only"):
+            await dbsession.execute(text(change))
+        await savepoint.rollback()
+
+    await dbsession.execute(text('DELETE FROM "user" WHERE id = :id'), {"id": person.id})
+    left = (await dbsession.execute(text("SELECT actor_id, action FROM audit_events WHERE action = 'thing.make'"))).all()
+    assert [(row.actor_id, row.action) for row in left] == [(None, "thing.make")]
