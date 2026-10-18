@@ -1,0 +1,11 @@
+# Never in the image: local settings and keys (the Dockerfile copies the whole folder), environments, caches.
+.env
+.env.*
+.venv
+venv/
+.git/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

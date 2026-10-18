@@ -23,3 +23,14 @@ def test_the_environment_wins_over_a_file(tmp_path: Path, monkeypatch: pytest.Mo
     (tmp_path / "FADEN_BACKEND_CREDENTIAL_PEPPER").write_text("from-a-file", encoding="utf-8")
     monkeypatch.setenv("FADEN_BACKEND_CREDENTIAL_PEPPER", "from-the-environment")
     assert Settings(_env_file=None, _secrets_dir=tmp_path).credential_pepper == "from-the-environment"
+
+
+def test_the_mounted_file_wins_over_a_dotenv_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A developer's .env copied into an image held the development key; it outranked the mounted one."""
+    monkeypatch.delenv("FADEN_BACKEND_CREDENTIAL_PEPPER", raising=False)
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    (secrets / "FADEN_BACKEND_CREDENTIAL_PEPPER").write_text("from-the-mounted-file", encoding="utf-8")
+    (tmp_path / ".env").write_text("FADEN_BACKEND_CREDENTIAL_PEPPER=from-a-dotenv-file\n", encoding="utf-8")
+    loaded = Settings(_env_file=tmp_path / ".env", _secrets_dir=secrets)
+    assert loaded.credential_pepper == "from-the-mounted-file"

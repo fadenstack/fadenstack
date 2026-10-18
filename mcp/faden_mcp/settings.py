@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from typing import Optional
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 from yarl import URL
 
 #: Where compose mounts the keys that open content (its ``secrets:``); a service run outside a container has
@@ -138,6 +138,23 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         secrets_dir=_SECRETS_DIR if _SECRETS_DIR.is_dir() else None,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """The keys compose mounts under /run/secrets come before a ``.env`` file.
+
+        pydantic-settings reads ``.env`` first by default. A ``.env`` that reached an image (a developer's, copied
+        by ``COPY . .``) then outranked the mounted keys, and the service ran on its development key. The
+        environment still wins over both.
+        """
+        return init_settings, env_settings, file_secret_settings, dotenv_settings
 
 
 settings = Settings()
