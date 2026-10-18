@@ -1,4 +1,26 @@
 {
+  "about": {
+    "title": "关于 Fadenstack",
+    "menu_item": "关于 Fadenstack",
+    "edition": "版本类型",
+    "edition_core": "Core",
+    "edition_enterprise": "Enterprise",
+    "version": "版本",
+    "version_source": "从源代码构建",
+    "licence": "许可证",
+    "console_build": "控制台构建",
+    "help": "帮助",
+    "third_party": "第三方声明",
+    "release_notes": "发行说明",
+    "website": "网站",
+    "security": "安全",
+    "developers": "开发者文档",
+    "source_code": "源代码",
+    "copy": "复制详细信息",
+    "copied": "已复制",
+    "close": "关闭",
+    "new_tab": "（在新标签页中打开）"
+  },
   "app": {
     "title": "Fadenstack",
     "subtitle": "控制台",

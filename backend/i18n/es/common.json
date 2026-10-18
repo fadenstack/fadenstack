@@ -1,4 +1,26 @@
 {
+  "about": {
+    "title": "Acerca de Fadenstack",
+    "menu_item": "Acerca de Fadenstack",
+    "edition": "Edición",
+    "edition_core": "Core",
+    "edition_enterprise": "Enterprise",
+    "version": "Versión",
+    "version_source": "compilado desde el código fuente",
+    "licence": "Licencia",
+    "console_build": "Compilación de la consola",
+    "help": "Ayuda",
+    "third_party": "Avisos de terceros",
+    "release_notes": "Notas de la versión",
+    "website": "Sitio web",
+    "security": "Seguridad",
+    "developers": "Documentación para desarrolladores",
+    "source_code": "Código fuente",
+    "copy": "Copiar detalles",
+    "copied": "Copiado",
+    "close": "Cerrar",
+    "new_tab": "(se abre en una pestaña nueva)"
+  },
   "app": {
     "title": "Fadenstack",
     "subtitle": "Consola",

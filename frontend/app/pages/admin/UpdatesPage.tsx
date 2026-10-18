@@ -7,6 +7,8 @@
  * once a day (Settings > Updates), on "Check now", or uploaded by hand on a
  * server without internet.
  */
+import { useAboutInfo } from "~/components/AboutDialog";
+import { EXTERNAL_LINK, tagVendorUrl } from "~/lib/vendorLinks";
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -324,18 +326,20 @@ function SummaryBody({
   );
 }
 
+/** A release's notes; on fadenstack.com tagged with ref=console-updates and this server's release line. */
 function NotesLink({ url }: { url: string }) {
   const { t } = useTranslation();
+  const about = useAboutInfo();
   return (
     <Link
-      href={url}
-      target="_blank"
-      rel="noreferrer"
+      href={tagVendorUrl(url, "console-updates", about?.version)}
+      {...EXTERNAL_LINK}
+      aria-label={`${t("updates.release_notes")} ${t("about.new_tab")}`}
       variant="body2"
       sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, mt: 0.5 }}
     >
       {t("updates.release_notes")}
-      <OpenInNewIcon sx={{ fontSize: 14 }} />
+      <OpenInNewIcon sx={{ fontSize: 14 }} aria-hidden />
     </Link>
   );
 }

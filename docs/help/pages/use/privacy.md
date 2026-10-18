@@ -96,6 +96,14 @@ The model list does not always show where a model runs. If it matters for what y
 
 If something must be erased sooner, for example personal data you pasted by mistake, ask your administrator: a chat they delete in the console is erased at once. Backups taken before keep it until they are replaced (the nightly ones after a week).
 
+## Links to fadenstack.com
+
+The sign-in page, **About Fadenstack** (in the menu behind your account button), the release notes on **Updates**,
+the footer of these Help pages and the chat panels of the add-ins link to fadenstack.com. Such a link tells the
+website where it was clicked (for example `ref=console-about`) and the release line (`v=0.4`), so Fadenstack can
+count how its software is used. It carries nothing about you, your organisation or this server, opens in a new tab,
+and does not pass on the address of the page you came from. Nothing is sent unless you click one.
+
 ## When it does not work
 
 | You see | What to do |

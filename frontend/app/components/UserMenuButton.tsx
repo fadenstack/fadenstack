@@ -17,6 +17,11 @@ import Typography from "@mui/material/Typography";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
+import { AboutDialog } from "~/components/AboutDialog";
+import { helpUrl } from "~/lib/pageHelp";
 
 export interface UserMenuButtonProps {
   email: string;
@@ -29,8 +34,9 @@ export interface UserMenuButtonProps {
 }
 
 export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium", extraItems }: UserMenuButtonProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const label = t("profile.logged_in_as", { ns: "common", email });
 
   return (
@@ -90,6 +96,32 @@ export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium"
             <ListItemText>{item.label}</ListItemText>
           </MenuItem>
         ))}
+        <Divider sx={{ my: 0.5 }} />
+        {/* Help is this server's own; About names the release and links to the vendor's site. */}
+        <MenuItem
+          component="a"
+          href={helpUrl(undefined, i18n.language)}
+          target="_blank"
+          rel="noopener"
+          onClick={() => setAnchor(null)}
+        >
+          <ListItemIcon>
+            <HelpOutlineIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>{t("about.help")}</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            setAboutOpen(true);
+          }}
+        >
+          <ListItemIcon>
+            <InfoOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>{t("about.menu_item")}</ListItemText>
+        </MenuItem>
+        <Divider sx={{ my: 0.5 }} />
         <MenuItem
           onClick={() => {
             setAnchor(null);
@@ -102,6 +134,7 @@ export function UserMenuButton({ email, onProfile, onLogout, iconSize = "medium"
           <ListItemText>{t("profile.logout", { ns: "common" })}</ListItemText>
         </MenuItem>
       </Menu>
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </>
   );
 }

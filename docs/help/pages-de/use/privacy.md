@@ -96,6 +96,15 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 
 Muss etwas früher endgültig gelöscht werden, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator: Ein Chat, den er in der Konsole löscht, wird sofort gelöscht. Vorher erstellte Sicherungen enthalten ihn, bis sie ersetzt werden (die nächtlichen nach einer Woche).
 
+## Links zu fadenstack.com {#links-to-fadenstackcom}
+
+Die Anmeldeseite, **Über Fadenstack** (im Menü hinter Ihrer Konto-Schaltfläche), die Versionshinweise unter
+**Updates**, die Fußzeile dieser Hilfeseiten und die Chat-Bereiche der Add-ins verlinken auf fadenstack.com. Ein
+solcher Link teilt der Website mit, wo er angeklickt wurde (z. B. `ref=console-about`), und die Release-Linie
+(`v=0.4`), damit Fadenstack zählen kann, wie seine Software genutzt wird. Er enthält nichts über Sie, Ihre
+Organisation oder diesen Server, öffnet sich in einem neuen Tab und gibt die Adresse der Seite, von der Sie kommen,
+nicht weiter. Gesendet wird nur etwas, wenn Sie einen anklicken.
+
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 
 | Sie sehen | Was Sie tun |

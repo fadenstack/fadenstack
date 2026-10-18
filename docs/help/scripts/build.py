@@ -271,10 +271,15 @@ def assemble(out: Path, target: str, lang: str = "en", theme: Path = THEME) -> l
     alternate = [
         {"name": LANGS[code]["name"], "link": f"{base}{LANGS[code]['prefix']}", "lang": code} for code in LANGS
     ]
+    # The Help an install serves (/help in the console) links back with ref=help, so the website's log tells a
+    # running installation's visit apart (fadenstack-dev features/about-and-ref-links.md); the public Help site
+    # needs no tag. No version: the Help pages do not know which release serves them.
+    ref = "?ref=help" if target == "console" else ""
     copyright_line = (
-        "copyright = '© 2026 Emagin8 UG (haftungsbeschränkt) · "
-        '<a href="https://fadenstack.com/impressum/">Impressum</a> · '
-        f'<a href="https://fadenstack.com/privacy/">{words["privacy"]}</a>\''
+        f"copyright = '<a href=\"https://fadenstack.com/{ref}\" rel=\"noopener noreferrer\">Fadenstack</a> · "
+        "© 2026 Emagin8 UG (haftungsbeschränkt) · "
+        f'<a href="https://fadenstack.com/impressum/{ref}" rel="noopener noreferrer">Impressum</a> · '
+        f'<a href="https://fadenstack.com/privacy/{ref}" rel="noopener noreferrer">{words["privacy"]}</a>\''
     )
     config = (HELP / "site.toml").read_text(encoding="utf-8")
     for marker, value in (

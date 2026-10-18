@@ -34,6 +34,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
 import { APP_BRANDING } from "~/branding";
+import { AboutVersionLine } from "~/components/AboutDialog";
 import { NavHandPicker, phonePanelPaperSx } from "~/components/NavHandPicker";
 import { usePendingJoins } from "~/lib/usePendingJoins";
 import { useUpdateNotice } from "~/lib/updateNotice";
@@ -659,6 +660,9 @@ export function AdminSidebar({
             })()}
         </DragOverlay>
       </DndContext>
+
+      {/* The release, which opens About (the open sidebar and the phone panel only) */}
+      {(mobile || drawerOpen) && <AboutVersionLine />}
 
       {/* Collapse / reset row; on a phone, which side the menu button is on */}
       {mobile ? (

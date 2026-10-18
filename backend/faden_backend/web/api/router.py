@@ -1,6 +1,6 @@
 from fastapi.routing import APIRouter
 
-from faden_backend.web.api import docs, i18n, logs, monitoring, users
+from faden_backend.web.api import about, docs, i18n, logs, monitoring, users
 from faden_backend.web.api.admin import admin_router
 from faden_backend.web.api.agents.views import router as agents_router
 from faden_backend.web.api.agents.views import tokens_router as agent_tokens_router
@@ -14,6 +14,7 @@ from faden_backend.web.api.skills.views import router as skills_router
 
 api_router = APIRouter()
 api_router.include_router(monitoring.router)
+api_router.include_router(about.router)
 api_router.include_router(users.router)
 api_router.include_router(docs.router)
 api_router.include_router(bootstrap_router)

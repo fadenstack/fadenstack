@@ -129,7 +129,7 @@ describe("UpdatesPage", () => {
 
     const newer = screen.getByRole("region", { name: "Newer releases" });
     expect(within(newer).getByText("FSA-2026-001")).toBeInTheDocument();
-    expect(within(newer).getByRole("link", { name: "Release notes" })).toHaveAttribute("href", release.notes_url);
+    expect(within(newer).getByRole("link", { name: /^Release notes/ })).toHaveAttribute("href", release.notes_url);
 
     const parts = screen.getByRole("region", { name: "Parts of this install" });
     expect(within(parts).getByRole("link", { name: "192.0.2.71" })).toHaveAttribute("href", "/admin/nodes/5b1c");

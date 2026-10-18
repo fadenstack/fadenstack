@@ -17,9 +17,12 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import AppBrand from "~/components/AppBrand";
 import BrandMark from "~/components/BrandMark";
+import Link from "@mui/material/Link";
+import { helpUrl } from "~/lib/pageHelp";
+import { EXTERNAL_LINK, websiteUrl } from "~/lib/vendorLinks";
 
 export default function LoginPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = params.get("next") || "/admin/dashboard";
@@ -124,8 +127,10 @@ export default function LoginPage() {
       sx={{
         minHeight: "100vh",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        gap: 1.5,
         p: 2,
       }}
     >
@@ -216,6 +221,23 @@ export default function LoginPage() {
           </Stack>
         </CardContent>
       </Card>
+      {/* Small and muted, under the card: the vendor's site (tagged, no version: anyone sees this page) and
+          this server's own Help. */}
+      <Typography component="footer" variant="caption" color="text.secondary" data-testid="signin-footer">
+        <Link
+          href={websiteUrl("/", "console-signin")}
+          {...EXTERNAL_LINK}
+          color="inherit"
+          underline="hover"
+          aria-label={`Fadenstack ${t("about.new_tab")}`}
+        >
+          Fadenstack
+        </Link>
+        {" · "}
+        <Link href={helpUrl(undefined, i18n.language)} target="_blank" rel="noopener" color="inherit" underline="hover">
+          {t("about.help")}
+        </Link>
+      </Typography>
     </Box>
   );
 }

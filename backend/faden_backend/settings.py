@@ -215,6 +215,11 @@ class Settings(BaseSettings):
     # the console shows. Empty for a source checkout.
     install_release: str = ""
     cli_installer: str = ""
+    # What the About dialog names (GET /api/about). The edition is "core" unless Enterprise sets it; the links
+    # back to fadenstack.com (tagged ?ref=, features/about-and-ref-links.md) stay on in core, and only Enterprise
+    # switches them off.
+    edition: str = "core"
+    vendor_links: bool = True
 
     # Where runtime images are exported once for nodes to download. A file
     # has a length and can be resumed; a live ``docker save`` has neither.
