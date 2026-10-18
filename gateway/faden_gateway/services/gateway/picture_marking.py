@@ -26,7 +26,8 @@ from faden_gateway.services.gateway.provenance_client import EditKind, Provenanc
 
 logger = logging.getLogger(__name__)
 
-#: The receipts of the pictures an answer carries, comma-separated, in their order.
+#: An answer's receipts, comma-separated: its text's first, when it has text (``text_receipts``), then
+#: those of the pictures it carries, in their order.
 HEADER = "x-faden-provenance"
 
 #: What the caller reads when a picture could not be marked; the gateway's log has the reason.

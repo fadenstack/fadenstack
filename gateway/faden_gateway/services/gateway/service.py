@@ -35,6 +35,7 @@ from faden_gateway.services.gateway import (
     provider_address,
     skill_files,
     system_tools,
+    text_receipts,
 )
 from faden_gateway.services.extensions import registry as extension_registry
 from faden_gateway.services.gateway import governance as gov
@@ -48,7 +49,7 @@ from faden_gateway.services.gateway.observability import (
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from faden_gateway.services.gateway.pii_client import PIIClient
-from faden_gateway.services.gateway.provenance_client import ProvenanceClient
+from faden_gateway.services.gateway.provenance_client import ProvenanceClient, SignedReceipt
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
     PIIPolicy,
@@ -175,7 +176,8 @@ class GatewayResponse:
     provider_instance_id: str
     latency_ms: int
     trace_id: str | None = None
-    #: The receipts of the pictures the answer carries, marked by the provenance engine, in their order.
+    #: The answer's receipts from the provenance engine: its text's first (``text_receipts``), then those
+    #: of the pictures it carries, marked, in their order.
     provenance: tuple[str, ...] = ()
 
 
@@ -426,6 +428,15 @@ async def _to_the_end(step: Awaitable[Any], *, until: asyncio.Event | None = Non
 #: The event that closes an OpenAI-style stream.
 _DONE_EVENT = b"data: [DONE]\n\n"
 _DONE_MARK = re.compile(rb"data:[ \t]*\[DONE\]")
+
+
+def _close_buffer(buffer: StreamBuffer, session_id: str, *, closing: bool, receipt: bytes | None) -> None:
+    """End a reply in the buffer: a complete one with its receipt's event, when it has one, and ``[DONE]``."""
+    if closing:
+        if receipt is not None:
+            buffer.push(session_id, receipt)
+        buffer.push(session_id, _DONE_EVENT)
+    buffer.finish(session_id)
 
 
 def _split_done(chunk: bytes) -> tuple[bytes, bool]:
@@ -1115,6 +1126,8 @@ class _Prepared:
     turn_id: str | None = None
     #: Writing that row, which runs beside the model call.
     turn_written: asyncio.Future[Any] | None = None
+    #: A streamed answer's ``faden.provenance`` event, sent before its ``[DONE]`` (``text_receipts``).
+    provenance_event: bytes | None = None
 
     @property
     def instance_id(self) -> str | None:
@@ -1173,7 +1186,8 @@ class GatewayService:
         self.tool_router = tool_router
         self.usage_groups = usage_groups
         self.group_memberships = group_memberships
-        #: Marks each picture an answer carries before it leaves; ``None`` with the provenance module off.
+        #: Marks each picture an answer carries before it leaves, and signs each answer's text a receipt;
+        #: ``None`` with the provenance module off.
         self.provenance_client = provenance_client
         self.stream_buffer: StreamBuffer | None = None
 
@@ -1387,6 +1401,12 @@ class GatewayService:
                     req, response_payload, auth=auth, request_id=request_id,
                 )
                 finish_reason = "content_filter" if req.blocked_output else finish_reason
+            if endpoint == "/v1/chat/completions" and result.status_code == 200 and not req.blocked_output:
+                # The answer's text leaves with its receipt, with the module on (text_receipts).
+                response_payload, receipts = await self._receipted(
+                    req, response_payload, receipts, completion_tokens=usage_completion,
+                    model_alias=model_alias, request_id=request_id,
+                )
 
             if req.trace_context is not None:
                 self.observability.record_success(
@@ -1510,6 +1530,95 @@ class GatewayService:
         if not receipts:
             return result, ()
         return UpstreamResult(status_code=200, payload=payload, headers=result.headers), tuple(receipts)
+
+    def _answer_receipt(
+        self, req: _Prepared, text: str, *, completion_tokens: int | None, model_alias: str, request_id: str,
+    ) -> Awaitable[SignedReceipt | None] | None:
+        """The engine's receipt for the answer *text*, to await (``text_receipts``); ``None``: none asked.
+
+        None is with the module off, or for an answer without text (tool calls
+        only). The awaitable never raises: an engine that fails gives ``None``.
+        """
+        client = self.provenance_client
+        if client is None or req.decision is None or not text_receipts.has_text(text):
+            return None
+        candidate = req.decision.candidate
+        return text_receipts.sign(
+            client,
+            text,
+            candidate=candidate,
+            sent=req.egress_payload or {},
+            completion_tokens=completion_tokens,
+            model=candidate.litellm_model or model_alias,
+            agent=req.agent.id if req.agent is not None else None,
+            request_id=request_id,
+        )
+
+    async def _receipted(
+        self,
+        req: _Prepared,
+        payload: Any,
+        pictures: tuple[str, ...],
+        *,
+        completion_tokens: int | None,
+        model_alias: str,
+        request_id: str,
+    ) -> tuple[Any, tuple[str, ...]]:
+        """A whole answer with its text's receipt: the id before the pictures' receipts (the header).
+
+        A client that asked for events gets ``faden.provenance`` in the
+        answer's ``faden`` object, signed or saying it is unsigned. Without a
+        receipt -- no text, the module off, the engine failing -- the answer
+        is as it was and the receipts are the pictures' alone.
+        """
+        signing = self._answer_receipt(
+            req, text_receipts.answer_text(payload), completion_tokens=completion_tokens,
+            model_alias=model_alias, request_id=request_id,
+        )
+        if signing is None:
+            return payload, pictures
+        signed = await signing
+        if req.faden_events and isinstance(payload, dict):
+            faden = payload.get("faden") if isinstance(payload.get("faden"), dict) else {}
+            events = [*(faden.get("events") or []), text_receipts.event(signed)]
+            payload = {**payload, "faden": {**faden, "events": events}}
+        return payload, ((signed.receipt_id, *pictures) if signed is not None else pictures)
+
+    def _stream_receipt(
+        self,
+        req: _Prepared,
+        *,
+        content: str,
+        status_code: int,
+        closing: bool,
+        interrupted: bool,
+        stats: Any,
+        model_alias: str,
+        request_id: str,
+    ) -> asyncio.Future[Any] | None:
+        """A streamed answer's receipt, being asked for; ``None`` for an answer that gets none.
+
+        Only a complete answer with text gets one: not one that failed, was
+        stopped or refused, or that called tools only.
+        """
+        if not closing or interrupted or status_code >= 400 or req.blocked_output:
+            return None
+        signing = self._answer_receipt(
+            req, content, completion_tokens=stats.usage.completion_tokens if stats is not None else None,
+            model_alias=model_alias, request_id=request_id,
+        )
+        return _kept(signing) if signing is not None else None
+
+    @staticmethod
+    async def _receipt_event(req: _Prepared, signing: asyncio.Future[Any] | None) -> None:
+        """The streamed answer's ``faden.provenance`` event, in ``req.provenance_event``.
+
+        Only for a client that reads the gateway's events: signed, or saying
+        the answer is unsigned when the engine failed. A client that reads no
+        events does not wait for the receipt.
+        """
+        if signing is not None and req.faden_events:
+            req.provenance_event = faden_events.sse_event(text_receipts.event(await signing))
 
     async def route_stream_chat(
         self,
@@ -1705,6 +1814,9 @@ class GatewayService:
                 if failure is not None:
                     yield failure
                 if closing:
+                    # The answer's receipt, after its last token (``_finish_stream`` asks for it).
+                    if req.provenance_event is not None:
+                        yield req.provenance_event
                     yield _DONE_EVENT
 
             return StreamingGatewayResponse(
@@ -3585,9 +3697,11 @@ class GatewayService:
         saved: asyncio.Event,
         interrupted: bool = False,
     ) -> None:
-        """What a streamed answer owes once it has ended: the slot, the reply, the audit row, the trace.
+        """What a streamed answer owes once it ends: the slot, the receipt, the reply, the log, the trace.
 
-        *saved* is set once the reply is stored, whether or not that worked.
+        *saved* is set once the reply is stored, whether or not that worked,
+        and -- for a client that reads the gateway's events -- once the
+        answer's receipt is in ``req.provenance_event``, to go before ``[DONE]``.
         Each step stands alone: one failing does not skip the ones after it.
         """
         # The model is done: its slot first, then what is saved. It was given
@@ -3596,6 +3710,11 @@ class GatewayService:
             await self._release(req)
         except Exception:
             logger.warning("Failed to release the model slot", exc_info=True)
+        # Asked for while the reply is stored; a client that does not read events does not wait for it.
+        signing = self._stream_receipt(
+            req, content=content, status_code=status_code, closing=closing, interrupted=interrupted,
+            stats=stats, model_alias=model_alias, request_id=request_id,
+        )
         if req.session_id:
             if req.blocked_output:
                 turn_status, turn_error = TurnStatus.BLOCKED_OUTPUT.value, None
@@ -3625,13 +3744,12 @@ class GatewayService:
                 )
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
+        await self._receipt_event(req, signing)
         saved.set()
         # Whoever reads the reply from the buffer -- the chat page, or one that
         # came back -- is done once it is saved, as the live stream is.
         if stream_buffer and buffer_session_id:
-            if closing:
-                stream_buffer.push(buffer_session_id, _DONE_EVENT)
-            stream_buffer.finish(buffer_session_id)
+            _close_buffer(stream_buffer, buffer_session_id, closing=closing, receipt=req.provenance_event)
         # Best effort, and nothing need wait for it.
         _in_background(self._record_skills_usage(req.skills, auth, session_id=req.session_id))
         final_error_code = error_code or req.fallback_error_code

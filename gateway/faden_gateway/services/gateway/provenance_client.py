@@ -2,9 +2,12 @@
 
 The service marks generated content and signs generation receipts. The
 gateway has each picture it returns marked (``mark_image``, from
-``picture_marking``), and reads what the engine offers
-(``GET /api/v1/provenance/info``) and whether it is up (``GET /api/health``)
-for the services manifest (``/v1/services``).
+``picture_marking``), asks for a receipt for each answer with text
+(``receipt``, from ``text_receipts``), passes on what an agent's SDK asks of
+the engine (``sign_record``, ``report_placement``, ``policy``, ``anchors``:
+the public routes in ``web/api/v1/provenance.py``), and reads what the engine
+offers (``GET /api/v1/provenance/info``) and whether it is up
+(``GET /api/health``) for the services manifest (``/v1/services``).
 
 The gateway uses only an engine that speaks the contract it knows
 (``CONTRACT``): ``info()`` refuses any other.
@@ -15,6 +18,8 @@ from __future__ import annotations
 import base64
 import logging
 import re
+import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
@@ -34,6 +39,13 @@ _INFO_TIMEOUT_SEC = 5.0
 _HEALTH_TIMEOUT_SEC = 3.0
 #: The engine answers a mark within 30 s or says it is busy.
 _MARK_TIMEOUT_SEC = 40.0
+#: Receipts, records, placements, the policy and the anchors are the engine's fast lane: it answers in
+#: milliseconds, so a turn waits for a receipt 5 s at most.
+_RECEIPT_TIMEOUT_SEC = 5.0
+_FAST_TIMEOUT_SEC = 5.0
+#: How long the anchors are kept between reads: they change only when a signing key is rotated, and the
+#: route that serves them needs no sign-in.
+_ANCHORS_TTL_SEC = 60.0
 
 #: The pictures the engine marks.
 MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
@@ -104,7 +116,22 @@ class MarkedImage:
     layers: tuple[dict[str, Any], ...] = ()
 
 
-class ProvenanceMarkError(Exception):
+class ProvenanceRequestError(Exception):
+    """A call to the engine did not give what was asked; ``code`` says why, in the engine's words or ours.
+
+    The engine's: ``busy``, ``no_signing_key``, ``unavailable``. The gateway's:
+    ``unreachable``, ``timeout``, ``token_refused`` (401, 403), ``too_large``
+    (413), ``invalid_request`` (422: the engine did not take the body), and
+    ``unreadable_answer``.
+    """
+
+    def __init__(self, message: str, *, code: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status_code = status_code
+
+
+class ProvenanceMarkError(ProvenanceRequestError):
     """A picture was not marked; ``code`` says why, in the engine's words or the gateway's.
 
     The engine's: ``busy``, ``no_signing_key``, ``unavailable``. The gateway's:
@@ -113,10 +140,27 @@ class ProvenanceMarkError(Exception):
     (the answer does not say a watermark and metadata were applied).
     """
 
-    def __init__(self, message: str, *, code: str, status_code: int | None = None) -> None:
-        super().__init__(message)
-        self.code = code
-        self.status_code = status_code
+
+@dataclass(frozen=True, slots=True)
+class SignedReceipt:
+    """A receipt the engine signed (``SignedReceipt``): the ``GenerationReceipt``, its JWS, its time-stamp."""
+
+    #: The ``GenerationReceipt`` as the engine sent it; its JWS signs exactly these fields.
+    receipt: dict[str, Any]
+    signature: str
+    #: The RFC 3161 time-stamp token (base64 DER), where a time-stamp authority answered.
+    timestamp: str | None = None
+
+    @property
+    def receipt_id(self) -> str:
+        return str(self.receipt["id"])
+
+    def to_dict(self) -> dict[str, Any]:
+        """As the client gets it: the receipt and its signature, and the time-stamp when there is one."""
+        out: dict[str, Any] = {"receipt": self.receipt, "signature": self.signature}
+        if self.timestamp:
+            out["timestamp"] = self.timestamp
+        return out
 
 
 def _engine_error(resp: httpx.Response) -> tuple[str, str]:
@@ -164,6 +208,49 @@ def _read_marked(resp: httpx.Response) -> MarkedImage:
     return MarkedImage(image=image, media_type=media_type, receipt_id=receipt_id, layers=tuple(layers))
 
 
+def _unreadable(resp: httpx.Response) -> ProvenanceRequestError:
+    return ProvenanceRequestError(
+        "The provenance service's answer could not be read.",
+        code="unreadable_answer", status_code=resp.status_code,
+    )
+
+
+def _object(resp: httpx.Response) -> dict[str, Any]:
+    """The engine's 2xx answer, a JSON object."""
+    try:
+        data = resp.json()
+    except ValueError:
+        raise _unreadable(resp) from None
+    if not isinstance(data, dict):
+        raise _unreadable(resp)
+    return data
+
+
+def _signed(resp: httpx.Response, key: str) -> dict[str, Any]:
+    """A signed answer (``SignedReceipt``, ``SignedRecord``): *key*'s object, with an id, and a JWS."""
+    data = _object(resp)
+    signed = data.get(key)
+    signature = data.get("signature")
+    timestamp = data.get("timestamp")
+    if (
+        not isinstance(signed, dict)
+        or not _RECEIPT_ID.match(str(signed.get("id") or ""))
+        or not isinstance(signature, str)
+        or not signature
+        or not (timestamp is None or isinstance(timestamp, str))
+    ):
+        raise _unreadable(resp)
+    return data
+
+
+def _anchors(data: dict[str, Any]) -> bool:
+    return (
+        isinstance(data.get("signing_chains"), list)
+        and isinstance(data.get("trust_anchors"), list)
+        and isinstance(data.get("detector"), dict)
+    )
+
+
 def _capabilities(raw: Any) -> ProvenanceCapabilities:
     """The capabilities the engine sends; a flag that is missing or not ``true`` is off."""
     if not isinstance(raw, dict):
@@ -179,7 +266,14 @@ def _capabilities(raw: Any) -> ProvenanceCapabilities:
 class ProvenanceClient:
     """Async client wrapping the provenance service's HTTP endpoints."""
 
-    def __init__(self, *, base_url: str, http_client: httpx.AsyncClient, service_token: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        http_client: httpx.AsyncClient,
+        service_token: str,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._base = base_url.rstrip("/")
         self._http = http_client
         self._has_token = bool(service_token)
@@ -188,6 +282,9 @@ class ProvenanceClient:
         self._headers = {"Authorization": f"Bearer {service_token}"} if service_token else {}
         # Each problem is logged once per process, not on every manifest read.
         self._logged: set[str] = set()
+        self._clock = clock
+        #: The anchors last read, and until when they are served without asking again.
+        self._anchors: tuple[dict[str, Any], float] | None = None
 
     def _log_once(self, key: str, level: int, message: str, *args: Any) -> None:
         if key in self._logged:
@@ -217,6 +314,40 @@ class ProvenanceClient:
         code, said = _engine_error(resp)
         message = f"The provenance service answered {status} ({code})" + (f": {said}" if said else ".")
         return ProvenanceMarkError(message, code=code, status_code=status)
+
+    def _call_refused(self, resp: httpx.Response) -> ProvenanceRequestError:
+        """Why the engine answered a receipt, record, placement, policy or anchors call with an error."""
+        status = resp.status_code
+        if status in (401, 403):
+            message = f"The provenance service refused the gateway ({status}): {self._refusal_reason()}."
+            return ProvenanceRequestError(message, code="token_refused", status_code=status)
+        if status == 413:
+            message = "The request is over the provenance service's size limit."
+            return ProvenanceRequestError(message, code="too_large", status_code=status)
+        if status == 422:
+            message = "The provenance service did not take the request."
+            return ProvenanceRequestError(message, code="invalid_request", status_code=status)
+        code, said = _engine_error(resp)
+        message = f"The provenance service answered {status} ({code})" + (f": {said}" if said else ".")
+        return ProvenanceRequestError(message, code=code, status_code=status)
+
+    async def _call(
+        self, method: str, path: str, *, timeout: float, body: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        """One call to the engine with the token; its 2xx answer, or ``ProvenanceRequestError``."""
+        try:
+            resp = await self._http.request(
+                method, f"{self._base}{path}", json=body, headers=self._headers, timeout=timeout,
+            )
+        except httpx.TimeoutException as exc:
+            message = f"The provenance service did not answer within {timeout:g} s."
+            raise ProvenanceRequestError(message, code="timeout") from exc
+        except httpx.HTTPError as exc:
+            message = "The provenance service could not be reached."
+            raise ProvenanceRequestError(message, code="unreachable") from exc
+        if resp.status_code >= 400:
+            raise self._call_refused(resp)
+        return resp
 
     async def healthy(self) -> bool:
         """Whether the service answers its health check (``GET /api/health``) with ``ok``.
@@ -334,6 +465,79 @@ class ProvenanceClient:
         if resp.status_code >= 400:
             raise self._mark_refused(resp)
         return _read_marked(resp)
+
+    async def receipt(
+        self,
+        *,
+        content_sha256: str,
+        model: str,
+        watermark: dict[str, Any],
+        agent: str | None = None,
+        model_version: str | None = None,
+    ) -> SignedReceipt:
+        """A signed receipt for a text a model wrote: ``POST /api/v1/provenance/receipts``, with the token.
+
+        The engine gets the text's hash only (``content_hash.text_sha256``),
+        never the text. It answers in milliseconds; the call waits 5 s at
+        most. Raises ``ProvenanceRequestError`` when no signed receipt comes back.
+        """
+        body = {
+            "kind": "text",
+            "model": model,
+            "model_version": model_version,
+            "agent": agent,
+            "content_sha256": content_sha256,
+            "watermark": watermark,
+        }
+        resp = await self._call(
+            "POST", "/api/v1/provenance/receipts", body=body, timeout=_RECEIPT_TIMEOUT_SEC,
+        )
+        data = _signed(resp, "receipt")
+        return SignedReceipt(
+            receipt=data["receipt"], signature=data["signature"], timestamp=data.get("timestamp"),
+        )
+
+    async def sign_record(self, record: dict[str, Any], *, agent: str | None) -> dict[str, Any]:
+        """A signed record of a placement (``SignedRecord``): ``POST /api/v1/provenance/records/sign``.
+
+        *record* is a ``RecordRequest`` without its agent, which is *agent*.
+        Raises ``ProvenanceRequestError`` when no signed record comes back.
+        """
+        resp = await self._call(
+            "POST", "/api/v1/provenance/records/sign",
+            body={**record, "agent": agent}, timeout=_FAST_TIMEOUT_SEC,
+        )
+        return _signed(resp, "record")
+
+    async def report_placement(self, report: dict[str, Any], *, agent: str | None) -> None:
+        """Keep a placement report (``PlacementReport``) for *agent*: ``POST /api/v1/provenance/placements``.
+
+        Raises ``ProvenanceRequestError`` when the engine does not take it.
+        """
+        await self._call(
+            "POST", "/api/v1/provenance/placements",
+            body={**report, "agent": agent}, timeout=_FAST_TIMEOUT_SEC,
+        )
+
+    async def policy(self) -> dict[str, Any]:
+        """The engine's default ``ProvenancePolicy``: ``GET /api/v1/provenance/policy``."""
+        return _object(await self._call("GET", "/api/v1/provenance/policy", timeout=_FAST_TIMEOUT_SEC))
+
+    async def anchors(self) -> dict[str, Any]:
+        """What anyone needs to check this installation's signatures offline (``Anchors``).
+
+        ``GET /api/v1/provenance/anchors``, kept for a minute: they change
+        only when a signing key is rotated, and they are served to anyone.
+        """
+        kept = self._anchors
+        if kept is not None and kept[1] > self._clock():
+            return kept[0]
+        resp = await self._call("GET", "/api/v1/provenance/anchors", timeout=_FAST_TIMEOUT_SEC)
+        data = _object(resp)
+        if not _anchors(data):
+            raise _unreadable(resp)
+        self._anchors = (data, self._clock() + _ANCHORS_TTL_SEC)
+        return data
 
     async def probe(self) -> ProbeResult:
         """The module's line in the services manifest: healthy with the engine's info, or why not."""

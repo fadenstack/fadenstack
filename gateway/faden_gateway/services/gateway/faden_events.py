@@ -21,6 +21,9 @@ OpenAI stream: an OpenAI SDK would not know what to do with a named event.
 - ``CUSTOM`` ``faden.attachment_left_out``: a file of the chat that was not
   sent to the model, and why (``no_vision``: a picture, and the model does not
   take pictures).
+- ``CUSTOM`` ``faden.provenance``: the answer's signed receipt from the
+  provenance engine, after its last token and before ``[DONE]``, or that it
+  is unsigned (``text_receipts``).
 """
 
 from __future__ import annotations

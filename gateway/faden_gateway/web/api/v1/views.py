@@ -182,7 +182,7 @@ def get_gateway_service(
         tool_router=tool_router,
         usage_groups=getattr(request.app.state, "usage_group_resolver", None),
         group_memberships=getattr(request.app.state, "group_membership_resolver", None),
-        # Provenance client (optional - when the module is on: every picture leaves marked)
+        # Provenance client (optional - when the module is on: pictures leave marked, texts with a receipt)
         provenance_client=getattr(request.app.state, "provenance_client", None),
     )
     service.stream_buffer = _stream_buffer(request)
@@ -651,7 +651,7 @@ async def create_embeddings(
 
 
 def _provenance_header(response: Response, receipts: tuple[str, ...]) -> None:
-    """The receipts of the answer's marked pictures, in their order, when it carries any."""
+    """The answer's receipts, when it has any: its text's first, then its marked pictures', in their order."""
     if receipts:
         response.headers[picture_marking.HEADER] = ",".join(receipts)
 

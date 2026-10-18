@@ -39,6 +39,7 @@ from tests.test_agent_routes import (  # noqa: F401 - the fixture the agent rout
 from tests.test_gateway_images import IMAGES, PICTURE, _Recording
 from tests.test_gateway_pipeline_combined import ALIAS, _Observability, _seed, _token
 from tests.test_provenance_module import BASE, TOKEN
+from tests.test_text_receipts import RECEIPTS, signed_receipt
 
 MARK = b"|marked"
 SECOND = base64.b64encode(base64.b64decode(PICTURE) + b"second").decode()
@@ -60,19 +61,28 @@ Answer = Callable[[httpx.Request], httpx.Response]
 
 
 class _Engine:
-    """The engine's mark route as the contract describes it; keeps what it was sent, fails as told."""
+    """The engine's mark route as the contract describes it; keeps what it was sent, fails as told.
+
+    It signs the receipts of the answers' texts too (``text_receipts``), apart from the pictures'.
+    """
 
     def __init__(self) -> None:
         self.sent: list[dict[str, Any]] = []
         self.requests: list[httpx.Request] = []
         self.receipts: list[str] = []
+        #: The receipts it signed for answers' texts.
+        self.text_receipts: list[str] = []
         #: The answer to the n-th call (from 1) instead of a marked picture.
         self.fail: dict[int, Answer] = {}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        assert request.url.path == MARK_PATH
         if request.headers.get("authorization") != f"Bearer {TOKEN}":
             return httpx.Response(403, json={"detail": "Forbidden"})
+        if request.url.path == RECEIPTS:
+            receipt = f"text-{uuid.uuid4()}"
+            self.text_receipts.append(receipt)
+            return httpx.Response(200, json=signed_receipt(json.loads(request.content), receipt))
+        assert request.url.path == MARK_PATH
         body = json.loads(request.content)
         self.sent.append(body)
         self.requests.append(request)
@@ -415,12 +425,14 @@ async def test_a_chats_pictures_leave_marked(
     assert message["images"] == [
         {"type": "image_url", "index": 0, "image_url": {"url": f"data:image/png;base64,{_marked(PICTURE)}"}},
     ]
-    assert r.headers[picture_marking.HEADER] == engine.receipts[0]
+    assert r.headers[picture_marking.HEADER] == f"{engine.text_receipts[0]},{engine.receipts[0]}", (
+        "the text's receipt first, then the picture's"
+    )
     assert engine.sent[0]["edit_kind"] == "generated"
 
 
 @pytest.mark.anyio
-async def test_a_chat_without_pictures_is_not_sent_to_the_engine(
+async def test_a_chat_without_pictures_is_not_sent_to_the_mark_route(
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
@@ -432,7 +444,7 @@ async def test_a_chat_without_pictures_is_not_sent_to_the_engine(
 
     assert r.status_code == 200, r.text
     assert r.json()["choices"][0]["message"]["content"] == "A lighthouse stands on a rock."
-    assert picture_marking.HEADER not in r.headers
+    assert r.headers[picture_marking.HEADER] == engine.text_receipts[0], "the text's receipt alone"
     assert engine.sent == []
 
 
