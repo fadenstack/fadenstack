@@ -79,6 +79,14 @@ def _capacity_hints(service: dict) -> dict | None:
     return {"first_token_timeout_sec": float(wait)}
 
 
+def _watermark(published: object) -> dict | None:
+    """The endpoint's watermark as the driver published it: algorithm, key version, context width."""
+    if not isinstance(published, dict) or not isinstance(published.get("algorithm"), str):
+        return None
+    fields = ("algorithm", "key_version", "context_width")
+    return {key: published[key] for key in fields if published.get(key) is not None}
+
+
 class InferencePublicationCoordinator:
     """Synchronizes normalized inference endpoint status to the Gateway."""
 
@@ -193,6 +201,9 @@ class InferencePublicationCoordinator:
                 # Behind the machine's model-TLS proxy: reached with the
                 # gateway's machine certificate (services/machine_tls).
                 machine_tls=bool((primary_endpoint.published_json or {}).get("machine_tls")),
+                # How the runtime watermarks the answers (services/provenance/watermark.py):
+                # the gateway's receipt for an answer names it.
+                watermark=_watermark((primary_endpoint.published_json or {}).get("watermark")),
             )
         elif primary_endpoint.status in (EndpointStatus.FAILED, EndpointStatus.RETIRED) or ready_replicas == 0:
             # Endpoint is unhealthy or has 0 ready replicas

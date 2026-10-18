@@ -54,6 +54,8 @@ from faden_backend.services.inference.schemas import (
     InferenceDeploymentSpecV1Alpha1,
     parse_inference_deployment_spec,
 )
+from faden_backend.services.llm.kinds import CHAT, deployment_kind
+from faden_backend.services.provenance import watermark
 
 # Ray's ``ray.serve.llm`` only supports the vLLM engine.  The stored spec uses
 # the short form (``"vllm"``); Ray's ``LLMConfig.llm_engine`` validator
@@ -757,6 +759,7 @@ def compile_spec(
     revision: str | None = None,
     runtime_env: dict[str, Any] | None = None,
     node_resource: str | None = None,
+    watermark_key: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Compile one resolved deployment into a Ray ``LLMServingArgs`` document.
 
@@ -771,6 +774,9 @@ def compile_spec(
         node_resource: Ray's resource for the machine every copy is pinned to
             (``node:<address>``), resolved by the orchestrator from
             ``resources.replica.machine``.
+        watermark_key: (version, key) of the text watermark the engine starts
+            with (``services/provenance/watermark.py``); ``None`` starts it
+            without one, whatever the spec says.
 
     Returns:
         A plain dictionary shaped like ``ray.serve.llm.LLMServingArgs`` with a
@@ -797,6 +803,10 @@ def compile_spec(
         revision=effective_revision,
         replica_gpus=float(replica_gpus) if replica_gpus is not None else None,
     )
+    if watermark_key is not None:
+        watermark.apply(engine_kwargs, watermark_key)
+    else:
+        watermark.leave_out(engine_kwargs)
 
     # Determine the active replica representation.
     stopped = (desired_state or "active").strip().lower() == "stopped"
@@ -955,6 +965,7 @@ def compile_deployment(
     desired_state: str = "active",
     runtime_env: dict[str, Any] | None = None,
     node_resource: str | None = None,
+    watermark_key: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """End-to-end, testable compiler entrypoint.
 
@@ -963,7 +974,8 @@ def compile_deployment(
     the single function the orchestrator calls — and the one golden-fixture
     tests target.  ``capabilities`` is accepted for API stability (gating
     advanced features is Phase 4+); the deployment accelerator (if any) is read
-    from the spec's ``resources.replica.accelerator``.
+    from the spec's ``resources.replica.accelerator``. ``watermark_key`` is
+    given to a chat model only: the others generate no text.
     """
     spec = parse_inference_deployment_spec(spec_data)
     effective_revision = spec.artifacts.revision or hf_revision
@@ -984,6 +996,7 @@ def compile_deployment(
         revision=effective_revision,
         runtime_env=runtime_env,
         node_resource=node_resource,
+        watermark_key=watermark_key if deployment_kind(spec_data) == CHAT else None,
     )
 
 

@@ -59,6 +59,10 @@ CODE_SETTINGS: dict[str, str] = {
     "ssl_certfile": "reads a certificate from a file on the machine",
     "ssl_ca_certs": "reads certificates from a file on the machine",
     "allowed_local_media_path": "lets requests read files from a directory on the machine",
+    "watermark_config": (
+        "switches off the text watermark that marks this model's answers as AI-generated "
+        "(EU AI Act Art. 50(2)); the installation's own key is used otherwise, never one in the deployment"
+    ),
 }
 
 #: Settings that take a model reference or a file. A repository id is fine for an

@@ -443,11 +443,14 @@ class GatewaySyncService:
         tools: bool | None = None,
         vision: bool | None = None,
         machine_tls: bool = False,
+        watermark: dict[str, Any] | None = None,
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
 
         *task* is what it serves (``kinds.deployment_kind``): ``chat`` unless
-        the caller says otherwise.
+        the caller says otherwise. *watermark* is how its runtime watermarks
+        the answers (algorithm, key version, context width; never the key), in
+        ``node_metadata["watermark"]`` for the gateway's receipts.
 
         Ensures exactly one logical LLMProviderInstance exists for the deployment.
         """
@@ -522,10 +525,13 @@ class GatewaySyncService:
                         "capacity_hints": json.dumps(capacity_hints) if capacity_hints else None,
                         "node_metadata": json.dumps(
                             {
-                                k: v for k, v in (("task", task), ("tools", tools), ("vision", vision))
+                                k: v for k, v in (
+                                    ("task", task), ("tools", tools), ("vision", vision),
+                                    ("watermark", watermark),
+                                )
                                 if v is not None
                             },
-                        ) if (task or tools is not None or vision is not None) else None,
+                        ) if (task or tools is not None or vision is not None or watermark) else None,
                         "dep_id": deployment_id,
                         "machine_tls": machine_tls,
                     },

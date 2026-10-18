@@ -322,6 +322,10 @@ class Settings(BaseSettings):
     # Presented to the engine (Bearer): its FADEN_PROVENANCE_SERVICE_TOKEN. The engine refuses every call
     # without it.
     provenance_service_token: str = ""
+    # The keys of the text watermark the model runtimes put into answers, "<version>:<whole number>,...",
+    # made by the CLI and mounted as a file (/run/secrets); the current one goes to the chat models the
+    # backend starts (services/provenance/watermark.py). Empty: models start without the watermark.
+    provenance_watermark_keys: str = ""
 
     # How long a console sign-in lasts (system setting "users.login_lifetime_s"). The
     # login token is a JWT with this lifetime; 0 or less means it never expires.

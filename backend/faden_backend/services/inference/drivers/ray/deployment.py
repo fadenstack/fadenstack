@@ -107,6 +107,7 @@ from faden_backend.services.inference.drivers.ray.schemas import (
     check_environment_config,
 )
 from faden_backend.services import machine_tls
+from faden_backend.services.provenance import watermark
 from faden_backend.settings import settings
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
@@ -770,9 +771,13 @@ class RayDeploymentManager:
             )
             return
 
-        # 2. Plan (compile the spec into a LLMServingArgs document).
+        # 2. Plan (compile the spec into a LLMServingArgs document), with the
+        # text watermark's key version it was applied with: a newer one is
+        # taken only when it is applied again anyway (step 4).
+        applied_mark = (deployment.observed_status_json or {}).get("applied_watermark")
+        pinned = applied_mark.get("key_version") if isinstance(applied_mark, dict) else None
         try:
-            llm_serving_args = self._compile(facts)
+            llm_serving_args = self._compile(facts, watermark_version=pinned)
         except ArtifactResolutionError as exc:
             self._observe(
                 deployment, DeploymentPhase.FAILED, f"artifact resolution failed: {exc}",
@@ -1082,6 +1087,15 @@ class RayDeploymentManager:
 
         run_result: dict[str, Any] = {}
         if need_apply:
+            # Applied anyway, so with the current watermark key (the copies
+            # start again in any case).
+            current = self._compile(facts)
+            if current != llm_serving_args:
+                llm_serving_args = current
+                config_hash = hashlib.sha256(
+                    json.dumps(llm_serving_args, sort_keys=True).encode()
+                ).hexdigest()
+                config_shape = shape_hash(llm_serving_args)
             try:
                 run_result = await client.run_serve_app(
                     head_node_id=facts.head_node_id,
@@ -1118,6 +1132,11 @@ class RayDeploymentManager:
             # From here on the engine's output is this run's: an earlier
             # run's failure is never taken for it (``engine_root_cause``).
             observed_now["applied_at"] = datetime.now(tz=UTC).isoformat()
+            # How its answers are watermarked, never the key: published with
+            # the endpoint for the gateway's receipts, and kept for step 2.
+            observed_now["applied_watermark"] = watermark.published(
+                llm_serving_args, watermark.installed_keys()
+            )
             deployment.observed_status_json = observed_now
         else:
             run_result = _reported_run(deployment) or {"app": app_name, "deployed": True, "cached": True}
@@ -1679,8 +1698,26 @@ class RayDeploymentManager:
             return int(autoscale.get("min_replicas") or 1)
         return int(scale.get("replicas") or 1)
 
-    def _compile(self, facts: _DeploymentFacts) -> dict[str, Any]:
+    def _watermark_key(self, facts: _DeploymentFacts, pinned: int | None) -> tuple[int, int] | None:
+        """(version, key) of the text watermark the deployment starts with, or ``None`` for none.
+
+        With the provenance module on and keys given, on a runtime that has the
+        watermark (vLLM 0.30 or later). *pinned* is the version the deployment
+        was last applied with: kept while it is, so a new version restarts no
+        model by itself (``_reconcile_one`` takes the current one for an apply).
+        """
+        keys = watermark.installed_keys()
+        bundle = facts.runtime_bundle
+        matrix = getattr(bundle, "compatibility_matrix", None)
+        if keys is None or not watermark.runtime_has_it(getattr(matrix, "vllm_version", None)):
+            return None
+        return keys.pick(pinned)
+
+    def _compile(self, facts: _DeploymentFacts, *, watermark_version: int | None = None) -> dict[str, Any]:
         """Compile the spec into ``LLMServingArgs``.
+
+        *watermark_version* is the text watermark's key version to keep
+        (``_watermark_key``); ``None`` takes the current one.
 
         :raises: :class:`ArtifactResolutionError` / ``ValueError`` — translated
             to a FAILED phase by the caller.
@@ -1694,6 +1731,7 @@ class RayDeploymentManager:
             availability_root_path=facts.availability_root_path,
             desired_state="active",
             node_resource=facts.node_resource,
+            watermark_key=self._watermark_key(facts, watermark_version),
         )
 
     # ------------------------------------------------------------------
@@ -1897,6 +1935,9 @@ class RayDeploymentManager:
             # Serve predates model TLS on this cluster: moving it is one
             # administrator action (``move_behind_model_tls``).
             "model_tls_pending": bool(getattr(facts, "model_tls", False) and not machine),
+            # How the answers are watermarked (algorithm, key version, context
+            # width), for the gateway's receipts; None without the watermark.
+            "watermark": (deployment.observed_status_json or {}).get("applied_watermark"),
         }
         if target is None:
             await endpoint_dao.create(

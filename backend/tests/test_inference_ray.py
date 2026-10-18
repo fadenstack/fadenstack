@@ -1672,3 +1672,52 @@ def test_an_old_wsl_kernel_and_an_operator_choice_are_respected() -> None:
     assert RayEnvironmentManager._machine_env(old) == {}  # noqa: SLF001
     linux = SimpleNamespace(capabilities_json={"os": "Linux-6.8.0-1017-nvidia-aarch64-with-glibc2.39"})
     assert RayEnvironmentManager._machine_env(linux) == {}  # noqa: SLF001
+
+
+async def test_a_chat_model_starts_with_the_watermark_and_keeps_its_key_version_until_applied_again(
+    deployment_env, dbsession: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The current watermark key when applied; a key rotated since restarts nothing; the next apply takes it."""
+    from faden_backend.db.dao.inference_dao import EndpointDAO
+    from faden_backend.services.provenance import watermark
+
+    _fast_readiness(monkeypatch)
+    monkeypatch.setattr(watermark, "runtime_has_it", lambda version: True)
+    monkeypatch.setattr(settings, "provenance_enabled", True)
+    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:42")
+    dep, _node = deployment_env
+    app = f"faden-{dep.id}"
+    fake = _FakeNodeControl(
+        result_json=_healthy_probe_result(),
+        results={
+            NodeCommandType.RUN_SERVE_APP.value: _run_serve_result(app),
+            NodeCommandType.GET_RAY_SERVE_STATUS.value: _serve_status(app),
+        },
+    )
+    manager = _ray_driver().deployment_manager
+
+    def keys_run() -> list[dict[str, Any]]:
+        runs = fake.by_type(NodeCommandType.RUN_SERVE_APP.value)
+        return [r["payload"]["llm_serving_args"]["llm_configs"][0]["engine_kwargs"]["watermark_config"] for r in runs]
+
+    await manager.reconcile_deployment(dbsession, dep, node_control=fake)
+    assert dep.phase == "running"
+    assert keys_run() == [{"algorithm": "gumbel", "context_width": 4, "key": 42}]
+    mark = {"algorithm": "gumbel", "key_version": 1, "context_width": 4}
+    assert dep.observed_status_json["applied_watermark"] == mark
+    endpoint = (await EndpointDAO(dbsession).list_for_deployment(dep.id))[0]
+    assert endpoint.published_json["watermark"] == mark, "for the gateway's receipts; never the key"
+    assert "42" not in str(endpoint.published_json)
+
+    # faden secrets rotate: a version 2. A saved change that compiles the same applies nothing.
+    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:42,2:43")
+    dep.generation += 1
+    await manager.reconcile_deployment(dbsession, dep, node_control=fake)
+    assert len(keys_run()) == 1, "the model was not restarted for the new key"
+
+    # A change that is applied takes the current key.
+    dep.spec_json = {**dep.spec_json, "engine": {"name": "vllm", "config": {"max_model_len": 4096}}}
+    dep.generation += 1
+    await manager.reconcile_deployment(dbsession, dep, node_control=fake)
+    assert keys_run()[-1]["key"] == 43
+    assert dep.observed_status_json["applied_watermark"]["key_version"] == 2

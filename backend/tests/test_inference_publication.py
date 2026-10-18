@@ -82,6 +82,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         tools=False,  # no engine config: vLLM's tool calls are off
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
+        watermark=None,  # the endpoint names no watermark
     )
 
 
@@ -148,6 +149,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         tools=False,  # no engine config: vLLM's tool calls are off
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
+        watermark=None,  # the endpoint names no watermark
     )
 
 

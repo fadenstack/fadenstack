@@ -20,5 +20,6 @@
   "ssl_keyfile",
   "ssl_certfile",
   "ssl_ca_certs",
-  "allowed_local_media_path"
+  "allowed_local_media_path",
+  "watermark_config"
 ]
