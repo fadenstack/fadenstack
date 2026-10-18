@@ -99,12 +99,31 @@ class ComposeContext:
     project_dir: Path | None = None
     profiles: list[str] = field(default_factory=list)
 
+    def write_secret_files(self) -> list[str]:
+        """Write the content keys' files from .env, for a compose file that mounts them; the required keys missing.
+
+        Before every compose command: a file compose mounts that is not there becomes an empty folder Docker
+        makes in its place (core/secret_files.py).
+        """
+        from faden_cli.core import secret_files  # noqa: PLC0415
+
+        if self.project_dir is None or self.env_file is None:
+            return []
+        if not secret_files.uses_secret_files(self.compose_files):
+            return []
+        try:
+            return secret_files.write(Path(str(self.project_dir)), Path(str(self.env_file)))
+        except (secret_files.SecretFileError, OSError) as exc:
+            error(f"The keys' files could not be written: {exc}")
+            sys.exit(1)
+
     def base_cmd(self) -> list[str]:
         """Build the ``docker compose`` prefix with all file/profile flags."""
         docker = shutil.which("docker")
         if not docker:
             error("docker not found on PATH")
             sys.exit(1)
+        self.write_secret_files()
 
         cmd: list[str] = [docker, "compose"]
         for f in self.compose_files:
@@ -212,7 +231,16 @@ def up(
     *timeout* sets the max wait time in seconds (requires *wait*).
     *force_recreate* recreates containers even if config hasn't changed.
     *no_deps* starts only *services*, not what they depend on.
+
+    A key the services cannot start without, missing from .env, stops it before compose runs, as compose
+    itself did while the keys were environment (``${NAME:?...}``).
     """
+    if missing := ctx.write_secret_files():
+        error(
+            f"Not set in .env: {', '.join(missing)}. The services cannot start without them; `faden upgrade` "
+            "writes the ones an install lacks (Help, Installing, Secrets in .env)."
+        )
+        return 1
     cmd = ctx.base_cmd() + ["up"]
     if detach:
         cmd.append("-d")

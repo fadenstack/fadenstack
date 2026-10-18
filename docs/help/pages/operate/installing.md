@@ -219,6 +219,15 @@ Started by hand with `docker compose` instead, set them yourself, each to a long
 Outside development, the backend, the gateway and the MCP and skills services do not start on the development
 values that are published with the source code, and say what to set.
 
+??? info "The keys that open content are files, not environment"
+    The settings master key, the pepper, the MCP key and the chat key (and their `_PREVIOUS` values during a
+    rotation) are not in any container's environment, where `docker inspect` and the console's container pages
+    would show them. Before every compose command it runs, `faden` writes them from `.env` into
+    `~/fadenstack/secrets/` (readable by you only), and compose mounts each into the service that reads it, under
+    `/run/secrets`. Keep changing them in `.env` as before: after a change by hand, run `faden up` so the
+    services get the new value. Started with `docker compose` directly, write those files yourself, one per
+    variable, named like it.
+
 ### An install started by hand before release 0.4.2
 
 Until then the compose file fell back to fixed values when `.env` had none, the same for every install and

@@ -22,7 +22,7 @@ except ImportError:  # the tests load this file for bundle_files() alone
 
 #: What an install writes or generates for itself, and what is only for
 #: building from source. None of it belongs in a release.
-_SKIP_DIRS = {"backups", "base", ".empty-hf-cache", "__pycache__"}
+_SKIP_DIRS = {"backups", "base", ".empty-hf-cache", "__pycache__", "secrets"}
 _SKIP_FILES = {
     ".env",
     ".bootstrap-credentials",

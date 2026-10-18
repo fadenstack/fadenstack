@@ -6,6 +6,10 @@ from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from yarl import URL
 
+#: Where compose mounts the keys that open content (its ``secrets:``); a service run outside a container has
+#: none, and reads them from its environment as before. The environment wins where both have one.
+_SECRETS_DIR = Path("/run/secrets")
+
 TEMP_DIR = Path(gettempdir())
 
 
@@ -132,6 +136,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_prefix="FADEN_MCP_",
         env_file_encoding="utf-8",
+        secrets_dir=_SECRETS_DIR if _SECRETS_DIR.is_dir() else None,
     )
 
 

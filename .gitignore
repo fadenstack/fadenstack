@@ -66,3 +66,5 @@ shared/grafana/provisioning/dashboards/json/vllm-rt-*.json
 shared/rabbitmq/definitions.json
 shared/rabbitmq/10-faden.conf
 shared/prometheus/targets.json
+# The keys compose mounts into the services, written from .env by `faden` (cli/core/secret_files.py).
+shared/secrets/

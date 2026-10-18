@@ -45,9 +45,12 @@ PUBLISHED = (
 
 
 def test_the_compose_file_requires_exactly_these() -> None:
+    """Compose requires them, or `faden up` does for the keys it mounts as files (core/secret_files.py)."""
+    from faden_cli.core.secret_files import REQUIRED  # noqa: PLC0415
+
     lines = COMPOSE.read_text(encoding="utf-8").splitlines()
     compose = "\n".join(line for line in lines if not line.lstrip().startswith("#"))
-    assert set(re.findall(r"\$\{([A-Z0-9_]+):\?", compose)) == set(REQUIRED_KEYS)
+    assert set(re.findall(r"\$\{([A-Z0-9_]+):\?", compose)) | REQUIRED == set(REQUIRED_KEYS)
 
 
 def test_the_compose_file_falls_back_to_nothing_published() -> None:

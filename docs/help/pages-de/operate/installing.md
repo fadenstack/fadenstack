@@ -234,6 +234,15 @@ Zufallswert (`openssl rand -base64 48`):
 Außerhalb der Entwicklung starten das Backend, das Gateway sowie der MCP- und der Skills-Dienst nicht mit den
 Entwicklungswerten, die mit dem Quellcode veröffentlicht sind, und sagen, was zu setzen ist.
 
+??? info "Die Schlüssel, die Inhalte öffnen, sind Dateien, keine Umgebung"
+    Der Settings-Master-Key, der Pepper, der MCP-Schlüssel und der Chat-Schlüssel (und während einer Rotation ihre
+    `_PREVIOUS`-Werte) stehen in keiner Container-Umgebung, wo `docker inspect` und die Container-Seiten der
+    Konsole sie zeigen würden. Vor jedem Compose-Befehl, den es ausführt, schreibt `faden` sie aus der `.env` nach
+    `~/fadenstack/secrets/` (nur für Sie lesbar), und Compose bindet jede Datei in den Dienst ein, der sie liest,
+    unter `/run/secrets`. Ändern Sie sie weiter in der `.env`: Nach einer Änderung von Hand führen Sie `faden up`
+    aus, damit die Dienste den neuen Wert bekommen. Starten Sie direkt mit `docker compose`, schreiben Sie diese
+    Dateien selbst, eine je Variable, benannt wie sie.
+
 ### Eine von Hand gestartete Installation vor Release 0.4.2 {#an-install-started-by-hand-before-release-042}
 
 Bis dahin griff die Compose-Datei auf feste Werte zurück, wenn die `.env` keinen hatte: für jede Installation
