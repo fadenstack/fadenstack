@@ -21,11 +21,13 @@ from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.system_settings import InfraAgentStatus
 from faden_backend.db.models.users import User
 from faden_backend.services.docker.client import DockerService
+from faden_backend.services.module_registry import module_registry
 from faden_backend.services.nodes import NodeControlService
 from faden_backend.services.nodes import signing as command_signing
 from faden_backend.services.nodes.wakeup import get_command_notifier
 from faden_backend.services.system_settings import SettingsCrypto, SystemSettingsService
 from faden_backend.services.system_settings.executors import AgentApplyExecutor, LocalApplyExecutor
+from faden_backend.services.system_settings.runtime_mapping import resolve_runtime_attr
 from faden_backend.settings import settings
 from faden_backend.web.api.admin.hardware.schema import (
     GpuDeviceDTO,
@@ -119,6 +121,29 @@ def get_node_control_service(
     )
 
 
+def _refuse_unconfirmed_switch_off(key: str, value: object) -> None:
+    """A module that asks before it is switched off (provenance) is switched off only by its own route.
+
+    That route (``PUT /api/admin/services/{name}/disable``) needs ``confirm: true`` and records the switch;
+    setting the module's flag here would skip both.
+    """
+    if value is not False:
+        return
+    attr = resolve_runtime_attr(key)
+    for mod in module_registry.list_modules():
+        if mod.disable_warning and attr is not None and mod.settings_flag == attr:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "use_module_switch",
+                    "message": (
+                        f"{key} switches the {mod.display_name} module off. Switch it off under "
+                        "Settings > Modules, which asks for confirmation and records it."
+                    ),
+                },
+            )
+
+
 @router.get("/settings/schema", response_model=list[SettingsSchemaItemDTO], name="system_settings_schema")
 async def system_settings_schema(
     _user: Annotated[User, Depends(require_permission("system.settings", "read"))],
@@ -151,6 +176,7 @@ async def system_settings_update(
     audit_dao: AuditDAO = Depends(),
 ) -> SettingUpdateResponse:
     """Update one setting and run immediate apply when required."""
+    _refuse_unconfirmed_switch_off(key, body.value)
     try:
         result = await service.update_value(
             key=key,
@@ -277,6 +303,8 @@ async def wizard_apply(
     audit_dao: AuditDAO = Depends(),
 ) -> WizardApplyResponse:
     """Apply a wizard step payload via shared settings path."""
+    for key, value in body.values.items():
+        _refuse_unconfirmed_switch_off(key, value)
     results: list[SettingUpdateResponse] = []
     for key, value in body.values.items():
         result = await service.update_value(

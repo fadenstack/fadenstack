@@ -59,6 +59,11 @@ class ModuleDef:
     on_enable: SyncCallback | None = None
     on_disable: SyncCallback | None = None
 
+    # ── Switching off ─────────────────────────────────────────
+    #: What is lost when the module is switched off. When set, ``disable`` is refused
+    #: without an explicit ``confirm: true``, and the refusal says this.
+    disable_warning: str | None = None
+
 
 class ModuleRegistry:
     """Ordered, thread-safe registry of :class:`ModuleDef` instances.

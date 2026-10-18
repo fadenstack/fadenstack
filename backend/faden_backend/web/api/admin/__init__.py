@@ -93,6 +93,11 @@ from faden_backend.web.api.admin.mcp.views import router as mcp_router  # noqa: 
 
 admin_router.include_router(mcp_router, prefix="/mcp", tags=["admin-mcp"])
 
+# --- Provenance status (always registered; the engine's absence is a state) ---
+from faden_backend.web.api.admin.provenance.views import router as provenance_router  # noqa: E402
+
+admin_router.include_router(provenance_router, prefix="/provenance", tags=["admin-provenance"])
+
 # --- Observability (cost dashboard + pricing editor) ----------------------
 from faden_backend.web.api.admin.observability.views import router as observability_router  # noqa: E402
 

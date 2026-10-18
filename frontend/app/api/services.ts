@@ -8,6 +8,8 @@
  *           PUT  /api/admin/services/:name/disable
  */
 
+import { readError } from "./http";
+
 const BASE = "/api/admin";
 
 export interface ContainerState {
@@ -29,6 +31,12 @@ export interface ServiceInfo {
   module_type?: "container" | "plugin";
   /** Whether this is an enterprise-only module. */
   enterprise?: boolean;
+  /**
+   * Set when switching the module off needs an explicit confirmation: what
+   * is lost (provenance: content is no longer marked). The backend refuses
+   * `disable` without `confirm: true`.
+   */
+  disable_warning?: string | null;
 }
 
 export interface ServicesManifest {
@@ -44,10 +52,8 @@ export interface ModuleActionResult {
 }
 
 async function assertOk(res: Response): Promise<void> {
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${text}`);
-  }
+  // The server's own message, and its code (`confirmation_required`).
+  if (!res.ok) throw await readError(res);
 }
 
 export const servicesApi = {
@@ -78,13 +84,26 @@ export const servicesApi = {
     return res.json() as Promise<ModuleActionResult>;
   },
 
-  /** Stop all containers belonging to the named module. */
-  async disable(name: string): Promise<ModuleActionResult> {
+  /**
+   * Stop all containers belonging to the named module. A module with a
+   * `disable_warning` is switched off only with `confirm: true`, which the
+   * caller sends after the person confirmed.
+   */
+  async disable(
+    name: string,
+    options: { confirm?: boolean } = {},
+  ): Promise<ModuleActionResult> {
     const res = await fetch(
       `${BASE}/services/${encodeURIComponent(name)}/disable`,
       {
         method: "PUT",
         credentials: "include",
+        ...(options.confirm
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ confirm: true }),
+            }
+          : {}),
       },
     );
     await assertOk(res);

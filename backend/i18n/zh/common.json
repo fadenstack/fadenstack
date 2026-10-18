@@ -1423,6 +1423,11 @@
       "name": "MCP",
       "description": "模型上下文协议工具注册表 — 外部 MCP 服务器的受控代理。"
     },
+    "provenance": {
+      "name": "内容溯源",
+      "description": "以机器可读的方式将 AI 生成的内容标记为 AI 生成（欧盟《人工智能法》第 50 条第 2 款）。默认开启。",
+      "disable_warning": "生成的内容将不再被标记为 AI 生成。欧盟《人工智能法》第 50 条第 2 款要求，人工智能系统生成的内容须以机器可读的格式标记为人工智能生成。"
+    },
     "status": {
       "healthy": "健康",
       "unhealthy": "异常",
@@ -1444,7 +1449,37 @@
     "action_success": "{{module}} {{action}} 成功。",
     "logs": "日志",
     "logs_title": "{{module}} — 容器日志",
-    "module_settings": "模块设置"
+    "module_settings": "模块设置",
+    "confirm_disable_recorded": "关闭操作将连同您的姓名和时间记录在审计日志中。",
+    "confirm_disable_ack": "我了解生成的内容将不再被标记为 AI 生成。",
+    "switch_off": "关闭"
+  },
+  "provenance_status": {
+    "title": "标记服务",
+    "state": {
+      "running": "运行中",
+      "not_running": "未运行",
+      "refused": "服务拒绝了服务令牌",
+      "unexpected": "服务返回了意外的响应"
+    },
+    "not_running_hint": "服务未运行期间，内容无法被标记。",
+    "refused_hint": "后端和服务必须使用相同的服务令牌。",
+    "unexpected_hint": "请在模块设置中检查服务地址。",
+    "contract": "接口约定：{{contract}}",
+    "contract_unsupported": "此服务器使用 {{expected}}，服务使用 {{contract}}。请让两者运行同一版本。",
+    "engine_version": "版本 {{version}}",
+    "capabilities": "功能",
+    "capability": {
+      "images": "图片",
+      "receipts": "回执",
+      "records": "记录",
+      "detect": "内容检查"
+    },
+    "capability_available": "{{name}}：可用",
+    "capability_unavailable": "{{name}}：尚不可用",
+    "plugins": "插件：{{plugins}}",
+    "no_plugins": "未加载插件",
+    "load_failed": "无法读取模块状态。"
   },
   "pii_dashboard": {
     "title": "PII 仪表盘",

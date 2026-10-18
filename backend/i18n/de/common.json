@@ -1423,6 +1423,11 @@
       "name": "MCP",
       "description": "Tool-Register für das Model Context Protocol — verwalteter Broker für externe MCP-Server."
     },
+    "provenance": {
+      "name": "Herkunftsnachweis",
+      "description": "Kennzeichnet KI-generierte Inhalte maschinenlesbar als solche (EU-KI-Verordnung, Art. 50 Abs. 2). Standardmäßig eingeschaltet.",
+      "disable_warning": "Erzeugte Inhalte werden dann nicht mehr als KI-generiert gekennzeichnet. Die EU-KI-Verordnung (Art. 50 Abs. 2) verlangt, dass von KI-Systemen erzeugte Inhalte in einem maschinenlesbaren Format als künstlich erzeugt gekennzeichnet sind."
+    },
     "status": {
       "healthy": "funktionsfähig",
       "unhealthy": "fehlerhaft",
@@ -1444,7 +1449,37 @@
     "action_success": "{{module}} erfolgreich {{action}}.",
     "logs": "Logs",
     "logs_title": "{{module}} – Container-Protokolle",
-    "module_settings": "Moduleinstellungen"
+    "module_settings": "Moduleinstellungen",
+    "confirm_disable_recorded": "Das Abschalten wird mit Ihrem Namen und der Uhrzeit im Audit-Protokoll festgehalten.",
+    "confirm_disable_ack": "Mir ist bewusst, dass erzeugte Inhalte dann nicht mehr als KI-generiert gekennzeichnet werden.",
+    "switch_off": "Abschalten"
+  },
+  "provenance_status": {
+    "title": "Kennzeichnungsdienst",
+    "state": {
+      "running": "Läuft",
+      "not_running": "Läuft nicht",
+      "refused": "Der Dienst hat das Service-Token abgelehnt",
+      "unexpected": "Der Dienst hat unerwartet geantwortet"
+    },
+    "not_running_hint": "Solange der Dienst nicht läuft, können Inhalte nicht gekennzeichnet werden.",
+    "refused_hint": "Backend und Dienst müssen dasselbe Service-Token verwenden.",
+    "unexpected_hint": "Prüfen Sie die Adresse des Dienstes in den Moduleinstellungen.",
+    "contract": "Schnittstelle: {{contract}}",
+    "contract_unsupported": "Dieser Server spricht {{expected}}, der Dienst {{contract}}. Betreiben Sie beide mit demselben Release.",
+    "engine_version": "Version {{version}}",
+    "capabilities": "Funktionen",
+    "capability": {
+      "images": "Bilder",
+      "receipts": "Belege",
+      "records": "Nachweise",
+      "detect": "Inhalte prüfen"
+    },
+    "capability_available": "{{name}}: verfügbar",
+    "capability_unavailable": "{{name}}: noch nicht verfügbar",
+    "plugins": "Plugins: {{plugins}}",
+    "no_plugins": "Keine Plugins geladen",
+    "load_failed": "Der Status des Moduls konnte nicht gelesen werden."
   },
   "pii_dashboard": {
     "title": "PII-Dashboard",

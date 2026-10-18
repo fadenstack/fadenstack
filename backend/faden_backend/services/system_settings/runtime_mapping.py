@@ -15,6 +15,8 @@ _RUNTIME_VALUE_KEY_MAP: dict[str, str] = {
     "faden_gateway.mcp_service_url": "mcp_service_url",
     "faden_gateway.skills_enabled": "skills_enabled",
     "faden_gateway.skills_service_url": "skills_service_url",
+    "faden_gateway.provenance_enabled": "provenance_enabled",
+    "faden_gateway.provenance_service_url": "provenance_service_url",
     "faden_gateway.sessions_enabled": "sessions_enabled",
     "rag_lite.enabled": "rag_lite_enabled",
     "rag_lite.embedding_provider_id": "rag_lite_embedding_provider_id",
@@ -46,6 +48,7 @@ _RUNTIME_SECRET_KEY_MAP: dict[str, str] = {
     "faden_backend.users_secret": "users_secret",
     "faden_gateway.mcp_service_token": "mcp_service_token",
     "faden_gateway.skills_service_token": "skills_service_token",
+    "faden_gateway.provenance_service_token": "provenance_service_token",
 }
 
 
