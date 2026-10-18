@@ -48,6 +48,11 @@ _CLIENT_KEY_PURPOSE = "machine-tls-client-key"
 _GATEWAY_CLIENT = "fadenstack-gateway"
 #: Clients not used for this long, and no longer current, are closed.
 _IDLE_CLOSE_SEC = 1800.0
+#: What a caller is told while the gateway has no machine certificate yet: it passes within a minute.
+MACHINE_TLS_NOT_LOADED = (
+    "This model is served over TLS by its machine, and the gateway has not loaded "
+    "its machine certificate yet (the backend makes it; the gateway reads it every minute)."
+)
 
 
 class MachineTlsUnavailableError(RuntimeError):
@@ -129,10 +134,7 @@ def for_provider(
     if mode == MACHINE_MODE:
         identity = machine_identity.current
         if identity is None:
-            raise MachineTlsUnavailableError(
-                "This model is served over TLS by its machine, and the gateway has not loaded "
-                "its machine certificate yet (the backend makes it; the gateway reads it every minute).",
-            )
+            raise MachineTlsUnavailableError(MACHINE_TLS_NOT_LOADED)
         return identity
     insecure = mode == "insecure" and settings.tls_outbound_allow_insecure
     if mode == "insecure" and not insecure:

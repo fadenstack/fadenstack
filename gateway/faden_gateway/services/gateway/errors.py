@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 
 class GatewayError(Exception):
@@ -56,6 +57,18 @@ def error_response(
             **(extra or {}),
         },
         headers=headers,
+    )
+
+
+def validation_message(exc: ValidationError) -> str:
+    """What was wrong with a request body, field by field: ``messages.0.role: Field required``.
+
+    Not ``str(exc)``, which repeats the values sent -- a whole manifest, whatever a client put in a
+    field -- and adds a link to pydantic's documentation per error.
+    """
+    return "; ".join(
+        f"{'.'.join(map(str, e['loc']))}: {e['msg']}" if e["loc"] else e["msg"]
+        for e in exc.errors(include_url=False, include_input=False)
     )
 
 

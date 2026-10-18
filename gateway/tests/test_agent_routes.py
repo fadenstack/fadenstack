@@ -795,6 +795,12 @@ async def test_a_manifest_is_checked_and_bounded(
         assert r.status_code == 400, bad
         assert r.json()["error"]["code"] == "invalid_manifest"
 
+    # What is wrong, by field: not the value sent, not pydantic's links.
+    r = await client.put(MANIFEST_URL, headers=_headers(), json={**MANIFEST, "tools": [{"name": "rm -rf /srv/s3cr3t"}]})
+    message = r.json()["error"]["message"]
+    assert message.startswith("tools.0.name: String should match pattern"), message
+    assert "s3cr3t" not in message and "pydantic.dev" not in message
+
     huge = {**MANIFEST, "tools": [{"name": "big", "parameters": {"description": "x" * 40_000}}]}
     assert (await client.put(MANIFEST_URL, headers=_headers(), json=huge)).status_code == 400
     r = await client.put(MANIFEST_URL, headers=_headers(), content=b"{" + b" " * 600_000 + b"}")
@@ -809,6 +815,7 @@ async def test_a_manifest_is_checked_and_bounded(
     r = await client.put(MANIFEST_URL, headers=_headers(), json={**MANIFEST, "app": {"name": "Other"}})
     assert r.status_code == 429
     assert r.json()["error"]["code"] == "too_many_manifests"
+    assert r.json()["error"]["message"] == "The agent keeps 1 manifests at most."
 
 
 @pytest.mark.anyio

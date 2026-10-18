@@ -47,7 +47,7 @@ from faden_gateway.services.gateway.auth import (
     get_agent_route_claims,
     get_auth_context_from_claims,
 )
-from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
+from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response, validation_message
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
 from faden_gateway.services.gateway.skills_client import SkillsUnavailableError
@@ -575,7 +575,7 @@ async def agent_events(
     except ValidationError as exc:
         return error_response(
             status_code=400,
-            message=str(exc),
+            message=validation_message(exc),
             error_type="invalid_request_error",
             code="invalid_events",
         )
@@ -616,7 +616,7 @@ async def agent_user(
     except ValidationError as exc:
         return error_response(
             status_code=400,
-            message=str(exc),
+            message=validation_message(exc),
             error_type="invalid_request_error",
             code="invalid_user_settings",
         )
@@ -670,16 +670,20 @@ async def agent_manifest(
         manifest = agent_manifests.AppManifest.model_validate_json(body)
     except ValidationError as exc:
         return error_response(
-            status_code=400, message=str(exc), error_type="invalid_request_error", code="invalid_manifest",
+            status_code=400, message=validation_message(exc), error_type="invalid_request_error",
+            code="invalid_manifest",
         )
     try:
         digest, new = await agent_manifests.record(
             dao.session, tenant_id=auth.tenant_id, agent_id=agent.id, user_id=auth.user_id,
             device_id=agent.device_id, manifest=manifest.stored(), source="app",
         )
-    except agent_manifests.ManifestLimitError as exc:
+    except agent_manifests.ManifestLimitError:
         return error_response(
-            status_code=429, message=str(exc), error_type="rate_limit_error", code="too_many_manifests",
+            status_code=429,
+            message=f"The agent keeps {agent_manifests.MAX_MANIFESTS_PER_AGENT} manifests at most.",
+            error_type="rate_limit_error",
+            code="too_many_manifests",
         )
     return JSONResponse({"sha256": digest, "new": new})
 

@@ -1305,9 +1305,16 @@ class GatewayService:
                     break
                 except Exception as exc:
                     if attempt >= settings.retry_pre_first_token:
+                        # The cause -- a machine's address and port, a TLS alert, a
+                        # library's own words -- is the log's; the caller gets the
+                        # request id to quote.
+                        logger.exception("Request %s: the upstream request failed", request_id)
                         raise GatewayError(
                             status_code=502,
-                            message=f"Upstream request failed: {exc}",
+                            message=(
+                                "Upstream request failed; the gateway's log has the details "
+                                f"under request id {request_id}."
+                            ),
                             error_type="server_error",
                             code="upstream_request_failed",
                         ) from exc

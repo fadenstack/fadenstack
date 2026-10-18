@@ -316,6 +316,14 @@ async def refusal(url: str, *, allowed_hosts: str) -> str | None:
     addresses = await resolve(host)
     if addresses and all(address_allowed(host, a, allowed_hosts) for a in addresses):
         return None
+    return not_public(host)
+
+
+def not_public(host: str) -> str:
+    """Why *host*'s media is not fetched, in the same words before the fetch and when connecting.
+
+    The address a name resolves to here is not said: that would answer what an internal name is.
+    """
     return f"{host} is not a public address that resolves from here, and media URLs must be"
 
 

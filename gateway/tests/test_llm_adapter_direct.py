@@ -217,13 +217,28 @@ async def test_an_engine_that_refuses_becomes_an_error_event() -> None:
 
 
 @pytest.mark.anyio
-async def test_an_engine_that_cannot_be_reached_becomes_an_error_event() -> None:
+async def test_an_engine_that_fails_says_so_without_its_own_words(caplog: pytest.LogCaptureFixture) -> None:
+    """A 5xx's body is the engine's: a traceback, a path inside the image. The log keeps it."""
+    trace = b'{"error": "Traceback: File /opt/venv/lib/python3.12/site-packages/vllm/engine.py, CUDA error"}'
+    async with _engine([trace], [], status=500) as http:
+        out = await _stream(LLMAdapter(http_client=http))
+    error = json.loads(out[0][len(b"data: "):])["error"]
+    assert error["type"] == "server_error"
+    assert error["message"] == "upstream 500: The model failed to answer; the gateway's log says why."
+    assert "/opt/venv" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_an_engine_that_cannot_be_reached_becomes_an_error_event(caplog: pytest.LogCaptureFixture) -> None:
     def refuse(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("connection refused", request=request)
+        raise httpx.ConnectError("connect to 10.88.10.71:8443 refused", request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(refuse)) as http:
         out = await _stream(LLMAdapter(http_client=http))
-    assert json.loads(out[0][len(b"data: "):])["error"]["type"] == "server_error"
+    error = json.loads(out[0][len(b"data: "):])["error"]
+    assert error["type"] == "server_error"
+    assert error["message"] == "The model failed to answer; the gateway's log says why.", "no address, no port"
+    assert "10.88.10.71:8443" in caplog.text
     assert out[-1] == b"data: [DONE]\n\n"
 
 

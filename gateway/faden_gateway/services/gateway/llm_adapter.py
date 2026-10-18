@@ -509,7 +509,26 @@ _WARNED_NO_CLIENT_CERT: set[str] = set()
 
 
 class _TlsRefusedError(Exception):
-    """A model this gateway cannot reach securely yet; the message says why."""
+    """A model this gateway cannot reach securely yet (``upstream_tls.MACHINE_TLS_NOT_LOADED`` says why)."""
+
+
+#: What a caller is told when the model's side failed: a 5xx, no connection, a TLS error, an
+#: exception in LiteLLM. The cause names machines, ports and certificates, and LiteLLM's
+#: connection error carries a traceback: it goes to the gateway's log, not into the answer.
+_UPSTREAM_FAILED = "The model failed to answer; the gateway's log says why."
+#: The upstream refusals a caller reads as the upstream said them: the request as it stands was
+#: refused (too long for the model's context, a parameter it does not take), or the provider's
+#: key or limit refused it.
+_SAID_AS_IS = (
+    litellm.exceptions.BadRequestError,
+    litellm.exceptions.AuthenticationError,
+    litellm.exceptions.RateLimitError,
+)
+
+
+def _for_caller(exc: BaseException) -> str:
+    """What the caller is told of *exc*: an upstream 4xx in its own words, anything else not."""
+    return str(exc) if isinstance(exc, _SAID_AS_IS) else _UPSTREAM_FAILED
 
 
 def _provider_tls(
@@ -530,7 +549,7 @@ def _provider_tls(
             ssl_client_key_pem=ssl_client_key_pem,
         )
     except upstream_tls.MachineTlsUnavailableError as exc:
-        raise _TlsRefusedError(str(exc)) from exc
+        raise _TlsRefusedError from exc
 
 
 def _native_kwargs(
@@ -689,8 +708,8 @@ class LLMAdapter:
                 ssl_client_cert_pem=ssl_client_cert_pem,
                 ssl_client_key_pem=ssl_client_key_pem,
             )
-        except _TlsRefusedError as exc:
-            return _refusal(stream, str(exc))  # type: ignore[no-any-return]
+        except _TlsRefusedError:
+            return _refusal(stream, upstream_tls.MACHINE_TLS_NOT_LOADED)  # type: ignore[no-any-return]
         native = _native_kwargs(
             tls, provider_type=provider_type, instance_id=instance_id,
             ssl_verify_mode=ssl_verify_mode,
@@ -802,7 +821,10 @@ class LLMAdapter:
                             body, tries = again, tries + 1
                             continue
                         logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
-                        refusal = f"upstream {response.status_code}: {detail}"
+                        # A 4xx is about the request (too long for the context, a parameter vLLM does not
+                        # take), which the caller reads; a 5xx's body is the engine's own, for the log.
+                        said = detail if response.status_code < 500 else _UPSTREAM_FAILED
+                        refusal = f"upstream {response.status_code}: {said}"
                         yield _sse(_error_payload("server_error", refusal))
                         yield _DONE
                         return
@@ -836,11 +858,11 @@ class LLMAdapter:
             yield _sse(_error_payload("server_error", message))
             yield _DONE
             return
-        except (httpx.HTTPError, ssl.SSLError) as exc:
+        except (httpx.HTTPError, ssl.SSLError):
             # A TLS alert after the handshake -- a proxy refusing this client's
             # certificate, under TLS 1.3 -- arrives on the first read, unmapped.
             logger.exception("Direct vLLM stream failed")
-            yield _sse(_error_payload("server_error", str(exc) or type(exc).__name__))
+            yield _sse(_error_payload("server_error", _UPSTREAM_FAILED))
             yield _DONE
             return
         if not closed:
@@ -887,11 +909,11 @@ class LLMAdapter:
                 status_code=400,
                 payload=_error_payload("invalid_request_error", str(exc)),
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("LiteLLM completion failed")
             return CompletionResult(
                 status_code=502,
-                payload=_error_payload("server_error", str(exc)),
+                payload=_error_payload("server_error", _UPSTREAM_FAILED),
             )
 
     async def _stream_completion(self, **kwargs: Any) -> AsyncIterator[bytes]:
@@ -912,8 +934,9 @@ class LLMAdapter:
         except Exception as exc:
             # Pre-stream failure — yield the error as an SSE event so the
             # client receives a structured error instead of a broken stream.
+            # A refusal of the request (context length, ...) is said as it is.
             logger.exception("LiteLLM streaming failed (pre-stream)")
-            error_data = _error_payload("server_error", str(exc))
+            error_data = _error_payload("server_error", _for_caller(exc))
             yield f"data: {json.dumps(error_data)}\n\n".encode()
             yield b"data: [DONE]\n\n"
             return
@@ -923,9 +946,9 @@ class LLMAdapter:
                 data = openai_chunk(chunk.model_dump())  # type: ignore[union-attr]
                 yield f"data: {json.dumps(data)}\n\n".encode()
             yield b"data: [DONE]\n\n"
-        except Exception as exc:
+        except Exception:
             logger.exception("LiteLLM streaming failed (mid-stream)")
-            error_data = _error_payload("server_error", str(exc))
+            error_data = _error_payload("server_error", _UPSTREAM_FAILED)
             yield f"data: {json.dumps(error_data)}\n\n".encode()
             yield b"data: [DONE]\n\n"
 
@@ -979,8 +1002,10 @@ class LLMAdapter:
                 ssl_client_cert_pem=ssl_client_cert_pem,
                 ssl_client_key_pem=ssl_client_key_pem,
             )
-        except _TlsRefusedError as exc:
-            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        except _TlsRefusedError:
+            return CompletionResult(
+                status_code=503, payload=_error_payload("server_error", upstream_tls.MACHINE_TLS_NOT_LOADED),
+            )
         native = _native_kwargs(
             tls, provider_type=provider_type, instance_id=instance_id,
             ssl_verify_mode=ssl_verify_mode,
@@ -1005,11 +1030,11 @@ class LLMAdapter:
             return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
         except litellm.exceptions.BadRequestError as exc:
             return CompletionResult(status_code=400, payload=_error_payload("invalid_request_error", str(exc)))
-        except Exception as exc:
+        except Exception:
             logger.exception("LiteLLM embedding failed")
             return CompletionResult(
                 status_code=502,
-                payload=_error_payload("server_error", str(exc)),
+                payload=_error_payload("server_error", _UPSTREAM_FAILED),
             )
 
 
@@ -1079,8 +1104,10 @@ class LLMAdapter:
                 ssl_client_cert_pem=ssl_client_cert_pem,
                 ssl_client_key_pem=ssl_client_key_pem,
             )
-        except _TlsRefusedError as exc:
-            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        except _TlsRefusedError:
+            return CompletionResult(
+                status_code=503, payload=_error_payload("server_error", upstream_tls.MACHINE_TLS_NOT_LOADED),
+            )
         native = _native_kwargs(
             tls, provider_type=provider_type, instance_id=instance_id,
             ssl_verify_mode=ssl_verify_mode,
@@ -1100,9 +1127,9 @@ class LLMAdapter:
             return CompletionResult(
                 status_code=400, payload=_error_payload("invalid_request_error", str(exc)),
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("LiteLLM image generation failed")
-            return CompletionResult(status_code=502, payload=_error_payload("server_error", str(exc)))
+            return CompletionResult(status_code=502, payload=_error_payload("server_error", _UPSTREAM_FAILED))
 
     async def rerank(
         self,
@@ -1167,8 +1194,10 @@ class LLMAdapter:
                 ssl_client_cert_pem=ssl_client_cert_pem,
                 ssl_client_key_pem=ssl_client_key_pem,
             )
-        except _TlsRefusedError as exc:
-            return CompletionResult(status_code=503, payload=_error_payload("server_error", str(exc)))
+        except _TlsRefusedError:
+            return CompletionResult(
+                status_code=503, payload=_error_payload("server_error", upstream_tls.MACHINE_TLS_NOT_LOADED),
+            )
         if tls is not None:
             # Rerank goes through LiteLLM's own HTTP handler for every
             # provider, and that takes a ready-made one.
@@ -1182,9 +1211,9 @@ class LLMAdapter:
             return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
         except litellm.exceptions.BadRequestError as exc:
             return CompletionResult(status_code=400, payload=_error_payload("invalid_request_error", str(exc)))
-        except Exception as exc:
+        except Exception:
             logger.exception("LiteLLM rerank failed")
-            return CompletionResult(status_code=502, payload=_error_payload("server_error", str(exc)))
+            return CompletionResult(status_code=502, payload=_error_payload("server_error", _UPSTREAM_FAILED))
 
 
 #: Providers whose rerank API is the Cohere / Jina shape at ``/v1/rerank``.

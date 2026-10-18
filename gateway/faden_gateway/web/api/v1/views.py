@@ -26,7 +26,12 @@ from faden_gateway.services.gateway.auth import (
     pii_weaken_granted,
     require_chat,
 )
-from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
+from faden_gateway.services.gateway.errors import (
+    GatewayError,
+    error_from,
+    error_response,
+    validation_message,
+)
 from faden_gateway.services.gateway.lease import LeaseManager
 from faden_gateway.services.gateway.llm_adapter import LLMAdapter
 from faden_gateway.services.gateway.observability import GatewayObservability
@@ -435,7 +440,7 @@ async def patch_session_tool_policy(
         patch = SessionToolPolicyPatchDTO.model_validate(body)
     except ValidationError as exc:
         # It was a 500.
-        raise GatewayError(status_code=400, message=str(exc), code="validation_error") from exc
+        raise GatewayError(status_code=400, message=validation_message(exc), code="validation_error") from exc
 
     from faden_gateway.db.models.gateway import ExecutionMode  # noqa: PLC0415
 
@@ -687,7 +692,7 @@ async def serve_images(
     except ValidationError as exc:
         return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=str(exc),
+            message=validation_message(exc),
             error_type="invalid_request_error",
             code="validation_error",
         )
@@ -721,7 +726,7 @@ async def create_rerank(
     except ValidationError as exc:
         return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=str(exc),
+            message=validation_message(exc),
             error_type="invalid_request_error",
             code="validation_error",
         )
@@ -818,7 +823,7 @@ async def serve_chat_completions(
         await _log_refusal(request, service, auth, agent, payload, 400, "validation_error")
         return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            message=str(exc),
+            message=validation_message(exc),
             error_type="invalid_request_error",
             code="validation_error",
         )

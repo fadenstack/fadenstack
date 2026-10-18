@@ -490,6 +490,22 @@ async def test_an_answer_from_another_address_than_the_one_checked_is_refused(we
 
 
 @pytest.mark.anyio
+async def test_a_refusal_when_connecting_does_not_say_where_the_name_led(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Which address an internal name has is the log's, not the caller's."""
+    async def rebound(request: httpx.Request) -> httpx.Response:
+        raise media_fetch.MediaAddressRefusedError("pictures.example.com resolves to 10.0.0.5, which is not public")
+
+    monkeypatch.setattr(media_fetch, "client", lambda: media_fetch.make_client(httpx.MockTransport(rebound)))
+    refused = await _refused(CAT)
+    assert refused.code == "media_url_not_allowed"
+    assert "pictures.example.com is not a public address that resolves from here" in refused.message
+    assert "10.0.0.5" not in refused.message
+    assert "10.0.0.5" in caplog.text
+
+
+@pytest.mark.anyio
 async def test_the_size_cap_holds_for_the_whole_request_as_it_streams(
     web: _Web, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

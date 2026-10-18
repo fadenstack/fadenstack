@@ -254,8 +254,11 @@ async def _get(where: str, url: str, kind: str) -> AsyncIterator[httpx.Response]
                 )
             yield response
     except MediaAddressRefusedError as exc:
+        # Where the name led is the log's (see media_urls.not_public).
         logger.warning("A media URL was refused when connecting: %s", exc)
-        raise media_urls.refused(where, f"{where}: {exc}. {media_urls.ADVICE}") from None
+        raise media_urls.refused(
+            where, f"{where}: {media_urls.not_public(host)}. {media_urls.ADVICE}",
+        ) from None
     except (httpx.HTTPError, httpx.InvalidURL, OSError) as exc:
         raise _unreachable(where, f"{host} could not be reached ({type(exc).__name__})") from None
 
