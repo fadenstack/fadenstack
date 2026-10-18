@@ -24,6 +24,8 @@ export interface ChatShell {
   onSkills?: () => void;
   /** Open the agents the user looks after; no entry without the right to. */
   onAgents?: () => void;
+  /** Open the content check; no entry without the right to or while the provenance module is off. */
+  onCheckContent?: () => void;
   /** Set on a phone (below 600 px). */
   phoneNav: ChatPhoneNav | null;
 }

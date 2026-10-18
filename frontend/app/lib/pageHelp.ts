@@ -342,6 +342,11 @@ const PAGES: PageHelpDef[] = [
     doc: "operate/upgrading",
   },
   {
+    prefix: "/admin/check-content",
+    id: "check_content",
+    actions: ["check", "verdict", "download", "public"],
+  },
+  {
     prefix: "/admin/settings",
     id: "settings",
     actions: ["general", "modules", "appearance"],

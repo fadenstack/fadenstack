@@ -157,6 +157,16 @@ describe("ModulesTab: provenance", () => {
     expect(disable).not.toHaveBeenCalled();
   });
 
+  it("carries the public check page's settings in its card", async () => {
+    render(<ModulesTab />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Module settings" }));
+    expect(
+      await screen.findByRole("switch", { name: "Offer a public check page" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Contact for text checks" })).toBeInTheDocument();
+  });
+
   it("shows the server's refusal when it asks for the confirmation", async () => {
     vi.spyOn(servicesApi, "disable").mockRejectedValue(
       new Error("To switch it off, confirm it (send confirm: true)."),

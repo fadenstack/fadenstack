@@ -70,6 +70,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import GavelIcon from "@mui/icons-material/Gavel";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import { AGENTS_PAGE_KEYS } from "~/api/agents";
 
 // ── Drawer sizing ────────────────────────────────────────────────
@@ -357,6 +358,13 @@ export const NAV: NavEntry[] = [
         superuserOnly: true,
         badge: "updateAvailable",
       },
+      {
+        // Everyone signed in has the same check beside the chat (/check-content).
+        to: "/admin/check-content",
+        labelKey: "nav.check_content",
+        icon: <FactCheckIcon />,
+        module: "provenance",
+      },
     ],
   },
   {
@@ -607,6 +615,7 @@ export function adminPageTitle(
   if (pathname.startsWith("/admin/agents")) return t("agents.title");
   if (pathname.startsWith("/admin/governance")) return t("governance.title");
   if (pathname.startsWith("/admin/updates")) return t("updates.title");
+  if (pathname.startsWith("/admin/check-content")) return t("content_check.title");
   if (pathname.startsWith("/admin/llm/graph")) return t("nav.llm_calls");
   if (pathname.startsWith("/admin/logs")) {
     const tab = new URLSearchParams(search).get("tab");

@@ -32,6 +32,7 @@ import { agentRights } from "~/api/agents";
 import { skillRights } from "~/api/skills";
 import CreateSkillDialog from "~/components/skills/CreateSkillDialog";
 import { useCan } from "~/lib/useCan";
+import { useContentCheck } from "~/lib/useContentCheck";
 import { useSkillsModule } from "~/lib/useSkillsModule";
 import type { InitialMessageState } from "./components/ChatWelcome";
 import ChatSidebar, { CHAT_RAIL_WIDTH } from "./components/ChatSidebar";
@@ -60,6 +61,7 @@ export default function ChatPage() {
   const skillsAllowed = skillRights((p) => can(p));
   const agentsAllowed = agentRights(can).open;
   const skillsModule = useSkillsModule();
+  const checkAllowed = useContentCheck(can("provenance:check")).state === "on";
   const navigate = useNavigate();
   const { t, i18n } = useTranslation("chat");
   const theme = useTheme();
@@ -310,11 +312,22 @@ export default function ChatPage() {
       onLogout: handleLogout,
       onSkills: chatSkills.value.enabled ? () => navigate("/skills") : undefined,
       onAgents: agentsAllowed ? () => navigate("/agents") : undefined,
+      onCheckContent: checkAllowed ? () => navigate("/check-content") : undefined,
       phoneNav: isPhone
         ? { hand: navHand, open: sidebarOpen, onOpen: () => setSidebarOpen(true) }
         : null,
     }),
-    [user.email, handleLogout, isPhone, navHand, sidebarOpen, chatSkills.value.enabled, agentsAllowed, navigate],
+    [
+      user.email,
+      handleLogout,
+      isPhone,
+      navHand,
+      sidebarOpen,
+      chatSkills.value.enabled,
+      agentsAllowed,
+      checkAllowed,
+      navigate,
+    ],
   );
 
   // A phone's 100vh reaches behind the browser's toolbar.

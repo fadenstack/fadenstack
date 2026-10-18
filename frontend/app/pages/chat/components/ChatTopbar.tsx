@@ -17,6 +17,7 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import AgentAvatar from "~/components/AgentAvatar";
 import InputBase from "@mui/material/InputBase";
@@ -164,6 +165,12 @@ export default function ChatTopbar({
                 label: t("agents.title", { ns: "common" }),
                 icon: <AgentAvatar size={20} variant="mono" />,
                 onClick: shell.onAgents,
+              },
+              shell.onCheckContent && {
+                key: "check-content",
+                label: t("nav.check_content", { ns: "common" }),
+                icon: <FactCheckIcon fontSize="small" />,
+                onClick: shell.onCheckContent,
               },
             ].filter((item) => !!item)}
           />

@@ -38,6 +38,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 
 import ContainerLogsDialog from "~/components/ContainerLogsDialog";
 import PiiPolicyForm from "~/components/PiiPolicyForm";
+import ProvenancePublicCheckSettings from "~/components/ProvenancePublicCheckSettings";
 import ProvenanceStatus from "~/components/ProvenanceStatus";
 import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import { useServices } from "~/lib/ServicesContext";
@@ -546,7 +547,8 @@ export default function ModulesTab() {
                 <ProvenanceStatus refreshKey={statusTick} />
               )}
 
-              {moduleSettingsFor(svc.name, settingsSchema).length > 0 && (
+              {(moduleSettingsFor(svc.name, settingsSchema).length > 0 ||
+                svc.name === "provenance") && (
                 <Accordion
                   disableGutters
                   sx={{ mt: 1.5 }}
@@ -738,6 +740,9 @@ export default function ModulesTab() {
                             );
                           },
                         )
+                      )}
+                      {svc.name === "provenance" && (
+                        <ProvenancePublicCheckSettings />
                       )}
                     </Stack>
                   </AccordionDetails>

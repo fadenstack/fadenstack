@@ -10,6 +10,9 @@ export default [
   route("/login", "routes/login.tsx"),
   route("/forgot-password", "routes/forgot-password.tsx"),
   route("/reset-password", "routes/reset-password.tsx"),
+  // Checking a picture or file without an account, when an administrator
+  // offers it; otherwise the page says it is not offered here.
+  route("/check", "routes/check.tsx"),
   // Which build this server runs: open pages ask, to notice an upgrade.
   route("/_build", "routes/build.ts"),
   // Standalone chat UI
@@ -26,6 +29,8 @@ export default [
     // admin console is for superusers.
     route("/agents", "pages/agents/MyAgentsPage.tsx"),
     route("/agents/:slug", "pages/agents/MyAgentPage.tsx"),
+    // Checking content for marks of AI generation (provenance:check).
+    route("/check-content", "pages/check/CheckContentPage.tsx"),
   ]),
   layout("routes/admin.tsx", [
     route("/admin", "pages/admin/AdminRouteRedirectPage.tsx"),
@@ -67,6 +72,10 @@ export default [
     route("/admin/nodes/profiles", "pages/admin/nodes/NodeProfilesPage.tsx"),
     route("/admin/nodes/:id", "pages/admin/nodes/NodeDetailPage.tsx"),
     route("/admin/scheduler", "pages/admin/SchedulerPage.tsx"),
+    // Checking content — guarded by the provenance module
+    layout("routes/provenance-guard.tsx", [
+      route("/admin/check-content", "pages/admin/provenance/AdminCheckContentPage.tsx"),
+    ]),
     route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
     // PII routes — guarded by module status
