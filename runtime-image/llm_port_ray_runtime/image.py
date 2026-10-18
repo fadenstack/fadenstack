@@ -28,7 +28,7 @@ import io
 import logging
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -67,22 +67,32 @@ def is_image_app(args: Any) -> bool:
     return isinstance(args, dict) and bool(args.get(IMAGE_KEY))
 
 
-def size_of(size: Optional[str], default: str = DEFAULT_SIZE, max_pixels: int = DEFAULT_MAX_PIXELS) -> Tuple[int, int]:
-    """``"WxH"`` as (width, height) a diffusion model takes, or ``ValueError`` saying why not.
+def size_of(
+    size: Optional[str], default: str = DEFAULT_SIZE, max_pixels: int = DEFAULT_MAX_PIXELS,
+) -> Union[Tuple[int, int], str]:
+    """``"WxH"`` as (width, height) a diffusion model takes, or a sentence saying why not.
 
     Sides are rounded down to multiples of 16 rather than refused: a caller
     asking for 1000x750 gets 992x736, which is what it meant.
     """
-    text = (size or default or DEFAULT_SIZE).strip().lower()
+    text = str(size or default or DEFAULT_SIZE).strip().lower()
     parts = text.split("x")
     if len(parts) != 2 or not all(p.strip().isdigit() for p in parts):
-        raise ValueError(f"size must be WIDTHxHEIGHT, such as 1024x1024 (got {size!r})")
+        return f"size must be WIDTHxHEIGHT, such as 1024x1024 (got {size!r})"
     width, height = (int(p) // STEP * STEP for p in parts)
     if not (MIN_SIDE <= width <= MAX_SIDE and MIN_SIDE <= height <= MAX_SIDE):
-        raise ValueError(f"each side must be between {MIN_SIDE} and {MAX_SIDE} pixels (got {size})")
+        return f"each side must be between {MIN_SIDE} and {MAX_SIDE} pixels (got {size})"
     if width * height > max_pixels:
-        raise ValueError(f"{width}x{height} is more than this model makes ({max_pixels} pixels at most)")
+        return f"{width}x{height} is more than this model makes ({max_pixels} pixels at most)"
     return width, height
+
+
+def _number(value: Any, kind: type) -> Any:
+    """*value* as *kind* (``int`` or ``float``), or None when it is not one."""
+    try:
+        return kind(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def diffusers_without_xformers() -> Any:
@@ -168,45 +178,73 @@ class ImageServer:
             return _error(400, "prompt is required")
         if (body.get("response_format") or "b64_json") != "b64_json":
             return _error(400, "pictures come back as b64_json only")
+        made = self._call(body, prompt)
+        if isinstance(made, str):
+            return _error(400, made)
+        call, seed = made
         try:
-            n = int(body.get("n") or 1)
-            if not 1 <= n <= MAX_PICTURES:
-                raise ValueError(f"n must be between 1 and {MAX_PICTURES}")
-            width, height = size_of(body.get("size"), self.size, self.max_pixels)
-            call = self._call(body, prompt, n, width, height)
-        except (TypeError, ValueError) as exc:
-            return _error(400, str(exc))
-        try:
-            pictures = await asyncio.to_thread(self._make, call, body.get("seed"))
-        except Exception as exc:  # noqa: BLE001 - the caller gets the reason, the log the traceback
+            pictures = await asyncio.to_thread(self._make, call, seed)
+        except Exception as exc:  # noqa: BLE001 - the log gets the traceback, the caller a sentence
+            # Not the exception's text: CUDA's and torch's words name the server's insides, and
+            # they reach API callers through the gateway.
             log.exception("%s: generation failed", self.model_id)
-            return _error(500, f"the picture could not be made: {exc}", "server_error")
+            if self._out_of_memory(exc):
+                return _error(
+                    503, "the model server has no GPU memory free for this picture now; try again shortly, "
+                    "or ask for a smaller picture", "server_error",
+                )
+            return _error(500, "the picture could not be made; the model server's log says why", "server_error")
         return {
             "created": int(time.time()),
             "data": [{"b64_json": picture} for picture in pictures],
         }
 
-    def _call(self, body: Dict[str, Any], prompt: str, n: int, width: int, height: int) -> Dict[str, Any]:
-        """The pipeline's arguments: the request's, else the deployment's, else the model's own defaults."""
+    def _call(self, body: Dict[str, Any], prompt: str) -> Union[Tuple[Dict[str, Any], Optional[int]], str]:
+        """The pipeline's arguments and the seed, or a sentence saying what in the request is wrong.
+
+        Each argument is the request's, else the deployment's, else the model's own default. The
+        sentence is made here from the request, never from an exception's text.
+        """
+        n = _number(body.get("n") or 1, int)
+        if n is None or not 1 <= n <= MAX_PICTURES:
+            return f"n must be a whole number between 1 and {MAX_PICTURES}"
+        size = size_of(body.get("size"), self.size, self.max_pixels)
+        if isinstance(size, str):
+            return size
+        width, height = size
         call: Dict[str, Any] = {"prompt": prompt, "width": width, "height": height, "num_images_per_prompt": n}
         steps = body.get("num_inference_steps")
         steps = self.steps if steps is None else steps
         if steps is not None:
-            call["num_inference_steps"] = int(steps)
+            call["num_inference_steps"] = _number(steps, int)
+            if call["num_inference_steps"] is None:
+                return "num_inference_steps must be a whole number"
         guidance = body.get("guidance_scale")
         guidance = self.guidance if guidance is None else guidance
         if guidance is not None:
-            call["guidance_scale"] = float(guidance)
+            call["guidance_scale"] = _number(guidance, float)
+            if call["guidance_scale"] is None:
+                return "guidance_scale must be a number"
         negative = body.get("negative_prompt")
         if negative and "negative_prompt" in self._takes:
             call["negative_prompt"] = str(negative)
-        return {k: v for k, v in call.items() if k in self._takes}
+        seed = body.get("seed")
+        if seed is not None:
+            seed = _number(seed, int)
+            if seed is None:
+                return "seed must be a whole number"
+        return {k: v for k, v in call.items() if k in self._takes}, seed
 
-    def _make(self, call: Dict[str, Any], seed: Any) -> List[str]:
+    def _out_of_memory(self, exc: BaseException) -> bool:
+        """Whether *exc* is CUDA out of memory (``torch.cuda.OutOfMemoryError``, from torch 1.13 on)."""
+        oom = getattr(getattr(self._torch, "cuda", None), "OutOfMemoryError", None)
+        return isinstance(oom, type) and isinstance(exc, oom)
+
+    def _make(self, call: Dict[str, Any], seed: Optional[int]) -> List[str]:
         torch = self._torch
         with self._lock:
             if seed is not None and "generator" in self._takes:
-                call = {**call, "generator": torch.Generator(device="cuda").manual_seed(int(seed))}
+                call = {**call, "generator": torch.Generator(device="cuda").manual_seed(seed)}
             with torch.inference_mode():
                 images = self.pipe(**call).images
             # Memory goes back to the machine between requests: it is shared with a chat model.

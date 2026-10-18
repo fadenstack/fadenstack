@@ -23,6 +23,7 @@ kept by the maintainers outside this repository, as it needs a DGX Spark pair.
 | `llm_port_ray_runtime/` | the helper package baked into the image; provides the `llm-port-ray-runtime` CLI the agent drives, and the image app that serves picture models with diffusers (`image.py`) |
 | `setup.py` | packaging for that helper |
 | `fixtures.json`, `test_local_validation.py` | copied into the image; validate imports, dependencies and `LLMConfig` shapes from inside it |
+| `tests/` | not copied: the image app's answers, with a stand-in for Ray Serve (`python -m pytest runtime-image/tests` with FastAPI installed) |
 | `check_ray_vllm.py` | run by both builds: every vLLM module and name Ray Serve LLM imports must resolve |
 | `vllm_compat.py` | run by the GB10 build, **temporary**: bridges two modules vLLM 0.29 moved away from where Ray 2.58 imports them |
 | `runtime-manifest-<flavor>-<release>.json` | the minted identity of each runtime (see below) |
