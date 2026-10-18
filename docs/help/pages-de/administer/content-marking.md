@@ -16,6 +16,12 @@ Wie Benutzer einen Text, ein Bild oder eine Datei prüfen, steht unter [Inhalte 
 | Textantworten Ihrer eigenen Modelle | Zusätzlich ein unsichtbares Text-Wasserzeichen, auf einer Runtime, die es hat |
 | Was die Agenten in Dokumente, E-Mails, Webformulare und Dateien schreiben | Eine Kennzeichnung dort und einen signierten Nachweis jeder Einfügung (siehe [Was die Agenten schreiben](#what-the-agents-write)) |
 
+!!! tip "Bitten Sie darum, die Kennzeichnung zu erhalten"
+    Die Kennzeichnung nützt nur, solange sie erhalten bleibt. Sagen Sie den Benutzern, dass sie sie nicht
+    entfernen sollen: weder die Metadaten oder Herkunftsangaben eines Bildes löschen noch einen Text nur deshalb
+    umschreiben, damit sein Wasserzeichen verschwindet. Der Verhaltenskodex der EU zur Kennzeichnung verlangt von
+    Anbietern, darauf hinzuweisen.
+
 ## Bilder {#pictures}
 
 Jedes Bild, das ein Bildmodell über Fadenstack zurückgibt, wird gekennzeichnet, bevor es den Server verlässt:

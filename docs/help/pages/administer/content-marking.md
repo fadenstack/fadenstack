@@ -16,6 +16,11 @@ How people check a text, a picture or a file is on [Checking content](../use/che
 | Text answers of your own models | Also an invisible text watermark, on a runtime that has it |
 | What the agents write into documents, mails, web forms and files | A mark there, and a signed record of each placement (see [What the agents write](#what-the-agents-write)) |
 
+!!! tip "Ask people to keep the marks"
+    The marks are only useful while they stay in place. Tell the people who use generated content not to remove
+    them: not to strip a picture's metadata or content credentials, and not to edit a text just to get rid of its
+    watermark. The EU's Code of Practice on marking asks providers to say this.
+
 ## Pictures
 
 Every picture that an image model returns through Fadenstack is marked before it leaves:
