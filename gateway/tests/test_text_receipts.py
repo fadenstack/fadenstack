@@ -893,16 +893,21 @@ async def test_an_engine_that_fails_never_fails_a_streamed_answer(
     assert ANSWER not in caplog.text
 
 
-# ── Answers that get no receipt ───────────────────────────────────
+def test_a_turns_output_is_its_text_then_its_tool_calls_arguments() -> None:
+    calls = [TOOL_CALL, {"id": "c2", "type": "function", "function": {"name": "insert_text", "arguments": "{}"}}]
+    assert text_receipts.turn_output("Done.", calls) == 'Done.\n{"page": 12}\n{}'
+    assert text_receipts.turn_output("", [TOOL_CALL]) == '{"page": 12}'
+    assert text_receipts.turn_output("", None) == ""
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
-async def test_an_answer_of_tool_calls_only_gets_no_receipt(
+async def test_an_answer_of_tool_calls_gets_a_receipt_of_their_arguments(
     stream: bool,
     fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
     engine: _Engine,
 ) -> None:
+    """The text an agent writes into a document arrives as tool arguments: the receipt covers them (14 §1)."""
     await _seeded(fastapi_app, db_session)
     _answers(monkeypatch, "", tool_calls=[TOOL_CALL])
 
@@ -910,13 +915,15 @@ async def test_an_answer_of_tool_calls_only_gets_no_receipt(
 
     assert r.status_code == 200, r.text
     await _settled()
-    assert engine.asked == []
+    assert [b["content_sha256"] for b in engine.asked] == [text_sha256('{"page": 12}')]
     if stream:
-        assert _receipt_events(_sse(r.text)) == []
+        assert _ends_with_the_receipt(_sse(r.text))["receipt"]["id"] == engine.receipts[0]
     else:
-        assert picture_marking.HEADER not in r.headers
+        assert r.headers[picture_marking.HEADER] == engine.receipts[0]
         assert r.json()["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "read_page"
-        assert not [e for e in r.json()["faden"]["events"] if e.get("name") == text_receipts.EVENT]
+
+
+# ── Answers that get no receipt ───────────────────────────────────
 
 
 @pytest.mark.anyio

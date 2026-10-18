@@ -10,7 +10,9 @@ agent, and whether the text carries a watermark (``watermark``, the table in the
   for either way, so the engine keeps it; a client that did not ask does not wait for it.
 - A whole answer gets the receipt's id in ``X-Faden-Provenance``, before the receipts of the pictures
   it carries; a client that asked for events gets the event in the answer's ``faden`` object too.
-- An answer without text (tool calls only) gets none.
+- The receipt covers the turn's whole output: its text, then each tool call's arguments as the model wrote
+  them (sdk/14 §1): the text an agent writes into a document arrives as tool arguments. A turn with neither
+  gets none.
 
 The engine failing never holds an answer back or fails it: the event says the answer is unsigned
 (``server-unavailable``), a whole answer leaves without the header, and the log gets one line -- never
@@ -60,6 +62,25 @@ def answer_text(payload: Any) -> str:
         parts = (part for part in content if isinstance(part, dict) and part.get("type") == "text")
         return "".join(str(part.get("text") or "") for part in parts)
     return ""
+
+
+def turn_output(text: str, tool_calls: list[dict[str, Any]] | None) -> str:
+    """What a turn's receipt covers: its text, then each tool call's arguments as the model wrote them."""
+    parts = [text] if text else []
+    for call in tool_calls or []:
+        arguments = (call.get("function") or {}).get("arguments") if isinstance(call, dict) else None
+        if isinstance(arguments, str) and arguments:
+            parts.append(arguments)
+    return "\n".join(parts)
+
+
+def answer_output(payload: Any) -> str:
+    """A whole answer's :func:`turn_output`: its first choice's text and tool calls."""
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    first = choices[0] if isinstance(choices, list) and choices else None
+    message = first.get("message") if isinstance(first, dict) else None
+    calls = message.get("tool_calls") if isinstance(message, dict) else None
+    return turn_output(answer_text(payload), calls if isinstance(calls, list) else None)
 
 
 def has_text(text: str) -> bool:

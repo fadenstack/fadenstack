@@ -1538,10 +1538,12 @@ class GatewayService:
     def _answer_receipt(
         self, req: _Prepared, text: str, *, completion_tokens: int | None, model_alias: str, request_id: str,
     ) -> Awaitable[SignedReceipt | None] | None:
-        """The engine's receipt for the answer *text*, to await (``text_receipts``); ``None``: none asked.
+        """The engine's receipt for the turn's output *text*, to await; ``None``: none asked.
 
-        None is with the module off, or for an answer without text (tool calls
-        only). The awaitable never raises: an engine that fails gives ``None``.
+        *text* is the answer's text and its tool calls' arguments
+        (``text_receipts.turn_output``). None is with the module off, or for a
+        turn with neither. The awaitable never raises: an engine that fails
+        gives ``None``.
         """
         client = self.provenance_client
         if client is None or req.decision is None or not text_receipts.has_text(text):
@@ -1576,7 +1578,7 @@ class GatewayService:
         is as it was and the receipts are the pictures' alone.
         """
         signing = self._answer_receipt(
-            req, text_receipts.answer_text(payload), completion_tokens=completion_tokens,
+            req, text_receipts.answer_output(payload), completion_tokens=completion_tokens,
             model_alias=model_alias, request_id=request_id,
         )
         if signing is None:
@@ -1599,16 +1601,18 @@ class GatewayService:
         stats: Any,
         model_alias: str,
         request_id: str,
+        tool_calls: list[dict[str, Any]] | None = None,
     ) -> asyncio.Future[Any] | None:
         """A streamed answer's receipt, being asked for; ``None`` for an answer that gets none.
 
-        Only a complete answer with text gets one: not one that failed, was
-        stopped or refused, or that called tools only.
+        Only a complete answer with text or tool calls gets one (both are
+        covered): not one that failed, was stopped or refused.
         """
         if not closing or interrupted or status_code >= 400 or req.blocked_output:
             return None
         signing = self._answer_receipt(
-            req, content, completion_tokens=stats.usage.completion_tokens if stats is not None else None,
+            req, text_receipts.turn_output(content, tool_calls),
+            completion_tokens=stats.usage.completion_tokens if stats is not None else None,
             model_alias=model_alias, request_id=request_id,
         )
         return _kept(signing) if signing is not None else None
@@ -1730,7 +1734,7 @@ class GatewayService:
 
             def _finish(
                 content: str, status_code: int, error_code: str | None, closing: bool, saved: asyncio.Event,
-                *, interrupted: bool = False,
+                *, interrupted: bool = False, tool_calls: list[dict[str, Any]] | None = None,
             ) -> Awaitable[None]:
                 return self._finish_stream(
                     req,
@@ -1749,6 +1753,7 @@ class GatewayService:
                     buffer_session_id=_sbuf_sid,
                     saved=saved,
                     interrupted=interrupted,
+                    tool_calls=tool_calls,
                 )
 
             if background and req.turn_id and _sbuf and _sbuf_sid:
@@ -1773,6 +1778,7 @@ class GatewayService:
                 stream_status_code = 200
                 stream_error_code: str | None = None
                 accumulated_content: list[str] = []
+                handed = ToolCalls()
                 closing = False
                 failure: bytes | None = None
                 try:
@@ -1786,8 +1792,8 @@ class GatewayService:
                         closing = closing or seen
                         if not piece:
                             continue
-                        # Collect assistant content for persistence
-                        _accumulate_stream_content(piece, accumulated_content)
+                        # Collect assistant content for persistence, and the tool calls for the receipt
+                        _accumulate_stream_content(piece, accumulated_content, handed)
                         # Push to reconnection buffer
                         if _sbuf and _sbuf_sid:
                             _sbuf.push(_sbuf_sid, piece)
@@ -1814,6 +1820,7 @@ class GatewayService:
                     saved = asyncio.Event()
                     await _to_the_end(_finish(
                         "".join(accumulated_content), stream_status_code, stream_error_code, closing, saved,
+                        tool_calls=handed.calls(),
                     ), until=saved)
                 if failure is not None:
                     yield failure
@@ -3702,8 +3709,11 @@ class GatewayService:
         buffer_session_id: str | None,
         saved: asyncio.Event,
         interrupted: bool = False,
+        tool_calls: list[dict[str, Any]] | None = None,
     ) -> None:
         """What a streamed answer owes once it ends: the slot, the receipt, the reply, the log, the trace.
+
+        *tool_calls* are the calls the client was handed: the receipt covers them with the text.
 
         *saved* is set once the reply is stored, whether or not that worked,
         and -- for a client that reads the gateway's events -- once the
@@ -3719,7 +3729,7 @@ class GatewayService:
         # Asked for while the reply is stored; a client that does not read events does not wait for it.
         signing = self._stream_receipt(
             req, content=content, status_code=status_code, closing=closing, interrupted=interrupted,
-            stats=stats, model_alias=model_alias, request_id=request_id,
+            stats=stats, model_alias=model_alias, request_id=request_id, tool_calls=tool_calls,
         )
         if req.session_id:
             if req.blocked_output:
@@ -3872,6 +3882,7 @@ class GatewayService:
         sid = req.session_id
         assert sid is not None  # noqa: S101
         written: list[str] = []
+        handed = ToolCalls()
         closing = False
 
         async def read() -> None:
@@ -3880,7 +3891,7 @@ class GatewayService:
                 piece, seen = _split_done(chunk)
                 closing = closing or seen
                 if piece:
-                    _accumulate_stream_content(piece, written)
+                    _accumulate_stream_content(piece, written, handed)
                     buffer.push(sid, piece)
 
         reading = asyncio.ensure_future(read())
@@ -3903,6 +3914,7 @@ class GatewayService:
             try:
                 await finish(
                     "".join(written), status_code, error_code, closing, asyncio.Event(), interrupted=interrupted,
+                    tool_calls=handed.calls(),
                 )
             finally:
                 try:
@@ -4079,8 +4091,8 @@ class GatewayService:
                 await fresh_session.commit()
 
 
-def _accumulate_stream_content(chunk: bytes, acc: list[str]) -> None:
-    """Extract assistant content deltas from an SSE chunk and append to acc."""
+def _accumulate_stream_content(chunk: bytes, acc: list[str], calls: ToolCalls | None = None) -> None:
+    """Extract assistant content deltas from an SSE chunk and append to acc; tool-call pieces to *calls*."""
     text = chunk.decode("utf-8", errors="ignore")
     for line in text.splitlines():
         if not line.startswith("data:"):
@@ -4097,6 +4109,9 @@ def _accumulate_stream_content(chunk: bytes, acc: list[str]) -> None:
             delta_content = choice.get("delta", {}).get("content")
             if delta_content:
                 acc.append(delta_content)
+            pieces = choice.get("delta", {}).get("tool_calls")
+            if calls is not None and isinstance(pieces, list):
+                calls.add(pieces)
 
 
 def _resolve_pii_policy(
