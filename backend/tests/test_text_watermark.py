@@ -135,8 +135,10 @@ def test_what_is_published_names_the_version_never_the_key() -> None:
     doc = compile_deployment(
         spec_data=_spec(), model_display_name="Qwen/Qwen3.8-27B-FP8", model_source="remote", watermark_key=KEY,
     )
-    published = watermark.published(doc, watermark.WatermarkKeys({1: 42, KEY[0]: KEY[1]}))
-    assert published == {"algorithm": "gumbel", "key_version": 2, "context_width": 4}
+    published = watermark.published(doc, watermark.WatermarkKeys({1: 42, KEY[0]: KEY[1]}), "Qwen/Qwen3.8-27B-FP8")
+    assert published == {
+        "algorithm": "gumbel", "key_version": 2, "context_width": 4, "tokenizer": "Qwen/Qwen3.8-27B-FP8",
+    }
     assert str(KEY[1]) not in str(published)
     plain = compile_deployment(spec_data=_spec(), model_display_name="m", model_source="remote")
     assert watermark.published(plain, watermark.WatermarkKeys({1: 42})) is None
@@ -163,9 +165,10 @@ def test_the_driver_gives_a_key_only_on_a_runtime_with_the_watermark(monkeypatch
 
 
 def test_publication_passes_only_how_it_watermarks() -> None:
-    published = {"algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "key": 43}
+    published = {"algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "tokenizer": "Qwen/x",
+                 "key": 43}
     assert publication._watermark(published) == {  # noqa: SLF001
-        "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4,
+        "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "tokenizer": "Qwen/x",
     }
     assert publication._watermark(None) is None  # noqa: SLF001
     assert publication._watermark({"key_version": 2}) is None  # noqa: SLF001

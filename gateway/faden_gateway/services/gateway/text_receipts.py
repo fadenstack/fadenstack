@@ -82,6 +82,18 @@ def _greedy(params: dict[str, Any]) -> bool:
     return False
 
 
+def _switched_off(params: dict[str, Any]) -> bool:
+    """Whether the route's own parameters switch vLLM's watermark off (``watermarking: false``).
+
+    A client's never reach the model (the adapter passes OpenAI's parameters only); an administrator's
+    route parameters do, so the receipt says the text carries none.
+    """
+    nested = params.get("extra_body")
+    return any(
+        source.get("watermarking") is False for source in (params, nested if isinstance(nested, dict) else {})
+    )
+
+
 def _remote(candidate: Any) -> bool:
     provider = getattr(candidate, "provider_type", None)
     return str(getattr(provider, "value", provider) or "").startswith("remote_")
@@ -99,8 +111,8 @@ def _marking_vendor(candidate: Any) -> str | None:
 def _runtime_mark(candidate: Any) -> dict[str, Any] | None:
     """How the route's runtime watermarks the text (``node_metadata["watermark"]``); ``None``: not at all.
 
-    The backend publishes ``{"algorithm", "key_version", "context_width"}`` for a deployment it started
-    with the watermark: what the engine needs to check a text for it later.
+    The backend publishes ``{"algorithm", "key_version", "context_width", "tokenizer"}`` for a deployment
+    it started with the watermark: what the engine needs to check a text for it later.
     """
     said = (getattr(candidate, "node_metadata", None) or {}).get("watermark")
     if not said:
@@ -116,6 +128,9 @@ def _runtime_mark(candidate: Any) -> dict[str, Any] | None:
         value = said.get(field)
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             mark[field] = value
+    tokenizer = said.get("tokenizer")
+    if isinstance(tokenizer, str) and 0 < len(tokenizer) <= 256:
+        mark["tokenizer"] = tokenizer
     return mark
 
 
@@ -138,7 +153,7 @@ def watermark(
         return {"applied": "none", "reason": "no-watermark-greedy"}
     if not _remote(candidate):
         mark = _runtime_mark(candidate)
-        if mark is None:
+        if mark is None or _switched_off(getattr(candidate, "extra_params", None) or {}):
             return {"applied": "none", "reason": "runtime-without-watermark"}
         return {"applied": "model", **mark}
     vendor = _marking_vendor(candidate)

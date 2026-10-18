@@ -493,15 +493,62 @@ def test_greedy_decoding_set_by_the_route_counts(extra: dict[str, Any]) -> None:
 def test_a_deployment_started_with_the_watermark_names_its_key_version_and_context_width() -> None:
     """What the backend publishes (``node_metadata["watermark"]``) is what the engine checks a text with."""
     started = _route(metadata={"watermark": {
-        "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "other": "dropped",
+        "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "tokenizer": "Qwen/Qwen3.8-27B-FP8",
+        "other": "dropped",
     }})
     assert text_receipts.watermark(started, {}, completion_tokens=400, text=LONG) == {
         "applied": "model", "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4,
+        "tokenizer": "Qwen/Qwen3.8-27B-FP8",
     }
     odd = _route(metadata={"watermark": {"algorithm": "gumbel", "key_version": True, "context_width": -1}})
     assert text_receipts.watermark(odd, {}, completion_tokens=400, text=LONG) == {
         "applied": "model", "algorithm": "gumbel",
     }
+
+
+@pytest.mark.parametrize("extra", [{"watermarking": False}, {"extra_body": {"watermarking": False}}],
+                         ids=["top-level", "extra-body"])
+def test_a_route_that_switches_the_runtimes_watermark_off_gets_a_receipt_that_says_so(extra: dict[str, Any]) -> None:
+    route = _route(metadata={"watermark": {"algorithm": "gumbel", "key_version": 1}}, extra=extra)
+    assert text_receipts.watermark(route, {}, completion_tokens=400, text=LONG) == {
+        "applied": "none", "reason": "runtime-without-watermark",
+    }
+
+
+@pytest.mark.anyio
+async def test_a_clients_watermarking_false_never_reaches_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A request's ``watermarking: false`` would switch vLLM's watermark off; through the gateway none reaches it."""
+    import litellm  # noqa: PLC0415
+
+    from faden_gateway.services.gateway.llm_adapter import LLMAdapter  # noqa: PLC0415
+    from tests.test_llm_adapter_direct import _stream  # noqa: PLC0415
+
+    payload = {
+        "model": "qwen", "messages": [{"role": "user", "content": "hi"}], "watermarking": False,
+        "extra_body": {"watermarking": False}, "temperature": 0.7,
+    }
+    through_litellm: list[dict[str, Any]] = []
+
+    async def acompletion(**kwargs: Any) -> Any:
+        through_litellm.append(kwargs)
+        return SimpleNamespace(model_dump=lambda: {"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(litellm, "acompletion", acompletion)
+    await LLMAdapter().completion(
+        provider_type=ProviderType.VLLM, base_url="http://10.0.0.1:8000/faden-x", api_key_encrypted=None,
+        litellm_provider=None, litellm_model=None, extra_params=None, stream=False, payload=payload,
+    )
+    assert through_litellm and "watermarking" not in json.dumps(through_litellm[0], default=str)
+
+    direct: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        direct.append(json.loads(request.content))
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=b"data: [DONE]\n\n")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        await _stream(LLMAdapter(http_client=http), payload=payload)
+    assert direct and "watermarking" not in json.dumps(direct[0])
 
 
 def test_a_route_that_names_its_algorithm_or_vendor_is_said_so() -> None:

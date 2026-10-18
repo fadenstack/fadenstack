@@ -80,10 +80,10 @@ def _capacity_hints(service: dict) -> dict | None:
 
 
 def _watermark(published: object) -> dict | None:
-    """The endpoint's watermark as the driver published it: algorithm, key version, context width."""
+    """The endpoint's watermark as the driver published it (algorithm, key version, width, tokenizer)."""
     if not isinstance(published, dict) or not isinstance(published.get("algorithm"), str):
         return None
-    fields = ("algorithm", "key_version", "context_width")
+    fields = ("algorithm", "key_version", "context_width", "tokenizer")
     return {key: published[key] for key in fields if published.get(key) is not None}
 
 

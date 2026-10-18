@@ -153,17 +153,26 @@ def leave_out(kwargs: dict[str, Any]) -> None:
     kwargs.pop("watermark_config", None)
 
 
-def published(llm_serving_args: dict[str, Any], keys: WatermarkKeys | None) -> dict[str, Any] | None:
-    """How a compiled deployment watermarks (algorithm, key version, context width; never the key)."""
+def published(
+    llm_serving_args: dict[str, Any], keys: WatermarkKeys | None, tokenizer: str | None = None,
+) -> dict[str, Any] | None:
+    """How a compiled deployment watermarks (algorithm, key version, context width; never the key).
+
+    *tokenizer* is the model repository whose tokenizer it generates with: the provenance engine checks a
+    text with it (the name the gateway routes by can be an alias).
+    """
     for config in llm_serving_args.get("llm_configs") or []:
         engine = (config.get("engine_kwargs") if isinstance(config, dict) else None) or {}
         mark = engine.get("watermark_config") if isinstance(engine, dict) else None
         if not isinstance(mark, dict) or "key" not in mark:
             continue
         version = next((v for v, k in (keys.versions.items() if keys else ()) if k == mark["key"]), None)
-        return {
+        found: dict[str, Any] = {
             "algorithm": str(mark.get("algorithm") or "gumbel"),
             "key_version": version,
             "context_width": int(mark.get("context_width") or CONTEXT_WIDTH),
         }
+        if tokenizer:
+            found["tokenizer"] = tokenizer
+        return found
     return None

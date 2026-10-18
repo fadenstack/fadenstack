@@ -1135,7 +1135,7 @@ class RayDeploymentManager:
             # How its answers are watermarked, never the key: published with
             # the endpoint for the gateway's receipts, and kept for step 2.
             observed_now["applied_watermark"] = watermark.published(
-                llm_serving_args, watermark.installed_keys()
+                llm_serving_args, watermark.installed_keys(), tokenizer=facts.hf_repo_id,
             )
             deployment.observed_status_json = observed_now
         else:

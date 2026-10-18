@@ -1033,6 +1033,9 @@ services:
         target: FADEN_PROVENANCE_HASH_KEYS
       - source: provenance_watermark_keys
         target: FADEN_PROVENANCE_WATERMARK_KEYS
+    # The server's model store, read only: the tokenizers a text's watermark is checked with.
+    volumes:
+      - faden_models:/srv/faden/models:ro
     environment:
       FADEN_PROVENANCE_HOST: 0.0.0.0
       FADEN_PROVENANCE_PORT: 8000

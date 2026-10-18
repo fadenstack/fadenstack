@@ -1703,7 +1703,7 @@ async def test_a_chat_model_starts_with_the_watermark_and_keeps_its_key_version_
     await manager.reconcile_deployment(dbsession, dep, node_control=fake)
     assert dep.phase == "running"
     assert keys_run() == [{"algorithm": "gumbel", "context_width": 4, "key": 42}]
-    mark = {"algorithm": "gumbel", "key_version": 1, "context_width": 4}
+    mark = {"algorithm": "gumbel", "key_version": 1, "context_width": 4, "tokenizer": "org/tiny-model"}
     assert dep.observed_status_json["applied_watermark"] == mark
     endpoint = (await EndpointDAO(dbsession).list_for_deployment(dep.id))[0]
     assert endpoint.published_json["watermark"] == mark, "for the gateway's receipts; never the key"
