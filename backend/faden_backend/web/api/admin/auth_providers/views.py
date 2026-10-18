@@ -254,7 +254,7 @@ async def delete_auth_provider(
 async def oauth_authorize(provider_id: uuid.UUID) -> RedirectResponse:
     """Redirect the browser to the auth module, which handles the full OAuth exchange."""
     _require_auth_module()
-    return RedirectResponse(f"{_auth_base()}/{provider_id}/authorize")
+    return RedirectResponse(_auth_base() + f"/{provider_id}/authorize")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

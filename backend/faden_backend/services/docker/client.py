@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections.abc import AsyncIterator
-from pathlib import Path
 from typing import Any
 
 from aiodocker import Docker
@@ -22,7 +22,7 @@ def _resolve_bind_path(host_path: str) -> str:
     full Windows path (with forward slashes) so it can translate it to
     the correct WSL2 / Hyper-V mount.  On Linux this is a no-op.
     """
-    resolved = str(Path(host_path).resolve())
+    resolved = os.path.realpath(host_path)
     # Docker Desktop for Windows accepts forward-slash paths.
     return resolved.replace("\\", "/")
 

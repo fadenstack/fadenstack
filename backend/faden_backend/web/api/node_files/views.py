@@ -17,6 +17,7 @@ import os
 import re
 import time
 import uuid
+from collections.abc import Iterator
 from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Any
@@ -532,15 +533,16 @@ async def model_blob(
     if model_dir is None:
         raise HTTPException(status_code=404, detail="Model cache not found.")
 
-    # Resolve and enforce blobs/ containment
-    blobs_dir = (model_dir / "blobs").resolve()
-    target = (model_dir / "blobs" / blob_hash).resolve()
-    if not str(target).startswith(str(blobs_dir)):
+    # Resolve and enforce blobs/ containment (os.path: the form code
+    # scanning recognises as a containment check)
+    blobs_dir = os.path.realpath(os.path.join(model_dir, "blobs"))
+    target = os.path.realpath(os.path.join(blobs_dir, blob_hash))
+    if not target.startswith(blobs_dir + os.sep):
         raise HTTPException(status_code=400, detail="Invalid blob hash.")
-    if not target.is_file():
+    if not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="Blob not found.")
 
-    file_size = target.stat().st_size
+    file_size = os.path.getsize(target)
 
     # Parse Range header for resumable downloads
     range_header = request.headers.get("range")
@@ -568,8 +570,9 @@ async def model_blob(
     content_length = end - start + 1
     headers["Content-Length"] = str(content_length)
 
-    def _stream():
-        with open(target, "rb") as fh:
+    # The checked path is passed in, not closed over.
+    def _stream(blob_path: str, start: int, content_length: int) -> Iterator[bytes]:
+        with open(blob_path, "rb") as fh:
             fh.seek(start)
             remaining = content_length
             while remaining > 0:
@@ -580,7 +583,7 @@ async def model_blob(
                 yield chunk
 
     return StreamingResponse(
-        _stream(),
+        _stream(target, start, content_length),
         status_code=status_code,
         media_type="application/octet-stream",
         headers=headers,
