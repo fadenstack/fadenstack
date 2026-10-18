@@ -16,7 +16,7 @@ from starlette import status
 from faden_gateway.db.dao.gateway_dao import GatewayDAO
 from faden_gateway.db.dao.session_dao import SessionDAO
 from faden_gateway.db.models.gateway import TURNS_RETRYABLE, ChatMessage, TurnStatus
-from faden_gateway.services.gateway import faden_events, tool_classes
+from faden_gateway.services.gateway import faden_events, picture_marking, tool_classes
 from faden_gateway.services.gateway.agents import AgentRequest
 from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.auth import (
@@ -182,6 +182,8 @@ def get_gateway_service(
         tool_router=tool_router,
         usage_groups=getattr(request.app.state, "usage_group_resolver", None),
         group_memberships=getattr(request.app.state, "group_membership_resolver", None),
+        # Provenance client (optional - when the module is on: every picture leaves marked)
+        provenance_client=getattr(request.app.state, "provenance_client", None),
     )
     service.stream_buffer = _stream_buffer(request)
     return service
@@ -648,6 +650,12 @@ async def create_embeddings(
         return error_from(exc)
 
 
+def _provenance_header(response: Response, receipts: tuple[str, ...]) -> None:
+    """The receipts of the answer's marked pictures, in their order, when it carries any."""
+    if receipts:
+        response.headers[picture_marking.HEADER] = ",".join(receipts)
+
+
 @router.post("/v1/images/generations")
 async def create_images(
     request: Request,
@@ -688,6 +696,7 @@ async def serve_images(
         response.headers["x-provider-instance-id"] = routed.provider_instance_id
         if routed.trace_id:
             response.headers["x-langfuse-trace-id"] = routed.trace_id
+        _provenance_header(response, routed.provenance)
         return response
     except ValidationError as exc:
         return error_response(
@@ -818,6 +827,7 @@ async def serve_chat_completions(
         )
         if non_stream.trace_id:
             json_response.headers["x-langfuse-trace-id"] = non_stream.trace_id
+        _provenance_header(json_response, non_stream.provenance)
         return json_response
     except ValidationError as exc:
         await _log_refusal(request, service, auth, agent, payload, 400, "validation_error")

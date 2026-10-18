@@ -235,9 +235,10 @@ def _setup_service_registry(app: FastAPI) -> None:
 def _setup_provenance(app: FastAPI) -> None:
     """The provenance service's client on ``app.state.provenance_client``; ``None`` with the module off.
 
-    Needs the shared HTTP client, so it runs after it is made. The services
-    manifest checks the module with the client's probe, which reads the
-    engine's contract and capabilities; nothing in a request's path uses it.
+    Needs the shared HTTP client, so it runs after it is made. Each request
+    whose answer carries pictures has them marked with it (``GatewayService``,
+    ``picture_marking``), and the services manifest checks the module with the
+    client's probe, which reads the engine's contract and capabilities.
     """
     client: ProvenanceClient | None = None
     url = service_registry.get_url("provenance")

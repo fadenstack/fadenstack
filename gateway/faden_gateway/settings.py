@@ -218,12 +218,14 @@ class Settings(BaseSettings):
     skills_service_token: str = ""
 
     # Optional module: Provenance (marks generated content, signs generation
-    # receipts). Only its status is read so far: the services manifest
-    # (/v1/services) lists its engine, contract and capabilities.
+    # receipts). With it on, every picture the gateway returns is marked
+    # first, and a request whose pictures cannot be marked fails (503); the
+    # services manifest (/v1/services) lists its engine, contract and
+    # capabilities. Off unless set; the CLI switches it on for an install.
     provenance_enabled: bool = False
     provenance_service_url: str = "http://faden-provenance:8000"
-    #: Presented to the provenance service (Bearer); it refuses its info
-    #: route without it (401) or with another (403).
+    #: Presented to the provenance service (Bearer); it refuses its routes
+    #: without it (401) or with another (403).
     provenance_service_token: str = ""
 
     # Optional module: External auth service
