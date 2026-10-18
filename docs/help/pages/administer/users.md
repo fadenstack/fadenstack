@@ -150,8 +150,13 @@ Their sign-ins, API tokens and agents stop working within a minute. Nothing of t
 in** in the same place gives them their access back, but the sign-ins they had stay over: they sign in again.
 You cannot suspend yourself, nor the last superuser.
 
-**Delete** (the bin icon) removes the account and cannot be undone. You cannot delete yourself, nor the last
-active superuser.
+**Delete** (the bin icon) removes the account and cannot be undone: its chats, projects, attached files and
+what the assistant remembered for it are erased with it. You cannot delete yourself, nor the last active
+superuser.
+
+How long chats people delete themselves are kept before they are erased is under **Settings → Chat** (30 days
+unless `faden deploy` was told otherwise). Chat data of accounts deleted before this release stayed on the
+server; `faden chats orphans` lists it and `faden chats orphans --erase` erases it.
 
 ## Administrators and auditors
 

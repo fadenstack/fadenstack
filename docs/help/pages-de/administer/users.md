@@ -158,8 +158,14 @@ Ihre Anmeldungen, API-Tokens und Agenten funktionieren innerhalb einer Minute ni
 gelöscht: **Wieder freigeben** an derselben Stelle gibt ihr den Zugang zurück, die bisherigen Anmeldungen bleiben
 aber beendet: Sie meldet sich neu an. Sie können weder sich selbst sperren noch den letzten Superuser.
 
-**Löschen** (das Papierkorb-Symbol) entfernt das Konto und lässt sich nicht rückgängig machen. Sie können weder sich
-selbst löschen noch den letzten aktiven Superuser.
+**Löschen** (das Papierkorb-Symbol) entfernt das Konto und lässt sich nicht rückgängig machen: Seine Chats,
+Projekte, angehängten Dateien und das, was sich der Assistent dafür gemerkt hat, werden mit ihm gelöscht. Sie
+können weder sich selbst löschen noch den letzten aktiven Superuser.
+
+Wie lange Chats, die Personen selbst löschen, aufbewahrt werden, bevor sie endgültig gelöscht werden, steht unter
+**Einstellungen → Chat** (30 Tage, wenn `faden deploy` nichts anderes gesagt wurde). Chat-Daten von Konten, die
+vor dieser Version gelöscht wurden, sind auf dem Server geblieben; `faden chats orphans` listet sie auf und
+`faden chats orphans --erase` löscht sie.
 
 ## Administratoren und Prüfer {#administrators-and-auditors}
 

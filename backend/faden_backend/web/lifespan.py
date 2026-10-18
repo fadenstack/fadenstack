@@ -411,6 +411,13 @@ async def _node_command_reaper_loop(app: FastAPI) -> None:
                     )
                     if any(pruned.values()):
                         log.info("Pruned machine history: %s", pruned)
+                    # Sent notifications hold live password-reset links: kept a week, then gone.
+                    from faden_backend.services.notifications.retention import (  # noqa: PLC0415
+                        prune_sent_notifications,
+                    )
+
+                    if dropped := await prune_sent_notifications(session):
+                        log.info("Deleted %d sent notification(s) older than a week", dropped)
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -64,6 +64,30 @@ def pii_weaken_grant(user_id: str, session_id: str | None, *, secret: str) -> st
     return pyjwt.encode(claims, secret, algorithm="HS256")
 
 
+#: The grant for the gateway's erase (an administrator's delete, an account deleted): only the backend signs it.
+ERASE_GRANT_HEADER = "X-Faden-Erase-Grant"
+ERASE_TOKEN_TYPE = "chat_erase"  # noqa: S105 - a claim value, not a secret
+ERASE_TTL_SEC = 60
+
+
+def erase_grant(scope: str, target: str, *, secret: str) -> str:
+    """The signed grant that the gateway may erase *target* (a chat, project, file id, or a user id)."""
+    now = int(time.time())
+    claims = {
+        "typ": ERASE_TOKEN_TYPE, "scope": scope, "target": target, "jti": uuid.uuid4().hex,
+        "iat": now, "exp": now + ERASE_TTL_SEC,
+    }
+    return pyjwt.encode(claims, secret, algorithm="HS256")
+
+
+class EraseFailed(RuntimeError):
+    """The gateway did not erase what it was asked to (not reached, refused, not found)."""
+
+    def __init__(self, message: str, status_code: int = 502) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 async def _nothing() -> None:
     return None
 
@@ -432,6 +456,21 @@ class GatewayChatClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    async def erase(self, scope: str, target: str, *, secret: str) -> dict[str, int]:
+        """Have the gateway erase chat data for good, files first (services/gateway/erasure.py there)."""
+        client = self._ensure_client()
+        try:
+            response = await client.post(
+                "/internal/chat-erase",
+                json={"scope": scope, "target": target},
+                headers={ERASE_GRANT_HEADER: erase_grant(scope, target, secret=secret)},
+            )
+        except httpx.HTTPError as exc:
+            raise EraseFailed(f"The gateway could not be reached: {exc}") from exc
+        if response.status_code != 200:  # noqa: PLR2004
+            raise EraseFailed(f"The gateway answered {response.status_code}.", status_code=502)
+        return response.json()
 
     async def delete_session(self, session_id: str, jwt: str) -> None:
         client = self._ensure_client()

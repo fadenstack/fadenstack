@@ -130,6 +130,42 @@ async def grant_admin(args: argparse.Namespace) -> dict[str, Any]:
     return {"ok": True, "user_id": user_id, "already": already}
 
 
+#: Settings the CLI may read and write (``faden deploy`` and ``faden upgrade`` ask for these).
+_CLI_SETTINGS = {"chat.deleted_retention_days": int}
+
+
+async def get_setting(args: argparse.Namespace) -> dict[str, Any]:
+    """A console setting's stored value, or null when none is stored (the default applies)."""
+    from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+
+    if args.key not in _CLI_SETTINGS:
+        return {"ok": False, "error": f"The CLI does not read {args.key}."}
+    async with _factory()() as session:
+        row = await SystemSettingsDAO(session).get_value(args.key)
+    return {"ok": True, "key": args.key, "value": (row.value_json or {}).get("value") if row else None}
+
+
+async def set_setting(args: argparse.Namespace) -> dict[str, Any]:
+    """Store a console setting from the CLI; recorded."""
+    from faden_backend.db.dao.system_settings_dao import SystemSettingsDAO  # noqa: PLC0415
+
+    kind = _CLI_SETTINGS.get(args.key)
+    if kind is None:
+        return {"ok": False, "error": f"The CLI does not set {args.key}."}
+    try:
+        value = kind(args.value)
+    except ValueError:
+        return {"ok": False, "error": f"{args.key} takes a whole number."}
+    if isinstance(value, int) and value < 0:
+        return {"ok": False, "error": f"{args.key} cannot be negative."}
+    factory = _factory()
+    async with factory() as session:
+        await SystemSettingsDAO(session).upsert_value(args.key, {"value": value}, None)
+        await session.commit()
+    await _record(factory, "system.settings.update", "system_setting", args.key, metadata={"value": value})
+    return {"ok": True, "key": args.key, "value": value}
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse, run, print the JSON line."""
     parser = argparse.ArgumentParser(prog="python -m faden_backend.tools.admin")
@@ -148,8 +184,16 @@ def main(argv: list[str] | None = None) -> int:
     grant = commands.add_parser("grant-admin")
     grant.add_argument("--email", required=True)
     grant.add_argument("--reason", required=True)
+    get = commands.add_parser("get-setting")
+    get.add_argument("--key", required=True)
+    put = commands.add_parser("set-setting")
+    put.add_argument("--key", required=True)
+    put.add_argument("--value", required=True)
     args = parser.parse_args(argv)
-    run = {"record": record, "verify": verify, "reset-password": reset_password, "grant-admin": grant_admin}
+    run = {
+        "record": record, "verify": verify, "reset-password": reset_password, "grant-admin": grant_admin,
+        "get-setting": get_setting, "set-setting": set_setting,
+    }
     try:
         outcome = asyncio.run(run[args.command](args))
     except Exception as exc:

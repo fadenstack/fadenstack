@@ -568,6 +568,8 @@ class ChatSession(Base):
         default=SessionStatus.ACTIVE,
     )
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(EncryptedJSON("chat-content"), nullable=True)
+    #: When its person deleted it: erased this many days later (``chat.deleted_retention_days``).
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     execution_mode: Mapped[ExecutionMode] = mapped_column(
         SAEnum(
             ExecutionMode,

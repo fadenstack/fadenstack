@@ -70,6 +70,12 @@ from faden_cli.core.settings import load_config, save_config
     default=False,
     help="Show what would happen without executing.",
 )
+@click.option(
+    "--chat-retention-days",
+    type=click.IntRange(min=0),
+    default=None,
+    help="Days a chat someone deleted is kept before it is erased for good (default 30; asked when not given).",
+)
 @click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation prompt.")
 def upgrade_cmd(
     *,
@@ -81,6 +87,7 @@ def upgrade_cmd(
     runtime_images: str | None,
     dry_run: bool,
     yes: bool,
+    chat_retention_days: int | None = None,
 ) -> None:
     """Upgrade the running Fadenstack installation in place.
 
@@ -264,6 +271,13 @@ def upgrade_cmd(
         else:
             record_installer(env_path, shared_dir)
         success(".env refreshed (existing settings kept).")
+        # Deleted chats are erased after a retention from this release on: asked once. Chats deleted
+        # before count from the upgrade (gateway migration d3l3t3d4t), so none is erased sooner.
+        from faden_cli.core.chat_retention import ask_retention  # noqa: PLC0415
+
+        retention_days = ask_retention(
+            env_path, days=chat_retention_days, yes=yes, heading="Deleted chats…",
+        )
         # Sized again, as deploy does: what ``faden tune`` last chose.
         from faden_cli.core.tune import tune_env  # noqa: PLC0415
 
@@ -360,6 +374,10 @@ def upgrade_cmd(
     from faden_cli.core.sealing import seal_and_report  # noqa: PLC0415
 
     seal_and_report()
+    if env_path.exists():
+        from faden_cli.core.chat_retention import apply_retention, ask_retention  # noqa: PLC0415
+
+        apply_retention(ask_retention(env_path, days=chat_retention_days, yes=True, heading=""))
 
     # ── Done ──────────────────────────────────────────────────
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415

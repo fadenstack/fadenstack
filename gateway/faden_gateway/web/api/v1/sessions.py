@@ -135,19 +135,11 @@ async def delete_project(
             message="Project not found.",
             code="project_not_found",
         )
-    # Clean up attachment files before DB cascade deletes records
-    file_store = getattr(request.app.state, "chat_file_store", None)
-    if file_store:
-        attachments = await dao.list_attachments_for_project(project_id=project_id)
-        for att in attachments:
-            try:
-                await file_store.delete(att.storage_key)
-            except Exception:
-                pass
-    deleted = await dao.delete_project(
-        project_id=project_id, tenant_id=auth.tenant_id, user_id=auth.user_id,
-    )
-    if not deleted:
+    # Erased with every chat in it and all their files (the chats' own files were left on disk before).
+    from faden_gateway.services.gateway.erasure import erase_project  # noqa: PLC0415
+
+    erased = await erase_project(dao.session, getattr(request.app.state, "chat_file_store", None), project_id)
+    if not erased.projects:
         raise GatewayError(
             status_code=404,
             message="Project not found.",

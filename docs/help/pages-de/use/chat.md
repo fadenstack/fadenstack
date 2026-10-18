@@ -70,7 +70,7 @@ Unter jeder Antwort: wie lange sie gedauert hat (wenn der Chat bei Ihnen offen w
     Die Seitenleiste listet Ihre neuesten Chats danach, wann Sie sie genutzt haben (**Heute**, **Gestern**, **Letzte 7 Tage**, **Letzte 30 Tage**, **Älter**); **Mehr anzeigen** lädt ältere. **Einklappen** (der Pfeil unten) klappt sie zu einem schmalen Streifen zusammen, das Logo öffnet sie wieder. **Kein Projekt** unter **In Projekt verschieben** nimmt einen Chat aus seinem Projekt. Ihre Chats gehören Ihnen: Aus dem Chat heraus lässt sich ein Chat nicht mit Kollegen teilen.
 
 !!! warning "Löschen lässt sich nicht rückgängig machen"
-    **Löschen** bei einem Chat entfernt ihn sofort, ohne Rückfrage. Wenn Sie ein Projekt löschen, werden alle Chats darin gelöscht, ebenfalls ohne Rückfrage. Was mit gelöschten Chats auf dem Server geschieht, steht unter [Ihre Daten und Datenschutz](privacy.md#deleting).
+    **Löschen** bei einem Chat entfernt ihn sofort, ohne Rückfrage, und er lässt sich nicht zurückholen. Wenn Sie ein Projekt löschen, werden alle Chats darin endgültig gelöscht, ebenfalls ohne Rückfrage. Was mit gelöschten Chats auf dem Server geschieht, steht unter [Ihre Daten und Datenschutz](privacy.md#deleting).
 
 ## Auf dem Smartphone {#on-a-phone}
 

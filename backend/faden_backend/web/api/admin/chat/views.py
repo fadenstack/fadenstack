@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from faden_backend.settings import settings
 from faden_backend.db.models.users import User
 from faden_backend.web.api.admin.dependencies import require_superuser
 
@@ -43,6 +44,19 @@ async def _get_gateway_session(request: Request) -> AsyncGenerator[AsyncSession,
 
 
 # ── Projects ──────────────────────────────────────────────────────
+
+
+async def _erase(scope: str, target: str, not_found: str) -> None:
+    """Erase through the gateway, which alone reaches the files; 404 when nothing was there."""
+    from faden_backend.services.chat.gateway_client import EraseFailed, shared_client  # noqa: PLC0415
+
+    try:
+        erased = await shared_client().erase(scope, target, secret=settings.users_secret)
+    except EraseFailed as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+    counts = {"session": "chats", "project": "projects", "attachment": "files"}
+    if not erased.get(counts[scope]) and not (scope == "attachment" and erased):
+        raise HTTPException(status_code=404, detail=not_found)
 
 
 @router.get("/projects")
@@ -78,20 +92,9 @@ async def list_projects(
 async def delete_project(
     project_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-    gw: AsyncSession = Depends(_get_gateway_session),
 ) -> None:
-    try:
-        result = await gw.execute(
-            text("DELETE FROM chat_project WHERE id = :pid"),
-            {"pid": project_id},
-        )
-        await gw.commit()
-    except ProgrammingError as exc:
-        if _is_missing_table(exc):
-            raise HTTPException(status_code=503, detail="Chat tables not yet migrated")
-        raise
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Project not found")
+    """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
+    await _erase("project", str(project_id), "Project not found")
 
 
 # ── Sessions ──────────────────────────────────────────────────────
@@ -136,20 +139,9 @@ async def list_sessions(
 async def delete_session(
     session_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-    gw: AsyncSession = Depends(_get_gateway_session),
 ) -> None:
-    try:
-        result = await gw.execute(
-            text("DELETE FROM chat_session WHERE id = :sid"),
-            {"sid": session_id},
-        )
-        await gw.commit()
-    except ProgrammingError as exc:
-        if _is_missing_table(exc):
-            raise HTTPException(status_code=503, detail="Chat tables not yet migrated")
-        raise
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Session not found")
+    """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
+    await _erase("session", str(session_id), "Session not found")
 
 
 # ── Attachments ───────────────────────────────────────────────────
@@ -202,20 +194,9 @@ async def list_attachments(
 async def delete_attachment(
     attachment_id: uuid.UUID,
     _user: Annotated[User, Depends(require_superuser)],
-    gw: AsyncSession = Depends(_get_gateway_session),
 ) -> None:
-    try:
-        result = await gw.execute(
-            text("DELETE FROM chat_attachment WHERE id = :aid"),
-            {"aid": attachment_id},
-        )
-        await gw.commit()
-    except ProgrammingError as exc:
-        if _is_missing_table(exc):
-            raise HTTPException(status_code=503, detail="Chat tables not yet migrated")
-        raise
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Attachment not found")
+    """Erase it for good through the gateway: its files go with its rows (recorded in the audit trail)."""
+    await _erase("attachment", str(attachment_id), "Attachment not found")
 
 
 # ── Stats ─────────────────────────────────────────────────────────

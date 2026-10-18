@@ -29,6 +29,24 @@ from faden_backend.web.application import get_app
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture(autouse=True)
+def _no_gateway_erase(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """The gateway's erase (an administrator's delete, an account deleted) is answered here, never sent.
+
+    Returns the calls, so a test can check what was asked.
+    """
+    from faden_backend.services.chat.gateway_client import GatewayChatClient  # noqa: PLC0415
+
+    calls: list[tuple[str, str]] = []
+
+    async def erase(self: Any, scope: str, target: str, *, secret: str) -> dict[str, int]:
+        calls.append((scope, target))
+        return {"chats": 1, "projects": 1, "files": 1, "memory_facts": 0}
+
+    monkeypatch.setattr(GatewayChatClient, "erase", erase)
+    return calls
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _run_from_the_repository_root() -> Generator[None]:
     """

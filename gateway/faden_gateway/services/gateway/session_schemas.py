@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Literal, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,7 +54,8 @@ class SessionCreateRequest(BaseModel):
 
 class SessionUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=512)
-    status: str | None = None
+    #: Active or archived; a chat is deleted with DELETE, and a deleted one is not changed.
+    status: Literal["active", "archived"] | None = None
     metadata_json: dict[str, Any] | None = None
     #: Move the chat into one of the caller's projects; null takes it out.
     project_id: uuid.UUID | None = None

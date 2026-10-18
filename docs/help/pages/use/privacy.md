@@ -89,11 +89,12 @@ The model list does not always show where a model runs. If it matters for what y
 
 | You delete | What happens |
 |---|---|
-| **A chat** | It disappears from your list at once. It is not erased from the server: its messages and files stay there until an administrator deletes the chat. |
-| **A project** | It is deleted with all its chats. |
+| **A chat** | It disappears from your list at once and cannot be brought back. The server keeps it for the time your organisation set (30 days unless it chose another), then erases it for good, with its files and what the assistant remembered from it. |
+| **A project** | It is erased at once, with all its chats and their files. |
+| **Your account** (an administrator does it) | Your chats, projects, files and what the assistant remembered are erased with it. |
 | A chat in **Chat history**, in the browser agent | It is removed from your browser. |
 
-If something must be erased for good, for example personal data you pasted by mistake, ask your administrator.
+If something must be erased sooner, for example personal data you pasted by mistake, ask your administrator: a chat they delete in the console is erased at once. Backups taken before keep it until they are replaced (the nightly ones after a week).
 
 ## When it does not work
 

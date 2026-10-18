@@ -256,6 +256,73 @@ async def _turn_sweep_loop(app: FastAPI) -> None:
         await asyncio.sleep(60)
 
 
+async def _retention_days() -> int:
+    """Days deleted chats are kept: the console's setting when set, else the install's (`faden deploy` asks)."""
+    import asyncpg  # noqa: PLC0415
+
+    days = settings.chat_deleted_retention_days
+    if not settings.backend_db_base:
+        return days
+    dsn = (
+        f"postgresql://{settings.db_user}:{settings.db_pass}"
+        f"@{settings.db_host}:{settings.db_port}/{settings.backend_db_base}"
+    )
+    try:
+        conn = await asyncpg.connect(dsn)
+        try:
+            raw = await conn.fetchval(
+                "SELECT value_json FROM system_setting_value WHERE key = 'chat.deleted_retention_days'",
+            )
+        finally:
+            await conn.close()
+    except Exception:  # the console's database is not there: the install's value
+        return days
+    import json  # noqa: PLC0415
+
+    value = json.loads(raw) if isinstance(raw, str) else raw
+    value = value.get("value") if isinstance(value, dict) else value
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return days
+
+
+async def _purge_loop(app: FastAPI) -> None:
+    """Erase chats their people deleted longer ago than the retention, every hour, one worker at a time.
+
+    Files go first, then the rows (services/gateway/erasure.py); each pass erases at most a few hundred chats
+    in its own transaction, and the next pass goes on.
+    """
+    import asyncio  # noqa: PLC0415
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    from faden_gateway.services.gateway import erasure  # noqa: PLC0415
+
+    await asyncio.sleep(300)  # not during start-up
+    while True:
+        try:
+            days = await _retention_days()
+            before = datetime.now(timezone.utc) - timedelta(days=days)
+            while True:
+                async with app.state.db_session_factory() as session:
+                    if not await erasure.take_purge_lock(session):
+                        break
+                    erased = await erasure.purge_deleted(
+                        session, getattr(app.state, "chat_file_store", None), deleted_before=before,
+                    )
+                    await session.commit()
+                if erased.chats:
+                    log.info(
+                        "Erased %d chat(s) deleted more than %d days ago (%d file(s))",
+                        erased.chats, days, erased.files,
+                    )
+                if erased.chats < erasure.PURGE_BATCH:
+                    break
+        except Exception:
+            log.warning("Erasing deleted chats failed; tried again in an hour", exc_info=True)
+        await asyncio.sleep(3600)
+
+
 @asynccontextmanager
 async def lifespan_setup(
     app: FastAPI,
@@ -375,6 +442,8 @@ async def lifespan_setup(
 
     pricing_task = asyncio.create_task(_pricing_refresh_loop())
     turn_sweep_task = asyncio.create_task(_turn_sweep_loop(app), name="turn_sweep")
+    # Chats people deleted are erased after the retention (features/admin-guardrails.md, phase 5).
+    purge_task = asyncio.create_task(_purge_loop(app), name="purge_deleted_chats")
     # The machines' mutual TLS: the gateway's certificate and the machine CAs,
     # read from the backend every minute (services/gateway/upstream_tls.py).
     from faden_gateway.services.gateway import upstream_tls  # noqa: PLC0415
@@ -395,6 +464,7 @@ async def lifespan_setup(
     await device_hub.stop()
     pricing_task.cancel()
     turn_sweep_task.cancel()
+    purge_task.cancel()
     machine_tls_task.cancel()
     if not broker.is_worker_process:
         await broker.shutdown()

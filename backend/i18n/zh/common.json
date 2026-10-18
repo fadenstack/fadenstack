@@ -876,7 +876,8 @@
       "llm": "LLM",
       "logging": "日志",
       "observability": "可观测性",
-      "updates": "更新"
+      "updates": "更新",
+      "chat": "聊天"
     },
     "groups": {
       "auth": "认证",
@@ -897,7 +898,8 @@
       "redis": "Redis",
       "skills": "技能",
       "data_residency": "数据驻留",
-      "update_check": "更新检查"
+      "update_check": "更新检查",
+      "retention": "保留期限"
     },
     "current_value": "（当前：{{value}}）",
     "appearance": {

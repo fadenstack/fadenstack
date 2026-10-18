@@ -22,6 +22,7 @@ from faden_gateway.db.models.gateway import (
     SessionToolOverride,
     ExecutionMode,
     ToolRealm,
+    SessionStatus,
 )
 
 
@@ -365,6 +366,8 @@ class GatewayDAO:
                     ChatSession.id == session_id,
                     ChatSession.tenant_id == tenant_id,
                     ChatSession.user_id == user_id,
+                    # A deleted chat is no one's to use any more.
+                    ChatSession.status != SessionStatus.DELETED,
                 ),
             ),
         )

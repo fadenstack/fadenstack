@@ -138,7 +138,7 @@ def verify_token(token: str, *, check_audience: bool = True) -> dict[str, Any]:
             message="Invalid JWT token.",
             code="invalid_token",
         ) from exc
-    if claims.get("typ") == PII_WEAKEN_TOKEN_TYPE:
+    if claims.get("typ") in (PII_WEAKEN_TOKEN_TYPE, "chat_erase"):
         # A weaken grant is a claim about one chat, never a sign-in: without a
         # configured audience nothing else would tell it from a user's token.
         raise GatewayError(

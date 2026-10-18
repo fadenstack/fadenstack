@@ -210,6 +210,8 @@ class SessionDAO:
                 ChatSession.id == session_id,
                 ChatSession.tenant_id == tenant_id,
                 ChatSession.user_id == user_id,
+                # A deleted chat is not changed (a PATCH with status "active" used to bring it back).
+                ChatSession.status != SessionStatus.DELETED,
             )
             .values(**updates),
         )
@@ -221,15 +223,16 @@ class SessionDAO:
     async def delete_session(
         self, *, session_id: uuid.UUID, tenant_id: str, user_id: str,
     ) -> bool:
-        """Soft-delete a session."""
+        """Mark a session deleted: gone for its person now, erased after the retention (services/gateway/erasure.py)."""
         result = await self.session.execute(
             update(ChatSession)
             .where(
                 ChatSession.id == session_id,
                 ChatSession.tenant_id == tenant_id,
                 ChatSession.user_id == user_id,
+                ChatSession.status != SessionStatus.DELETED,
             )
-            .values(status=SessionStatus.DELETED),
+            .values(status=SessionStatus.DELETED, deleted_at=func.now()),
         )
         await self.session.flush()
         return (result.rowcount or 0) > 0
@@ -602,6 +605,7 @@ class SessionDAO:
                 ChatSession.id == session_id,
                 ChatSession.tenant_id == tenant_id,
                 ChatSession.user_id == user_id,
+                ChatSession.status != SessionStatus.DELETED,
             )
             .subquery()
         )
@@ -661,12 +665,15 @@ class SessionDAO:
         self, *, tenant_id: str, user_id: str | None = None,
     ) -> dict[str, int]:
         """Return ``{count, total_bytes}`` for tenant (optionally per-user)."""
+        # Files of deleted chats do not count: they are erased with the chat, and the person cannot see them.
+        deleted = select(ChatSession.id).where(ChatSession.status == SessionStatus.DELETED)
+        live = or_(ChatAttachment.session_id.is_(None), ChatAttachment.session_id.not_in(deleted))
         q_count = select(func.count(ChatAttachment.id)).where(
-            ChatAttachment.tenant_id == tenant_id,
+            ChatAttachment.tenant_id == tenant_id, live,
         )
         q_bytes = select(
             func.coalesce(func.sum(ChatAttachment.size_bytes), 0),
-        ).where(ChatAttachment.tenant_id == tenant_id)
+        ).where(ChatAttachment.tenant_id == tenant_id, live)
         if user_id is not None:
             q_count = q_count.where(ChatAttachment.user_id == user_id)
             q_bytes = q_bytes.where(ChatAttachment.user_id == user_id)

@@ -1,6 +1,7 @@
 from fastapi.routing import APIRouter
 
 from faden_gateway.web.api import docs, monitoring
+from faden_gateway.web.api.internal_erase import router as internal_erase_router
 from faden_gateway.web.api.v1 import router as v1_router
 from faden_gateway.web.api.v1.agents import router as agents_router
 from faden_gateway.web.api.v1.approvals import router as approvals_router
@@ -20,3 +21,5 @@ public_router.include_router(approvals_router, tags=["gateway"])
 public_router.include_router(sessions_router)
 public_router.include_router(memory_router)
 public_router.include_router(attachments_router)
+# The backend's erase (an administrator's delete, an account deleted): signed grants only.
+public_router.include_router(internal_erase_router)

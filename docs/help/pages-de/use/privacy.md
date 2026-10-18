@@ -89,11 +89,12 @@ Die Modellliste zeigt nicht immer, wo ein Modell läuft. Wenn das für das, was 
 
 | Sie löschen | Was geschieht |
 |---|---|
-| **Einen Chat** | Er verschwindet sofort aus Ihrer Liste. Vom Server wird er dabei nicht gelöscht: Seine Nachrichten und Dateien bleiben dort, bis ein Administrator den Chat löscht. |
-| **Ein Projekt** | Es wird mit allen seinen Chats gelöscht. |
+| **Einen Chat** | Er verschwindet sofort aus Ihrer Liste und lässt sich nicht zurückholen. Der Server behält ihn so lange, wie Ihre Organisation es eingestellt hat (30 Tage, wenn sie nichts anderes gewählt hat), und löscht ihn dann endgültig, mit seinen Dateien und dem, was sich der Assistent daraus gemerkt hat. |
+| **Ein Projekt** | Es wird sofort endgültig gelöscht, mit allen seinen Chats und deren Dateien. |
+| **Ihr Konto** (ein Administrator löscht es) | Ihre Chats, Projekte, Dateien und das, was sich der Assistent gemerkt hat, werden mit ihm gelöscht. |
 | Einen Chat in **Chat history**, im Browser-Agenten | Er wird aus Ihrem Browser entfernt. |
 
-Wenn etwas endgültig gelöscht werden muss, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator.
+Muss etwas früher endgültig gelöscht werden, z. B. personenbezogene Daten, die Sie versehentlich eingefügt haben, wenden Sie sich an Ihren Administrator: Ein Chat, den er in der Konsole löscht, wird sofort gelöscht. Vorher erstellte Sicherungen enthalten ihn, bis sie ersetzt werden (die nächtlichen nach einer Woche).
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

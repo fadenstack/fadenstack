@@ -29,6 +29,7 @@ def never_touch_real_processes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(backend_tool, "run_backend_tool", lambda *_a, **_k: {"ok": True})
     # Sealing chats goes through `docker exec faden-gateway`: answered here too.
     monkeypatch.setattr(sealing, "run_seal", lambda *_a, **_k: {"ok": True, "columns": {}})
+    # The chat retention is stored in the console through the backend tool (answered above).
     # The upgrade, deploy and rebuild steps that carry chat files out of the gateway container: none here.
     monkeypatch.setattr(backup, "keep_chat_files", lambda *_a, **_k: None)
     monkeypatch.setattr(backup, "keep_company_files", lambda *_a, **_k: None)

@@ -63,5 +63,5 @@ When your question may depend on those documents, the model searches the knowled
 | **File type '…' is not allowed.** | Your organisation does not accept that kind of file. Save it as PDF or text, or ask your administrator. |
 | **File exceeds maximum size of … MB.** | Make the file smaller, or attach only the part you need. |
 | **Maximum of … attachments per session reached.** | Start a new chat for further files. |
-| **Total attachment storage would exceed … MB.** | Your attached files fill your space. Deleting a chat does not free it; ask your administrator to remove files you no longer need. |
+| **Total attachment storage would exceed … MB.** | Your attached files fill your space. Deleting a chat frees the space its files took; so does removing files you no longer need from a chat. |
 | The model says it found nothing | The knowledge base may not hold a document on the subject. Ask your administrator what it contains. |

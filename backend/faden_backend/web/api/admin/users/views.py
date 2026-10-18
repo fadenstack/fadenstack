@@ -469,6 +469,18 @@ async def delete_user(
     if target.id == admin.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You cannot delete yourself.")
     await _refuse_last_superuser(session, target)
+    # Their chats, projects, files and memory go first: they stayed in the gateway's database for good, with
+    # the files on disk, after the account was gone.
+    from faden_backend.services.chat.gateway_client import EraseFailed, shared_client  # noqa: PLC0415
+    from faden_backend.settings import settings  # noqa: PLC0415
+
+    try:
+        erased = await shared_client().erase("user", str(user_id), secret=settings.users_secret)
+    except EraseFailed as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=f"The account was not deleted: its chats could not be erased ({exc}). Try again.",
+        ) from None
     email, was_admin = target.email, target.is_superuser
     await session.delete(target)
     await session.flush()
@@ -480,7 +492,7 @@ async def delete_user(
         result=AuditResult.ALLOW,
         actor_id=admin.id,
         severity="high",
-        metadata_json=json.dumps({"email": email, "administrator": was_admin}),
+        metadata_json=json.dumps({"email": email, "administrator": was_admin, "chat_data_erased": erased}),
     )
 
 

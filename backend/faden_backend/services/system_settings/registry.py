@@ -418,6 +418,22 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         service_targets=(),
     ),
     SettingDefinition(
+        key="chat.deleted_retention_days",
+        type="int",
+        category="chat",
+        group="retention",
+        label="Keep deleted chats (days)",
+        description=(
+            "How long a chat its person deleted is kept before it is erased for good, with its files and "
+            "memory. 0 erases at the next hourly pass. Chats deleted before the upgrade to this release count "
+            "from the upgrade. An administrator's delete in the console erases at once."
+        ),
+        is_secret=False,
+        default=30,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
         key="rag_lite.rerank_candidates",
         type="int",
         category="modules",

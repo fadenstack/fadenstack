@@ -876,7 +876,8 @@
       "llm": "LLM",
       "logging": "Registros",
       "observability": "Observabilidad",
-      "updates": "Actualizaciones"
+      "updates": "Actualizaciones",
+      "chat": "Chat"
     },
     "groups": {
       "auth": "Auth",
@@ -897,7 +898,8 @@
       "redis": "Redis",
       "skills": "Skills",
       "data_residency": "Residencia de datos",
-      "update_check": "Comprobación de actualizaciones"
+      "update_check": "Comprobación de actualizaciones",
+      "retention": "Conservación"
     },
     "current_value": "(actual: {{value}})",
     "appearance": {

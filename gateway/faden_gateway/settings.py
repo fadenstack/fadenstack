@@ -236,6 +236,9 @@ class Settings(BaseSettings):
     # A running reply whose heartbeat is older than this was left by a
     # gateway that went away.
     chat_turn_stale_sec: float = 30.0
+    #: Days a chat its person deleted is kept before it is erased; the console's setting
+    #: (``chat.deleted_retention_days``) wins when set. `faden deploy` asks for it.
+    chat_deleted_retention_days: int = 30
     session_max_recent_messages: int = 20
     session_token_budget: int = 4096
     session_summary_threshold: int = 10

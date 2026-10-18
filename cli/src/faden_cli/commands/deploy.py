@@ -469,6 +469,12 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     show_default=True,
     help="Use sudo for systemd installation in node-agent provisioning.",
 )
+@click.option(
+    "--chat-retention-days",
+    type=click.IntRange(min=0),
+    default=None,
+    help="Days a chat someone deleted is kept before it is erased for good (default 30; asked when not given).",
+)
 def deploy_cmd(
     install_dir: str | None,
     *,
@@ -500,6 +506,7 @@ def deploy_cmd(
     local_node_advertise_host: str,
     local_node_enrollment_token: str,
     local_node_sudo: bool,
+    chat_retention_days: int | None = None,
 ) -> None:
     """Deploy Fadenstack to a local production environment.
 
@@ -749,6 +756,13 @@ def deploy_cmd(
     # ── 3e. New releases ──────────────────────────────────────────
     update_check_step(env_path, cfg, choice=update_check, yes=yes)
 
+    # ── 3f. Deleted chats ─────────────────────────────────────────
+    from faden_cli.core.chat_retention import apply_retention, ask_retention  # noqa: PLC0415
+
+    retention_days = ask_retention(
+        env_path, days=chat_retention_days, yes=yes, heading="Step 3f: Deleted chats…",
+    )
+
     # ── 4. Save config ────────────────────────────────────────────
     cfg.install_dir = str(shared_dir)
     cfg.compose_file = compose_file.name
@@ -979,6 +993,9 @@ def deploy_cmd(
                 )
                 for note in notes:
                     warning(note)
+
+    # The console's setting, now that the backend runs (an administrator changes it there later).
+    apply_retention(retention_days)
 
     # ── 8. Endpoint summary ───────────────────────────────────────
     console.print("\n[bold green]✨ Deployment complete![/bold green]\n")

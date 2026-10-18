@@ -63,5 +63,5 @@ Wenn Ihre Frage von diesen Dokumenten abhängen kann, durchsucht das Modell die 
 | **File type '…' is not allowed.** | Ihre Organisation nimmt diese Art von Datei nicht an. Speichern Sie sie als PDF oder Text, oder fragen Sie Ihren Administrator. |
 | **File exceeds maximum size of … MB.** | Verkleinern Sie die Datei, oder hängen Sie nur den Teil an, den Sie brauchen. |
 | **Maximum of … attachments per session reached.** | Beginnen Sie für weitere Dateien einen neuen Chat. |
-| **Total attachment storage would exceed … MB.** | Ihre angehängten Dateien füllen den Ihnen zustehenden Speicherplatz. Das Löschen eines Chats gibt ihn nicht frei; bitten Sie Ihren Administrator, Dateien zu entfernen, die Sie nicht mehr brauchen. |
+| **Total attachment storage would exceed … MB.** | Ihre angehängten Dateien füllen den Ihnen zustehenden Speicherplatz. Das Löschen eines Chats gibt den Platz seiner Dateien frei, ebenso das Entfernen nicht mehr benötigter Dateien aus einem Chat. |
 | Das Modell sagt, es habe nichts gefunden | Die Wissensdatenbank enthält möglicherweise kein Dokument zu dem Thema. Fragen Sie Ihren Administrator, was sie enthält. |

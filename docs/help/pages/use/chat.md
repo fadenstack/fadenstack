@@ -70,7 +70,7 @@ Under each reply: how long it took (if you had the chat open), its size in token
     The sidebar lists your most recent chats by when you used them (**Today**, **Yesterday**, **Previous 7 days**, **Previous 30 days**, **Older**); **Show more** loads older ones. **Collapse** (the arrow at the bottom) folds it into a narrow strip, and the logo opens it again. **No project** in **Move to project** takes a chat out of its project. Chats are yours: there is no way to share a chat with a colleague from the chat.
 
 !!! warning "Deleting has no undo"
-    **Delete** on a chat removes it at once, without asking. Deleting a project deletes all the chats in it, also without asking. What happens to deleted chats on the server is on [Your data and privacy](privacy.md#deleting).
+    **Delete** on a chat removes it at once, without asking, and it cannot be brought back. Deleting a project erases all the chats in it, also without asking. What happens to deleted chats on the server is on [Your data and privacy](privacy.md#deleting).
 
 ## On a phone
 

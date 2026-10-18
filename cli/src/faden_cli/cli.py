@@ -94,6 +94,7 @@ def register_core_commands(group: click.Group | None = None) -> None:
     from faden_cli.commands.dev.dev_group import dev_group
     from faden_cli.commands.admin import admin_group
     from faden_cli.commands.audit import audit_group
+    from faden_cli.commands.chats import chats_group
     from faden_cli.commands.observe import observe_group
     from faden_cli.commands.runtime_images import runtime_images_cmd
     from faden_cli.commands.tls import tls_group
@@ -118,6 +119,7 @@ def register_core_commands(group: click.Group | None = None) -> None:
     target.add_command(dev_group, "dev")
     target.add_command(admin_group, "admin")
     target.add_command(audit_group, "audit")
+    target.add_command(chats_group, "chats")
     target.add_command(observe_group, "observe")
     target.add_command(runtime_images_cmd, "runtime-images")
     target.add_command(tls_group, "tls")
