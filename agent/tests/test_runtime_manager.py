@@ -179,6 +179,31 @@ async def test_deploy_workload_includes_gpu_flag(manager: RuntimeManager, fake_r
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize(
+    ("image", "skips_check"),
+    [
+        ("nvcr.io/nvidia/vllm:26.01-py3", True),
+        ("nvcr.io/nvidia/vllm@sha256:" + "a" * 64, True),
+        ("vllm/vllm-openai:latest", False),
+        ("registry.example.com/nvcr.io/nvidia/vllm:26.01-py3", False),
+        ("nvcr.io.example.com/nvidia/vllm:26.01-py3", False),
+    ],
+)
+async def test_only_an_ngc_image_skips_the_driver_check(
+    manager: RuntimeManager, fake_runtime: FakeRuntime, healthy_health: AsyncMock, image: str, skips_check: bool,
+) -> None:
+    """NGC's entrypoint check is switched off for images from nvcr.io itself, by the registry, not a substring."""
+    await manager.deploy_workload({
+        "runtime_id": "rt-ngc",
+        "provider_type": "vllm",
+        "image": image,
+        "model_sync": {"hf_repo_id": "org/model"},
+    })
+    env = fake_runtime.run_kwargs()["env"]
+    assert (env.get("NVIDIA_DISABLE_REQUIRE") == "1") is skips_check
+
+
+@pytest.mark.asyncio()
 async def test_deploy_workload_custom_port(manager: RuntimeManager, fake_runtime: FakeRuntime, healthy_health: AsyncMock) -> None:
     """Verify custom container_port is used."""
     await manager.deploy_workload({

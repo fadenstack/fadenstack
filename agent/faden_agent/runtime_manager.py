@@ -282,7 +282,9 @@ class RuntimeManager:
         # CUDA forward-compat libs (e.g. nvcr.io containers).  The compat
         # libraries handle the actual runtime compatibility; the entrypoint
         # check is overly strict and blocks valid driver/CUDA combinations.
-        if gpu_request and "nvcr.io" in image:
+        # The registry is the part before the first "/": "nvcr.io/nvidia/vllm:26.01-py3",
+        # with a tag or a digest; "nvcr.io" anywhere else in a name is not NGC.
+        if gpu_request and image.split("/", 1)[0] == "nvcr.io":
             run_env["NVIDIA_DISABLE_REQUIRE"] = "1"
         run_volumes: list[str] = []
         extra_args: list[str] = []
