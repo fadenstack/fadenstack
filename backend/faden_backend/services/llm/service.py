@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -354,12 +355,16 @@ class LLMService:
         path: str,
         tags: list[str] | None = None,
     ) -> LLMModel:
-        """Register a model already present on disk."""
+        """Register a model already present on disk: a folder inside the model store.
+
+        It scans the folder the check resolved, not *path* again, so a link
+        changed in between does not lead the scan out of the store.
+        """
         # Guard against path traversal — ensure the resolved path is
         # within the configured model store root.
-        resolved = Path(path).resolve()
-        store_root = Path(settings.model_store_root).resolve()
-        if not resolved.is_relative_to(store_root):
+        resolved = os.path.realpath(path)
+        store_root = os.path.realpath(settings.model_store_root)
+        if not resolved.startswith(store_root + os.sep):
             msg = f"Path '{path}' resolves outside the model store root '{settings.model_store_root}'."
             raise ValueError(msg)
 
@@ -369,7 +374,7 @@ class LLMService:
             tags=tags,
             status=ModelStatus.AVAILABLE,
         )
-        artifacts = await asyncio.to_thread(scan_model_directory, path)
+        artifacts = await asyncio.to_thread(scan_model_directory, resolved)
         if artifacts:
             await artifact_dao.create_batch(model.id, artifacts)
         return model

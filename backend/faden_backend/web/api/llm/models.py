@@ -140,14 +140,20 @@ async def register_model(
     artifact_dao: ArtifactDAO = Depends(),
     audit_dao: AuditDAO = Depends(),
 ) -> ModelDTO:
-    """Register a model from a local path."""
-    model = await llm_service.register_local_model(
-        model_dao,
-        artifact_dao,
-        display_name=body.display_name,
-        path=body.path,
-        tags=body.tags,
-    )
+    """Register a model from a local path: a folder inside the model store, or a 422."""
+    try:
+        model = await llm_service.register_local_model(
+            model_dao,
+            artifact_dao,
+            display_name=body.display_name,
+            path=body.path,
+            tags=body.tags,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     await audit_action(
         action="llm.model.register",
         target_type="llm_model",
