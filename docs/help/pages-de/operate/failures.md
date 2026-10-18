@@ -122,6 +122,9 @@ Clusters hat **Metrik-Dashboard öffnen**).
     Maschinen senden ihre Logs über die normale Adresse des Servers, mit ihren eigenen Zugangsdaten; eine Zeile, die
     der Server nicht angenommen hat, wird später erneut gesendet. Auf den Maschinen muss nichts eingerichtet werden.
 
+    Eine Suche darf mit den Filtern bis zu 8.192 Zeichen lang sein; eine längere wird mit **„The query is too long“**
+    abgelehnt.
+
 ### Auf dem Server {#on-the-server}
 
 ```bash

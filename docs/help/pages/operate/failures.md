@@ -118,6 +118,9 @@ metrics dashboard**).
     Machines send their logs through the server's normal address, with their own credential; a line the server did
     not take is sent again later. Nothing has to be set up on the machines.
 
+    A search, with the filters, can be up to 8,192 characters long; a longer one is refused with **"The query is too
+    long"**.
+
 ### On the server
 
 ```bash

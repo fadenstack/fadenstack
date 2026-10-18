@@ -9,6 +9,7 @@ upstream, Docker, or database is touched.
 from __future__ import annotations
 
 import json
+import time
 from datetime import UTC, datetime
 
 import pytest
@@ -69,6 +70,58 @@ def test_extract_labels_matches_all_operators() -> None:
 
 def test_extract_labels_no_braces_empty() -> None:
     assert logs_views._extract_query_labels("no braces here") == set()
+
+
+@pytest.mark.parametrize(
+    ("query", "labels"),
+    [
+        ('{app="}", secret=~".+"}', {"app", "secret"}),  # a brace in a value ended the selector
+        ("{app=`}`, secret=\"z\"}", {"app", "secret"}),  # in a raw string too
+        ('{app="a{b", secret="y"}', {"app", "secret"}),
+        ('{app="x\\"}", secret="y"}', {"app", "secret"}),  # an escaped quote does not end the value
+        ('{app="x" # }\n, secret="y"}', {"app", "secret"}),  # a comment hides nothing
+        ('{"secret"=~".+"}', {"secret"}),  # a quoted name
+        ('sum by (pod) (rate({namespace!="kube", Container !~ "x"}[5m]))', {"namespace", "container"}),
+        ('{app="x"} |= "error" | json | level="warn"', {"app"}),  # pipeline label filters: not selectors
+        ('{app="x"} | line_format "{{.secret}}"', {"app"}),
+    ],
+)
+def test_extract_labels_reads_values_and_names_as_loki_does(query: str, labels: set[str]) -> None:
+    assert logs_views._extract_query_labels(query) == labels
+
+
+@pytest.mark.parametrize(
+    "query",
+    ['{app="}", secret=~".+"}', '{app=`}`, secret="z"}'],
+)
+def test_query_allowlist_sees_a_label_after_a_brace_in_a_value(
+    monkeypatch: pytest.MonkeyPatch, query: str,
+) -> None:
+    monkeypatch.setattr(settings, "logs_allowed_labels_raw", "app")
+    with pytest.raises(HTTPException) as exc:
+        logs_views._enforce_query_allowlist(query)
+    assert exc.value.status_code == 400
+    assert "secret" in str(exc.value.detail)
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["{" * 8192, "A" * 8192, "{" + "A" * 8191, '{"' + "\\" * 8190, "{" + "a=" * 4095, "{" + "'" * 8191],
+)
+def test_extract_labels_takes_linear_time(query: str) -> None:
+    """Quadratic before: 1.3 s for 8 KB of ``{``, 16 s for 32 KB, on the event loop."""
+    started = time.perf_counter()
+    logs_views._extract_query_labels(query)
+    logs_views._extract_query_labels(query * 4)  # past the cap: still quick
+    assert time.perf_counter() - started < 0.5
+
+
+def test_a_query_longer_than_the_cap_is_refused() -> None:
+    logs_views._enforce_query_length("{" + "a" * (logs_views.MAX_QUERY_CHARS - 1))
+    with pytest.raises(HTTPException) as exc:
+        logs_views._enforce_query_length("{" * (logs_views.MAX_QUERY_CHARS + 1))
+    assert exc.value.status_code == 400
+    assert "too long" in str(exc.value.detail)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

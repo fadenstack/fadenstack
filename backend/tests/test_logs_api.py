@@ -83,6 +83,27 @@ async def test_query_allowlist_enforced(
     assert "Disallowed labels" in resp.text
 
 
+async def test_a_query_past_the_length_cap_is_refused_before_loki(
+    monkeypatch: pytest.MonkeyPatch, authed_app: FastAPI, client: AsyncClient
+) -> None:
+    monkeypatch.setattr(settings, "logs_allowed_labels_raw", "job")
+    asked: list[str] = []
+
+    async def _fake_request(path: str, params: dict[str, str] | None = None, timeout: float = 10.0) -> dict:
+        asked.append(path)
+        return {"data": {"result": []}}
+
+    monkeypatch.setattr(logs_views, "_request_loki_json", _fake_request)
+
+    url = authed_app.url_path_for("logs_query_range")
+    resp = await client.get(url, params={"query": "{" * (logs_views.MAX_QUERY_CHARS + 1)})
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "too long" in resp.text
+    resp = await client.get(url, params={"query": '{job="api"} |= "' + "x" * 8000 + '"'})
+    assert resp.status_code == status.HTTP_200_OK
+    assert asked == ["/loki/api/v1/query_range"]
+
+
 async def test_label_name_allowlist_enforced(
     monkeypatch: pytest.MonkeyPatch,
     authed_app: FastAPI,

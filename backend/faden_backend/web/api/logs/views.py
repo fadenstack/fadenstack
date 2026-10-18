@@ -137,7 +137,20 @@ async def _ws_recheck(websocket: WebSocket, token: str | None, upstream: Any) ->
 
 _rate_buckets: dict[str, int] = defaultdict(int)
 
-_LABEL_MATCH_RE = re.compile(r"([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|!=|=~|!~)")
+#: The longest query passed on to Loki. The console's are a few hundred characters.
+MAX_QUERY_CHARS = 8192
+
+#: LogQL's tokens, as far as the allowlist needs them: strings (``"..."`` with
+#: escapes, `` `...` `` raw, ``'...'``; an unclosed one runs to the end), ``#``
+#: comments, braces, names, the four matcher operators, and any other single
+#: character. A token that starts always matches, and is never tried again
+#: shorter, so a query is read in linear time (the regexes before took 1.3 s
+#: on 8 KB of ``{``, on the event loop).
+_LOGQL_TOKEN = re.compile(
+    r'"(?:[^"\\]|\\.)*"?|`[^`]*`?|\'(?:[^\'\\]|\\.)*\'?|#[^\n]*|[{}]|[A-Za-z_]\w*|=~|!~|!=|=|\s+|.',
+    re.DOTALL,
+)
+_MATCHER_OPS = frozenset({"=", "!=", "=~", "!~"})
 
 
 class LokiUpstreamError(Exception):
@@ -192,12 +205,41 @@ def _enforce_label_name_allowed(name: str) -> None:
 
 
 def _extract_query_labels(query: str) -> set[str]:
-    selectors = re.findall(r"\{([^}]*)\}", query)
-    extracted: set[str] = set()
-    for selector in selectors:
-        for match in _LABEL_MATCH_RE.finditer(selector):
-            extracted.add(match.group(1).lower())
-    return extracted
+    """The label names the stream selectors (``{...}``) of *query* match on.
+
+    Read token by token, so a ``}`` inside a value no longer ends the
+    selector: ``{app="}", secret=~".+"}`` matched on ``secret`` unseen. A
+    quoted name before an operator counts as a label too. Label filters in
+    the pipeline (``{app="x"} | secret="y"``) are not selectors and are not
+    covered: they only narrow the streams an allowed selector chose.
+    """
+    labels: set[str] = set()
+    depth = 0
+    pending: str | None = None
+    for tok in _LOGQL_TOKEN.findall(query):
+        if tok.isspace() or tok.startswith("#"):
+            continue
+        if tok == "{":
+            depth += 1
+        elif tok == "}":
+            depth = max(depth - 1, 0)
+        elif depth and pending is not None and tok in _MATCHER_OPS:
+            labels.add(pending.lower())
+        if depth and (tok[0].isalpha() or tok[0] == "_"):
+            pending = tok
+        elif depth and tok[0] in "\"`'" and len(tok) > 1:
+            pending = tok[1:-1]
+        else:
+            pending = None
+    return labels
+
+
+def _enforce_query_length(query: str) -> None:
+    if len(query) > MAX_QUERY_CHARS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The query is too long: at most {MAX_QUERY_CHARS} characters.",
+        )
 
 
 def _enforce_query_allowlist(query: str) -> None:
@@ -477,6 +519,7 @@ async def query_range(
     """Proxy Loki query_range and normalize response for frontend consumption."""
     correlation_id = _get_correlation_id(request)
     _enforce_rate_limit(request, "query_range")
+    _enforce_query_length(query)
     _enforce_query_allowlist(query)
 
     now = datetime.now(tz=UTC)
@@ -531,6 +574,7 @@ async def tail_logs(
     user = await _ws_authenticate(websocket)
     if user is None:
         return
+    _enforce_query_length(query)
     _enforce_query_allowlist(query)
     token = websocket.cookies.get("fapiauth")
     await websocket.accept()
