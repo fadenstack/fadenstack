@@ -26,6 +26,9 @@ export function useThemeMode(): ThemeModeContextValue {
   return useContext(ThemeModeContext);
 }
 
+/** The accents as a script's array literal, written out from the constants as the storage keys are. */
+const ACCENT_LIST = `[${ACCENT_KEYS.map((key) => `"${key}"`).join(",")}]`;
+
 /**
  * Runs in the page's <head>, before the first paint: reads the stored mode
  * and accent onto <html data-mode data-accent>, so the server-rendered page
@@ -33,7 +36,7 @@ export function useThemeMode(): ThemeModeContextValue {
  * PREPAINT_CSS -- and the app starts from them instead of flashing the
  * defaults. Plain ES5 in a string: it runs before any bundle.
  */
-export const PREPAINT_SCRIPT = `(function(){try{var d=document.documentElement,s=window.localStorage,m=s.getItem("${MODE_STORAGE_KEY}"),a=s.getItem("${ACCENT_STORAGE_KEY}");if(m!=="light"&&m!=="dark"){m=window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}if(${JSON.stringify(ACCENT_KEYS)}.indexOf(a)<0){a="${DEFAULT_ACCENT}"}d.dataset.mode=m;d.dataset.accent=a;d.style.colorScheme=m}catch(e){}})();`;
+export const PREPAINT_SCRIPT = `(function(){try{var d=document.documentElement,s=window.localStorage,m=s.getItem("${MODE_STORAGE_KEY}"),a=s.getItem("${ACCENT_STORAGE_KEY}");if(m!=="light"&&m!=="dark"){m=window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}if(${ACCENT_LIST}.indexOf(a)<0){a="${DEFAULT_ACCENT}"}d.dataset.mode=m;d.dataset.accent=a;d.style.colorScheme=m}catch(e){}})();`;
 
 /**
  * What the server-rendered page shows before the app takes over -- the
