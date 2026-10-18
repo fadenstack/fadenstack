@@ -156,3 +156,21 @@ def test_accepting_takes_the_admins_classes_and_the_apps_parameters() -> None:
 ])
 def test_descriptions_that_try_to_instruct_the_model_are_flagged(text: str | None, expected: list[str]) -> None:
     assert description_warnings(text) == expected
+
+
+def test_a_tool_that_writes_without_declaring_its_output_is_flagged() -> None:
+    """What such a tool writes is not marked as AI-generated: the reviewer asks its developer (sdk/13 §4.1)."""
+    version = _Version(host_tool_contract=[{"name": "insert_text", "risk": "write"}])
+    declared = {"outputs": [{"argument": "text", "media_type": "text/markdown", "edit_kind": "generated"}]}
+    rows = [_row("Word add-in", "1.0", [
+        _tool("insert_text", "write"),
+        _tool("replace_text", "write", **declared),
+        _tool("fill_field", "write", output={"argument": "value", "media_type": "text/plain"}),
+        _tool("delete_range", "destructive"),
+        _tool("read_page", "read"),
+    ])]
+    warned = {t.name: t.warnings for t in review(rows, version, now=NOW).tools}
+    assert warned["insert_text"] == ["unmarked_writes"], "the contract's class counts"
+    assert warned["delete_range"] == [], "destructive tools mostly delete or send"
+    assert warned["replace_text"] == [] and warned["fill_field"] == [], "outputs declared (or the one-object form)"
+    assert warned["read_page"] == []

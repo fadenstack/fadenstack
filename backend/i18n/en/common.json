@@ -3694,6 +3694,10 @@
         "long": {
           "label": "Long",
           "detail": "Its description is unusually long."
+        },
+        "unmarked_writes": {
+          "label": "Content not declared",
+          "detail": "It writes content people read but does not say which argument holds it, so what it writes is not marked as AI-generated. Ask its developer to declare the tool's output."
         }
       },
       "greeting_title": "Greeting the app suggests",

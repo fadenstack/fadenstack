@@ -242,7 +242,8 @@ class ToolReviewDTO(BaseModel):
     open_world: bool | None
     apps: list[str]
     last_seen_at: datetime | None
-    #: ``instructions``, ``hidden_characters``, ``link``, ``long``: hints about the description.
+    #: ``instructions``, ``hidden_characters``, ``link``, ``long``: hints about the description;
+    #: ``unmarked_writes``: it writes but declares no output, so what it writes is not marked as AI-generated.
     warnings: list[str]
 
 

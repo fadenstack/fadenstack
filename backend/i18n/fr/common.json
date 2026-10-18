@@ -3696,6 +3696,10 @@
         "long": {
           "label": "Longue",
           "detail": "Sa description est inhabituellement longue."
+        },
+        "unmarked_writes": {
+          "label": "Contenu non déclaré",
+          "detail": "Il écrit du contenu que des personnes lisent sans indiquer l'argument qui le contient : ce qu'il écrit n'est donc pas marqué comme généré par l'IA. Demandez à son développeur de déclarer la sortie de l'outil."
         }
       },
       "greeting_title": "Message d'accueil proposé par l'application",

@@ -3696,6 +3696,10 @@
         "long": {
           "label": "Lang",
           "detail": "Seine Beschreibung ist ungewöhnlich lang."
+        },
+        "unmarked_writes": {
+          "label": "Inhalt nicht angegeben",
+          "detail": "Es schreibt Inhalte, die Menschen lesen, sagt aber nicht, in welchem Argument sie stehen; was es schreibt, wird daher nicht als KI-generiert gekennzeichnet. Bitten Sie seinen Entwickler, die Ausgabe des Werkzeugs anzugeben."
         }
       },
       "greeting_title": "Begrüßung, die die App vorschlägt",

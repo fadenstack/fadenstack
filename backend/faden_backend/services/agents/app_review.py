@@ -107,6 +107,9 @@ class ToolReview:
     apps: list[str] = field(default_factory=list)
     last_seen_at: datetime | None = None
     warnings: list[str] = field(default_factory=list)
+    #: Whether an app declares the content it writes for people (the SDKs' ``outputs``): what such a tool
+    #: writes is marked as AI-generated (sdk/13 §4.1).
+    declares_output: bool = False
 
 
 @dataclass
@@ -225,6 +228,7 @@ def _brought(current: list[ManifestRow]) -> dict[str, ToolReview]:
                     schema_sha256=tool.get("schema_sha256"),
                     open_world=tool.get("open_world"),
                     last_seen_at=row.last_seen_at,
+                    declares_output=_declares_output(tool),
                 )
             else:
                 entry.suggested_class = _stricter(entry.suggested_class, suggested)
@@ -233,11 +237,31 @@ def _brought(current: list[ManifestRow]) -> dict[str, ToolReview]:
     return brought
 
 
+def _declares_output(tool: Mapping[str, Any]) -> bool:
+    """Whether a manifest's tool says which of its arguments holds content for people (``outputs``)."""
+    outputs = tool.get("outputs")
+    if isinstance(outputs, list):
+        return any(isinstance(o, Mapping) and o.get("argument") for o in outputs)
+    single = tool.get("output")  # the first TypeScript previews sent one object
+    return isinstance(single, Mapping) and bool(single.get("argument"))
+
+
+def _unmarked_writes(entry: ToolReview) -> bool:
+    """A write tool (the contract's class, else the app's) declaring no output: ``unmarked_writes``.
+
+    Destructive tools are left out: most delete or send rather than write content.
+    """
+    risk = entry.contract_class or entry.suggested_class
+    return risk == "write" and not entry.declares_output
+
+
 def _judge(entry: ToolReview, listed: dict[str, Any] | None) -> ToolReview:
     """*entry*'s status against the contract's entry for it."""
     entry.warnings = description_warnings(entry.description)
     if listed is None:
         entry.status = "new"
+        if _unmarked_writes(entry):
+            entry.warnings.append("unmarked_writes")
         return entry
     entry.in_contract = True
     entry.contract_class = listed.get("risk") if listed.get("risk") in _ORDER else None
@@ -251,6 +275,8 @@ def _judge(entry: ToolReview, listed: dict[str, Any] | None) -> ToolReview:
         and _ORDER[entry.suggested_class] > _ORDER[entry.contract_class]
     ):
         entry.status = "riskier"
+    if _unmarked_writes(entry):
+        entry.warnings.append("unmarked_writes")
     return entry
 
 

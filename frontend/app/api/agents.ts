@@ -163,7 +163,10 @@ export interface ToolReview {
   /** "Chrome extension 0.2.0", or "requests" for tools held back from requests. */
   apps: string[];
   last_seen_at: string | null;
-  /** `instructions`, `hidden_characters`, `link`, `long`: hints about the description. */
+  /**
+   * `instructions`, `hidden_characters`, `link`, `long`: hints about the description; `unmarked_writes`: it writes
+   * but declares no output, so what it writes is not marked as AI-generated.
+   */
   warnings: string[];
 }
 
