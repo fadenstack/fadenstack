@@ -63,6 +63,7 @@ Today:
 | Manifest | Base | vLLM | Certified | Channel |
 |---|---|---|---|---|
 | `runtime-manifest-gb10-vllm0.29.0.json` | vLLM 0.29.0 (`vllm/vllm-openai`) | 0.29.0 (+ `vllm_compat.py`) | passed 11/11 | stable |
+| `runtime-manifest-gb10-vllm0.31.0.json` | vLLM 0.31.0 (`vllm/vllm-openai`) | 0.31.0 (+ `vllm_compat.py`), text watermarking | no | none recorded |
 | `runtime-manifest-x86_64.json` | python:3.12 slim | 0.26.0 | no | stable |
 
 ## The manifests are minted, not written
@@ -126,7 +127,7 @@ rather than ship a layer that changes theirs:
 `vllm_compat.py` is a stopgap. Ray 2.58 imports
 `vllm.entrypoints.openai.cli_args` and `vllm.entrypoints.openai.engine.protocol`,
 which vLLM 0.29 moved to `vllm.entrypoints.launchers.cli_args` and
-`vllm.entrypoints.serve.engine.protocol`. The script writes re-exporting
+`vllm.entrypoints.serve.engine.protocol` (still there in 0.31). The script writes re-exporting
 modules at the old paths, and only where they are missing: on a vLLM
 that still has them there it changes nothing. Remove it, and its line in the Dockerfile, with the first
 Ray release that imports the new paths. `check_ray_vllm.py` will tell you
