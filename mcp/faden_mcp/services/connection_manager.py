@@ -12,7 +12,12 @@ import httpx
 from mcp.shared.exceptions import McpError
 
 from faden_mcp.db.models.mcp import MCPServerModel
-from faden_mcp.services.transport.base import GenericMCPServer, MCPServerConfig
+from faden_mcp.services import outbound
+from faden_mcp.services.transport.base import (
+    GenericMCPServer,
+    MCPConnectError,
+    MCPServerConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +120,12 @@ class MCPConnectionManager:
             return self._connections[server_id]
 
         config = _server_config_from_model(server)
+        # Not at a link-local or metadata address (services/outbound.py):
+        # looked up again here, as the name may point elsewhere by now.
+        if config.transport != "stdio":
+            reason = await outbound.refusal(config.url)
+            if reason:
+                raise MCPConnectError(reason)
         adapter = _create_adapter(config)
         await adapter.connect()
         self._connections[server_id] = adapter

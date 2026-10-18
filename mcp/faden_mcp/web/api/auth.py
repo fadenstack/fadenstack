@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,6 +25,12 @@ class AuthContext:
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _is_service_token(token: str) -> bool:
+    """Whether *token* is the configured service token, compared in constant time."""
+    expected = settings.service_token
+    return bool(expected) and hmac.compare_digest(token.encode(), expected.encode())
 
 
 def _verify_token(token: str) -> dict[str, Any]:
@@ -58,7 +65,7 @@ async def get_auth_context(
         raise HTTPException(status_code=401, detail="Missing Authorization header.")
 
     # Allow trusted service-token from the backend proxy.
-    if settings.service_token and token == settings.service_token:
+    if _is_service_token(token):
         return AuthContext(
             user_id="service",
             tenant_id="default",
@@ -83,6 +90,5 @@ async def verify_service_token(request: Request) -> None:
     auth_header = request.headers.get("authorization", "")
     if not auth_header.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing service token.")
-    token = auth_header[7:]
-    if token != settings.service_token:
+    if not _is_service_token(auth_header[7:]):
         raise HTTPException(status_code=403, detail="Invalid service token.")

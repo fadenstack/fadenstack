@@ -10,7 +10,9 @@ against a fake upstream; the SDK in between is the real one.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -23,6 +25,7 @@ from faden_mcp.services.transport.base import (
     describe_failure,
 )
 from faden_mcp.services.transport.streamable_http import StreamableHTTPMCPServer
+from faden_mcp.web.api.admin import views
 
 URL = "https://mcp.example.test/mcp"
 
@@ -140,6 +143,56 @@ def test_each_status_says_something_useful(status: int, says: str) -> None:
     response = httpx.Response(status, request=request)
     error = httpx.HTTPStatusError("x", request=request, response=response)
     assert says in describe_failure(error, URL)
+
+
+@pytest.mark.asyncio
+async def test_the_connection_test_says_why_as_refresh_does(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """**Test** gives the operator's reason, not the exception's text."""
+    server = SimpleNamespace(
+        id=uuid.uuid4(), name="github", url=URL, command_json=None,
+    )
+
+    class _Dao:
+        def __init__(self, _session: object) -> None:
+            pass
+
+        async def get_server(self, _server_id: object) -> SimpleNamespace:
+            return server
+
+    class _Manager:
+        def __init__(self, failure: Exception) -> None:
+            self.failure = failure
+
+        def get(self, _server_id: str) -> None:
+            return None
+
+        async def start(self, _server: object) -> None:
+            raise self.failure
+
+    monkeypatch.setattr(views, "MCPDao", _Dao)
+    request = httpx.Request("POST", URL)
+    unauthorized = httpx.Response(401, request=request)
+    refused = "x is a cloud metadata address"
+    for failure, says in (
+        (
+            httpx.HTTPStatusError("x", request=request, response=unauthorized),
+            f"{URL} answered 401 Unauthorized: it needs credentials.",
+        ),
+        (MCPConnectError(refused), refused),
+    ):
+        manager = _Manager(failure)
+        app = SimpleNamespace(state=SimpleNamespace(connection_manager=manager))
+        result = await views.test_server(
+            server.id,
+            SimpleNamespace(app=app),  # type: ignore[arg-type]
+            auth=None,  # type: ignore[arg-type]
+            session=None,  # type: ignore[arg-type]
+        )
+        assert result["status"] == "error"
+        assert result["message"].startswith(says)
+        assert "Connection failed" not in result["message"]
 
 
 def test_a_command_that_is_not_installed_says_where() -> None:

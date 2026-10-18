@@ -33,6 +33,13 @@ aus, wenn ein Modell es anfordert – nach den Regeln, die Sie festlegen.
 Fadenstack verbindet sich mit dem Server und listet seine Tools auf. Der Server erscheint dann als aktiv, mit der
 Zahl seiner Tools.
 
+Ein Server, der als Container auf dem Fadenstack-Server läuft, ist unter seinem Namen erreichbar, z. B.
+`http://mcp-github:8080/mcp`, sobald der Container im Netzwerk `fadenstack_default` ist. Beim Registrieren des
+Servers kommt der Container dorthin, wenn seine Klasse `MCP` oder `TENANT_APP` ist (siehe
+[Container](../operate/containers.md#classes)); jeder andere Container bleibt, wo er ist. Geben Sie ihm vor dem
+Registrieren in seiner Zeile eine dieser Klassen, oder wählen Sie das Netzwerk, wenn Sie den Container
+[erstellen](../operate/containers.md#create-a-container) oder [bearbeiten](../operate/containers.md#edit-a-container).
+
 ??? info "Mehr zu den Feldern"
     | Feld | Was Sie eingeben |
     |---|---|
@@ -49,8 +56,8 @@ Zahl seiner Tools.
     Namen. Jede Person, deren Chat die Tools des Servers nutzt, handelt mit diesen Zugangsdaten. Geben Sie dem
     Server ein Token mit nur den Rechten, die die Tools brauchen, wo möglich nur mit Leserechten.
 
-**Netzwerk durchsuchen** sucht auf einem Host in einem Portbereich nach MCP-Servern und bietet die gefundenen
-zur Registrierung an.
+**Netzwerk durchsuchen** sucht auf einem Host (einem Namen oder einer IPv4-Adresse) in einem Portbereich nach
+MCP-Servern und bietet die gefundenen zur Registrierung an.
 
 ## Die Seite eines Servers {#a-servers-page}
 
@@ -138,5 +145,7 @@ Ein Server, den Sie bei ausgeschaltetem PII-Modul registrieren, startet mit **Zu
 | Der Grund lautet `401 Unauthorized` | Der Server braucht Zugangsdaten: Fügen Sie sie als Header hinzu, z. B. `Authorization: Bearer <token>`. |
 | Der Grund lautet `404` | Unter dieser Adresse gibt es keinen MCP-Endpunkt: Adressen für Streamable HTTP enden meist auf `/mcp`, Adressen für SSE auf `/sse`. |
 | Der Grund lautet `Connection refused` | Unter dieser Adresse lauscht nichts, oder der Fadenstack-Server erreicht sie nicht. |
+| Der Grund lautet `Cannot reach` bei einem Container auf dem Fadenstack-Server | Der Container ist nicht im Netzwerk `fadenstack_default`. Wählen Sie dieses Netzwerk unter **Netzwerke**, wenn Sie [den Container bearbeiten](../operate/containers.md#edit-a-container), und wählen Sie dann auf der Seite des Servers **Aktualisieren**. |
+| **„… is a link-local address“** oder **„… a cloud metadata address“** beim Registrieren, Bearbeiten oder Durchsuchen | Die Adresse liegt, oder ihr Name löst sich auf, in `169.254.0.0/16` oder `fe80::/10`, beim Metadatendienst einer Cloud oder auf `0.0.0.0`. Solche Adressen ruft Fadenstack nicht auf; der MCP-Dienst prüft vor dem Verbinden noch einmal, denn ein Name kann später auf eine andere Adresse zeigen. Geben Sie die eigene Adresse des Servers ein: Adressen in Ihrem Netzwerk, auf diesem Server und Containernamen gehen. |
 | **„MCP-Server … ist …“** im Dashboard | Der Server ist fehlerhaft oder getrennt, und seine Tools stehen Chats nicht zur Verfügung. Öffnen Sie ihn und wählen Sie **Testen**. |
 | Benutzer sehen im Chat keine Tools | Prüfen Sie, ob der Server aktiviert ist, ob seine Tools aktiviert sind und ob das Modell, mit dem sie chatten, Tools aufrufen kann. |

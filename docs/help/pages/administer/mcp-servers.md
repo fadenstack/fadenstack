@@ -32,6 +32,13 @@ rules you set.
 Fadenstack connects to the server and lists its tools. The server then shows as active, with its number of
 tools.
 
+A server that runs as a container on the Fadenstack server is reached by its name, for example
+`http://mcp-github:8080/mcp`, once the container is on the `fadenstack_default` network. Registering the server
+puts the container there if its class is `MCP` or `TENANT_APP` (see [Containers](../operate/containers.md#classes));
+any other container is left where it is. Give it one of those classes on its row before you register the server,
+or choose the network when you [create](../operate/containers.md#create-a-container) or
+[edit](../operate/containers.md#edit-a-container) the container.
+
 ??? info "More about the fields"
     | Field | What to enter |
     |---|---|
@@ -48,8 +55,8 @@ tools.
     Every person whose chat uses the server's tools acts with these credentials. Give the server a token with
     only the rights the tools need, read-only where you can.
 
-**Scan Network** looks for MCP servers on a host and a range of ports, and offers the ones it finds for
-registration.
+**Scan Network** looks for MCP servers on a host (a name or an IPv4 address) and a range of ports, and offers
+the ones it finds for registration.
 
 ## A server's page
 
@@ -131,5 +138,7 @@ that already exist keep their mode.
 | The reason says `401 Unauthorized` | The server needs credentials: add them as a header, for example `Authorization: Bearer <token>`. |
 | The reason says `404` | The server has no MCP endpoint at that address: Streamable HTTP addresses usually end in `/mcp`, SSE ones in `/sse`. |
 | The reason says `Connection refused` | Nothing listens at that address, or the Fadenstack server cannot reach it. |
+| The reason says `Cannot reach` for a container on the Fadenstack server | The container is not on the `fadenstack_default` network. Choose that network under **Networks** when you [edit the container](../operate/containers.md#edit-a-container), then select **Refresh** on the server's page. |
+| **"… is a link-local address"** or **"… a cloud metadata address"** when you register, edit or scan | The address is, or its name resolves to, one in `169.254.0.0/16` or `fe80::/10`, a cloud's metadata service, or `0.0.0.0`. Fadenstack does not call those; the MCP service checks again before it connects, because a name can point somewhere else later. Enter the server's own address: addresses on your network, on this server and container names are fine. |
 | **"MCP server … is …"** on the dashboard | The server is in error or disconnected, and its tools are not available to chats. Open it and select **Test**. |
 | People see no tools in the chat | Check that the server is enabled, its tools are enabled, and the model they chat with can call tools. |

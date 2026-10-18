@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
@@ -16,9 +17,14 @@ import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
+from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
+from faden_backend.db.models.containers import ContainerClass, ContainerPolicy
 from faden_backend.db.models.users import User
+from faden_backend.services import outbound
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services.mcp.client import MCPServiceClient, get_mcp_client
+from faden_backend.web.api.admin.containers import platform_volumes
+from faden_backend.web.api.admin.containers.views import _classification
 from faden_backend.web.api.admin.dependencies import get_docker, require_superuser
 from faden_backend.services.tls import default_httpx_verify
 
@@ -28,16 +34,56 @@ router = APIRouter()
 # Name of the MCP service container — used to discover its network.
 _MCP_SERVICE_CONTAINER = "faden-mcp"
 
+#: The containers a server URL's host joins to the MCP service's network:
+#: those classed as MCP servers or as the administrator's own (Containers →
+#: Classes). Any other was joined too, without Root Mode -- a container left
+#: off the network on purpose, or one of Fadenstack's own -- just by naming it
+#: in a URL; it is now left where it is.
+_JOINABLE_CLASSES = frozenset({ContainerClass.MCP, ContainerClass.TENANT_APP})
+
+
+async def _refuse_url(url: str | None) -> None:
+    """422 for a server URL at a link-local or cloud metadata address (services/outbound.py).
+
+    The MCP service fetches the URL and, for its settings, hands the answer
+    to the console. Loopback, private ranges and container names stay
+    allowed: that is where MCP servers run.
+    """
+    try:
+        await outbound.check_url(url)
+    except outbound.RefusedAddressError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+async def _not_joined(
+    docker: DockerService,
+    registry_dao: ContainerRegistryDAO,
+    target: dict[str, Any],
+) -> str | None:
+    """Why the container *target* is not joined to the MCP service's network; None when it is."""
+    container_class, policy = await _classification(target, target.get("Id", ""), registry_dao)
+    if container_class not in _JOINABLE_CLASSES:
+        return f"a {container_class.value} container"
+    if policy == ContainerPolicy.LOCKED:
+        return "locked"
+    project = ((target.get("Config") or {}).get("Labels") or {}).get(platform_volumes.COMPOSE_PROJECT)
+    if project is not None and project == await platform_volumes.own_project(docker):
+        return "one of Fadenstack's own containers"
+    return None
+
 
 async def _ensure_container_network(
     docker: DockerService,
+    registry_dao: ContainerRegistryDAO,
     url: str,
 ) -> None:
     """Connect the container referenced by *url* to the MCP service's network.
 
     Parses the hostname from the URL, looks up whether a Docker container
-    with that name exists, and — if so — connects it to the same network
-    as the ``faden-mcp`` container so they can communicate via DNS.
+    with that name exists, and — if so, and it is classed ``MCP`` or
+    ``TENANT_APP``, not locked and not one of Fadenstack's own (its compose
+    project) — connects it to the same network as the ``faden-mcp``
+    container so they can communicate via DNS.
     This is a best-effort operation: failures are logged but never raised.
     """
     try:
@@ -52,6 +98,11 @@ async def _ensure_container_network(
                 "MCP network auto-join: container %r not found — skipping",
                 hostname,
             )
+            return
+
+        refused = await _not_joined(docker, registry_dao, target)
+        if refused:
+            logger.info("MCP network auto-join: %s is %s; not joined", hostname, refused)
             return
 
         mcp_container = await docker.find_container_by_name(_MCP_SERVICE_CONTAINER)
@@ -123,13 +174,15 @@ async def register_server(
     _user: Annotated[User, Depends(require_superuser)],
     client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
     docker: Annotated[DockerService, Depends(get_docker)],
+    registry_dao: Annotated[ContainerRegistryDAO, Depends()],
     payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
     # Auto-join the MCP server's container to our Docker network
     # BEFORE registration, because the MCP service connects immediately.
-    url = payload.get("url", "")
-    if url:
-        await _ensure_container_network(docker, url)
+    url = payload.get("url")
+    if isinstance(url, str) and url:
+        await _refuse_url(url)
+        await _ensure_container_network(docker, registry_dao, url)
     return await client.register_server(payload)
 
 
@@ -148,11 +201,13 @@ async def update_server(
     _user: Annotated[User, Depends(require_superuser)],
     client: Annotated[MCPServiceClient, Depends(get_mcp_client)],
     docker: Annotated[DockerService, Depends(get_docker)],
+    registry_dao: Annotated[ContainerRegistryDAO, Depends()],
     payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
-    url = payload.get("url", "")
-    if url:
-        await _ensure_container_network(docker, url)
+    url = payload.get("url")
+    if isinstance(url, str) and url:
+        await _refuse_url(url)
+        await _ensure_container_network(docker, registry_dao, url)
     return await client.update_server(server_id, payload)
 
 
@@ -246,12 +301,20 @@ class ScanRequest(BaseModel):
 
 
 def _normalize_scan_host(host: str) -> str:
+    """The host to scan -- a host name or an IPv4 address -- or a 422.
+
+    The scan builds ``http://{host}:{port}/mcp/`` from it, and anything went
+    in as it was: ``10.0.0.5:6379#`` probed one port of another service,
+    ``user@host`` another host.
+    """
     normalized = host.strip()
     normalized = normalized.replace("host.docker.internel", "host.docker.internal")
     if normalized.startswith(("http://", "https://")):
         normalized = urlparse(normalized).hostname or normalized
     if "/" in normalized:
         normalized = normalized.split("/", 1)[0]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", normalized):
+        raise HTTPException(status_code=422, detail="Enter a host name or an IPv4 address to scan.")
     return normalized
 
 
@@ -379,6 +442,7 @@ async def scan_for_servers(
 ) -> ScanResponse:
     """Scan a host for running MCP servers on a port range."""
     host = _normalize_scan_host(body.host)
+    await _refuse_url(f"http://{host}/")
 
     if body.port_end < body.port_start:
         raise HTTPException(status_code=422, detail="port_end must be >= port_start.")
@@ -400,11 +464,11 @@ async def scan_for_servers(
     # Probe all ports concurrently with bounded parallelism
     sem = asyncio.Semaphore(50)
 
-    async def probe(port: int) -> DiscoveredServer | None:
+    async def probe(checked_host: str, port: int) -> DiscoveredServer | None:
         async with sem:
-            return await _probe_mcp_port(host, port)
+            return await _probe_mcp_port(checked_host, port)
 
-    tasks = [probe(p) for p in range(body.port_start, body.port_end + 1)]
+    tasks = [probe(host, p) for p in range(body.port_start, body.port_end + 1)]
     results = await asyncio.gather(*tasks)
 
     discovered: list[DiscoveredServer] = []
