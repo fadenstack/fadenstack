@@ -23,6 +23,8 @@ CREATE DATABASE faden_gateway;
 CREATE DATABASE faden_mcp;
 -- DB for Skills Registry
 CREATE DATABASE faden_skills;
+-- DB for Provenance (its migrator also makes it on installs created before)
+CREATE DATABASE faden_provenance;
 
 -- Optional: enable pgvector in rag DB
 \connect rag

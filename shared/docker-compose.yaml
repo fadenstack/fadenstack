@@ -85,8 +85,8 @@ services:
     # segment"). pgvector's README asks for more.
     shm_size: 1g
     # Every worker of every service keeps its own pool, and they all share this
-    # server: with PII, MCP and skills an install from this file alone can open
-    # about 130 connections at its peak, past Postgres' default of 100 (see
+    # server: with PII, MCP, skills and provenance an install from this file
+    # alone can open about 145 connections at its peak, past Postgres' default of 100 (see
     # docs/help/pages/operate/requirements.md, The server). A connection is a
     # process of about 6 MB, so 250 at once is about 1.5 GB.
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-250}"]
@@ -458,6 +458,10 @@ services:
       FADEN_GATEWAY_SKILLS_ENABLED: ${FADEN_GATEWAY_SKILLS_ENABLED:-false}
       FADEN_GATEWAY_SKILLS_SERVICE_URL: ${FADEN_GATEWAY_SKILLS_SERVICE_URL:-http://faden-skills:8000}
       FADEN_GATEWAY_SKILLS_SERVICE_TOKEN: ${FADEN_GATEWAY_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      # Provenance: marks AI-generated content (set via .env or COMPOSE_PROFILES)
+      FADEN_GATEWAY_PROVENANCE_ENABLED: ${FADEN_GATEWAY_PROVENANCE_ENABLED:-false}
+      FADEN_GATEWAY_PROVENANCE_SERVICE_URL: ${FADEN_GATEWAY_PROVENANCE_SERVICE_URL:-http://faden-provenance:8000}
+      FADEN_GATEWAY_PROVENANCE_SERVICE_TOKEN: ${FADEN_GATEWAY_PROVENANCE_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Knowledge search runs in the backend. The default, 127.0.0.1:8000, is this container's own port:
       # every search reached the gateway itself and failed with 404.
       FADEN_GATEWAY_RAG_LITE_BACKEND_URL: ${FADEN_GATEWAY_RAG_LITE_BACKEND_URL:-http://faden-backend:8000}
@@ -606,6 +610,9 @@ services:
       FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
       FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
       FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      FADEN_BACKEND_PROVENANCE_ENABLED: ${FADEN_BACKEND_PROVENANCE_ENABLED:-false}
+      FADEN_BACKEND_PROVENANCE_SERVICE_URL: ${FADEN_BACKEND_PROVENANCE_SERVICE_URL:-http://faden-provenance:8000}
+      FADEN_BACKEND_PROVENANCE_SERVICE_TOKEN: ${FADEN_BACKEND_PROVENANCE_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Scalability tuning (set via faden tune)
       FADEN_BACKEND_WORKERS_COUNT: ${FADEN_BACKEND_WORKERS_COUNT:-4}
       FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
@@ -721,6 +728,9 @@ services:
       FADEN_BACKEND_DOCLING_SERVICE_URL: ${FADEN_BACKEND_DOCLING_SERVICE_URL:-http://faden-docling:8000}
       FADEN_BACKEND_SKILLS_SERVICE_URL: ${FADEN_BACKEND_SKILLS_SERVICE_URL:-http://faden-skills:8000}
       FADEN_BACKEND_SKILLS_SERVICE_TOKEN: ${FADEN_BACKEND_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      FADEN_BACKEND_PROVENANCE_ENABLED: ${FADEN_BACKEND_PROVENANCE_ENABLED:-false}
+      FADEN_BACKEND_PROVENANCE_SERVICE_URL: ${FADEN_BACKEND_PROVENANCE_SERVICE_URL:-http://faden-provenance:8000}
+      FADEN_BACKEND_PROVENANCE_SERVICE_TOKEN: ${FADEN_BACKEND_PROVENANCE_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       # Scalability tuning (set via faden tune)
       FADEN_BACKEND_DB_POOL_SIZE: ${FADEN_BACKEND_DB_POOL_SIZE:-5}
       FADEN_BACKEND_DB_MAX_OVERFLOW: ${FADEN_BACKEND_DB_MAX_OVERFLOW:-5}
@@ -965,6 +975,60 @@ services:
       FADEN_SKILLS_REDIS_BASE: 4
       FADEN_SKILLS_SERVICE_TOKEN: ${FADEN_SKILLS_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_SKILLS_WORKERS_COUNT: ${FADEN_SKILLS_WORKERS_COUNT:-1}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # =====================================================================
+  # Provenance (profile: provenance)
+  #
+  # Marks AI-generated content and checks marks (EU AI Act Art. 50(2)).
+  # Published as an image only; switched on by default by faden deploy
+  # and faden upgrade. The migrator makes the database faden_provenance
+  # when an install created before the module has none.
+  # =====================================================================
+  faden-provenance-migrator:
+    profiles: ["provenance"]
+    image: ${REGISTRY:-ghcr.io/fadenstack}/provenance:${VERSION:-latest}
+    container_name: faden-provenance-migrator
+    logging: *faden-logging
+    restart: on-failure:5
+    command: ["sh", "-c", "sleep 5 && python -m faden_provenance.db.ensure && alembic upgrade head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FADEN_PROVENANCE_DB_HOST: postgres
+      FADEN_PROVENANCE_DB_PORT: 5432
+      FADEN_PROVENANCE_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_PROVENANCE_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      FADEN_PROVENANCE_DB_BASE: faden_provenance
+
+  faden-provenance:
+    profiles: ["provenance"]
+    image: ${REGISTRY:-ghcr.io/fadenstack}/provenance:${VERSION:-latest}
+    container_name: faden-provenance
+    logging: *faden-logging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      faden-provenance-migrator:
+        condition: service_completed_successfully
+    environment:
+      FADEN_PROVENANCE_HOST: 0.0.0.0
+      FADEN_PROVENANCE_PORT: 8000
+      FADEN_PROVENANCE_RELOAD: "false"
+      FADEN_PROVENANCE_ENVIRONMENT: ${FADEN_PROVENANCE_ENVIRONMENT:-production}
+      FADEN_PROVENANCE_DB_HOST: postgres
+      FADEN_PROVENANCE_DB_PORT: 5432
+      FADEN_PROVENANCE_DB_USER: ${POSTGRES_USER:-postgres}
+      FADEN_PROVENANCE_DB_PASS: ${POSTGRES_PASSWORD:?set it in .env; an install that ran without it keeps its data only with the old default value (Help, Installing, Secrets in .env)}
+      FADEN_PROVENANCE_DB_BASE: faden_provenance
+      FADEN_PROVENANCE_SERVICE_TOKEN: ${FADEN_PROVENANCE_SERVICE_TOKEN:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
+      FADEN_PROVENANCE_PLUGINS: ${FADEN_PROVENANCE_PLUGINS:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
       interval: 5s

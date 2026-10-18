@@ -28,6 +28,7 @@ Usage from gateway / backend code::
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -71,6 +72,19 @@ class ServiceInfo:
             "version": self.version,
             "metadata": self.metadata,
         }
+
+
+@dataclass(slots=True)
+class ProbeResult:
+    """What a module's own probe found: its status, and what the manifest says about it."""
+
+    status: ServiceStatus
+    version: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+#: A module's own health check, in place of the plain GET on its health path.
+Probe = Callable[[], Awaitable[ProbeResult]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +150,17 @@ _KNOWN_SERVICES: list[_ServiceDef] = [
         ),
         health_path="/api/health",
     ),
+    # Its probe (ProvenanceClient.probe) also reads the engine's contract and
+    # capabilities, with the gateway's token.
+    _ServiceDef(
+        name="provenance",
+        display_name="Content Provenance",
+        description=(
+            "Marks AI-generated content and signs generation receipts "
+            "(EU AI Act Art. 50(2))."
+        ),
+        health_path="/api/health",
+    ),
 ]
 
 
@@ -148,6 +173,7 @@ class ServiceRegistry:
 
     def __init__(self) -> None:
         self._services: dict[str, ServiceInfo] = {}
+        self._probes: dict[str, Probe] = {}
         for svc in _KNOWN_SERVICES:
             self._services[svc.name] = ServiceInfo(
                 name=svc.name,
@@ -183,6 +209,19 @@ class ServiceRegistry:
         info.status = (
             ServiceStatus.CONFIGURED if info.enabled else ServiceStatus.DISABLED
         )
+        if not info.enabled:
+            info.version = None
+            info.metadata = {}
+
+    def set_probe(self, name: str, probe: Probe | None) -> None:
+        """Check *name* with *probe* instead of a GET on its health path; ``None`` goes back to the GET."""
+        if name not in self._services:
+            logger.warning("Unknown service '%s' in registry.set_probe()", name)
+            return
+        if probe is None:
+            self._probes.pop(name, None)
+        else:
+            self._probes[name] = probe
 
     # ------------------------------------------------------------------
     # Queries
@@ -238,6 +277,16 @@ class ServiceRegistry:
         for svc in targets:
             if not svc.enabled or not svc.url:
                 results[svc.name] = ServiceStatus.DISABLED
+                continue
+            probe = self._probes.get(svc.name)
+            if probe is not None:
+                try:
+                    found = await probe()
+                    svc.status, svc.version, svc.metadata = found.status, found.version, found.metadata
+                except Exception:
+                    svc.status, svc.version, svc.metadata = ServiceStatus.UNHEALTHY, None, {}
+                    logger.debug("Health probe failed for %s", svc.name, exc_info=True)
+                results[svc.name] = svc.status
                 continue
             try:
                 resp = await http_client.get(

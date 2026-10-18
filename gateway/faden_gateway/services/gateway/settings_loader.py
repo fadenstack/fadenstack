@@ -16,6 +16,8 @@ Keys loaded
 - ``faden_gateway.mcp_service_url`` → ``settings.mcp_service_url``
 - ``faden_gateway.skills_enabled`` → ``settings.skills_enabled``
 - ``faden_gateway.skills_service_url`` → ``settings.skills_service_url``
+- ``faden_gateway.provenance_enabled`` → ``settings.provenance_enabled``
+- ``faden_gateway.provenance_service_url`` → ``settings.provenance_service_url``
 - ``rag_lite.enabled`` → ``settings.rag_lite_enabled``
 """
 
@@ -37,6 +39,8 @@ _VALUE_KEYS: dict[str, str] = {
     "faden_gateway.mcp_service_url": "mcp_service_url",
     "faden_gateway.skills_enabled": "skills_enabled",
     "faden_gateway.skills_service_url": "skills_service_url",
+    "faden_gateway.provenance_enabled": "provenance_enabled",
+    "faden_gateway.provenance_service_url": "provenance_service_url",
     # The Modules page switches RAG Lite on for the backend only; without
     # this the gateway never added retrieved context to a chat that asked
     # for it -- it went to the model without it, and nothing said so.

@@ -27,6 +27,7 @@ from faden_gateway.db.connection_budget import check_connection_budget
 from faden_gateway.services.gateway.file_store import LocalFileStore, SealedFileStore
 from faden_gateway.services.gateway.observability import GatewayObservability
 from faden_gateway.services.gateway.pricing import PricingService
+from faden_gateway.services.gateway.provenance_client import ProvenanceClient
 from faden_gateway.services.gateway.proxy import create_shared_http_client
 from faden_gateway.services.gateway.jwt_secret import load_jwt_secret_from_backend_db
 from faden_gateway.services.gateway.settings_loader import load_system_settings_from_backend_db
@@ -225,7 +226,34 @@ def _setup_service_registry(app: FastAPI) -> None:
     service_registry.configure(
         "skills", enabled=settings.skills_enabled, url=settings.skills_service_url,
     )
+    service_registry.configure(
+        "provenance", enabled=settings.provenance_enabled, url=settings.provenance_service_url,
+    )
     app.state.service_registry = service_registry
+
+
+def _setup_provenance(app: FastAPI) -> None:
+    """The provenance service's client on ``app.state.provenance_client``; ``None`` with the module off.
+
+    Needs the shared HTTP client, so it runs after it is made. The services
+    manifest checks the module with the client's probe, which reads the
+    engine's contract and capabilities; nothing in a request's path uses it.
+    """
+    client: ProvenanceClient | None = None
+    url = service_registry.get_url("provenance")
+    if url:
+        if not settings.provenance_service_token:
+            log.warning(
+                "FADEN_GATEWAY_PROVENANCE_SERVICE_TOKEN is empty: the provenance service refuses "
+                "the gateway's calls, and the services manifest lists it as unhealthy.",
+            )
+        client = ProvenanceClient(
+            base_url=url,
+            http_client=app.state.http_client,
+            service_token=settings.provenance_service_token,
+        )
+    app.state.provenance_client = client
+    service_registry.set_probe("provenance", client.probe if client is not None else None)
 
 
 async def _turn_sweep_loop(app: FastAPI) -> None:
@@ -403,6 +431,7 @@ async def lifespan_setup(
     app.state.http_client = create_shared_http_client(
         timeout_sec=settings.http_timeout_sec,
     )
+    _setup_provenance(app)
     app.state._resource_capacity = resource_capacity(gateway_plugin)
     # Chat file store
     if settings.sessions_enabled:

@@ -217,6 +217,15 @@ class Settings(BaseSettings):
     skills_enabled: bool = False
     skills_service_token: str = ""
 
+    # Optional module: Provenance (marks generated content, signs generation
+    # receipts). Only its status is read so far: the services manifest
+    # (/v1/services) lists its engine, contract and capabilities.
+    provenance_enabled: bool = False
+    provenance_service_url: str = "http://faden-provenance:8000"
+    #: Presented to the provenance service (Bearer); it refuses its info
+    #: route without it (401) or with another (403).
+    provenance_service_token: str = ""
+
     # Optional module: External auth service
     auth_service_url: str | None = None
     auth_enabled: bool = False
