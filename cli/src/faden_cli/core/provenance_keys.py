@@ -10,13 +10,17 @@ keys are kept in ``.env`` with the install's other secrets, one line each:
   trust;
 * ``FADEN_PROVENANCE_HASH_KEYS``: ``<version>:<base64 of 32 random bytes>``, comma-separated, the highest
   version the current one. Every version ever used stays: what was hashed with it is checked with it.
+* ``FADEN_PROVENANCE_WATERMARK_KEYS``: ``<version>:<random whole number below 2^63>``, kept the same way:
+  the key of the text watermark the model runtimes put into answers (vLLM's ``--watermark-config``). The
+  backend gives the current one to the deployments it starts, the engine checks texts with every version.
 
 ``faden`` writes them into ``secrets/`` like the other keys (:mod:`faden_cli.core.secret_files`), and
-compose mounts them under ``/run/secrets`` of ``faden-provenance`` only. ``faden deploy`` makes them;
-``faden upgrade`` and ``faden up`` make what is missing and issue the certificate again (a new key with it)
-when it has fewer than :data:`RENEW_BEFORE_DAYS` days left or its authority is no longer the install's
-current one. ``faden secrets rotate`` gives the signer a new key and certificate and appends a hash-key
-version. A backup carries them in its ``.env``; a restore keeps the hash-key versions the install had
+compose mounts them under ``/run/secrets`` of ``faden-provenance``, and the watermark keys of the backend
+too. ``faden deploy`` makes them; ``faden upgrade`` and ``faden up`` make what is missing and issue the
+certificate again (a new key with it) when it has fewer than :data:`RENEW_BEFORE_DAYS` days left or its
+authority is no longer the install's current one. ``faden secrets rotate`` gives the signer a new key and
+certificate and appends a hash-key and a watermark-key version (a deployment takes the new watermark key
+when it next starts). A backup carries them in its ``.env``; a restore keeps the versions the install had
 beside the backup's, and a ``.env`` written anew keeps every version of the one it replaces
 (:func:`keep_versions`).
 
@@ -39,9 +43,14 @@ if TYPE_CHECKING:
 SIGNING_KEY = "FADEN_PROVENANCE_SIGNING_KEY"
 SIGNING_CERTS = "FADEN_PROVENANCE_SIGNING_CERTS"
 HASH_KEYS = "FADEN_PROVENANCE_HASH_KEYS"
+WATERMARK_KEYS = "FADEN_PROVENANCE_WATERMARK_KEYS"
 #: The signer: replaced together, never one without the other.
 SIGNER_KEYS: tuple[str, ...] = (SIGNING_KEY, SIGNING_CERTS)
-KEYS: tuple[str, ...] = (*SIGNER_KEYS, HASH_KEYS)
+#: Kept in versions: every version ever used stays, the highest is the current one.
+VERSIONED_KEYS: tuple[str, ...] = (HASH_KEYS, WATERMARK_KEYS)
+KEYS: tuple[str, ...] = (*SIGNER_KEYS, *VERSIONED_KEYS)
+#: What the console calls each versioned key.
+LABELS = {HASH_KEYS: "hash key", WATERMARK_KEYS: "text watermark key"}
 
 #: Extended key usages of the signer's certificate: C2PA claim signing, document signing, e-mail protection.
 C2PA_CLAIM_SIGNING = "1.3.6.1.4.1.62558.2.1"
@@ -50,6 +59,8 @@ SIGNER_DAYS = 365
 #: Issued again this many days before it runs out.
 RENEW_BEFORE_DAYS = 30
 HASH_KEY_BYTES = 32
+#: The watermark keys are whole numbers below this: vLLM seeds the watermark's random function with one.
+WATERMARK_KEY_LIMIT = 2**63
 #: Where a key line written here goes in .env.
 ENV_HEADER = "Provenance keys (faden deploy, upgrade, up)"
 
@@ -58,11 +69,29 @@ class ProvenanceKeyError(ValueError):
     """A provenance key in ``.env`` does not read; the message names the key, never its value."""
 
 
-# ── Hash keys ─────────────────────────────────────────────────────
+# ── Versioned keys: the hash keys and the watermark keys ──────────
 
 
-def parse_hash_keys(value: str) -> dict[int, str]:
-    """The versions in a :data:`HASH_KEYS` value, by number.
+def _shape(name: str) -> str:
+    return "<version>:<whole number>" if name == WATERMARK_KEYS else "<version>:<base64 key>"
+
+
+def _check(name: str, number: int, key: str) -> None:
+    """Raise :class:`ProvenanceKeyError` when *key*, version *number* of *name*, is not a key of its kind."""
+    if name == WATERMARK_KEYS:
+        if not key.isdigit() or not 0 < int(key) < WATERMARK_KEY_LIMIT:
+            raise ProvenanceKeyError(f"{name} version {number} is not a whole number from 1 to 2^63 - 1.")
+        return
+    try:
+        decoded = base64.b64decode(key, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ProvenanceKeyError(f"{name} version {number} is not base64.") from exc
+    if not decoded:
+        raise ProvenanceKeyError(f"{name} version {number} is empty.")
+
+
+def parse_versions(value: str, name: str = HASH_KEYS) -> dict[int, str]:
+    """The versions in a :data:`HASH_KEYS` or :data:`WATERMARK_KEYS` value (*name*), by number.
 
     Raises :class:`ProvenanceKeyError` when one does not read.
     """
@@ -73,62 +102,84 @@ def parse_hash_keys(value: str) -> dict[int, str]:
         raw_number, sep, raw_key = entry.partition(":")
         digits, key = raw_number.strip(), raw_key.strip()
         if not sep or not digits.isdigit() or int(digits) < 1 or not key:
-            raise ProvenanceKeyError(f"{HASH_KEYS} has an entry that is not <version>:<base64 key>.")
+            raise ProvenanceKeyError(f"{name} has an entry that is not {_shape(name)}.")
         number = int(digits)
-        try:
-            decoded = base64.b64decode(key, validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise ProvenanceKeyError(f"{HASH_KEYS} version {number} is not base64.") from exc
-        if not decoded:
-            raise ProvenanceKeyError(f"{HASH_KEYS} version {number} is empty.")
+        _check(name, number, key)
         if versions.get(number, key) != key:
-            raise ProvenanceKeyError(f"{HASH_KEYS} holds version {number} twice, with two different keys.")
+            raise ProvenanceKeyError(f"{name} holds version {number} twice, with two different keys.")
         versions[number] = key
     return versions
 
 
-def format_hash_keys(versions: dict[int, str]) -> str:
+def parse_hash_keys(value: str) -> dict[int, str]:
+    """The versions in a :data:`HASH_KEYS` value, by number."""
+    return parse_versions(value, HASH_KEYS)
+
+
+def parse_watermark_keys(value: str) -> dict[int, str]:
+    """The versions in a :data:`WATERMARK_KEYS` value, by number (the keys as their decimal digits)."""
+    return parse_versions(value, WATERMARK_KEYS)
+
+
+def format_versions(versions: dict[int, str]) -> str:
     """*versions* as one ``.env`` value, oldest first."""
     return ",".join(f"{number}:{versions[number]}" for number in sorted(versions))
 
 
-def new_hash_key() -> str:
-    """A new hash key: 32 random bytes, in base64."""
+def new_key(name: str = HASH_KEYS) -> str:
+    """A new key for *name*: 32 random bytes in base64; for the watermark, a whole number below 2^63."""
+    if name == WATERMARK_KEYS:
+        return str(secrets.randbelow(WATERMARK_KEY_LIMIT - 1) + 1)
     return base64.b64encode(secrets.token_bytes(HASH_KEY_BYTES)).decode("ascii")
 
 
+def new_hash_key() -> str:
+    """A new hash key: 32 random bytes, in base64."""
+    return new_key(HASH_KEYS)
+
+
+def add_version(value: str, name: str = HASH_KEYS) -> str:
+    """*value* with a new version after its highest: the one used from now on."""
+    versions = parse_versions(value, name)
+    versions[max(versions, default=0) + 1] = new_key(name)
+    return format_versions(versions)
+
+
 def add_hash_key(value: str) -> str:
-    """*value* with a new version after its highest: the one hashes are made with from now on."""
-    versions = parse_hash_keys(value)
-    versions[max(versions, default=0) + 1] = new_hash_key()
-    return format_hash_keys(versions)
+    """*value* with a new hash-key version after its highest: the one hashes are made with from now on."""
+    return add_version(value, HASH_KEYS)
 
 
-def merge_hash_keys(first: str, second: str) -> str:
+def merge_versions(first: str, second: str, name: str = HASH_KEYS) -> str:
     """Every version of *first* under its number, then every key of *second* that *first* lacks.
 
     A key of *second* under a number *first* gives another key is added as a new version after the
     highest: no key is lost. Raises :class:`ProvenanceKeyError` when either does not read.
     """
-    merged = parse_hash_keys(first)
+    merged = parse_versions(first, name)
     known = set(merged.values())
-    for number, key in sorted(parse_hash_keys(second).items()):
+    for number, key in sorted(parse_versions(second, name).items()):
         if key in known:
             continue
         merged[max(merged) + 1 if number in merged else number] = key
         known.add(key)
-    return format_hash_keys(merged)
+    return format_versions(merged)
 
 
-def keep_versions(kept: str, new: str) -> str:
-    """What a ``.env`` written anew holds as :data:`HASH_KEYS`: *new*, with every version of *kept* it lacks.
+def merge_hash_keys(first: str, second: str) -> str:
+    """:func:`merge_versions` of two :data:`HASH_KEYS` values."""
+    return merge_versions(first, second, HASH_KEYS)
+
+
+def keep_versions(kept: str, new: str, name: str = HASH_KEYS) -> str:
+    """What a ``.env`` written anew holds as *name*: *new*, with every version of *kept* it lacks.
 
     When either does not read, *kept* as it was: a value that is not understood is never thrown away.
     """
     if not kept or not new or kept == new:
         return kept or new
     try:
-        return merge_hash_keys(new, kept)
+        return merge_versions(new, kept, name)
     except ProvenanceKeyError:
         return kept
 
@@ -274,16 +325,22 @@ class Ensured:
     issued: str | None = None
     #: The day the signer's certificate runs out, when one was issued.
     valid_until: datetime | None = None
-    hash_key_made: bool = False
+    #: The versioned keys made (version 1), by their .env name.
+    made: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+
+    @property
+    def hash_key_made(self) -> bool:
+        """Whether the hash keys were made."""
+        return HASH_KEYS in self.made
 
 
 def ensure(install_dir: Path, env_path: Path, *, now: datetime | None = None) -> Ensured:
     """Give the install's ``.env`` the provenance keys it lacks, and a signer when the one there is due.
 
-    Every other line of ``.env`` stays as it is. Existing hash keys are never touched; a value of them
-    that does not read is reported, not replaced. Raises :class:`faden_cli.core.tls.TlsError` when the
-    authority cannot be read, before ``.env`` changes.
+    Every other line of ``.env`` stays as it is. Existing hash and watermark keys are never touched; a value
+    of them that does not read is reported, not replaced. Raises :class:`faden_cli.core.tls.TlsError` when
+    the authority cannot be read, before ``.env`` changes.
     """
     from faden_cli.core.env_gen import read_env_file, rewrite_env  # noqa: PLC0415
 
@@ -298,12 +355,13 @@ def ensure(install_dir: Path, env_path: Path, *, now: datetime | None = None) ->
     if why is not None:
         values[SIGNING_KEY], values[SIGNING_CERTS] = issue_signer(install_dir, now=now)
         done.issued, done.valid_until = why, now + timedelta(days=SIGNER_DAYS)
-    if not env.get(HASH_KEYS):
-        values[HASH_KEYS] = add_hash_key("")
-        done.hash_key_made = True
-    else:
+    for name in VERSIONED_KEYS:
+        if not env.get(name):
+            values[name] = add_version("", name)
+            done.made.append(name)
+            continue
         try:
-            parse_hash_keys(env[HASH_KEYS])
+            parse_versions(env[name], name)
         except ProvenanceKeyError as exc:
             done.problems.append(f"{exc} It is left as it is; the provenance engine cannot use it so.")
     if values:
@@ -326,62 +384,65 @@ def ensure_step(install_dir: Path, env_path: Path) -> None:
             f"Provenance signing certificate issued from the install's authority ({done.issued}); "
             f"valid until {done.valid_until:%Y-%m-%d}."
         )
-    if done.hash_key_made:
-        info("Provenance hash key made (version 1).")
+    for name in done.made:
+        info(f"Provenance {LABELS[name]} made (version 1).")
     for problem in done.problems:
         warning(problem)
 
 
 def rotated(install_dir: Path, env: dict[str, str], *, now: datetime | None = None) -> dict[str, str]:
-    """What ``faden secrets rotate`` writes: a new signing key and certificate, and a new hash-key version.
+    """What ``faden secrets rotate`` writes: a new signer, and a new version of the hash and watermark keys.
 
-    The hash-key versions there stay as they are. Raises :class:`ProvenanceKeyError` when they do not
-    read, and :class:`faden_cli.core.tls.TlsError` when the authority cannot be read.
+    The versions there stay as they are. Raises :class:`ProvenanceKeyError` when they do not read, and
+    :class:`faden_cli.core.tls.TlsError` when the authority cannot be read.
     """
-    hash_keys = add_hash_key(env.get(HASH_KEYS, ""))
-    key, certs = issue_signer(install_dir, now=now)
-    return {SIGNING_KEY: key, SIGNING_CERTS: certs, HASH_KEYS: hash_keys}
+    values = {name: add_version(env.get(name, ""), name) for name in VERSIONED_KEYS}
+    values[SIGNING_KEY], values[SIGNING_CERTS] = issue_signer(install_dir, now=now)
+    return values
 
 
-def keep_after_restore(env_path: Path, before: str) -> str | None:
-    """After a restore wrote a backup's ``.env`` over the install's: the install's hash-key versions, kept.
+def keep_after_restore(env_path: Path, before: dict[str, str]) -> list[str]:
+    """After a restore wrote a backup's ``.env`` over the install's: the install's key versions, kept.
 
-    *before* is the install's :data:`HASH_KEYS` before the restore. The backup's versions keep their
-    numbers; a key only the install had is added after them. A value that does not read holds no key that
-    can be used: when one of the two does not, the other is kept, and the warning returned says so
-    (``None`` otherwise).
+    *before* is the install's ``.env`` before the restore. The backup's versions keep their numbers; a key
+    only the install had is added after them. A value that does not read holds no key that can be used: when
+    one of the two does not, the other is kept, and a warning returned says so.
     """
     from faden_cli.core.env_gen import read_env_file, rewrite_env  # noqa: PLC0415
 
-    restored = read_env_file(env_path).get(HASH_KEYS, "")
-    if not before:
-        return None
-    note = None
-    if not restored:
-        merged = before  # nothing restored in its place: the install's value, as it was
-    else:
-        try:
-            merged = merge_hash_keys(restored, before)
-        except ProvenanceKeyError:
-            merged, note = _one_readable(restored, before)
-            if merged is None:
-                return note
-    if merged != restored:
-        rewrite_env(env_path, set_values={HASH_KEYS: merged}, header=ENV_HEADER)
-    return note
+    restored_env = read_env_file(env_path)
+    values: dict[str, str] = {}
+    notes: list[str] = []
+    for name in VERSIONED_KEYS:
+        kept, restored = before.get(name, ""), restored_env.get(name, "")
+        if not kept:
+            continue
+        if not restored:
+            merged: str | None = kept  # nothing restored in its place: the install's value, as it was
+        else:
+            try:
+                merged = merge_versions(restored, kept, name)
+            except ProvenanceKeyError:
+                merged, note = _one_readable(restored, kept, name)
+                notes.append(note)
+        if merged is not None and merged != restored:
+            values[name] = merged
+    if values:
+        rewrite_env(env_path, set_values=values, header=ENV_HEADER)
+    return notes
 
 
-def _one_readable(restored: str, before: str) -> tuple[str | None, str]:
-    """Of two :data:`HASH_KEYS` values that do not merge, the one that reads, and what to say of the other."""
+def _one_readable(restored: str, before: str, name: str) -> tuple[str | None, str]:
+    """Of two values of *name* that do not merge, the one that reads, and what to say of the other."""
     try:
-        return format_hash_keys(parse_hash_keys(restored)), (
-            f"{HASH_KEYS} before the restore does not read; the backup's is kept."
+        return format_versions(parse_versions(restored, name)), (
+            f"{name} before the restore does not read; the backup's is kept."
         )
     except ProvenanceKeyError:
         pass
     try:
-        return format_hash_keys(parse_hash_keys(before)), (
-            f"{HASH_KEYS} in the backup's .env does not read; the install's is kept."
+        return format_versions(parse_versions(before, name)), (
+            f"{name} in the backup's .env does not read; the install's is kept."
         )
     except ProvenanceKeyError:
-        return None, f"{HASH_KEYS} does not read, in the backup's .env nor before; it is left as restored."
+        return None, f"{name} does not read, in the backup's .env nor before; it is left as restored."

@@ -5,7 +5,8 @@ pages showed it to administrators: the chat key there opened every chat. The com
 keys as files under ``/run/secrets`` (its ``secrets:``), where the services read them (pydantic-settings
 ``secrets_dir``). ``.env`` stays where they are kept and changed: every compose command the CLI runs writes
 the files from it first (:meth:`ComposeContext.base_cmd`), so a key rotated, restored or set by hand reaches the
-services the next time they start. The provenance engine's signing key and hash keys go the same way.
+services the next time they start. The provenance engine's signing key, hash keys and watermark keys go the
+same way.
 
 The folder is the install user's only (0700); the files in it are 0644, so a service that does not run as
 root can read the one it is given, while nobody else on the server reaches them. Each is rewritten in place:
@@ -29,11 +30,12 @@ SECRET_FILES: tuple[str, ...] = (
     "FADEN_BACKEND_CREDENTIAL_PEPPER",
     "FADEN_MCP_ENCRYPTION_KEY",
     "FADEN_MCP_ENCRYPTION_KEY_PREVIOUS",
-    # The provenance engine's signer and hash keys (core/provenance_keys.py). Not required: only
-    # faden-provenance reads them, and the module can be switched off; an empty file is what it gets then.
+    # The provenance engine's signer, hash keys and text watermark keys (core/provenance_keys.py). Not
+    # required: the module can be switched off; an empty file is what the services get then.
     "FADEN_PROVENANCE_SIGNING_KEY",
     "FADEN_PROVENANCE_SIGNING_CERTS",
     "FADEN_PROVENANCE_HASH_KEYS",
+    "FADEN_PROVENANCE_WATERMARK_KEYS",
 )
 #: Never empty when the services start (compose refused to start without them while they were environment).
 REQUIRED: frozenset[str] = frozenset({

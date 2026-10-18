@@ -1,9 +1,10 @@
-"""The provenance engine's keys: its signing certificate from the install's authority, and its hash keys.
+"""The provenance keys: the engine's signing certificate and hash keys, and the text watermark's key.
 
 ``faden-provenance`` signs C2PA manifests on generated pictures (EU AI Act Art. 50(2)) with a key whose
-certificate the install's own authority issues, and keys the hashes of what it records. The keys live in
-``.env`` with the other secrets, reach the engine as files under ``/run/secrets``, and every hash-key version
-ever used stays: what was hashed with it is checked with it.
+certificate the install's own authority issues, and keys the hashes of what it records. The model runtimes
+watermark answers with a key the backend gives them. The keys live in ``.env`` with the other secrets, reach
+the services as files under ``/run/secrets``, and every hash-key and watermark-key version ever used stays:
+what was hashed or watermarked with it is checked with it.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from faden_cli.core.env_gen import default_env_vars, read_env_file, write_env_fi
 
 SHARED = Path(__file__).resolve().parents[2] / "shared"
 KEY_LINE = re.compile(r"[0-9]+:[A-Za-z0-9+/]{43}=")
+WATERMARK_LINE = re.compile(r"1:[1-9][0-9]*")
 
 
 def _now() -> datetime:
@@ -180,21 +182,25 @@ def test_a_signer_is_due_once_its_authority_is_replaced(install: Path) -> None:
 # ── In .env ───────────────────────────────────────────────────────
 
 
-def test_ensure_writes_the_three_keys_once(install: Path) -> None:
+def test_ensure_writes_the_keys_once(install: Path) -> None:
     env_path = install / ".env"
     done = pk.ensure(install, env_path)
     assert done.issued == "there was none" and done.hash_key_made
+    assert done.made == [pk.HASH_KEYS, pk.WATERMARK_KEYS]
     env = read_env_file(env_path)
     assert env["POSTGRES_PASSWORD"] == "keep-me", "the rest of .env stays"
     assert KEY_LINE.fullmatch(env[pk.HASH_KEYS]) and env[pk.HASH_KEYS].startswith("1:")
     assert len(base64.b64decode(env[pk.HASH_KEYS].split(":", 1)[1])) == 32
+    assert WATERMARK_LINE.fullmatch(env[pk.WATERMARK_KEYS])
+    assert 0 < int(env[pk.WATERMARK_KEYS].split(":", 1)[1]) < 2**63, "a key vLLM's watermark takes"
     _chain(env)[0].verify_directly_issued_by(_authority(install))
     lines = env_path.read_text(encoding="utf-8").splitlines()
-    assert sum(line.startswith(tuple(f"{k}=" for k in pk.KEYS)) for line in lines) == 3, "a line each"
+    written = sum(line.startswith(tuple(f"{k}=" for k in pk.KEYS)) for line in lines)
+    assert written == len(pk.KEYS), "a line each"
 
     before = env_path.read_bytes()
     again = pk.ensure(install, env_path)
-    assert again.issued is None and not again.hash_key_made
+    assert again.issued is None and not again.made
     assert env_path.read_bytes() == before, "nothing changes while they serve"
 
 
@@ -231,8 +237,10 @@ def test_no_key_is_ever_said(install: Path, capsys: pytest.CaptureFixture[str]) 
     env = read_env_file(env_path)
     said = capsys.readouterr().out
     assert "Provenance signing certificate issued" in " ".join(said.split())
+    assert "Provenance text watermark key made (version 1)" in " ".join(said.split())
     hash_key = env[pk.HASH_KEYS].split(":", 1)[1]
-    for secret in (env[pk.SIGNING_KEY][:40], hash_key):
+    watermark_key = env[pk.WATERMARK_KEYS].split(":", 1)[1]
+    for secret in (env[pk.SIGNING_KEY][:40], hash_key, watermark_key):
         assert secret not in said
 
 
@@ -269,6 +277,24 @@ def test_a_value_that_does_not_read_is_refused_without_its_content(value: str) -
         assert content not in str(refused.value), "names the key, never its value"
 
 
+@pytest.mark.parametrize("value", ["1:abc", "1:0", f"1:{2**63}", "1:-5", "1:12,1:13"])
+def test_a_watermark_key_that_is_not_a_whole_number_vllm_takes_is_refused(value: str) -> None:
+    with pytest.raises(pk.ProvenanceKeyError) as refused:
+        pk.parse_watermark_keys(value)
+    assert pk.WATERMARK_KEYS in str(refused.value)
+    for content in ("abc", str(2**63), "12", "13"):
+        assert content not in str(refused.value).replace(pk.WATERMARK_KEYS, ""), "never its value"
+
+
+def test_watermark_versions_are_added_and_merged_like_the_hash_keys() -> None:
+    first = pk.add_version("", pk.WATERMARK_KEYS)
+    second = pk.add_version(first, pk.WATERMARK_KEYS)
+    assert second.startswith(first + ",2:") and len(set(pk.parse_watermark_keys(second).values())) == 2
+    other = pk.add_version("", pk.WATERMARK_KEYS)
+    merged = pk.merge_versions(second, other, pk.WATERMARK_KEYS)
+    assert pk.parse_watermark_keys(merged) == {**pk.parse_watermark_keys(second), 3: other.split(":", 1)[1]}
+
+
 def test_merging_loses_no_key() -> None:
     a, b, c = (pk.new_hash_key() for _ in range(3))
     assert pk.merge_hash_keys(f"1:{a}", f"1:{a},2:{b}") == f"1:{a},2:{b}"
@@ -290,13 +316,17 @@ def test_regenerating_env_keeps_every_hash_key_version(install: Path) -> None:
     env_path = install / ".env"
     pk.ensure(install, env_path)
     current = read_env_file(env_path)
-    write_env_file(env_path, {**current, pk.HASH_KEYS: pk.add_hash_key(current[pk.HASH_KEYS])})
+    write_env_file(env_path, {
+        **current, pk.HASH_KEYS: pk.add_hash_key(current[pk.HASH_KEYS]),
+        pk.WATERMARK_KEYS: pk.add_version(current[pk.WATERMARK_KEYS], pk.WATERMARK_KEYS),
+    })
     before = read_env_file(env_path)
 
     write_env_file(env_path, default_env_vars(), preserve_secrets=False)
 
     after = read_env_file(env_path)
     assert after[pk.HASH_KEYS] == before[pk.HASH_KEYS]
+    assert after[pk.WATERMARK_KEYS] == before[pk.WATERMARK_KEYS]
     assert pk.SIGNING_KEY not in after, "a new signer is issued for a new .env"
 
 
@@ -315,12 +345,12 @@ def test_up_env_gen_keeps_the_signer_and_the_hash_keys(install: Path) -> None:
 # ── Secret files and the compose file ─────────────────────────────
 
 
-def test_the_three_are_secret_files_and_none_is_required() -> None:
+def test_they_are_secret_files_and_none_is_required() -> None:
     assert set(pk.KEYS) <= set(secret_files.SECRET_FILES)
     assert not set(pk.KEYS) & secret_files.REQUIRED, "the module can be switched off"
 
 
-def test_only_the_engine_mounts_them_where_it_reads_them() -> None:
+def test_the_engine_mounts_them_and_the_backend_only_the_watermark_keys() -> None:
     doc = yaml.safe_load((SHARED / "docker-compose.yaml").read_text(encoding="utf-8"))
     files = {name: spec["file"] for name, spec in doc["secrets"].items()}
     mounts = {
@@ -328,8 +358,15 @@ def test_only_the_engine_mounts_them_where_it_reads_them() -> None:
         for service, spec in doc["services"].items()
     }
     assert mounts["faden-provenance"] == {key: f"./secrets/{key}" for key in pk.KEYS}
-    others = {service for service, mounted in mounts.items() if set(mounted) & set(pk.KEYS)}
-    assert others == {"faden-provenance"}
+    ours = {f"./secrets/{key}" for key in pk.KEYS}
+    others = {
+        service: {target: file for target, file in mounted.items() if file in ours}
+        for service, mounted in mounts.items()
+        if service != "faden-provenance" and set(mounted.values()) & ours
+    }
+    # The backend reads its settings with its own prefix; it starts the models with the current key.
+    backend = {"FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS": f"./secrets/{pk.WATERMARK_KEYS}"}
+    assert others == {"faden-backend": backend, "faden-backend-worker": backend}
     assert "provenance" in doc["services"]["faden-provenance"]["profiles"]
 
 
@@ -525,7 +562,7 @@ def _rotate(env_path: Path, only: list[str] | None = None) -> FakeInstall:
     return fake
 
 
-def test_rotation_gives_a_new_signer_and_appends_a_hash_key_version(install: Path) -> None:
+def test_rotation_gives_a_new_signer_and_appends_a_hash_and_a_watermark_key_version(install: Path) -> None:
     env_path = _rotatable(install)
     before = read_env_file(env_path)
 
@@ -535,7 +572,11 @@ def test_rotation_gives_a_new_signer_and_appends_a_hash_key_version(install: Pat
     assert after[pk.SIGNING_KEY] != before[pk.SIGNING_KEY]
     _chain(after)[0].verify_directly_issued_by(_authority(install))
     assert after[pk.HASH_KEYS].startswith(before[pk.HASH_KEYS] + ",2:"), "version 1 exactly as it was"
-    assert fake.names().count("restart:faden-provenance") == 2
+    assert after[pk.WATERMARK_KEYS].startswith(before[pk.WATERMARK_KEYS] + ",2:")
+    restarts = [name for name in fake.names() if name.startswith("restart:")]
+    assert restarts == ["restart:faden-provenance,faden-backend,faden-backend-worker"] * 2, (
+        "the backend too: it starts the models with the new watermark key"
+    )
     assert not [name for name in fake.names() if name.startswith("job:")], "nothing to re-seal"
     assert after["FADEN_BACKEND_SETTINGS_MASTER_KEY"] == before["FADEN_BACKEND_SETTINGS_MASTER_KEY"]
 
@@ -581,7 +622,7 @@ def test_the_commands_show_and_rotate_it_without_a_key(
     states = rot.key_states(read_env_file(env_path), ["provenance"])
     state = next(s for s in states if s.scope.name == "provenance")
     assert _shown(state, read_env_file(env_path), ["provenance"]) == (
-        "[green]set[/green], 1 hash-key version(s), all kept"
+        "[green]set[/green], 1 hash key version(s), 1 text watermark key version(s), all kept"
     )
     assert _shown(state, read_env_file(env_path), []) == "[dim]module off[/dim]"
     cfg = SimpleNamespace(
@@ -599,14 +640,18 @@ def test_the_commands_show_and_rotate_it_without_a_key(
     assert rotated.exit_code == 0, rotated.output
     assert "FADEN_PROVENANCE_SIGNING_KEY is for the C2PA signatures" in _said(rotated)
     assert len(pk.parse_hash_keys(read_env_file(env_path)[pk.HASH_KEYS])) == 2
-    for secret in (before[pk.SIGNING_KEY][:40], before[pk.HASH_KEYS].split(":", 1)[1]):
+    for secret in (
+        before[pk.SIGNING_KEY][:40],
+        before[pk.HASH_KEYS].split(":", 1)[1],
+        before[pk.WATERMARK_KEYS].split(":", 1)[1],
+    ):
         assert secret not in status.output + rotated.output
 
 
 # ── Backup and restore ────────────────────────────────────────────
 
 
-def test_a_backup_carries_the_three_keys(install: Path, tmp_path: Path) -> None:
+def test_a_backup_carries_the_keys(install: Path, tmp_path: Path) -> None:
     pk.ensure(install, install / ".env")
     snapshot = tmp_path / "backup"
     snapshot.mkdir()
@@ -626,12 +671,14 @@ def test_a_restore_keeps_the_versions_added_since_the_backup(install: Path, tmp_
     backup.snapshot_env(env_path, snapshot)
     backed_up = read_env_file(env_path)
     _rotate_hash_key(env_path)
-    now = read_env_file(env_path)[pk.HASH_KEYS]
+    _rotate_watermark_key(env_path)
+    now = read_env_file(env_path)
 
     assert backup.restore_env(snapshot, env_path)
 
     restored = read_env_file(env_path)
-    assert restored[pk.HASH_KEYS] == now, "version 2 stays"
+    assert restored[pk.HASH_KEYS] == now[pk.HASH_KEYS], "version 2 stays"
+    assert restored[pk.WATERMARK_KEYS] == now[pk.WATERMARK_KEYS], "answers marked with version 2 are found"
     assert restored[pk.SIGNING_KEY] == backed_up[pk.SIGNING_KEY], "the rest is the backup's"
 
 
@@ -671,3 +718,10 @@ def _rotate_hash_key(env_path: Path) -> None:
     from faden_cli.core.env_gen import rewrite_env  # noqa: PLC0415
 
     rewrite_env(env_path, set_values={pk.HASH_KEYS: pk.add_hash_key(read_env_file(env_path)[pk.HASH_KEYS])})
+
+
+def _rotate_watermark_key(env_path: Path) -> None:
+    from faden_cli.core.env_gen import rewrite_env  # noqa: PLC0415
+
+    current = read_env_file(env_path)[pk.WATERMARK_KEYS]
+    rewrite_env(env_path, set_values={pk.WATERMARK_KEYS: pk.add_version(current, pk.WATERMARK_KEYS)})

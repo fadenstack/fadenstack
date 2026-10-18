@@ -33,16 +33,20 @@ def _config():  # noqa: ANN202
 
 
 def _hash_key_versions(env: dict[str, str]) -> str:
-    """How many provenance hash-key versions .env holds: a count, never a key."""
-    from faden_cli.core import provenance_keys  # noqa: PLC0415
+    """How many provenance hash-key and watermark-key versions .env holds: counts, never a key."""
+    from faden_cli.core import provenance_keys as pk  # noqa: PLC0415
 
-    try:
-        count = len(provenance_keys.parse_hash_keys(env.get(provenance_keys.HASH_KEYS, "")))
-    except provenance_keys.ProvenanceKeyError:
-        return f"[red]{provenance_keys.HASH_KEYS} does not read[/red]"
-    if not count:
-        return "[red]no hash key[/red] (faden up makes one)"
-    return f"{count} hash-key version(s), all kept"
+    shown: list[str] = []
+    for name in pk.VERSIONED_KEYS:
+        try:
+            count = len(pk.parse_versions(env.get(name, ""), name))
+        except pk.ProvenanceKeyError:
+            shown.append(f"[red]{name} does not read[/red]")
+            continue
+        label = pk.LABELS[name]
+        missing = f"[red]no {label}[/red] (faden up makes one)"
+        shown.append(f"{count} {label} version(s)" if count else missing)
+    return ", ".join(shown) + ", all kept"
 
 
 def _shown(state: rotation.KeyState, env: dict[str, str], profiles: list[str]) -> str:

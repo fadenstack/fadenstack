@@ -133,10 +133,12 @@ SCOPES: tuple[Scope, ...] = (
         previous="",
         seals=(
             "the C2PA signatures on generated pictures (a new key and certificate), with "
-            f"{provenance_keys.HASH_KEYS} for the provenance records' hashes "
-            "(a new version; every earlier one is kept)"
+            f"{provenance_keys.HASH_KEYS} for the provenance records' hashes and "
+            f"{provenance_keys.WATERMARK_KEYS} for the text watermark "
+            "(a new version of each; every earlier one is kept, and a model takes the new watermark key "
+            "when it next starts)"
         ),
-        services=("faden-provenance",),
+        services=("faden-provenance", "faden-backend", "faden-backend-worker"),
         jobs=(),
         published=frozenset(),
         profile="provenance",

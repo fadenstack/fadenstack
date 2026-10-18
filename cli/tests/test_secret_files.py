@@ -30,8 +30,14 @@ def _compose() -> dict:
     return yaml.safe_load((SHARED / "docker-compose.yaml").read_text(encoding="utf-8"))
 
 
-#: The names the services read the keys under (the gateway reads the backend's master key as its own).
-_AS_READ = {*secret_files.SECRET_FILES, "FADEN_GATEWAY_SETTINGS_MASTER_KEY", "FADEN_GATEWAY_SETTINGS_MASTER_KEY_PREVIOUS"}
+#: The names the services read the keys under (the gateway reads the backend's master key as its own, the
+#: backend the provenance watermark keys).
+_AS_READ = {
+    *secret_files.SECRET_FILES,
+    "FADEN_GATEWAY_SETTINGS_MASTER_KEY",
+    "FADEN_GATEWAY_SETTINGS_MASTER_KEY_PREVIOUS",
+    "FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS",
+}
 
 
 def test_no_service_gets_a_content_key_in_its_environment() -> None:
@@ -57,8 +63,11 @@ def test_each_service_gets_the_keys_it_had_as_files() -> None:
     }
     assert set(targets["faden-backend"]) == set(targets["faden-backend-worker"]) == {
         "FADEN_BACKEND_SETTINGS_MASTER_KEY", "FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS",
-        "FADEN_BACKEND_CREDENTIAL_PEPPER",
+        "FADEN_BACKEND_CREDENTIAL_PEPPER", "FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS",
     }
+    assert targets["faden-backend"]["FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS"] == (
+        "./secrets/FADEN_PROVENANCE_WATERMARK_KEYS"
+    )
     assert set(targets["faden-gateway-migrator"]) == {
         "FADEN_GATEWAY_SETTINGS_MASTER_KEY", "FADEN_GATEWAY_ENCRYPTION_KEY", "FADEN_GATEWAY_ENCRYPTION_KEY_PREVIOUS",
     }
@@ -68,6 +77,7 @@ def test_each_service_gets_the_keys_it_had_as_files() -> None:
         "FADEN_PROVENANCE_SIGNING_KEY": "./secrets/FADEN_PROVENANCE_SIGNING_KEY",
         "FADEN_PROVENANCE_SIGNING_CERTS": "./secrets/FADEN_PROVENANCE_SIGNING_CERTS",
         "FADEN_PROVENANCE_HASH_KEYS": "./secrets/FADEN_PROVENANCE_HASH_KEYS",
+        "FADEN_PROVENANCE_WATERMARK_KEYS": "./secrets/FADEN_PROVENANCE_WATERMARK_KEYS",
     }
 
 

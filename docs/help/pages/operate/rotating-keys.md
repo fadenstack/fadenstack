@@ -28,7 +28,7 @@ It lists the variables and their state, never the keys themselves.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores (the Hugging Face token, the TLS key, secrets of the knowledge base, the tokens of Ray clusters), the API keys of remote providers, and the private keys of the machine certificate authority |
 | `FADEN_MCP_ENCRYPTION_KEY` | The headers and environment of MCP servers: bearer tokens and API keys. Only where the MCP module is on |
-| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS` | What marks generated content as AI-generated: the key that signs the marks gets a new key and certificate from the install's authority; the hash keys get a new version, and every older version stays, so marks made before can still be checked. Only where the provenance module is on |
+| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS`, `FADEN_PROVENANCE_WATERMARK_KEYS` | What marks generated content as AI-generated: the key that signs the marks gets a new key and certificate from the install's authority; the hash keys and the text watermark keys get a new version, and every older version stays, so marks made before can still be checked. A model running now keeps its watermark key until it next starts. Only where the provenance module is on |
 | `FADEN_GATEWAY_ENCRYPTION_KEY` | The chats: messages, titles, memory and attachment notes. After a rotation of this key, chats stored in plain text are sealed with the new one (see below) |
 
 These are not rotated:

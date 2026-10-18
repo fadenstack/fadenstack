@@ -474,7 +474,9 @@ def write_env_file(
 
 
 def _keep_provenance_keys(existing: dict[str, str], variables: dict[str, str], *, signer: bool) -> None:
-    """Into *variables*: every provenance hash-key version of *existing*, and with *signer* its signer.
+    """Into *variables*: every provenance key version of *existing*, and with *signer* its signer.
+
+    The versions are those of the hash keys and the watermark keys.
 
     The signer is issued from the install's authority, not with the other defaults, so *variables* lacks it.
     """
@@ -482,11 +484,10 @@ def _keep_provenance_keys(existing: dict[str, str], variables: dict[str, str], *
         for key in provenance_keys.SIGNER_KEYS:
             if existing.get(key) and not variables.get(key):
                 variables[key] = existing[key]
-    hash_keys = provenance_keys.keep_versions(
-        existing.get(provenance_keys.HASH_KEYS, ""), variables.get(provenance_keys.HASH_KEYS, "")
-    )
-    if hash_keys:
-        variables[provenance_keys.HASH_KEYS] = hash_keys
+    for name in provenance_keys.VERSIONED_KEYS:
+        kept = provenance_keys.keep_versions(existing.get(name, ""), variables.get(name, ""), name)
+        if kept:
+            variables[name] = kept
 
 
 def ensure_bootstrap_token(env_path: Path) -> bool:

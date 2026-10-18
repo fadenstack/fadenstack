@@ -550,6 +550,9 @@ services:
         target: FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS
       - source: credential_pepper
         target: FADEN_BACKEND_CREDENTIAL_PEPPER
+      # The text watermark keys: the current one goes to the models it starts (core/provenance_keys.py).
+      - source: provenance_watermark_keys
+        target: FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS
     environment:
       FADEN_BACKEND_HOST: 0.0.0.0
       FADEN_BACKEND_PORT: 8000
@@ -693,6 +696,9 @@ services:
         target: FADEN_BACKEND_SETTINGS_MASTER_KEY_PREVIOUS
       - source: credential_pepper
         target: FADEN_BACKEND_CREDENTIAL_PEPPER
+      # The text watermark keys: the current one goes to the models it starts (core/provenance_keys.py).
+      - source: provenance_watermark_keys
+        target: FADEN_BACKEND_PROVENANCE_WATERMARK_KEYS
     environment:
       FADEN_BACKEND_ENVIRONMENT: ${FADEN_BACKEND_ENVIRONMENT:-production}
       FADEN_BACKEND_DB_HOST: postgres
@@ -1017,7 +1023,7 @@ services:
         condition: service_healthy
       faden-provenance-migrator:
         condition: service_completed_successfully
-    # Its signer and hash keys, as files under /run/secrets (secrets: at the end), not environment.
+    # Its signer, hash keys and watermark keys, as files under /run/secrets (secrets: at the end), not environment.
     secrets:
       - source: provenance_signing_key
         target: FADEN_PROVENANCE_SIGNING_KEY
@@ -1025,6 +1031,8 @@ services:
         target: FADEN_PROVENANCE_SIGNING_CERTS
       - source: provenance_hash_keys
         target: FADEN_PROVENANCE_HASH_KEYS
+      - source: provenance_watermark_keys
+        target: FADEN_PROVENANCE_WATERMARK_KEYS
     environment:
       FADEN_PROVENANCE_HOST: 0.0.0.0
       FADEN_PROVENANCE_PORT: 8000
@@ -1212,3 +1220,7 @@ secrets:
   provenance_hash_keys:
     # The keys of the provenance records' hashes: every version ever used, the highest current (`1:...,2:...`).
     file: ./secrets/FADEN_PROVENANCE_HASH_KEYS
+  provenance_watermark_keys:
+    # The keys of the text watermark the model runtimes put into answers (vLLM's --watermark-config): every
+    # version ever used, the highest current (`1:<whole number>,...`). Empty while the module is off.
+    file: ./secrets/FADEN_PROVENANCE_WATERMARK_KEYS
