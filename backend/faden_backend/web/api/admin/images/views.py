@@ -37,6 +37,11 @@ from faden_backend.web.api.admin.images.schema import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+#: What a pull's progress stream says when it fails; why is in the backend's log.
+_PROGRESS_FAILED = (
+    "Following the pull's progress failed; the pull may still be running. The backend's log says why."
+)
+
 
 @router.get("/", response_model=list[ImageSummaryDTO], name="list_images")
 async def list_images(
@@ -158,9 +163,10 @@ async def pull_progress(
         except asyncio.CancelledError:
             # Normal when browser closes/reconnects EventSource.
             return
-        except Exception as exc:
-            logger.warning("Pull progress stream crashed for pull_id=%s: %s", pull_id, exc)
-            payload = json.dumps({"error": str(exc), "pull_id": pull_id})
+        except Exception:
+            # The exception's text stays in the log: the stream is for anyone with images:read.
+            logger.exception("Pull progress stream crashed for pull_id=%s", pull_id)
+            payload = json.dumps({"error": _PROGRESS_FAILED, "pull_id": pull_id})
             yield f"event: error\ndata: {payload}\n\n"
 
     return StreamingResponse(
