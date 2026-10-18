@@ -998,10 +998,14 @@ async def test_a_placement_is_kept_for_the_agent(
 
     assert r.status_code == 202, r.text
     assert r.json() == {"stored": True}
-    layers = [{"reason": None, **layer} for layer in PLACEMENT["layers"]]  # type: ignore[attr-defined]
+    layers = [{"reason": None, "verified": None, **layer} for layer in PLACEMENT["layers"]]  # type: ignore[attr-defined]
     assert engine.bodies[PLACEMENTS] == [{**PLACEMENT, "layers": layers, "agent": AGENT_ID}]
     r = await client.post(PLACEMENTS_URL, headers=_headers(), json={**PLACEMENT, "text": "the content"})
     assert r.status_code == 400, "never the content"
+    exempt = {key: value for key, value in PLACEMENT.items() if key != "record_id"}
+    r = await client.post(PLACEMENTS_URL, headers=_headers(), json=exempt)
+    assert r.status_code == 202, "exempt content has no record"
+    assert engine.bodies[PLACEMENTS][-1]["record_id"] is None
 
 
 @pytest.mark.anyio

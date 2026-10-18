@@ -83,6 +83,8 @@ class LayerOutcome(BaseModel):
     method: str = Field(max_length=64)
     applied: bool
     reason: NotAppliedReason | None = None
+    #: Read back from the host after placing (true), or not readable there (false); None: not tried.
+    verified: bool | None = None
 
 
 class PlacementBody(BaseModel):
@@ -90,7 +92,8 @@ class PlacementBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    record_id: str = Field(max_length=128)
+    #: None for content exempt from marking: it has no record.
+    record_id: str | None = Field(default=None, max_length=128)
     tool: str = Field(max_length=128)
     sink_kind: str = Field(max_length=128)
     media_type: str = Field(max_length=255)
