@@ -466,7 +466,8 @@ def _upstream_kwargs(
       though the endpoint needs none, so we send the conventional
       ``"EMPTY"`` placeholder.  Cloud providers reached at their default
       base URL (no ``api_base`` set) never take this branch: they require
-      a real key and will fail with a clear 401 instead.
+      a real key and will fail with a clear refusal instead
+      (``upstream_authentication_failed``, see ``_PROVIDER_REFUSED``).
     """
     kwargs: dict[str, Any] = {}
     if base_url and not base_url.startswith("litellm://"):
@@ -518,17 +519,52 @@ class _TlsRefusedError(Exception):
 _UPSTREAM_FAILED = "The model failed to answer; the gateway's log says why."
 #: The upstream refusals a caller reads as the upstream said them: the request as it stands was
 #: refused (too long for the model's context, a parameter it does not take), or the provider's
-#: key or limit refused it.
+#: limit refused it.
 _SAID_AS_IS = (
     litellm.exceptions.BadRequestError,
-    litellm.exceptions.AuthenticationError,
     litellm.exceptions.RateLimitError,
+)
+#: The model's provider refused the gateway's own credentials (401, 403). Not the caller's: their
+#: sign-in is fine, and the SDKs read a 401 as "sign in again" -- they drop the user's token -- so
+#: a wrong provider key in the console signed out everyone using the model. A 502 instead, which
+#: an administrator can act on; the provider's words, which can quote part of the key, are logged.
+_PROVIDER_REFUSED = (
+    litellm.exceptions.AuthenticationError,
+    litellm.exceptions.PermissionDeniedError,
+)
+_PROVIDER_REFUSED_STATUSES = (401, 403)
+_PROVIDER_REFUSED_MESSAGE = (
+    "The model's provider refused the gateway's credentials; "
+    "ask your administrator to check the provider's key."
 )
 
 
-def _for_caller(exc: BaseException) -> str:
-    """What the caller is told of *exc*: an upstream 4xx in its own words, anything else not."""
-    return str(exc) if isinstance(exc, _SAID_AS_IS) else _UPSTREAM_FAILED
+def _provider_refused() -> dict[str, Any]:
+    """The error for a provider that refused the gateway's credentials."""
+    return _error_payload("server_error", _PROVIDER_REFUSED_MESSAGE, code="upstream_authentication_failed")
+
+
+def _provider_refused_result(exc: BaseException) -> CompletionResult:
+    """A whole answer's 502 for a provider that refused the gateway's credentials; its words are logged."""
+    logger.warning("The model's provider refused the gateway's credentials: %s", exc)
+    return CompletionResult(status_code=502, payload=_provider_refused())
+
+
+def _failure(exc: BaseException) -> dict[str, Any]:
+    """The error a stream's caller is told of *exc*: an upstream 4xx in its own words, anything else not."""
+    if isinstance(exc, _PROVIDER_REFUSED):
+        return _provider_refused()
+    return _error_payload("server_error", str(exc) if isinstance(exc, _SAID_AS_IS) else _UPSTREAM_FAILED)
+
+
+def _engine_refusal(status: int, detail: str) -> dict[str, Any]:
+    """The error event for an engine that refused a streamed chat with *status* and *detail*."""
+    if status in _PROVIDER_REFUSED_STATUSES:
+        return _provider_refused()
+    # A 4xx is about the request (too long for the context, a parameter vLLM does not take),
+    # which the caller reads; a 5xx's body is the engine's own, for the log.
+    said = detail if status < 500 else _UPSTREAM_FAILED
+    return _error_payload("server_error", f"upstream {status}: {said}")
 
 
 def _provider_tls(
@@ -821,11 +857,7 @@ class LLMAdapter:
                             body, tries = again, tries + 1
                             continue
                         logger.warning("vLLM refused a streamed chat: %s %s", response.status_code, detail)
-                        # A 4xx is about the request (too long for the context, a parameter vLLM does not
-                        # take), which the caller reads; a 5xx's body is the engine's own, for the log.
-                        said = detail if response.status_code < 500 else _UPSTREAM_FAILED
-                        refusal = f"upstream {response.status_code}: {said}"
-                        yield _sse(_error_payload("server_error", refusal))
+                        yield _sse(_engine_refusal(response.status_code, detail))
                         yield _DONE
                         return
                     events = await stack.enter_async_context(aclosing(_whole_events(response)))
@@ -894,11 +926,8 @@ class LLMAdapter:
             # LiteLLM returns a ModelResponse — convert to dict
             payload = response.model_dump()  # type: ignore[union-attr]
             return CompletionResult(status_code=200, payload=payload)
-        except litellm.exceptions.AuthenticationError as exc:
-            return CompletionResult(
-                status_code=401,
-                payload=_error_payload("authentication_error", str(exc)),
-            )
+        except _PROVIDER_REFUSED as exc:
+            return _provider_refused_result(exc)
         except litellm.exceptions.RateLimitError as exc:
             return CompletionResult(
                 status_code=429,
@@ -936,7 +965,7 @@ class LLMAdapter:
             # client receives a structured error instead of a broken stream.
             # A refusal of the request (context length, ...) is said as it is.
             logger.exception("LiteLLM streaming failed (pre-stream)")
-            error_data = _error_payload("server_error", _for_caller(exc))
+            error_data = _failure(exc)
             yield f"data: {json.dumps(error_data)}\n\n".encode()
             yield b"data: [DONE]\n\n"
             return
@@ -1024,8 +1053,8 @@ class LLMAdapter:
                 status_code=200,
                 payload=response.model_dump(),  # type: ignore[union-attr]
             )
-        except litellm.exceptions.AuthenticationError as exc:
-            return CompletionResult(status_code=401, payload=_error_payload("authentication_error", str(exc)))
+        except _PROVIDER_REFUSED as exc:
+            return _provider_refused_result(exc)
         except litellm.exceptions.RateLimitError as exc:
             return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
         except litellm.exceptions.BadRequestError as exc:
@@ -1119,8 +1148,8 @@ class LLMAdapter:
         try:
             response = await litellm.aimage_generation(**kwargs)
             return CompletionResult(status_code=200, payload=response.model_dump())  # type: ignore[union-attr]
-        except litellm.exceptions.AuthenticationError as exc:
-            return CompletionResult(status_code=401, payload=_error_payload("authentication_error", str(exc)))
+        except _PROVIDER_REFUSED as exc:
+            return _provider_refused_result(exc)
         except litellm.exceptions.RateLimitError as exc:
             return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
         except litellm.exceptions.BadRequestError as exc:
@@ -1205,8 +1234,8 @@ class LLMAdapter:
         try:
             response = await litellm.arerank(**kwargs)
             return CompletionResult(status_code=200, payload=response.model_dump())  # type: ignore[union-attr]
-        except litellm.exceptions.AuthenticationError as exc:
-            return CompletionResult(status_code=401, payload=_error_payload("authentication_error", str(exc)))
+        except _PROVIDER_REFUSED as exc:
+            return _provider_refused_result(exc)
         except litellm.exceptions.RateLimitError as exc:
             return CompletionResult(status_code=429, payload=_error_payload("rate_limit_error", str(exc)))
         except litellm.exceptions.BadRequestError as exc:
@@ -1247,12 +1276,12 @@ def _readable(message: str) -> str:
     return _HTML_PAGE.sub(page_title, message).strip()
 
 
-def _error_payload(error_type: str, message: str) -> dict[str, Any]:
+def _error_payload(error_type: str, message: str, *, code: str | None = None) -> dict[str, Any]:
     return {
         "error": {
             "type": error_type,
             "message": _readable(message),
             "param": None,
-            "code": error_type,
+            "code": code or error_type,
         },
     }
