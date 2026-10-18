@@ -30,6 +30,11 @@ from faden_backend.settings import settings
 
 
 def _factory() -> async_sessionmaker[AsyncSession]:
+    # Every model, as the backend has them: an audit event's actor_id names the user table, and a write
+    # without that table's model failed (NoReferencedTableError), so the CLI's events were never recorded.
+    from faden_backend.db.models import load_all_models  # noqa: PLC0415
+
+    load_all_models()
     engine = create_async_engine(str(settings.db_url))
     return async_sessionmaker(engine, expire_on_commit=False)
 
