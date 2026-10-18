@@ -96,16 +96,27 @@ def _marking_vendor(candidate: Any) -> str | None:
     return vendor
 
 
-def _runtime_mark(candidate: Any) -> tuple[bool, str | None]:
-    """Whether the route's runtime watermarks the text (``node_metadata["watermark"]``), and with what."""
+def _runtime_mark(candidate: Any) -> dict[str, Any] | None:
+    """How the route's runtime watermarks the text (``node_metadata["watermark"]``); ``None``: not at all.
+
+    The backend publishes ``{"algorithm", "key_version", "context_width"}`` for a deployment it started
+    with the watermark: what the engine needs to check a text for it later.
+    """
     said = (getattr(candidate, "node_metadata", None) or {}).get("watermark")
     if not said:
-        return False, None
+        return None
     if isinstance(said, str):
-        return True, said
-    if isinstance(said, dict) and isinstance(said.get("algorithm"), str):
-        return True, said["algorithm"]
-    return True, None
+        return {"algorithm": said}
+    if not isinstance(said, dict):
+        return {}
+    mark: dict[str, Any] = {}
+    if isinstance(said.get("algorithm"), str):
+        mark["algorithm"] = said["algorithm"]
+    for field in ("key_version", "context_width"):
+        value = said.get(field)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            mark[field] = value
+    return mark
 
 
 def watermark(
@@ -126,10 +137,10 @@ def watermark(
     if _greedy({**sent, **(getattr(candidate, "extra_params", None) or {})}):
         return {"applied": "none", "reason": "no-watermark-greedy"}
     if not _remote(candidate):
-        marks, algorithm = _runtime_mark(candidate)
-        if not marks:
+        mark = _runtime_mark(candidate)
+        if mark is None:
             return {"applied": "none", "reason": "runtime-without-watermark"}
-        return {"applied": "model", **({"algorithm": algorithm} if algorithm else {})}
+        return {"applied": "model", **mark}
     vendor = _marking_vendor(candidate)
     if vendor is not None:
         return {"applied": "upstream", "vendor": vendor}

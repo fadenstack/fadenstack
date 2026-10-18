@@ -65,6 +65,12 @@ RECORDS = "/api/v1/provenance/records/sign"
 PLACEMENTS = "/api/v1/provenance/placements"
 ANCHORS_PATH = "/api/v1/provenance/anchors"
 POLICY_PATH = "/api/v1/provenance/policy"
+VERIFY_PATH = "/api/v1/provenance/verify"
+VERIFIED = {
+    "contract": "provenance/v1", "verdict": "ai-generated", "checked_at": "2026-10-18T10:00:00Z",
+    "content_hash": "2" * 64, "detector": "fadenstack-provenance/0.4.5", "signature": None,
+    "findings": [{"layer": "watermark", "method": "vllm-gumbel", "found": True, "detail": "x", "score": 1e-9}],
+}
 
 ANSWER = "Page 12 holds the motor circuit."
 #: An answer long enough to carry a watermark (with usage saying 250 completion tokens).
@@ -136,6 +142,7 @@ class _Engine:
             return self._record(body or {})
         fixed = {
             PLACEMENTS: (202, {"stored": True}), ANCHORS_PATH: (200, ANCHORS), POLICY_PATH: (200, POLICY),
+            VERIFY_PATH: (200, VERIFIED),
         }
         status, answer = fixed.get(path, (404, None))
         return httpx.Response(status, json=answer)
@@ -480,6 +487,20 @@ def test_greedy_decoding_set_by_the_route_counts(extra: dict[str, Any]) -> None:
     route = _route(metadata={"watermark": True}, extra=extra)
     assert text_receipts.watermark(route, {"temperature": 0.7}, completion_tokens=400, text=LONG) == {
         "applied": "none", "reason": "no-watermark-greedy",
+    }
+
+
+def test_a_deployment_started_with_the_watermark_names_its_key_version_and_context_width() -> None:
+    """What the backend publishes (``node_metadata["watermark"]``) is what the engine checks a text with."""
+    started = _route(metadata={"watermark": {
+        "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4, "other": "dropped",
+    }})
+    assert text_receipts.watermark(started, {}, completion_tokens=400, text=LONG) == {
+        "applied": "model", "algorithm": "dual_key_gumbel", "key_version": 2, "context_width": 4,
+    }
+    odd = _route(metadata={"watermark": {"algorithm": "gumbel", "key_version": True, "context_width": -1}})
+    assert text_receipts.watermark(odd, {}, completion_tokens=400, text=LONG) == {
+        "applied": "model", "algorithm": "gumbel",
     }
 
 
@@ -874,6 +895,8 @@ POLICY_URL = "/v1/agents/eplan-assistant/provenance/policy"
 RECORDS_URL = "/v1/agents/eplan-assistant/provenance/records"
 PLACEMENTS_URL = "/v1/agents/eplan-assistant/provenance/placements"
 ANCHORS_URL = "/v1/provenance/anchors"
+VERIFY_URL = "/v1/provenance/verify"
+AGENT_VERIFY_URL = "/v1/agents/eplan-assistant/provenance/verify"
 
 #: The agent routes, each with a body it takes.
 AGENT_ROUTES = [
@@ -1008,3 +1031,83 @@ async def test_a_record_the_engine_does_not_take_is_a_400(
     r = await client.post(RECORDS_URL, headers=_headers(), json=RECORD)
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "invalid_provenance_request"
+
+
+# ── Checking content ──────────────────────────────────────────────
+
+
+@pytest.mark.anyio
+async def test_a_signed_in_user_checks_a_text_and_nothing_else_goes_to_the_engine(
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG, "signed": True})
+
+    assert r.status_code == 200, r.text
+    assert r.json() == VERIFIED
+    assert r.headers["cache-control"] == "no-store"
+    assert engine.bodies[VERIFY_PATH] == [{"text": LONG, "signed": True}]
+
+
+@pytest.mark.anyio
+async def test_an_agent_checks_a_file_on_its_own_route(
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    body = {"file": "aGVsbG8=", "media_type": "image/png"}
+    r = await client.post(AGENT_VERIFY_URL, headers=_headers(), json=body)
+    assert r.status_code == 200, r.text
+    assert engine.bodies[VERIFY_PATH] == [{**body, "signed": False}]
+
+
+@pytest.mark.anyio
+async def test_checking_needs_a_sign_in_and_an_agent_token_only_on_its_route(
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    r = await client.post(VERIFY_URL, json={"text": LONG})
+    assert (r.status_code, r.json()["error"]["code"]) == (401, "missing_authorization")
+    r = await client.post(VERIFY_URL, headers=_headers(), json={"text": LONG})
+    assert (r.status_code, r.json()["error"]["code"]) == (403, "agent_token_not_allowed")
+    r = await client.post(AGENT_VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG})
+    assert (r.status_code, r.json()["error"]["code"]) == (403, "agent_token_required")
+    assert engine.requests == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("body", [
+    pytest.param({}, id="nothing"),
+    pytest.param({"text": "a", "file": "aGVsbG8=", "media_type": "image/png"}, id="both"),
+    pytest.param({"file": "aGVsbG8="}, id="file-without-media-type"),
+    pytest.param({"text": "a", "keep": True}, id="unknown-field"),
+])
+async def test_a_check_the_contract_does_not_take_is_refused_before_the_engine(
+    body: dict[str, Any], client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json=body)
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["code"] == "validation_error"
+    assert engine.requests == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("answer", "status", "code"), [
+    pytest.param(_answer(413, {"detail": "too big"}), 413, "too_large", id="too-large"),
+    pytest.param(_answer(422, {"detail": [{"msg": "bad"}]}), 400, "invalid_provenance_request", id="refused"),
+    pytest.param(_answer(503, {"detail": {"code": "busy", "message": "Busy"}}), 503, "busy", id="busy"),
+    pytest.param(_answer(200, {"no": "verdict"}), 503, "unreadable_answer", id="unreadable"),
+])
+async def test_a_check_the_engine_cannot_do_says_why(
+    answer: Answer, status: int, code: str,
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    engine.fail = answer
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG})
+    assert (r.status_code, r.json()["error"]["code"]) == (status, code), r.text
+
+
+@pytest.mark.anyio
+async def test_with_the_module_off_checking_says_so(
+    fastapi_app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+    backend: Any,  # noqa: F811 - the fixture
+) -> None:
+    monkeypatch.setattr(fastapi_app.state, "provenance_client", None, raising=False)
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG})
+    assert (r.status_code, r.json()["error"]["code"]) == (503, "provenance_off")

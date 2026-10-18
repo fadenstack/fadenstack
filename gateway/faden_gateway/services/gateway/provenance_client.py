@@ -43,6 +43,8 @@ _MARK_TIMEOUT_SEC = 40.0
 #: milliseconds, so a turn waits for a receipt 5 s at most.
 _RECEIPT_TIMEOUT_SEC = 5.0
 _FAST_TIMEOUT_SEC = 5.0
+#: The engine checks a picture within 30 s or says it is busy; a text or a document in a moment.
+_VERIFY_TIMEOUT_SEC = 40.0
 #: How long the anchors are kept between reads: they change only when a signing key is rotated, and the
 #: route that serves them needs no sign-in.
 _ANCHORS_TTL_SEC = 60.0
@@ -518,6 +520,19 @@ class ProvenanceClient:
             "POST", "/api/v1/provenance/placements",
             body={**report, "agent": agent}, timeout=_FAST_TIMEOUT_SEC,
         )
+
+    async def verify(self, body: dict[str, Any]) -> dict[str, Any]:
+        """What the engine finds in content (``VerifyResult``): ``POST /api/v1/provenance/verify``.
+
+        *body* is a ``VerifyRequest``: a text, or a file's bytes in base64 with
+        its media type. The engine keeps nothing of it. Raises
+        ``ProvenanceRequestError`` when no result comes back.
+        """
+        resp = await self._call("POST", "/api/v1/provenance/verify", body=body, timeout=_VERIFY_TIMEOUT_SEC)
+        data = _object(resp)
+        if not isinstance(data.get("verdict"), str) or not isinstance(data.get("findings"), list):
+            raise _unreadable(resp)
+        return data
 
     async def policy(self) -> dict[str, Any]:
         """The engine's default ``ProvenancePolicy``: ``GET /api/v1/provenance/policy``."""

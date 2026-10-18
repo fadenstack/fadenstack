@@ -12,6 +12,11 @@ gateway's service token; these take the caller's.
 - ``POST /v1/agents/{agent}/provenance/placements``: a ``PlacementReport``,
   kept by the engine for the agent: 202.
 - ``GET /v1/provenance/anchors``: the ``Anchors``, without sign-in.
+- ``POST /v1/provenance/verify``: a ``VerifyRequest`` checked by the engine's
+  detector, for a signed-in user: the ``VerifyResult``. Nothing submitted is
+  kept. ``POST /v1/agents/{agent}/provenance/verify`` does the same for an
+  agent's token. (The public check page, without sign-in, takes pictures and
+  files only; texts are checked by people the installation knows, CoP 2.1.2.)
 
 The agent routes authenticate as the other ``/v1/agents/{agent}/...`` routes
 do: an agent token for this agent, or the token of one of its maintainers.
@@ -26,11 +31,11 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette import status
 
 from faden_gateway.services.gateway.agents import AgentRequest
-from faden_gateway.services.gateway.auth import AuthContext
+from faden_gateway.services.gateway.auth import AuthContext, get_auth_context
 from faden_gateway.services.gateway.errors import GatewayError, error_response, validation_message
 from faden_gateway.services.gateway.provenance_client import ProvenanceClient, ProvenanceRequestError
 from faden_gateway.web.api.v1.agents import agent_request
@@ -94,6 +99,25 @@ class PlacementBody(BaseModel):
     layers: list[LayerOutcome] = Field(max_length=32)
 
 
+class VerifyBody(BaseModel):
+    """A ``VerifyRequest``: a text, or a file's bytes in base64 with its media type; never both."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str | None = Field(default=None, max_length=1_000_000)
+    file: str | None = None
+    media_type: str | None = Field(default=None, max_length=255)
+    signed: bool = False
+
+    @model_validator(mode="after")
+    def _one_of_them(self) -> VerifyBody:
+        if (self.text is None) == (self.file is None):
+            raise ValueError("Send either text or file, not both and not neither.")
+        if self.file is not None and not self.media_type:
+            raise ValueError("A file needs its media_type.")
+        return self
+
+
 def _engine(request: Request) -> ProvenanceClient:
     """The provenance engine's client; 503 with the module off."""
     client: ProvenanceClient | None = getattr(request.app.state, "provenance_client", None)
@@ -116,6 +140,13 @@ def _failed(exc: ProvenanceRequestError, what: str) -> GatewayError:
             message="The provenance service did not take the request.",
             error_type="invalid_request_error",
             code="invalid_provenance_request",
+        )
+    if exc.code == "too_large":
+        return GatewayError(
+            status_code=413,
+            message="The content is over the provenance service's size limit.",
+            error_type="invalid_request_error",
+            code="too_large",
         )
     return GatewayError(
         status_code=503,
@@ -198,3 +229,35 @@ async def provenance_anchors(request: Request) -> Response:
     except ProvenanceRequestError as exc:
         raise _failed(exc, "read the anchors") from exc
     return JSONResponse(anchors, headers={"cache-control": "public, max-age=60"})
+
+
+async def _verify(request: Request) -> Response:
+    client = _engine(request)
+    try:
+        body = VerifyBody.model_validate(await _get_json_payload(request))
+    except ValidationError as exc:
+        return _invalid(exc)
+    try:
+        result = await client.verify(body.model_dump(mode="json", exclude_none=True))
+    except ProvenanceRequestError as exc:
+        raise _failed(exc, "check the content") from exc
+    return JSONResponse(result, headers={"cache-control": "no-store"})
+
+
+@router.post("/v1/provenance/verify", response_model=None)
+async def provenance_verify(
+    request: Request, auth: Annotated[AuthContext, Depends(get_auth_context)],
+) -> Response:
+    """Check content for this installation's marks for a signed-in user (``VerifyResult``); nothing kept."""
+    del auth
+    return await _verify(request)
+
+
+@router.post("/v1/agents/{agent}/provenance/verify", response_model=None)
+async def agent_provenance_verify(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+) -> Response:
+    """Check content for this installation's marks for an agent's token (``VerifyResult``); nothing kept."""
+    del caller
+    return await _verify(request)
