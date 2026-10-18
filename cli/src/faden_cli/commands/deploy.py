@@ -785,6 +785,10 @@ def deploy_cmd(
         names=tls_names,
         ca=tls_ca,
     )
+    # The provenance engine's signing certificate, from the authority above, and its hash keys (into .env).
+    from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+    provenance_keys_step(shared_dir, env_path)
 
     # ── 3e. New releases ──────────────────────────────────────────
     update_check_step(env_path, cfg, choice=update_check, yes=yes)

@@ -4,6 +4,7 @@ Examples:
     faden secrets status                  # which keys are published defaults; is a rotation unfinished
     faden secrets rotate                  # new random keys, every stored value re-sealed
     faden secrets rotate --only settings  # just the settings master key
+    faden secrets rotate --only provenance  # a new signing key and certificate, a new hash-key version
     faden secrets rotate --resume         # finish a rotation that stopped
 """
 
@@ -31,6 +32,40 @@ def _config():  # noqa: ANN202
     return cfg
 
 
+def _hash_key_versions(env: dict[str, str]) -> str:
+    """How many provenance hash-key versions .env holds: a count, never a key."""
+    from faden_cli.core import provenance_keys  # noqa: PLC0415
+
+    try:
+        count = len(provenance_keys.parse_hash_keys(env.get(provenance_keys.HASH_KEYS, "")))
+    except provenance_keys.ProvenanceKeyError:
+        return f"[red]{provenance_keys.HASH_KEYS} does not read[/red]"
+    if not count:
+        return "[red]no hash key[/red] (faden up makes one)"
+    return f"{count} hash-key version(s), all kept"
+
+
+def _shown(state: rotation.KeyState, env: dict[str, str], profiles: list[str]) -> str:
+    """A key's state in the status table."""
+    scope = state.scope
+    if scope.profile and scope.profile not in profiles:
+        shown = "[dim]module off[/dim]"
+    elif not state.present:
+        shown = {
+            "chat": "[dim]not set (stored unencrypted)[/dim]",
+            "provenance": "[red]not set[/red] (faden up issues it)",
+        }.get(scope.name, "[red]not set[/red]")
+    elif scope.name == "provenance":
+        shown = f"[green]set[/green], {_hash_key_versions(env)}"
+    elif state.published:
+        shown = "[red]published default[/red] (anyone who reads the source code knows it)"
+    else:
+        shown = "[green]own random value[/green]"
+    if state.unfinished:
+        shown += " [yellow]- rotation unfinished[/yellow]"
+    return shown
+
+
 @click.group("secrets")
 def secrets_group() -> None:
     """The keys that seal stored data: see which are defaults, and rotate them."""
@@ -48,18 +83,7 @@ def status_cmd() -> None:
     table.add_column("Seals")
     table.add_column("State")
     for state in states:
-        scope = state.scope
-        if scope.profile and scope.profile not in cfg.profiles:
-            shown = "[dim]module off[/dim]"
-        elif not state.present:
-            shown = "[dim]not set (stored unencrypted)[/dim]" if scope.name == "chat" else "[red]not set[/red]"
-        elif state.published:
-            shown = "[red]published default[/red] (anyone who reads the source code knows it)"
-        else:
-            shown = "[green]own random value[/green]"
-        if state.unfinished:
-            shown += " [yellow]- rotation unfinished[/yellow]"
-        table.add_row(scope.key, scope.seals, shown)
+        table.add_row(state.scope.key, state.scope.seals, _shown(state, env, cfg.profiles))
     console.print(table)
 
     other = [name for name, value in rotation.OTHER_PUBLISHED.items() if env.get(name) == value]
@@ -106,6 +130,9 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     Takes a backup, writes the new keys to .env next to the old ones, restarts the services that use them
     behind the maintenance page, re-seals every stored value in one transaction per database, checks it,
     and only then drops the old keys. The machines stay connected. If it stops, run it again.
+
+    The provenance engine gets a new signing key and certificate, and a new hash-key version; every earlier
+    version stays, since what was hashed with it is checked with it.
     """
     cfg = _config()
     env = read_env_file(cfg.env_path)
@@ -119,7 +146,7 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     if plan.mode == "resume":
         info("A rotation is unfinished; this run finishes it before anything else.")
     for scope in plan.scopes:
-        console.print(f"  [bold]{scope.key}[/bold] seals {scope.seals}")
+        console.print(f"  [bold]{scope.key}[/bold] {'seals' if scope.renew is None else 'is for'} {scope.seals}")
     if plan.deferred:
         info("Then run it again for: " + ", ".join(s.name for s in plan.deferred))
     console.print(

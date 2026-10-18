@@ -62,6 +62,15 @@ def test_the_previous_keys_and_the_pepper_reach_the_services_that_read_them() ->
     assert _mounted("faden-mcp")["FADEN_MCP_ENCRYPTION_KEY_PREVIOUS"] == "FADEN_MCP_ENCRYPTION_KEY_PREVIOUS"
 
 
+def test_the_provenance_keys_reach_the_engine() -> None:
+    """Its signer and hash keys, written into .env by deploy, upgrade and up (core/provenance_keys.py)."""
+    mounted = _mounted("faden-provenance")
+    keys = ("FADEN_PROVENANCE_SIGNING_KEY", "FADEN_PROVENANCE_SIGNING_CERTS", "FADEN_PROVENANCE_HASH_KEYS")
+    for key in keys:
+        assert mounted[key] == key
+        assert key not in secret_files.REQUIRED, "an install without the module starts without them"
+
+
 def test_the_migrators_seal_provider_keys_with_the_installs_master_key() -> None:
     """Without it the migration (pr0vk3ys / pr0vk3yg) sealed them with the published development default."""
     assert _mounted("faden-backend-migrator")["FADEN_BACKEND_SETTINGS_MASTER_KEY"] == "FADEN_BACKEND_SETTINGS_MASTER_KEY"

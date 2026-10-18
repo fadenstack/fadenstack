@@ -1017,6 +1017,14 @@ services:
         condition: service_healthy
       faden-provenance-migrator:
         condition: service_completed_successfully
+    # Its signer and hash keys, as files under /run/secrets (secrets: at the end), not environment.
+    secrets:
+      - source: provenance_signing_key
+        target: FADEN_PROVENANCE_SIGNING_KEY
+      - source: provenance_signing_certs
+        target: FADEN_PROVENANCE_SIGNING_CERTS
+      - source: provenance_hash_keys
+        target: FADEN_PROVENANCE_HASH_KEYS
     environment:
       FADEN_PROVENANCE_HOST: 0.0.0.0
       FADEN_PROVENANCE_PORT: 8000
@@ -1167,11 +1175,11 @@ volumes:
   faden_audit:
 
 # The keys that open content: the chats, the sealed settings and provider keys, the machines' credentials, the
-# MCP servers' credentials. They are kept and changed in .env as before; `faden` writes them into secrets/
-# (readable by the install's user only) before every compose command it runs, and compose mounts them
-# read-only under /run/secrets, where the services read them. They are in no container's environment, so
-# neither `docker inspect` nor the console's container pages show them. Run compose through `faden`, or
-# `faden up` once after changing one of them in .env by hand.
+# MCP servers' credentials; and the provenance engine's signer and hash keys. They are kept and changed in .env
+# as before; `faden` writes them into secrets/ (readable by the install's user only) before every compose
+# command it runs, and compose mounts them read-only under /run/secrets, where the services read them. They
+# are in no container's environment, so neither `docker inspect` nor the console's container pages show them.
+# Run compose through `faden`, or `faden up` once after changing one of them in .env by hand.
 secrets:
   gateway_encryption_key:
     # The key chats are encrypted with at rest: messages, titles, memory, attachment names and files, a reply's
@@ -1195,3 +1203,12 @@ secrets:
     file: ./secrets/FADEN_MCP_ENCRYPTION_KEY
   mcp_encryption_key_previous:
     file: ./secrets/FADEN_MCP_ENCRYPTION_KEY_PREVIOUS
+  provenance_signing_key:
+    # The key C2PA manifests on generated pictures are signed with (PKCS#8 DER, base64); new with each certificate.
+    file: ./secrets/FADEN_PROVENANCE_SIGNING_KEY
+  provenance_signing_certs:
+    # Its certificate from the install's authority, then the authority (PEM, base64); renewed 30 days ahead.
+    file: ./secrets/FADEN_PROVENANCE_SIGNING_CERTS
+  provenance_hash_keys:
+    # The keys of the provenance records' hashes: every version ever used, the highest current (`1:...,2:...`).
+    file: ./secrets/FADEN_PROVENANCE_HASH_KEYS

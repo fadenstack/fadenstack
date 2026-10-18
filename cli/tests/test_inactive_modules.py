@@ -91,7 +91,7 @@ def test_all_modules_on_stops_nothing(fake) -> None:
 
 
 def test_up_reports_each_stopped_module(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    ctx = SimpleNamespace(env_file=tmp_path / ".env")
+    ctx = SimpleNamespace(env_file=tmp_path / ".env", project_dir=tmp_path)
     monkeypatch.setattr(up_command, "load_config", lambda: SimpleNamespace(profiles=[]))
     monkeypatch.setattr(up_command, "build_context_from_config", lambda _c: ctx)
     monkeypatch.setattr(up_command, "compose_up", lambda *_a, **_k: 0)
@@ -103,7 +103,7 @@ def test_up_reports_each_stopped_module(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
 
 def test_up_with_named_services_does_not_stop_modules(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    ctx = SimpleNamespace(env_file=tmp_path / ".env")
+    ctx = SimpleNamespace(env_file=tmp_path / ".env", project_dir=tmp_path)
     monkeypatch.setattr(up_command, "load_config", lambda: SimpleNamespace(profiles=[]))
     monkeypatch.setattr(up_command, "build_context_from_config", lambda _c: ctx)
     monkeypatch.setattr(up_command, "compose_up", lambda *_a, **_k: 0)

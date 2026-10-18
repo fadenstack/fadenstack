@@ -332,6 +332,11 @@ def upgrade_cmd(
     else:
         if ca_created:
             success(f"Certificate authority for the machines made: {ca_public}")
+    # The provenance engine's keys: what an older .env lacks, and a signer issued again when it is due
+    # (fewer than 30 days left, or issued by an authority the install no longer uses).
+    from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+    provenance_keys_step(shared_dir, env_path)
     from faden_cli.commands.tls import refresh_edge_info  # noqa: PLC0415
 
     refresh_edge_info(shared_dir)
