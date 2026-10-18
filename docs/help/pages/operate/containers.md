@@ -102,14 +102,18 @@ Only a superuser creates, edits or reclassifies containers. A container that wou
 `C:\data`; the Docker socket, `/` and system folders such as `/etc` among them), or that uses the `host` network or
 another container's network. Without Root Mode the console refuses it and says why. Under **Volume Mounts**, give a
 name instead of a host path (`my-data`, not `/data/app`): Docker keeps a named volume for the container, and it needs
-no Root Mode. Only the time zone may be mounted read-only without it (`/etc/localtime`, `/etc/timezone`,
-`/usr/share/zoneinfo`, with `:ro`).
+no Root Mode. Fadenstack's own volumes are the exception: the database's files, the chat files, the audit trail and
+the models (`fadenstack_pg_data`, `fadenstack_faden_chat_files` and the others its containers use) are mounted only
+in Root Mode, and the audit log records which volumes a container got. Only the time zone may be mounted read-only
+without it (`/etc/localtime`, `/etc/timezone`, `/usr/share/zoneinfo`, with `:ro`).
 
 ??? info "More about what needs Root Mode"
-    - **Edit**: the new container keeps what the form does not show, so an edit needs Root Mode also when the
-      container runs privileged, shares the server's processes or memory, uses its devices (GPUs aside) or takes
-      another container's volumes. Most of Fadenstack's own containers mount files of the install, so an edit of
-      one needs Root Mode.
+    - **Edit**: Fadenstack's own containers (`SYSTEM_CORE` and `SYSTEM_AUX`) are edited only in Root Mode: a new
+      image or environment for the gateway would read every chat with the key it holds. Their **Edit** button is
+      greyed out until Root Mode is on.
+    - The new container keeps what the form does not show, so an edit needs Root Mode also when the container runs
+      privileged, shares the server's processes or memory, uses its devices (GPUs aside), takes another container's
+      volumes or mounts one of Fadenstack's own.
     - **Class**: changing the class of a container that has any of the above, or of a `SYSTEM_CORE` or
       `SYSTEM_AUX` container, needs Root Mode; so does unlocking a locked system container.
     - Start, stop and restart need no Root Mode: they run nothing new in the container.

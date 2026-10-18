@@ -24,7 +24,7 @@ from faden_backend.services import secret_redaction
 from faden_backend.services.docker import recreate
 from faden_backend.services.docker.client import DockerService
 from faden_backend.services.policy.enforcement import Action, PolicyEnforcer
-from faden_backend.web.api.admin.containers import host_access
+from faden_backend.web.api.admin.containers import host_access, platform_volumes
 from faden_backend.web.api.admin.containers.schema import (
     ContainerDetailDTO,
     ContainerSettingsDTO,
@@ -145,6 +145,25 @@ async def _refuse_host_access(
         return
     await _deny(
         host_access.refusal(reasons, doing=doing), {"host_access": reasons},
+        audit=audit, target_id=target_id, user=user, audit_dao=audit_dao,
+    )
+
+
+async def _refuse_platform_volumes(
+    volumes: list[str],
+    *,
+    root_mode: bool,
+    doing: str,
+    audit: str,
+    target_id: str,
+    user: User,
+    audit_dao: AuditDAO,
+) -> None:
+    """Refuse a container that mounts Fadenstack's own volumes outside Root Mode; the refusal is audited."""
+    if not volumes or root_mode:
+        return
+    await _deny(
+        platform_volumes.refusal(volumes, doing=doing), {"platform_volumes": volumes},
         audit=audit, target_id=target_id, user=user, audit_dao=audit_dao,
     )
 
@@ -361,12 +380,18 @@ async def create_container(
     """Create a new container and register it in the classification registry.
 
     One with root on the host (any host folder bound, the Docker socket among
-    them; the host's network) is made only in Root Mode. Named volumes need
-    nothing.
+    them; the host's network) is made only in Root Mode; so is one that mounts
+    Fadenstack's own volumes (its database, the chat files, the audit trail).
+    Other named volumes need nothing.
     """
     reasons = host_access.host_access(body.volumes, body.network)
     await _refuse_host_access(
         reasons, root_mode=root_mode, doing="create", audit="container.create",
+        target_id=body.name or body.image, user=user, audit_dao=audit_dao,
+    )
+    own_volumes = await platform_volumes.find(docker, host_access.named_volumes(body.volumes))
+    await _refuse_platform_volumes(
+        own_volumes, root_mode=root_mode, doing="create", audit="container.create",
         target_id=body.name or body.image, user=user, audit_dao=audit_dao,
     )
     # A new container has no stored value for a hidden one to stand for.
@@ -422,7 +447,7 @@ async def create_container(
         target_id=container_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        severity=_ROOT_MODE_SEVERITY if reasons else _severity(root_mode),
+        severity=_ROOT_MODE_SEVERITY if reasons or own_volumes else _severity(root_mode),
         audit_dao=audit_dao,
         metadata_json=json.dumps(
             {
@@ -430,7 +455,9 @@ async def create_container(
                 "name": raw_name,
                 "class": body.container_class.value,
                 "policy": body.policy.value,
+                "volumes": body.volumes,
                 **({"host_access": reasons} if reasons else {}),
+                **({"platform_volumes": own_volumes} if own_volumes else {}),
             }
         ),
     )
@@ -584,11 +611,19 @@ async def update_container(
     exists. The new container has a new id; the old one is removed once the
     new one runs, and is back as it was if the new one cannot be made.
     A new container with root on the host, from the form or from what the
-    old one kept, is made only in Root Mode; so is a new class for a system
-    container.
+    old one kept, is made only in Root Mode; so is one that mounts
+    Fadenstack's own volumes, any change to one of Fadenstack's own
+    containers, and a new class for one.
     """
     try:
-        enforcer.enforce(Action.UPDATE_CONFIG, entry.container_class, entry.policy, root_mode)
+        raw = await docker.inspect_container(container_id)
+    except DockerError as exc:
+        raise _docker_refused(exc, "The container could not be read") from None
+    # Its class as the registry has it, else by its name: a system container
+    # never listed has no registry entry, and is no tenant's for that.
+    current = await _classification(raw, container_id, registry_dao)
+    try:
+        enforcer.enforce(Action.UPDATE_CONFIG, *current, root_mode)
     except HTTPException:
         await audit_action(
             action="container.update",
@@ -596,15 +631,11 @@ async def update_container(
             target_id=container_id,
             result=AuditResult.DENY,
             actor_id=user.id,
-            severity=_severity(root_mode),
+            severity=_ROOT_MODE_SEVERITY if current[0] in _SYSTEM_CLASSES else _severity(root_mode),
             audit_dao=audit_dao,
+            metadata_json=json.dumps({"class": current[0].value, "policy": current[1].value}),
         )
         raise
-
-    try:
-        raw = await docker.inspect_container(container_id)
-    except DockerError as exc:
-        raise _docker_refused(exc, "The container could not be read") from None
     if raw.get("Id") == recreate.own_container_id():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -618,9 +649,17 @@ async def update_container(
         reasons, root_mode=root_mode, doing="change", audit="container.update",
         target_id=container_id, user=user, audit_dao=audit_dao,
     )
+    # The form's binds, and the mounts the new container keeps.
+    own_volumes = await platform_volumes.find(
+        docker, host_access.named_volumes(body.volumes, raw.get("HostConfig") or {}),
+    )
+    await _refuse_platform_volumes(
+        own_volumes, root_mode=root_mode, doing="change", audit="container.update",
+        target_id=container_id, user=user, audit_dao=audit_dao,
+    )
     # The new container takes the form's class: the same as registering it.
     await _refuse_system_change(
-        await _classification(raw, container_id, registry_dao), body.container_class, body.policy,
+        current, body.container_class, body.policy,
         root_mode=root_mode, audit="container.update", target_id=container_id, user=user, audit_dao=audit_dao,
     )
     image = await _image_of(docker, raw)
@@ -675,7 +714,9 @@ async def update_container(
                 "env": sorted(item.split("=", 1)[0] for item in edit.env),
                 "class": body.container_class.value,
                 "policy": body.policy.value,
+                "volumes": edit.volumes,
                 **({"host_access": reasons} if reasons else {}),
+                **({"platform_volumes": own_volumes} if own_volumes else {}),
             }),
         )
     except Exception:
@@ -874,6 +915,13 @@ async def register_container(
         reasons, root_mode=root_mode, doing="reclassify", audit="container.register",
         target_id=full_id, user=user, audit_dao=audit_dao,
     )
+    host_config = raw.get("HostConfig") or {}
+    mounted = host_access.named_volumes(host_config.get("Binds") or [], host_config, raw.get("Mounts") or [])
+    own_volumes = await platform_volumes.find(docker, mounted)
+    await _refuse_platform_volumes(
+        own_volumes, root_mode=root_mode, doing="reclassify", audit="container.register",
+        target_id=full_id, user=user, audit_dao=audit_dao,
+    )
     await _refuse_system_change(
         await _classification(raw, container_id, registry_dao), body.container_class, body.policy,
         root_mode=root_mode, audit="container.register", target_id=full_id, user=user, audit_dao=audit_dao,
@@ -893,7 +941,7 @@ async def register_container(
         target_id=full_id,
         result=AuditResult.ALLOW,
         actor_id=user.id,
-        severity=_ROOT_MODE_SEVERITY if reasons else _severity(root_mode),
+        severity=_ROOT_MODE_SEVERITY if reasons or own_volumes else _severity(root_mode),
         audit_dao=audit_dao,
         metadata_json=json.dumps(
             {
@@ -901,6 +949,7 @@ async def register_container(
                 "policy": body.policy.value,
                 "owner_scope": body.owner_scope,
                 **({"host_access": reasons} if reasons else {}),
+                **({"platform_volumes": own_volumes} if own_volumes else {}),
             }
         ),
     )

@@ -230,6 +230,8 @@ def docker() -> MagicMock:
     for name in ("rename", "connect_with_endpoint", "stop", "start", "delete"):
         setattr(mock, name, AsyncMock())
     mock.create_from_config = AsyncMock(return_value=NEW_ID)
+    mock.list_containers = AsyncMock(return_value=[])
+    mock.inspect_volume = AsyncMock(side_effect=DockerError(404, {"message": "no such volume"}))
     return mock
 
 

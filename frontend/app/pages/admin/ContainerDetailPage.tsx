@@ -3,11 +3,12 @@
  * Shows inspect data and live logs.
  */
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useOutletContext, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   containers,
   canEdit,
+  isSystemClass,
   type ContainerDetail,
 } from "~/api/admin";
 import { ClassChip } from "~/components/Chips";
@@ -20,6 +21,7 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -30,6 +32,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 
 export default function ContainerDetailPage() {
   const { t } = useTranslation();
+  const { rootModeActive } = useOutletContext<{ rootModeActive: boolean }>() ?? { rootModeActive: false };
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [detail, setDetail] = useState<ContainerDetail | null>(null);
@@ -103,14 +106,26 @@ export default function ContainerDetailPage() {
               {detail.id.slice(0, 64)}
             </Typography>
           </Box>
-          {canEdit(detail.policy) && (
-            <Button
-              variant="outlined"
-              startIcon={<EditIcon />}
-              onClick={() => navigate(`/admin/containers/${detail.id}/edit`)}
+          {detail.policy !== "locked" && (
+            // Fadenstack's own containers are edited only in Root Mode: the button says so.
+            <Tooltip
+              title={
+                canEdit(cls, detail.policy, rootModeActive)
+                  ? ""
+                  : t("container_detail.edit_needs_root")
+              }
             >
-              {t("container_detail.edit")}
-            </Button>
+              <span>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  disabled={!canEdit(cls, detail.policy, rootModeActive)}
+                  onClick={() => navigate(`/admin/containers/${detail.id}/edit`)}
+                >
+                  {t("container_detail.edit")}
+                </Button>
+              </span>
+            </Tooltip>
           )}
         </Stack>
 

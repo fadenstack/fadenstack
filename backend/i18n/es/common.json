@@ -988,6 +988,7 @@
   },
   "container_detail": {
     "failed_load": "Failed to load container.",
+    "edit_needs_root": "Un contenedor del propio Fadenstack: active el modo Root para editarlo.",
     "error_loading_logs": "Error loading logs",
     "tabs": {
       "overview": "Overview",

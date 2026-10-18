@@ -963,9 +963,22 @@ export const adminAuthProviders = {
   },
 };
 
-/** Every class can be edited (the container is replaced); a locked policy cannot. */
-export function canEdit(policy: ContainerPolicy): boolean {
-  return policy !== "locked";
+/** Fadenstack's own containers: edited only in Root Mode. */
+export function isSystemClass(cls: ContainerClass): boolean {
+  return cls === "SYSTEM_CORE" || cls === "SYSTEM_AUX";
+}
+
+/**
+ * A container can be edited (it is replaced) unless its policy is locked;
+ * one of Fadenstack's own only in Root Mode.
+ */
+export function canEdit(
+  cls: ContainerClass,
+  policy: ContainerPolicy,
+  rootModeActive: boolean,
+): boolean {
+  if (policy === "locked") return false;
+  return rootModeActive || !isSystemClass(cls);
 }
 
 export function canStop(cls: ContainerClass, rootModeActive: boolean): boolean {

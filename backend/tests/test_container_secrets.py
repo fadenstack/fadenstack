@@ -16,7 +16,7 @@ from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
 from faden_backend.db.models.containers import AuditEvent, ContainerClass, ContainerPolicy
 from faden_backend.db.models.users import current_active_user
 from faden_backend.services.secret_redaction import MASK
-from faden_backend.web.api.admin.dependencies import get_docker
+from faden_backend.web.api.admin.dependencies import get_docker, get_root_mode_active
 from tests.test_container_edit import IMAGE, NEW_ID, OLD_ID, _raw, _superuser
 
 SECRET_ENV = [
@@ -50,6 +50,8 @@ async def app(fastapi_app: FastAPI, dbsession: AsyncSession, docker: MagicMock) 
     user = await _superuser(dbsession)
     fastapi_app.dependency_overrides[current_active_user] = lambda: user
     fastapi_app.dependency_overrides[get_docker] = lambda: docker
+    # The gateway's settings are edited only in Root Mode (test_container_host_access.py).
+    fastapi_app.dependency_overrides[get_root_mode_active] = lambda: True
     await ContainerRegistryDAO(dbsession).upsert(
         container_id=OLD_ID, name="faden-gateway", container_class=ContainerClass.SYSTEM_CORE,
         policy=ContainerPolicy.FREE,

@@ -988,6 +988,7 @@
   },
   "container_detail": {
     "failed_load": "加载容器失败。",
+    "edit_needs_root": "这是 Fadenstack 自身的容器：请启用 Root 模式后再编辑。",
     "error_loading_logs": "加载日志出错",
     "tabs": {
       "overview": "概览",

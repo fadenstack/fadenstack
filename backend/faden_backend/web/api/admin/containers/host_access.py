@@ -269,10 +269,33 @@ def container_reasons(raw: dict[str, Any]) -> list[str]:
     return reasons
 
 
+def _bind_volume(entry: str) -> str | None:
+    """The named volume a bind (``name:/path``, ``type=volume,source=name,...``) mounts, if it mounts one."""
+    if "=" in entry.split(":", 1)[0]:
+        fields = dict(field.partition("=")[::2] for field in entry.split(","))
+        source = fields.get("source") or fields.get("src") or ""
+        return source if fields.get("type", "volume") == "volume" and _named_volume(source) else None
+    host, _ = _host_side(entry)
+    return host if host and _named_volume(host) else None
+
+
+def named_volumes(
+    volumes: Iterable[str], host_config: dict[str, Any] | None = None, mounts: Iterable[Any] = (),
+) -> list[str]:
+    """The named volumes in binds, a HostConfig's ``Mounts`` and an inspect's ``Mounts``, each once."""
+    names = [name for bind in volumes if (name := _bind_volume(bind))]
+    for mount in [*((host_config or {}).get("Mounts") or []), *mounts]:
+        volume = isinstance(mount, dict) and str(mount.get("Type") or "").lower() == "volume"
+        # A HostConfig names it Source, an inspect's Mounts Name.
+        if volume and (name := str(mount.get("Name") or mount.get("Source") or "")):
+            names.append(name)
+    return list(dict.fromkeys(names))
+
+
 def refusal(reasons: list[str], *, doing: str) -> str:
     """What the console says when a container like this needs Root Mode."""
     hint = (
-        " A named volume (a name instead of a host path) needs no Root Mode."
+        " A named volume of its own (a name instead of a host path) needs no Root Mode."
         if any(reason.startswith("binds ") for reason in reasons) and doing in {"create", "change"} else ""
     )
     return (

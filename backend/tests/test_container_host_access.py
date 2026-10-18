@@ -7,19 +7,22 @@ only ``containers:update``, and every lifecycle action only ``containers:start``
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiodocker.exceptions import DockerError
 from fastapi import FastAPI
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from faden_backend.db.dao.container_registry_dao import ContainerRegistryDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
-from faden_backend.db.models.containers import ContainerClass, ContainerPolicy
+from faden_backend.db.models.containers import AuditEvent, ContainerClass, ContainerPolicy
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.web.api.admin.containers import host_access
 from faden_backend.web.api.admin.dependencies import get_docker, get_root_mode_active
@@ -222,6 +225,7 @@ def docker() -> MagicMock:
     mock.inspect_container = AsyncMock(side_effect=lambda cid: _raw() if cid == OLD_ID else created)
     mock.inspect_image = AsyncMock(return_value={"Config": {}})
     mock.list_containers = AsyncMock(return_value=[])
+    mock.inspect_volume = AsyncMock(side_effect=DockerError(404, {"message": "no such volume"}))
     mock.create_from_config = AsyncMock(return_value=NEW_ID)
     for name in ("rename", "connect_with_endpoint", "start", "stop", "restart", "pause", "unpause", "delete"):
         setattr(mock, name, AsyncMock())
@@ -476,20 +480,42 @@ async def test_a_locked_system_container_is_unlocked_only_in_root_mode(
 
 
 @pytest.mark.anyio
-async def test_an_edit_gives_a_system_container_another_class_only_in_root_mode(
+async def test_a_system_container_is_edited_only_in_root_mode(
     fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
 ) -> None:
-    """The new container takes the form's class: an edit is a register too."""
+    """A new image or environment for the gateway reads every chat with the key it holds."""
     await _registered(dbsession, ContainerClass.SYSTEM_AUX)
     user = await _user(dbsession, superuser=True)
     url = fastapi_app.url_path_for("update_container", container_id=OLD_ID)
     _as(fastapi_app, user, docker)
-    r = await client.put(url, json=_create())  # TENANT_APP
+    for body in (_create(), _create(container_class="SYSTEM_AUX")):  # another class, or the same
+        r = await client.put(url, json=body)
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert "SYSTEM_AUX" in r.json()["detail"] and "Root Mode" in r.json()["detail"]
+    docker.create_from_config.assert_not_called()
+    refused = (await dbsession.execute(
+        select(AuditEvent).where(AuditEvent.action == "container.update", AuditEvent.target_id == OLD_ID),
+    )).scalars().all()
+    assert {event.severity for event in refused} == {"high"}
+
+    _as(fastapi_app, user, docker, root_mode=True)
+    r = await client.put(url, json=_create(container_class="SYSTEM_AUX"))
+    assert r.status_code == status.HTTP_200_OK, r.text
+
+
+@pytest.mark.anyio
+async def test_a_system_container_never_listed_is_still_one_of_fadenstacks_own(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    """No registry entry: its name decides, not the UNTRUSTED stand-in an unknown container gets."""
+    docker.inspect_container = AsyncMock(return_value={**_raw(), "Name": "/faden-gateway"})
+    _as(fastapi_app, await _user(dbsession, superuser=True), docker)
+    r = await client.put(
+        fastapi_app.url_path_for("update_container", container_id=OLD_ID), json=_create(container_class="SYSTEM_AUX"),
+    )
     assert r.status_code == status.HTTP_403_FORBIDDEN
     assert "SYSTEM_AUX" in r.json()["detail"]
     docker.create_from_config.assert_not_called()
-    r = await client.put(url, json=_create(container_class="SYSTEM_AUX"))
-    assert r.status_code == status.HTTP_200_OK, r.text
 
 
 @pytest.mark.anyio
@@ -561,3 +587,135 @@ async def test_a_container_addressed_by_name_gets_the_class_it_is_registered_wit
     app = _as(fastapi_app, await _user(dbsession, superuser=True), docker)
     r = await client.post(app.url_path_for("container_lifecycle", container_id="tool", action="stop"))
     assert r.status_code == status.HTTP_204_NO_CONTENT, r.text
+
+
+# ── Fadenstack's own volumes ──────────────────────────────────────
+
+
+def test_the_named_volumes_of_binds_and_mounts_are_found() -> None:
+    assert host_access.named_volumes(
+        [
+            "fadenstack_pg_data:/data:ro", "/srv/x:/x", "C:/data:/d", "/only/in/container",
+            "type=volume,source=fadenstack_faden_audit,target=/a", "type=bind,source=/srv,target=/s",
+        ],
+        {"Mounts": [{"Type": "volume", "Source": "fadenstack_faden_chat_files"}, {"Type": "tmpfs", "Target": "/t"}]},
+        [{"Type": "volume", "Name": "fadenstack_pg_data"}, {"Type": "bind", "Source": "/srv"}],
+    ) == ["fadenstack_pg_data", "fadenstack_faden_audit", "fadenstack_faden_chat_files"]
+
+
+def _project_volumes(docker: MagicMock, **projects: str) -> None:
+    """Docker's volumes: *projects* maps a volume's name to the compose project that made it."""
+
+    async def inspect(name: str) -> dict[str, Any]:
+        if name not in projects:
+            raise DockerError(404, {"message": "no such volume"})
+        return {"Name": name, "Labels": {"com.docker.compose.project": projects[name]}}
+
+    docker.inspect_volume = AsyncMock(side_effect=inspect)
+
+
+async def _event(db: AsyncSession, action: str, target_id: str) -> AuditEvent:
+    return (await db.execute(
+        select(AuditEvent).where(AuditEvent.action == action, AuditEvent.target_id == target_id),
+    )).scalars().one()
+
+
+@pytest.mark.anyio
+async def test_a_container_that_mounts_fadenstacks_own_volume_needs_root_mode(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    """A named volume needs nothing, but the database's files and the chat files are not any volume."""
+    _project_volumes(docker, fadenstack_pg_data="fadenstack", other_data="someone-else")
+    user = await _user(dbsession, superuser=True)
+    url = fastapi_app.url_path_for("create_container")
+    _as(fastapi_app, user, docker)
+    r = await client.post(url, json=_create(name="peek", volumes=["fadenstack_pg_data:/pg:ro"]))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert "fadenstack_pg_data" in r.json()["detail"] and "Activate Root Mode to create" in r.json()["detail"]
+    docker.create_container.assert_not_called()
+    refused = await _event(dbsession, "container.create", "peek")
+    assert (refused.result.value, refused.severity) == ("deny", "high")
+    assert json.loads(refused.metadata_json or "{}") == {"platform_volumes": ["fadenstack_pg_data"]}
+
+    # Another project's volume, or a new one: nothing to ask.
+    r = await client.post(url, json=_create(name="ok", volumes=["other_data:/o", "fresh:/f"]))
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    made = json.loads((await _event(dbsession, "container.create", NEW_ID)).metadata_json or "{}")
+    assert made["volumes"] == ["other_data:/o", "fresh:/f"] and "platform_volumes" not in made
+
+    _as(fastapi_app, user, docker, root_mode=True)
+    docker.create_container.reset_mock()
+    r = await client.post(url, json=_create(name="peek", volumes=["fadenstack_pg_data:/pg:ro"]))
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+    events = (await dbsession.execute(
+        select(AuditEvent).where(AuditEvent.action == "container.create", AuditEvent.target_id == NEW_ID),
+    )).scalars().all()
+    rooted = next(e for e in events if "platform_volumes" in (e.metadata_json or ""))
+    assert rooted.severity == "high"
+    assert json.loads(rooted.metadata_json or "{}")["volumes"] == ["fadenstack_pg_data:/pg:ro"]
+
+
+@pytest.mark.anyio
+async def test_a_volume_one_of_fadenstacks_containers_uses_is_its_own(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    """Made by hand (no compose label), but the gateway mounts it."""
+    _project_volumes(docker, chats_by_hand="")
+    docker.list_containers = AsyncMock(return_value=[
+        {"Names": ["/faden-gateway"], "Labels": {"com.docker.compose.project": "fadenstack"},
+         "Mounts": [{"Type": "volume", "Name": "chats_by_hand"}]},
+        {"Names": ["/tool"], "Labels": {}, "Mounts": [{"Type": "volume", "Name": "tool_data"}]},
+    ])
+    _as(fastapi_app, await _user(dbsession, superuser=True), docker)
+    url = fastapi_app.url_path_for("create_container")
+    r = await client.post(url, json=_create(volumes=["chats_by_hand:/c"]))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert "chats_by_hand" in r.json()["detail"]
+    r = await client.post(url, json=_create(volumes=["tool_data:/data"]))  # a tenant's volume
+    assert r.status_code == status.HTTP_201_CREATED, r.text
+
+
+@pytest.mark.anyio
+async def test_an_edit_that_keeps_or_adds_fadenstacks_volume_needs_root_mode(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    await _registered(dbsession)
+    _project_volumes(docker, fadenstack_faden_chat_files="fadenstack")
+    user = await _user(dbsession, superuser=True)
+    url = fastapi_app.url_path_for("update_container", container_id=OLD_ID)
+    _as(fastapi_app, user, docker)
+    r = await client.put(url, json=_create(volumes=["fadenstack_faden_chat_files:/files"]))
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert "Activate Root Mode to change" in r.json()["detail"]
+    # Mounted through HostConfig.Mounts (kept as it was by an edit).
+    kept = _raw(Mounts=[{"Type": "volume", "Source": "fadenstack_faden_chat_files", "Target": "/files"}])
+    made = docker.inspect_container.side_effect
+    docker.inspect_container = AsyncMock(side_effect=lambda cid: kept if cid == OLD_ID else made(cid))
+    r = await client.put(url, json=_create())
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    docker.create_from_config.assert_not_called()
+    _as(fastapi_app, user, docker, root_mode=True)
+    r = await client.put(url, json=_create())
+    assert r.status_code == status.HTTP_200_OK, r.text
+    changed = json.loads((await _event(dbsession, "container.update", NEW_ID)).metadata_json or "{}")
+    assert changed["platform_volumes"] == ["fadenstack_faden_chat_files"]
+
+
+@pytest.mark.anyio
+async def test_a_container_with_fadenstacks_volume_is_reclassified_only_in_root_mode(
+    fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession, docker: MagicMock,
+) -> None:
+    """Made TENANT_APP outside the console, it could be exec'd into: the database's files."""
+    _project_volumes(docker, fadenstack_pg_data="fadenstack")
+    raw = {**_raw(Binds=["fadenstack_pg_data:/pg"]), "Mounts": [{"Type": "volume", "Name": "fadenstack_pg_data"}]}
+    docker.inspect_container = AsyncMock(return_value=raw)
+    user = await _user(dbsession, superuser=True)
+    url = fastapi_app.url_path_for("register_container", container_id=OLD_ID)
+    _as(fastapi_app, user, docker)
+    r = await client.put(url, json=_TENANT)
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    assert "Activate Root Mode to reclassify" in r.json()["detail"]
+    assert await ContainerRegistryDAO(dbsession).get(OLD_ID) is None
+    _as(fastapi_app, user, docker, root_mode=True)
+    r = await client.put(url, json=_TENANT)
+    assert r.status_code == status.HTTP_200_OK, r.text

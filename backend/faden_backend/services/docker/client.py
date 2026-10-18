@@ -295,6 +295,10 @@ class DockerService:
         """Return full inspection data for an image (by name or id)."""
         return await self.client.images.inspect(image)
 
+    async def inspect_volume(self, name: str) -> dict[str, Any]:
+        """Inspect the named volume *name* (its labels among the rest); DockerError 404 if it is not there."""
+        return await (await self.client.volumes.get(name)).show()
+
     async def delete(self, container_id: str, force: bool = False) -> None:
         """Delete a container."""
         c = await self.client.containers.get(container_id)

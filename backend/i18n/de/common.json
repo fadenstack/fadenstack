@@ -988,6 +988,7 @@
   },
   "container_detail": {
     "failed_load": "Container konnte nicht geladen werden.",
+    "edit_needs_root": "Ein Container von Fadenstack selbst: Aktivieren Sie den Root-Modus, um ihn zu bearbeiten.",
     "error_loading_logs": "Fehler beim Laden der Logs",
     "tabs": {
       "overview": "Übersicht",

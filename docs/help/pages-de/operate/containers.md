@@ -109,15 +109,20 @@ Host-Pfad wie `/srv/data`, `./config` oder `C:\data`; darunter auch den Docker-S
 `/etc`), oder der das Netzwerk `host` oder das Netzwerk eines anderen Containers nutzt. Ohne Root-Modus lehnt die
 Konsole ihn ab und sagt, warum. Geben Sie unter **Volume-Mounts** statt eines Host-Pfads einen Namen an (`my-data`,
 nicht `/data/app`): Docker legt dann ein benanntes Volume für den Container an, und das braucht keinen Root-Modus.
-Ohne ihn darf nur die Zeitzone schreibgeschützt eingebunden werden (`/etc/localtime`, `/etc/timezone`,
+Ausgenommen sind die eigenen Volumes von Fadenstack: Die Dateien der Datenbank, die Chat-Dateien, das Audit-Protokoll
+und die Modelle (`fadenstack_pg_data`, `fadenstack_faden_chat_files` und die übrigen, die seine Container nutzen)
+werden nur im Root-Modus eingebunden, und das Audit-Protokoll hält fest, welche Volumes ein Container bekam. Ohne
+Root-Modus darf nur die Zeitzone schreibgeschützt eingebunden werden (`/etc/localtime`, `/etc/timezone`,
 `/usr/share/zoneinfo`, mit `:ro`).
 
 ??? info "Mehr dazu, was den Root-Modus braucht"
-    - **Bearbeiten**: Der neue Container behält, was das Formular nicht zeigt. Deshalb braucht eine Bearbeitung den
-      Root-Modus auch, wenn der Container privilegiert läuft, die Prozesse oder den Speicher des Servers teilt,
-      dessen Geräte nutzt (GPUs ausgenommen) oder die Volumes eines anderen Containers übernimmt. Die meisten
-      eigenen Container von Fadenstack binden Dateien der Installation ein; sie zu bearbeiten, braucht daher den
-      Root-Modus.
+    - **Bearbeiten**: Die eigenen Container von Fadenstack (`SYSTEM_CORE` und `SYSTEM_AUX`) werden nur im Root-Modus
+      bearbeitet: Ein neues Image oder eine neue Umgebung für das Gateway läse mit dessen Schlüssel jeden Chat. Ihre
+      Schaltfläche **Bearbeiten** ist ausgegraut, bis der Root-Modus aktiv ist.
+    - Der neue Container behält, was das Formular nicht zeigt. Deshalb braucht eine Bearbeitung den Root-Modus auch,
+      wenn der Container privilegiert läuft, die Prozesse oder den Speicher des Servers teilt, dessen Geräte nutzt
+      (GPUs ausgenommen), die Volumes eines anderen Containers übernimmt oder eines der eigenen Volumes von
+      Fadenstack einbindet.
     - **Klasse**: Die Klasse eines Containers mit einem der genannten Punkte oder eines `SYSTEM_CORE`- oder
       `SYSTEM_AUX`-Containers zu ändern, braucht den Root-Modus; ebenso das Entsperren eines gesperrten
       Systemcontainers.

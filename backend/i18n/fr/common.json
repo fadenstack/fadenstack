@@ -983,6 +983,7 @@
   },
   "container_detail": {
     "failed_load": "Échec du chargement du conteneur.",
+    "edit_needs_root": "Un conteneur de Fadenstack lui-même : activez le mode Root pour le modifier.",
     "error_loading_logs": "Erreur de chargement des journaux",
     "tabs": {
       "overview": "Aperçu",

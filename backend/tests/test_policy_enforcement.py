@@ -137,7 +137,7 @@ def test_enforce_raises_on_deny(enforcer: PolicyEnforcer) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Editing (the container is replaced): every class, unless LOCKED
+# Editing (the container is replaced): every class unless LOCKED, Fadenstack's own in Root Mode
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -146,5 +146,8 @@ def test_enforce_raises_on_deny(enforcer: PolicyEnforcer) -> None:
 def test_every_class_can_be_edited_unless_locked(
     enforcer: PolicyEnforcer, container_class: ContainerClass, root_mode: bool,
 ) -> None:
-    assert enforcer.check(Action.UPDATE_CONFIG, container_class, ContainerPolicy.FREE, root_mode)
+    system = container_class in (ContainerClass.SYSTEM_CORE, ContainerClass.SYSTEM_AUX)
+    assert enforcer.check(Action.UPDATE_CONFIG, container_class, ContainerPolicy.FREE, root_mode) == (
+        root_mode or not system
+    )
     assert not enforcer.check(Action.UPDATE_CONFIG, container_class, ContainerPolicy.LOCKED, root_mode)

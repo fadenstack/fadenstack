@@ -75,7 +75,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.SYSTEM_AUX, Action.PAUSE): False,
     (ContainerClass.SYSTEM_AUX, Action.UNPAUSE): False,
     (ContainerClass.SYSTEM_AUX, Action.EXEC): False,
-    (ContainerClass.SYSTEM_AUX, Action.UPDATE_CONFIG): True,
+    (ContainerClass.SYSTEM_AUX, Action.UPDATE_CONFIG): False,  # Root Mode: its keys, its volumes
     (ContainerClass.SYSTEM_AUX, Action.DELETE): False,
     (ContainerClass.SYSTEM_AUX, Action.IMAGE_PULL): True,
     (ContainerClass.SYSTEM_AUX, Action.IMAGE_PRUNE): False,
@@ -107,7 +107,7 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
     (ContainerClass.SYSTEM_CORE, Action.PAUSE): False,
     (ContainerClass.SYSTEM_CORE, Action.UNPAUSE): False,
     (ContainerClass.SYSTEM_CORE, Action.EXEC): False,
-    (ContainerClass.SYSTEM_CORE, Action.UPDATE_CONFIG): True,
+    (ContainerClass.SYSTEM_CORE, Action.UPDATE_CONFIG): False,  # Root Mode: its keys, its volumes
     (ContainerClass.SYSTEM_CORE, Action.DELETE): False,
     (ContainerClass.SYSTEM_CORE, Action.IMAGE_PULL): True,
     (ContainerClass.SYSTEM_CORE, Action.IMAGE_PRUNE): False,
@@ -133,8 +133,11 @@ _ADMIN_ALLOW: dict[tuple[ContainerClass, Action], bool] = {
 }
 
 # Editing a container (it is replaced by one with the new settings) is
-# allowed for every class: only a LOCKED policy blocks it. It was TENANT_APP
-# only, and an MCP server's container could not get a new variable.
+# allowed for tenant, MCP and untrusted containers; a LOCKED policy blocks it.
+# It was TENANT_APP only, and an MCP server's container could not get a new
+# variable. Fadenstack's own containers (SYSTEM_CORE, SYSTEM_AUX) are edited
+# only in Root Mode: a new image or environment for the gateway reads every
+# chat with the key it holds.
 
 # Root mode: all actions allowed on any class
 _ROOT_ALLOW_ALL = True
