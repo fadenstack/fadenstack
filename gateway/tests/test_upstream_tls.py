@@ -306,3 +306,18 @@ def test_the_setting_a_provider_asks_for() -> None:
         ssl_verify_mode="default", ssl_ca_bundle_pem=None, ssl_client_cert_pem=combined, ssl_client_key_pem=None,
     )
     assert tls is not None and tls.key_pem == combined
+
+
+@pytest.mark.anyio
+async def test_one_openai_client_per_setting_address_and_key() -> None:
+    """Kept by the key itself, which stays in this process's memory, as it does in the client made with it."""
+    clients = upstream_tls.UpstreamClients()
+    tls = upstream_tls.UpstreamTls()
+    first = clients.openai(tls, base_url="https://m:8443/v1", api_key="sk-a")
+    assert clients.openai(tls, base_url="https://m:8443/v1", api_key="sk-a") is first
+    assert clients.openai(tls, base_url="https://m:8443/v1", api_key="sk-b") is not first
+    assert clients.openai(tls, base_url="https://n:8443/v1", api_key="sk-a") is not first
+    assert clients.openai(tls, base_url="https://m:8443/v1", api_key=None) is clients.openai(
+        tls, base_url="https://m:8443/v1", api_key="",
+    ), "no key is one key"
+    await clients.http(tls).aclose()

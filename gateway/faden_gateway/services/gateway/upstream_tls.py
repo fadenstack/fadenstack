@@ -196,8 +196,8 @@ class UpstreamClients:
 
         # Taken on every use, so the httpx client under it never looks idle.
         http = self.http(tls)
-        key_hash = hashlib.sha256((api_key or "").encode()).hexdigest()
-        key = (tls.digest, base_url, key_hash)
+        # The key itself: it never leaves this process's memory, and the client under it holds it anyway.
+        key = (tls.digest, base_url, api_key or "")
         entry = self._openai.get(key)
         if entry is None or getattr(entry.client, "_client", http) is not http:
             entry = _Entry(AsyncOpenAI(
