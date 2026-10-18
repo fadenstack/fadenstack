@@ -122,7 +122,7 @@ fragt nach einer Bestätigung und hält fest, wer es wann ausgeschaltet hat; `fa
 ## Nachweise {#records}
 
 Belege, die Nachweise der Einfügungen und die Berichte der Agenten darüber enthalten Hashes und IDs, nie den
-Inhalt. Sie bleiben erhalten, solange die Installation läuft. Jede Sicherung enthält sie, mit der Datenbank des
+Inhalt. Sie bleiben erhalten, solange sie gebraucht werden. Jede Sicherung enthält sie, mit der Datenbank des
 Herkunftsnachweises und ihren Schlüsseln, und eine Wiederherstellung oder ein Upgrade behält sie (siehe
 [Sicherungen](../operate/backups.md)).
 

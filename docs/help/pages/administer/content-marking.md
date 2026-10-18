@@ -113,7 +113,7 @@ confirm and records who switched it off and when; `faden up` then applies it, an
 ## Records
 
 Receipts, the records of placements and the agents' reports about them hold hashes and ids, never the content.
-They are kept as long as the installation runs. Every backup includes them, with the provenance database and
+They are kept as long as they are needed. Every backup includes them, with the provenance database and
 its keys, and a restore or an upgrade keeps them (see [Backups](../operate/backups.md)).
 
 ## Keys
