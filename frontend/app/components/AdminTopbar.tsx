@@ -15,6 +15,7 @@ import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -38,6 +39,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import AgentAvatar from "~/components/AgentAvatar";
 import { NavLogoButton } from "~/components/NavLogoButton";
 import { UserMenuButton } from "~/components/UserMenuButton";
+import { AboutDialog } from "~/components/AboutDialog";
 import { helpUrl } from "~/lib/pageHelp";
 import { pickLanguage } from "~/lib/userLanguage";
 
@@ -92,6 +94,7 @@ export function AdminTopbar({
   const isRootActive = rootStatus?.active ?? false;
 
   // Help dropdown menu state
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [helpMenuAnchor, setHelpMenuAnchor] = useState<HTMLElement | null>(
     null,
   );
@@ -203,7 +206,21 @@ export function AdminTopbar({
               <ListItemText>{t(`help.${key}`, { ns: "tour" })}</ListItemText>
             </MenuItem>
           ))}
+          <Divider sx={{ my: 0.5 }} />
+          <MenuItem
+            data-help-item="about_fadenstack"
+            onClick={() => {
+              setHelpMenuAnchor(null);
+              setAboutOpen(true);
+            }}
+          >
+            <ListItemIcon>
+              <InfoOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>{t("about.menu_item")}</ListItemText>
+          </MenuItem>
         </Menu>
+        <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
         <Tooltip title={t("language.label")} arrow>
           <IconButton
             size="small"

@@ -30,6 +30,8 @@ Die Seitenleiste zeigt sich in der Sprache Ihres Browsers. Um eine andere zu wä
 
 Unter den Sprachen zeigen die **Einstellungen**, welchen Agenten Sie auf welchem Server nutzen, mit **Auf diesem Gerät abmelden** und **Server oder Agent ändern**.
 
+**Info**, der letzte Eintrag unter dem Zahnrad, nennt den Agenten und seine Version, das Modell, die Erweiterung, das Fadenstack-SDK, mit dem er gebaut ist, und den Server; **Details kopieren** kopiert sie für eine Frage an Ihre IT-Abteilung. Er verlinkt auf die Hilfe Ihrer Organisation und auf fadenstack.com. Unter dem Nachrichtenfeld steht außerdem ein kleiner Link **Fadenstack** (was ein solcher Link sendet: [Ihre Daten und Datenschutz](privacy.md#links-to-fadenstackcom)).
+
 ## Fragen zu einer Seite stellen {#ask-about-a-page}
 
 Geben Sie Ihre Frage in der Seitenleiste ein, z. B. „Fasse diese Seite zusammen“ oder „Was sagt dieser Vertrag über Kündigungsfristen?“. Die Leiste über dem Nachrichtenfeld nennt die Seite, mit der der Agent arbeitet.

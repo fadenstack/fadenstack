@@ -26,6 +26,8 @@ Eine Anmeldung gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer
 
 Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wählen Sie oben im Bereich das Zahnrad (**Einstellungen**) und dann unter **Sprache** eine Sprache: Der ganze Bereich wechselt sofort, auch die Unterhaltung. **Automatisch** kehrt zur Sprache von Office zurück. Die Auswahl gilt für Word, Excel, PowerPoint und Outlook auf diesem Computer und wird für Ihr Konto gespeichert, sodass die Konsole und der Browser-Agent ihr folgen. Hat Ihre Organisation eine Sprache festgelegt, zeigen die Einstellungen sie mit **Von Ihrer Organisation festgelegt** an, und Sie können sie nicht ändern. Die eigenen Texte des Bereichs, etwa die Anmeldung, sind vorerst auf Englisch.
 
+**Info**, der letzte Eintrag unter dem Zahnrad, nennt den Agenten und seine Version, das Modell, das Add-in, das Fadenstack-SDK, mit dem er gebaut ist, und den Server; **Details kopieren** kopiert sie für eine Frage an Ihre IT-Abteilung. Er verlinkt auf die Hilfe Ihrer Organisation und auf fadenstack.com. Unter dem Nachrichtenfeld steht außerdem ein kleiner Link **Fadenstack** (was ein solcher Link sendet: [Ihre Daten und Datenschutz](privacy.md#links-to-fadenstackcom)).
+
 ## Dem Agenten Kontext geben {#give-the-agent-context}
 
 ![Der Aufgabenbereich des Agenten in Excel: vorgeschlagene Anfragen, die markierten Zellen als Chip im Nachrichtenfeld und darunter die Schaltfläche Context](../images/use/office-excel-pane.png)

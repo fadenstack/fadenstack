@@ -37,7 +37,7 @@ Sie landen im Chat.
 | Wo | Was dort ist |
 |---|---|
 | Die Seitenleiste links | **Neuer Chat**, die Suche, Ihre **Projekte** und Ihre **Chats** |
-| Die Leiste oben | Der Titel des Chats (mit dem Stift benennen Sie ihn um), **Sprache**, das helle oder dunkle Design und Ihr Avatar mit **Profil verwalten**, **Skills** und **Abmelden** |
+| Die Leiste oben | Der Titel des Chats (mit dem Stift benennen Sie ihn um), **Sprache**, das helle oder dunkle Design und Ihr Avatar mit **Profil verwalten**, **Skills**, **Hilfe**, **Über Fadenstack** und **Abmelden** |
 | Das Feld unten | Hier schreiben Sie. Daneben: die Tool-Schaltfläche (ein Schraubenschlüssel), die Skill-Schaltfläche (ein Puzzleteil), die Büroklammer für Dateien, die Auswahl **Modell** und die Senden-Schaltfläche |
 
 ??? info "Wenn Sie Administrator sind"

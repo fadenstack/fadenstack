@@ -30,6 +30,8 @@ The panel shows itself in your browser's language. To pick another, select the g
 
 Below the languages, **Settings** shows which agent you use on which server, with **Sign out on this device** and **Change server or agent**.
 
+**About**, the last entry under the gear, names the agent and its version, the model, the extension, the Fadenstack SDK it is built with and the server; **Copy details** copies them for a question to your IT department. It links to your organisation's Help and to fadenstack.com. A small **Fadenstack** link also sits under the message box (what such a link sends: [Your data and privacy](privacy.md#links-to-fadenstackcom)).
+
 ## Ask about a page
 
 Type your question in the panel, for example "Summarise this page" or "What does this contract say about notice periods?". The bar above the message box names the page the agent works with.

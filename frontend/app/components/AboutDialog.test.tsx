@@ -11,6 +11,7 @@ import Login from "~/routes/login";
 
 import { AboutDialog, AboutVersionLine } from "./AboutDialog";
 import { UserMenuButton } from "./UserMenuButton";
+import { AdminTopbar } from "./AdminTopbar";
 
 vi.mock("~/api/about", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/api/about")>();
@@ -101,5 +102,25 @@ describe("the sign-in page", () => {
     expect(site.getAttribute("rel")).toBe("noopener noreferrer");
     expect(help.getAttribute("href")).toBe("/help/");
     expect(aboutInfo).not.toHaveBeenCalled(); // nothing asked before signing in
+  });
+});
+
+describe("the console's Help menu", () => {
+  it("ends with About Fadenstack", async () => {
+    aboutInfo.mockResolvedValue(CORE);
+    const noop = () => {};
+    renderPage(
+      <AdminTopbar
+        mode="light" toggleMode={noop} currentUserEmail="admin@example.com" isSuperuser rootStatus={null}
+        languages={[]} language="en" languageMenuAnchor={null} onLanguageMenuOpen={noop} onLanguageMenuClose={noop}
+        onLanguageChange={noop} onGettingStartedOpen={noop} onConsoleTourOpen={noop} onHowToGuidesOpen={noop}
+        onResetGuides={noop} onPageHelp={noop} onRootFormOpen={noop} onRootDeactivate={noop} onLogout={noop}
+      />,
+    );
+    fireEvent.click(document.querySelector('[data-tour-id="topbar.help"]') ?? screen.getAllByRole("button")[0]);
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.at(-1)).toHaveTextContent("About Fadenstack");
+    fireEvent.click(items.at(-1)!);
+    expect(await screen.findByTestId("about-dialog")).toBeInTheDocument();
   });
 });

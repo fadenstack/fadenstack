@@ -23,6 +23,7 @@ The **Help** menu (the question mark in the top bar) has:
 | **Tour of the console** | A minute's look at where things are. |
 | **About this page** (or ++f1++) | Explains the page you are on and what you can do there. |
 | **How-to guides** | Walk you through a task on the real pages: you do the clicks, the guide shows the way. |
+| **About Fadenstack** | The edition, the release this server runs and its licence, with links to the release notes, Help, third-party notices, security and the developers' docs, and **Copy details** for a support request. The release also shows at the bottom of the menu on the left; a click on it opens the same. |
 
 ![The Getting started list on the dashboard: five steps, four of them ticked, each with Open, and Hide at the top right](../images/administer/getting-started.png)
 

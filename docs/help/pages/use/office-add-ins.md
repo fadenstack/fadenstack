@@ -26,6 +26,8 @@ One sign-in covers Word, Excel, PowerPoint and Outlook on this computer.
 
 The pane shows itself in Office's language. To pick another, select the gear (**Settings**) at the top of the pane, then a language under **Language**: the whole pane changes at once, the conversation too. **Automatic** goes back to Office's language. The choice holds for Word, Excel, PowerPoint and Outlook on this computer, and is kept for your account, so the console and the browser agent follow it. If your organisation set a language, the settings show it with **Set by your organisation**, and you cannot change it. The pane's own words, such as the sign-in, are in English for now.
 
+**About**, the last entry under the gear, names the agent and its version, the model, the add-in, the Fadenstack SDK it is built with and the server; **Copy details** copies them for a question to your IT department. It links to your organisation's Help and to fadenstack.com. A small **Fadenstack** link also sits under the message box (what such a link sends: [Your data and privacy](privacy.md#links-to-fadenstackcom)).
+
 ## Give the agent context
 
 ![The agent's pane in Excel: suggested requests, the selected cells offered as a chip in the message box, and the Context button below it](../images/use/office-excel-pane.png)

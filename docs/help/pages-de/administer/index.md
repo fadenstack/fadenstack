@@ -23,6 +23,7 @@ Das Menü **Hilfe** (das Fragezeichen in der oberen Leiste) enthält:
 | **Rundgang durch die Konsole** | Zeigt Ihnen in einer Minute, wo was zu finden ist. |
 | **Über diese Seite** (oder ++f1++) | Erklärt die Seite, auf der Sie gerade sind, und was Sie dort tun können. |
 | **Anleitungen** | Führen Sie auf den echten Seiten durch eine Aufgabe: Sie klicken selbst, die Anleitung zeigt den Weg. |
+| **Über Fadenstack** | Die Edition, das Release, das dieser Server ausführt, und seine Lizenz, mit Links zu den Versionshinweisen, zur Hilfe, zu den Hinweisen zu Drittanbietern, zur Sicherheit und zur Entwicklerdokumentation, und **Details kopieren** für eine Support-Anfrage. Das Release steht auch unten im Menü links; ein Klick darauf öffnet dasselbe. |
 
 ![Die Liste „Erste Schritte“ auf dem Dashboard: fünf Schritte, vier davon abgehakt, jeder mit „Öffnen“, und „Ausblenden“ oben rechts](../images/administer/getting-started.png)
 

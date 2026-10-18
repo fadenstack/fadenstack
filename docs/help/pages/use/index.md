@@ -37,7 +37,7 @@ You land in the chat.
 | Where | What is there |
 |---|---|
 | The sidebar on the left | **New chat**, the search, your **Projects** and your **Chats** |
-| The bar at the top | The chat's title (the pencil renames it), **Language**, the light or dark theme, and your avatar with **Manage Profile**, **Skills** and **Logout** |
+| The bar at the top | The chat's title (the pencil renames it), **Language**, the light or dark theme, and your avatar with **Manage Profile**, **Skills**, **Help**, **About Fadenstack** and **Logout** |
 | The box at the bottom | Where you type. Beside it: the tools button (a wrench), the skills button (a puzzle piece), the paper clip for files, the **Model** picker and the send button |
 
 ??? info "If you are an administrator"
