@@ -71,6 +71,8 @@ class RecordBody(BaseModel):
 
     #: SHA-256 of the content placed, hex; text normalised first, as ``content_hash`` does.
     content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    #: For HTML and Markdown: SHA-256 of the plain text a reader sees, normalised as ``content_hash`` does.
+    text_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     media_type: str = Field(max_length=255)
     edit_kind: EditKind
     receipt_id: str | None = Field(default=None, max_length=128)

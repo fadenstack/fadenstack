@@ -1030,7 +1030,10 @@ async def test_a_record_is_signed_for_the_agent_the_route_names(
     assert r.status_code == 200, r.text
     assert r.json()["record"]["id"] == "rec-1"
     assert r.json()["signature"] == "eyJ.rec-1.sig"
-    assert engine.bodies[RECORDS] == [{**RECORD, "model": None, "agent": AGENT_ID}]
+    assert engine.bodies[RECORDS] == [{**RECORD, "model": None, "text_sha256": None, "agent": AGENT_ID}]
+    r = await client.post(RECORDS_URL, headers=_headers(), json={**RECORD, "text_sha256": "b" * 64})
+    assert r.status_code == 200, "the plain text's hash of HTML or Markdown goes along"
+    assert engine.bodies[RECORDS][-1]["text_sha256"] == "b" * 64
 
 
 @pytest.mark.anyio
