@@ -21,12 +21,17 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from faden_cli import __version__
+from faden_cli.core import backup_crypto
 from faden_cli.core.compose import ComposeContext, up as compose_up
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.private_files import PRIVATE_DIR, open_private, private_dir, write_private
 from faden_cli.core.registry import DATABASES, POSTGRES_CONTAINER
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
 
 # Named Docker volumes that can be included in a backup, by their name in the compose file. Not among them:
 # Postgres's data volume, because the dumps are the databases' backup, a copy of a running data directory is
@@ -93,6 +98,8 @@ class BackupResult:
     volumes: list[str] = field(default_factory=list)
     tls_material: list[str] = field(default_factory=list)
     manifest_path: Path | None = None
+    #: The id of the backup key it is encrypted to; empty when it is not encrypted.
+    encrypted_to: str = ""
     ok: bool = True
     errors: list[str] = field(default_factory=list)
 
@@ -1013,6 +1020,7 @@ def write_manifest(
         "kind": kind,
         "databases": db_entries,
         "env_snapshot": env_snapshot,
+        "env_sha256": _sha256(env_file) if env_snapshot and (env_file := backup_dir / env_snapshot).is_file() else "",
         "volumes": volumes,
         # By archive name, like the dumps and certificate files: a restore empties a volume before it writes
         # the archive in, so a damaged archive has to be found first.
@@ -1070,6 +1078,13 @@ def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
         error_text = _volume_archive_error(backup_dir, archive, expected)
         if error_text:
             errors.append(error_text)
+    env_snapshot, env_expected = manifest.get("env_snapshot") or "", manifest.get("env_sha256") or ""
+    if env_snapshot and env_expected:  # a manifest from before .env.bak had a checksum has none
+        env_path = backup_dir / env_snapshot
+        if not env_path.is_file():
+            errors.append(f"Missing .env snapshot: {env_snapshot}")
+        elif _sha256(env_path) != env_expected:
+            errors.append(f"Checksum mismatch for {env_snapshot}")
     for rel, expected in (manifest.get("tls_material") or {}).items():
         path = backup_dir / _TLS_BACKUP_DIR / rel
         if not path.is_file():
@@ -1082,15 +1097,26 @@ def verify_backup(backup_dir: Path, manifest: dict) -> list[str]:
 # ── Retention ─────────────────────────────────────────────────────
 
 
+def is_backup(folder: Path) -> bool:
+    """Whether *folder* is a backup: its manifest, or the index of an encrypted one."""
+    return (folder / "manifest.json").is_file() or backup_crypto.is_encrypted(folder)
+
+
 def _kind_of(backup_dir: Path) -> str | None:
     """What made the backup in *backup_dir*, or ``None`` when its manifest cannot be read.
 
-    A manifest without a kind is an older install's backup, and counts as manual.
+    A manifest without a kind is an older install's backup, and counts as manual. An encrypted backup says
+    its kind in the clear, in its index.
     """
-    try:
-        manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
+    if backup_crypto.is_encrypted(backup_dir):
+        manifest = backup_crypto.read_index(backup_dir)
+        if manifest is None:
+            return None
+    else:
+        try:
+            manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
     kind = manifest.get("kind") if isinstance(manifest, dict) else None
     return kind if isinstance(kind, str) and kind else DEFAULT_KIND
 
@@ -1113,7 +1139,7 @@ def rotate_backups(backup_root: Path, *, retain: int = 5, kind: str = DEFAULT_KI
         [
             d
             for d in backup_root.iterdir()
-            if d.is_dir() and (d / "manifest.json").exists() and _kind_of(d) == kind
+            if d.is_dir() and is_backup(d) and _kind_of(d) == kind
         ],
         key=lambda d: d.name,
     )
@@ -1144,7 +1170,8 @@ def create_backup(
     5. Optionally snapshot volumes
     6. Collect migration heads
     7. Write manifest
-    8. Rotate old backups of the same *kind*
+    8. Encrypt every file to the install's backup key, when it has one
+    9. Rotate old backups of the same *kind*
     """
     # Owner-only, the directory and each backup in it: a backup holds every database and secret. A directory
     # of the operator's (--output-dir) that already exists keeps its mode; the backups in it are private.
@@ -1209,12 +1236,41 @@ def create_backup(
         kind=kind,
     )
 
-    # 7. Rotate
+    # 7. Encrypt, when the install has a backup key (faden backup key create): the manifest too
+    recipient = _recipient(ctx, result)
+    if not result.ok:
+        return result
+    if recipient is not None:
+        console.print("\n[bold cyan]Encrypting the backup…[/bold cyan]")
+        backup_crypto.encrypt_backup(backup_dir, recipient, kind=kind)
+        result.encrypted_to = backup_crypto.key_id(recipient)
+
+    # 8. Rotate
     removed = rotate_backups(output_dir, retain=retain, kind=kind)
     if removed:
         info(f"Rotated {removed} old backup(s).")
 
     return result
+
+
+def _recipient(ctx: ComposeContext, result: BackupResult) -> X25519PublicKey | None:
+    """The install's backup key; a key file that does not read fails the backup rather than leave it open."""
+    from faden_cli.core import backup_key  # noqa: PLC0415
+
+    # The install folder is .env's (the compose file may be in its shared/), as `faden backup key` has it.
+    install = Path(str(ctx.env_file)).parent if ctx.env_file else ctx.project_dir
+    if install is None:
+        return None
+    try:
+        return backup_key.recipient(Path(str(install)))
+    except (OSError, ValueError) as exc:
+        result.ok = False
+        result.errors.append(
+            f"The backup key ({backup_key.PUBLIC_FILE}) does not read: {exc}. The backup was not encrypted; "
+            f"remove {result.backup_dir} and fix the key file, or make a new key with "
+            "`faden backup key create --replace`."
+        )
+        return None
 
 
 def restore_backup(

@@ -85,6 +85,7 @@ def test_backup_without_a_subcommand_still_backs_up(tmp_path: Path, monkeypatch:
         volumes: list[str] = []  # noqa: RUF012
         tls_material: list[str] = []  # noqa: RUF012
         manifest_path = None
+        encrypted_to = ""
 
     monkeypatch.setattr(backup_module, "build_context_from_config", lambda cfg: None)
     monkeypatch.setattr(backup_module, "create_backup", lambda ctx, **k: ran.append(k["output_dir"]) or _Result())

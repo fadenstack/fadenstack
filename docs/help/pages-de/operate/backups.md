@@ -20,9 +20,10 @@ her; die Wiederherstellung wird noch getestet (siehe [Wiederherstellen](#restore
 | Die GPU-Maschinen | Nichts zu sichern | Sie halten keinen Zustand, den der Server braucht; ihre Cluster laufen weiter, wenn der Server verloren geht |
 
 !!! warning
-    Eine Sicherung enthält private Schlüssel und alle Geheimnisse der Installation. Behandeln Sie Sicherungen so
-    vertraulich wie die `.env`, und bewahren Sie Kopien außerhalb des Servers auf: Eine Sicherung auf derselben
-    Festplatte übersteht den Verlust dieser Festplatte nicht.
+    Eine Sicherung enthält private Schlüssel und alle Geheimnisse der Installation. Verschlüsseln Sie sie (siehe
+    [Verschlüsselte Sicherungen](#encrypted-backups)), behandeln Sie sie so vertraulich wie die `.env`, und bewahren
+    Sie Kopien außerhalb des Servers auf: Eine Sicherung auf derselben Festplatte übersteht den Verlust dieser
+    Festplatte nicht.
 
 Auf dem Server kann eine Sicherung nur der Benutzer lesen, der `faden` ausführt, wie die `.env`; `faden deploy` und
 `faden upgrade` tun dasselbe für Sicherungen von früher.
@@ -76,6 +77,50 @@ Sie die Sicherungen mit Ihren eigenen Werkzeugen woanders hin, oder planen Sie s
 
 Jedes `faden upgrade` legt außerdem eine Sicherung an, bevor es etwas ändert.
 
+## Verschlüsselte Sicherungen {#encrypted-backups}
+
+Sobald die Installation einen Sicherungsschlüssel hat, wird jede Sicherung verschlüsselt. Jede Datei darin wird
+für den öffentlichen Teil des Schlüssels verschlüsselt, der auf dem Server bleibt; die nächtliche Sicherung läuft
+also von allein. Nur der **Wiederherstellungsschlüssel** öffnet eine Sicherung: Ohne ihn liest sie niemand, weder
+wer die Sicherungsplatte hat noch wer diesen Server verwaltet. Fadenstack bewahrt keine Kopie davon auf.
+
+`faden deploy` legt den Schlüssel an. `faden upgrade` bietet es einmal an, wenn jemand am Terminal sitzt;
+`faden upgrade -y` lässt die Sicherungen, wie sie waren. So legen Sie ihn selbst an:
+
+```bash
+faden backup key create
+```
+
+1. Der Wiederherstellungsschlüssel wird einmal angezeigt: `FADEN-BACKUP-KEY1` und zwölf Zeichengruppen.
+2. Bewahren Sie eine Kopie außerhalb des Servers auf, in einem Passwort-Manager oder auf Papier an einem sicheren
+   Ort, und bestätigen Sie das.
+3. Der Bildschirm wird geleert, und Sie werden nach zwei Gruppen des Schlüssels an zufälligen Stellen gefragt,
+   aus Ihrer Kopie. Nach drei falschen Antworten wird der Schlüssel noch einmal von vorn gezeigt.
+
+Mit `--write-to PATH` landet der Schlüssel stattdessen in einer Datei, etwa auf einem USB-Stick (nie im
+Installationsordner), und wird zur Prüfung zurückgelesen.
+
+??? info "Nach einer unbeaufsichtigten Installation (`faden deploy -y`)"
+    Niemand ist da, der den Schlüssel sehen könnte. Er bleibt deshalb in `~/fadenstack/backup-recovery-key.txt`,
+    lesbar nur für den Benutzer, der `faden` ausführt. Solange er dort liegt, liegt der Schlüssel auf demselben
+    Server wie die Sicherungen: `faden backup`, `faden upgrade` und `faden backup key status` erinnern Sie daran,
+    bis Sie ihn vom Server kopiert und `faden backup key confirm` ausgeführt haben. Der Befehl fragt nach zwei
+    Gruppen aus Ihrer Kopie und löscht dann die Datei.
+
+| Befehl | Was er tut |
+|---|---|
+| `faden backup key status` | Ob Sicherungen verschlüsselt werden, für welchen Schlüssel, und was noch zu tun ist |
+| `faden backup key check` | Prüft, ob Ihre Kopie des Wiederherstellungsschlüssels noch die dieser Installation ist; nichts wird gespeichert. Einmal im Jahr und bei jedem Wiederherstellungstest |
+| `faden backup key create --replace` | Ein neuer Schlüssel. Die bisherigen Sicherungen brauchen weiterhin den alten Wiederherstellungsschlüssel |
+
+In einer verschlüsselten Sicherung bleibt nur eine kleine `backup.json` lesbar: wann sie angelegt wurde, von wem,
+und welcher Schlüssel sie öffnet. Sicherungen aus der Zeit, bevor die Installation einen Schlüssel hatte, bleiben,
+wie sie sind, und werden wie bisher wiederhergestellt; löschen Sie sie, sobald es verschlüsselte gibt.
+
+!!! warning
+    Ohne den Wiederherstellungsschlüssel lassen sich die damit angelegten Sicherungen nicht wiederherstellen, von
+    niemandem.
+
 ## Wiederherstellen {#restore}
 
 !!! warning "Wird noch getestet"
@@ -90,22 +135,26 @@ Jedes `faden upgrade` legt außerdem eine Sicherung an, bevor es etwas ändert.
 faden restore ~/fadenstack/backups/<time>
 ```
 
-Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie).
+Der Befehl fragt nach einer Bestätigung (`-y` überspringt sie). Eine verschlüsselte Sicherung fragt zuerst nach
+dem Wiederherstellungsschlüssel.
 
 ??? info "Was die Wiederherstellung tut, der Reihe nach"
-    1. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
-    2. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
+    1. öffnet eine verschlüsselte Sicherung mit dem Wiederherstellungsschlüssel, in einen Ordner in ihr, den nur Sie
+       lesen können und der am Ende der Wiederherstellung gelöscht wird;
+    2. zeigt das Datum der Sicherung, die Version des Werkzeugs, mit der sie angelegt wurde, und was sie enthält;
+    3. prüft die Datenbank-Dumps, die Volume-Archive und die Zertifikatsdateien gegen die Prüfsummen in der Sicherung und bricht ab,
        wenn eine nicht passt;
-    3. fragt nach einer Bestätigung (`-y` überspringt sie);
-    4. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
+    4. fragt nach einer Bestätigung (`-y` überspringt sie);
+    5. schaltet die Wartungsseite ein, stoppt alle Dienste außer dem Eingangstor (nginx), stellt jede Datenbank
        und, sofern nicht anders angegeben, die `.env` und das Zertifikatsmaterial wieder her;
-    5. startet alles wieder und nimmt die Wartungsseite wieder weg, auch wenn die Wiederherstellung fehlschlägt.
+    6. startet alles wieder und nimmt die Wartungsseite wieder weg, auch wenn die Wiederherstellung fehlschlägt.
 
 | Option | Was sie tut |
 |---|---|
 | `--verify-only` | Die Prüfsummen der Sicherung prüfen, nichts wiederherstellen |
 | `--db-only` | Nur die Datenbanken wiederherstellen |
 | `--skip-env` | Die aktuelle `.env` behalten |
+| `--key-file PATH` | Den Wiederherstellungsschlüssel aus dieser Datei lesen, statt nach ihm zu fragen |
 | `-y` | Nicht nachfragen |
 
 !!! warning
@@ -125,7 +174,9 @@ Die Wiederherstellung wird noch getestet: Probieren Sie sie zuerst an einer Kopi
 
 1. Installieren Sie mit `faden deploy` einen neuen Server mit demselben Release, mit dem die Sicherung angelegt
    wurde (`faden restore --verify-only` zeigt es an).
-2. Kopieren Sie die Sicherung darauf und führen Sie `faden restore` mit ihrem Pfad aus.
+2. Kopieren Sie die Sicherung darauf und führen Sie `faden restore` mit ihrem Pfad aus, bei einer verschlüsselten
+   Sicherung mit dem Wiederherstellungsschlüssel. Der neue Server verschlüsselt seine eigenen Sicherungen für den
+   Schlüssel, den sein `faden deploy` angelegt hat.
 3. Hat der neue Server eine andere Adresse, führen Sie auf jeder Maschine die Installationszeile aus seiner
    Konsole erneut aus, damit sich die Agenten mit ihm verbinden (siehe [GPU-Maschinen](machines.md)).
 4. Führen Sie `faden runtime-images` aus, wenn die Maschinen Runtime-Images brauchen werden, die der Server noch

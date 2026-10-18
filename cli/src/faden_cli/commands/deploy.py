@@ -997,6 +997,11 @@ def deploy_cmd(
     # The console's setting, now that the backend runs (an administrator changes it there later).
     apply_retention(retention_days)
 
+    # The backup key: backups encrypted from the first one (features/admin-guardrails.md, 6.4).
+    from faden_cli.core import backup_key  # noqa: PLC0415
+
+    backup_key.key_step(env_path.parent, yes=yes, deploy=True)
+
     # ── 8. Endpoint summary ───────────────────────────────────────
     console.print("\n[bold green]✨ Deployment complete![/bold green]\n")
 

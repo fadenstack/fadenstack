@@ -56,6 +56,7 @@ Führen Sie nach der Installation des Werkzeugs `faden doctor` aus, um zuerst de
 | Admin password | Mindestens 8 Zeichen, und nicht die E-Mail-Adresse. Leer lassen, um ein Passwort erzeugen zu lassen. |
 | Save to file? | Speichert die Zugangsdaten in `~/fadenstack/.bootstrap-credentials` (nur für Sie lesbar). |
 | Back up every night? | Ja (Standard) führt `faden backup` um 03:00 Uhr aus und behält die letzten 7. Siehe [Sicherungen](backups.md). |
+| Make the backup key now? | Ja (Standard) zeigt den Wiederherstellungsschlüssel der Sicherungen einmal an und fragt nach zwei Gruppen aus Ihrer Kopie; jede Sicherung wird für ihn verschlüsselt. Siehe [Verschlüsselte Sicherungen](backups.md#encrypted-backups). |
 
 Die Zugangsdaten werden nur einmal angezeigt. Bewahren Sie sie in einem Passwort-Manager auf.
 
@@ -64,6 +65,8 @@ Die Zugangsdaten werden nur einmal angezeigt. Bewahren Sie sie in einem Passwort
 `faden deploy -y` fragt nichts: HTTPS mit einem hier erstellten Zertifikat, der Administrator `admin@localhost`
 mit einem erzeugten Passwort, gespeichert in `~/fadenstack/.bootstrap-credentials`, die nächtliche Sicherung und
 die Update-Prüfung eingeschaltet. Bewahren Sie die Zugangsdaten an einem sicheren Ort auf und löschen Sie dann diese Datei.
+Der Wiederherstellungsschlüssel der Sicherungen bleibt in `~/fadenstack/backup-recovery-key.txt`: Kopieren Sie
+ihn vom Server und führen Sie dann `faden backup key confirm` aus.
 
 Die Auswahl lässt sich auch vorab angeben:
 
@@ -117,6 +120,8 @@ Als Nächstes: [die GPU-Maschinen hinzufügen](machines.md).
 | `~/fadenstack/.env` | Alle Passwörter, Schlüssel und Einstellungen, nur für Sie lesbar. Halten Sie die Datei vertraulich und bewahren Sie eine Kopie bei Ihren Sicherungen auf |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | Das ausgelieferte Zertifikat und die eigene Zertifizierungsstelle des Servers mit ihrem Schlüssel |
 | `~/fadenstack/backups/` | Sicherungen |
+| `~/fadenstack/backup-key.pub` | Der öffentliche Teil des Sicherungsschlüssels: Sicherungen werden für ihn verschlüsselt. Er öffnet nichts |
+| `~/fadenstack/backup-recovery-key.txt` | Nur nach `faden deploy -y`: der Wiederherstellungsschlüssel, bis `faden backup key confirm` ihn löscht |
 | `~/fadenstack/logs/` | Das Log der täglichen Zertifikatserneuerung (die nächtliche Sicherung schreibt nach `~/fadenstack/backups/backup.log`) |
 | `~/.config/faden/faden.yaml` | Die Einstellungen des Werkzeugs selbst: wo die Installation liegt, welche Module eingeschaltet sind |
 

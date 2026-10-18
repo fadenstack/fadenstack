@@ -53,6 +53,7 @@ Run `faden doctor` after installing the tool to check the host first.
 | Admin password | At least 8 characters, and not the e-mail address. Leave blank to have one generated. |
 | Save to file? | Saves the credentials to `~/fadenstack/.bootstrap-credentials` (readable by you only). |
 | Back up every night? | Yes (the default) runs `faden backup` at 03:00 and keeps the last 7. See [Backups](backups.md). |
+| Make the backup key now? | Yes (the default) shows the backup recovery key once and asks for two groups of it from your copy; every backup is encrypted to it. See [Encrypted backups](backups.md#encrypted-backups). |
 
 The credentials are shown once. Store them in a password manager.
 
@@ -60,7 +61,8 @@ The credentials are shown once. Store them in a password manager.
 
 `faden deploy -y` asks nothing: HTTPS with a certificate made here, the administrator `admin@localhost` with a
 generated password, saved to `~/fadenstack/.bootstrap-credentials`, the nightly backup and the update check on. Store the
-credentials somewhere safe, then delete that file.
+credentials somewhere safe, then delete that file. The backup recovery key is left in
+`~/fadenstack/backup-recovery-key.txt`: copy it off the server, then run `faden backup key confirm`.
 
 Choices can be given up front:
 
@@ -109,6 +111,8 @@ Next: [add the GPU machines](machines.md).
 | `~/fadenstack/.env` | Every password, key and setting, readable by you only. Keep it private, and keep a copy with your backups |
 | `~/fadenstack/tls/`, `~/fadenstack/tls-ca/` | The served certificate, and the server's own certificate authority with its key |
 | `~/fadenstack/backups/` | Backups |
+| `~/fadenstack/backup-key.pub` | The public half of the backup key: backups are encrypted to it. It opens nothing |
+| `~/fadenstack/backup-recovery-key.txt` | After `faden deploy -y` only: the recovery key, until `faden backup key confirm` deletes it |
 | `~/fadenstack/logs/` | The log of the daily certificate renewal (the nightly backup logs to `~/fadenstack/backups/backup.log`) |
 | `~/.config/faden/faden.yaml` | The tool's own settings: where the install is, which modules are on |
 

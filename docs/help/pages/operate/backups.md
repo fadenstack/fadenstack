@@ -20,8 +20,9 @@ when you install.
 | The GPU machines | Nothing to back up | They hold no state the server needs; their clusters keep running if the server is lost |
 
 !!! warning
-    A backup holds private keys and every secret of the install. Keep backups as private as `.env`, and keep
-    copies off the server: a backup on the same disk does not survive losing the disk.
+    A backup holds private keys and every secret of the install. Encrypt them (see
+    [Encrypted backups](#encrypted-backups)), keep them as private as `.env`, and keep copies off the server: a
+    backup on the same disk does not survive losing the disk.
 
 On the server, a backup is readable by the user who runs `faden` only, like `.env`; `faden deploy` and
 `faden upgrade` do the same for backups made before.
@@ -73,6 +74,47 @@ instead.
 
 Every `faden upgrade` also takes a backup before it changes anything.
 
+## Encrypted backups
+
+Once the install has a backup key, every backup is encrypted. Each file in it is encrypted to the key's public
+half, which stays on the server, so the nightly backup runs on its own. Only the **recovery key** opens a backup:
+without it nobody reads one, whether they hold the backup disk or administer this server. Fadenstack keeps no copy
+of it.
+
+`faden deploy` makes the key. `faden upgrade`, run by someone at the terminal, offers to make it once;
+`faden upgrade -y` leaves the backups as they were. To make it yourself:
+
+```bash
+faden backup key create
+```
+
+1. The recovery key is shown once: `FADEN-BACKUP-KEY1` and twelve groups of characters.
+2. Keep a copy off the server, in a password manager or on paper kept somewhere safe, and confirm that you did.
+3. The screen is cleared, and you are asked for two groups of the key, at random positions, from your copy. Three
+   wrong answers show the key again from the start.
+
+With `--write-to PATH` the key goes into a file instead, such as one on a USB stick (never inside the install
+folder), and is read back to check it.
+
+??? info "After an unattended install (`faden deploy -y`)"
+    Nobody is there to see the key, so it is left in `~/fadenstack/backup-recovery-key.txt`, readable by the user
+    who runs `faden` only. While it is there, the key is on the same server as the backups: `faden backup`,
+    `faden upgrade` and `faden backup key status` remind you until you copy it off the server and run
+    `faden backup key confirm`. That asks for two groups from your copy, then deletes the file.
+
+| Command | What it does |
+|---|---|
+| `faden backup key status` | Whether backups are encrypted, to which key, and what is still to do |
+| `faden backup key check` | Checks that your copy of the recovery key is still this install's; nothing is stored. Do it once a year and with every restore test |
+| `faden backup key create --replace` | A new key. The backups made so far still need the old recovery key |
+
+Only a small `backup.json` stays readable in an encrypted backup: when it was made, what made it, and which key
+opens it. Backups made before the install had a key stay as they are and are restored as before; delete them once
+encrypted ones exist.
+
+!!! warning
+    Without the recovery key, the backups made with it cannot be restored, by anyone.
+
 ## Restore
 
 !!! warning "Under testing"
@@ -85,22 +127,25 @@ Every `faden upgrade` also takes a backup before it changes anything.
 faden restore ~/fadenstack/backups/<time>
 ```
 
-It asks for confirmation (`-y` skips it).
+It asks for confirmation (`-y` skips it). An encrypted backup asks for the recovery key first.
 
 ??? info "What the restore does, in order"
-    1. shows the backup's date, the tool version it was taken with, and what it holds;
-    2. checks the database dumps, the volume archives and the certificate files against the checksums in the backup, and stops if one
+    1. opens an encrypted backup with the recovery key, into a folder inside it that only you can read and that is
+       deleted when the restore ends;
+    2. shows the backup's date, the tool version it was taken with, and what it holds;
+    3. checks the database dumps, the volume archives and the certificate files against the checksums in the backup, and stops if one
        does not match;
-    3. asks for confirmation (`-y` skips it);
-    4. puts up the maintenance page, stops every service except the front door (nginx), restores every database
+    4. asks for confirmation (`-y` skips it);
+    5. puts up the maintenance page, stops every service except the front door (nginx), restores every database
        and, unless told otherwise, the `.env` and the certificate material;
-    5. starts everything again and takes the maintenance page down, also when the restore fails.
+    6. starts everything again and takes the maintenance page down, also when the restore fails.
 
 | Option | What it does |
 |---|---|
 | `--verify-only` | Check the backup's checksums, restore nothing |
 | `--db-only` | Restore the databases only |
 | `--skip-env` | Keep the current `.env` |
+| `--key-file PATH` | Read the recovery key from this file instead of asking for it |
 | `-y` | Do not ask |
 
 !!! warning
@@ -118,7 +163,8 @@ Restoring is still being tested: try it on a copy of the server first (see [Rest
 
 1. Install a new server with the same release the backup was taken with (`faden restore --verify-only` shows it),
    using `faden deploy`.
-2. Copy the backup onto it and run `faden restore` with its path.
+2. Copy the backup onto it and run `faden restore` with its path, and the recovery key if the backup is
+   encrypted. The new server encrypts its own backups to the key its `faden deploy` made.
 3. If the new server has another address, run the install line from its console on each machine again, so the
    agents connect to it (see [GPU machines](machines.md)).
 4. Run `faden runtime-images` if the machines will need runtime images the server does not hold yet.

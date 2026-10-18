@@ -5,6 +5,7 @@ Examples:
     faden restore backups/20250115T120000Z --verify-only
     faden restore backups/20250115T120000Z --db-only
     faden restore backups/20250115T120000Z --skip-env
+    faden restore backups/20250115T120000Z --key-file /media/usb/fadenstack-recovery-key.txt
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import click
 
-from faden_cli.core import maintenance
+from faden_cli.core import backup_crypto, backup_key, maintenance
 from faden_cli.core.backup import (
     RestoreResult,
     read_manifest,
@@ -44,6 +45,12 @@ from faden_cli.commands.deploy import _sync_postgres_password
     default=False,
     help="Validate checksums without restoring.",
 )
+@click.option(
+    "--key-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="The recovery key, for an encrypted backup; otherwise it is asked for.",
+)
 @click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation prompt.")
 def restore_cmd(
     backup_dir: str,
@@ -51,19 +58,63 @@ def restore_cmd(
     db_only: bool,
     skip_env: bool,
     verify_only: bool,
+    key_file: Path | None,
     yes: bool,
 ) -> None:
     """Restore Fadenstack from a backup directory.
 
     BACKUP_DIR is the path to a timestamped backup folder containing
-    a manifest.json file created by ``faden backup``.
+    a manifest.json file created by ``faden backup``. An encrypted backup
+    is opened with the recovery key first.
     """
     console.print("\n[bold magenta]fadenstack — Restore[/bold magenta]\n")
 
     backup_path = Path(backup_dir).resolve()
-    manifest = read_manifest(backup_path)
+    if not backup_crypto.is_encrypted(backup_path):
+        _restore_cmd(backup_path, backup_path, db_only=db_only, skip_env=skip_env, verify_only=verify_only, yes=yes)
+        return
+    opened = _open(backup_path, key_file)
+    try:
+        _restore_cmd(backup_path, opened, db_only=db_only, skip_env=skip_env, verify_only=verify_only, yes=yes)
+    finally:
+        backup_crypto.close_backup(backup_path)
+
+
+#: Recovery keys typed wrong before the restore stops.
+_KEY_ATTEMPTS = 3
+
+
+def _open(backup_path: Path, key_file: Path | None) -> Path:
+    """Decrypt the encrypted backup with the recovery key: from --key-file, still on the server, or asked."""
+    from faden_cli.commands.backup import key_text  # noqa: PLC0415
+
+    index = backup_crypto.read_index(backup_path) or {}
+    info(f"This backup is encrypted to the backup key {index.get('key_id') or 'unknown'}.")
+    cfg = load_config()
+    left = backup_key.pending(cfg.install_path) if cfg.install_dir else None
+    given = key_file or left
+    if left is not None and key_file is None:
+        info(f"Using the recovery key still on this server ({left}).")
+    for attempt in range(1, _KEY_ATTEMPTS + 1):
+        text = key_text(given.read_text(encoding="utf-8")) if given else click.prompt("Recovery key", hide_input=True)
+        try:
+            key = backup_crypto.RecoveryKey.from_text(text)
+            info("Opening the backup…")
+            return backup_crypto.open_backup(backup_path, key)
+        except (backup_crypto.KeyTextError, backup_crypto.OpenError) as exc:
+            error(f"The backup does not open with that key: {exc}")
+            if given or attempt == _KEY_ATTEMPTS:
+                sys.exit(1)
+    sys.exit(1)
+
+
+def _restore_cmd(
+    backup_path: Path, source: Path, *, db_only: bool, skip_env: bool, verify_only: bool, yes: bool,
+) -> None:
+    """Check the backup in *source* (the backup itself, or its decrypted copy) and restore it."""
+    manifest = read_manifest(source)
     if manifest is None:
-        error(f"No manifest.json found in {backup_path}")
+        error(f"No manifest.json found in {source}")
         sys.exit(1)
 
     # ── Show backup info ──────────────────────────────────────
@@ -79,7 +130,7 @@ def restore_cmd(
 
     # ── Verify checksums ──────────────────────────────────────
     info("Verifying backup checksums…")
-    check_errors = verify_backup(backup_path, manifest)
+    check_errors = verify_backup(source, manifest)
     if check_errors:
         for msg in check_errors:
             error(f"  {msg}")
@@ -103,7 +154,7 @@ def restore_cmd(
     # however this ends. nginx holds none of the volumes a restore writes (it mounts the install's nginx/
     # and tls/ directories, read-only), so it can run through it.
     with maintenance.during(Path(str(ctx.project_dir)), reason="restore"):
-        result = _restore(ctx, cfg, backup_path, db_only=db_only, skip_env=skip_env)
+        result = _restore(ctx, cfg, source, db_only=db_only, skip_env=skip_env)
 
     console.print()
     success("Restore complete.")
@@ -111,7 +162,10 @@ def restore_cmd(
 
     record_event(
         "backup.restore", "install", Path(str(backup_path)).name,
-        metadata={"databases": list(result.databases_restored or []), "db_only": db_only},
+        metadata={
+            "databases": list(result.databases_restored or []), "db_only": db_only,
+            "encrypted": source != backup_path,
+        },
     )
     if result.databases_restored:
         console.print(f"  Databases: {', '.join(result.databases_restored)}")

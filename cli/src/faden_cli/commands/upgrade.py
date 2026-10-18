@@ -378,6 +378,10 @@ def upgrade_cmd(
         from faden_cli.core.chat_retention import apply_retention, ask_retention  # noqa: PLC0415
 
         apply_retention(ask_retention(env_path, days=chat_retention_days, yes=True, heading=""))
+        # The backup key: asked once of someone at the terminal; -y leaves backups as they were.
+        from faden_cli.core import backup_key  # noqa: PLC0415
+
+        backup_key.key_step(env_path.parent, yes=yes, deploy=False)
 
     # ── Done ──────────────────────────────────────────────────
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
