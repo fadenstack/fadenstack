@@ -111,6 +111,8 @@ class MessageDTO(BaseModel):
     decision_id: uuid.UUID | None = None
     #: What the user was told about a blocked message (the admin's message).
     notice: str | None = None
+    #: A reply's provenance receipt: the signed proof this installation's model wrote it.
+    receipt_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -132,6 +134,7 @@ class MessageDTO(BaseModel):
             status=msg.status,
             error=msg.error,
             decision_id=msg.decision_id,
+            receipt_id=getattr(msg, "receipt_id", None),
         )
 
 

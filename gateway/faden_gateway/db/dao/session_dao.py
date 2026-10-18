@@ -254,6 +254,7 @@ class SessionDAO:
         status: str = "complete",
         decision_id: uuid.UUID | None = None,
         content_hmac: str | None = None,
+        receipt_id: str | None = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             session_id=session_id,
@@ -268,6 +269,7 @@ class SessionDAO:
             status=status,
             decision_id=decision_id,
             content_hmac=content_hmac,
+            receipt_id=receipt_id,
         )
         self.session.add(msg)
         await self.session.flush()

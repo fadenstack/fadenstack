@@ -671,6 +671,9 @@ class ChatMessage(Base):
     #: only ``content_hmac`` (keyed per tenant) and the decision.
     decision_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     content_hmac: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: The provenance engine's receipt for a reply's text (``text_receipts``): what proves, later, that
+    #: this installation's model wrote it. Set once the receipt is signed; None without the module.
+    receipt_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         server_default=func.now(), index=True,

@@ -1401,12 +1401,15 @@ class GatewayService:
                     req, response_payload, auth=auth, request_id=request_id,
                 )
                 finish_reason = "content_filter" if req.blocked_output else finish_reason
+            text_receipt: str | None = None
             if endpoint == "/v1/chat/completions" and result.status_code == 200 and not req.blocked_output:
                 # The answer's text leaves with its receipt, with the module on (text_receipts).
+                pictures = receipts
                 response_payload, receipts = await self._receipted(
                     req, response_payload, receipts, completion_tokens=usage_completion,
                     model_alias=model_alias, request_id=request_id,
                 )
+                text_receipt = receipts[0] if len(receipts) > len(pictures) else None
 
             if req.trace_context is not None:
                 self.observability.record_success(
@@ -1429,6 +1432,7 @@ class GatewayService:
                 trace_id=req.trace_id,
                 tool_exchange=req.tool_exchange,
                 blocked=req.blocked_output,
+                receipt_id=text_receipt,
             )
 
             # Best effort, and the client need not wait for it.
@@ -3620,8 +3624,9 @@ class GatewayService:
         trace_id: str | None = None,
         tool_exchange: list[dict[str, Any]] | None = None,
         blocked: tuple[uuid.UUID | None, str | None] | None = None,
+        receipt_id: str | None = None,
     ) -> None:
-        """Store the assistant's response message in the session.
+        """Store the assistant's response message in the session, with its text's receipt when it has one.
 
         A refused answer is stored as a notice: no text, its decision and HMAC.
         """
@@ -3675,6 +3680,7 @@ class GatewayService:
             token_estimate=tokens,
             trace_id=trace_id,
             tool_call_json=_exchange_record(tool_exchange),
+            receipt_id=receipt_id,
         )
 
     async def _finish_stream(
@@ -3728,7 +3734,7 @@ class GatewayService:
                     interrupted=interrupted,
                 )
             try:
-                await self._persist_stream_assistant_response(
+                stored = await self._persist_stream_assistant_response(
                     session_id_str=req.session_id,
                     # A refused answer is not stored, not even the part already sent.
                     content="" if req.blocked_output else content,
@@ -3742,6 +3748,9 @@ class GatewayService:
                     blocked=req.blocked_output,
                     turn=req,
                 )
+                if stored is not None and signing is not None:
+                    # Kept with the message once signed; nothing waits for it.
+                    _in_background(self._keep_receipt_id(stored, signing))
             except Exception:
                 logger.warning("Failed to persist streamed assistant response", exc_info=True)
         await self._receipt_event(req, signing)
@@ -3998,23 +4007,23 @@ class GatewayService:
         error: str | None = None,
         blocked: tuple[uuid.UUID | None, str | None] | None = None,
         turn: _Prepared | None = None,
-    ) -> None:
-        """Store how a streamed reply ended in the session: on its row, or as a new one.
+    ) -> uuid.UUID | None:
+        """Store how a streamed reply ended in the session: on its row, or as a new one; the row's id.
 
         The row written as the reply started (*turn*) is filled in; without
         one, the reply is added. A complete reply with no text (tool calls for
-        the client to run) is not kept, as before.
+        the client to run) is not kept, as before (``None``).
 
         Uses a fresh, independent DB session so the commit is not tied
         to the request-scoped session (which may already be closed or
         rolled back if the client disconnected mid-stream).
         """
         if not self.session_dao:
-            return
+            return None
         try:
             sid = uuid.UUID(session_id_str)
         except ValueError:
-            return
+            return None
         row_id = uuid.UUID(turn.turn_id) if turn is not None and turn.turn_id else None
         written = False
         if turn is not None and turn.turn_written is not None:
@@ -4037,7 +4046,7 @@ class GatewayService:
                 if row is not None:
                     await fresh_session.delete(row)
                     await fresh_session.commit()
-                return
+                return None
             if row is None:
                 row = ChatMessage(id=row_id or uuid.uuid4(), session_id=sid, role="assistant")
                 fresh_session.add(row)
@@ -4053,6 +4062,21 @@ class GatewayService:
             row.content_hmac = blocked[1] if blocked else None
             row.updated_at = datetime.now(timezone.utc)
             await fresh_session.commit()
+            return row.id
+
+    async def _keep_receipt_id(self, message_id: uuid.UUID, signing: asyncio.Future[Any]) -> None:
+        """Once a streamed reply's receipt is signed, keep its id with the message (none: nothing to keep)."""
+        signed = await signing
+        if signed is None or not self.session_dao:
+            return
+        engine = self.session_dao.session.bind
+        from sqlalchemy.ext.asyncio import AsyncSession  # noqa: PLC0415
+
+        async with AsyncSession(engine, expire_on_commit=False) as fresh_session:
+            row = await fresh_session.get(ChatMessage, message_id)
+            if row is not None:
+                row.receipt_id = signed.receipt_id
+                await fresh_session.commit()
 
 
 def _accumulate_stream_content(chunk: bytes, acc: list[str]) -> None:

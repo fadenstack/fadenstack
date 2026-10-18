@@ -753,6 +753,57 @@ async def test_a_chat_pages_reply_has_its_receipt_before_done(
     assert _ends_with_the_receipt(_sse(back.text))["receipt"]["id"] == engine.receipts[0]
     assert len(engine.asked) == 1
 
+    # The message keeps its receipt (14 §5), and the chat's messages say it.
+    await _settled()
+    db_session.expire_all()
+    assert (await _replies(db_session, sid, _ended))[-1].receipt_id == engine.receipts[0]
+    messages = (await client.get(f"/v1/sessions/{sid}/messages", headers=_auth())).json()
+    listed = messages["data"]
+    assert [m.get("receipt_id") for m in listed if m["role"] == "assistant"] == [engine.receipts[0]]
+
+
+@pytest.mark.anyio
+async def test_a_whole_answer_in_a_chat_keeps_its_receipt_with_the_message(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded(fastapi_app, db_session)
+    sid = await _session(db_session)
+    await db_session.commit()
+    _answers(monkeypatch)
+
+    r = await client.post("/v1/chat/completions", headers=_auth(), json={
+        "model": ALIAS, "session_id": str(sid), "messages": [{"role": "user", "content": "What is on page 12?"}],
+    })
+
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    reply = (await _replies(db_session, sid, lambda rows: len(rows) == 2))[-1]
+    assert reply.receipt_id == engine.receipts[0]
+
+
+@pytest.mark.anyio
+async def test_a_reply_whose_receipt_was_not_signed_keeps_none(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seeded(fastapi_app, db_session)
+    sid = await _session(db_session)
+    await db_session.commit()
+    _answers(monkeypatch)
+    engine.fail = _answer(503, {"detail": {"code": "busy", "message": "Busy"}})
+
+    r = await client.post("/v1/chat/completions", headers=_auth(**EVENTS), json={
+        "model": ALIAS, "stream": True, "session_id": str(sid), "background": True,
+        "messages": [{"role": "user", "content": "What is on page 12?"}],
+    })
+
+    assert r.status_code == 200, r.text
+    await _settled()
+    db_session.expire_all()
+    reply = (await _replies(db_session, sid, _ended))[-1]
+    assert (reply.content, reply.receipt_id) == (ANSWER, None)
+
 
 # ── Every row of the table, as the engine hears it ────────────────
 
