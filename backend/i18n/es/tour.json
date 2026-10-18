@@ -638,6 +638,14 @@
       "action_upgrade": "Cómo actualizar: los comandos para el servidor, una versión tras otra cuando haga falta",
       "action_parts": "Componentes: qué ejecuta cada servicio, agente de máquina, clúster y la CLI, frente a esta versión",
       "action_offline": "Sin internet: subir index.json e index.json.sig copiados de fadenstack.com"
+    },
+    "check_content": {
+      "title": "Comprobar contenido",
+      "description": "Si un texto, una imagen o un archivo lleva las marcas que esta instalación pone al contenido generado por IA. No se guarda nada de lo enviado.",
+      "action_check": "Pegue un texto o elija una imagen, un documento de Office, un PDF o un archivo de texto",
+      "action_verdict": "Lea el veredicto y lo que encontró cada capa: marca de agua, credenciales de contenido, metadatos, recibos y registros",
+      "action_download": "Descargue el resultado firmado, como archivo JSON",
+      "action_public": "Ofrezca la comprobación de imágenes y archivos a personas sin cuenta en Configuración > Módulos > Procedencia"
     }
   }
 }

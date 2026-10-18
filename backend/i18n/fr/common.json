@@ -100,7 +100,8 @@
     "agents_group": "Agents",
     "agents": "Agents",
     "governance": "Gouvernance",
-    "updates": "Mises à jour"
+    "updates": "Mises à jour",
+    "check_content": "Vérifier un contenu"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -1623,6 +1624,120 @@
     "plugins": "Extensions : {{plugins}}",
     "no_plugins": "Aucune extension chargée",
     "load_failed": "Impossible de lire l'état du module."
+  },
+  "content_check": {
+    "title": "Vérifier un contenu",
+    "intro": "Vérifiez si un texte, une image ou un fichier porte les marques que cette installation appose sur les contenus générés par l'IA.",
+    "back_to_chat": "Retour au chat",
+    "no_access": "Vous n'avez pas le droit de vérifier des contenus. Adressez-vous à votre administrateur.",
+    "module_off": "Les contenus ne peuvent pas être vérifiés ici : le module Provenance est désactivé.",
+    "source_label": "Ce qu'il faut vérifier",
+    "tab_text": "Texte",
+    "tab_file": "Image ou fichier",
+    "text_label": "Texte à vérifier",
+    "text_placeholder": "Collez le texte ici",
+    "text_limit": "Jusqu'à {{size}}. Les retours à la ligne et les espaces n'ont pas d'importance.",
+    "choose_file": "Choisir un fichier",
+    "drop_hint": "ou déposez-le ici",
+    "file_types": "Images (PNG, JPEG, WebP), documents Word, PowerPoint et Excel, PDF et fichiers texte, jusqu'à {{size}}.",
+    "public_file_types": "Images (PNG, JPEG, WebP), documents Word, PowerPoint et Excel et PDF, jusqu'à {{size}}.",
+    "selected_file": "{{name}} ({{size}})",
+    "remove_file": "Retirer le fichier",
+    "check": "Vérifier",
+    "checking": "Vérification…",
+    "verdict": {
+      "ai-generated": {
+        "title": "Marqué comme généré par l'IA",
+        "body": "Ce contenu porte une marque indiquant qu'il a été généré par l'IA, et cette marque peut être confirmée."
+      },
+      "inconclusive": {
+        "title": "Non concluant",
+        "body": "Certains indices montrent que ce contenu a été généré par l'IA, mais aucun ne peut être confirmé ici."
+      },
+      "no-mark-found": {
+        "title": "Aucune marque trouvée",
+        "body": "Rien dans ce contenu n'indique qu'il a été généré par l'IA. Cela ne prouve pas qu'une personne l'a créé."
+      }
+    },
+    "findings": "Ce qui a été trouvé",
+    "no_findings": "Aucun filigrane, aucun identifiant de contenu, aucune métadonnée ni aucun enregistrement correspondant n'a été trouvé.",
+    "layer": {
+      "watermark": "Filigrane",
+      "metadata": "Métadonnées",
+      "fingerprint": "Empreinte",
+      "label": "Mention visible"
+    },
+    "method": {
+      "c2pa": "Identifiants de contenu (C2PA)",
+      "trustmark-Q": "Filigrane invisible (TrustMark)",
+      "xmp": "Métadonnées de l'image (IPTC)",
+      "receipt-hash": "Correspond à un reçu de génération",
+      "record-hash": "Correspond à un enregistrement d'insertion",
+      "receipt-reference": "Cite un reçu de génération",
+      "record-reference": "Cite un enregistrement d'insertion",
+      "vllm-gumbel": "Filigrane de texte",
+      "vllm-dual_key_gumbel": "Filigrane de texte"
+    },
+    "finding_found": "Indique une génération par l'IA",
+    "finding_not_found": "N'indique pas une génération par l'IA",
+    "record_id": "Enregistrement {{id}}",
+    "receipt_id": "Reçu {{id}}",
+    "score": "Mesure : {{score}}",
+    "checked_by": "Vérifié le {{time}} par {{detector}}",
+    "content_hash": "SHA-256 du contenu : {{hash}}",
+    "download_signed": "Télécharger le résultat signé",
+    "signing": "Signature…",
+    "download_hint": "Le résultat signé est un fichier JSON. Sa signature peut être vérifiée avec les certificats de cette installation.",
+    "unsigned": "Le résultat ne peut pas être signé pour le moment : le service de marquage n'a pas de clé de signature.",
+    "start_over": "Vérifier autre chose",
+    "explain": {
+      "title": "Ce qui est vérifié",
+      "what": "Les filigranes invisibles et les identifiants de contenu signés (C2PA) des images, les métadonnées des images, les marques des documents Word, PowerPoint et Excel, les filigranes de texte, et si le contenu correspond à un reçu ou à un enregistrement conservé ici lors de sa génération ou de son insertion.",
+      "what_public": "Les filigranes invisibles et les identifiants de contenu signés (C2PA) des images, les métadonnées des images, les marques des documents Word, PowerPoint et Excel, et si le fichier correspond à un enregistrement conservé ici lors de sa génération ou de son insertion.",
+      "how": "Seules les marques de cette installation peuvent être confirmées ; celles d'autres systèmes sont signalées, mais pas confirmées.",
+      "kept": "Rien de ce que vous soumettez n'est conservé ni journalisé, ni par ce serveur ni par le service de marquage.",
+      "no_proof": "« Aucune marque trouvée » ne prouve pas qu'une personne a créé le contenu : les marques peuvent être retirées, et de nombreux systèmes d'IA n'en apposent aucune."
+    },
+    "errors": {
+      "too_large": "Ce contenu dépasse {{size}} et ne peut pas être vérifié.",
+      "busy": "Le service de marquage est occupé. Réessayez dans un instant.",
+      "unavailable": "Le service de marquage n'est pas disponible pour le moment. Réessayez plus tard.",
+      "timeout": "La vérification a pris trop de temps. Réessayez, ou essayez avec un fichier plus petit.",
+      "no_signing_key": "Les contenus ne peuvent pas encore être vérifiés : aucune clé n'est configurée pour le service de marquage. Prévenez votre administrateur.",
+      "module_off": "Les contenus ne peuvent pas être vérifiés ici : le module Provenance est désactivé.",
+      "rate_limited": "Trop de vérifications en une minute. Patientez un instant, puis réessayez.",
+      "refused": "Le service de marquage a refusé ce serveur. Prévenez votre administrateur.",
+      "unexpected": "Le service de marquage a donné une réponse inattendue. Réessayez plus tard.",
+      "invalid": "La vérification est impossible : ce qui a été envoyé n'est pas une demande de vérification.",
+      "not-base64": "Le fichier n'a pas pu être lu. Choisissez-le de nouveau.",
+      "nothing-to-check": "Collez d'abord un texte ou choisissez un fichier.",
+      "text_not_public": "Ici, les textes ne sont vérifiés que pour les personnes disposant d'un compte.",
+      "read_failed": "Le fichier n'a pas pu être lu. Choisissez-le de nouveau.",
+      "generic": "La vérification a échoué : {{message}}"
+    },
+    "public": {
+      "title": "Vérifier une image ou un fichier",
+      "intro": "Vérifiez si une image ou un fichier porte les marques que les systèmes d'IA de cette organisation apposent sur ce qu'ils génèrent. Aucun compte n'est nécessaire.",
+      "not_offered": "Les vérifications de contenu ne sont pas proposées ici.",
+      "not_offered_hint": "Ce serveur ne propose pas de page de vérification publique.",
+      "text_checks": "Les textes sont vérifiés pour les personnes disposant d'un compte auprès de cette organisation.",
+      "contact": "Pour faire vérifier un texte, contactez : {{contact}}",
+      "no_contact": "Pour faire vérifier un texte, adressez-vous à l'organisation qui exploite ce serveur.",
+      "sign_in": "Se connecter"
+    },
+    "settings": {
+      "title": "Page de vérification publique",
+      "enabled": "Proposer une page de vérification publique",
+      "enabled_help": "Sur /check, n'importe qui peut vérifier une image ou un fichier sans compte : 10 vérifications par minute et par adresse, jusqu'à 20 Mo, rien n'est conservé. Les textes restent réservés aux personnes disposant d'un compte.",
+      "page_is_at": "La page :",
+      "contact": "Contact pour la vérification de textes",
+      "contact_help": "Affiché sur la page publique aux personnes qui souhaitent faire vérifier un texte, par exemple une adresse e-mail.",
+      "now_on": "La page de vérification publique est désormais proposée.",
+      "now_off": "La page de vérification publique n'est plus proposée.",
+      "contact_saved": "Le contact est enregistré.",
+      "load_failed": "Les paramètres de la page de vérification publique n'ont pas pu être lus.",
+      "save_failed": "Le paramètre n'a pas pu être enregistré."
+    }
   },
   "pii_dashboard": {
     "title": "Tableau de bord PII",

@@ -100,7 +100,8 @@
     "agents_group": "Agentes",
     "agents": "Agentes",
     "governance": "Gobernanza",
-    "updates": "Actualizaciones"
+    "updates": "Actualizaciones",
+    "check_content": "Comprobar contenido"
   },
   "auth": {
     "logout": "Cerrar sesion",
@@ -1480,6 +1481,120 @@
     "plugins": "Complementos: {{plugins}}",
     "no_plugins": "No hay complementos cargados",
     "load_failed": "No se pudo leer el estado del módulo."
+  },
+  "content_check": {
+    "title": "Comprobar contenido",
+    "intro": "Compruebe si un texto, una imagen o un archivo lleva las marcas que esta instalación pone al contenido generado por IA.",
+    "back_to_chat": "Volver al chat",
+    "no_access": "No tiene permiso para comprobar contenido. Consulte a su administrador.",
+    "module_off": "Aquí no se puede comprobar contenido: el módulo de Procedencia está desactivado.",
+    "source_label": "Qué comprobar",
+    "tab_text": "Texto",
+    "tab_file": "Imagen o archivo",
+    "text_label": "Texto que comprobar",
+    "text_placeholder": "Pegue aquí el texto",
+    "text_limit": "Hasta {{size}}. Los saltos de línea y los espacios no importan.",
+    "choose_file": "Elegir un archivo",
+    "drop_hint": "o arrástrelo aquí",
+    "file_types": "Imágenes (PNG, JPEG, WebP), documentos de Word, PowerPoint y Excel, PDF y archivos de texto, hasta {{size}}.",
+    "public_file_types": "Imágenes (PNG, JPEG, WebP), documentos de Word, PowerPoint y Excel y PDF, hasta {{size}}.",
+    "selected_file": "{{name}} ({{size}})",
+    "remove_file": "Quitar el archivo",
+    "check": "Comprobar",
+    "checking": "Comprobando…",
+    "verdict": {
+      "ai-generated": {
+        "title": "Marcado como generado por IA",
+        "body": "Este contenido lleva una marca que indica que lo generó una IA, y la marca se puede confirmar."
+      },
+      "inconclusive": {
+        "title": "No concluyente",
+        "body": "Hay indicios de que una IA generó este contenido, pero ninguno que se pueda confirmar aquí."
+      },
+      "no-mark-found": {
+        "title": "No se encontró ninguna marca",
+        "body": "Nada en este contenido indica que lo generara una IA. Eso no demuestra que lo hiciera una persona."
+      }
+    },
+    "findings": "Qué se encontró",
+    "no_findings": "No se encontró ninguna marca de agua, credencial de contenido, metadato ni registro coincidente.",
+    "layer": {
+      "watermark": "Marca de agua",
+      "metadata": "Metadatos",
+      "fingerprint": "Huella",
+      "label": "Etiqueta visible"
+    },
+    "method": {
+      "c2pa": "Credenciales de contenido (C2PA)",
+      "trustmark-Q": "Marca de agua invisible (TrustMark)",
+      "xmp": "Metadatos de la imagen (IPTC)",
+      "receipt-hash": "Coincide con un recibo de generación",
+      "record-hash": "Coincide con un registro de inserción",
+      "receipt-reference": "Menciona un recibo de generación",
+      "record-reference": "Menciona un registro de inserción",
+      "vllm-gumbel": "Marca de agua en el texto",
+      "vllm-dual_key_gumbel": "Marca de agua en el texto"
+    },
+    "finding_found": "Indica generación por IA",
+    "finding_not_found": "No indica que lo hiciera una IA",
+    "record_id": "Registro {{id}}",
+    "receipt_id": "Recibo {{id}}",
+    "score": "Medida: {{score}}",
+    "checked_by": "Comprobado el {{time}} por {{detector}}",
+    "content_hash": "SHA-256 del contenido: {{hash}}",
+    "download_signed": "Descargar el resultado firmado",
+    "signing": "Firmando…",
+    "download_hint": "El resultado firmado es un archivo JSON. Su firma se puede verificar con los certificados de esta instalación.",
+    "unsigned": "Ahora no se puede firmar el resultado: el servicio de marcado no tiene clave de firma.",
+    "start_over": "Comprobar otra cosa",
+    "explain": {
+      "title": "Qué se comprueba",
+      "what": "Las marcas de agua invisibles y las credenciales de contenido firmadas (C2PA) de las imágenes, los metadatos de las imágenes, las marcas de los documentos de Word, PowerPoint y Excel, las marcas de agua en el texto y si el contenido coincide con un recibo o un registro guardado aquí cuando se generó o se insertó.",
+      "what_public": "Las marcas de agua invisibles y las credenciales de contenido firmadas (C2PA) de las imágenes, los metadatos de las imágenes, las marcas de los documentos de Word, PowerPoint y Excel y si el archivo coincide con un registro guardado aquí cuando se generó o se insertó.",
+      "how": "Solo se pueden confirmar las marcas de esta instalación; las de otros sistemas se indican, pero no se confirman.",
+      "kept": "Nada de lo que envíe se guarda ni se registra, ni en este servidor ni en el servicio de marcado.",
+      "no_proof": "«No se encontró ninguna marca» no demuestra que el contenido lo hiciera una persona: las marcas se pueden eliminar y muchos sistemas de IA no marcan nada."
+    },
+    "errors": {
+      "too_large": "Supera {{size}} y no se puede comprobar.",
+      "busy": "El servicio de marcado está ocupado. Vuelva a intentarlo en un momento.",
+      "unavailable": "El servicio de marcado no está disponible ahora. Vuelva a intentarlo más tarde.",
+      "timeout": "La comprobación tardó demasiado. Vuelva a intentarlo o pruebe con un archivo más pequeño.",
+      "no_signing_key": "Todavía no se puede comprobar contenido: el servicio de marcado no tiene claves configuradas. Avise a su administrador.",
+      "module_off": "Aquí no se puede comprobar contenido: el módulo de Procedencia está desactivado.",
+      "rate_limited": "Demasiadas comprobaciones en un minuto. Espere un momento y vuelva a intentarlo.",
+      "refused": "El servicio de marcado rechazó este servidor. Avise a su administrador.",
+      "unexpected": "El servicio de marcado dio una respuesta inesperada. Vuelva a intentarlo más tarde.",
+      "invalid": "No se pudo comprobar: lo enviado no es una comprobación válida.",
+      "not-base64": "No se pudo leer el archivo. Vuelva a elegirlo.",
+      "nothing-to-check": "Primero pegue un texto o elija un archivo.",
+      "text_not_public": "Aquí los textos solo se comprueban para personas con una cuenta.",
+      "read_failed": "No se pudo leer el archivo. Vuelva a elegirlo.",
+      "generic": "La comprobación falló: {{message}}"
+    },
+    "public": {
+      "title": "Comprobar una imagen o un archivo",
+      "intro": "Compruebe si una imagen o un archivo lleva las marcas que los sistemas de IA de esta organización ponen a lo que generan. No hace falta una cuenta.",
+      "not_offered": "Aquí no se ofrecen comprobaciones de contenido.",
+      "not_offered_hint": "Este servidor no ofrece una página pública de comprobación.",
+      "text_checks": "Los textos se comprueban para personas con una cuenta en esta organización.",
+      "contact": "Para que se compruebe un texto, contacte con: {{contact}}",
+      "no_contact": "Para que se compruebe un texto, consulte a la organización que gestiona este servidor.",
+      "sign_in": "Iniciar sesión"
+    },
+    "settings": {
+      "title": "Página pública de comprobación",
+      "enabled": "Ofrecer una página pública de comprobación",
+      "enabled_help": "Cualquiera puede comprobar una imagen o un archivo en /check sin cuenta: 10 comprobaciones por minuto y dirección, hasta 20 MB, sin guardar nada. Los textos siguen reservados a las personas con una cuenta.",
+      "page_is_at": "La página:",
+      "contact": "Contacto para comprobar textos",
+      "contact_help": "Se muestra en la página pública a quien quiera que se compruebe un texto; por ejemplo, una dirección de correo electrónico.",
+      "now_on": "La página pública de comprobación ya se ofrece.",
+      "now_off": "La página pública de comprobación ya no se ofrece.",
+      "contact_saved": "El contacto se ha guardado.",
+      "load_failed": "No se pudo leer la configuración de la página pública de comprobación.",
+      "save_failed": "No se pudo guardar la configuración."
+    }
   },
   "pii_dashboard": {
     "title": "Panel PII",

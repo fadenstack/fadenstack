@@ -638,6 +638,14 @@
       "action_upgrade": "So aktualisieren Sie: die Befehle für den Server, bei Bedarf eine Version nach der anderen",
       "action_parts": "Bestandteile: was jeder Dienst, Maschinen-Agent, Cluster und die CLI ausführt, verglichen mit dieser Version",
       "action_offline": "Kein Internet: index.json und index.json.sig von fadenstack.com kopieren und hier hochladen"
+    },
+    "check_content": {
+      "title": "Inhalte prüfen",
+      "description": "Ob ein Text, ein Bild oder eine Datei die Kennzeichnung trägt, mit der diese Installation KI-generierte Inhalte versieht. Nichts Eingereichtes wird gespeichert.",
+      "action_check": "Einen Text einfügen oder ein Bild, ein Office-Dokument, ein PDF oder eine Textdatei auswählen",
+      "action_verdict": "Das Ergebnis lesen und was jede Ebene gefunden hat: Wasserzeichen, signierte Herkunftsangaben, Metadaten, Belege und Nachweise",
+      "action_download": "Das Ergebnis signiert als JSON-Datei herunterladen",
+      "action_public": "Bilder und Dateien unter Einstellungen > Module > Herkunftsnachweis auch Personen ohne Konto anbieten"
     }
   }
 }

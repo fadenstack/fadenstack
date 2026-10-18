@@ -359,6 +359,39 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         service_targets=("faden-gateway",),
         protected=True,
     ),
+    # The public check page (/check): read from the database on every request
+    # (services/provenance/checks.py), so every worker follows a change at once.
+    SettingDefinition(
+        key="provenance.public_check_enabled",
+        type="bool",
+        category="modules",
+        group="provenance",
+        label="Public check page",
+        description=(
+            "Offer the page /check, where anyone can check a picture or a file for marks without an "
+            "account (10 checks a minute per address, up to 20 MB; nothing submitted is kept). Texts are "
+            "checked only for people with an account. Off by default."
+        ),
+        is_secret=False,
+        default=False,
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
+    SettingDefinition(
+        key="provenance.public_check_contact",
+        type="string",
+        category="modules",
+        group="provenance",
+        label="Contact for text checks",
+        description=(
+            "Shown on the public check page to people who want a text checked, e.g. an e-mail address "
+            "(up to 500 characters). Empty: the page names none."
+        ),
+        is_secret=False,
+        default="",
+        apply_scope=SystemApplyScope.LIVE_RELOAD,
+        service_targets=(),
+    ),
     # ── RAG Lite ─────────────────────────────────────────────
     SettingDefinition(
         key="rag_lite.enabled",

@@ -638,6 +638,14 @@
       "action_upgrade": "Comment mettre à jour : les commandes à exécuter sur le serveur, une version après l'autre si nécessaire",
       "action_parts": "Composants : ce qu'exécutent chaque service, agent de machine, cluster et la CLI, comparé à cette version",
       "action_offline": "Sans internet : importer index.json et index.json.sig copiés depuis fadenstack.com"
+    },
+    "check_content": {
+      "title": "Vérifier un contenu",
+      "description": "Si un texte, une image ou un fichier porte les marques que cette installation appose sur les contenus générés par l'IA. Rien de ce qui est soumis n'est conservé.",
+      "action_check": "Collez un texte ou choisissez une image, un document Office, un PDF ou un fichier texte",
+      "action_verdict": "Lisez le verdict et ce que chaque couche a trouvé : filigrane, identifiants de contenu, métadonnées, reçus et enregistrements",
+      "action_download": "Téléchargez le résultat signé, sous forme de fichier JSON",
+      "action_public": "Proposez la vérification d'images et de fichiers aux personnes sans compte dans Paramètres > Modules > Provenance"
     }
   }
 }

@@ -100,7 +100,8 @@
     "agents_group": "Agenten",
     "agents": "Agenten",
     "governance": "Governance",
-    "updates": "Updates"
+    "updates": "Updates",
+    "check_content": "Inhalte prüfen"
   },
   "auth": {
     "logout": "Abmelden",
@@ -1480,6 +1481,120 @@
     "plugins": "Plugins: {{plugins}}",
     "no_plugins": "Keine Plugins geladen",
     "load_failed": "Der Status des Moduls konnte nicht gelesen werden."
+  },
+  "content_check": {
+    "title": "Inhalte prüfen",
+    "intro": "Prüfen Sie, ob ein Text, ein Bild oder eine Datei die Kennzeichnung trägt, mit der diese Installation KI-generierte Inhalte versieht.",
+    "back_to_chat": "Zurück zum Chat",
+    "no_access": "Sie haben keine Berechtigung, Inhalte zu prüfen. Wenden Sie sich an Ihren Administrator.",
+    "module_off": "Inhalte können hier nicht geprüft werden: Das Modul „Herkunftsnachweis“ ist ausgeschaltet.",
+    "source_label": "Was geprüft werden soll",
+    "tab_text": "Text",
+    "tab_file": "Bild oder Datei",
+    "text_label": "Zu prüfender Text",
+    "text_placeholder": "Fügen Sie den Text hier ein",
+    "text_limit": "Bis {{size}}. Zeilenumbrüche und Abstände spielen keine Rolle.",
+    "choose_file": "Datei auswählen",
+    "drop_hint": "oder hierher ziehen",
+    "file_types": "Bilder (PNG, JPEG, WebP), Word-, PowerPoint- und Excel-Dokumente, PDF und Textdateien, bis {{size}}.",
+    "public_file_types": "Bilder (PNG, JPEG, WebP), Word-, PowerPoint- und Excel-Dokumente und PDF, bis {{size}}.",
+    "selected_file": "{{name}} ({{size}})",
+    "remove_file": "Datei entfernen",
+    "check": "Prüfen",
+    "checking": "Wird geprüft …",
+    "verdict": {
+      "ai-generated": {
+        "title": "Als KI-generiert gekennzeichnet",
+        "body": "Dieser Inhalt trägt eine Kennzeichnung, dass KI ihn erzeugt hat, und die Kennzeichnung lässt sich bestätigen."
+      },
+      "inconclusive": {
+        "title": "Nicht eindeutig",
+        "body": "Es gibt Hinweise, dass KI diesen Inhalt erzeugt hat, aber keinen, der sich hier bestätigen lässt."
+      },
+      "no-mark-found": {
+        "title": "Keine Kennzeichnung gefunden",
+        "body": "Nichts in diesem Inhalt besagt, dass KI ihn erzeugt hat. Das beweist nicht, dass ein Mensch ihn geschaffen hat."
+      }
+    },
+    "findings": "Was gefunden wurde",
+    "no_findings": "Es wurden weder ein Wasserzeichen noch signierte Herkunftsangaben, Metadaten oder ein passender Nachweis gefunden.",
+    "layer": {
+      "watermark": "Wasserzeichen",
+      "metadata": "Metadaten",
+      "fingerprint": "Fingerabdruck",
+      "label": "Sichtbarer Hinweis"
+    },
+    "method": {
+      "c2pa": "Signierte Herkunftsangaben (C2PA)",
+      "trustmark-Q": "Unsichtbares Wasserzeichen (TrustMark)",
+      "xmp": "Bild-Metadaten (IPTC)",
+      "receipt-hash": "Entspricht einem Erzeugungsbeleg",
+      "record-hash": "Entspricht einem Einfügenachweis",
+      "receipt-reference": "Verweist auf einen Erzeugungsbeleg",
+      "record-reference": "Verweist auf einen Einfügenachweis",
+      "vllm-gumbel": "Text-Wasserzeichen",
+      "vllm-dual_key_gumbel": "Text-Wasserzeichen"
+    },
+    "finding_found": "Deutet auf KI-Erzeugung hin",
+    "finding_not_found": "Kein Hinweis auf KI",
+    "record_id": "Nachweis {{id}}",
+    "receipt_id": "Beleg {{id}}",
+    "score": "Messwert: {{score}}",
+    "checked_by": "Geprüft am {{time}} von {{detector}}",
+    "content_hash": "SHA-256 des Inhalts: {{hash}}",
+    "download_signed": "Signiertes Ergebnis herunterladen",
+    "signing": "Wird signiert …",
+    "download_hint": "Das signierte Ergebnis ist eine JSON-Datei. Seine Signatur lässt sich mit den Zertifikaten dieser Installation prüfen.",
+    "unsigned": "Das Ergebnis kann gerade nicht signiert werden: Der Kennzeichnungsdienst hat keinen Signaturschlüssel.",
+    "start_over": "Etwas anderes prüfen",
+    "explain": {
+      "title": "Was geprüft wird",
+      "what": "Unsichtbare Wasserzeichen und signierte Herkunftsangaben (C2PA) in Bildern, Bild-Metadaten, die Kennzeichnung in Word-, PowerPoint- und Excel-Dokumenten, Text-Wasserzeichen und ob der Inhalt einem Beleg oder Nachweis entspricht, der hier beim Erzeugen oder Einfügen angelegt wurde.",
+      "what_public": "Unsichtbare Wasserzeichen und signierte Herkunftsangaben (C2PA) in Bildern, Bild-Metadaten, die Kennzeichnung in Word-, PowerPoint- und Excel-Dokumenten und ob die Datei einem Nachweis entspricht, der hier beim Erzeugen oder Einfügen angelegt wurde.",
+      "how": "Bestätigen lässt sich nur die Kennzeichnung dieser Installation; Kennzeichnungen anderer Systeme werden genannt, aber nicht bestätigt.",
+      "kept": "Nichts, was Sie einreichen, wird gespeichert oder protokolliert – weder von diesem Server noch vom Kennzeichnungsdienst.",
+      "no_proof": "„Keine Kennzeichnung gefunden“ beweist nicht, dass ein Mensch den Inhalt geschaffen hat: Kennzeichnungen lassen sich entfernen, und viele KI-Systeme kennzeichnen gar nichts."
+    },
+    "errors": {
+      "too_large": "Das ist größer als {{size}} und kann nicht geprüft werden.",
+      "busy": "Der Kennzeichnungsdienst ist ausgelastet. Versuchen Sie es gleich noch einmal.",
+      "unavailable": "Der Kennzeichnungsdienst ist gerade nicht erreichbar. Versuchen Sie es später noch einmal.",
+      "timeout": "Die Prüfung hat zu lange gedauert. Versuchen Sie es noch einmal oder mit einer kleineren Datei.",
+      "no_signing_key": "Inhalte können noch nicht geprüft werden: Für den Kennzeichnungsdienst sind keine Schlüssel eingerichtet. Wenden Sie sich an Ihren Administrator.",
+      "module_off": "Inhalte können hier nicht geprüft werden: Das Modul „Herkunftsnachweis“ ist ausgeschaltet.",
+      "rate_limited": "Zu viele Prüfungen in einer Minute. Warten Sie einen Moment und versuchen Sie es dann noch einmal.",
+      "refused": "Der Kennzeichnungsdienst hat diesen Server abgewiesen. Wenden Sie sich an Ihren Administrator.",
+      "unexpected": "Der Kennzeichnungsdienst hat unerwartet geantwortet. Versuchen Sie es später noch einmal.",
+      "invalid": "Das ließ sich nicht prüfen: Die Anfrage war keine gültige Prüfung.",
+      "not-base64": "Die Datei konnte nicht gelesen werden. Wählen Sie sie noch einmal aus.",
+      "nothing-to-check": "Fügen Sie zuerst einen Text ein oder wählen Sie eine Datei aus.",
+      "text_not_public": "Texte werden hier nur für Personen mit einem Konto geprüft.",
+      "read_failed": "Die Datei konnte nicht gelesen werden. Wählen Sie sie noch einmal aus.",
+      "generic": "Die Prüfung ist fehlgeschlagen: {{message}}"
+    },
+    "public": {
+      "title": "Ein Bild oder eine Datei prüfen",
+      "intro": "Prüfen Sie, ob ein Bild oder eine Datei die Kennzeichnung trägt, mit der die KI-Systeme dieser Organisation ihre Erzeugnisse versehen. Ein Konto ist nicht nötig.",
+      "not_offered": "Inhaltsprüfungen werden hier nicht angeboten.",
+      "not_offered_hint": "Dieser Server bietet keine öffentliche Prüfseite an.",
+      "text_checks": "Texte werden für Personen mit einem Konto bei dieser Organisation geprüft.",
+      "contact": "Wenn Sie einen Text prüfen lassen möchten, wenden Sie sich an: {{contact}}",
+      "no_contact": "Wenn Sie einen Text prüfen lassen möchten, wenden Sie sich an die Organisation, die diesen Server betreibt.",
+      "sign_in": "Anmelden"
+    },
+    "settings": {
+      "title": "Öffentliche Prüfseite",
+      "enabled": "Öffentliche Prüfseite anbieten",
+      "enabled_help": "Unter /check kann jeder ohne Konto ein Bild oder eine Datei prüfen: 10 Prüfungen pro Minute und Adresse, bis 20 MB, nichts wird gespeichert. Texte bleiben Personen mit einem Konto vorbehalten.",
+      "page_is_at": "Die Seite:",
+      "contact": "Kontakt für Textprüfungen",
+      "contact_help": "Wird auf der öffentlichen Seite Personen angezeigt, die einen Text prüfen lassen möchten, z. B. eine E-Mail-Adresse.",
+      "now_on": "Die öffentliche Prüfseite wird jetzt angeboten.",
+      "now_off": "Die öffentliche Prüfseite wird nicht mehr angeboten.",
+      "contact_saved": "Der Kontakt ist gespeichert.",
+      "load_failed": "Die Einstellungen der öffentlichen Prüfseite konnten nicht gelesen werden.",
+      "save_failed": "Die Einstellung konnte nicht gespeichert werden."
+    }
   },
   "pii_dashboard": {
     "title": "PII-Dashboard",

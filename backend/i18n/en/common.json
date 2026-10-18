@@ -100,7 +100,8 @@
     "agents_group": "Agents",
     "agents": "Agents",
     "governance": "Governance",
-    "updates": "Updates"
+    "updates": "Updates",
+    "check_content": "Check content"
   },
   "auth": {
     "logout": "Logout",
@@ -1621,6 +1622,120 @@
     "plugins": "Plugins: {{plugins}}",
     "no_plugins": "No plugins loaded",
     "load_failed": "The module's status could not be read."
+  },
+  "content_check": {
+    "title": "Check content",
+    "intro": "Find out whether a text, a picture or a file carries the marks this installation puts on AI-generated content.",
+    "back_to_chat": "Back to the chat",
+    "no_access": "You do not have the right to check content. Ask your administrator.",
+    "module_off": "Content cannot be checked here: the provenance module is switched off.",
+    "source_label": "What to check",
+    "tab_text": "Text",
+    "tab_file": "Picture or file",
+    "text_label": "Text to check",
+    "text_placeholder": "Paste the text here",
+    "text_limit": "Up to {{size}}. Line breaks and spacing do not matter.",
+    "choose_file": "Choose a file",
+    "drop_hint": "or drop it here",
+    "file_types": "Pictures (PNG, JPEG, WebP), Word, PowerPoint and Excel documents, PDF and text files, up to {{size}}.",
+    "public_file_types": "Pictures (PNG, JPEG, WebP), Word, PowerPoint and Excel documents and PDF, up to {{size}}.",
+    "selected_file": "{{name}} ({{size}})",
+    "remove_file": "Remove the file",
+    "check": "Check",
+    "checking": "Checking…",
+    "verdict": {
+      "ai-generated": {
+        "title": "Marked as AI-generated",
+        "body": "This content carries a mark saying that AI generated it, and the mark can be confirmed."
+      },
+      "inconclusive": {
+        "title": "Inconclusive",
+        "body": "There are signs that AI generated this content, but none that can be confirmed here."
+      },
+      "no-mark-found": {
+        "title": "No mark found",
+        "body": "Nothing in this content says that AI generated it. That does not prove that a person made it."
+      }
+    },
+    "findings": "What was found",
+    "no_findings": "No watermark, content credentials, metadata or matching record was found.",
+    "layer": {
+      "watermark": "Watermark",
+      "metadata": "Metadata",
+      "fingerprint": "Fingerprint",
+      "label": "Visible label"
+    },
+    "method": {
+      "c2pa": "Content credentials (C2PA)",
+      "trustmark-Q": "Invisible watermark (TrustMark)",
+      "xmp": "Picture metadata (IPTC)",
+      "receipt-hash": "Matches a generation receipt",
+      "record-hash": "Matches a placement record",
+      "receipt-reference": "Names a generation receipt",
+      "record-reference": "Names a placement record",
+      "vllm-gumbel": "Text watermark",
+      "vllm-dual_key_gumbel": "Text watermark"
+    },
+    "finding_found": "Points to AI generation",
+    "finding_not_found": "Does not say AI made it",
+    "record_id": "Record {{id}}",
+    "receipt_id": "Receipt {{id}}",
+    "score": "Measure: {{score}}",
+    "checked_by": "Checked on {{time}} by {{detector}}",
+    "content_hash": "SHA-256 of the content: {{hash}}",
+    "download_signed": "Download signed result",
+    "signing": "Signing…",
+    "download_hint": "The signed result is a JSON file. Its signature can be checked with this installation's certificates.",
+    "unsigned": "The result cannot be signed right now: the marking engine has no signing key.",
+    "start_over": "Check something else",
+    "explain": {
+      "title": "What is checked",
+      "what": "Invisible watermarks and signed content credentials (C2PA) in pictures, picture metadata, the marks in Word, PowerPoint and Excel documents, text watermarks, and whether the content matches a receipt or record kept here when it was generated or placed.",
+      "what_public": "Invisible watermarks and signed content credentials (C2PA) in pictures, picture metadata, the marks in Word, PowerPoint and Excel documents, and whether the file matches a record kept here when it was generated or placed.",
+      "how": "Only the marks of this installation can be confirmed; marks of other systems are named but not confirmed.",
+      "kept": "Nothing you submit is kept or logged, neither by this server nor by the marking engine.",
+      "no_proof": "\"No mark found\" does not prove that a person made the content: marks can be removed, and many AI systems do not mark anything."
+    },
+    "errors": {
+      "too_large": "This is larger than {{size}} and cannot be checked.",
+      "busy": "The marking engine is busy. Try again in a moment.",
+      "unavailable": "The marking engine is not available right now. Try again later.",
+      "timeout": "The check took too long. Try again, or try a smaller file.",
+      "no_signing_key": "Content cannot be checked yet: the marking engine has no keys set up. Tell your administrator.",
+      "module_off": "Content cannot be checked here: the provenance module is switched off.",
+      "rate_limited": "Too many checks in a minute. Wait a moment and try again.",
+      "refused": "The marking engine refused this server. Tell your administrator.",
+      "unexpected": "The marking engine gave an unexpected answer. Try again later.",
+      "invalid": "This could not be checked: what was sent is not a check.",
+      "not-base64": "The file could not be read. Choose it again.",
+      "nothing-to-check": "Paste a text or choose a file first.",
+      "text_not_public": "Texts are checked here only for people with an account.",
+      "read_failed": "The file could not be read. Choose it again.",
+      "generic": "The check failed: {{message}}"
+    },
+    "public": {
+      "title": "Check a picture or a file",
+      "intro": "Find out whether a picture or a file carries the marks that this organisation's AI systems put on what they generate. No account needed.",
+      "not_offered": "Content checks are not offered here.",
+      "not_offered_hint": "This server does not offer a public check page.",
+      "text_checks": "Texts are checked for people with an account at this organisation.",
+      "contact": "To have a text checked, contact: {{contact}}",
+      "no_contact": "To have a text checked, ask the organisation that runs this server.",
+      "sign_in": "Sign in"
+    },
+    "settings": {
+      "title": "Public check page",
+      "enabled": "Offer a public check page",
+      "enabled_help": "Anyone can check a picture or a file at /check without an account: 10 checks a minute per address, up to 20 MB, nothing kept. Texts stay for people with an account.",
+      "page_is_at": "The page:",
+      "contact": "Contact for text checks",
+      "contact_help": "Shown on the public page to people who want a text checked, e.g. an e-mail address.",
+      "now_on": "The public check page is now offered.",
+      "now_off": "The public check page is no longer offered.",
+      "contact_saved": "The contact is saved.",
+      "load_failed": "The settings of the public check page could not be read.",
+      "save_failed": "The setting could not be saved."
+    }
   },
   "pii_dashboard": {
     "title": "PII Dashboard",

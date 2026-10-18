@@ -15,6 +15,10 @@ from faden_backend.db.models.rbac import (
     UserRole,
 )
 
+#: Checking content for marks (``/api/provenance/verify``): every built-in role has it, so everyone who
+#: signs in can check; a custom role has it when it is given.
+CONTENT_CHECK = {"provenance": ["check"]}
+
 # Default roles and their permission scopes
 _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
     "admin": {
@@ -75,6 +79,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "pii.session": ["read", "strengthen", "weaken"],
         "skills": ["read", "create", "share", "publish", "manage"],
         "agents": ["read", "create", "manage", "delete"],
+        **CONTENT_CHECK,
     },
     "operator": {
         "llm.providers": ["read"],
@@ -117,6 +122,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "pii.session": ["read", "strengthen"],
         "skills": ["read", "create", "share"],
         "agents": ["read"],
+        **CONTENT_CHECK,
     },
     "viewer": {
         "llm.providers": ["read"],
@@ -152,6 +158,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.jobs": ["read"],
         "rag.search": ["read"],
         "skills": ["read"],
+        **CONTENT_CHECK,
     },
     "rag_manager": {
         "rag.runtime": ["read", "update"],
@@ -160,6 +167,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["execute", "read"],
         "rag.jobs": ["read"],
         "rag.search": ["read", "write"],
+        **CONTENT_CHECK,
     },
     "rag_editor": {
         "rag.runtime": ["read"],
@@ -168,6 +176,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["execute", "read"],
         "rag.jobs": ["read"],
         "rag.search": ["read", "write"],
+        **CONTENT_CHECK,
     },
     "rag_viewer": {
         "rag.runtime": ["read"],
@@ -176,11 +185,13 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["read"],
         "rag.jobs": ["read"],
         "rag.search": ["read"],
+        **CONTENT_CHECK,
     },
     # Reads the audit trail and changes nothing; assigned and handed over like the administrator right
     # (features/admin-guardrails.md 2.6, 2.7).
     "auditor": {
         "audit": ["read", "export"],
+        **CONTENT_CHECK,
     },
     "default_user": {
         "chat.projects": ["create", "read", "update", "delete"],
@@ -201,6 +212,7 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "rag.publish": ["read"],
         "rag.jobs": ["read"],
         "rag.search": ["read"],
+        **CONTENT_CHECK,
     },
 }
 

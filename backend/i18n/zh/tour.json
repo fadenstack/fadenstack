@@ -638,6 +638,14 @@
       "action_upgrade": "如何升级：在服务器上运行的命令，必要时逐个版本升级",
       "action_parts": "组成部分：每个服务、机器代理、集群和 CLI 运行的版本，与此版本对比",
       "action_offline": "无法访问互联网：上传从 fadenstack.com 复制的 index.json 和 index.json.sig"
+    },
+    "check_content": {
+      "title": "检查内容",
+      "description": "检查一段文本、一张图片或一个文件是否带有本系统为 AI 生成内容添加的标记。提交的内容不会被保存。",
+      "action_check": "粘贴文本，或选择图片、Office 文档、PDF 或文本文件",
+      "action_verdict": "查看结论以及各层的发现：水印、内容凭证、元数据、回执和记录",
+      "action_download": "以 JSON 文件下载已签名的结果",
+      "action_public": "在“设置 > 模块 > 内容溯源”中，为没有账户的人提供图片和文件检查"
     }
   }
 }

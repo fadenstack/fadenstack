@@ -10,6 +10,8 @@ from faden_backend.web.api.inference import inference_router
 from faden_backend.web.api.install import router as install_router
 from faden_backend.web.api.llm import llm_router
 from faden_backend.web.api.node_files import router as node_files_router
+from faden_backend.web.api.provenance.public import router as public_provenance_router
+from faden_backend.web.api.provenance.views import router as provenance_router
 from faden_backend.web.api.skills.views import router as skills_router
 
 api_router = APIRouter()
@@ -24,6 +26,10 @@ api_router.include_router(chat_router, tags=["chat"])
 # Skills for everyone: what each user may do is RBAC plus the skill's owner
 # and grants (the admin pages use it too; there is no separate admin API).
 api_router.include_router(skills_router, tags=["skills"])
+# Checking content for marks: for everyone signed in with provenance:check, and -- when an
+# administrator offers it -- pictures and files without an account (404 otherwise).
+api_router.include_router(provenance_router)
+api_router.include_router(public_provenance_router)
 api_router.include_router(agents_router)
 api_router.include_router(agent_tokens_router)
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])

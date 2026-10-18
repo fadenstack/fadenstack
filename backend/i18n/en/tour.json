@@ -638,6 +638,14 @@
       "action_upgrade": "How to upgrade: the commands to run on the server, one release at a time when needed",
       "action_parts": "Parts: what each service, machine agent, cluster and the CLI runs, against this release",
       "action_offline": "No internet: upload index.json and index.json.sig copied from fadenstack.com"
+    },
+    "check_content": {
+      "title": "Check content",
+      "description": "Whether a text, a picture or a file carries this installation's marks of AI-generated content. Nothing submitted is kept.",
+      "action_check": "Paste a text or choose a picture, an Office document, a PDF or a text file",
+      "action_verdict": "Read the verdict and what each layer found: watermark, content credentials, metadata, receipts and records",
+      "action_download": "Download the result signed, as a JSON file",
+      "action_public": "Offer pictures and files to people without an account under Settings > Modules > Provenance"
     }
   }
 }

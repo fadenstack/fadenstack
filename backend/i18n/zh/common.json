@@ -100,7 +100,8 @@
     "agents_group": "智能体",
     "agents": "智能体",
     "governance": "治理",
-    "updates": "更新"
+    "updates": "更新",
+    "check_content": "检查内容"
   },
   "auth": {
     "logout": "退出登录",
@@ -1480,6 +1481,120 @@
     "plugins": "插件：{{plugins}}",
     "no_plugins": "未加载插件",
     "load_failed": "无法读取模块状态。"
+  },
+  "content_check": {
+    "title": "检查内容",
+    "intro": "检查一段文本、一张图片或一个文件是否带有本系统为 AI 生成内容添加的标记。",
+    "back_to_chat": "返回聊天",
+    "no_access": "您没有检查内容的权限。请联系管理员。",
+    "module_off": "此处无法检查内容：内容溯源模块已关闭。",
+    "source_label": "检查对象",
+    "tab_text": "文本",
+    "tab_file": "图片或文件",
+    "text_label": "要检查的文本",
+    "text_placeholder": "在此粘贴文本",
+    "text_limit": "最大 {{size}}。换行和空格不影响结果。",
+    "choose_file": "选择文件",
+    "drop_hint": "或将文件拖到此处",
+    "file_types": "图片（PNG、JPEG、WebP）、Word、PowerPoint 和 Excel 文档、PDF 及文本文件，最大 {{size}}。",
+    "public_file_types": "图片（PNG、JPEG、WebP）、Word、PowerPoint 和 Excel 文档及 PDF，最大 {{size}}。",
+    "selected_file": "{{name}}（{{size}}）",
+    "remove_file": "移除文件",
+    "check": "检查",
+    "checking": "正在检查…",
+    "verdict": {
+      "ai-generated": {
+        "title": "已标记为 AI 生成",
+        "body": "此内容带有由 AI 生成的标记，且该标记可以得到确认。"
+      },
+      "inconclusive": {
+        "title": "无法确定",
+        "body": "有迹象表明此内容由 AI 生成，但没有一项能在此得到确认。"
+      },
+      "no-mark-found": {
+        "title": "未发现标记",
+        "body": "此内容中没有任何信息表明它由 AI 生成。但这并不能证明它出自人手。"
+      }
+    },
+    "findings": "发现的内容",
+    "no_findings": "未发现水印、内容凭证、元数据或匹配的记录。",
+    "layer": {
+      "watermark": "水印",
+      "metadata": "元数据",
+      "fingerprint": "指纹",
+      "label": "可见标识"
+    },
+    "method": {
+      "c2pa": "内容凭证（C2PA）",
+      "trustmark-Q": "隐形水印（TrustMark）",
+      "xmp": "图片元数据（IPTC）",
+      "receipt-hash": "与一份生成回执一致",
+      "record-hash": "与一条插入记录一致",
+      "receipt-reference": "引用了一份生成回执",
+      "record-reference": "引用了一条插入记录",
+      "vllm-gumbel": "文本水印",
+      "vllm-dual_key_gumbel": "文本水印"
+    },
+    "finding_found": "表明由 AI 生成",
+    "finding_not_found": "未表明由 AI 生成",
+    "record_id": "记录 {{id}}",
+    "receipt_id": "回执 {{id}}",
+    "score": "度量值：{{score}}",
+    "checked_by": "{{time}} 由 {{detector}} 检查",
+    "content_hash": "内容的 SHA-256：{{hash}}",
+    "download_signed": "下载已签名的结果",
+    "signing": "正在签名…",
+    "download_hint": "已签名的结果是一个 JSON 文件，可使用本系统的证书验证其签名。",
+    "unsigned": "目前无法对结果签名：标记服务没有签名密钥。",
+    "start_over": "检查其他内容",
+    "explain": {
+      "title": "检查哪些内容",
+      "what": "图片中的隐形水印和已签名的内容凭证（C2PA）、图片元数据、Word、PowerPoint 和 Excel 文档中的标记、文本水印，以及内容是否与本系统在生成或插入时保存的回执或记录一致。",
+      "what_public": "图片中的隐形水印和已签名的内容凭证（C2PA）、图片元数据、Word、PowerPoint 和 Excel 文档中的标记，以及文件是否与本系统在生成或插入时保存的记录一致。",
+      "how": "只有本系统的标记可以得到确认；其他系统的标记会列出，但不会被确认。",
+      "kept": "您提交的任何内容都不会被保存或记录，无论是本服务器还是标记服务。",
+      "no_proof": "“未发现标记”并不能证明内容出自人手：标记可能被移除，而且许多 AI 系统根本不做标记。"
+    },
+    "errors": {
+      "too_large": "内容超过 {{size}}，无法检查。",
+      "busy": "标记服务正忙，请稍后重试。",
+      "unavailable": "标记服务暂时不可用，请稍后再试。",
+      "timeout": "检查耗时过长。请重试，或换一个较小的文件。",
+      "no_signing_key": "暂时无法检查内容：标记服务尚未配置密钥。请告知管理员。",
+      "module_off": "此处无法检查内容：内容溯源模块已关闭。",
+      "rate_limited": "一分钟内检查次数过多，请稍候再试。",
+      "refused": "标记服务拒绝了本服务器。请告知管理员。",
+      "unexpected": "标记服务返回了意外的响应，请稍后再试。",
+      "invalid": "无法检查：提交的内容不是有效的检查请求。",
+      "not-base64": "无法读取该文件，请重新选择。",
+      "nothing-to-check": "请先粘贴文本或选择文件。",
+      "text_not_public": "此处仅为拥有账户的用户检查文本。",
+      "read_failed": "无法读取该文件，请重新选择。",
+      "generic": "检查失败：{{message}}"
+    },
+    "public": {
+      "title": "检查图片或文件",
+      "intro": "检查一张图片或一个文件是否带有本机构的 AI 系统为其生成内容添加的标记。无需账户。",
+      "not_offered": "此处不提供内容检查。",
+      "not_offered_hint": "本服务器未提供公开检查页面。",
+      "text_checks": "文本仅为在本机构拥有账户的用户检查。",
+      "contact": "如需检查文本，请联系：{{contact}}",
+      "no_contact": "如需检查文本，请联系运营本服务器的机构。",
+      "sign_in": "登录"
+    },
+    "settings": {
+      "title": "公开检查页面",
+      "enabled": "提供公开检查页面",
+      "enabled_help": "任何人无需账户即可在 /check 检查图片或文件：每个地址每分钟 10 次，最大 20 MB，不保存任何内容。文本检查仍仅限拥有账户的用户。",
+      "page_is_at": "页面地址：",
+      "contact": "文本检查联系方式",
+      "contact_help": "在公开页面上向希望检查文本的人显示，例如一个电子邮件地址。",
+      "now_on": "现已提供公开检查页面。",
+      "now_off": "已不再提供公开检查页面。",
+      "contact_saved": "联系方式已保存。",
+      "load_failed": "无法读取公开检查页面的设置。",
+      "save_failed": "无法保存该设置。"
+    }
   },
   "pii_dashboard": {
     "title": "PII 仪表盘",
