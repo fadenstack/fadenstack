@@ -170,8 +170,8 @@ def _contents(request: httpx.Request) -> list[str]:
     return [m["content"] for m in json.loads(request.content)["messages"]]
 
 
-def _refusing_engine(seen: list[httpx.Request], *, refusal: str = REFUSED) -> httpx.AsyncClient:
-    """A vLLM whose template takes one system message, first (Qwen 3.5 and later)."""
+def _refusing_engine(seen: list[httpx.Request], *, refusal: str = REFUSED, status: int = 400) -> httpx.AsyncClient:
+    """A vLLM whose template takes one system message, first (Qwen 3.5 and later); behind Ray Serve, a 500."""
 
     async def body() -> AsyncIterator[bytes]:
         yield _event({"content": "ok"})
@@ -181,7 +181,7 @@ def _refusing_engine(seen: list[httpx.Request], *, refusal: str = REFUSED) -> ht
         seen.append(request)
         roles = [m["role"] for m in json.loads(request.content)["messages"]]
         if "system" in roles[1:]:
-            return httpx.Response(400, json={"object": "error", "message": refusal})
+            return httpx.Response(status, json={"object": "error", "message": refusal})
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=body())
 
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -221,6 +221,67 @@ async def test_two_system_messages_before_the_history_go_again_as_one() -> None:
         out = await _stream(LLMAdapter(http_client=http), payload={"model": "qwen3.8", "messages": TWO_LEADING})
     assert b"ok" in b"".join(out)
     assert [_contents(request) for request in seen] == [["date", "pii", "q1"], ["date\n\npii", "q1"]]
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("fresh_memory")
+async def test_a_template_refusal_behind_ray_serve_goes_again_too() -> None:
+    """Under Ray Serve, vLLM 0.31 answers the template's refusal with 500 (the release server, 2026-10-19)."""
+    seen: list[httpx.Request] = []
+    refusal = "System message must be at the beginning."
+    async with _refusing_engine(seen, refusal=refusal, status=500) as http:
+        out = await _stream(LLMAdapter(http_client=http), payload={"model": "qwen3.8", "messages": LATE_SYSTEM})
+    assert b"ok" in b"".join(out)
+    assert [_contents(request) for request in seen] == [[m["content"] for m in LATE_SYSTEM], UP_FRONT]
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("fresh_memory")
+async def test_any_other_500_is_not_sent_again() -> None:
+    seen: list[httpx.Request] = []
+    async with _refusing_engine(seen, refusal="CUDA out of memory", status=500) as http:
+        await _stream(LLMAdapter(http_client=http), payload={"model": "qwen", "messages": LATE_SYSTEM})
+    assert len(seen) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("fresh_memory")
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+async def test_a_template_refusal_as_litellms_internal_error_goes_again(
+    stream: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Through LiteLLM the 500 is an InternalServerError; it goes again up front, whole or streamed."""
+    sent: list[list[str]] = []
+
+    async def chunks() -> AsyncIterator[Any]:
+        for _ in ():
+            yield _
+
+    async def acompletion(**kwargs: Any) -> Any:
+        contents = [m["content"] for m in kwargs["messages"]]
+        sent.append(contents)
+        if contents != UP_FRONT:
+            raise litellm.exceptions.InternalServerError(
+                message="OpenAIException - System message must be at the beginning.", model="qwen",
+                llm_provider="openai",
+            )
+        if kwargs["stream"]:
+            return chunks()
+        return SimpleNamespace(model_dump=lambda: {"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(litellm, "acompletion", acompletion)
+    result = await LLMAdapter().completion(
+        provider_type=ProviderType.REMOTE_OPENAI, base_url="http://api.local/v1", api_key_encrypted=None,
+        litellm_provider=None, litellm_model=None, extra_params=None,
+        payload={"model": "qwen", "messages": LATE_SYSTEM}, stream=stream,
+    )
+    if stream:
+        assert not isinstance(result, CompletionResult)
+        out = [piece async for piece in result]  # type: ignore[union-attr]
+        assert b"error" not in b"".join(out)
+    else:
+        assert isinstance(result, CompletionResult) and result.status_code == 200
+    assert sent == [[m["content"] for m in LATE_SYSTEM], UP_FRONT]
 
 
 def test_one_system_message_first_is_left_as_it_is() -> None:

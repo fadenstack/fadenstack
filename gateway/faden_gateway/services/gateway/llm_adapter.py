@@ -180,6 +180,18 @@ def _system_first(messages: list[dict[str, Any]]) -> list[dict[str, Any]] | None
     return [merged, *(m for m in messages if m.get("role") != "system")]
 
 
+def _internal_error_result(exc: Exception) -> CompletionResult:
+    """A whole answer's 500 from LiteLLM: a template's refusal behind Ray Serve goes again (_whole_answer).
+
+    Any other is the model's side failing; the caller is told so, the cause goes to the log.
+    """
+    if not _TEMPLATE_REFUSAL.search(str(exc)):
+        logger.error("LiteLLM completion failed: %s", type(exc).__name__, exc_info=exc)
+        return CompletionResult(status_code=502, payload=_error_payload("server_error", _UPSTREAM_FAILED))
+    logger.warning("The model's chat template refused the request: %s", str(exc)[:300])
+    return CompletionResult(status_code=500, payload=_error_payload("server_error", _TEMPLATE_REFUSED))
+
+
 def _late_system_refused(
     status: int, detail: str, messages: list[dict[str, Any]],
 ) -> list[dict[str, Any]] | None:
@@ -188,10 +200,13 @@ def _late_system_refused(
     The gateway sends several: the date, the PII note, memory, a turn's
     skills after the history, so the prefix vLLM caches stays the same
     (``session_skills_position``). Llama 3's template takes them anywhere;
-    one that does not answers 400 with the template's error. That request
-    then goes again with its system messages as one, first.
+    one that does not answers 400 with the template's error -- or 500
+    behind Ray Serve with vLLM 0.31, which turns the template's exception
+    into an internal error (the release server, 2026-10-19: every agent
+    turn of the 27B failed). That request then goes again with its system
+    messages as one, first.
     """
-    if status != 400 or not _TEMPLATE_REFUSAL.search(detail):
+    if status not in (400, 500) or not _TEMPLATE_REFUSAL.search(detail):
         return None
     return _system_first(messages)
 
@@ -513,6 +528,10 @@ class _TlsRefusedError(Exception):
     """A model this gateway cannot reach securely yet (``upstream_tls.MACHINE_TLS_NOT_LOADED`` says why)."""
 
 
+#: Refusals before a stream starts that one change may cure (``_try_again``): a 400, or a template's 500.
+_MAY_GO_AGAIN = (litellm.exceptions.BadRequestError, litellm.exceptions.InternalServerError)
+#: What a caller is told when the model's chat template refused the request, and going again did not help.
+_TEMPLATE_REFUSED = "The model's chat template refused the request's system messages."
 #: What a caller is told when the model's side failed: a 5xx, no connection, a TLS error, an
 #: exception in LiteLLM. The cause names machines, ports and certificates, and LiteLLM's
 #: connection error carries a traceback: it goes to the gateway's log, not into the answer.
@@ -938,6 +957,8 @@ class LLMAdapter:
                 status_code=400,
                 payload=_error_payload("invalid_request_error", str(exc)),
             )
+        except litellm.exceptions.InternalServerError as exc:
+            return _internal_error_result(exc)
         except Exception:
             logger.exception("LiteLLM completion failed")
             return CompletionResult(
@@ -953,9 +974,10 @@ class LLMAdapter:
                 try:
                     response = await litellm.acompletion(**kwargs)
                     break
-                except litellm.exceptions.BadRequestError as refused:
+                except _MAY_GO_AGAIN as refused:
+                    status = 400 if isinstance(refused, litellm.exceptions.BadRequestError) else 500
                     again = None if tries == _RETRIES else _try_again(
-                        400, str(refused), kwargs, str(kwargs["model"]),
+                        status, str(refused), kwargs, str(kwargs["model"]),
                     )
                     if again is None:
                         raise
