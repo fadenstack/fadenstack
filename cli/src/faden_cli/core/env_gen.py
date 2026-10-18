@@ -15,8 +15,16 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from faden_cli.core.private_files import write_private
-from faden_cli.core.registry import module_env_vars
+from faden_cli.core.registry import BUILTIN_MODULES, MODULES, module_env_vars
 from faden_cli.core.sysinfo import calculate_tune_profile
+
+#: The modules whose secrets every ``.env`` holds, from their registry entries (``secret_groups``,
+#: ``dev_service_token``, ``dev_settings``): a module adds its tokens and keys there, nowhere here.
+_MODULES = tuple(MODULES[name] for name in BUILTIN_MODULES)
+#: One value per group, shared by every key in it: a service token the callers and the module hold, or a
+#: key of the module's own (MCP's encryption key).
+_MODULE_SECRET_GROUPS: tuple[tuple[str, ...], ...] = tuple(g for m in _MODULES for g in m.secret_groups)
+_MODULE_SECRET_KEYS: tuple[str, ...] = tuple(key for group in _MODULE_SECRET_GROUPS for key in group)
 
 # Keys that contain cryptographic secrets. These must never be replaced
 # when regenerating an .env file because changing them would make
@@ -36,27 +44,17 @@ SECRET_KEYS: frozenset[str] = frozenset({
     "LANGFUSE_ENCRYPTION_KEY",
     "FADEN_BACKEND_SETTINGS_MASTER_KEY",
     "FADEN_GATEWAY_ENCRYPTION_KEY",
-    "FADEN_MCP_ENCRYPTION_KEY",
     # What the machines' credential hashes are keyed with: a new value would disconnect every machine.
     "FADEN_BACKEND_CREDENTIAL_PEPPER",
     "USERS_SECRET",
     # Inter-service auth tokens — each downstream service has one shared
     # value across (api → service), (backend → service), (service receiver).
-    # All three keys per service MUST stay in lock-step, so they're listed
-    # together here to be preserved as a group on .env regeneration.
-    "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
-    "FADEN_BACKEND_MCP_SERVICE_TOKEN",
-    "FADEN_MCP_SERVICE_TOKEN",
-    "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
-    "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
-    "FADEN_SKILLS_SERVICE_TOKEN",
+    # All keys of a service MUST stay in lock-step, so they're kept
+    # together as a group on .env regeneration.
     "FADEN_BACKEND_RAG_SERVICE_TOKEN",
     "FADEN_RAG_SERVICE_TOKEN",
-    # The PII service's own routes: what the gateway, the backend and MCP present, and what it expects.
-    "FADEN_GATEWAY_PII_SERVICE_TOKEN",
-    "FADEN_BACKEND_PII_SERVICE_TOKEN",
-    "FADEN_MCP_PII_SERVICE_TOKEN",
-    "FADEN_PII_SERVICE_TOKEN",
+    # The modules' tokens, and the keys of their own (MCP's encryption key).
+    *_MODULE_SECRET_KEYS,
     # The PII service reports its scan events to the backend with this.
     "FADEN_BACKEND_INTERNAL_TOKEN",
     "FADEN_PII_BACKEND_TOKEN",
@@ -100,17 +98,8 @@ REQUIRED_KEYS: tuple[str, ...] = (
     "GRAFANA_ADMIN_PASSWORD",
     "FADEN_BACKEND_SETTINGS_MASTER_KEY",
     "FADEN_BACKEND_CREDENTIAL_PEPPER",
-    "FADEN_MCP_ENCRYPTION_KEY",
-    "FADEN_GATEWAY_MCP_SERVICE_TOKEN",
-    "FADEN_BACKEND_MCP_SERVICE_TOKEN",
-    "FADEN_MCP_SERVICE_TOKEN",
-    "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN",
-    "FADEN_BACKEND_SKILLS_SERVICE_TOKEN",
-    "FADEN_SKILLS_SERVICE_TOKEN",
-    "FADEN_GATEWAY_PII_SERVICE_TOKEN",
-    "FADEN_BACKEND_PII_SERVICE_TOKEN",
-    "FADEN_MCP_PII_SERVICE_TOKEN",
-    "FADEN_PII_SERVICE_TOKEN",
+    # Every module's tokens and keys (registry.MODULES): required whether the module is switched on or not.
+    *_MODULE_SECRET_KEYS,
     # Chats are sealed with it; an install from before it reached the gateway (2 October 2026) gets one here, and
     # `faden secrets seal` seals what was written in plain text (features/admin-guardrails.md, phase 3).
     "FADEN_GATEWAY_ENCRYPTION_KEY",
@@ -141,15 +130,8 @@ ALLOW_PUBLISHED_KEYS = "FADEN_ALLOW_PUBLISHED_KEYS"
 _REFUSED_DATA_KEYS = ("FADEN_BACKEND_SETTINGS_MASTER_KEY", "FADEN_MCP_ENCRYPTION_KEY")
 
 #: Keys that must hold one value: what the gateway and the backend present, and what the module expects.
-_TOKEN_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("FADEN_GATEWAY_MCP_SERVICE_TOKEN", "FADEN_BACKEND_MCP_SERVICE_TOKEN", "FADEN_MCP_SERVICE_TOKEN"),
-    ("FADEN_GATEWAY_SKILLS_SERVICE_TOKEN", "FADEN_BACKEND_SKILLS_SERVICE_TOKEN", "FADEN_SKILLS_SERVICE_TOKEN"),
-    (
-        "FADEN_GATEWAY_PII_SERVICE_TOKEN",
-        "FADEN_BACKEND_PII_SERVICE_TOKEN",
-        "FADEN_MCP_PII_SERVICE_TOKEN",
-        "FADEN_PII_SERVICE_TOKEN",
-    ),
+_TOKEN_GROUPS: tuple[tuple[str, ...], ...] = tuple(
+    module.service_token_keys for module in _MODULES if module.service_token_keys
 )
 
 
@@ -240,9 +222,7 @@ def dev_env_vars(
         # services and compose default to production.
         "FADEN_BACKEND_ENVIRONMENT": "dev",
         "FADEN_GATEWAY_ENVIRONMENT": "dev",
-        "FADEN_PII_ENVIRONMENT": "dev",
-        "FADEN_MCP_ENVIRONMENT": "dev",
-        "FADEN_SKILLS_ENVIRONMENT": "dev",
+        **_module_environments("dev"),
         # Langfuse initial admin seeding
         "LANGFUSE_INIT_USER_EMAIL": "",
         "LANGFUSE_INIT_USER_PASSWORD": "",
@@ -266,23 +246,35 @@ def dev_env_vars(
 
 
 def _dev_module_secrets() -> dict[str, str]:
-    """The PII, MCP and skills tokens and the MCP key a development stack uses."""
-    from faden_cli.core.registry import MODULES  # noqa: PLC0415
+    """Every module's tokens and keys with the development values ``faden dev up`` runs it with.
 
-    mcp, skills, pii = MODULES["mcp"], MODULES["skills"], MODULES["pii"]
-    return {
-        "FADEN_GATEWAY_PII_SERVICE_TOKEN": pii.dev_service_token,
-        "FADEN_BACKEND_PII_SERVICE_TOKEN": pii.dev_service_token,
-        "FADEN_MCP_PII_SERVICE_TOKEN": pii.dev_service_token,
-        "FADEN_PII_SERVICE_TOKEN": pii.dev_service_token,
-        "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp.dev_service_token,
-        "FADEN_BACKEND_MCP_SERVICE_TOKEN": mcp.dev_service_token,
-        "FADEN_MCP_SERVICE_TOKEN": mcp.dev_service_token,
-        "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
-        "FADEN_BACKEND_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
-        "FADEN_SKILLS_SERVICE_TOKEN": skills.dev_service_token,
-        "FADEN_MCP_ENCRYPTION_KEY": dict(mcp.dev_settings)["ENCRYPTION_KEY"],
-    }
+    A token group holds the module's ``dev_service_token``; a key of its own (``FADEN_MCP_ENCRYPTION_KEY``)
+    the module's development setting of that name (``ENCRYPTION_KEY`` in its ``dev_settings``).
+    """
+    values: dict[str, str] = {}
+    for module in _MODULES:
+        prefix = f"FADEN_{module.name.upper()}_"
+        settings = dict(module.dev_settings)
+        for group in module.secret_groups:
+            if group == module.service_token_keys:
+                value = module.dev_service_token
+            else:
+                value = settings[next(key for key in group if key.startswith(prefix)).removeprefix(prefix)]
+            values.update(dict.fromkeys(group, value))
+    return values
+
+
+def _module_secrets() -> dict[str, str]:
+    """A random value for each module secret group, the same for every key in it."""
+    values: dict[str, str] = {}
+    for group in _MODULE_SECRET_GROUPS:
+        values.update(dict.fromkeys(group, _random_secret()))
+    return values
+
+
+def _module_environments(environment: str) -> dict[str, str]:
+    """What each module runs as (``FADEN_<NAME>_ENVIRONMENT``): ``dev`` or ``production``."""
+    return {f"FADEN_{module.name.upper()}_ENVIRONMENT": environment for module in _MODULES}
 
 
 # ── Production defaults (random secrets) ──────────────────────────
@@ -301,16 +293,13 @@ def default_env_vars(
     minio_password = _random_password(24)
 
     # Inter-service auth tokens. One random value per downstream service,
-    # written to all three env vars (api → service, backend → service,
+    # written to every env var of its group (api → service, backend → service,
     # service receiver) so they stay in lock-step. The receiver-side
     # ``verify_service_token`` fails open when its env var is empty, so it
     # is critical that these are generated and propagated for production
-    # deployments.
-    mcp_service_token = _random_secret()
-    skills_service_token = _random_secret()
+    # deployments. The modules' groups come from the registry (_module_secrets).
     rag_service_token = _random_secret()
     internal_token = _random_secret()
-    pii_service_token = _random_secret()
 
     env = {
         # Postgres
@@ -350,33 +339,19 @@ def default_env_vars(
         "FADEN_BACKEND_GATEWAY_URL": "http://faden-gateway:8000",
         "FADEN_BACKEND_ENVIRONMENT": "production",
         "FADEN_GATEWAY_ENVIRONMENT": "production",
-        "FADEN_PII_ENVIRONMENT": "production",
-        "FADEN_MCP_ENVIRONMENT": "production",
-        "FADEN_SKILLS_ENVIRONMENT": "production",
+        **_module_environments("production"),
         "USERS_SECRET": _random_secret(),
         **DEPLOY_SETTINGS,
-        # Inter-service auth tokens (see comment above). Each pair of
-        # caller env vars must equal the receiver's env var.
-        "FADEN_GATEWAY_MCP_SERVICE_TOKEN": mcp_service_token,
-        "FADEN_BACKEND_MCP_SERVICE_TOKEN": mcp_service_token,
-        "FADEN_MCP_SERVICE_TOKEN": mcp_service_token,
-        "FADEN_GATEWAY_SKILLS_SERVICE_TOKEN": skills_service_token,
-        "FADEN_BACKEND_SKILLS_SERVICE_TOKEN": skills_service_token,
-        "FADEN_SKILLS_SERVICE_TOKEN": skills_service_token,
+        # Inter-service auth tokens (see comment above). Every caller's env var
+        # must equal the receiver's. Each module's tokens, and the keys of its
+        # own: MCP's encrypts the credentials it stores, and an install without
+        # one would run on the development key, the same for every install.
+        **_module_secrets(),
         "FADEN_BACKEND_RAG_SERVICE_TOKEN": rag_service_token,
         "FADEN_RAG_SERVICE_TOKEN": rag_service_token,
-        # The PII service takes calls on its routes only with this: its own secret, apart from the
-        # internal token, which is what it presents to the backend. It cannot be told which caller
-        # is which, so the gateway, the backend and MCP share one value.
-        "FADEN_GATEWAY_PII_SERVICE_TOKEN": pii_service_token,
-        "FADEN_BACKEND_PII_SERVICE_TOKEN": pii_service_token,
-        "FADEN_MCP_PII_SERVICE_TOKEN": pii_service_token,
-        "FADEN_PII_SERVICE_TOKEN": pii_service_token,
+        # What the PII service presents to the backend, apart from the token it expects on its own routes.
         "FADEN_BACKEND_INTERNAL_TOKEN": internal_token,
         "FADEN_PII_BACKEND_TOKEN": internal_token,
-        # Encrypts the credentials MCP stores. Without it the compose file
-        # falls back to a fixed dev key, the same for every install.
-        "FADEN_MCP_ENCRYPTION_KEY": _random_secret(),
         # Asked for by the backend before it creates the first administrator;
         # deploy sends it. Without it bootstrap is refused.
         BOOTSTRAP_TOKEN_KEY: _random_secret(),
@@ -670,8 +645,6 @@ def _key_lines(lines: list[str]) -> dict[str, int]:
 
 def _enabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
     """The settings and missing secrets that switch *names* on."""
-    from faden_cli.core.registry import MODULES  # noqa: PLC0415
-
     changes: dict[str, str] = {}
     for name in names:
         module = MODULES[name]
@@ -684,8 +657,6 @@ def _enabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> di
 
 def _disabling(current: dict[str, str], names: list[str] | tuple[str, ...]) -> dict[str, str]:
     """The switches that turn *names* off; their secrets stay."""
-    from faden_cli.core.registry import MODULES  # noqa: PLC0415
-
     return {
         key: "false"
         for name in names

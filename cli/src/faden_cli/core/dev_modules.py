@@ -1,4 +1,4 @@
-"""The optional modules -- PII, MCP, skills -- in the dev environment.
+"""The optional modules -- PII, MCP, skills, provenance -- in the dev environment.
 
 ``faden dev up`` runs the backend and gateway on the host. The modules were
 only ever wired for the container stack: each was addressed by its Docker
@@ -10,9 +10,11 @@ ports the CLI reserves for them.
 
 So they run the way the backend does: from their service directory, bound to
 127.0.0.1 (only the gateway and backend call them), each on its reserved
-port. This module works out what that takes -- which modules, their own
-settings, and what the gateway and backend need to reach them -- as plain
-dicts, so it can be tested without starting anything.
+port. Provenance has a repository of its own and runs from its checkout
+beside the core one (``../fadenstack-provenance``). This module works out
+what that takes -- which modules, their own settings, and what the gateway
+and backend need to reach them -- as plain dicts, so it can be tested
+without starting anything.
 """
 
 from __future__ import annotations
@@ -60,6 +62,11 @@ def select_modules(requested: str | None, profiles: list[str] | None) -> list[Mo
 def dev_url(module: ModuleInfo) -> str:
     """The root URL a host-run module answers on."""
     return f"http://{_HOST}:{module.port}"
+
+
+def dev_command(module: ModuleInfo) -> str:
+    """How ``dev up`` starts *module* in its directory (``uv run -m faden_pii``)."""
+    return f"uv run -m {module.dev_module or module.dev_dir}"
 
 
 def service_token(module: ModuleInfo, shared: dict[str, str]) -> str:

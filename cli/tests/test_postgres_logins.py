@@ -24,7 +24,7 @@ def test_a_new_database_gets_no_login() -> None:
     sql = "\n".join(p.read_text(encoding="utf-8") for p in sorted(INITDB.glob("*.sql"))).upper()
     statements = [line for line in sql.splitlines() if not line.strip().startswith("--")]
     assert not any("CREATE ROLE" in line or "PASSWORD" in line for line in statements)
-    for db in ("LANGFUSE", "FADEN_BACKEND", "FADEN_GATEWAY", "FADEN_MCP", "FADEN_SKILLS"):
+    for db in ("LANGFUSE", "FADEN_BACKEND", "FADEN_GATEWAY", "FADEN_MCP", "FADEN_SKILLS", "FADEN_PROVENANCE"):
         assert f"CREATE DATABASE {db};" in sql
 
 

@@ -75,6 +75,7 @@ _MIGRATOR_SERVICES: dict[str, str] = {
     "faden-gateway-migrator": "faden_gateway",
     "faden-mcp-migrator": "faden_mcp",
     "faden-skills-migrator": "faden_skills",
+    "faden-provenance-migrator": "faden_provenance",
     "faden-pii-migrator": "pii",
 }
 

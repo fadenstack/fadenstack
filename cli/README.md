@@ -30,7 +30,7 @@ upgrade the CLI and run `faden upgrade`. See
 - **Auto-tuning** — detects host CPU / RAM and computes optimal worker counts,
   DB pool sizes, and queue channel pools.
 - **Module management** — enable / disable optional services
-  (PII redaction, MCP tools, skills) via Docker Compose profiles.
+  (PII redaction, MCP tools, skills, provenance) via Docker Compose profiles.
 - **GPU detection** — `faden doctor` lists the host's GPUs; `faden deploy`
   adds the NVIDIA GPU overlay when the host has an NVIDIA runtime.
 - **Developer workflow** — clone all repos, install deps, run infra + migrations,
@@ -130,6 +130,12 @@ faden module enable pii skills    # enable modules
 faden module disable mcp          # disable a module
 ```
 
+Provenance marks AI-generated content (EU AI Act Art. 50(2)) and is on by
+default: `faden deploy` and `faden upgrade` switch it on. `faden module disable
+provenance` warns that generated content will no longer be marked, asks first
+(`--yes` for scripts), and records in faden.yaml who switched it off and when;
+upgrades then leave it off until `faden module enable provenance`.
+
 ### Configuration
 
 ```bash
@@ -166,7 +172,7 @@ faden dev init ~/projects/fadenstack --overwrite   # re-clone existing repos
 faden dev up                            # on this machine only (127.0.0.1)
 faden dev up --lan                      # on every interface, for one run
 faden dev up --backend-only
-faden dev up --modules pii,mcp,skills   # also run the optional modules
+faden dev up --modules pii,mcp,skills,provenance   # also run the optional modules
 faden dev up --local-node
 faden dev up --local-node --local-node-host ubuntu@10.0.0.12
 faden dev down
@@ -177,8 +183,11 @@ faden dev doctor
 faden dev doctor --install --yes
 ```
 
-`--modules` runs PII (8003), MCP (8007) and skills (8008) on the host beside
-the backend, and points the gateway and backend at them. Without it, the
+`--modules` runs PII (8003), MCP (8007), skills (8008) and provenance (8009)
+on the host beside the backend, and points the gateway and backend at them.
+Provenance has a repository of its own: it runs from a checkout beside the
+core one (`../fadenstack-provenance`), and without that checkout `dev up`
+says so and starts the rest. Without `--modules`, the
 modules switched on with `faden module enable` run; the others are switched
 off in the gateway and backend. See
 [What happens to a request](../docs/help/pages/administer/requests.md).

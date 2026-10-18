@@ -66,10 +66,18 @@ class ModuleInfo:
     port: int = 0
     service_url: str = ""
     env_vars: tuple[tuple[str, str], ...] = ()
+    #: Switched on for a new install (``faden deploy``) and by ``faden upgrade``, unless an administrator
+    #: switched it off (``faden module disable``, recorded in faden.yaml).
+    on_by_default: bool = False
+    #: What switching it off loses: ``faden module disable`` says it and asks before it does.
+    off_warning: str = ""
     # ── How ``faden dev up`` runs it: on the host, like the backend ──
-    #: The service directory it runs from; empty for a module dev mode
-    #: does not run.
+    #: The service directory it runs from, relative to the core checkout
+    #: (``../<name>`` for a repository checked out beside it); empty for a
+    #: module dev mode does not run.
     dev_dir: str = ""
+    #: The Python module ``uv run -m`` starts; empty: ``dev_dir``.
+    dev_module: str = ""
     #: Its own database, migrated with Alembic from ``dev_dir``.
     database: str = ""
     #: The Redis database number it uses, when it uses Redis.
@@ -90,6 +98,12 @@ class ModuleInfo:
     #: backend and the module itself all hold.
     secret_groups: tuple[tuple[str, ...], ...] = ()
 
+    @property
+    def service_token_keys(self) -> tuple[str, ...]:
+        """The secret group of its service token: ``FADEN_<NAME>_SERVICE_TOKEN`` and its callers' keys."""
+        own = f"FADEN_{self.name.upper()}_SERVICE_TOKEN"
+        return next((group for group in self.secret_groups if own in group), ())
+
 
 MODULES: dict[str, ModuleInfo] = {
     "pii": ModuleInfo(
@@ -107,6 +121,7 @@ MODULES: dict[str, ModuleInfo] = {
             ("FADEN_BACKEND_PII_ENABLED", "true"),
         ),
         dev_dir="pii",
+        dev_module="faden_pii",
         backend_url_suffix="/api",
         dev_service_token="dev-pii-service-token",
         # The spaCy model Presidio loads. Not a PyPI package, so the lock
@@ -138,6 +153,7 @@ MODULES: dict[str, ModuleInfo] = {
             ("FADEN_BACKEND_MCP_SERVICE_URL", "http://faden-mcp:8000"),
         ),
         dev_dir="mcp",
+        dev_module="faden_mcp",
         database="faden_mcp",
         redis_base=3,
         dev_service_token="dev-mcp-service-token",
@@ -170,6 +186,7 @@ MODULES: dict[str, ModuleInfo] = {
             ("FADEN_BACKEND_SKILLS_SERVICE_URL", "http://faden-skills:8000"),
         ),
         dev_dir="skills",
+        dev_module="faden_skills",
         database="faden_skills",
         redis_base=4,
         dev_service_token="dev-skills-service-token",
@@ -181,7 +198,40 @@ MODULES: dict[str, ModuleInfo] = {
             ),
         ),
     ),
+    "provenance": ModuleInfo(
+        name="provenance",
+        profile="provenance",
+        description="Provenance (marks AI-generated content, Art. 50(2))",
+        # Published as an image only (faden-provenance and faden-provenance-migrator); nothing here builds it.
+        container="faden-provenance",
+        port=8009,
+        service_url="http://faden-provenance:8000",
+        env_vars=(
+            ("FADEN_GATEWAY_PROVENANCE_ENABLED", "true"),
+            ("FADEN_GATEWAY_PROVENANCE_SERVICE_URL", "http://faden-provenance:8000"),
+            ("FADEN_BACKEND_PROVENANCE_ENABLED", "true"),
+            ("FADEN_BACKEND_PROVENANCE_SERVICE_URL", "http://faden-provenance:8000"),
+        ),
+        on_by_default=True,
+        off_warning="Generated content will no longer be marked as AI-generated (EU AI Act Art. 50(2)).",
+        # Its own repository, checked out beside the core one.
+        dev_dir="../fadenstack-provenance",
+        dev_module="faden_provenance",
+        database="faden_provenance",
+        dev_service_token="dev-provenance-service-token",  # noqa: S106 - the published development token
+        secret_groups=(
+            (
+                "FADEN_GATEWAY_PROVENANCE_SERVICE_TOKEN",
+                "FADEN_BACKEND_PROVENANCE_SERVICE_TOKEN",
+                "FADEN_PROVENANCE_SERVICE_TOKEN",
+            ),
+        ),
+    ),
 }
+
+#: The modules defined above, before any :func:`extend_modules`: every install's ``.env`` holds their
+#: secrets and settings, which core/env_gen.py derives from these entries.
+BUILTIN_MODULES: tuple[str, ...] = tuple(MODULES)
 
 # Legacy dict-of-dicts shape consumed by commands/module.py
 MODULES_COMPAT: dict[str, dict[str, str]] = {
@@ -211,6 +261,7 @@ KNOWN_PORTS: list[tuple[int, str]] = [
     (8003, "PII Service"),
     (8007, "MCP Tool Registry"),
     (8008, "Skills Registry"),
+    (8009, "Provenance"),
     # Tools
     (5050, "pgAdmin"),
     (3000, "Langfuse"),
@@ -227,6 +278,7 @@ DATABASES: list[str] = [
     "pii",
     "faden_mcp",
     "faden_skills",
+    "faden_provenance",
     "langfuse",
 ]
 
@@ -356,6 +408,7 @@ DEV_PROCESSES: list[DevProcess] = [
     DevProcess("PII", "faden_pii", "http://127.0.0.1:8003"),
     DevProcess("MCP", "faden_mcp", "http://127.0.0.1:8007"),
     DevProcess("Skills", "faden_skills", "http://127.0.0.1:8008"),
+    DevProcess("Provenance", "faden_provenance", "http://127.0.0.1:8009"),
 ]
 
 
@@ -372,6 +425,7 @@ DEV_ENDPOINTS: list[tuple[str, str]] = [
     ("PII", "http://127.0.0.1:8003"),
     ("MCP Registry", "http://127.0.0.1:8007"),
     ("Skills Registry", "http://127.0.0.1:8008"),
+    ("Provenance", "http://127.0.0.1:8009"),
 ]
 
 #: The endpoints above that exist only while their module runs.
@@ -379,6 +433,7 @@ DEV_MODULE_ENDPOINTS: dict[str, str] = {
     "PII": "pii",
     "MCP Registry": "mcp",
     "Skills Registry": "skills",
+    "Provenance": "provenance",
 }
 
 

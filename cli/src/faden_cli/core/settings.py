@@ -78,6 +78,10 @@ class FadenConfig:
     update_channel: str = "stable"
     #: Where the release feed is read; empty: fadenstack.com. A mirror for sites without internet.
     update_feed_url: str = ""
+    #: Modules on by default that an administrator switched off (``faden module disable``), with who and
+    #: when: ``{name: {"by": OS user, "at": ISO time}}``. Deploy and upgrade leave them off;
+    #: ``faden module enable`` removes the entry.
+    modules_switched_off: dict[str, dict[str, str]] = field(default_factory=dict)
     dev: DevConfig = field(default_factory=DevConfig)
 
     # ── Derived paths ─────────────────────────────────────────
