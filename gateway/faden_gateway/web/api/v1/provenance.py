@@ -44,6 +44,9 @@ from faden_gateway.web.api.v1.views import _get_json_payload
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+#: What a check may send: a file of up to 20 MiB (the engine's limit), in base64, and the JSON around it.
+VERIFY_MAX_BODY_BYTES = 20 * 1024 * 1024 * 4 // 3 + 64 * 1024
+
 #: How the content placed came from a model's output (contract ``provenance/v1``).
 EditKind = Literal[
     "generated", "rewritten", "summarised", "translated", "corrected", "formatted", "extracted",
@@ -237,7 +240,7 @@ async def provenance_anchors(request: Request) -> Response:
 async def _verify(request: Request) -> Response:
     client = _engine(request)
     try:
-        body = VerifyBody.model_validate(await _get_json_payload(request))
+        body = VerifyBody.model_validate(await _get_json_payload(request, max_bytes=VERIFY_MAX_BODY_BYTES))
     except ValidationError as exc:
         return _invalid(exc)
     try:

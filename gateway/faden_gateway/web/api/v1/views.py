@@ -1101,22 +1101,23 @@ def _request_id(request: Request) -> str:
     return header_val or str(uuid.uuid4())
 
 
-async def _get_json_payload(request: Request) -> dict[str, Any]:
+async def _get_json_payload(request: Request, *, max_bytes: int | None = None) -> dict[str, Any]:
+    limit = max_bytes or settings.request_max_body_bytes
     content_length = request.headers.get("content-length")
     if content_length:
         try:
-            if int(content_length) > settings.request_max_body_bytes:
+            if int(content_length) > limit:
                 raise GatewayError(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status_code=413,
                     message="Request body exceeds size limit.",
                     code="request_too_large",
                 )
         except ValueError:
             pass
     body = await request.body()
-    if len(body) > settings.request_max_body_bytes:
+    if len(body) > limit:
         raise GatewayError(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,
             message="Request body exceeds size limit.",
             code="request_too_large",
         )

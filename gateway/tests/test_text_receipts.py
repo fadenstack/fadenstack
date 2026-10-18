@@ -12,6 +12,7 @@ sign-in.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import uuid
@@ -1210,6 +1211,21 @@ async def test_a_check_the_engine_cannot_do_says_why(
     engine.fail = answer
     r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)), json={"text": LONG})
     assert (r.status_code, r.json()["error"]["code"]) == (status, code), r.text
+
+
+@pytest.mark.anyio
+async def test_a_picture_larger_than_a_chat_request_may_be_checked(
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    """A chat request is held to 2 MB; a check takes a file of up to 20 MB, in base64."""
+    picture = base64.b64encode(b"0" * (3 * 1024 * 1024)).decode()
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)),
+                          json={"file": picture, "media_type": "image/png"})
+    assert r.status_code == 200, r.text
+    too_big = base64.b64encode(b"0" * (21 * 1024 * 1024)).decode()
+    r = await client.post(VERIFY_URL, headers=_headers(_login_token(USER)),
+                          json={"file": too_big, "media_type": "image/png"})
+    assert r.status_code == 413
 
 
 @pytest.mark.anyio
