@@ -15,12 +15,16 @@ endpoints alone.
 
 They are offered only to a route whose model answers with tool calls
 (``node_metadata["tools"]``); vLLM refuses a request that offers tools
-otherwise.
+otherwise. And only to someone with something to search
+(:func:`has_something_to_search`): a person who may read no document, or an
+agent whose collections hold none, got the tools anyway, and a model's first
+call was a search that failed.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass
@@ -33,6 +37,8 @@ from faden_gateway.settings import settings
 
 if TYPE_CHECKING:
     from faden_gateway.services.gateway.auth import AuthContext
+
+logger = logging.getLogger(__name__)
 
 SEARCH = "knowledge_search"
 OPEN = "knowledge_open"
@@ -56,6 +62,54 @@ def reader_token(auth: AuthContext) -> str | None:
     if auth.knowledge is not None:
         claims["collections"] = list(auth.knowledge)
     return jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm or "HS256")
+
+
+#: How long the answer to "has this person anything to search" is kept. The tools are offered on every chat
+#: turn, and the answer is a call to the backend: kept, it costs one small call a minute.
+SEARCHABLE_TTL_S = 60.0
+#: A check that failed is asked again sooner; until then the tools are offered, as before there was a check.
+SEARCHABLE_RETRY_S = 15.0
+_SEARCHABLE_MAX = 10_000
+#: (person, an agent's collections) -> (whether there is anything to search, until when that holds).
+_searchable: dict[tuple[str, tuple[str, ...] | None], tuple[bool, float]] = {}
+
+#: A knowledge tool's answer when there is nothing to search: not an error, the model moves on.
+NOTHING_TO_SEARCH = json.dumps({"results": [], "note": "There is nothing in the knowledge base to search."})
+#: Beside a search's empty results.
+NOTHING_FOUND = "Nothing in the knowledge base matched this search."
+
+
+async def has_something_to_search(
+    client: RagLiteClient, auth: AuthContext, *, now: float | None = None,
+) -> bool:
+    """Whether *auth*'s person -- within an agent's collections -- has anything in the knowledge base.
+
+    Asked of the backend once a minute per person and collections, not on every turn. A check that fails
+    answers yes: the tools are offered as before, and a search that then fails tells the model so.
+    """
+    key = (str(auth.user_id), auth.knowledge)
+    moment = time.monotonic() if now is None else now
+    kept = _searchable.get(key)
+    if kept is not None and kept[1] > moment:
+        return kept[0]
+    try:
+        answer, ttl = await client.searchable(api_token=reader_token(auth)), SEARCHABLE_TTL_S
+    except Exception as exc:  # the chat goes on without the answer
+        logger.warning("Could not tell whether user %s has anything to search: %r", auth.user_id, exc)
+        answer, ttl = True, SEARCHABLE_RETRY_S
+    if len(_searchable) >= _SEARCHABLE_MAX and key not in _searchable:
+        for stale in [k for k, (_, until) in _searchable.items() if until <= moment]:
+            del _searchable[stale]
+        if len(_searchable) >= _SEARCHABLE_MAX:  # still full: the answer that ends soonest goes
+            del _searchable[min(_searchable, key=lambda k: _searchable[k][1])]
+    _searchable[key] = (answer, moment + ttl)
+    return answer
+
+
+def forget_searchable() -> None:
+    """Forgets every answer to whether there is anything to search (tests)."""
+    _searchable.clear()
+
 
 #: Passages a search returns at most, whatever the model asks for.
 _MAX_RESULTS = 10
@@ -146,7 +200,7 @@ class KnowledgeTools:
             raise ValueError("knowledge_search needs a query.")
         top_k = max(1, min(int(arguments.get("top_k") or 5), _MAX_RESULTS))
         results = await self._client.search(query=query, top_k=top_k, api_token=self._token)
-        return json.dumps({
+        answer: dict[str, Any] = {
             "query": query,
             "results": [
                 {
@@ -158,7 +212,10 @@ class KnowledgeTools:
                 }
                 for r in results
             ],
-        })
+        }
+        if not results:  # said in words: the model tells the user, and goes on without it
+            answer["note"] = NOTHING_FOUND
+        return json.dumps(answer)
 
     async def _open(self, arguments: dict[str, Any]) -> str:
         # The model chose it, and it goes into a URL path: an id, or nothing.

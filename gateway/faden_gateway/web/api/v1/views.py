@@ -124,14 +124,7 @@ def get_gateway_service(
         mcp_tool_cache = _shared_tool_cache(request, mcp_client)
 
     # Skills client (optional - when Skills module is enabled in registry)
-    skills_client: SkillsClient | None = None
-    skills_url = service_registry.get_url("skills")
-    if skills_url and settings.skills_service_token:
-        skills_client = SkillsClient(
-            base_url=skills_url,
-            http_client=request.app.state.http_client,
-            service_token=settings.skills_service_token,
-        )
+    skills_client = skills_client_for(request)
 
     # RAG Lite client (optional - when RAG Lite is enabled)
     from faden_gateway.services.gateway.rag_lite_client import RagLiteClient  # noqa: PLC0415
@@ -187,6 +180,18 @@ def get_gateway_service(
     )
     service.stream_buffer = _stream_buffer(request)
     return service
+
+
+def skills_client_for(request: Request) -> SkillsClient | None:
+    """The skills service's client; ``None`` with the Skills module off or no service token for it."""
+    skills_url = service_registry.get_url("skills")
+    if not skills_url or not settings.skills_service_token:
+        return None
+    return SkillsClient(
+        base_url=skills_url,
+        http_client=request.app.state.http_client,
+        service_token=settings.skills_service_token,
+    )
 
 
 def _stream_buffer(request: Request) -> StreamBuffer:

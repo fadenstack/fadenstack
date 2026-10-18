@@ -50,7 +50,13 @@ from faden_gateway.services.gateway.auth import (
 from faden_gateway.services.gateway.errors import GatewayError, error_from, error_response
 from faden_gateway.services.gateway.pii_policy import VALID_EGRESS_MODES, mode_switch_allowed
 from faden_gateway.services.gateway.service import GatewayService
-from faden_gateway.web.api.v1.views import get_gateway_service, serve_chat_completions, serve_images
+from faden_gateway.services.gateway.skills_client import SkillsUnavailableError
+from faden_gateway.web.api.v1.views import (
+    get_gateway_service,
+    serve_chat_completions,
+    serve_images,
+    skills_client_for,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -387,6 +393,8 @@ async def agent_profile(
             ),
         },
         "ui": profile.ui,
+        # Whether the Skills module runs here: the SDK shows a skill picker (GET .../skills) only then.
+        "skills": skills_client_for(request) is not None,
         # The signed-in user's own settings every client shares: the language they picked (or ``None``).
         "user": {"language": language},
         "extensions": profile.extensions,
@@ -416,6 +424,74 @@ async def agent_models(
         return JSONResponse(await service.list_models(auth))
     except GatewayError as exc:
         return _error(exc)
+
+
+# -- skills ---------------------------------------------------------------------------
+
+#: How many skills one list holds at most, and by default.
+SKILLS_LIMIT_MAX = 100
+SKILLS_LIMIT_DEFAULT = 50
+#: The longest search for a skill.
+SKILLS_QUERY_MAX = 200
+
+
+def _skills_query(request: Request) -> tuple[str | None, int]:
+    """The list's ``q`` and ``limit``, refused in the gateway's error shape when out of bounds."""
+    query = (request.query_params.get("q") or "").strip() or None
+    if query is not None and len(query) > SKILLS_QUERY_MAX:
+        raise GatewayError(
+            status_code=400,
+            message=f"q may be {SKILLS_QUERY_MAX} characters at most.",
+            code="invalid_query",
+            param="q",
+        )
+    raw = (request.query_params.get("limit") or "").strip()
+    try:
+        limit = int(raw) if raw else SKILLS_LIMIT_DEFAULT
+    except ValueError:
+        limit = 0
+    if not 1 <= limit <= SKILLS_LIMIT_MAX:
+        raise GatewayError(
+            status_code=400,
+            message=f"limit must be a whole number from 1 to {SKILLS_LIMIT_MAX}.",
+            code="invalid_query",
+            param="limit",
+        )
+    return query, limit
+
+
+@router.get("/v1/agents/{agent}/skills")
+async def agent_skills(
+    request: Request,
+    caller: Annotated[tuple[AuthContext, AgentRequest], Depends(agent_request)],
+) -> dict[str, Any]:
+    """The skills its person may pick in the agent's chats (a chat request's ``skills``), for a picker.
+
+    What the console chat's picker lists for them -- their own, the tenant's, those shared with them or one
+    of their groups; published and switched on -- and only what a picker shows, never their instructions.
+    ``q`` searches, ``limit`` (1-100, 50) bounds the list. With no Skills module on this server the list is
+    empty and ``available`` false.
+    """
+    auth, agent = caller
+    query, limit = _skills_query(request)
+    client = skills_client_for(request)
+    if client is None:
+        return {"object": "list", "available": False, "data": []}
+    resolver = getattr(request.app.state, "group_membership_resolver", None)
+    groups = tuple(await resolver.resolve(auth.user_id) or ()) if resolver is not None else ()
+    try:
+        found = await client.list_usable(
+            tenant_id=auth.tenant_id, user_id=auth.user_id, group_ids=groups, query=query, limit=limit,
+        )
+    except SkillsUnavailableError as exc:
+        logger.warning("Could not list the skills of user %s for agent %s: %s", auth.user_id, agent.id, exc)
+        raise GatewayError(
+            status_code=502 if exc.reached else 503,
+            message="The skills could not be listed right now; try again.",
+            error_type="server_error",
+            code="skills_unavailable",
+        ) from exc
+    return {"object": "list", "available": True, "data": [dataclasses.asdict(skill) for skill in found]}
 
 
 # -- events -------------------------------------------------------------------------

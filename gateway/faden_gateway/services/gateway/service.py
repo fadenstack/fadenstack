@@ -1049,6 +1049,9 @@ class _Prepared:
     released: bool = False
     #: Whether the knowledge tools were offered to the model.
     knowledge: bool = False
+    #: Whether the caller has anything in the knowledge base to search; ``None``: not asked, as the tools
+    #: could not be offered anyway. With nothing, they are not offered, and a call of one is told so.
+    knowledge_to_search: bool | None = None
     #: Attached files too long to include, which the model can search.
     attachments: list[attachment_search.SearchableFile] = field(default_factory=list)
     #: The tools the gateway ran, for the audit log, and in how many rounds.
@@ -2210,7 +2213,13 @@ class GatewayService:
         # before the lookups below: the session step uses the same database
         # session, which cannot run two queries at once.
         file_types = await self._chat_file_types(auth, session_id) if chat and self.skills_client else []
-        (payload, req.session_id, req.project_id), req.skills, mcp_tools, req.group_id = await _together(
+        (
+            (payload, req.session_id, req.project_id),
+            req.skills,
+            mcp_tools,
+            req.group_id,
+            req.knowledge_to_search,
+        ) = await _together(
             self._inject_session_context(
                 payload, auth, session_id, req=req if searchable else None, saved=req.user_message_ids,
                 # Sent before the answer, to a client that asked for the events.
@@ -2230,6 +2239,9 @@ class GatewayService:
             else _value([]),
             self.mcp_tool_cache.get_tools(auth.tenant_id) if chat and self.mcp_tool_cache else _value(None),
             self.usage_groups.resolve(auth.user_id) if self.usage_groups else _value(None),
+            # Asked before the slot, beside the lookups above; kept a minute (knowledge.py), so most
+            # turns wait for nothing.
+            self._knowledge_to_search(req, auth, payload, candidates) if chat else _value(None),
         )
         insert_skill = (
             _insert_before_question if settings.session_skills_position == "tail" else _insert_after_system
@@ -2316,7 +2328,7 @@ class GatewayService:
                     egress = self._merge_mcp_tools(egress, _switched_on(req), auth.tenant_id)
             else:
                 req.mcp_on = set()
-            if self._offers_knowledge(req.decision.candidate, payload):
+            if self._offers_knowledge(req, req.decision.candidate, payload):
                 egress = _with_tools(egress, knowledge.TOOLS)
                 req.knowledge = True
             if req.attachments:
@@ -2942,6 +2954,9 @@ class GatewayService:
                 "error": f"The tool {name} is not available to this agent. Do not call it again; "
                 "use only the tools you were given.",
             }), True
+        if name in knowledge.NAMES and req.knowledge_to_search is False:
+            # Not offered, as there is nothing to search: a model that calls it anyway hears so, no error.
+            return knowledge.NOTHING_TO_SEARCH, False
         can_find = req.system_tools and bool(req.mcp_findable)
         if name == system_tools.FIND and req.system_tools:
             return self._find_tools(req, arguments)
@@ -3012,19 +3027,42 @@ class GatewayService:
         req.mcp_changed = False
         return _with_mcp_tools(payload, _switched_on(req))
 
-    def _offers_knowledge(self, candidate: Any, payload: dict[str, Any]) -> bool:
-        """Whether the model gets the knowledge tools.
-
-        When RAG Lite is on, the client has not ruled tools out, and the
-        route's model answers with tool calls -- vLLM refuses a request that
-        offers tools otherwise.
-        """
+    def _knowledge_on(self, payload: dict[str, Any]) -> bool:
+        """Whether a request may get the knowledge tools at all: RAG Lite is on, the client allows tools."""
         return (
             self.rag_lite_client is not None
             and settings.rag_lite_enabled
             and not settings.rag_enabled
             and payload.get("tool_choice") != "none"
+        )
+
+    async def _knowledge_to_search(
+        self, req: _Prepared, auth: AuthContext, payload: dict[str, Any], candidates: list[Any],
+    ) -> bool | None:
+        """Whether the caller has anything to search (knowledge.py); ``None``: the tools cannot be offered.
+
+        Not asked when no route the request may take calls tools, or the agent's limit rules the search out.
+        """
+        if (
+            not self._knowledge_on(payload)
+            or not any(knowledge.calls_tools(c) for c in candidates)
+            or _agent_refuses(req, knowledge.SEARCH)
+        ):
+            return None
+        assert self.rag_lite_client is not None  # noqa: S101
+        return await knowledge.has_something_to_search(self.rag_lite_client, auth)
+
+    def _offers_knowledge(self, req: _Prepared, candidate: Any, payload: dict[str, Any]) -> bool:
+        """Whether the model gets the knowledge tools.
+
+        When RAG Lite is on, the client has not ruled tools out, the route's
+        model answers with tool calls -- vLLM refuses a request that offers
+        tools otherwise -- and the caller has something to search.
+        """
+        return (
+            self._knowledge_on(payload)
             and knowledge.calls_tools(candidate)
+            and req.knowledge_to_search is True
         )
 
     def _router_session(self, session_id: str | None) -> uuid.UUID | None:

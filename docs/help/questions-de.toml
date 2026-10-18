@@ -36,6 +36,12 @@
 "Was fragt der Browser-Agent, bevor er handelt?" = "what-it-asks-first"
 "Welche Berechtigungen braucht er im Browser?" = "permissions-it-asks-for"
 "Wie ändere ich die Sprache der Seitenleiste im Browser?" = "language-and-settings"
+"Wie übersetze ich eine Webseite oder eine Markierung in Chrome?" = "quick-actions"
+"Kann der Assistent Text verbessern, den ich in ein Webformular geschrieben habe?" = "quick-actions"
+"Wie schicke ich dem Assistenten einen Screenshot?" = "ask-about-a-page"
+"Wie nutze ich einen Skill in der Seitenleiste des Browsers?" = "skills"
+"Kann der Assistent in Chrome im Web suchen?" = "web-search"
+"Warum hat die Antwort angehalten, als ich die Seitenleiste geschlossen habe?" = "what-it-asks-first"
 
 ["use/office-add-ins.md"]
 "Wie nutze ich den Assistenten in Word, Excel, PowerPoint oder Outlook?" = "open-the-agent-and-sign-in"

@@ -11,14 +11,15 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 import jwt
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from faden_backend.db.dao.rag_lite_dao import RagLiteChunkDAO
+from faden_backend.db.dao.rag_lite_dao import CollectionScope, RagLiteChunkDAO
 from faden_backend.db.dao.rbac_dao import RbacDAO
 from faden_backend.db.models.groups import Group, UserGroup
 from faden_backend.db.models.rag_lite import (
@@ -35,7 +36,9 @@ from faden_backend.db.models.rag_lite import (
 )
 from faden_backend.db.models.users import User, current_active_user
 from faden_backend.services import knowledge_access
+from faden_backend.services.rag_lite.embedding import EmbeddingClient
 from faden_backend.settings import settings
+from faden_backend.web.api.admin.rag_lite import views as rag_lite_views
 
 API = "/api/admin/rag"
 #: Every chunk's and the query's: each chunk is as near as the next, so a search returns all it may see.
@@ -201,6 +204,25 @@ async def test_an_empty_scope_finds_nothing_not_everything(world: World, dbsessi
     assert await RagLiteChunkDAO(dbsession).search_lexical("holiday", top_k=10, scope=scope) == []
 
 
+async def test_whether_there_is_anything_to_search_follows_the_scope(world: World, dbsession: AsyncSession) -> None:
+    chunks = RagLiteChunkDAO(dbsession)
+    empty = RagLiteCollection(id=uuid.uuid4(), name="Empty")
+    dbsession.add(empty)
+    await dbsession.flush()
+
+    async def anything(user: User, only: set[uuid.UUID] | None = None) -> bool:
+        reader = await knowledge_access.reader_for(dbsession, user, only=frozenset(only) if only else None)
+        return await chunks.any_searchable(scope=await knowledge_access.search_scope(dbsession, reader))
+
+    assert await anything(world.bob), "the handbook, and what is in no collection"
+    assert await anything(world.alice, {world.hr.id}), "HR is granted to alice's group"
+    assert not await anything(world.bob, {world.hr.id}), "HR is hidden from bob"
+    assert not await anything(world.alice, {empty.id}), "a collection with no document"
+    assert not await anything(world.alice, {uuid.uuid4()}), "no such collection"
+    bob = await knowledge_access.search_scope(dbsession, await knowledge_access.reader_for(dbsession, world.bob))
+    assert not await chunks.any_searchable([world.hr.id], bob), "asked for a collection bob may not read"
+
+
 # ---------------------------------------------------------------------------
 # The endpoints
 # ---------------------------------------------------------------------------
@@ -295,6 +317,40 @@ async def test_an_agent_reads_only_its_collections(
     assert (await client.get(f"{API}/documents/{world.unfiled_doc.id}", headers=agent)).status_code == 404
 
 
+async def test_the_gateway_asks_as_the_person_whether_there_is_anything_to_search(
+    world: World, fastapi_app: FastAPI, client: AsyncClient,
+) -> None:
+    fastapi_app.dependency_overrides[knowledge_access.optional_active_user] = lambda: None
+
+    async def searchable(token: str) -> bool:
+        r = await client.get(f"{API}/searchable", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200, r.text
+        return r.json()["searchable"]
+
+    assert await searchable(_knowledge_token(world.bob)) is True
+    assert await searchable(_knowledge_token(world.alice, [str(world.hr.id)])) is True
+    assert await searchable(_knowledge_token(world.bob, [str(world.hr.id)])) is False, "an agent of bob's on HR"
+
+
+async def test_a_search_with_nothing_to_search_finds_nothing_and_needs_no_embedding_model(
+    world: World, fastapi_app: FastAPI, client: AsyncClient,
+) -> None:
+    """The tests' database has no embedding model: every search here was a 500."""
+    fastapi_app.dependency_overrides[knowledge_access.optional_active_user] = lambda: None
+    fastapi_app.state.rag_lite_service = None  # not reached: the check, or the embedding model, ends the search
+    as_bob = {"Authorization": f"Bearer {_knowledge_token(world.bob)}"}
+
+    hidden = await client.post(
+        f"{API}/search", json={"query": "salary", "collection_ids": [str(world.hr.id)]}, headers=as_bob,
+    )
+    assert hidden.status_code == 200, hidden.text
+    assert hidden.json() == {"query": "salary", "results": []}
+
+    found = await client.post(f"{API}/search", json={"query": "holiday"}, headers=as_bob)
+    assert found.status_code == 503, "something to search and nothing to search it with: said, not a 500"
+    assert "embedding model" in found.json()["detail"]
+
+
 async def test_a_knowledge_token_is_refused_once_expired_or_for_an_inactive_person(
     world: World, fastapi_app: FastAPI, client: AsyncClient, dbsession: AsyncSession,
 ) -> None:
@@ -368,3 +424,78 @@ async def test_ingest_jobs_load_with_their_events_and_keep_to_the_reader(
     assert (await client.get(f"{API}/jobs/{jobs['hr.txt'].id}")).status_code == 404
     seen = {j["id"] for j in (await client.get(f"{API}/jobs")).json()}
     assert str(jobs["handbook.txt"].id) in seen and str(jobs["hr.txt"].id) not in seen
+
+
+# ---------------------------------------------------------------------------
+# Nothing to search: the endpoints alone, without a database
+# ---------------------------------------------------------------------------
+
+#: What the reader may see, as ``search_scope`` would say.
+_SCOPE = CollectionScope(frozenset({uuid.uuid4()}), unfiled=True)
+
+
+class _Chunks:
+    """The chunk DAO as the search endpoints use it: whether there is anything to search."""
+
+    def __init__(self, *, anything: bool) -> None:
+        self.anything = anything
+        self.session = None
+        self.asked: list[tuple[list[uuid.UUID] | None, CollectionScope | None]] = []
+
+    async def any_searchable(
+        self, collection_ids: list[uuid.UUID] | None = None, scope: CollectionScope | None = None,
+    ) -> bool:
+        self.asked.append((collection_ids, scope))
+        return self.anything
+
+
+def _knowledge_app(monkeypatch: pytest.MonkeyPatch, chunks: _Chunks) -> FastAPI:
+    """The knowledge endpoints alone, for a reader who may see :data:`_SCOPE`; no embedding model is set up."""
+
+    async def scope(_session: Any, _reader: Any) -> CollectionScope:
+        return _SCOPE
+
+    async def no_settings(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    async def no_model(*_args: Any, **_kwargs: Any) -> EmbeddingClient:
+        raise ValueError("No embedding-capable providers configured.")
+
+    monkeypatch.setattr(rag_lite_views, "search_scope", scope)
+    monkeypatch.setattr(rag_lite_views, "refresh_runtime_values", no_settings)
+    monkeypatch.setattr(EmbeddingClient, "auto_detect", no_model)
+    app = FastAPI()
+    app.include_router(rag_lite_views.router, prefix=API)
+    app.dependency_overrides[knowledge_access.knowledge_reader] = lambda: knowledge_access.KnowledgeReader(uuid.uuid4())
+    app.dependency_overrides[RagLiteChunkDAO] = lambda: chunks
+    return app
+
+
+async def test_nothing_to_search_is_an_empty_answer_and_no_embedding_model_a_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The query was embedded first: with no embedding model set up, a search of nothing was a 500."""
+    chunks = _Chunks(anything=False)
+    app = _knowledge_app(monkeypatch, chunks)  # and no RAG Lite service: an empty search needs none
+    asked_for = uuid.uuid4()
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+        r = await client.post(f"{API}/search", json={"query": "salary", "collection_ids": [str(asked_for)]})
+        assert r.status_code == 200, r.text
+        assert r.json() == {"query": "salary", "results": []}
+        assert chunks.asked == [([asked_for], _SCOPE)], "within what the reader may see, and what was asked for"
+
+        chunks.anything = True
+        app.state.rag_lite_service = object()
+        r = await client.post(f"{API}/search", json={"query": "salary"})
+        assert r.status_code == 503, r.text
+        assert "embedding model" in r.json()["detail"]
+
+
+async def test_the_gateway_learns_whether_there_is_anything_to_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    chunks = _Chunks(anything=False)
+    app = _knowledge_app(monkeypatch, chunks)
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+        assert (await client.get(f"{API}/searchable")).json() == {"searchable": False}
+        chunks.anything = True
+        assert (await client.get(f"{API}/searchable")).json() == {"searchable": True}
+    assert chunks.asked == [(None, _SCOPE), (None, _SCOPE)]

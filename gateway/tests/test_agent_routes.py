@@ -18,6 +18,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
+import httpx
 import jwt
 import pytest
 from fastapi import FastAPI
@@ -50,6 +51,7 @@ from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdap
 from faden_gateway.services.gateway.service import GatewayService, _agent_tools, _Prepared
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.registry import service_registry
+from faden_gateway.settings import settings
 from tests.test_gateway_pipeline_combined import (
     ALIAS,
     TEST_JWT_SECRET,
@@ -851,6 +853,136 @@ async def test_the_profile_carries_what_the_sdk_caches_not_the_instructions(
     assert profile["required_client_modules"] == []
     assert profile["edition"] == "community" and "agents" in profile["features"]
     assert profile["user"] == {"language": None}
+    assert profile["skills"] is False, "no Skills module here: the SDK shows no skill picker"
+
+
+# -- the skills its person may pick -------------------------------------------------------------
+
+SKILLS_URL = "/v1/agents/eplan-assistant/skills"
+SKILL_ID = str(uuid.uuid4())
+#: A row of the skills service's list, all of it: the picker gets five fields of it.
+SKILL_ROW = {
+    "id": SKILL_ID, "tenant_id": "tenant-a", "name": "Code review", "slug": "code-review",
+    "description": "Reviews a diff.", "owner_id": USER, "visibility": "private", "activation": "manual",
+    "status": "published", "enabled": True, "priority": 50, "tags": ["dev"], "latest_version": 2,
+    "published_version": 2, "created_by": USER, "created_at": "2026-10-01T08:00:00Z",
+    "updated_at": "2026-10-02T08:00:00Z", "access": "owner", "body_markdown": "Look for off-by-one errors.",
+}
+
+
+class _SkillsService:
+    """The skills service as the gateway reaches it over HTTP: what it was asked, and how it answers."""
+
+    def __init__(self) -> None:
+        self.asked: list[httpx.Request] = []
+        self.status = 200
+        self.down = False
+
+    def answer(self, request: httpx.Request) -> httpx.Response:
+        self.asked.append(request)
+        if self.down:
+            raise httpx.ConnectError("Connection refused", request=request)
+        return httpx.Response(self.status, json={"items": [SKILL_ROW], "total": 1, "offset": 0, "limit": 50})
+
+
+@pytest.fixture
+async def skills_service(fastapi_app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[_SkillsService]:
+    """The Skills module on, its service faked behind the app's HTTP client; off again afterwards."""
+    fake = _SkillsService()
+    service_registry.configure("skills", enabled=True, url="http://skills.local")
+    monkeypatch.setattr(settings, "skills_service_token", "skills-token")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake.answer)) as http:
+        monkeypatch.setattr(fastapi_app.state, "http_client", http)
+        yield fake
+    service_registry.configure("skills", enabled=False, url=None)
+
+
+@pytest.mark.anyio
+async def test_the_skills_a_user_may_pick_are_listed_as_the_user_with_their_groups(
+    client: AsyncClient, backend: _Backend, skills_service: _SkillsService,
+) -> None:
+    backend.groups[USER] = (TEAM,)
+    r = await client.get(SKILLS_URL, params={"q": "review", "limit": "20"}, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "object": "list",
+        "available": True,
+        "data": [{"id": SKILL_ID, "slug": "code-review", "name": "Code review", "description": "Reviews a diff.",
+                  "activation": "manual"}],
+    }
+    assert "off-by-one" not in r.text, "never a skill's instructions"
+
+    [asked] = skills_service.asked
+    assert (asked.method, asked.url.host, asked.url.path) == ("GET", "skills.local", "/api/skills")
+    assert dict(asked.url.params) == {"usable": "true", "q": "review", "limit": "20"}
+    assert asked.headers["authorization"] == "Bearer skills-token"
+    assert (asked.headers["x-faden-user"], asked.headers["x-faden-groups"], asked.headers["x-faden-tenant"]) == (
+        USER, TEAM, "tenant-a",
+    )
+    assert asked.headers["x-faden-caps"] == "", "no capabilities: what a chat may be given, never as an administrator"
+
+
+@pytest.mark.anyio
+async def test_the_skills_list_takes_fifty_by_default_and_refuses_bounds_it_does_not_keep(
+    client: AsyncClient, backend: _Backend, skills_service: _SkillsService,
+) -> None:
+    r = await client.get(SKILLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert dict(skills_service.asked[0].url.params) == {"usable": "true", "limit": "50"}
+    assert skills_service.asked[0].headers["x-faden-groups"] == "", "in no group"
+
+    for params, param in (({"limit": "101"}, "limit"), ({"limit": "0"}, "limit"), ({"limit": "many"}, "limit"),
+                          ({"q": "x" * 201}, "q")):
+        r = await client.get(SKILLS_URL, params=params, headers=_headers())
+        assert r.status_code == 400, params
+        assert (r.json()["error"]["code"], r.json()["error"]["param"]) == ("invalid_query", param)
+    assert len(skills_service.asked) == 1, "a refused list asks nothing"
+
+
+@pytest.mark.anyio
+async def test_without_the_skills_module_the_list_is_empty_and_the_profile_says_so(
+    client: AsyncClient, backend: _Backend,
+) -> None:
+    r = await client.get(SKILLS_URL, headers=_headers())
+    assert r.status_code == 200, r.text
+    assert r.json() == {"object": "list", "available": False, "data": []}
+    profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert profile.json()["skills"] is False
+
+
+@pytest.mark.anyio
+async def test_with_the_skills_module_the_profile_offers_a_picker(
+    client: AsyncClient, backend: _Backend, skills_service: _SkillsService,
+) -> None:
+    profile = await client.get("/v1/agents/eplan-assistant/profile", headers=_headers())
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["skills"] is True
+    assert skills_service.asked == [], "the profile does not list them"
+
+
+@pytest.mark.anyio
+async def test_a_failing_skills_service_is_a_gateway_error_not_a_500(
+    client: AsyncClient, backend: _Backend, skills_service: _SkillsService,
+) -> None:
+    skills_service.status = 500
+    r = await client.get(SKILLS_URL, headers=_headers())
+    assert r.status_code == 502, r.text
+    assert r.json()["error"]["code"] == "skills_unavailable" and r.json()["error"]["type"] == "server_error"
+
+    skills_service.down = True
+    r = await client.get(SKILLS_URL, headers=_headers())
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "skills_unavailable"
+
+
+@pytest.mark.anyio
+async def test_only_those_who_may_use_the_agent_list_its_skills(
+    client: AsyncClient, backend: _Backend, skills_service: _SkillsService,
+) -> None:
+    outsider = _agent_token(sub="44444444-4444-4444-4444-444444444444")
+    assert (await client.get(SKILLS_URL, headers=_headers(outsider))).status_code == 403
+    assert (await client.get(SKILLS_URL)).status_code == 401
+    assert skills_service.asked == []
 
 
 # -- the user's settings ------------------------------------------------------------------------
