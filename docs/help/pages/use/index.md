@@ -14,6 +14,7 @@ Fadenstack is your organisation's own AI assistant. You chat with the models you
 | **Ask about your organisation's documents**: the model can search the knowledge base your administrator filled | [Knowledge](knowledge.md) |
 | **Work in Chrome** with the browser agent, which reads the page you are on | [The browser agent](browser-agent.md) |
 | **Work in Office** with the add-ins for Word, Excel, PowerPoint and Outlook | [Office add-ins](office-add-ins.md) |
+| **Check content**: find out whether a text, a picture or a file carries the mark of AI-generated content | [Checking content](checking-content.md) |
 
 ## Before you start
 

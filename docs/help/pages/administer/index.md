@@ -68,4 +68,5 @@ the module is on.
 
 **Provenance** is on from the start: it marks generated content as AI-generated, as the EU AI Act requires
 (Art. 50(2)). Switching it off explains what stops being marked, asks you to confirm, and is recorded in the
-audit log with your name and the time.
+audit log with your name and the time. What it marks, and the public check page, are on
+[Content marking](content-marking.md).

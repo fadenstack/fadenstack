@@ -268,7 +268,7 @@ One module is on from the start: `provenance` marks the content Fadenstack gener
 marks, as the EU AI Act requires (Art. 50(2)). `faden deploy` switches it on in a new installation and `faden upgrade`
 in an existing one. `faden module disable provenance` explains what stops being marked, asks you to confirm, and
 records who switched it off and when; `faden upgrade` then leaves it off. Its records are kept as long as they are
-needed and go into every backup.
+needed and go into every backup. What it marks is on [Content marking](../administer/content-marking.md).
 
 ## Everyday commands
 

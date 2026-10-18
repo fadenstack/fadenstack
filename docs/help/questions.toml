@@ -51,6 +51,12 @@
 "Where does my data from Office go?" = "where-your-data-goes"
 "How do I change the language of the Office pane?" = "language-and-settings"
 
+["use/checking-content.md"]
+"How do I check whether a text or a picture was made by AI?" = "check-a-text-a-picture-or-a-file"
+"What does the result of a content check mean?" = "read-the-result"
+"Does \"No mark found\" mean a person wrote it?" = "read-the-result"
+"Can someone without an account check a picture or a file?" = "without-an-account"
+
 ["use/privacy.md"]
 "Who can see my chats?" = "who-can-see-what"
 "Can other people or administrators read my chats?" = "who-can-see-what"
@@ -125,6 +131,12 @@
 "How do I change the privacy policy?" = "change-the-policy"
 "How do I block or allow tools?" = "tool-rules"
 "What do people see when a request is stopped?" = "what-people-see-when-something-is-stopped"
+
+["administer/content-marking.md"]
+"How is AI-generated content marked (EU AI Act)?" = "what-is-marked"
+"Why does an answer carry no text watermark?" = "text-answers"
+"How do I offer a public page to check pictures and files?" = "the-public-check-page"
+"Can I switch content marking off?" = "switch-it-off-or-on-again"
 
 ["administer/requests.md"]
 "What happens to a request on its way to the model?" = "six-things-happen-to-every-request"

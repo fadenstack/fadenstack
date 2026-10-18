@@ -345,6 +345,7 @@ const PAGES: PageHelpDef[] = [
     prefix: "/admin/check-content",
     id: "check_content",
     actions: ["check", "verdict", "download", "public"],
+    doc: "use/checking-content",
   },
   {
     prefix: "/admin/settings",

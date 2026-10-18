@@ -29,7 +29,7 @@ Es listet die Variablen und ihren Zustand auf, nie die Schlüssel selbst.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert (das Hugging-Face-Token, der TLS-Schlüssel, Geheimnisse der Wissensdatenbank, die Tokens der Ray-Cluster), die API-Schlüssel externer Provider und die privaten Schlüssel der Zertifizierungsstelle für die Maschinen |
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Header und die Umgebung der MCP-Server: Bearer-Tokens und API-Schlüssel. Nur, wo das MCP-Modul eingeschaltet ist |
-| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS`, `FADEN_PROVENANCE_WATERMARK_KEYS` | Was erzeugte Inhalte als KI-generiert kennzeichnet: Der Schlüssel, der die Kennzeichnungen signiert, bekommt einen neuen Schlüssel und ein neues Zertifikat von der Zertifizierungsstelle der Installation; die Hash-Schlüssel und die Schlüssel des Text-Wasserzeichens bekommen eine neue Version, und jede ältere bleibt, damit früher gekennzeichnete Inhalte weiter geprüft werden können. Ein Modell, das gerade läuft, behält seinen Wasserzeichen-Schlüssel, bis es das nächste Mal startet. Nur, wo das Modul Provenance eingeschaltet ist |
+| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS`, `FADEN_PROVENANCE_WATERMARK_KEYS` | Was erzeugte Inhalte als KI-generiert kennzeichnet: Der Schlüssel, der die Kennzeichnungen signiert, bekommt einen neuen Schlüssel und ein neues Zertifikat von der Zertifizierungsstelle der Installation; die Hash-Schlüssel und die Schlüssel des Text-Wasserzeichens bekommen eine neue Version, und jede ältere bleibt, damit früher gekennzeichnete Inhalte weiter geprüft werden können. Ein Modell, das gerade läuft, behält seinen Wasserzeichen-Schlüssel, bis es das nächste Mal startet. Nur, wo das Modul Herkunftsnachweis eingeschaltet ist (siehe [Kennzeichnung KI-generierter Inhalte](../administer/content-marking.md#keys)) |
 | `FADEN_GATEWAY_ENCRYPTION_KEY` | Die Chats: Nachrichten, Titel, Gedächtnis und Anhangsnotizen. Nach dem Erneuern dieses Schlüssels werden unverschlüsselt gespeicherte Chats mit dem neuen versiegelt (siehe unten) |
 
 Nicht erneuert werden:
@@ -64,7 +64,7 @@ Es listet die Schlüssel auf, die es erneuern wird, und fragt nach (`-y` übersp
 
 | Option | Was sie bewirkt |
 |---|---|
-| `--only settings`, `--only mcp`, `--only chat` | Nur diesen Schlüssel erneuern. Die Option lässt sich für zwei wiederholen. Standard: jeder Schlüssel, den die Installation verwendet |
+| `--only settings`, `--only mcp`, `--only chat`, `--only provenance` | Nur diesen Schlüssel erneuern. Die Option lässt sich für zwei wiederholen. Standard: jeder Schlüssel, den die Installation verwendet |
 | `--resume` | Eine abgebrochene Erneuerung zu Ende führen. Den Befehl erneut auszuführen bewirkt dasselbe |
 | `--skip-unreadable` | Gespeicherte Werte, die weder der neue noch der alte Schlüssel öffnet, unverändert lassen, statt anzuhalten |
 | `-y` | Nicht nachfragen |

@@ -28,7 +28,7 @@ It lists the variables and their state, never the keys themselves.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | The secrets the console stores (the Hugging Face token, the TLS key, secrets of the knowledge base, the tokens of Ray clusters), the API keys of remote providers, and the private keys of the machine certificate authority |
 | `FADEN_MCP_ENCRYPTION_KEY` | The headers and environment of MCP servers: bearer tokens and API keys. Only where the MCP module is on |
-| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS`, `FADEN_PROVENANCE_WATERMARK_KEYS` | What marks generated content as AI-generated: the key that signs the marks gets a new key and certificate from the install's authority; the hash keys and the text watermark keys get a new version, and every older version stays, so marks made before can still be checked. A model running now keeps its watermark key until it next starts. Only where the provenance module is on |
+| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS`, `FADEN_PROVENANCE_WATERMARK_KEYS` | What marks generated content as AI-generated: the key that signs the marks gets a new key and certificate from the install's authority; the hash keys and the text watermark keys get a new version, and every older version stays, so marks made before can still be checked. A model running now keeps its watermark key until it next starts. Only where the provenance module is on (see [Content marking](../administer/content-marking.md#keys)) |
 | `FADEN_GATEWAY_ENCRYPTION_KEY` | The chats: messages, titles, memory and attachment notes. After a rotation of this key, chats stored in plain text are sealed with the new one (see below) |
 
 These are not rotated:
@@ -62,7 +62,7 @@ It lists the keys it will rotate and asks for confirmation (`-y` skips it).
 
 | Option | What it does |
 |---|---|
-| `--only settings`, `--only mcp`, `--only chat` | Rotate just that key. Repeat the option for two. Default: every key the install uses |
+| `--only settings`, `--only mcp`, `--only chat`, `--only provenance` | Rotate just that key. Repeat the option for two. Default: every key the install uses |
 | `--resume` | Finish a rotation that stopped. Running the command again does the same |
 | `--skip-unreadable` | Leave stored values that neither the new nor the old key opens as they are, instead of stopping |
 | `-y` | Do not ask |

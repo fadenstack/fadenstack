@@ -49,6 +49,12 @@
 "Wohin gehen meine Daten aus Office?" = "where-your-data-goes"
 "Wie ändere ich die Sprache des Bereichs in Office?" = "language-and-settings"
 
+["use/checking-content.md"]
+"Wie prüfe ich, ob ein Text oder ein Bild von einer KI stammt?" = "check-a-text-a-picture-or-a-file"
+"Was bedeutet das Ergebnis einer Inhaltsprüfung?" = "read-the-result"
+"Heißt „Keine Kennzeichnung gefunden“, dass ein Mensch es geschrieben hat?" = "read-the-result"
+"Kann jemand ohne Konto ein Bild oder eine Datei prüfen?" = "without-an-account"
+
 ["use/privacy.md"]
 "Wer kann meine Chats sehen?" = "who-can-see-what"
 "Können andere Personen oder Administratoren meine Chats lesen?" = "who-can-see-what"
@@ -123,6 +129,12 @@
 "Wie ändere ich die Datenschutz-Richtlinie?" = "change-the-policy"
 "Wie sperre oder erlaube ich Tools?" = "tool-rules"
 "Was sehen Benutzer, wenn eine Anfrage gestoppt wird?" = "what-people-see-when-something-is-stopped"
+
+["administer/content-marking.md"]
+"Wie werden KI-generierte Inhalte gekennzeichnet (KI-Verordnung)?" = "what-is-marked"
+"Warum trägt eine Antwort kein Text-Wasserzeichen?" = "text-answers"
+"Wie biete ich eine öffentliche Seite zum Prüfen von Bildern und Dateien an?" = "the-public-check-page"
+"Kann ich die Kennzeichnung ausschalten?" = "switch-it-off-or-on-again"
 
 ["administer/requests.md"]
 "Was passiert mit einer Anfrage auf dem Weg zum Modell?" = "six-things-happen-to-every-request"

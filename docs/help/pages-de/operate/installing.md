@@ -287,7 +287,8 @@ KI-generiert und prüft solche Kennzeichnungen, wie es die KI-Verordnung verlang
 schaltet es in einer neuen Installation ein, `faden upgrade` in einer bestehenden. `faden module disable provenance`
 erklärt, was dann nicht mehr gekennzeichnet wird, fragt nach einer Bestätigung und hält fest, wer es wann
 ausgeschaltet hat; `faden upgrade` lässt es danach aus. Seine Nachweise bleiben erhalten, solange sie gebraucht
-werden, und gehen in jede Sicherung ein.
+werden, und gehen in jede Sicherung ein. Was es kennzeichnet, steht unter
+[Kennzeichnung KI-generierter Inhalte](../administer/content-marking.md).
 
 ## Befehle für den Alltag {#everyday-commands}
 
