@@ -492,7 +492,8 @@ def record_certification(path: Path, report_path: Path, *, channel: str = "stabl
         "checks_passed": sum(1 for c in checks if str(c["status"]).upper() == "PASS"),
         "checks_total": len(checks),
         "timestamp": report.get("timestamp"),
-        "detail": f"{report.get('target') or 'certification run'}: {', '.join(sorted(ran))}",
+        # How many machines ran it, never their addresses: the manifest is published.
+        "detail": f"{report.get('target') or 'certification run'}: {len(ran)} machines",
     }
     _save(path, manifest)
     return manifest
