@@ -537,3 +537,37 @@ async def test_serve_on_the_network_is_recorded_where_it_listens(
     dep = await dbsession.get(InferenceDeployment, uuid.UUID("e783c0c2-cde1-4385-9d2e-08ea4bd2a52e"))
     run = dep.observed_status_json["last_run"]
     assert "model_tls" not in run and run["serve_http"] == {"host": "0.0.0.0", "port": 8000}
+
+
+@pytest.mark.anyio
+async def test_a_watermark_key_is_sealed_in_the_command_and_opened_only_for_the_machine(dbsession: AsyncSession) -> None:
+    """The console's command pages (viewer, operator) never show the key; the machine still gets it."""
+    from faden_backend.db.dao.node_control_dao import NodeControlDAO
+    from faden_backend.services.nodes.service import NodeControlService
+
+    node = InfraNode(agent_id=f"a-{uuid.uuid4().hex[:6]}", host="10.0.0.1", status="healthy")
+    dbsession.add(node)
+    await dbsession.commit()
+    service = NodeControlService(NodeControlDAO(dbsession), pepper="p", enrollment_ttl_minutes=10,
+                                 default_command_timeout_sec=60)
+    engine = {"max_model_len": 4096, "watermark_config": {"algorithm": "gumbel", "context_width": 4,
+                                                          "key": 8314559120734552031}}
+    payload = {"app_name": "faden-x", "llm_serving_args": {"llm_configs": [{"engine_kwargs": engine}]}}
+    command = await service.issue_command(
+        node_id=node.id, command_type=NodeCommandType.RUN_SERVE_APP.value, payload=payload, issued_by=None,
+        correlation_id=None, timeout_sec=60, idempotency_key=uuid.uuid4().hex,
+    )
+    await dbsession.commit()
+
+    assert "8314559120734552031" not in str(command.payload_json), "never stored in plain text"
+    shown = service.serialize_command(command)["payload"]["llm_serving_args"]["llm_configs"][0]["engine_kwargs"]
+    assert shown["watermark_config"] == {"algorithm": "gumbel", "context_width": 4, "key_sealed": "sealed"}
+    timeline = await service.get_command_timeline(command_id=command.id)
+    assert "8314559120734552031" not in str(timeline)
+
+    sent = await service.list_commands_for_dispatch(node_id=node.id)
+    config = sent[0]["payload"]["llm_serving_args"]["llm_configs"][0]["engine_kwargs"]["watermark_config"]
+    assert config == {"algorithm": "gumbel", "context_width": 4, "key": 8314559120734552031}
+    assert payload["llm_serving_args"]["llm_configs"][0]["engine_kwargs"]["watermark_config"]["key"] == (
+        8314559120734552031
+    ), "the caller's document is left as it was"

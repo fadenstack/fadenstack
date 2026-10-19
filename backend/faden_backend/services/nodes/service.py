@@ -35,6 +35,7 @@ from faden_backend.services.llm.monitoring import (
     deprovision_for_runtime,
     provision_for_runtime,
 )
+from faden_backend.services.nodes import payload_secrets
 from faden_backend.services.nodes.wakeup import get_command_notifier
 from faden_backend.services.nodes.auth import constant_time_equal, hash_with_pepper, random_secret
 
@@ -782,6 +783,8 @@ class NodeControlService:
             # an option is refused here, also for a runtime saved before the
             # API checked it.
             check_runtime_images(payload)
+        # A watermark key in a model's engine settings is stored sealed (payload_secrets).
+        payload = payload_secrets.seal(payload) or payload
         node = await self._dao.get_node_by_id(node_id)
         if node is None:
             raise ValueError("Node not found.")
@@ -842,7 +845,7 @@ class NodeControlService:
                 )
             elif not unacked:
                 continue
-            items.append(self.serialize_command(command))
+            items.append(self.serialize_command(command, for_machine=True))
         return items
 
     async def list_dispatchable_commands(self, *, node_id: uuid.UUID, limit: int = 50) -> list[dict[str, Any]]:
@@ -874,7 +877,7 @@ class NodeControlService:
                 message="Command re-dispatched (still in flight past timeout).",
                 payload_json=None,
             )
-            item = self.serialize_command(command)
+            item = self.serialize_command(command, for_machine=True)
             # Mark as server-driven re-dispatch so a new agent skips only the
             # fresh-command age check (an overdue in-flight command is by
             # definition older than the 5-minute freshness bound and would
@@ -1943,7 +1946,10 @@ class NodeControlService:
         }
 
     @staticmethod
-    def serialize_command(command: InfraNodeCommand) -> dict[str, Any]:
+    def serialize_command(command: InfraNodeCommand, *, for_machine: bool = False) -> dict[str, Any]:
+        """The command as the API shows it; *for_machine*, as it is sent to the machine (secrets opened)."""
+        shown = payload_secrets.for_machine if for_machine else payload_secrets.for_people
+        payload = shown(command.payload_json)
         return {
             "id": str(command.id),
             "node_id": str(command.node_id),
@@ -1951,7 +1957,7 @@ class NodeControlService:
             "status": command.status,
             "correlation_id": command.correlation_id,
             "idempotency_key": command.idempotency_key,
-            "payload": command.payload_json,
+            "payload": payload,
             "result": command.result_json,
             "timeout_sec": command.timeout_sec,
             "error_code": command.error_code,

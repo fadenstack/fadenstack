@@ -1205,7 +1205,7 @@ async def system_node_stream(websocket: WebSocket) -> None:
         queued = {item["id"] for item in commands}
         for command in replay:
             if str(command.id) not in queued:
-                commands.append(service.serialize_command(command) | {"redispatch": True})
+                commands.append(service.serialize_command(command, for_machine=True) | {"redispatch": True})
         profile_payload = await service.get_node_profile(node_id=_node_id)
         await websocket.send_json(
             {
