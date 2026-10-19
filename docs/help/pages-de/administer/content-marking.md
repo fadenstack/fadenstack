@@ -62,9 +62,12 @@ Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was da
 - Antworten externer Provider. Anthropic kennzeichnet die Antworten seiner Modelle selbst; der Beleg vermerkt das;
 - Antworten einer Bereitstellung, für die ein Superuser das Wasserzeichen ausgeschaltet hat.
 
-!!! note "Dieselbe Frage, dieselbe Antwort"
-    Mit dem Text-Wasserzeichen ist die Wortwahl des Modells an den Schlüssel gebunden. Wer genau dieselbe Frage
-    noch einmal stellt, bekommt deshalb meist genau dieselbe Antwort.
+!!! note "Dieselbe Frage, eine neue Antwort"
+    Mit dem Text-Wasserzeichen ist die Wortwahl des Modells an den Schlüssel gebunden, sodass genau dieselbe
+    Anfrage genau dieselbe Antwort bekäme. Fadenstack variiert deshalb jede Anfrage an ein Modell mit
+    Wasserzeichen unsichtbar: Ein neuer Versuch bringt eine neue Antwort, wie ohne Wasserzeichen, und eine Anfrage
+    mit `seed` bekommt für denselben Seed dieselbe Antwort. Mehrere Antworten auf eine Anfrage (`n`) gibt es nur
+    ohne Streaming.
 
 ## Die Runtime entscheidet {#the-runtime-decides}
 

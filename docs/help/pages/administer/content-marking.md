@@ -56,9 +56,11 @@ These answers carry no text watermark, and their receipt records which of these 
 - answers of remote providers. Anthropic marks its own models' answers; the receipt says so;
 - answers of a deployment for which a superuser switched the watermark off.
 
-!!! note "The same question, the same answer"
-    With the text watermark, the model's choice of words is keyed. Asking exactly the same question again
-    therefore tends to give exactly the same answer.
+!!! note "The same question, a new answer"
+    With the text watermark, the model's choice of words is keyed, so exactly the same request would get exactly
+    the same answer. Fadenstack therefore varies each request to a watermarking model invisibly: trying again
+    gives a new answer, as it does without the watermark, and a request with a `seed` gets the same answer
+    for the same seed. Several answers to one request (`n`) come only without streaming.
 
 ## The runtime decides
 
