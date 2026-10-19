@@ -105,6 +105,16 @@ class PlacementBody(BaseModel):
     edit_kind: EditKind
     length_class: Literal["short", "medium", "long"]
     layers: list[LayerOutcome] = Field(max_length=32)
+    #: False for a write the host failed after the record was signed: the engine marks the record not written.
+    written: bool = True
+    #: With ``written`` false: the host error's name as a short code, never its message.
+    failure: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.:-]{1,64}$")
+
+    @model_validator(mode="after")
+    def _failure_only_unwritten(self) -> PlacementBody:
+        if self.failure is not None and self.written:
+            raise ValueError("A failure goes with written false only.")
+        return self
 
 
 class VerifyBody(BaseModel):
@@ -219,7 +229,9 @@ async def agent_provenance_placement(
     except ValidationError as exc:
         return _invalid(exc)
     try:
-        await client.report_placement(body.model_dump(mode="json"), agent=agent.id)
+        # The two fields only for a write that failed: an engine from before them takes every other report.
+        left_out = set() if not body.written else {"written", "failure"}
+        await client.report_placement(body.model_dump(mode="json", exclude=left_out), agent=agent.id)
     except ProvenanceRequestError as exc:
         raise _failed(exc, "keep the placement") from exc
     return JSONResponse({"stored": True}, status_code=status.HTTP_202_ACCEPTED)

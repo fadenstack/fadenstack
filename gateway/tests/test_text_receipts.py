@@ -1068,6 +1068,26 @@ async def test_a_placement_is_kept_for_the_agent(
     r = await client.post(PLACEMENTS_URL, headers=_headers(), json=exempt)
     assert r.status_code == 202, "exempt content has no record"
     assert engine.bodies[PLACEMENTS][-1]["record_id"] is None
+    assert "written" not in engine.bodies[PLACEMENTS][-1], "a written placement is sent as before the field"
+
+
+@pytest.mark.anyio
+async def test_a_write_that_failed_is_kept_as_not_written(
+    client: AsyncClient, backend: Any, engine: _Engine,  # noqa: F811 - the fixture
+) -> None:
+    """The host failed the write after the record was signed: the engine marks the record not written."""
+    failed = {**PLACEMENT, "written": False, "failure": "FileBusyError"}
+    r = await client.post(PLACEMENTS_URL, headers=_headers(), json=failed)
+    assert r.status_code == 202, r.text
+    assert engine.bodies[PLACEMENTS][-1]["written"] is False
+    assert engine.bodies[PLACEMENTS][-1]["failure"] == "FileBusyError"
+    for wrong in (
+        {**PLACEMENT, "failure": "FileBusyError"},  # a failure goes with written false only
+        {**PLACEMENT, "written": False, "failure": "The file is busy. Try again."},  # a code, never a message
+        {**PLACEMENT, "written": False, "failure": "x" * 65},
+    ):
+        r = await client.post(PLACEMENTS_URL, headers=_headers(), json=wrong)
+        assert r.status_code == 400, wrong
 
 
 @pytest.mark.anyio
