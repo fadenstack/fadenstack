@@ -237,6 +237,21 @@ async def test_a_template_refusal_behind_ray_serve_goes_again_too() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.usefixtures("fresh_memory")
+async def test_a_template_refusal_after_a_long_traceback_goes_again() -> None:
+    """Ray Serve's 500 starts with a traceback; the template's words come after 2000 characters (.22, 2026-10-19)."""
+    seen: list[httpx.Request] = []
+    refusal = "Traceback (most recent call last):\n" + "  File \"x.py\", line 1, in f\n" * 120 + (
+        "vllm.exceptions.VLLMValidationError: System message must be at the beginning."
+    )
+    async with _refusing_engine(seen, refusal=refusal, status=500) as http:
+        out = await _stream(LLMAdapter(http_client=http), payload={"model": "qwen3.8", "messages": LATE_SYSTEM})
+    assert len(refusal) > 2000
+    assert b"ok" in b"".join(out)
+    assert len(seen) == 2
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("fresh_memory")
 async def test_any_other_500_is_not_sent_again() -> None:
     seen: list[httpx.Request] = []
     async with _refusing_engine(seen, refusal="CUDA out of memory", status=500) as http:

@@ -528,6 +528,8 @@ class _TlsRefusedError(Exception):
     """A model this gateway cannot reach securely yet (``upstream_tls.MACHINE_TLS_NOT_LOADED`` says why)."""
 
 
+#: How much of an engine's refusal is read to see whether one change may cure it (``_try_again``).
+_REFUSAL_READ = 64 * 1024
 #: Refusals before a stream starts that one change may cure (``_try_again``): a 400, or a template's 500.
 _MAY_GO_AGAIN = (litellm.exceptions.BadRequestError, litellm.exceptions.InternalServerError)
 #: What a caller is told when the model's chat template refused the request, and going again did not help.
@@ -866,9 +868,12 @@ class LLMAdapter:
                             client.stream("POST", url, json=body, headers=headers, timeout=timeout),
                         )
                     if response.status_code >= 400:
-                        detail = (await response.aread()).decode("utf-8", errors="replace")[:2000]
+                        # Read whole for the retry: Ray Serve's 500 puts a traceback first and the template's
+                        # refusal after it, past what the log and the client are given.
+                        refusal = (await response.aread())[:_REFUSAL_READ].decode("utf-8", errors="replace")
+                        detail = refusal[:2000]
                         again = None if tries == _RETRIES else _try_again(
-                            response.status_code, detail, body, str(kwargs["model"]),
+                            response.status_code, refusal, body, str(kwargs["model"]),
                         )
                         if again is not None:
                             # Refused before a byte went to the client: again,
