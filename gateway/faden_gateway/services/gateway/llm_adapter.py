@@ -937,7 +937,7 @@ class LLMAdapter:
             result = await self._non_stream_completion(**kwargs)
         return result
 
-    async def _non_stream_completion(self, **kwargs: Any) -> CompletionResult:
+    async def _non_stream_completion(self, **kwargs: Any) -> CompletionResult:  # noqa: PLR0911 - one per failure
         """Execute a non-streaming completion.
 
         The whole answer has to be written before a byte comes back, so the wait is the one for a whole
@@ -964,6 +964,18 @@ class LLMAdapter:
             )
         except litellm.exceptions.InternalServerError as exc:
             return _internal_error_result(exc)
+        except litellm.exceptions.Timeout:
+            waited = kwargs["timeout"]
+            logger.warning("A whole answer was not done within %g s", waited)
+            return CompletionResult(
+                status_code=504,
+                payload=_error_payload(
+                    "server_error",
+                    f"The model did not finish its answer within {waited:g} s. A long answer comes through "
+                    "when it is streamed (stream: true).",
+                    code="upstream_timeout",
+                ),
+            )
         except Exception:
             logger.exception("LiteLLM completion failed")
             return CompletionResult(

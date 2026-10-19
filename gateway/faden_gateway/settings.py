@@ -172,8 +172,11 @@ class Settings(BaseSettings):
     litellm_request_timeout: float = 60.0
     # How long a reply that is not streamed may take in all. It arrives only
     # when the whole answer is written, which for a model that thinks first is
-    # often more than a minute; the edge and the backend wait 300 s for it.
-    non_stream_timeout_sec: float = 300.0
+    # often minutes: the 27B on the DGX pair writes about 8 tokens a second, so
+    # a thinking turn of 2,500 tokens ran past the 300 s this was. The edge
+    # waits a little longer on /v1/ (shared/nginx/locations.conf), so that a
+    # client gets the gateway's own words, not the edge's 504.
+    non_stream_timeout_sec: float = 1200.0
     # How long a reply streamed straight from vLLM may take to start, for a
     # model that sets no wait of its own (its deployment's
     # ``service.first_token_timeout_sec``). The engine sends nothing while a
