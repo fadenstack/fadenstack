@@ -45,8 +45,8 @@ from faden_backend.services.inference.drivers.ray.environment import RayEnvironm
 from faden_backend.services.inference.drivers.ray.schemas import NEW_CLUSTER_PORTS
 from tests.platform_fixtures import DGX_SPARK_PLATFORM
 
-#: The runtime a DGX Spark pair gets: the GB10 flavor's default.
-GB10_RUNTIME = "faden-ray-vllm-gb10-ray2.58-vllm0.29.0"
+#: The runtime a DGX Spark pair gets: the GB10 flavor's default, whichever runtime the manifests make it.
+GB10_RUNTIME = next(b for b in default_bundle_registry.defaults() if b.startswith("faden-ray-vllm-gb10-"))
 
 API = "/api/inference"
 

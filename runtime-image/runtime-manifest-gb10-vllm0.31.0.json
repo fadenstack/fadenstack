@@ -1580,11 +1580,73 @@
   ],
   "certification": {
     "hardware_target": "NVIDIA DGX Spark / GB10",
-    "overall_status": "uncertified",
-    "checks": [],
-    "checks_passed": 0,
-    "checks_total": 0,
-    "timestamp": null,
-    "detail": "built; certify it on its hardware before the catalogue points at it"
+    "overall_status": "passed",
+    "channel": "stable",
+    "checks": [
+      {
+        "name": "Head GPU Detection",
+        "status": "PASS",
+        "detail": "NVIDIA GB10 | Compute Cap: 12.1 | 79.7GB free / 121.7GB total"
+      },
+      {
+        "name": "Direct NIC enp1s0f1np1",
+        "status": "PASS",
+        "detail": "Interface is UP with IP 10.100.0.1 (Speed: 200000 Mb/s)"
+      },
+      {
+        "name": "Direct Interconnect Link (10.100.0.2)",
+        "status": "PASS",
+        "detail": "Point-to-point 200Gb/s route from 10.100.0.1 to 10.100.0.2 verified on enp1s0f1np1"
+      },
+      {
+        "name": "Ray Head Startup",
+        "status": "PASS",
+        "detail": "Ray Head active on 10.100.0.1:6389 (metrics port 8089)"
+      },
+      {
+        "name": "Two-Node Cluster Formation",
+        "status": "PASS",
+        "detail": "2 nodes online: ['10.100.0.2', '10.100.0.1'] | GPUs: 2.0 GB10 | CPUs: 40.0"
+      },
+      {
+        "name": "Cross-Node Distributed GPU Tasks",
+        "status": "PASS",
+        "detail": "Tasks completed across: [{'task_id': 0, 'hostname': 'spark-ts3202', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92724.15}, {'task_id': 1, 'hostname': 'spark-3201', 'device_id': 0, 'device_name': 'NVIDIA GB10', 'bf16_norm': 92758.23}]"
+      },
+      {
+        "name": "Distributed Ray Serve Health (TP=2)",
+        "status": "PASS",
+        "detail": "Ray Serve LLM application is RUNNING and deployment is HEALTHY across both nodes"
+      },
+      {
+        "name": "Distributed OpenAI Completion",
+        "status": "PASS",
+        "detail": "Response: '\"Two-node DGX Spark cluster certified!\"'"
+      },
+      {
+        "name": "Distributed OpenAI Streaming",
+        "status": "PASS",
+        "detail": "Streamed tokens: \"I'm sorry, but I don't understand what you're asking for. Could you please provide more\""
+      },
+      {
+        "name": "Distributed Text Watermark (Gumbel)",
+        "status": "PASS",
+        "detail": "400 tokens; with its key p=5.63e-98 (400 scored, found); with another key p=8.72e-01 (not found)"
+      },
+      {
+        "name": "Distributed Serve Teardown",
+        "status": "PASS",
+        "detail": "TP=2 application deleted and Serve controller shutdown cleanly"
+      },
+      {
+        "name": "Cluster Prometheus Metrics Export",
+        "status": "PASS",
+        "detail": "Successfully scraped 2 nodes: ['10.100.0.2', '10.100.0.1']"
+      }
+    ],
+    "checks_passed": 12,
+    "checks_total": 12,
+    "timestamp": "2026-10-19T19:46:38Z",
+    "detail": "NVIDIA DGX Spark Two-Node Pair (GB10): 10.88.10.49, 10.88.10.71"
   }
 }

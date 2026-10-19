@@ -63,7 +63,7 @@ Today:
 | Manifest | Base | vLLM | Certified | Channel |
 |---|---|---|---|---|
 | `runtime-manifest-gb10-vllm0.29.0.json` | vLLM 0.29.0 (`vllm/vllm-openai`) | 0.29.0 (+ `vllm_compat.py`) | passed 11/11 | stable |
-| `runtime-manifest-gb10-vllm0.31.0.json` | vLLM 0.31.0 (`vllm/vllm-openai`) | 0.31.0 (+ `vllm_compat.py`), text watermarking | no | none recorded |
+| `runtime-manifest-gb10-vllm0.31.0.json` | vLLM 0.31.0 (`vllm/vllm-openai`) | 0.31.0 (+ `vllm_compat.py`), text watermarking | passed 12/12, the watermark too | stable, the GB10 default |
 | `runtime-manifest-x86_64.json` | python:3.12 slim | 0.26.0 | no | stable |
 
 ## The manifests are minted, not written
