@@ -9,6 +9,9 @@ never an error for the person asking.
 content check. They return the engine's answer or raise :class:`EngineError`, which carries the HTTP status
 and the code the backend answers with. What is sent to be checked is never logged: not here, not in an
 error.
+
+``not_written`` (``GET /api/v1/provenance/records/not-written``): the records whose write an agent reported
+as failed, for an auditor debugging an agent.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
+from urllib.parse import urlencode
 
 import httpx
 
@@ -122,6 +126,7 @@ async def engine_info(
 
 VERIFY_PATH = "/api/v1/provenance/verify"
 ANCHORS_PATH = "/api/v1/provenance/anchors"
+NOT_WRITTEN_PATH = "/api/v1/provenance/records/not-written"
 
 #: The largest file the engine checks (its ``max_image_bytes``); a text is held to the same, in UTF-8.
 MAX_CONTENT_BYTES = 20 * 1024 * 1024
@@ -252,5 +257,25 @@ async def anchors(
     """The engine's ``Anchors`` (its signing chains, the CAs and the detector), or :class:`EngineError`."""
     return await _ask(
         "GET", ANCHORS_PATH, body=None, required=("signing_chains", "trust_anchors", "detector"),
+        base_url=base_url, token=token, timeout_sec=timeout_sec, transport=transport,
+    )
+
+
+async def not_written(
+    *,
+    since: str | None = None,
+    limit: int = 50,
+    base_url: str | None = None,
+    token: str | None = None,
+    timeout_sec: float = 10.0,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> dict[str, Any]:
+    """The records whose write an agent reported as failed, newest first (``NotWrittenRecords``).
+
+    Kept for debugging an agent: ids, times, agent, tool, the host error's code; never a hash or content.
+    """
+    query = urlencode({"limit": limit, **({"since": since} if since else {})})
+    return await _ask(
+        "GET", f"{NOT_WRITTEN_PATH}?{query}", body=None, required=("records",),
         base_url=base_url, token=token, timeout_sec=timeout_sec, transport=transport,
     )

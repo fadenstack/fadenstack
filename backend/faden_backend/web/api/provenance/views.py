@@ -4,13 +4,17 @@ Every built-in role has the right. A text, a picture or a file goes to the engin
 comes back as it is (``VerifyResult``): the verdict in plain words and what each layer found, signed when
 asked for (to download, CoP 2.1.2). 30 checks a minute per person; content up to 20 MB. Nothing submitted is
 kept or logged.
+
+``/records/not-written``, with ``audit:read``: the records whose write an agent reported as failed. They are
+kept (a write reported as failed may have gone through in part) and not counted as placed.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
@@ -59,5 +63,29 @@ async def content_check_verify(
     body = await read_check_body(request)
     try:
         return await engine.verify(body.engine_body())
+    except engine.EngineError as exc:
+        raise refuse(exc.status_code, exc.code, exc.message) from None
+
+
+@router.get("/records/not-written", name="provenance_not_written")
+async def provenance_not_written(
+    _user: Annotated[User, Depends(require_permission("audit", "read"))],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    since: Annotated[datetime | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> dict[str, Any]:
+    """The records whose write an agent reported as failed, newest first: to find out what went wrong.
+
+    Each with its times, agent, model, media type, edit kind, the host error's code, and the tool and
+    place of its last placement; never a hash, a signature or content. 503 ``module_off`` while the module is
+    switched off; the engine's refusals keep their code.
+    """
+    await refresh_runtime_values(session, prefix="faden_gateway.provenance_")
+    if not settings.provenance_enabled:
+        raise refuse(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "module_off", "The provenance module is switched off.",
+        )
+    try:
+        return await engine.not_written(since=since.isoformat() if since else None, limit=limit)
     except engine.EngineError as exc:
         raise refuse(exc.status_code, exc.code, exc.message) from None
