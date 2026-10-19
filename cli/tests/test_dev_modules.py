@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from faden_cli.commands.dev import dev_up
-from faden_cli.core.dev_modules import UnknownModuleError, caller_env, module_env, select_modules
+from faden_cli.core.dev_modules import UnknownModuleError, caller_env, dev_command, module_env, select_modules
 from faden_cli.core.registry import MODULES
 
 SHARED = {"POSTGRES_USER": "postgres", "POSTGRES_PASSWORD": "devpassword", "REDIS_AUTH": "redispass"}
@@ -37,7 +37,7 @@ def test_the_flag_decides_when_given() -> None:
 
 
 def test_a_misspelt_module_is_refused_not_ignored() -> None:
-    with pytest.raises(UnknownModuleError, match="pi.*Available: pii, mcp, skills"):
+    with pytest.raises(UnknownModuleError, match="pi.*Available: pii, mcp, skills, provenance"):
         select_modules("pi", None)
 
 
@@ -93,6 +93,7 @@ def test_a_module_that_does_not_run_is_switched_off() -> None:
     assert gateway["FADEN_GATEWAY_PII_ENABLED"] == "false"
     assert gateway["FADEN_GATEWAY_MCP_ENABLED"] == "false"
     assert gateway["FADEN_GATEWAY_SKILLS_ENABLED"] == "false"
+    assert gateway["FADEN_GATEWAY_PROVENANCE_ENABLED"] == "false"
     assert "FADEN_GATEWAY_PII_SERVICE_URL" not in gateway
 
 
@@ -123,8 +124,16 @@ def test_a_module_missing_from_the_workspace_is_skipped(tmp_path: Path) -> None:
 
 
 def test_module_processes_are_recognised_as_this_workspaces_services() -> None:
-    for module in ("faden_pii", "faden_mcp", "faden_skills"):
+    for module in ("faden_pii", "faden_mcp", "faden_skills", "faden_provenance"):
         assert f"uv run -m {module}" in dev_up._SERVICE_INVOCATIONS
+
+
+def test_a_module_starts_as_the_package_it_is_not_its_directory() -> None:
+    """``uv run -m pii`` found nothing: the directory is pii, the package faden_pii."""
+    assert [dev_command(m) for m in MODULES.values()] == [
+        "uv run -m faden_pii", "uv run -m faden_mcp", "uv run -m faden_skills", "uv run -m faden_provenance",
+    ]
+    assert all(dev_command(m) in dev_up._SERVICE_INVOCATIONS for m in MODULES.values()), "and reclaims them"
 
 
 def test_what_a_module_needs_is_installed_into_the_module(

@@ -34,7 +34,15 @@ from faden_cli.core.compose import (
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
-from faden_cli.core.env_gen import _random_password, default_env_vars, ensure_bootstrap_token, read_env_file, set_env_values, write_env_file
+from faden_cli.core.env_gen import (
+    _random_password,
+    default_env_vars,
+    ensure_bootstrap_token,
+    read_env_file,
+    set_env_values,
+    set_module_env,
+    write_env_file,
+)
 from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
@@ -278,6 +286,36 @@ def retire_fixed_logins(env_path: Path) -> list[str]:
     if retired:
         success(f"Old Postgres logins with fixed passwords switched off: {', '.join(retired)}.")
     return retired
+
+
+def deploy_profiles(cfg: FadenConfig, modules: str) -> set[str]:
+    """The compose profiles a deploy runs: the config's, those *modules* asks for, and the ones on by default.
+
+    A module on by default (provenance) is switched on unless an administrator switched it off
+    (``faden module disable``, recorded in faden.yaml). Asked for by name, that record goes, as with
+    ``faden module enable``; the caller saves *cfg*.
+    """
+    from faden_cli.commands.module import default_modules  # noqa: PLC0415
+
+    known_profiles = {m["profile"] for m in KNOWN_MODULES.values()}
+    profiles: set[str] = {p for p in (cfg.profiles or []) if p in known_profiles}
+
+    if modules:
+        for mod in modules.split(","):
+            mod = mod.strip().lower()
+            if not mod:
+                continue
+            if mod not in KNOWN_MODULES:
+                warning(f"Unknown module: {mod}. Available: {', '.join(sorted(KNOWN_MODULES))}")
+                continue
+            profiles.add(KNOWN_MODULES[mod]["profile"])
+            cfg.modules_switched_off = {k: v for k, v in (cfg.modules_switched_off or {}).items() if k != mod}
+            info(f"Enabled module: {mod}")
+
+    for name in default_modules(cfg, profiles):
+        profiles.add(KNOWN_MODULES[name]["profile"])
+        info(f"Enabled module: {name} (on by default; faden module disable {name} switches it off)")
+    return profiles
 
 
 def _resolve_compose_file(install_dir: Path) -> Path | None:
@@ -636,19 +674,11 @@ def deploy_cmd(
     # ── 2. Parse requested modules ────────────────────────────────
     console.print("\n[bold cyan]Step 2: Module configuration…[/bold cyan]")
 
-    known_profiles = {m["profile"] for m in KNOWN_MODULES.values()}
-    profiles: set[str] = {p for p in (cfg.profiles or []) if p in known_profiles}
-
-    if modules:
-        for mod in modules.split(","):
-            mod = mod.strip().lower()
-            if not mod:
-                continue
-            if mod not in KNOWN_MODULES:
-                warning(f"Unknown module: {mod}. Available: {', '.join(sorted(KNOWN_MODULES))}")
-                continue
-            profiles.add(KNOWN_MODULES[mod]["profile"])
-            info(f"Enabled module: {mod}")
+    profiles = deploy_profiles(cfg, modules)
+    # Switched on by this deploy: an .env that exists gets their switches and secrets below.
+    switched_on = sorted(
+        name for name, m in KNOWN_MODULES.items() if m["profile"] in profiles - set(cfg.profiles or [])
+    )
 
     if profiles:
         console.print(f"  Active profiles: [bold]{', '.join(sorted(profiles))}[/bold]")
@@ -666,6 +696,9 @@ def deploy_cmd(
 
         for note in fill_required_env(env_path, profiles=sorted(profiles)):
             warning(note)
+        # A new .env is written with the modules' settings; this one gets those of the modules switched on now.
+        if switched_on:
+            set_module_env(env_path, enable=switched_on)
     else:
         env_vars = default_env_vars(profiles=sorted(profiles))
         write_env_file(env_path, env_vars, preserve_secrets=not force_env)
@@ -752,6 +785,10 @@ def deploy_cmd(
         names=tls_names,
         ca=tls_ca,
     )
+    # The provenance engine's signing certificate, from the authority above, and its hash keys (into .env).
+    from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+    provenance_keys_step(shared_dir, env_path)
 
     # ── 3e. New releases ──────────────────────────────────────────
     update_check_step(env_path, cfg, choice=update_check, yes=yes)

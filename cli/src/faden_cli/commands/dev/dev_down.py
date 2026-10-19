@@ -68,6 +68,7 @@ _DEV_PROCESS_PATTERNS: list[tuple[str, list[str]]] = [
     ("PII", ["m faden_pii"]),
     ("MCP", ["m faden_mcp"]),
     ("Skills", ["m faden_skills"]),
+    ("Provenance", ["m faden_provenance"]),
 ]
 
 

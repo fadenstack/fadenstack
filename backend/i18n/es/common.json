@@ -1627,6 +1627,11 @@
       "name": "MCP",
       "description": "Registro de herramientas del Protocolo de Contexto de Modelo — intermediario gobernado para servidores MCP externos."
     },
+    "provenance": {
+      "name": "Procedencia",
+      "description": "Marca el contenido generado por IA como tal, en un formato legible por máquina (Reglamento de IA de la UE, art. 50, apartado 2). Activado por defecto.",
+      "disable_warning": "El contenido generado dejará de marcarse como generado por IA. El Reglamento de IA de la UE (art. 50, apartado 2) exige que el contenido generado por sistemas de IA esté marcado en un formato legible por máquina como generado artificialmente."
+    },
     "status": {
       "healthy": "saludable",
       "unhealthy": "en fallo",
@@ -1648,7 +1653,37 @@
     "action_success": "{{module}} {{action}} exitosamente.",
     "logs": "Logs",
     "logs_title": "{{module}}: registros del contenedor",
-    "module_settings": "Configuración del módulo"
+    "module_settings": "Configuración del módulo",
+    "confirm_disable_recorded": "La desactivación queda anotada en el registro de auditoría, con su nombre y la hora.",
+    "confirm_disable_ack": "Entiendo que el contenido generado dejará de marcarse como generado por IA.",
+    "switch_off": "Desactivar"
+  },
+  "provenance_status": {
+    "title": "Servicio de marcado",
+    "state": {
+      "running": "En ejecución",
+      "not_running": "No está en ejecución",
+      "refused": "El servicio rechazó el token de servicio",
+      "unexpected": "El servicio dio una respuesta inesperada"
+    },
+    "not_running_hint": "Mientras el servicio no esté en ejecución, el contenido no se puede marcar.",
+    "refused_hint": "El backend y el servicio deben usar el mismo token de servicio.",
+    "unexpected_hint": "Compruebe la dirección del servicio en la configuración del módulo.",
+    "contract": "Contrato: {{contract}}",
+    "contract_unsupported": "Este servidor usa {{expected}} y el servicio, {{contract}}. Ejecute ambos con la misma versión.",
+    "engine_version": "Versión {{version}}",
+    "capabilities": "Funciones",
+    "capability": {
+      "images": "Imágenes",
+      "receipts": "Recibos",
+      "records": "Registros",
+      "detect": "Comprobar contenido"
+    },
+    "capability_available": "{{name}}: disponible",
+    "capability_unavailable": "{{name}}: aún no disponible",
+    "plugins": "Complementos: {{plugins}}",
+    "no_plugins": "No hay complementos cargados",
+    "load_failed": "No se pudo leer el estado del módulo."
   },
   "pii_dashboard": {
     "title": "Panel PII",

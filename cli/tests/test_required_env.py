@@ -35,6 +35,7 @@ PUBLISHED = (
     "dev-mcp-service-token",
     "dev-skills-service-token",
     "dev-pii-service-token",
+    "dev-provenance-service-token",
     "myredissecret",
     "miniosecret",
     "mysalt",

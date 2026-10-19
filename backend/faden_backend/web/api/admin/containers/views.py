@@ -247,6 +247,7 @@ _AUTO_CLASS_RULES: list[tuple[list[str], ContainerClass, str]] = [
             "faden-frontend",
             "faden-mcp",
             "faden-skills",
+            "faden-provenance",
             "faden-pii",
             "faden-rag",
             "faden-auth",

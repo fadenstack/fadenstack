@@ -64,6 +64,11 @@ def test_each_service_gets_the_keys_it_had_as_files() -> None:
     }
     assert set(targets["faden-backend-migrator"]) == {"FADEN_BACKEND_SETTINGS_MASTER_KEY"}
     assert set(targets["faden-mcp"]) == {"FADEN_MCP_ENCRYPTION_KEY", "FADEN_MCP_ENCRYPTION_KEY_PREVIOUS"}
+    assert targets["faden-provenance"] == {
+        "FADEN_PROVENANCE_SIGNING_KEY": "./secrets/FADEN_PROVENANCE_SIGNING_KEY",
+        "FADEN_PROVENANCE_SIGNING_CERTS": "./secrets/FADEN_PROVENANCE_SIGNING_CERTS",
+        "FADEN_PROVENANCE_HASH_KEYS": "./secrets/FADEN_PROVENANCE_HASH_KEYS",
+    }
 
 
 def _install(tmp_path: Path, values: dict[str, str]) -> ComposeContext:

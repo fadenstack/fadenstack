@@ -35,6 +35,7 @@ SERVICE_ALIASES: dict[str, list[str]] = {
     "gateway": ["faden-gateway-migrator", "faden-gateway"],
     "mcp": ["faden-mcp"],
     "skills": ["faden-skills"],
+    "provenance": ["faden-provenance"],
     "pii": ["faden-pii", "faden-pii-worker"],
     "rag": ["faden-rag"],
     "auth": ["faden-auth"],
@@ -43,11 +44,14 @@ SERVICE_ALIASES: dict[str, list[str]] = {
     "nginx": ["faden-nginx"],
 }
 
-# Services that don't have a build context (they reuse another service's image).
-# compose_build() skips these; they just need their container recreated.
+# Services that don't have a build context: they reuse another service's
+# image, or are published as an image only (provenance). compose_build()
+# skips these; they just need their container recreated.
 _NO_BUILD_SERVICES: frozenset[str] = frozenset({
     "faden-backend-migrator",
     "faden-gateway-migrator",
+    "faden-provenance",
+    "faden-provenance-migrator",
 })
 
 
@@ -65,6 +69,25 @@ def _resolve_services(names: tuple[str, ...]) -> list[str]:
             prefixed = f"faden-{name}"
             resolved.append(prefixed)
     return list(dict.fromkeys(resolved))  # dedupe, preserve order
+
+
+def _build(ctx: ComposeContext, target_services: list[str] | None, *, no_cache: bool) -> None:
+    """Build the images of *target_services* that have a build context (all of them for ``None``)."""
+    build_services = (
+        [s for s in target_services if s not in _NO_BUILD_SERVICES]
+        if target_services
+        else None
+    )
+    if target_services and not build_services:
+        # Only services without a build context: nothing to build (an empty list would build them all).
+        info("Nothing to build for these services; their containers are recreated.")
+        return
+    console.print("\n[bold cyan]Building images…[/bold cyan]")
+    rc = compose_build(ctx, services=build_services or None, no_cache=no_cache)
+    if rc != 0:
+        error(f"Build failed (exit code {rc}).")
+        sys.exit(rc)
+    success("Images built.")
 
 
 @click.command("rebuild")
@@ -115,18 +138,8 @@ def rebuild_cmd(
         target_services = _resolve_services(services)
         info(f"Rebuilding: {', '.join(target_services)}")
 
-    # Step 1: Build (skip migrators — they share the parent service image)
-    build_services = (
-        [s for s in target_services if s not in _NO_BUILD_SERVICES]
-        if target_services
-        else None
-    )
-    console.print("\n[bold cyan]Building images…[/bold cyan]")
-    rc = compose_build(ctx, services=build_services or None, no_cache=no_cache)
-    if rc != 0:
-        error(f"Build failed (exit code {rc}).")
-        sys.exit(rc)
-    success("Images built.")
+    # Step 1: Build (skip the services without a build context, see _NO_BUILD_SERVICES)
+    _build(ctx, target_services, no_cache=no_cache)
 
     env_path = ctx.env_file
 

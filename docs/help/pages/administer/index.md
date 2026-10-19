@@ -65,3 +65,7 @@ server adds them to the installation (see [Installing](../operate/installing.md#
 added, they can be switched on and off under **Settings → Modules**; switching one off stops it, and requests
 running through it are interrupted. Their pages, and their steps in **Getting started**, appear only while
 the module is on.
+
+**Provenance** is on from the start: it marks generated content as AI-generated, as the EU AI Act requires
+(Art. 50(2)). Switching it off explains what stops being marked, asks you to confirm, and is recorded in the
+audit log with your name and the time.

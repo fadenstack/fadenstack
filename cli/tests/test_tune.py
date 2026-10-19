@@ -31,10 +31,10 @@ def test_what_a_service_can_open_grows_with_its_workers_not_their_square(cores: 
 
 
 @pytest.mark.parametrize(
-    ("cores", "peak", "max_connections"), [(8, 90, 250), (32, 210, 350), (64, 370, 500)],
+    ("cores", "peak", "max_connections"), [(8, 105, 250), (32, 225, 350), (64, 385, 500)],
 )
 def test_postgres_takes_every_service_at_its_peak(cores: int, peak: int, max_connections: int) -> None:
-    """Gateway and backend (workers x 10), backend worker (2 x 10), MCP and skills (15 each), 100 spare."""
+    """Gateway, backend (workers x 10), backend worker (2 x 10), MCP, skills, provenance (15), 100 spare."""
     tp = calculate_tune_profile("prod", system=_host(cores))
     assert sum(tp.db_connections().values()) == peak
     assert tp.max_connections == max_connections

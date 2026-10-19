@@ -21,6 +21,11 @@ keys, and every stored value openable.
 
 The machines' credential hashes are keyed with ``FADEN_BACKEND_CREDENTIAL_PEPPER``, never rotated here: the
 machines stay connected.
+
+The provenance engine's keys seal nothing, so nothing is re-sealed and no previous key is kept: its signer
+gets a new key and certificate from the install's authority (the old certificate travels inside every
+manifest it signed), and its hash keys a new version after the others, which all stay
+(core/provenance_keys.py). The engine restarts with them.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from faden_cli.core import provenance_keys
 from faden_cli.core.env_gen import (
     ALLOW_PUBLISHED_KEYS,
     CREDENTIAL_PEPPER,
@@ -41,6 +47,7 @@ from faden_cli.core.env_gen import (
     read_env_file,
     rewrite_env,
 )
+from faden_cli.core.tls import TlsError
 
 
 class RotationError(RuntimeError):
@@ -66,7 +73,8 @@ class Scope:
     """One key that seals stored data: what it is, who uses it, and how its values are re-sealed."""
 
     name: str
-    #: The ``.env`` variable holding the key, and the one holding the key it replaced while a rotation is unfinished.
+    #: The ``.env`` variable holding the key, and the one holding the key it replaced while a rotation is
+    #: unfinished (empty for keys that seal nothing, which keep no previous key).
     key: str
     previous: str
     #: What the key seals, in the console's words.
@@ -78,6 +86,9 @@ class Scope:
     published: frozenset[str]
     #: A compose profile that must be on for the key to matter.
     profile: str | None = None
+    #: For keys that seal nothing: the ``.env`` values a rotation writes, from the install folder and its
+    #: ``.env``, instead of a new key beside the previous one.
+    renew: Callable[[Path, dict[str, str]], dict[str, str]] | None = None
 
 
 #: The keys, in the order they are rotated.
@@ -115,6 +126,21 @@ SCOPES: tuple[Scope, ...] = (
         services=("faden-gateway",),
         jobs=(Job("faden-gateway", "faden_gateway.tools.rotate_keys", ("--scope", "chat"), label="gateway database (chats)"),),
         published=frozenset({"dev-encryption-key-change-me"}),
+    ),
+    Scope(
+        name="provenance",
+        key=provenance_keys.SIGNING_KEY,
+        previous="",
+        seals=(
+            "the C2PA signatures on generated pictures (a new key and certificate), with "
+            f"{provenance_keys.HASH_KEYS} for the provenance records' hashes "
+            "(a new version; every earlier one is kept)"
+        ),
+        services=("faden-provenance",),
+        jobs=(),
+        published=frozenset(),
+        profile="provenance",
+        renew=provenance_keys.rotated,
     ),
 )
 
@@ -155,7 +181,7 @@ def key_states(env: dict[str, str], profiles: list[str] | tuple[str, ...]) -> li
                 scope=scope,
                 present=bool(value),
                 published=value in scope.published,
-                unfinished=bool(env.get(scope.previous)),
+                unfinished=bool(scope.previous and env.get(scope.previous)),
                 applicable=applicable,
             )
         )
@@ -249,7 +275,8 @@ def make_plan(
     if only is not None and not_applicable:
         raise RotationError(
             "Nothing to rotate for: " + ", ".join(not_applicable)
-            + ". (mcp needs the MCP module switched on; chat needs the chat key set.)"
+            + ". (mcp needs the MCP module switched on; chat needs the chat key set; provenance needs the provenance "
+            "module switched on and its keys in .env, which faden upgrade writes.)"
         )
     scopes = [s.scope for s in wanted if s.applicable]
     if not scopes:
@@ -290,13 +317,23 @@ def rotate(
     if plan.mode == "fresh":
         values: dict[str, str] = {}
         for scope in plan.scopes:
+            if scope.renew is not None:
+                try:
+                    values.update(scope.renew(env_path.parent, env))
+                except (provenance_keys.ProvenanceKeyError, TlsError, OSError) as exc:
+                    raise RotationError(f"{scope.name}: {exc} Nothing was changed.") from exc
+                continue
             values[scope.previous] = env[scope.key]
             values[scope.key] = new_key()
         # The pepper must hold what keyed the hashes so far, before the master key changes.
         if SETTINGS_MASTER_KEY in values and not env.get(CREDENTIAL_PEPPER):
             values[CREDENTIAL_PEPPER] = env[SETTINGS_MASTER_KEY]
         rewrite_env(env_path, set_values=values)
-        say("Wrote the new keys to .env (the old ones stay as previous keys until every value is re-sealed).")
+        keeping = any(scope.previous for scope in plan.scopes)
+        say(
+            "Wrote the new keys to .env"
+            + (" (the old ones stay as previous keys until every value is re-sealed)." if keeping else ".")
+        )
     else:
         # A resume keeps the new keys. A pepper that is missing is what the master key was before: the previous key.
         settings_scope = next((s for s in plan.scopes if s.name == "settings"), None)
@@ -323,13 +360,18 @@ def rotate(
 
         # Every value opens with the new keys alone: the old ones can go.
         after = read_env_file(env_path)
-        drop = tuple(scope.previous for scope in plan.scopes)
+        drop = tuple(scope.previous for scope in plan.scopes if scope.previous)
         after_keys = {k: v for k, v in after.items() if k not in drop}
         remove = list(drop)
         if after.get(ALLOW_PUBLISHED_KEYS) and not published_remaining(after_keys):
             remove.append(ALLOW_PUBLISHED_KEYS)
         rewrite_env(env_path, set_values={}, remove=tuple(remove))
-        say("Dropped the previous keys from .env" + (" and the published-keys switch." if ALLOW_PUBLISHED_KEYS in remove else "."))
+        switch = ALLOW_PUBLISHED_KEYS in remove
+        if drop:
+            tail = " and the published-keys switch." if switch else "."
+            say("Dropped the previous keys from .env" + tail)
+        elif switch:
+            say("Dropped the published-keys switch from .env.")
         if not ops.restart(services):
             raise RotationError(
                 "Every value is re-sealed and the previous keys are gone from .env, but the services did not restart "
@@ -360,7 +402,7 @@ def _services(scopes: list[Scope]) -> list[str]:
 
 
 def _order(name: str) -> int:
-    order = ["postgres", "faden-backend", "faden-backend-worker", "faden-gateway", "faden-mcp"]
+    order = ["postgres", "faden-backend", "faden-backend-worker", "faden-gateway", "faden-mcp", "faden-provenance"]
     return order.index(name) if name in order else len(order)
 
 

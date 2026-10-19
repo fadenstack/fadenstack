@@ -315,6 +315,14 @@ class Settings(BaseSettings):
     skills_service_url: str = "http://127.0.0.1:8008"
     skills_service_token: str = "dev-skills-service-token"
 
+    # Provenance module settings: marking AI-generated content (EU AI Act Art. 50(2)).
+    # On by default; switching it off in the console asks for confirmation and is recorded.
+    provenance_enabled: bool = True
+    provenance_service_url: str = "http://127.0.0.1:8009"
+    # Presented to the engine (Bearer): its FADEN_PROVENANCE_SERVICE_TOKEN. The engine refuses every call
+    # without it.
+    provenance_service_token: str = ""
+
     # How long a console sign-in lasts (system setting "users.login_lifetime_s"). The
     # login token is a JWT with this lifetime; 0 or less means it never expires.
     users_login_lifetime_s: int = 7 * 24 * 3600

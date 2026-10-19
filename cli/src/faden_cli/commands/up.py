@@ -47,6 +47,12 @@ def up_cmd(
 
     ctx = build_context_from_config(cfg)
 
+    # The provenance engine's keys: made when .env lacks them, its signer issued again when it is due.
+    if ctx.env_file is not None and ctx.project_dir is not None:
+        from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+        provenance_keys_step(ctx.project_dir, ctx.env_file)
+
     console.print("[bold cyan]Starting Fadenstack services…[/bold cyan]")
 
     # With FADEN_DATA_DIR set in .env, the files of the named volumes it covers go into its folders first,

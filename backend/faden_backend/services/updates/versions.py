@@ -24,7 +24,7 @@ from faden_backend.services.updates import release_feed
 
 log = logging.getLogger(__name__)
 
-#: The compose services built from this repository, which run the install's release.
+#: The compose services whose images are tagged with the install's release.
 CORE_SERVICES = (
     "faden-backend",
     "faden-backend-worker",
@@ -34,6 +34,7 @@ CORE_SERVICES = (
     "faden-pii-worker",
     "faden-mcp",
     "faden-skills",
+    "faden-provenance",
 )
 VERSION_LABEL = "org.opencontainers.image.version"
 REVISION_LABEL = "org.opencontainers.image.revision"

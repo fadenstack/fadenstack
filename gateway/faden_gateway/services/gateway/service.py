@@ -31,6 +31,7 @@ from faden_gateway.services.gateway import (
     faden_events,
     knowledge,
     media_fetch,
+    picture_marking,
     provider_address,
     skill_files,
     system_tools,
@@ -47,6 +48,7 @@ from faden_gateway.services.gateway.observability import (
 from faden_gateway.services.gateway.mcp_client import MCPClient
 from faden_gateway.services.gateway.mcp_tool_cache import MCP_TOOL_PREFIX, MCPToolCache
 from faden_gateway.services.gateway.pii_client import PIIClient
+from faden_gateway.services.gateway.provenance_client import ProvenanceClient
 from faden_gateway.services.gateway.session_titles import title_from_message
 from faden_gateway.services.gateway.pii_policy import (
     PIIPolicy,
@@ -173,6 +175,8 @@ class GatewayResponse:
     provider_instance_id: str
     latency_ms: int
     trace_id: str | None = None
+    #: The receipts of the pictures the answer carries, marked by the provenance engine, in their order.
+    provenance: tuple[str, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -1150,6 +1154,7 @@ class GatewayService:
         tool_router: ToolRouter | None = None,
         usage_groups: UsageGroupResolver[str] | None = None,
         group_memberships: UsageGroupResolver[tuple[str, ...]] | None = None,
+        provenance_client: ProvenanceClient | None = None,
     ) -> None:
         self.dao = dao
         self.router = router
@@ -1168,6 +1173,8 @@ class GatewayService:
         self.tool_router = tool_router
         self.usage_groups = usage_groups
         self.group_memberships = group_memberships
+        #: Marks each picture an answer carries before it leaves; ``None`` with the provenance module off.
+        self.provenance_client = provenance_client
         self.stream_buffer: StreamBuffer | None = None
 
     async def list_models(self, auth: AuthContext) -> dict[str, Any]:
@@ -1357,6 +1364,11 @@ class GatewayService:
             usage_prompt = usage.prompt_tokens
             usage_completion = usage.completion_tokens
             usage_total = usage.total_tokens
+            # Pictures leave marked as made by AI, or the request fails (the provenance module).
+            result, receipts = await self._marked(
+                req, result, endpoint=endpoint, model=decision.candidate.litellm_model or model_alias,
+                request_id=request_id,
+            )
             latency_ms = int((time.perf_counter() - started) * 1000)
 
             # The client gets the values tokenize mode took out; the trace
@@ -1408,6 +1420,7 @@ class GatewayService:
                 provider_instance_id=str(decision.candidate.instance_id),
                 latency_ms=latency_ms,
                 trace_id=req.trace_id,
+                provenance=receipts,
             )
         except GatewayError as exc:
             exc.logged = True  # the finally below writes its row
@@ -1470,6 +1483,33 @@ class GatewayService:
                 tool_calls=req.tool_calls,
                 **_agent_log_fields(req),
             )
+
+    async def _marked(
+        self, req: _Prepared, result: UpstreamResult, *, endpoint: str, model: str, request_id: str,
+    ) -> tuple[UpstreamResult, tuple[str, ...]]:
+        """*result* with each picture it carries marked by the provenance engine, and the pictures' receipts.
+
+        As it is with the module off, and for an answer with no pictures. A
+        picture that cannot be marked raises the 503 (``picture_marking``):
+        none of the answer's pictures leaves.
+        """
+        client = self.provenance_client
+        if client is None or result.status_code != 200 or not isinstance(result.payload, dict):
+            return result, ()
+        agent = req.agent.id if req.agent is not None else None
+        if endpoint == "/v1/images/generations":
+            payload, receipts = await picture_marking.mark_images(
+                client, result.payload, model=model, agent=agent, request_id=request_id,
+            )
+        elif endpoint == "/v1/chat/completions":
+            payload, receipts = await picture_marking.mark_chat(
+                client, result.payload, model=model, agent=agent, request_id=request_id,
+            )
+        else:
+            return result, ()
+        if not receipts:
+            return result, ()
+        return UpstreamResult(status_code=200, payload=payload, headers=result.headers), tuple(receipts)
 
     async def route_stream_chat(
         self,

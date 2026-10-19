@@ -68,3 +68,7 @@ betreibt, fügt sie der Installation hinzu (siehe [Installation](../operate/inst
 Danach lassen sie sich unter **Einstellungen → Module** ein- und ausschalten; das Ausschalten stoppt ein Modul,
 und Anfragen, die gerade darüber laufen, werden abgebrochen. Ihre Seiten und ihre Schritte unter
 **Erste Schritte** erscheinen nur, solange das Modul eingeschaltet ist.
+
+**Provenance** ist von Anfang an eingeschaltet: Es kennzeichnet erzeugte Inhalte als KI-generiert, wie es die
+KI-Verordnung verlangt (Art. 50 Abs. 2). Beim Ausschalten erklärt Fadenstack, was dann nicht mehr gekennzeichnet
+wird, fragt nach einer Bestätigung und hält es mit Ihrem Namen und der Uhrzeit im Prüfprotokoll fest.

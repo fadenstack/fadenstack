@@ -1770,6 +1770,11 @@
       "name": "MCP",
       "description": "Registre d'outils du protocole de contexte de modèle — courtier supervisé pour les serveurs MCP externes."
     },
+    "provenance": {
+      "name": "Provenance",
+      "description": "Marque les contenus générés par l'IA comme tels, dans un format lisible par machine (règlement européen sur l'IA, art. 50, paragraphe 2). Activé par défaut.",
+      "disable_warning": "Les contenus générés ne seront plus marqués comme générés par l'IA. Le règlement européen sur l'IA (art. 50, paragraphe 2) exige que les contenus générés par des systèmes d'IA soient marqués, dans un format lisible par machine, comme générés artificiellement."
+    },
     "status": {
       "healthy": "sain",
       "unhealthy": "dégradé",
@@ -1791,7 +1796,37 @@
     "action_success": "{{module}} {{action}} avec succès.",
     "logs": "Journaux",
     "logs_title": "{{module}} — journaux du conteneur",
-    "module_settings": "Paramètres du module"
+    "module_settings": "Paramètres du module",
+    "confirm_disable_recorded": "La désactivation est consignée dans le journal d'audit, avec votre nom et l'heure.",
+    "confirm_disable_ack": "Je comprends que les contenus générés ne seront plus marqués comme générés par l'IA.",
+    "switch_off": "Désactiver"
+  },
+  "provenance_status": {
+    "title": "Service de marquage",
+    "state": {
+      "running": "En cours d'exécution",
+      "not_running": "Pas en cours d'exécution",
+      "refused": "Le service a refusé le jeton de service",
+      "unexpected": "Le service a donné une réponse inattendue"
+    },
+    "not_running_hint": "Tant que le service n'est pas en cours d'exécution, les contenus ne peuvent pas être marqués.",
+    "refused_hint": "Le backend et le service doivent utiliser le même jeton de service.",
+    "unexpected_hint": "Vérifiez l'adresse du service dans les paramètres du module.",
+    "contract": "Contrat : {{contract}}",
+    "contract_unsupported": "Ce serveur utilise {{expected}}, le service {{contract}}. Exécutez les deux avec la même version.",
+    "engine_version": "Version {{version}}",
+    "capabilities": "Fonctions",
+    "capability": {
+      "images": "Images",
+      "receipts": "Reçus",
+      "records": "Enregistrements",
+      "detect": "Vérification des contenus"
+    },
+    "capability_available": "{{name}} : disponible",
+    "capability_unavailable": "{{name}} : pas encore disponible",
+    "plugins": "Extensions : {{plugins}}",
+    "no_plugins": "Aucune extension chargée",
+    "load_failed": "Impossible de lire l'état du module."
   },
   "pii_dashboard": {
     "title": "Tableau de bord PII",

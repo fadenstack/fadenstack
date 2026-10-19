@@ -214,6 +214,11 @@ def _restore(
             warning(note)
         info("Syncing Postgres password with restored .env…")
         _sync_postgres_password(ctx, env_path)
+    # The provenance signer of a .env from before the module, or issued by an authority the restore replaced.
+    if (result.env_restored or result.tls_restored) and ctx.env_file and ctx.project_dir:
+        from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+        provenance_keys_step(Path(ctx.project_dir), Path(str(ctx.env_file)))
 
     # ── Restart all services ──────────────────────────────────
     console.print("\n[bold cyan]Restarting all services…[/bold cyan]")

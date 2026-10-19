@@ -609,10 +609,14 @@ def _module_label(module: ModuleInfo) -> str:
 
 
 def _module_present(workspace: Path, module: ModuleInfo) -> bool:
-    """Whether the module's code is in this workspace; says so when it is not."""
-    if find_service_dir(workspace, module.dev_dir).exists():
+    """Whether the module's code is in this workspace, or checked out beside it; says so when it is not."""
+    module_dir = find_service_dir(workspace, module.dev_dir)
+    if module_dir.exists():
         return True
-    warning(f"{_module_label(module)}: {module.dev_dir} is not in this workspace — not started.")
+    if module.dev_dir.startswith("../"):
+        warning(f"{_module_label(module)}: no checkout at {module_dir.resolve()} — not started.")
+    else:
+        warning(f"{_module_label(module)}: {module.dev_dir} is not in this workspace — not started.")
     return False
 
 
@@ -747,6 +751,7 @@ _SERVICE_INVOCATIONS = (
     "uv run -m faden_pii",
     "uv run -m faden_mcp",
     "uv run -m faden_skills",
+    "uv run -m faden_provenance",
 )
 
 
@@ -949,12 +954,14 @@ def _supervisor_tree(proc: psutil.Process, own: set[int]) -> list[psutil.Process
     return [p for p in tree if p.pid not in own and p.pid > 4]
 
 
-def _reclaim_workspace(workspace: Path) -> None:
-    """Stop this workspace's services and say what is still in the way."""
-    stopped = _stop_workspace_services(workspace)
-    # Then the shells hosting them, which keep the listening socket alive
-    # after their child is gone.
-    stopped += _stop_service_hosts(workspace)
+def _reclaim_workspace(workspace: Path, *, beside: tuple[Path, ...] = ()) -> None:
+    """Stop the services of this workspace and of the checkouts *beside* it; say what is still in the way."""
+    stopped: list[int] = []
+    for root in (workspace, *beside):
+        stopped += _stop_workspace_services(root)
+        # Then the shells hosting them, which keep the listening socket alive
+        # after their child is gone.
+        stopped += _stop_service_hosts(root)
     # And the workers those hosts left behind, which hold the port while
     # appearing to belong to nobody.
     stopped += _stop_orphaned_workers()
@@ -1022,8 +1029,8 @@ def _stop_old_workers() -> None:
     metavar="LIST",
     help=(
         "Optional modules to run beside the backend, comma-separated "
-        "(pii, mcp, skills), or 'none'. Default: the ones switched on with "
-        "`faden module enable`."
+        "(pii, mcp, skills, provenance), or 'none'. Default: the ones switched on with "
+        "`faden module enable`. Provenance runs from its own checkout, ../fadenstack-provenance."
     ),
 )
 @click.option(
@@ -1116,8 +1123,10 @@ def dev_up(
       • PII       → uv run -m faden_pii       (http://127.0.0.1:8003)
       • MCP       → uv run -m faden_mcp       (http://127.0.0.1:8007)
       • Skills    → uv run -m faden_skills    (http://127.0.0.1:8008)
+      • Provenance → uv run -m faden_provenance (http://127.0.0.1:8009,
+                     from ../fadenstack-provenance beside the core checkout)
     """
-    from faden_cli.core.dev_modules import UnknownModuleError, select_modules
+    from faden_cli.core.dev_modules import UnknownModuleError, dev_command, select_modules
 
     cfg = load_config()
     workspace = _find_workspace()
@@ -1220,7 +1229,10 @@ def dev_up(
     # The ports of the modules about to start too -- and only theirs: a port
     # of a module not started here may be someone else's.
     _DEV_PORTS.update({m.port: _module_label(m) for m in running_modules})
-    _reclaim_workspace(workspace)
+    # A module run from a checkout of its own (provenance) is outside the workspace: reclaimed there too.
+    module_dirs = [find_service_dir(workspace, m.dev_dir).resolve() for m in running_modules]
+    beside = tuple(module_dir for module_dir in module_dirs if not _is_within(module_dir, workspace))
+    _reclaim_workspace(workspace, beside=beside)
 
     started: list[str] = []
 
@@ -1231,7 +1243,7 @@ def dev_up(
         label = _module_label(module)
         module_dir = find_service_dir(workspace, module.dev_dir)
         console.print(f"\n[cyan]Launching {label}…[/cyan]")
-        if _launch_terminal(label, module_dir, f"uv run -m {module.dev_dir}", headless=headless):
+        if _launch_terminal(label, module_dir, dev_command(module), headless=headless):
             success(f"{label} → http://127.0.0.1:{module.port}")
             started.append(label)
         else:

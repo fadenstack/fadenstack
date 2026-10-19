@@ -16,6 +16,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardActions from "@mui/material/CardActions";
 import CardContent from "@mui/material/CardContent";
+import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Dialog from "@mui/material/Dialog";
@@ -37,6 +38,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 
 import ContainerLogsDialog from "~/components/ContainerLogsDialog";
 import PiiPolicyForm from "~/components/PiiPolicyForm";
+import ProvenanceStatus from "~/components/ProvenanceStatus";
 import { fetchPIIPolicyOptions, normalizePIIPolicy } from "~/api/pii";
 import { useServices } from "~/lib/ServicesContext";
 import { servicesApi, type ServiceInfo } from "~/api/services";
@@ -89,6 +91,13 @@ function isRagLiteSettingKey(key: string): boolean {
   );
 }
 
+function isProvenanceSettingKey(key: string): boolean {
+  return (
+    key.startsWith("faden_gateway.provenance_") ||
+    key.startsWith("faden_provenance.")
+  );
+}
+
 function isModuleEnableFlag(key: string): boolean {
   const explicitModuleFlags = new Set([
     "faden_gateway.pii_enabled",
@@ -96,14 +105,18 @@ function isModuleEnableFlag(key: string): boolean {
     "faden_gateway.mcp_enabled",
     "faden_gateway.skills_enabled",
     "faden_gateway.rag_lite_enabled",
+    "faden_gateway.provenance_enabled",
     "faden_pii.enabled",
     "faden_mailer.enabled",
     "faden_mcp.enabled",
     "faden_skills.enabled",
     "faden_rag.enabled",
+    "faden_provenance.enabled",
   ]);
   if (explicitModuleFlags.has(key)) return true;
-  return /(?:^|\.)(pii|mailer|mcp|skills|rag_lite)_enabled$/.test(key);
+  return /(?:^|\.)(pii|mailer|mcp|skills|rag_lite|provenance)_enabled$/.test(
+    key,
+  );
 }
 
 function moduleSettingsFor(
@@ -135,6 +148,12 @@ function moduleSettingsFor(
       (item) => isRagLiteSettingKey(item.key) && !isModuleEnableFlag(item.key),
     );
   }
+  if (moduleName === "provenance") {
+    return schema.filter(
+      (item) =>
+        isProvenanceSettingKey(item.key) && !isModuleEnableFlag(item.key),
+    );
+  }
   return [];
 }
 
@@ -163,6 +182,11 @@ export default function ModulesTab() {
     module: ServiceInfo;
     action: "enable" | "disable";
   } | null>(null);
+  // A module with a disable_warning is switched off only after the person
+  // ticked that they understood it (provenance: content is no longer marked).
+  const [disableAcknowledged, setDisableAcknowledged] = useState(false);
+  // Bumped on refresh and after a switch, so module status panels ask again.
+  const [statusTick, setStatusTick] = useState(0);
   const [logsModule, setLogsModule] = useState<ServiceInfo | null>(null);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [settingsSchema, setSettingsSchema] = useState<
@@ -306,12 +330,15 @@ export default function ModulesTab() {
   }
 
   async function handleToggle(svc: ServiceInfo, action: "enable" | "disable") {
+    setDisableAcknowledged(false);
     setConfirmDialog({ module: svc, action });
   }
 
   async function confirmAction() {
     if (!confirmDialog) return;
     const { module: svc, action } = confirmDialog;
+    const needsAcknowledgement = action === "disable" && !!svc.disable_warning;
+    if (needsAcknowledgement && !disableAcknowledged) return;
     setConfirmDialog(null);
     setBusy(svc.name);
     setActionError(null);
@@ -321,7 +348,9 @@ export default function ModulesTab() {
       const result =
         action === "enable"
           ? await servicesApi.enable(svc.name)
-          : await servicesApi.disable(svc.name);
+          : await servicesApi.disable(svc.name, {
+              confirm: needsAcknowledgement,
+            });
 
       if (result.errors.length > 0) {
         setActionError(
@@ -348,8 +377,14 @@ export default function ModulesTab() {
       );
     } finally {
       setBusy(null);
+      setStatusTick((n) => n + 1);
     }
   }
+
+  // Switching off a module that says what is lost by it: warning, a note
+  // that it is recorded, and a tick before the button works.
+  const guardedDisable =
+    confirmDialog?.action === "disable" && !!confirmDialog.module.disable_warning;
 
   if (loading) {
     return (
@@ -372,6 +407,7 @@ export default function ModulesTab() {
           onClick={() => {
             void refresh();
             void loadModuleSettings();
+            setStatusTick((n) => n + 1);
           }}
         >
           {t("dashboard.refresh", { defaultValue: "Refresh" })}
@@ -466,13 +502,19 @@ export default function ModulesTab() {
                       onChange={() =>
                         void handleToggle(svc, isRunning ? "disable" : "enable")
                       }
-                      inputProps={{
-                        "aria-label": t("modules_tab.toggle_aria", {
-                          defaultValue: "Toggle {{module}}",
-                          module: t(`modules.${svc.name}.name`, {
-                            defaultValue: svc.display_name,
+                      // Switch sets its own input slot, so inputProps never
+                      // reached the input: the label goes in the slot (which
+                      // replaces Switch's own, hence the role).
+                      slotProps={{
+                        input: {
+                          role: "switch",
+                          "aria-label": t("modules_tab.toggle_aria", {
+                            defaultValue: "Toggle {{module}}",
+                            module: t(`modules.${svc.name}.name`, {
+                              defaultValue: svc.display_name,
+                            }),
                           }),
-                        }),
+                        },
                       }}
                     />
                   )}
@@ -498,6 +540,10 @@ export default function ModulesTab() {
                     />
                   ))}
                 </Stack>
+              )}
+
+              {svc.name === "provenance" && (
+                <ProvenanceStatus refreshKey={statusTick} />
               )}
 
               {moduleSettingsFor(svc.name, settingsSchema).length > 0 && (
@@ -755,6 +801,17 @@ export default function ModulesTab() {
               })}
         </DialogTitle>
         <DialogContent>
+          {guardedDisable && (
+            <Alert
+              severity="warning"
+              sx={{ mb: 2 }}
+              data-testid="module-disable-warning"
+            >
+              {t(`modules.${confirmDialog?.module.name}.disable_warning`, {
+                defaultValue: confirmDialog?.module.disable_warning ?? "",
+              })}
+            </Alert>
+          )}
           <DialogContentText>
             {confirmDialog?.action === "enable"
               ? t("modules_tab.confirm_enable_body", {
@@ -772,6 +829,30 @@ export default function ModulesTab() {
                   }),
                 })}
           </DialogContentText>
+          {guardedDisable && (
+            <>
+              <DialogContentText sx={{ mt: 1.5 }}>
+                {t("modules_tab.confirm_disable_recorded")}
+              </DialogContentText>
+              <FormControlLabel
+                sx={{ mt: 1 }}
+                control={
+                  <Checkbox
+                    checked={disableAcknowledged}
+                    onChange={(event) =>
+                      setDisableAcknowledged(event.target.checked)
+                    }
+                    inputProps={
+                      {
+                        "data-testid": "module-disable-ack",
+                      } as React.InputHTMLAttributes<HTMLInputElement>
+                    }
+                  />
+                }
+                label={t("modules_tab.confirm_disable_ack")}
+              />
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialog(null)}>
@@ -779,12 +860,22 @@ export default function ModulesTab() {
           </Button>
           <Button
             variant="contained"
-            color={confirmDialog?.action === "disable" ? "warning" : "primary"}
+            color={
+              guardedDisable
+                ? "error"
+                : confirmDialog?.action === "disable"
+                  ? "warning"
+                  : "primary"
+            }
+            disabled={guardedDisable && !disableAcknowledged}
+            data-testid="module-confirm-action"
             onClick={() => void confirmAction()}
           >
-            {confirmDialog?.action === "enable"
-              ? t("common.start")
-              : t("common.stop")}
+            {guardedDisable
+              ? t("modules_tab.switch_off")
+              : confirmDialog?.action === "enable"
+                ? t("common.start")
+                : t("common.stop")}
           </Button>
         </DialogActions>
       </Dialog>

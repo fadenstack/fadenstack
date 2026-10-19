@@ -53,7 +53,7 @@ RABBIT_CHANNELS_PER_WORKER = 10
 #: the backend's pool.
 BACKEND_TASK_WORKERS = 2
 #: Services with pools the CLI does not size: 1 worker x (5 + 10).
-UNTUNED_CONNECTIONS = {"mcp": 15, "skills": 15}
+UNTUNED_CONNECTIONS = {"mcp": 15, "skills": 15, "provenance": 15}
 #: Langfuse's web and worker, migrations, backups, psql.
 CONNECTION_HEADROOM = 100
 #: The shared compose file's default; tuning never goes below it.
@@ -76,8 +76,9 @@ OS_RESERVE_PCT = 0.05
 FIXED_MB = 2100
 #: One worker process of each service ``faden tune`` sizes.
 PER_WORKER_MB = {"backend": 200, "gateway": 290, "pii": 780}
-#: The optional modules' own processes (PII's task worker holds its models too).
-MODULE_MB = {"mcp": 110, "skills": 90, "pii": 1550}
+#: The optional modules' own processes (PII's task worker holds its models too). Provenance is not
+#: measured yet: taken as skills', a service of the same kind (one web worker, a database, no models).
+MODULE_MB = {"mcp": 110, "skills": 90, "pii": 1550, "provenance": 90}
 #: One process of the backend's task worker (taskiq), before any download.
 TASK_WORKER_MB = 160
 #: A model download holds up to one xet range (64 MB) per range it fetches at once.
@@ -133,7 +134,7 @@ class TuneProfile:
     rabbit_pool_size: dict[str, int] = field(default_factory=dict)
     rabbit_channel_pool_size: dict[str, int] = field(default_factory=dict)
 
-    #: Optional modules switched on ("pii", "mcp", "skills"): they take memory.
+    #: Optional modules switched on ("pii", "mcp", "skills", "provenance"): they take memory.
     modules: frozenset[str] = frozenset()
     #: Processes of the backend's task worker (taskiq ``--workers``).
     task_workers: int = BACKEND_TASK_WORKERS
@@ -273,7 +274,7 @@ def calculate_tune_profile(
         plane.  Only affects the ``"prod"`` profile.  Defaults to
         :data:`DEFAULT_RESOURCE_PCT` (25 %).
     modules
-        The optional modules switched on (``pii``, ``mcp``, ``skills``):
+        The optional modules switched on (``pii``, ``mcp``, ``skills``, ``provenance``):
         they take memory, and PII's workers are counted only with it on.
 
     The CPU sets the number of workers, and the memory then cuts it to what

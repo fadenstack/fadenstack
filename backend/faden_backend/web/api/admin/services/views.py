@@ -4,11 +4,18 @@ Returns the list of optional modules and their current status so the
 frontend can show / hide UI sections dynamically.  Also provides
 enable / disable endpoints that start / stop the Docker containers
 belonging to a module via ``docker compose --profile <profile>``.
+
+Every switch is recorded in the audit trail (``module.enable`` /
+``module.disable``: who, when, what came of it). A module with a
+``disable_warning`` is switched off only with ``confirm: true``; without it
+the request is refused (409, code ``confirmation_required``) and the refusal
+is recorded too.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import subprocess
@@ -18,8 +25,11 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 from starlette import status
 
+from faden_backend.db.dao.audit_dao import AuditDAO
+from faden_backend.db.models.containers import AuditResult
 from faden_backend.db.models.users import User
 from faden_backend.services.module_registry import ModuleDef, module_registry
 from faden_backend.services.notifications import NotificationService
@@ -194,6 +204,33 @@ async def _emit_module_lifecycle_alert(
         logger.exception("Failed to enqueue module lifecycle alert for %s.", module_name)
 
 
+class ModuleSwitch(BaseModel):
+    """What a switch request may carry."""
+
+    #: Switching off a module with a ``disable_warning``: the person saw the warning and confirmed.
+    confirm: bool = False
+
+
+async def _record_switch(
+    audit_dao: AuditDAO,
+    user: User,
+    mod: ModuleDef,
+    action: str,
+    result: AuditResult,
+    details: dict[str, Any],
+) -> None:
+    """The switch in the audit trail; the writer adds who and when."""
+    await audit_dao.log(
+        action=f"module.{action}",
+        target_type="module",
+        target_id=mod.name,
+        result=result,
+        actor_id=user.id,
+        severity="high" if mod.disable_warning else "normal",
+        metadata_json=json.dumps(details, default=str)[:8000],
+    )
+
+
 # ── GET /services ─────────────────────────────────────────────────────
 
 
@@ -233,6 +270,7 @@ async def list_services(
             "description": mod.description,
             "module_type": mod.module_type,
             "enterprise": mod.enterprise,
+            "disable_warning": mod.disable_warning,
         }
 
         if mod.module_type == "plugin":
@@ -304,6 +342,7 @@ async def enable_module(
     user: User = Depends(require_permission("modules", "manage")),
     docker: DockerService = Depends(get_docker),
     system_settings: SystemSettingsService = Depends(get_system_settings_service),
+    audit_dao: AuditDAO = Depends(),
 ) -> JSONResponse:
     """Bring up all containers belonging to a module (container-type)
     or invoke its ``on_enable`` callback (plugin-type).
@@ -336,6 +375,7 @@ async def enable_module(
                 summary=f"Failed to enable module '{name}'.",
                 details=detail,
             )
+            await _record_switch(audit_dao, user, mod, "enable", AuditResult.ALLOW, {"errors": [detail]})
             return JSONResponse(
                 status_code=200,
                 content={
@@ -368,6 +408,9 @@ async def enable_module(
     else:
         started = []
 
+    await _record_switch(
+        audit_dao, user, mod, "enable", AuditResult.ALLOW, {"started": started, "errors": errors},
+    )
     return JSONResponse(
         status_code=200,
         content={
@@ -386,18 +429,40 @@ async def enable_module(
 async def disable_module(
     name: str,
     request: Request,
+    switch: ModuleSwitch | None = None,
     user: User = Depends(require_permission("modules", "manage")),
     docker: DockerService = Depends(get_docker),
     system_settings: SystemSettingsService = Depends(get_system_settings_service),
+    audit_dao: AuditDAO = Depends(),
 ) -> JSONResponse:
     """Stop all containers belonging to a module (container-type)
     or invoke its ``on_disable`` callback (plugin-type).
+
+    A module with a ``disable_warning`` is switched off only with
+    ``{"confirm": true}``; without it nothing changes, the refusal (409,
+    code ``confirmation_required``) carries the warning, and it is recorded.
     """
     mod = module_registry.get_module(name)
     if mod is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown module: {name}",
+        )
+
+    confirmed = bool(switch and switch.confirm)
+    recorded: dict[str, Any] = (
+        {"confirmed": confirmed, "warning": mod.disable_warning} if mod.disable_warning else {}
+    )
+    if mod.disable_warning and not confirmed:
+        await _record_switch(
+            audit_dao, user, mod, "disable", AuditResult.DENY, {**recorded, "reason": "not confirmed"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "confirmation_required",
+                "message": f"{mod.disable_warning} To switch it off, confirm it (send confirm: true).",
+            },
         )
 
     # ── Lifecycle callback (run *before* stopping containers) ─
@@ -411,6 +476,9 @@ async def disable_module(
                 action="disable_sync",
                 summary=f"Failed to sync module disable for '{name}'.",
                 details="; ".join(errors),
+            )
+            await _record_switch(
+                audit_dao, user, mod, "disable", AuditResult.ALLOW, {**recorded, "errors": errors},
             )
             return JSONResponse(
                 status_code=200,
@@ -440,6 +508,9 @@ async def disable_module(
                 summary=f"Failed to disable module '{name}'.",
                 details=detail,
             )
+            await _record_switch(
+                audit_dao, user, mod, "disable", AuditResult.ALLOW, {**recorded, "errors": [detail]},
+            )
             return JSONResponse(
                 status_code=200,
                 content={
@@ -455,6 +526,9 @@ async def disable_module(
     else:
         stopped = []
 
+    await _record_switch(
+        audit_dao, user, mod, "disable", AuditResult.ALLOW, {**recorded, "stopped": stopped, "errors": []},
+    )
     return JSONResponse(
         status_code=200,
         content={

@@ -282,6 +282,13 @@ faden up
 
 Mit `faden module disable pii` und anschließend `faden up` entfernen Sie ein Modul wieder. `faden up` stoppt und entfernt die Container des Moduls. Seine Daten bleiben erhalten.
 
+Ein Modul ist von Anfang an eingeschaltet: `provenance` kennzeichnet die Inhalte, die Fadenstack erzeugt, als
+KI-generiert und prüft solche Kennzeichnungen, wie es die KI-Verordnung verlangt (Art. 50 Abs. 2). `faden deploy`
+schaltet es in einer neuen Installation ein, `faden upgrade` in einer bestehenden. `faden module disable provenance`
+erklärt, was dann nicht mehr gekennzeichnet wird, fragt nach einer Bestätigung und hält fest, wer es wann
+ausgeschaltet hat; `faden upgrade` lässt es danach aus. Seine Nachweise bleiben erhalten, solange sie gebraucht
+werden, und gehen in jede Sicherung ein.
+
 ## Befehle für den Alltag {#everyday-commands}
 
 | Befehl | Was er tut |

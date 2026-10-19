@@ -312,6 +312,53 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         service_targets=("faden-gateway",),
         protected=True,
     ),
+    # ── Provenance module settings ───────────────────────────
+    # The switch is the module's (Settings > Modules): switching it off there asks for
+    # confirmation and is recorded; this route refuses to switch it off.
+    SettingDefinition(
+        key="faden_gateway.provenance_enabled",
+        type="bool",
+        category="modules",
+        group="provenance",
+        label="Provenance Module Enabled",
+        description=(
+            "Mark AI-generated content as such in a machine-readable way (EU AI Act Art. 50(2)). "
+            "On by default."
+        ),
+        is_secret=False,
+        default=True,
+        apply_scope=SystemApplyScope.SERVICE_RESTART,
+        service_targets=("faden-gateway",),
+    ),
+    SettingDefinition(
+        key="faden_gateway.provenance_service_url",
+        type="string",
+        category="modules",
+        group="provenance",
+        label="Provenance Service URL",
+        description=(
+            "Internal URL of the provenance engine "
+            "(e.g. http://faden-provenance:8000 in Docker, "
+            "http://127.0.0.1:8009 in dev)."
+        ),
+        is_secret=False,
+        default="http://faden-provenance:8000",
+        apply_scope=SystemApplyScope.SERVICE_RESTART,
+        service_targets=("faden-gateway",),
+    ),
+    SettingDefinition(
+        key="faden_gateway.provenance_service_token",
+        type="secret",
+        category="modules",
+        group="provenance",
+        label="Provenance Service Token",
+        description="Shared bearer token the gateway and the backend present to the provenance engine.",
+        is_secret=True,
+        default="",
+        apply_scope=SystemApplyScope.SERVICE_RESTART,
+        service_targets=("faden-gateway",),
+        protected=True,
+    ),
     # ── RAG Lite ─────────────────────────────────────────────
     SettingDefinition(
         key="rag_lite.enabled",

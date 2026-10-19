@@ -1,9 +1,9 @@
 """Refuse to start, outside development, on a secret published with Fadenstack's source code.
 
 Mirrors the backend's check (faden_backend/published_secrets.py) for what the gateway holds: the backend's
-settings master key, which it reads stored secrets with, and the tokens it presents to the MCP and skills
-services. ``faden deploy`` writes random values into ``.env``; an install started by hand has to set them
-(Help: Installing, Secrets in .env).
+settings master key, which it reads stored secrets with, and the tokens it presents to the MCP, skills
+and provenance services. ``faden deploy`` writes random values into ``.env``; an install started by hand has
+to set them (Help: Installing, Secrets in .env).
 """
 
 from __future__ import annotations
@@ -17,6 +17,9 @@ log = logging.getLogger(__name__)
 PUBLISHED_MASTER_KEYS = frozenset({"dev-settings-master-key-change-me"})
 PUBLISHED_MCP_TOKENS = frozenset({"dev-mcp-service-token", "dev-mcp-service-token-change-me"})
 PUBLISHED_SKILLS_TOKENS = frozenset({"dev-skills-service-token", "dev-skills-service-token-change-me"})
+PUBLISHED_PROVENANCE_TOKENS = frozenset(
+    {"dev-provenance-service-token", "dev-provenance-service-token-change-me"},
+)
 PUBLISHED_CHAT_KEYS = frozenset({"dev-encryption-key-change-me"})
 
 CHAT_KEY_MISSING = (
@@ -77,6 +80,9 @@ def problems(settings: Settings) -> list[str]:
         found.append(token_refused("MCP", "MCP"))
     if settings.skills_enabled and settings.skills_service_token in PUBLISHED_SKILLS_TOKENS:
         found.append(token_refused("skills", "SKILLS"))
+    provenance_token = settings.provenance_service_token
+    if settings.provenance_enabled and provenance_token in PUBLISHED_PROVENANCE_TOKENS:
+        found.append(token_refused("provenance", "PROVENANCE"))
     if not settings.encryption_key:
         found.append(CHAT_KEY_MISSING)
     elif settings.encryption_key in PUBLISHED_CHAT_KEYS and not settings.allow_published_keys:

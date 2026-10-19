@@ -20,9 +20,13 @@ log = logging.getLogger(__name__)
 
 #: Development values of the settings master key: settings.py's default, and the compose file's fallback.
 PUBLISHED_MASTER_KEYS = frozenset({"dev-settings-master-key-change-me"})
-#: Development values of the MCP and skills service tokens (settings.py's defaults, the compose file's).
+#: Development values of the MCP, skills and provenance service tokens (settings.py's defaults, the compose
+#: file's).
 PUBLISHED_MCP_TOKENS = frozenset({"dev-mcp-service-token", "dev-mcp-service-token-change-me"})
 PUBLISHED_SKILLS_TOKENS = frozenset({"dev-skills-service-token", "dev-skills-service-token-change-me"})
+PUBLISHED_PROVENANCE_TOKENS = frozenset(
+    {"dev-provenance-service-token", "dev-provenance-service-token-change-me"},
+)
 
 MASTER_KEY_REFUSED = (
     "FADEN_BACKEND_SETTINGS_MASTER_KEY is the development default published with Fadenstack's source code: "
@@ -68,6 +72,8 @@ def problems(settings: Settings) -> list[str]:
         found.append(token_refused("MCP", "MCP"))
     if settings.skills_enabled and settings.skills_service_token in PUBLISHED_SKILLS_TOKENS:
         found.append(token_refused("skills", "SKILLS"))
+    if settings.provenance_enabled and settings.provenance_service_token in PUBLISHED_PROVENANCE_TOKENS:
+        found.append(token_refused("provenance", "PROVENANCE"))
     return found
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 
 import pytest
 
@@ -42,7 +43,15 @@ def test_switched_off_modules_are_not_run_and_nothing_is_pulled(docker) -> None:
     assert ran == ["faden-backend-migrator", "faden-gateway-migrator", "faden-pii-migrator"]
     assert all(cmd[cmd.index("--pull") + 1] == "never" for cmd in fake.runs)
     assert heads == {"faden_backend": "a1b2c3d4e5f6", "faden_gateway": "a1b2c3d4e5f6", "faden_mcp": "",
-                     "faden_skills": "", "pii": "a1b2c3d4e5f6"}
+                     "faden_skills": "", "faden_provenance": "", "pii": "a1b2c3d4e5f6"}
+
+
+def test_provenance_s_migrator_is_asked_when_it_runs(docker: Callable[[str | None], FakeDocker]) -> None:
+    fake = docker("faden-backend-migrator\nfaden-provenance-migrator\nfaden-provenance\n")
+    heads = backup.get_migration_heads(ComposeContext(profiles=["provenance"]))
+    ran = [cmd[cmd.index("never") + 1] for cmd in fake.runs]
+    assert ran == ["faden-backend-migrator", "faden-provenance-migrator"]
+    assert heads["faden_provenance"] == "a1b2c3d4e5f6"
 
 
 def test_without_the_service_list_every_migrator_is_asked_but_none_pulls(docker) -> None:

@@ -29,6 +29,7 @@ Es listet die Variablen und ihren Zustand auf, nie die Schlüssel selbst.
 |---|---|
 | `FADEN_BACKEND_SETTINGS_MASTER_KEY` | Die Geheimnisse, die die Konsole speichert (das Hugging-Face-Token, der TLS-Schlüssel, Geheimnisse der Wissensdatenbank, die Tokens der Ray-Cluster), die API-Schlüssel externer Provider und die privaten Schlüssel der Zertifizierungsstelle für die Maschinen |
 | `FADEN_MCP_ENCRYPTION_KEY` | Die Header und die Umgebung der MCP-Server: Bearer-Tokens und API-Schlüssel. Nur, wo das MCP-Modul eingeschaltet ist |
+| `FADEN_PROVENANCE_SIGNING_KEY`, `FADEN_PROVENANCE_HASH_KEYS` | Was erzeugte Inhalte als KI-generiert kennzeichnet: Der Schlüssel, der die Kennzeichnungen signiert, bekommt einen neuen Schlüssel und ein neues Zertifikat von der Zertifizierungsstelle der Installation; die Hash-Schlüssel bekommen eine neue Version, und jede ältere bleibt, damit früher gekennzeichnete Inhalte weiter geprüft werden können. Nur, wo das Modul Provenance eingeschaltet ist |
 | `FADEN_GATEWAY_ENCRYPTION_KEY` | Die Chats: Nachrichten, Titel, Gedächtnis und Anhangsnotizen. Nach dem Erneuern dieses Schlüssels werden unverschlüsselt gespeicherte Chats mit dem neuen versiegelt (siehe unten) |
 
 Nicht erneuert werden:

@@ -75,6 +75,7 @@ _MIGRATOR_SERVICES: dict[str, str] = {
     "faden-gateway-migrator": "faden_gateway",
     "faden-mcp-migrator": "faden_mcp",
     "faden-skills-migrator": "faden_skills",
+    "faden-provenance-migrator": "faden_provenance",
     "faden-pii-migrator": "pii",
 }
 
@@ -322,12 +323,23 @@ def snapshot_env(env_path: Path, backup_dir: Path) -> str:
 
 
 def restore_env(backup_dir: Path, env_path: Path) -> bool:
-    """Restore the .env snapshot from a backup, readable by its owner only."""
+    """Restore the .env snapshot from a backup, readable by its owner only.
+
+    The provenance hash-key versions the install had stay beside the backup's: what was hashed with any of
+    them is checked with it (core/provenance_keys.py).
+    """
+    from faden_cli.core import provenance_keys  # noqa: PLC0415
+    from faden_cli.core.env_gen import read_env_file  # noqa: PLC0415
+
     src = backup_dir / ".env.bak"
     if not src.exists():
         warning("  No .env snapshot in backup.")
         return False
+    before = read_env_file(env_path).get(provenance_keys.HASH_KEYS, "")
     write_private(env_path, src.read_bytes())
+    note = provenance_keys.keep_after_restore(env_path, before)
+    if note:
+        warning(f"  {note}")
     return True
 
 

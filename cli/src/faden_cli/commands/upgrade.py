@@ -3,7 +3,8 @@
 Performs a safe in-place upgrade:
   1. Pre-flight checks (Docker, disk)
   2. Auto-backup (unless --no-backup)
-  3. Refresh the deployment files and .env (existing values kept)
+  3. Refresh the deployment files and .env (existing values kept), and
+     switch on the modules on by default an administrator did not switch off
   4. Pull this release's images (an install made by ``faden deploy``
      from the published images), or rebuild them (a source checkout)
   5. Rolling restart: infra → migrators → app → modules
@@ -38,7 +39,8 @@ from faden_cli.core.compose import (
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
 from faden_cli.core.detect import detect_docker
-from faden_cli.core.env_gen import default_env_vars, read_env_file, write_env_file
+from faden_cli.core.env_gen import default_env_vars, read_env_file, set_module_env, write_env_file
+from faden_cli.core.registry import MODULES
 from faden_cli.core.settings import load_config, save_config
 
 
@@ -149,11 +151,18 @@ def upgrade_cmd(
     if has_nvidia_gpu() and gpu_overlay.exists():
         compose_files.append(gpu_overlay)
 
+    # Modules on by default that this install does not run yet (provenance): the upgrade switches them on,
+    # unless an administrator switched them off (faden module disable, recorded in faden.yaml).
+    from faden_cli.commands.module import default_modules  # noqa: PLC0415
+
+    switching_on = default_modules(cfg)
+    profiles = sorted({*(cfg.profiles or []), *(MODULES[name].profile for name in switching_on)})
+
     ctx = ComposeContext(
         compose_files=compose_files,
         env_file=env_path if env_path.exists() else None,
         project_dir=shared_dir,
-        profiles=list(cfg.profiles),
+        profiles=profiles,
     )
 
     # ── Dry-run summary ───────────────────────────────────────
@@ -161,7 +170,9 @@ def upgrade_cmd(
         console.print("[bold]Dry-run — no changes will be made.[/bold]\n")
         console.print(f"  Install directory: {shared_dir}")
         console.print(f"  Compose file:      {compose_file.name}")
-        console.print(f"  Profiles:          {', '.join(cfg.profiles) or '(none)'}")
+        console.print(f"  Profiles:          {', '.join(profiles) or '(none)'}")
+        if switching_on:
+            console.print(f"  Switched on:       {', '.join(switching_on)} (on by default)")
         console.print(f"  Backup:            {'skip' if no_backup else backup_dir}")
         if release is not None:
             console.print(f"  Release:           {release} -> {__version__} (pull published images)")
@@ -255,6 +266,16 @@ def upgrade_cmd(
         changed = unpack(shared_dir)
         success(f"Deployment files for release {__version__} ({len(changed)} changed).")
 
+    # The modules on by default this install did not run (see switching_on above): their profile in
+    # faden.yaml, their switches and secrets in .env.
+    if switching_on:
+        cfg.profiles = profiles
+        save_config(cfg)
+        if env_path.exists():
+            set_module_env(env_path, enable=switching_on)
+        for name in switching_on:
+            info(f"Switched on {name}: on by default (faden module disable {name} switches it off).")
+
     if env_path.exists():
         # What the install has wins; a new release only adds what it
         # introduced. Rewritten from the defaults with just the secrets kept,
@@ -311,6 +332,11 @@ def upgrade_cmd(
     else:
         if ca_created:
             success(f"Certificate authority for the machines made: {ca_public}")
+    # The provenance engine's keys: what an older .env lacks, and a signer issued again when it is due
+    # (fewer than 30 days left, or issued by an authority the install no longer uses).
+    from faden_cli.core.provenance_keys import ensure_step as provenance_keys_step  # noqa: PLC0415
+
+    provenance_keys_step(shared_dir, env_path)
     from faden_cli.commands.tls import refresh_edge_info  # noqa: PLC0415
 
     refresh_edge_info(shared_dir)
