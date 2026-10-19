@@ -115,6 +115,16 @@ When it asks, a card shows **Run …?** with the action and what it is given. Se
 
 If you close the panel while the agent answers, the answer stops: the agent works in the panel. When you open the panel again in that window, the chat is back, says **The answer stopped when the panel was closed**, and **Retry** asks again.
 
+## What it writes is marked
+
+Text the agent writes into a page, such as a reply in a mail or ticket editor, is marked as made with AI where
+the page keeps it: the text carries a hidden mark, and where the page shows a title for it, hovering over the text
+shows **AI-generated**. Your organisation keeps a signed record of each text, so
+[Check content](checking-content.md) finds it later, also when the words are copied out of the page. Leave the
+marks in place when you go on editing.
+
+![The browser agent's panel after it wrote a reply into a ticket's editor: the Run fill_field? card answered Allowed, Ran fill_field, and the two paragraphs it added](../images/use/browser-agent-write-done.png)
+
 ## What it never does
 
 - It never reads the content of a site you have not allowed; only the titles and addresses of this window's tabs reach the model. On such a site the bar says **The agent cannot read …**; select **Allow on this site** (or **All sites**) to let it. A quick action on text you selected sends that text, even from a site you have not allowed.

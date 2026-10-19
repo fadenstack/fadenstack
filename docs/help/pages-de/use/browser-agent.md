@@ -115,6 +115,12 @@ Wenn er fragt, zeigt eine Karte **… ausführen?** mit der Aktion und dem, was 
 
 Wenn Sie die Seitenleiste schließen, während der Agent antwortet, hält die Antwort an: Der Agent arbeitet in der Seitenleiste. Wenn Sie die Seitenleiste in diesem Fenster wieder öffnen, ist der Chat wieder da, meldet **Die Antwort wurde angehalten, als das Panel geschlossen wurde**, und **Erneut versuchen** fragt noch einmal.
 
+## Was er schreibt, ist gekennzeichnet {#what-it-writes-is-marked}
+
+Text, den der Agent in eine Seite schreibt, etwa eine Antwort im Editor einer Mail oder eines Tickets, ist dort, wo die Seite es behält, als mit KI erstellt gekennzeichnet: Der Text trägt eine verborgene Kennzeichnung, und wo die Seite einen Titel dafür anzeigt, erscheint beim Darüberfahren **KI-generiert**. Ihre Organisation bewahrt zu jedem Text einen signierten Nachweis auf, sodass [Inhalte prüfen](checking-content.md) ihn später findet, auch wenn die Wörter aus der Seite kopiert werden. Lassen Sie die Kennzeichnungen stehen, wenn Sie weiterschreiben.
+
+![Die Seitenleiste des Browser-Agenten, nachdem er eine Antwort in den Editor eines Tickets geschrieben hat: die Karte fill_field ausführen? mit Zugelassen beantwortet, fill_field ausgeführt und die beiden Absätze, die er eingefügt hat](../images/use/browser-agent-write-done.png)
+
 ## Was er nie tut {#what-it-never-does}
 
 - Er liest nie den Inhalt einer Website, die Sie nicht erlaubt haben; nur die Titel und Adressen der Tabs dieses Fensters erreichen das Modell. Auf einer solchen Website zeigt die Leiste **Der Agent kann … nicht lesen.**; wählen Sie **Auf dieser Website erlauben** (oder **Alle Websites**), um es zu erlauben. Eine Schnellaktion auf markiertem Text sendet diesen Text, auch von einer Website, die Sie nicht erlaubt haben.
