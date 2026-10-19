@@ -27,6 +27,7 @@ from faden_gateway.services.gateway.audit import AuditService
 from faden_gateway.services.gateway.usage_group import UsageGroupResolver
 from faden_gateway.services.gateway.auth import AuthContext
 from faden_gateway.services.gateway import (
+    answer_variety,
     attachment_search,
     faden_events,
     knowledge,
@@ -1032,6 +1033,18 @@ def _skills_used(skills: list[ResolvedSkill]) -> list[dict[str, Any]] | None:
     ]
 
 
+#: What the model is told of a tool that returned nothing. Given an empty tool message, models stopped,
+#: guessed, or ended their turn without a word; the SDKs say the same of the host's tools. For the model.
+TOOL_RETURNED_NOTHING = "The tool returned no result."
+
+
+def _or_no_result(content: Any) -> Any:
+    """A tool's result as the model gets it: :data:`TOOL_RETURNED_NOTHING` for none, or only spaces."""
+    if content is None or (isinstance(content, str) and not content.strip()):
+        return TOOL_RETURNED_NOTHING
+    return content
+
+
 @dataclass(slots=True)
 class _Prepared:
     """What a request has gathered on its way to the model.
@@ -1042,6 +1055,11 @@ class _Prepared:
 
     payload: dict[str, Any]
     egress_payload: dict[str, Any] | None = None
+    #: What goes to the model before ``answer_variety`` varied it: a request split into its ``n`` answers
+    #: varies each from this.
+    unvaried_payload: dict[str, Any] | None = None
+    #: How many answers a whole answer is asked for one by one (``answer_variety.split``); ``None``: as sent.
+    split_choices: int | None = None
     #: The media URLs the client sent, fetched by the gateway: (url, kind) -> data: URL (media_fetch.py).
     media: dict[tuple[str, str], str] = field(default_factory=dict)
     token_mapping: dict[str, str] | None = None
@@ -1309,11 +1327,7 @@ class GatewayService:
                             top_n=rerank.get("top_n"),
                         )
                     else:
-                        adapter_result = await self.adapter.completion(
-                            **_candidate_adapter_kwargs(decision.candidate),
-                            payload=req.egress_payload,
-                            stream=False,
-                        )
+                        adapter_result = await self._whole_chat(req)
                     from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
                     assert isinstance(adapter_result, CompletionResult)  # noqa: S101
                     result = UpstreamResult(
@@ -1575,20 +1589,27 @@ class GatewayService:
         A client that asked for events gets ``faden.provenance`` in the
         answer's ``faden`` object, signed or saying it is unsigned. Without a
         receipt -- no text, the module off, the engine failing -- the answer
-        is as it was and the receipts are the pictures' alone.
+        is as it was and the receipts are the pictures' alone. An answer with
+        several choices (``n``) gets one receipt per choice, in their order;
+        the usage counts them all, so each choice's tokens are counted from its
+        text for the short-text rule.
         """
-        signing = self._answer_receipt(
-            req, text_receipts.answer_output(payload), completion_tokens=completion_tokens,
-            model_alias=model_alias, request_id=request_id,
-        )
-        if signing is None:
+        outputs = text_receipts.answer_outputs(payload) or [""]
+        tokens = completion_tokens if len(outputs) == 1 else None
+        signings = [
+            self._answer_receipt(
+                req, output, completion_tokens=tokens, model_alias=model_alias, request_id=request_id,
+            )
+            for output in outputs
+        ]
+        if all(signing is None for signing in signings):
             return payload, pictures
-        signed = await signing
+        signed = await asyncio.gather(*(s for s in signings if s is not None))
         if req.faden_events and isinstance(payload, dict):
             faden = payload.get("faden") if isinstance(payload.get("faden"), dict) else {}
-            events = [*(faden.get("events") or []), text_receipts.event(signed)]
+            events = [*(faden.get("events") or []), *(text_receipts.event(s) for s in signed)]
             payload = {**payload, "faden": {**faden, "events": events}}
-        return payload, ((signed.receipt_id, *pictures) if signed is not None else pictures)
+        return payload, (*(s.receipt_id for s in signed if s is not None), *pictures)
 
     def _stream_receipt(
         self,
@@ -2519,6 +2540,17 @@ class GatewayService:
             # Last, on what leaves: every media URL as the data: URL the gateway fetched for it. The
             # tool rounds, the retries and the background turn all send this payload on.
             egress = await media_fetch.inline(egress, req.media)
+            # A watermarked model would give the same request the same answer: the request ends in an
+            # invisible variation, and n answers are asked for one by one (answer_variety).
+            req.unvaried_payload = egress
+            try:
+                req.split_choices = answer_variety.split(egress, req.decision.candidate, stream=stream)
+            except ValueError as exc:
+                raise GatewayError(
+                    status_code=400, message=str(exc), error_type="invalid_request_error",
+                    code="n_not_supported",
+                ) from exc
+            egress = answer_variety.vary(egress, req.decision.candidate)
         req.egress_payload = egress
         # The model call is next, and it lasts seconds.
         await self._release_request_connection()
@@ -3409,6 +3441,33 @@ class GatewayService:
         events.append(faden_events.gateway_round(_replayable(round_messages, req.token_mapping)))
         return events
 
+    async def _whole_chat(self, req: _Prepared) -> Any:
+        """A whole chat answer: as sent, or ``n`` answers asked for one by one and joined (answer_variety).
+
+        A split request's answers are asked for at once, so they take as long as one; the first that fails
+        is the answer.
+        """
+        assert req.decision is not None and req.egress_payload is not None  # noqa: S101
+        candidate = req.decision.candidate
+        if req.split_choices is None or req.unvaried_payload is None:
+            return await self.adapter.completion(
+                **_candidate_adapter_kwargs(candidate), payload=req.egress_payload, stream=False,
+            )
+        # Each call its own kwargs: the adapter takes the headers out of the extra parameters it is given.
+        results = await asyncio.gather(*(
+            self.adapter.completion(
+                **_candidate_adapter_kwargs(candidate),
+                payload=answer_variety.one_of(req.unvaried_payload, candidate, index), stream=False,
+            )
+            for index in range(req.split_choices)
+        ))
+        from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
+
+        failed = next((r for r in results if r.status_code >= 400 or not isinstance(r.payload, dict)), None)
+        if failed is not None:
+            return failed
+        return CompletionResult(status_code=200, payload=answer_variety.merged([r.payload for r in results]))
+
     async def _complete(self, req: _Prepared, payload: dict[str, Any]) -> UpstreamResult:
         """One whole model call; an error from upstream is raised, not answered."""
         from faden_gateway.services.gateway.llm_adapter import CompletionResult  # noqa: PLC0415
@@ -3535,6 +3594,7 @@ class GatewayService:
                 cited = None if is_error else faden_events.citations(name, content)
                 if cited is not None:
                     req.faden_pending.append(cited)
+            content = _or_no_result(content)
             return row, {"role": "tool", "tool_call_id": call.get("id", ""), "content": content}
 
         # Calls the model makes together are independent -- it asked for them

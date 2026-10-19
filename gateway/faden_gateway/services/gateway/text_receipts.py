@@ -9,7 +9,8 @@ agent, and whether the text carries a watermark (``watermark``, the table in the
   receipt, for a client that asked for the gateway's events (``X-Faden-Events``). The receipt is asked
   for either way, so the engine keeps it; a client that did not ask does not wait for it.
 - A whole answer gets the receipt's id in ``X-Faden-Provenance``, before the receipts of the pictures
-  it carries; a client that asked for events gets the event in the answer's ``faden`` object too.
+  it carries; a client that asked for events gets the event in the answer's ``faden`` object too. With
+  several choices (``n``), each gets its own receipt, in their order.
 - The receipt covers the turn's whole output: its text, then each tool call's arguments as the model wrote
   them (sdk/14 §1): the text an agent writes into a document arrives as tool arguments. A turn with neither
   gets none.
@@ -49,12 +50,13 @@ _MARKING_PROVIDERS = {ProviderType.REMOTE_ANTHROPIC: "anthropic"}
 _MARKING_LITELLM_PROVIDERS = {"anthropic": "anthropic"}
 
 
-def answer_text(payload: Any) -> str:
-    """A whole answer's first choice's text, as the client gets it: its content, or its text parts in turn."""
+def _choices(payload: Any) -> list[dict[str, Any]]:
     choices = payload.get("choices") if isinstance(payload, dict) else None
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        return ""
-    message = choices[0].get("message")
+    return [c for c in choices if isinstance(c, dict)] if isinstance(choices, list) else []
+
+
+def _choice_text(choice: dict[str, Any]) -> str:
+    message = choice.get("message")
     content = message.get("content") if isinstance(message, dict) else None
     if isinstance(content, str):
         return content
@@ -62,6 +64,18 @@ def answer_text(payload: Any) -> str:
         parts = (part for part in content if isinstance(part, dict) and part.get("type") == "text")
         return "".join(str(part.get("text") or "") for part in parts)
     return ""
+
+
+def _choice_output(choice: dict[str, Any]) -> str:
+    message = choice.get("message")
+    calls = message.get("tool_calls") if isinstance(message, dict) else None
+    return turn_output(_choice_text(choice), calls if isinstance(calls, list) else None)
+
+
+def answer_text(payload: Any) -> str:
+    """A whole answer's first choice's text, as the client gets it: its content, or its text parts in turn."""
+    choices = _choices(payload)
+    return _choice_text(choices[0]) if choices else ""
 
 
 def turn_output(text: str, tool_calls: list[dict[str, Any]] | None) -> str:
@@ -76,11 +90,13 @@ def turn_output(text: str, tool_calls: list[dict[str, Any]] | None) -> str:
 
 def answer_output(payload: Any) -> str:
     """A whole answer's :func:`turn_output`: its first choice's text and tool calls."""
-    choices = payload.get("choices") if isinstance(payload, dict) else None
-    first = choices[0] if isinstance(choices, list) and choices else None
-    message = first.get("message") if isinstance(first, dict) else None
-    calls = message.get("tool_calls") if isinstance(message, dict) else None
-    return turn_output(answer_text(payload), calls if isinstance(calls, list) else None)
+    choices = _choices(payload)
+    return _choice_output(choices[0]) if choices else ""
+
+
+def answer_outputs(payload: Any) -> list[str]:
+    """Each choice's :func:`turn_output`, in order: one per answer a request with ``n`` got."""
+    return [_choice_output(choice) for choice in _choices(payload)]
 
 
 def has_text(text: str) -> bool:
@@ -153,6 +169,21 @@ def _runtime_mark(candidate: Any) -> dict[str, Any] | None:
     if isinstance(tokenizer, str) and 0 < len(tokenizer) <= 256:
         mark["tokenizer"] = tokenizer
     return mark
+
+
+def watermarks(candidate: Any, sent: dict[str, Any]) -> bool:
+    """Whether *candidate*'s runtime watermarks its answer to the request *sent*, whatever its length.
+
+    A local route whose runtime says it watermarks, not switched off by the route's own parameters, and
+    not asked to decode greedily (vLLM never watermarks that).
+    """
+    params = getattr(candidate, "extra_params", None) or {}
+    return (
+        not _remote(candidate)
+        and _runtime_mark(candidate) is not None
+        and not _switched_off(params)
+        and not _greedy({**sent, **params})
+    )
 
 
 def watermark(
