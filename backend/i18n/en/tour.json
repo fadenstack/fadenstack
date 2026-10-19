@@ -360,9 +360,11 @@
     },
     "agent_trace": {
       "title": "LLM Calls",
-      "description": "How providers, runtimes and models connect, and the calls going through them as they happen.",
-      "action_graph": "Search and filter the graph; click a node for its details",
-      "action_live": "Watch calls arrive; pause and resume the stream"
+      "description": "Every call through the gateway: find the one that went wrong, see why, and see where calls are routed.",
+      "action_find": "Narrow the list by time, model, outcome or any id; click Errors to see only failures",
+      "action_inspect": "Open a call for its diagnosis, timeline, conversation and every recorded field; j and k move between calls",
+      "action_routing": "See which providers answered each model, with errors and p95 latency",
+      "action_live": "New calls arrive every few seconds; pause to read, and copy a call's link to share it"
     },
     "endpoint": {
       "title": "API Endpoint",

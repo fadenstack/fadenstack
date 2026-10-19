@@ -76,7 +76,7 @@ export default [
     layout("routes/provenance-guard.tsx", [
       route("/admin/check-content", "pages/admin/provenance/AdminCheckContentPage.tsx"),
     ]),
-    route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
+    route("/admin/llm/agent-trace", "pages/admin/llm/LlmCallsPage.tsx"),
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
     // PII routes — guarded by module status
     layout("routes/pii-guard.tsx", [

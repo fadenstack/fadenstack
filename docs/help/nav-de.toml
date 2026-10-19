@@ -27,6 +27,7 @@ nav = [
     { "Kennzeichnung KI-generierter Inhalte" = "administer/content-marking.md" },
     { "Was mit einer Anfrage geschieht" = "administer/requests.md" },
     { "Nutzung und Kosten" = "administer/usage.md" },
+    { "LLM-Aufrufe" = "administer/llm-calls.md" },
     { "Das Dashboard" = "administer/dashboard.md" },
   ] },
   { "Betreiben" = [

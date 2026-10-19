@@ -32,6 +32,7 @@ nav = [
     { "Content marking" = "administer/content-marking.md" },
     { "What happens to a request" = "administer/requests.md" },
     { "Usage and costs" = "administer/usage.md" },
+    { "LLM calls" = "administer/llm-calls.md" },
     { "The dashboard" = "administer/dashboard.md" },
   ] },
   { "Operate" = [

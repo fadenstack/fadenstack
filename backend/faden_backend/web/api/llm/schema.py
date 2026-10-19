@@ -522,3 +522,211 @@ class DataUsageSummaryDTO(BaseModel):
     instances: list[DataUsagePerInstanceDTO]
     grand_total_requests: int = 0
     grand_total_tokens: int = 0
+
+
+# -----------------------------------------------------------------------
+# LLM Calls explorer
+# -----------------------------------------------------------------------
+
+
+class LLMCallDTO(BaseModel):
+    """One call through the gateway: what it was, how long it took, how it ended."""
+
+    id: str
+    request_id: str
+    trace_id: str | None = None
+    tenant_id: str
+    user_id: str
+    model_alias: str | None = None
+    provider_instance_id: str | None = None
+    #: The backend provider the instance serves, and its name, when there still is one.
+    provider_id: str | None = None
+    provider_name: str | None = None
+    endpoint: str
+    status_code: int
+    latency_ms: int
+    ttft_ms: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    cached_tokens: int | None = None
+    error_code: str | None = None
+    estimated_total_cost: float | None = None
+    currency: str | None = None
+    stream: bool | None = None
+    session_id: str | None = None
+    agent_id: str | None = None
+    device_id: str | None = None
+    conversation_id: str | None = None
+    turn_id: str | None = None
+    group_id: str | None = None
+    project_id: str | None = None
+    finish_reason: str | None = None
+    retry_count: int | None = None
+    skills_used: Any = None
+    rag_context: Any = None
+    mcp_tool_call_count: int | None = None
+    mcp_tool_loop_iterations: int | None = None
+    created_at: datetime
+
+
+class LLMCallPageDTO(BaseModel):
+    """A page of calls, newest first unless sorted otherwise."""
+
+    items: list[LLMCallDTO]
+    total: int
+    page: int
+    limit: int
+
+
+class LLMCallModelCountDTO(BaseModel):
+    """A model name and how many calls asked for it."""
+
+    model_alias: str
+    calls: int
+
+
+class LLMCallStatsDTO(BaseModel):
+    """The calls a filter selects, summed up."""
+
+    total: int = 0
+    errors: int = 0
+    error_rate: float | None = None
+    p50_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    p95_ttft_ms: float | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    estimated_total_cost: float | None = None
+    models: list[LLMCallModelCountDTO] = Field(default_factory=list)
+
+
+class LLMCallToolDTO(BaseModel):
+    """A tool the gateway ran for a call: never its arguments, result or error text."""
+
+    id: str
+    iteration: int
+    tool_name: str
+    mcp_server: str | None = None
+    latency_ms: int | None = None
+    is_error: bool
+    error_kind: str | None = None
+    created_at: datetime
+
+
+class LLMCallPolicyDTO(BaseModel):
+    """What a governance check decided about a call: never the text it objected to."""
+
+    stage: str
+    outcome: str
+    category: str
+    check_name: str
+    tool_id: str | None = None
+    created_at: datetime
+
+
+class LLMClientEventDTO(BaseModel):
+    """What an agent's app reported doing during a turn: a tool it ran, or an approval it waited for.
+
+    Names, sources, outcomes and timings only: arguments, results and messages are never received.
+    """
+
+    type: str
+    at: datetime
+    tool: str | None = None
+    source: str | None = None
+    server: str | None = None
+    outcome: str | None = None
+    duration_ms: int | None = None
+    decision: str | None = None
+    wait_ms: int | None = None
+    scope: str | None = None
+
+
+class LLMCallDetailDTO(BaseModel):
+    """A call with what happened inside it and the calls around it."""
+
+    call: LLMCallDTO
+    tool_calls: list[LLMCallToolDTO] = Field(default_factory=list)
+    policy_decisions: list[LLMCallPolicyDTO] = Field(default_factory=list)
+    #: The other calls of the same conversation, session or trace, oldest first.
+    related: list[LLMCallDTO] = Field(default_factory=list)
+    related_by: str | None = None
+    related_key: str | None = None
+    #: The calls of the same turn (one user request: the model's rounds), oldest first.
+    turn_calls: list[LLMCallDTO] = Field(default_factory=list)
+    #: The tools the agent's app ran and the approvals it waited for during the turn.
+    client_events: list[LLMClientEventDTO] = Field(default_factory=list)
+
+
+class LLMTurnDTO(BaseModel):
+    """One user request: the calls an agent's app made for it (its turn), or a call on its own."""
+
+    key: str
+    turn_id: str | None = None
+    conversation_id: str | None = None
+    session_id: str | None = None
+    agent_id: str | None = None
+    device_id: str | None = None
+    tenant_id: str
+    user_id: str
+    started_at: datetime
+    ended_at: datetime
+    duration_ms: int
+    calls: int
+    #: Rounds that ended asking the app to run tools (finish reason ``tool_calls``).
+    tool_rounds: int = 0
+    errors: int = 0
+    llm_ms: int = 0
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_total_cost: float | None = None
+    currency: str | None = None
+    #: Tools the gateway ran itself (MCP).
+    server_tools: int = 0
+    #: Tools the app ran, as it reported them, and how many failed.
+    client_tools: int = 0
+    client_tool_errors: int = 0
+    approvals: int = 0
+    approvals_denied: int = 0
+    approval_wait_ms: int = 0
+    last_call_id: str
+    model_alias: str | None = None
+    provider_instance_id: str | None = None
+    provider_id: str | None = None
+    provider_name: str | None = None
+    endpoint: str
+    finish_reason: str | None = None
+    status_code: int
+    worst_status: int
+    error_code: str | None = None
+
+
+class LLMTurnPageDTO(BaseModel):
+    """A page of turns, newest first unless sorted otherwise."""
+
+    items: list[LLMTurnDTO]
+    total: int
+    page: int
+    limit: int
+
+
+class LLMRouteDTO(BaseModel):
+    """Calls for one model name that one provider instance answered."""
+
+    model_alias: str | None = None
+    provider_instance_id: str | None = None
+    provider_id: str | None = None
+    provider_name: str | None = None
+    calls: int
+    errors: int
+    p95_latency_ms: float | None = None
+    tokens: int = 0
+    last_call_at: datetime | None = None
+
+
+class LLMRoutingDTO(BaseModel):
+    """Where the calls in a window went."""
+
+    routes: list[LLMRouteDTO]

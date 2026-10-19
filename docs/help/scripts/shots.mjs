@@ -419,6 +419,19 @@ const SHOTS = [
     name: "use/chat-search", path: "/chat",
     act: async (p) => p.getByPlaceholder(L("Search chats")).fill("quantum"),
   },
+  // LLM Calls: the requests, one opened with its timeline, a failed call's diagnosis, the routing map.
+  { name: "administer/llm-calls", path: "/admin/llm/agent-trace?range=24h", wait: 3000 },
+  { name: "administer/llm-calls-request", path: () => `/admin/llm/agent-trace?range=24h&call=${IDS.llm_call}`, wait: 4000 },
+  {
+    name: "administer/llm-calls-request-timeline", path: () => `/admin/llm/agent-trace?range=24h&call=${IDS.llm_call}`, wait: 4000,
+    act: async (p) => p.getByTestId("llm-call-detail").getByText(K("llm_calls.section_turn"), { exact: true }).first().scrollIntoViewIfNeeded(),
+    clip: (p) => p.getByTestId("llm-call-detail"),
+  },
+  {
+    name: "administer/llm-calls-error",
+    path: () => `/admin/llm/agent-trace?range=7d&group=calls&outcome=error&call=${IDS.llm_call_error}`, wait: 4000,
+  },
+  { name: "administer/llm-calls-routing", path: "/admin/llm/agent-trace?range=7d&view=routing", wait: 3000 },
 ];
 
 const only = new Set(process.argv.slice(2));
