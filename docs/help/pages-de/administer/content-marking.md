@@ -74,8 +74,10 @@ GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
 
 - Ein Modell bekommt das Wasserzeichen beim nächsten Start. Ein Wechsel der Runtime startet den Cluster und seine
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
-- Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein. Es
-  wird in weniger ihrer Antworten gefunden, weil die Entwürfe, die das Modell übernimmt, wenig davon tragen.
+- Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein. Für
+  Modelle, die MTP haben, empfehlen wir es: Antworten kommen etwa 70 % schneller. Das Wasserzeichen wird in
+  weniger ihrer Antworten gefunden (in unserer Messung in etwa der Hälfte der langen), weil die Entwürfe, die das
+  Modell übernimmt, wenig davon tragen; Belege und die Nachweise der Agenten sind dieselben wie ohne MTP.
 - Ein Superuser kann das Wasserzeichen für eine einzelne Bereitstellung mit der Engine-Einstellung
   `watermark_config: false` ausschalten (siehe [Engine-Einstellungen](deployments.md#engine-settings)). Die Belege
   ihrer Antworten vermerken dann, dass sie keines tragen.

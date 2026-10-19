@@ -68,8 +68,10 @@ the one with vLLM 0.29 has none.
 
 - A model picks up the watermark the next time it starts. Switching a cluster's runtime restarts the cluster and
   its models (see [Clusters](../operate/clusters.md#runtime)).
-- Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself. It is found in
-  fewer of their answers, as the drafts the model accepts carry little of it.
+- Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself. We recommend MTP
+  for models that have it: answers come about 70 % faster. The watermark is found in fewer of their answers (about
+  half of the long ones in our measurement), as the drafts the model accepts carry little of it; receipts and the
+  agents' records are the same as without MTP.
 - A superuser can switch the watermark off for one deployment with the engine setting `watermark_config: false`
   (see [Engine settings](deployments.md#engine-settings)). The receipts of its answers then say that they carry
   none.
