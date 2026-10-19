@@ -88,6 +88,19 @@ export interface LlmCallPolicy {
   created_at: string;
 }
 
+export interface LlmClientEvent {
+  type: "tool.executed" | "approval.decided" | string;
+  at: string;
+  tool: string | null;
+  source: string | null;
+  server: string | null;
+  outcome: string | null;
+  duration_ms: number | null;
+  decision: string | null;
+  wait_ms: number | null;
+  scope: string | null;
+}
+
 export interface LlmCallDetail {
   call: LlmCall;
   tool_calls: LlmCallTool[];
@@ -95,6 +108,57 @@ export interface LlmCallDetail {
   related: LlmCall[];
   related_by: "conversation_id" | "session_id" | "trace_id" | null;
   related_key: string | null;
+  /** The calls of the same turn (one user request), oldest first. */
+  turn_calls: LlmCall[];
+  /** The tools the agent's app ran and the approvals it waited for during the turn. */
+  client_events: LlmClientEvent[];
+}
+
+/** One user request: the rounds an agent's app made for it, or a call on its own. */
+export interface LlmTurn {
+  key: string;
+  turn_id: string | null;
+  conversation_id: string | null;
+  session_id: string | null;
+  agent_id: string | null;
+  device_id: string | null;
+  tenant_id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  calls: number;
+  tool_rounds: number;
+  errors: number;
+  llm_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  estimated_total_cost: number | null;
+  currency: string | null;
+  server_tools: number;
+  client_tools: number;
+  client_tool_errors: number;
+  approvals: number;
+  approvals_denied: number;
+  approval_wait_ms: number;
+  last_call_id: string;
+  model_alias: string | null;
+  provider_instance_id: string | null;
+  provider_id: string | null;
+  provider_name: string | null;
+  endpoint: string;
+  finish_reason: string | null;
+  status_code: number;
+  worst_status: number;
+  error_code: string | null;
+}
+
+export interface LlmTurnPage {
+  items: LlmTurn[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface LlmRoute {
@@ -151,6 +215,9 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
 export const llmCalls = {
   list(query: CallQuery, opts: { page?: number; limit?: number; sort?: CallSort } = {}, signal?: AbortSignal) {
     return request<LlmCallPage>(`/calls${qs({ ...query, ...opts })}`, signal);
+  },
+  turns(query: CallQuery, opts: { page?: number; limit?: number; sort?: CallSort } = {}, signal?: AbortSignal) {
+    return request<LlmTurnPage>(`/turns${qs({ ...query, ...opts })}`, signal);
   },
   stats(query: CallQuery, signal?: AbortSignal) {
     return request<LlmCallStats>(`/calls/stats${qs(query)}`, signal);

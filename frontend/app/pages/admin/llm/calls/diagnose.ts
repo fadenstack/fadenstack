@@ -6,7 +6,7 @@
  * headline and ``<id>_hint`` for what to check next.
  */
 
-import type { LlmCall, LlmCallPolicy, LlmCallTool } from "~/api/llmCalls";
+import type { LlmCall, LlmCallPolicy, LlmCallTool, LlmClientEvent } from "~/api/llmCalls";
 
 import { formatDuration, generationSpeed } from "./format";
 
@@ -36,6 +36,8 @@ const MODEL_CODES = new Set(["model_not_found", "missing_model", "model_required
 const SLOW_TTFT_MS = 10_000;
 const SLOW_GENERATION_TOKENS_PER_SEC = 5;
 const LONG_WAIT_MS = 5 * 60_000;
+const APPROVAL_WAIT_MS = 30_000;
+const MANY_ROUNDS = 8;
 
 export function isErrorCall(call: Pick<LlmCall, "status_code" | "error_code">): boolean {
   return call.status_code >= 400 || Boolean(call.error_code);
@@ -65,11 +67,40 @@ function failure(call: LlmCall): Finding | null {
 
 export function diagnose(
   call: LlmCall,
-  opts: { tools?: LlmCallTool[]; policies?: LlmCallPolicy[]; p95LatencyMs?: number | null } = {},
+  opts: {
+    tools?: LlmCallTool[];
+    policies?: LlmCallPolicy[];
+    p95LatencyMs?: number | null;
+    /** What the agent's app reported during the turn: the tools it ran, the approvals it waited for. */
+    events?: LlmClientEvent[];
+    /** The calls of the turn (the model's rounds for one request). */
+    turnCalls?: LlmCall[];
+  } = {},
 ): Finding[] {
   const findings: Finding[] = [];
   const failed = failure(call);
   if (failed) findings.push(failed);
+
+  const events = opts.events ?? [];
+  const appFailures = events.filter(
+    (e) => e.type === "tool.executed" && e.outcome && e.outcome !== "ok" && e.outcome !== "denied",
+  );
+  if (appFailures.length) {
+    const names = [...new Set(appFailures.map((e) => e.tool ?? "?"))].slice(0, 3).join(", ");
+    findings.push({ id: "app_tool_errors", severity: "warning", params: { count: appFailures.length, names } });
+  }
+  const denied = events.filter(
+    (e) => (e.type === "approval.decided" && e.decision === "denied") || (e.type === "tool.executed" && e.outcome === "denied"),
+  );
+  if (denied.length) {
+    const names = [...new Set(denied.map((e) => e.tool ?? "?"))].slice(0, 3).join(", ");
+    findings.push({ id: "app_denied", severity: "info", params: { names } });
+  }
+  const waited = events.reduce((sum, e) => sum + (e.type === "approval.decided" ? (e.wait_ms ?? 0) : 0), 0);
+  if (waited >= APPROVAL_WAIT_MS)
+    findings.push({ id: "approval_wait", severity: "info", params: { wait: formatDuration(waited) } });
+  const rounds = opts.turnCalls?.length ?? 0;
+  if (rounds >= MANY_ROUNDS) findings.push({ id: "many_rounds", severity: "warning", params: { count: rounds } });
 
   const blocked = (opts.policies ?? []).filter((p) => p.outcome === "block" || p.outcome === "rejected");
   if (blocked.length && failed?.id !== "policy_blocked") {

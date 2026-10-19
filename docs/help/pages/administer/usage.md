@@ -26,6 +26,7 @@ counted: the chat, the agents, and applications using API tokens.
 |---|---|
 | [Dashboard](dashboard.md) | Today at a glance: **Requests today**, **Active users today**, **Kept in-house**, **Spend this month**, **Error rate (1 h)**; **AI traffic** (where requests were served) and **Usage** (requests per day, by where they were served). |
 | **Observability → Cost Dashboard** | The cost and usage pages (below). |
+| **Observability → LLM Calls** | Each request and call: why one failed, what an agent did for one question, where calls went (see [LLM calls](llm-calls.md)). |
 | An agent's **Activity** tab | Requests, errors, tokens, users and conversations of that agent, counts only (see [Agents and add-ins](agents.md)). |
 | A deployment's page | Requests, speed and failures of that model over the last minutes (see [Deployments](deployments.md)). |
 | **Observability → Data Residency** | How much data went to your machines, your network and outside (see [Data residency](providers.md#data-residency)). |

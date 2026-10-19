@@ -15,6 +15,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
+import HandymanOutlinedIcon from "@mui/icons-material/HandymanOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 
@@ -226,6 +227,11 @@ const Row = memo(function Row({
                 label={call.mcp_tool_call_count}
                 sx={{ height: 20, "& .MuiChip-label": { px: 0.5 } }}
               />
+            </Tooltip>
+          )}
+          {call.finish_reason === "tool_calls" && (
+            <Tooltip title={t("llm_calls.flag_requested_tools")}>
+              <HandymanOutlinedIcon sx={{ fontSize: 16, color: "info.main" }} />
             </Tooltip>
           )}
           {call.finish_reason === "length" && (

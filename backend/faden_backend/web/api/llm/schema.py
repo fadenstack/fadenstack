@@ -625,6 +625,24 @@ class LLMCallPolicyDTO(BaseModel):
     created_at: datetime
 
 
+class LLMClientEventDTO(BaseModel):
+    """What an agent's app reported doing during a turn: a tool it ran, or an approval it waited for.
+
+    Names, sources, outcomes and timings only: arguments, results and messages are never received.
+    """
+
+    type: str
+    at: datetime
+    tool: str | None = None
+    source: str | None = None
+    server: str | None = None
+    outcome: str | None = None
+    duration_ms: int | None = None
+    decision: str | None = None
+    wait_ms: int | None = None
+    scope: str | None = None
+
+
 class LLMCallDetailDTO(BaseModel):
     """A call with what happened inside it and the calls around it."""
 
@@ -635,6 +653,63 @@ class LLMCallDetailDTO(BaseModel):
     related: list[LLMCallDTO] = Field(default_factory=list)
     related_by: str | None = None
     related_key: str | None = None
+    #: The calls of the same turn (one user request: the model's rounds), oldest first.
+    turn_calls: list[LLMCallDTO] = Field(default_factory=list)
+    #: The tools the agent's app ran and the approvals it waited for during the turn.
+    client_events: list[LLMClientEventDTO] = Field(default_factory=list)
+
+
+class LLMTurnDTO(BaseModel):
+    """One user request: the calls an agent's app made for it (its turn), or a call on its own."""
+
+    key: str
+    turn_id: str | None = None
+    conversation_id: str | None = None
+    session_id: str | None = None
+    agent_id: str | None = None
+    device_id: str | None = None
+    tenant_id: str
+    user_id: str
+    started_at: datetime
+    ended_at: datetime
+    duration_ms: int
+    calls: int
+    #: Rounds that ended asking the app to run tools (finish reason ``tool_calls``).
+    tool_rounds: int = 0
+    errors: int = 0
+    llm_ms: int = 0
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_total_cost: float | None = None
+    currency: str | None = None
+    #: Tools the gateway ran itself (MCP).
+    server_tools: int = 0
+    #: Tools the app ran, as it reported them, and how many failed.
+    client_tools: int = 0
+    client_tool_errors: int = 0
+    approvals: int = 0
+    approvals_denied: int = 0
+    approval_wait_ms: int = 0
+    last_call_id: str
+    model_alias: str | None = None
+    provider_instance_id: str | None = None
+    provider_id: str | None = None
+    provider_name: str | None = None
+    endpoint: str
+    finish_reason: str | None = None
+    status_code: int
+    worst_status: int
+    error_code: str | None = None
+
+
+class LLMTurnPageDTO(BaseModel):
+    """A page of turns, newest first unless sorted otherwise."""
+
+    items: list[LLMTurnDTO]
+    total: int
+    page: int
+    limit: int
 
 
 class LLMRouteDTO(BaseModel):

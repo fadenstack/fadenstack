@@ -50,11 +50,13 @@ import {
   type LlmCallPage,
   type LlmCallStats,
   type LlmRoute,
+  type LlmTurnPage,
 } from "~/api/llmCalls";
 import { RangeToggle } from "~/components/dashboard/kit";
 
 import CallDetail from "./calls/CallDetail";
 import CallsTable from "./calls/CallsTable";
+import TurnsTable from "./calls/TurnsTable";
 import RoutingMap from "./calls/RoutingMap";
 import StatsStrip from "./calls/StatsStrip";
 import { shortId } from "./calls/format";
@@ -98,6 +100,8 @@ export default function LlmCallsPage() {
   const limit = PAGE_SIZES.includes(Number(params.get("limit"))) ? Number(params.get("limit")) : 50;
   const selectedId = params.get("call");
   const view = params.get("view") === "routing" ? "routing" : "calls";
+  /** Requests (an agent's rounds for one user request, together) unless each call is asked for. */
+  const grouped = params.get("group") !== "calls";
 
   const update = useCallback(
     (changes: Record<string, string | null | undefined>, opts: { resetPage?: boolean; push?: boolean } = {}) => {
@@ -127,6 +131,7 @@ export default function LlmCallsPage() {
 
   const [live, setLive] = useState(true);
   const [data, setData] = useState<LlmCallPage | null>(null);
+  const [turnData, setTurnData] = useState<LlmTurnPage | null>(null);
   const [stats, setStats] = useState<LlmCallStats | null>(null);
   const [routes, setRoutes] = useState<LlmRoute[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,7 +140,7 @@ export default function LlmCallsPage() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const knownIds = useRef<Set<string>>(new Set());
-  const queryKey = JSON.stringify([rangeMs, q, model, outcome, session, userId, sort, page, limit, view]);
+  const queryKey = JSON.stringify([rangeMs, q, model, outcome, session, userId, sort, page, limit, view, grouped]);
   const lastKey = useRef<string>("");
   /** Bumped by every load: only the latest one may write, whatever its trigger (filter, poll, button). */
   const loadSeq = useRef(0);
@@ -156,10 +161,11 @@ export default function LlmCallsPage() {
       const stale = () => signal.aborted || seq !== loadSeq.current;
       if (!background) setLoading(true);
       try {
-        const [list, summary, routing] = await Promise.all([
-          view === "calls" ? llmCalls.list(query, { page, limit, sort }, signal) : Promise.resolve(null),
+        const [list, summary, routing, turnList] = await Promise.all([
+          view === "calls" && !grouped ? llmCalls.list(query, { page, limit, sort }, signal) : Promise.resolve(null),
           llmCalls.stats(query, signal),
           view === "routing" ? llmCalls.routing(query, signal) : Promise.resolve(null),
+          view === "calls" && grouped ? llmCalls.turns(query, { page, limit, sort }, signal) : Promise.resolve(null),
         ]);
         if (stale()) return;
         if (list) {
@@ -168,6 +174,13 @@ export default function LlmCallsPage() {
           setFresh(background ? new Set(ids.filter((id) => !knownIds.current.has(id))) : new Set());
           knownIds.current = new Set(ids);
           setData(list);
+        }
+        if (turnList) {
+          // A turn that got another round counts as new too.
+          const keys = turnList.items.map((x) => `${x.key}:${x.calls}`);
+          setFresh(background ? new Set(turnList.items.filter((x, i) => !knownIds.current.has(keys[i])).map((x) => x.key)) : new Set());
+          knownIds.current = new Set(keys);
+          setTurnData(turnList);
         }
         if (routing) setRoutes(routing.routes);
         setStats(summary);
@@ -216,7 +229,9 @@ export default function LlmCallsPage() {
   }, []);
 
   const calls = data?.items ?? [];
-  const selectedIndex = selectedId ? calls.findIndex((c) => c.id === selectedId) : -1;
+  const turns = turnData?.items ?? [];
+  const selectedIndex = selectedId && !grouped ? calls.findIndex((c) => c.id === selectedId) : -1;
+  const turnIndex = selectedId && grouped ? turns.findIndex((x) => x.last_call_id === selectedId) : -1;
   // A linked call may be on another page of the list: the map fetches it on its own to draw its way.
   const [linkedCall, setLinkedCall] = useState<LlmCall | null>(null);
   const inList = selectedIndex >= 0;
@@ -234,9 +249,12 @@ export default function LlmCallsPage() {
   }, [selectedId, inList, view]);
   const selectedCall: LlmCall | null = inList ? calls[selectedIndex] : linkedCall;
   const select = useCallback((id: string | null) => update({ call: id }), [update]);
-  const onPrev = selectedIndex > 0 ? () => select(calls[selectedIndex - 1].id) : undefined;
-  const onNext =
-    selectedIndex >= 0 && selectedIndex < calls.length - 1 ? () => select(calls[selectedIndex + 1].id) : undefined;
+  const navIds = grouped ? turns.map((x) => x.last_call_id) : calls.map((c) => c.id);
+  const navIndex = grouped ? turnIndex : selectedIndex;
+  const onPrev = navIndex > 0 ? () => select(navIds[navIndex - 1]) : undefined;
+  const onNext = navIndex >= 0 && navIndex < navIds.length - 1 ? () => select(navIds[navIndex + 1]) : undefined;
+
+  const listTotal = grouped ? (turnData?.total ?? null) : (data?.total ?? null);
 
   const modelOptions = useMemo(() => {
     const list = (stats?.models ?? []).map((m) => m.model_alias);
@@ -399,9 +417,26 @@ export default function LlmCallsPage() {
             <Tab value="routing" label={t("llm_calls.view_routing")} />
           </Tabs>
           <Box sx={{ flex: 1 }} />
-          {view === "calls" && data && (
+          {view === "calls" && (
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={grouped ? "turns" : "calls"}
+              onChange={(_, v: string | null) => v && update({ group: v === "turns" ? null : v, call: null }, { resetPage: true })}
+              aria-label={t("llm_calls.group_by")}
+              sx={{ mr: 1.5, "& .MuiToggleButton-root": { py: 0.25, px: 1.25, textTransform: "none" } }}
+            >
+              <ToggleButton value="turns" title={t("llm_calls.group_turns_tooltip")}>
+                {t("llm_calls.group_turns")}
+              </ToggleButton>
+              <ToggleButton value="calls" title={t("llm_calls.group_calls_tooltip")}>
+                {t("llm_calls.group_calls")}
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          {view === "calls" && listTotal !== null && (
             <Typography variant="caption" color="text.secondary">
-              {t("llm_calls.showing", { count: data.total })}
+              {grouped ? t("llm_calls.showing_turns", { count: listTotal }) : t("llm_calls.showing", { count: listTotal })}
             </Typography>
           )}
         </Stack>
@@ -429,13 +464,25 @@ export default function LlmCallsPage() {
           >
             <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0 }}>
               <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-                {data && calls.length === 0 && !loading ? (
+                {listTotal === 0 && !loading ? (
                   <Box sx={{ p: 6, textAlign: "center" }}>
                     <Typography variant="subtitle1">{t("llm_calls.empty_title")}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                       {t("llm_calls.empty_hint")}
                     </Typography>
                   </Box>
+                ) : grouped ? (
+                  <TurnsTable
+                    turns={turns}
+                    selectedId={selectedId}
+                    onSelect={(id) => select(id === selectedId ? null : id)}
+                    p95LatencyMs={stats?.p95_latency_ms ?? null}
+                    sort={sort}
+                    onSort={(s) => update({ sort: s === "newest" ? null : s }, { resetPage: true })}
+                    fresh={fresh}
+                    now={now}
+                    compact={Boolean(selectedId) && !narrow}
+                  />
                 ) : (
                   <CallsTable
                     calls={calls}
@@ -450,10 +497,10 @@ export default function LlmCallsPage() {
                   />
                 )}
               </Box>
-              {data && data.total > 0 && (
+              {listTotal !== null && listTotal > 0 && (
                 <TablePagination
                   component="div"
-                  count={data.total}
+                  count={listTotal}
                   page={page - 1}
                   rowsPerPage={limit}
                   rowsPerPageOptions={PAGE_SIZES}

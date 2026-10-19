@@ -8,6 +8,7 @@ conversation, and where each model name was routed.
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -103,6 +104,20 @@ _GATEWAY_SCHEMA = (
         policy_name  varchar(256),
         content_hmac varchar(64),
         created_at   timestamptz  NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS agent_client_event (
+        id              uuid PRIMARY KEY,
+        tenant_id       varchar(128) NOT NULL,
+        agent_id        varchar(64)  NOT NULL,
+        user_id         varchar(128) NOT NULL,
+        device_id       varchar(64),
+        conversation_id varchar(128),
+        type            varchar(64)  NOT NULL,
+        data            json         NOT NULL,
+        occurred_at     timestamptz,
+        created_at      timestamptz  NOT NULL DEFAULT now()
     )
     """,
 )
@@ -312,9 +327,69 @@ async def test_routing_names_the_provider_each_instance_serves(gateway: AsyncSes
     assert all(c["provider_name"] == "qwen-cluster" for c in named)
 
 
+async def _event(session: AsyncSession, conv: str, kind: str, age_sec: float, user: str = "u1", **data: Any) -> None:
+    await session.execute(
+        text(
+            "INSERT INTO agent_client_event (id, tenant_id, agent_id, user_id, conversation_id, type, data, occurred_at)"
+            " VALUES (:id, 'default', 'a1', :user, :conv, :type, CAST(:data AS json), :at)",
+        ),
+        {"id": uuid.uuid4(), "user": user, "conv": conv, "type": kind, "data": json.dumps(data),
+         "at": datetime.now(tz=UTC) - timedelta(seconds=age_sec)},
+    )
+
+
+async def test_turns_group_an_agents_rounds_with_the_tools_its_app_ran(gateway: AsyncSession) -> None:
+    """An agent's app asks, runs the tools the model asked for on the device, and asks again: one turn."""
+    agent = {"agent_id": "a1", "conversation_id": "c1", "turn_id": "t1", "latency_ms": 2000}
+    await _call(gateway, **agent, finish_reason="tool_calls", age_sec=50)
+    second = await _call(gateway, **agent, finish_reason="tool_calls", age_sec=40)
+    last = await _call(gateway, **agent, finish_reason="stop", age_sec=30, prompt_tokens=10, total_tokens=12)
+    await _event(gateway, "c1", "tool.executed", 45, tool="read_context", source="host", outcome="ok",
+                 duration_ms=13, arguments="never shown")
+    await _event(gateway, "c1", "approval.decided", 36, tool="insert_text", decision="denied", wait_ms=2000)
+    await _event(gateway, "c1", "tool.executed", 35, tool="insert_text", source="host", outcome="denied")
+    await _event(gateway, "c1", "tool.executed", 5, tool="later", outcome="ok")  # a later turn's
+    await _event(gateway, "c2", "tool.executed", 45, tool="elsewhere", outcome="ok")
+    await _call(gateway, age_sec=20)  # a call of no turn: a turn of its own
+    await _call(gateway, user_id="u2", agent_id="a1", turn_id="t1", age_sec=10)  # same turn id, another user
+
+    svc = LLMCallsService(_factory(gateway))
+    page = await svc.list_turns(_window())
+    assert page["total"] == 3
+    turns = {(t["user_id"], t["turn_id"]): t for t in page["items"]}
+    turn = turns[("u1", "t1")]
+    assert turn["calls"] == 3
+    assert turn["tool_rounds"] == 2
+    assert turn["finish_reason"] == "stop"
+    assert turn["last_call_id"] == ROW_IDS[last]
+    assert turn["llm_ms"] == 6000
+    assert turn["duration_ms"] >= 21_000, "from the first call's start to the last call's end"
+    assert (turn["client_tools"], turn["client_tool_errors"]) == (2, 1)
+    assert (turn["approvals"], turn["approvals_denied"], turn["approval_wait_ms"]) == (1, 1, 2000)
+    assert turns[("u2", "t1")]["calls"] == 1, "a turn id is the app's: another user's is another turn"
+    assert turns[("u1", None)]["calls"] == 1
+    assert next(t["turn_id"] for t in page["items"]) == "t1", "newest first: u2's call"
+
+    errors_only = await svc.list_turns(CallFilters(**{**_window().__dict__, "model_alias": "nope"}))
+    assert errors_only["total"] == 0
+
+    detail = await svc.detail(ROW_IDS[second])
+    assert detail is not None
+    assert [c["finish_reason"] for c in detail["turn_calls"]] == ["tool_calls", "tool_calls", "stop"]
+    assert [(e["type"], e["tool"]) for e in detail["client_events"]] == [
+        ("tool.executed", "read_context"), ("approval.decided", "insert_text"), ("tool.executed", "insert_text"),
+    ]
+    assert all("arguments" not in e and "user_id" not in e for e in detail["client_events"])
+    alone = await svc.detail(ROW_IDS[await _call(gateway)])
+    assert alone is not None
+    assert [c["id"] for c in alone["turn_calls"]] == [alone["call"]["id"]]
+    assert alone["client_events"] == []
+
+
 async def test_without_gateway_database_the_explorer_is_empty() -> None:
     svc = LLMCallsService(None)
     assert (await svc.list_calls(_window()))["items"] == []
+    assert (await svc.list_turns(_window()))["items"] == []
     assert (await svc.stats(_window()))["total"] == 0
     assert await svc.detail("x") is None
     assert (await svc.routing(_window()))["routes"] == []
@@ -346,6 +421,9 @@ async def test_calls_api_validates_range_and_needs_permission(
     listed = await client.get(fastapi_app.url_path_for("list_llm_calls"), params={"outcome": "ok"})
     assert listed.status_code == 200
     assert [c["request_id"] for c in listed.json()["items"]] == [rid]
+
+    turns = await client.get(fastapi_app.url_path_for("list_llm_turns"))
+    assert [t["last_call_id"] for t in turns.json()["items"]] == [ROW_IDS[rid]]
 
     stats = await client.get(fastapi_app.url_path_for("get_llm_call_stats"))
     assert stats.json()["total"] == 1

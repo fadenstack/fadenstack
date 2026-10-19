@@ -25,6 +25,7 @@ nav = [
     { "Richtlinien und personenbezogene Daten" = "administer/policies.md" },
     { "Was mit einer Anfrage geschieht" = "administer/requests.md" },
     { "Nutzung und Kosten" = "administer/usage.md" },
+    { "LLM-Aufrufe" = "administer/llm-calls.md" },
     { "Das Dashboard" = "administer/dashboard.md" },
   ] },
   { "Betreiben" = [

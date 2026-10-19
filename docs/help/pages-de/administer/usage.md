@@ -27,6 +27,7 @@ Chat, die Agenten und Anwendungen, die API-Tokens nutzen.
 |---|---|
 | [Dashboard](dashboard.md) | Den heutigen Tag auf einen Blick: **Anfragen heute**, **Aktive Benutzer heute**, **Intern bearbeitet**, **Kosten diesen Monat**, **Fehlerquote (1 Std.)**; **KI-Datenverkehr** (wo Anfragen bedient wurden) und **Nutzung** (Anfragen pro Tag, nach Ort der Bearbeitung). |
 | **Observability → Kosten-Dashboard** | Die Kosten- und Nutzungsseiten (siehe unten). |
+| **Observability → LLM-Aufrufe** | Jede Anfrage und jeder Aufruf: warum einer fehlschlug, was ein Agent für eine Frage tat, wohin Aufrufe gingen (siehe [LLM-Aufrufe](llm-calls.md)). |
 | Der Reiter **Aktivität** eines Agenten | Anfragen, Fehler, Tokens, Benutzer und Unterhaltungen dieses Agenten, nur als Zahlen (siehe [Agenten und Add-ins](agents.md)). |
 | Die Seite einer Bereitstellung | Anfragen, Geschwindigkeit und Fehler dieses Modells in den letzten Minuten (siehe [Bereitstellungen](deployments.md)). |
 | **Observability → Datenresidenz** | Wie viele Daten an Ihre Maschinen, in Ihr Netz und nach außen gingen (siehe [Datenresidenz](providers.md#data-residency)). |

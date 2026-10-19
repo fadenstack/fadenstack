@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import Alert from "@mui/material/Alert";
@@ -22,10 +22,11 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import LinkIcon from "@mui/icons-material/Link";
 
-import { llmCalls, type LlmCall, type LlmCallDetail, type LlmCallTool } from "~/api/llmCalls";
+import { llmCalls, type LlmCall, type LlmCallDetail, type LlmCallTool, type LlmClientEvent } from "~/api/llmCalls";
 
 import { StatusDot } from "./CallsTable";
 import { diagnose, isErrorCall, type Finding } from "./diagnose";
+import { placeEvents } from "./timeline";
 import {
   callName,
   formatCost,
@@ -285,6 +286,189 @@ function TimelineRow({ span, total }: { span: Span; total: number }) {
   );
 }
 
+interface TurnRow {
+  key: string;
+  start: number;
+  duration: number;
+  label: string;
+  sub?: string;
+  color: string;
+  depth: number;
+  current?: boolean;
+  error?: boolean;
+  onClick?: () => void;
+}
+
+/**
+ * The whole request: the model's rounds as the gateway saw them, and between them the tools the app ran
+ * and the approvals it waited for, as the app reported them (its clock, matched by conversation and time).
+ */
+function TurnTimeline({
+  calls,
+  events,
+  currentId,
+  onSelect,
+}: {
+  calls: LlmCall[];
+  events: LlmClientEvent[];
+  currentId: string;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const rows: TurnRow[] = [];
+  calls.forEach((c, i) => {
+    const end = new Date(c.created_at).getTime();
+    const failed = isErrorCall(c);
+    rows.push({
+      key: c.id,
+      start: end - c.latency_ms,
+      duration: c.latency_ms,
+      label: t("llm_calls.round_n", { n: i + 1 }),
+      sub: [c.finish_reason === "tool_calls" ? t("llm_calls.asked_for_tools") : c.finish_reason, c.status_code !== 200 ? String(c.status_code) : null]
+        .filter(Boolean)
+        .join(" · "),
+      color: failed ? theme.palette.error.main : theme.palette.primary.main,
+      depth: 0,
+      current: c.id === currentId,
+      error: failed,
+      onClick: c.id === currentId ? undefined : () => onSelect(c.id),
+    });
+  });
+  const placement = placeEvents(calls, events);
+  placement.events.forEach(({ event: e, start: evStart, duration }, i) => {
+    if (e.type === "approval.decided") {
+      rows.push({
+        key: `ev-${i}`,
+        start: evStart,
+        duration,
+        label: t("llm_calls.approval_of", { tool: e.tool ?? "?" }),
+        sub: e.decision ? t(`llm_calls.ev_${e.decision}`, { defaultValue: e.decision }) : undefined,
+        color: e.decision === "denied" ? theme.palette.warning.dark : theme.palette.warning.main,
+        depth: 1,
+        error: e.decision === "denied",
+      });
+    } else {
+      const failed = Boolean(e.outcome && e.outcome !== "ok");
+      rows.push({
+        key: `ev-${i}`,
+        start: evStart,
+        duration,
+        label: e.tool ?? "?",
+        sub: [t(`llm_calls.tool_source_${e.source === "mcp" ? "mcp" : "app"}`), e.server, e.outcome && e.outcome !== "ok" ? t(`llm_calls.ev_${e.outcome}`, { defaultValue: e.outcome }) : null]
+          .filter(Boolean)
+          .join(" · "),
+        color: failed ? theme.palette.error.main : theme.palette.secondary.main,
+        depth: 1,
+        error: failed,
+      });
+    }
+  });
+  rows.sort((a, b) => a.start - b.start || a.depth - b.depth);
+  const start = Math.min(...rows.map((r) => r.start));
+  const end = Math.max(...rows.map((r) => r.start + r.duration));
+  const total = Math.max(1, end - start);
+  const tools = events.filter((e) => e.type === "tool.executed");
+  const failedTools = tools.filter((e) => e.outcome && e.outcome !== "ok").length;
+  const approvals = events.filter((e) => e.type === "approval.decided");
+  const waited = approvals.reduce((s, e) => s + (e.wait_ms ?? 0), 0);
+  const llm = calls.reduce((s, c) => s + c.latency_ms, 0);
+
+  return (
+    <Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        {t("llm_calls.turn_summary", {
+          duration: formatDuration(total),
+          rounds: calls.length,
+          llm: formatDuration(llm),
+          tools: tools.length,
+          failed: failedTools,
+        })}
+        {approvals.length > 0 &&
+          ` · ${t("llm_calls.turn_summary_approvals", { count: approvals.length, wait: formatDuration(waited) })}`}
+      </Typography>
+      <Box sx={{ display: "grid", gridTemplateColumns: "minmax(150px, 46%) 1fr", columnGap: 1.5, rowGap: 0.5 }}>
+        {rows.map((r) => {
+          const left = Math.min(100, ((r.start - start) / total) * 100);
+          const width = Math.max(0.6, Math.min(100 - left, (r.duration / total) * 100));
+          return (
+            <Fragment key={r.key}>
+              <Box
+                onClick={r.onClick}
+                sx={{
+                  pl: r.depth * 1.5,
+                  minWidth: 0,
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 0.75,
+                  cursor: r.onClick ? "pointer" : "default",
+                  "&:hover .turn-label": r.onClick ? { textDecoration: "underline" } : undefined,
+                }}
+              >
+                <Typography
+                  className="turn-label"
+                  variant="body2"
+                  noWrap
+                  sx={{ fontWeight: r.current ? 700 : r.depth === 0 ? 500 : 400, color: r.error ? "error.main" : undefined }}
+                >
+                  {r.current ? "▸ " : ""}
+                  {r.label}
+                </Typography>
+                {r.sub && (
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {r.sub}
+                  </Typography>
+                )}
+              </Box>
+              <Box
+                onClick={r.onClick}
+                sx={{ position: "relative", height: 20, borderRadius: 0.5, bgcolor: "action.hover", cursor: r.onClick ? "pointer" : "default" }}
+              >
+                <Tooltip title={formatDuration(r.duration)}>
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: `${left}%`,
+                      width: `${width}%`,
+                      top: 3,
+                      bottom: 3,
+                      borderRadius: 0.5,
+                      bgcolor: alpha(r.color, r.current ? 1 : 0.75),
+                      outline: r.current ? `2px solid ${theme.palette.primary.main}` : "none",
+                    }}
+                  />
+                </Tooltip>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    position: "absolute",
+                    top: 1,
+                    fontSize: "0.68rem",
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    ...(width >= 15
+                      ? { right: `${Math.max(0, 100 - left - width)}%`, pr: 0.75, color: "common.white", fontWeight: 600 }
+                      : left + width > 70
+                        ? { right: `${100 - left}%`, pr: 0.5, color: "text.primary" }
+                        : { left: `${left + width}%`, pl: 0.5, color: "text.primary" }),
+                  }}
+                >
+                  {formatDuration(r.duration)}
+                </Typography>
+              </Box>
+            </Fragment>
+          );
+        })}
+      </Box>
+      {events.length > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          {placement.inferred ? t("llm_calls.turn_events_inferred") : t("llm_calls.turn_events_note")}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function Field({ label, value, mono, onFilter }: { label: string; value: ReactNode; mono?: boolean; onFilter?: () => void }) {
   const { t } = useTranslation();
   const empty = value === null || value === undefined || value === "";
@@ -485,7 +669,13 @@ export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onS
   const findings = useMemo(
     () =>
       call
-        ? diagnose(call, { tools: current?.tool_calls, policies: current?.policy_decisions, p95LatencyMs })
+        ? diagnose(call, {
+            tools: current?.tool_calls,
+            policies: current?.policy_decisions,
+            p95LatencyMs,
+            events: current?.client_events,
+            turnCalls: current?.turn_calls,
+          })
         : [],
     [call, current, p95LatencyMs],
   );
@@ -508,7 +698,7 @@ export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onS
   }, [onClose, onNext, onPrev]);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <Box data-testid="llm-call-detail" sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* Header */}
       <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
@@ -629,7 +819,23 @@ export default function CallDetail({ callId, preview, p95LatencyMs, onClose, onS
                 {t("llm_calls.diag_none")}
               </Alert>
             )}
-            <Section title={t("llm_calls.section_timeline")}>
+            {current && (current.turn_calls.length > 1 || current.client_events.length > 0) && (
+              <Section title={t("llm_calls.section_turn")}>
+                <TurnTimeline
+                  calls={current.turn_calls}
+                  events={current.client_events}
+                  currentId={current.call.id}
+                  onSelect={onSelect}
+                />
+              </Section>
+            )}
+            <Section
+              title={
+                current && current.turn_calls.length > 1
+                  ? t("llm_calls.section_this_round")
+                  : t("llm_calls.section_timeline")
+              }
+            >
               <Timeline call={call} tools={current?.tool_calls ?? []} />
             </Section>
             {current && current.policy_decisions.length > 0 && (

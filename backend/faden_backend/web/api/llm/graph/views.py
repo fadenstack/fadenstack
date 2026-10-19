@@ -22,6 +22,7 @@ from faden_backend.web.api.llm.schema import (
     LLMCallPageDTO,
     LLMCallStatsDTO,
     LLMRoutingDTO,
+    LLMTurnPageDTO,
     TopologyResponseDTO,
     TraceSnapshotResponseDTO,
 )
@@ -118,6 +119,19 @@ async def list_llm_calls(
 ) -> LLMCallPageDTO:
     """A page of gateway calls in a window, filtered."""
     return LLMCallPageDTO(**await calls.list_calls(filters, page=page, limit=limit, sort=sort))
+
+
+@router.get("/turns", response_model=LLMTurnPageDTO)
+async def list_llm_turns(
+    user: User = Depends(require_permission("llm.graph", "read")),
+    calls: LLMCallsService = Depends(get_llm_calls_service),
+    filters: CallFilters = Depends(_call_filters),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=CALLS_MAX_LIMIT),
+    sort: Literal["newest", "oldest", "slowest", "tokens"] = Query("newest"),
+) -> LLMTurnPageDTO:
+    """A page of turns: the calls made for one user request, with the tools and approvals in between."""
+    return LLMTurnPageDTO(**await calls.list_turns(filters, page=page, limit=limit, sort=sort))
 
 
 @router.get("/calls/stats", response_model=LLMCallStatsDTO)

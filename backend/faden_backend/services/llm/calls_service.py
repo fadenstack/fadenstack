@@ -25,8 +25,39 @@ log = logging.getLogger(__name__)
 
 CALLS_MAX_LIMIT = 200
 RELATED_LIMIT = 100
+TURN_CALLS_LIMIT = 200
 #: How far around a call's own time its policy decisions are looked for.
 _POLICY_SLACK = timedelta(minutes=5)
+#: A turn: the calls an agent's app made for one user request (its ``turn_id``); else a call alone.
+_TURN_KEY = "COALESCE(l.turn_id, CAST(l.id AS TEXT))"
+#: How far outside the window a listed turn's other calls are still counted (approvals can take a while).
+_TURN_REACH = timedelta(hours=6)
+#: The app's clock and the gateway's differ a little; its events are matched to a turn with this slack.
+_EVENT_SLACK = timedelta(seconds=3)
+#: The fields of an app's tool and approval events that are shown: names, sources, outcomes and timings.
+_EVENT_FIELDS = ("tool", "source", "server", "outcome", "duration_ms", "decision", "wait_ms", "scope")
+#: (order of the matching turns, order of their figures) per sort.
+_TURN_SORTS = {
+    "newest": ("last_at DESC", "ended_at DESC"),
+    "oldest": ("last_at ASC", "ended_at ASC"),
+    "slowest": (
+        "last_at - first_at DESC",
+        "MAX(t.created_at) - MIN(t.created_at - t.latency_ms * interval '1 millisecond') DESC",
+    ),
+    "tokens": ("tokens DESC", "SUM(COALESCE(t.total_tokens, 0)) DESC"),
+}
+
+
+def _turn_of(event: dict[str, Any], turns: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The turn an app's event happened in: same conversation and user, within the turn's time."""
+    for turn in turns:
+        if (
+            turn["conversation_id"] == event["conversation_id"]
+            and turn["user_id"] == event["user_id"]
+            and turn["started_at"] - _EVENT_SLACK <= event["at"] <= turn["ended_at"] + _EVENT_SLACK
+        ):
+            return turn
+    return None
 
 #: A call failed when the upstream or the gateway said so.
 _IS_ERROR = "(l.status_code >= 400 OR l.error_code IS NOT NULL)"
@@ -177,6 +208,176 @@ class LLMCallsService:
         items = [self._call(dict(r)) for r in rows]
         return {"items": items, "total": int(total), "page": page, "limit": limit}
 
+    # ── turns ─────────────────────────────────────────────────────
+
+    async def list_turns(
+        self, filters: CallFilters, *, page: int = 1, limit: int = 50, sort: str = "newest",
+    ) -> dict[str, Any]:
+        """A page of turns: the calls of one user request (an agent's ``turn_id``), each with all its calls.
+
+        A call without a turn is a turn of its own. A turn is listed when any of its calls matches the
+        filters; its figures add up all its calls, also those just outside the window.
+        """
+        limit = max(1, min(limit, CALLS_MAX_LIMIT))
+        page = max(page, 1)
+        if self._factory is None:
+            return {"items": [], "total": 0, "page": page, "limit": limit}
+        where, params = filters.where()
+        match_order, turn_order = _TURN_SORTS.get(sort, _TURN_SORTS["newest"])
+        matched = f"""
+            SELECT l.user_id AS uid, {_TURN_KEY} AS tkey,
+                   MAX(l.created_at) AS last_at,
+                   MIN(l.created_at - l.latency_ms * interval '1 millisecond') AS first_at,
+                   SUM(COALESCE(l.total_tokens, 0)) AS tokens
+            {_FROM} {where}
+            GROUP BY l.user_id, {_TURN_KEY}
+        """
+        page_params = {
+            **params,
+            "limit": limit,
+            "offset": (page - 1) * limit,
+            "wide_start": filters.start - _TURN_REACH,
+            "wide_end": filters.end + _TURN_REACH,
+        }
+        async with self._factory() as session:
+            # Only whitelisted fragments go into the SQL text (the sort comes from _TURN_SORTS).
+            count_sql = text(f"SELECT COUNT(*) FROM ({matched}) m")  # noqa: S608
+            total = (await session.execute(count_sql, params)).scalar_one()
+            rows = (
+                await session.execute(
+                    text(f"""
+                        WITH m AS ({matched} ORDER BY {match_order} LIMIT :limit OFFSET :offset),
+                        t AS (
+                            SELECT l.*, {_TURN_KEY} AS tkey,
+                                   pi.source_kind AS pi_kind, CAST(pi.source_id AS TEXT) AS pi_source
+                            FROM llm_gateway_request_log l
+                            JOIN m ON m.uid = l.user_id AND m.tkey = {_TURN_KEY}
+                            LEFT JOIN llm_provider_instance pi ON pi.id = l.provider_instance_id
+                            WHERE l.created_at >= :wide_start AND l.created_at < :wide_end
+                        )
+                        SELECT
+                            t.user_id, t.tkey,
+                            MAX(t.turn_id) AS turn_id, MAX(t.conversation_id) AS conversation_id,
+                            MAX(t.session_id) AS session_id, MAX(t.agent_id) AS agent_id,
+                            MAX(t.device_id) AS device_id, MAX(t.tenant_id) AS tenant_id,
+                            MIN(t.created_at - t.latency_ms * interval '1 millisecond') AS started_at,
+                            MAX(t.created_at) AS ended_at,
+                            COUNT(*) AS calls,
+                            SUM(CASE WHEN t.finish_reason = 'tool_calls' THEN 1 ELSE 0 END) AS tool_rounds,
+                            SUM(CASE WHEN t.status_code >= 400 OR t.error_code IS NOT NULL THEN 1 ELSE 0 END)
+                                AS errors,
+                            SUM(t.latency_ms) AS llm_ms,
+                            SUM(t.prompt_tokens) AS prompt_tokens,
+                            SUM(t.completion_tokens) AS completion_tokens,
+                            SUM(t.total_tokens) AS total_tokens,
+                            SUM(t.estimated_total_cost) AS estimated_total_cost,
+                            MAX(t.currency) AS currency,
+                            COALESCE(SUM(t.mcp_tool_call_count), 0) AS server_tools,
+                            (array_agg(CAST(t.id AS TEXT) ORDER BY t.created_at DESC))[1] AS last_call_id,
+                            (array_agg(t.model_alias ORDER BY t.created_at DESC))[1] AS model_alias,
+                            (array_agg(t.endpoint ORDER BY t.created_at DESC))[1] AS endpoint,
+                            (array_agg(t.finish_reason ORDER BY t.created_at DESC))[1] AS finish_reason,
+                            (array_agg(t.status_code ORDER BY t.created_at DESC))[1] AS status_code,
+                            (array_agg(t.status_code ORDER BY t.status_code DESC))[1] AS worst_status,
+                            (array_agg(t.error_code ORDER BY t.created_at DESC)
+                                FILTER (WHERE t.error_code IS NOT NULL))[1] AS error_code,
+                            (array_agg(CAST(t.provider_instance_id AS TEXT) ORDER BY t.created_at DESC))[1]
+                                AS provider_instance_id,
+                            (array_agg(t.pi_kind ORDER BY t.created_at DESC))[1] AS source_kind,
+                            (array_agg(t.pi_source ORDER BY t.created_at DESC))[1] AS source_id
+                        FROM t
+                        GROUP BY t.user_id, t.tkey
+                        ORDER BY {turn_order}
+                    """),  # noqa: S608
+                    page_params,
+                )
+            ).mappings().all()
+            turns = [self._turn(dict(r)) for r in rows]
+            await self._count_client_events(session, turns)
+        return {"items": turns, "total": int(total), "page": page, "limit": limit}
+
+    def _turn(self, row: dict[str, Any]) -> dict[str, Any]:
+        turn = dict(row)
+        turn["key"] = f"{turn.pop('user_id')}:{turn.pop('tkey')}"
+        turn["user_id"] = row["user_id"]
+        turn["provider_id"], turn["provider_name"] = self._provider(row)
+        turn.pop("source_kind", None)
+        turn.pop("source_id", None)
+        for field in ("calls", "tool_rounds", "errors", "llm_ms", "server_tools"):
+            turn[field] = int(turn[field] or 0)
+        for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            turn[field] = None if turn[field] is None else int(turn[field])
+        turn["estimated_total_cost"] = _num(turn.get("estimated_total_cost"))
+        turn["duration_ms"] = int((turn["ended_at"] - turn["started_at"]).total_seconds() * 1000)
+        turn.update(client_tools=0, client_tool_errors=0, approvals=0, approvals_denied=0, approval_wait_ms=0)
+        return turn
+
+    async def _client_events(
+        self,
+        session: AsyncSession,
+        conversations: list[str],
+        since: datetime,
+        until: datetime,
+    ) -> list[dict[str, Any]]:
+        """What the agents' apps reported doing in these conversations: tool runs and approvals.
+
+        Only names, sources, outcomes and timings: the event's other fields are not read out.
+        """
+        if not conversations:
+            return []
+        rows = (
+            await session.execute(
+                text("""
+                    SELECT type, conversation_id, user_id, agent_id, data,
+                           COALESCE(occurred_at, created_at) AS at
+                    FROM agent_client_event
+                    WHERE conversation_id = ANY(:convs)
+                      AND type IN ('tool.executed', 'approval.decided')
+                      AND COALESCE(occurred_at, created_at) BETWEEN :since AND :until
+                    ORDER BY COALESCE(occurred_at, created_at)
+                    LIMIT 2000
+                """),
+                {"convs": conversations, "since": since - _EVENT_SLACK, "until": until + _EVENT_SLACK},
+            )
+        ).mappings().all()
+        events = []
+        for r in rows:
+            data = r["data"] if isinstance(r["data"], dict) else {}
+            events.append({
+                "type": r["type"],
+                "conversation_id": r["conversation_id"],
+                "user_id": r["user_id"],
+                "agent_id": r["agent_id"],
+                "at": r["at"],
+                **{k: data.get(k) for k in _EVENT_FIELDS},
+            })
+        return events
+
+    async def _count_client_events(self, session: AsyncSession, turns: list[dict[str, Any]]) -> None:
+        """Count per turn the tools its app ran and the approvals it waited for (conversation, time)."""
+        with_conv = [t for t in turns if t.get("conversation_id")]
+        if not with_conv:
+            return
+        events = await self._client_events(
+            session,
+            sorted({t["conversation_id"] for t in with_conv}),
+            min(t["started_at"] for t in with_conv),
+            max(t["ended_at"] for t in with_conv),
+        )
+        for event in events:
+            turn = _turn_of(event, with_conv)
+            if turn is None:
+                continue
+            if event["type"] == "tool.executed":
+                turn["client_tools"] += 1
+                if event.get("outcome") not in (None, "ok"):
+                    turn["client_tool_errors"] += 1
+            else:
+                turn["approvals"] += 1
+                if event.get("decision") == "denied":
+                    turn["approvals_denied"] += 1
+                turn["approval_wait_ms"] += int(event.get("wait_ms") or 0)
+
     # ── stats ─────────────────────────────────────────────────────
 
     async def stats(self, filters: CallFilters) -> dict[str, Any]:
@@ -296,6 +497,7 @@ class LLMCallsService:
                 )
             ).mappings().all()
             related, group_by, group_value = await self._related(session, call)
+            turn_calls, client_events = await self._turn_detail(session, call)
         return {
             "call": call,
             "tool_calls": [dict(t) for t in tools],
@@ -303,7 +505,45 @@ class LLMCallsService:
             "related": related,
             "related_by": group_by,
             "related_key": group_value,
+            "turn_calls": turn_calls,
+            "client_events": client_events,
         }
+
+    async def _turn_detail(
+        self, session: AsyncSession, call: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """The calls of the call's turn (oldest first) and what its app reported doing meanwhile."""
+        turn_calls = [call]
+        if call.get("turn_id"):
+            rows = (
+                await session.execute(
+                    text(f"""
+                        SELECT {_CALL_COLUMNS} {_FROM}
+                        WHERE l.turn_id = :turn AND l.user_id = :user
+                          AND l.created_at BETWEEN :since AND :until
+                        ORDER BY l.created_at ASC, l.id ASC
+                        LIMIT :limit
+                    """),
+                    {
+                        "turn": call["turn_id"],
+                        "user": call["user_id"],
+                        "since": call["created_at"] - _TURN_REACH,
+                        "until": call["created_at"] + _TURN_REACH,
+                        "limit": TURN_CALLS_LIMIT,
+                    },
+                )
+            ).mappings().all()
+            turn_calls = [self._call(dict(r)) for r in rows] or [call]
+        if not call.get("conversation_id"):
+            return turn_calls, []
+        started = min(c["created_at"] - timedelta(milliseconds=c["latency_ms"] or 0) for c in turn_calls)
+        ended = max(c["created_at"] for c in turn_calls)
+        events = await self._client_events(session, [call["conversation_id"]], started, ended)
+        events = [e for e in events if e["user_id"] == call["user_id"]]
+        for e in events:
+            for key in ("conversation_id", "user_id", "agent_id"):
+                e.pop(key, None)
+        return turn_calls, events
 
     async def _related(
         self, session: AsyncSession, call: dict[str, Any],

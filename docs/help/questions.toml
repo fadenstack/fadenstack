@@ -136,6 +136,13 @@
 "How do I see usage per person or per group?" = "usage-per-person-and-per-group"
 "Can I set limits or budgets?" = "limits-and-budgets"
 
+["administer/llm-calls.md"]
+"Why did a request to a model fail?" = "why-a-call-failed"
+"How do I find a call or a request?" = "find-a-call"
+"What did an agent do for one question?" = "open-a-request-or-a-call"
+"Which tools did an agent run, and did they fail?" = "open-a-request-or-a-call"
+"Which provider answered which model?" = "where-calls-went"
+
 ["operate/index.md"]
 "What do I run as the operator?" = "what-you-run"
 "In which order do I set things up?" = "the-order-of-work"

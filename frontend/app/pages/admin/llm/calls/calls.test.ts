@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { LlmCall } from "~/api/llmCalls";
+import type { LlmCall, LlmClientEvent } from "~/api/llmCalls";
 
 import { diagnose, isErrorCall } from "./diagnose";
 import {
@@ -142,6 +142,25 @@ describe("diagnose", () => {
     expect(diagnose(call(), { tools })[0]).toMatchObject({ id: "tool_errors", params: { count: 1, names: "search" } });
     const policies = [{ stage: "input", outcome: "block", category: "pii", check_name: "x", tool_id: null, created_at: "" }];
     expect(ids(call({ status_code: 403 }), { policies })).toEqual(["auth", "policy_blocked"]);
+  });
+
+  it("reads what the agent's app reported: failed and denied tools, approval waits, many rounds", () => {
+    const ev = (o: Partial<LlmClientEvent>): LlmClientEvent => ({
+      type: "tool.executed", at: "2026-10-19T10:00:00Z", tool: "x", source: "host", server: null,
+      outcome: "ok", duration_ms: 10, decision: null, wait_ms: null, scope: null, ...o,
+    });
+    const events = [
+      ev({ tool: "insert_text", outcome: "error" }),
+      ev({ tool: "nc_update_text_file", outcome: "denied" }),
+      ev({ type: "approval.decided", tool: "nc_update_text_file", decision: "denied", wait_ms: 20_000, outcome: null }),
+      ev({ type: "approval.decided", tool: "replace_text", decision: "approved", wait_ms: 15_000, outcome: null }),
+    ];
+    const found = diagnose(call(), { events, turnCalls: Array.from({ length: 9 }, () => call()) });
+    expect(found.map((f) => f.id)).toEqual(["app_tool_errors", "app_denied", "approval_wait", "many_rounds"]);
+    expect(found[0].params).toMatchObject({ count: 1, names: "insert_text" });
+    expect(found[1].params).toMatchObject({ names: "nc_update_text_file" });
+    expect(found[2].params).toMatchObject({ wait: "35.0 s" });
+    expect(ids(call(), { events: [ev({})], turnCalls: [call(), call()] })).toEqual([]);
   });
 
   it("flags an outlier against p95, and missing usage", () => {
