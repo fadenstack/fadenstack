@@ -9,7 +9,7 @@ A text's phrases: JSON string escapes (``\n``, ``\t``, ``\r``, ``\"``, ``\\``, `
 what they stand for, as tool calls' arguments arrive JSON-encoded; Unicode NFKC, case-folded, without format
 characters (zero-width spaces, word joiners, U+FEFF, soft hyphens) and variation selectors, so the gateway's
 answer variety and invisible marks change nothing; its words (``\w+``); every five consecutive words joined
-by one space, as the first 8 bytes of their SHA-256, big-endian. The fingerprint is the 64 smallest distinct
+by one space, as the first 8 bytes of their SHA-256, big-endian. The fingerprint is the 128 smallest distinct
 hashes, 16 hex digits each, with the number of distinct phrases; a text of fewer than 20 phrases has none.
 
 Tested against the engine's ``contracts/v1/text-fingerprint-vectors.json`` (a copy in ``tests/data``).
@@ -24,7 +24,7 @@ import unicodedata
 #: Words in one phrase.
 PHRASE_WORDS = 5
 #: Phrase hashes in a fingerprint.
-SAMPLE = 64
+SAMPLE = 128
 #: Fewer distinct phrases than this, and a text gets no fingerprint.
 MIN_PHRASES = 20
 #: Phrases read of one text at most.
