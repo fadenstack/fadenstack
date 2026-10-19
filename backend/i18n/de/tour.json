@@ -360,9 +360,11 @@
     },
     "agent_trace": {
       "title": "LLM-Aufrufe",
-      "description": "Wie Provider, Runtimes und Modelle zusammenhängen, und die Aufrufe, die gerade durchlaufen.",
-      "action_graph": "Den Graphen durchsuchen und filtern; ein Klick auf einen Knoten zeigt Details",
-      "action_live": "Aufrufe live verfolgen; den Datenstrom anhalten und fortsetzen"
+      "description": "Jeder Aufruf über das Gateway: den fehlerhaften finden, sehen warum, und sehen, wohin Aufrufe geroutet werden.",
+      "action_find": "Liste nach Zeit, Modell, Ergebnis oder einer beliebigen ID eingrenzen; auf Fehler klicken für nur fehlgeschlagene",
+      "action_inspect": "Einen Aufruf öffnen: Diagnose, Zeitverlauf, Unterhaltung und alle erfassten Felder; j und k wechseln zwischen Aufrufen",
+      "action_routing": "Sehen, welche Anbieter jedes Modell bedient haben, mit Fehlern und p95-Latenz",
+      "action_live": "Neue Aufrufe kommen alle paar Sekunden; zum Lesen pausieren und den Link eines Aufrufs zum Teilen kopieren"
     },
     "endpoint": {
       "title": "API-Endpunkt",

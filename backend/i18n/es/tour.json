@@ -360,9 +360,11 @@
     },
     "agent_trace": {
       "title": "Llamadas LLM",
-      "description": "Cómo se conectan proveedores, runtimes y modelos, y las llamadas que pasan por ellos en tiempo real.",
-      "action_graph": "Buscar y filtrar en el grafo; hacer clic en un nodo para ver sus detalles",
-      "action_live": "Ver llegar las llamadas; pausar y reanudar el flujo"
+      "description": "Cada llamada a través del gateway: encuentre la que falló, vea por qué y vea a dónde se enrutan las llamadas.",
+      "action_find": "Acote la lista por hora, modelo, resultado o cualquier id; pulse Errores para ver solo los fallos",
+      "action_inspect": "Abra una llamada para ver su diagnóstico, cronología, conversación y todos los campos registrados; j y k pasan de una a otra",
+      "action_routing": "Vea qué proveedores atendieron cada modelo, con errores y latencia p95",
+      "action_live": "Las llamadas nuevas llegan cada pocos segundos; pause para leer y copie el enlace de una llamada para compartirla"
     },
     "endpoint": {
       "title": "Punto de Acceso API",

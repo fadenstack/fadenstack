@@ -67,7 +67,7 @@ export default [
     route("/admin/nodes/profiles", "pages/admin/nodes/NodeProfilesPage.tsx"),
     route("/admin/nodes/:id", "pages/admin/nodes/NodeDetailPage.tsx"),
     route("/admin/scheduler", "pages/admin/SchedulerPage.tsx"),
-    route("/admin/llm/agent-trace", "pages/admin/llm/GraphPage.tsx"),
+    route("/admin/llm/agent-trace", "pages/admin/llm/LlmCallsPage.tsx"),
     route("/admin/llm/endpoint", "pages/admin/agents/ApiDocsPage.tsx"),
     // PII routes — guarded by module status
     layout("routes/pii-guard.tsx", [

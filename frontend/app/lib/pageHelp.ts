@@ -107,7 +107,7 @@ const PAGES: PageHelpDef[] = [
   {
     prefix: "/admin/llm/agent-trace",
     id: "agent_trace",
-    actions: ["graph", "live"],
+    actions: ["find", "inspect", "routing", "live"],
   },
   {
     prefix: "/admin/llm/endpoint",
