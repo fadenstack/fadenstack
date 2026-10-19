@@ -4,7 +4,7 @@ Examples:
     faden secrets status                  # which keys are published defaults; is a rotation unfinished
     faden secrets rotate                  # new random keys, every stored value re-sealed
     faden secrets rotate --only settings  # just the settings master key
-    faden secrets rotate --only provenance  # a new signing key and certificate, a new hash-key version
+    faden secrets rotate --only provenance  # a new signer, new hash and watermark key versions
     faden secrets rotate --resume         # finish a rotation that stopped
 """
 
@@ -135,8 +135,9 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     behind the maintenance page, re-seals every stored value in one transaction per database, checks it,
     and only then drops the old keys. The machines stay connected. If it stops, run it again.
 
-    The provenance engine gets a new signing key and certificate, and a new hash-key version; every earlier
-    version stays, since what was hashed with it is checked with it.
+    The provenance engine gets a new signing key and certificate, and a new version of the hash keys and of
+    the text watermark keys; every earlier version stays, since what was hashed or watermarked with it is
+    checked with it. A model takes the new watermark key when it next starts.
     """
     cfg = _config()
     env = read_env_file(cfg.env_path)
@@ -171,7 +172,12 @@ def rotate_cmd(*, only: tuple[str, ...], resume: bool, skip_unreadable: bool, ye
     console.print()
     for line in rotation.summary_lines(results):
         console.print(line)
-    success("Keys rotated. Machines stay connected; the old keys are gone from .env.")
+    # The sealing keys' old values go once everything is re-sealed; the provenance keys' versions all stay.
+    sealing = [s for s in plan.scopes if s.previous]
+    provenance = any(s.name == "provenance" for s in plan.scopes)
+    kept = " The provenance keys' earlier versions stay." if provenance else ""
+    success("Keys rotated. Machines stay connected"
+            + ("; the old keys are gone from .env." if sealing else ".") + kept)
     from faden_cli.core.backend_tool import record_event  # noqa: PLC0415
 
     record_event("secrets.rotate", "install", "keys", metadata={"scopes": [s.name for s in plan.scopes]})
