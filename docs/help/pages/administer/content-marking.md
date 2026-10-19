@@ -106,6 +106,8 @@ refused there, and the page names your contact instead: texts are checked only f
 AI Act's code of practice allows limiting who can check for text watermarks). With the page on, the
 certificates needed to check a signed result offline are published too.
 
+![The Provenance card under Settings, Modules: the marking engine running with its capabilities, and under Module settings the public check page switched on, with its address and the contact for text checks](../images/administer/provenance-module-settings.png)
+
 ## Switch it off, or on again
 
 1. Open **Settings → Modules**.

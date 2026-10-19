@@ -16,6 +16,8 @@ administrator.
    file on the box.
 3. Select **Check**.
 
+![The Check content page: the Text and Picture or file tabs, the box for the text to check and the Check button, and below them what is checked](../images/use/check-content.png)
+
 ??? info "What you can check"
     - Texts you paste. Line breaks and spacing do not matter.
     - Pictures: PNG, JPEG and WebP.
@@ -32,6 +34,10 @@ administrator.
 | **No mark found** | Nothing in the content says that AI generated it. |
 | **Inconclusive** | There are signs that AI generated it, for example another system's mark, but none that can be confirmed here. |
 
+![A text checked: Marked as AI-generated, found as matching a generation receipt and by its text watermark, with Download signed result and Check something else below](../images/use/check-content-text-ai.png)
+
+![A picture checked: Marked as AI-generated, found by its content credentials (C2PA), its invisible watermark (TrustMark) and its picture metadata (IPTC), all naming the same receipt](../images/use/check-content-picture.png)
+
 Under **What was found**, each finding names what was looked for, such as **Invisible watermark (TrustMark)**,
 **Content credentials (C2PA)**, **Picture metadata (IPTC)**, **Text watermark** or **Matches a generation
 receipt**, and says whether it **Points to AI generation**. A receipt or record that was found shows its id.
@@ -45,6 +51,8 @@ receipt**, and says whether it **Points to AI generation**. A receipt or record 
 !!! note "No mark found is no proof"
     **No mark found** does not prove that a person wrote it: marks can be removed, and content from other systems
     carries none of this installation's marks.
+
+![A text a person wrote, checked: No mark found, with the text watermark not found](../images/use/check-content-text-nothing.png)
 
 ## Show the result to someone else
 
@@ -60,6 +68,8 @@ Nothing you submit is kept or logged: the text or file is checked and then dropp
 Your organisation can offer a public check page, for example at `https://ai.example.internal/check`. There,
 anyone can check pictures and files without signing in. Texts are checked only for people with an account; the
 page names whom to ask. Administrators switch it on: see [Content marking](../administer/content-marking.md#the-public-check-page).
+
+![The public check page: Check a picture or a file, with Choose a file, the note that texts are checked for people with an account, and what is checked](../images/use/public-check.png)
 
 ## When it does not work
 

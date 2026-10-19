@@ -16,6 +16,8 @@ an Ihren Administrator.
    **Datei auswählen**, oder ziehen Sie die Datei in das Feld.
 3. Wählen Sie **Prüfen**.
 
+![Die Seite Inhalte prüfen: die Reiter Text und Bild oder Datei, das Feld für den zu prüfenden Text und die Schaltfläche Prüfen, darunter, was geprüft wird](../images/use/check-content.png)
+
 ??? info "Was Sie prüfen können"
     - Texte, die Sie einfügen. Zeilenumbrüche und Abstände spielen keine Rolle.
     - Bilder: PNG, JPEG und WebP.
@@ -32,6 +34,10 @@ an Ihren Administrator.
 | **Keine Kennzeichnung gefunden** | Nichts im Inhalt besagt, dass KI ihn erzeugt hat. |
 | **Nicht eindeutig** | Es gibt Hinweise, dass KI den Inhalt erzeugt hat, z. B. die Kennzeichnung eines anderen Systems, aber keinen, der sich hier bestätigen lässt. |
 
+![Ein geprüfter Text: Als KI-generiert gekennzeichnet, gefunden als Übereinstimmung mit einem Erzeugungsbeleg und an seinem Text-Wasserzeichen, darunter Signiertes Ergebnis herunterladen und Etwas anderes prüfen](../images/use/check-content-text-ai.png)
+
+![Ein geprüftes Bild: Als KI-generiert gekennzeichnet, gefunden an seinen Content Credentials (C2PA), seinem unsichtbaren Wasserzeichen (TrustMark) und seinen Bildmetadaten (IPTC), alle mit demselben Beleg](../images/use/check-content-picture.png)
+
 Unter **Was gefunden wurde** nennt jeder Fund, wonach gesucht wurde, etwa **Unsichtbares Wasserzeichen
 (TrustMark)**, **Signierte Herkunftsangaben (C2PA)**, **Bild-Metadaten (IPTC)**, **Text-Wasserzeichen** oder
 **Entspricht einem Erzeugungsbeleg**, und ob er **Deutet auf KI-Erzeugung hin**. Ein gefundener Beleg oder
@@ -46,6 +52,8 @@ Nachweis zeigt seine ID.
 !!! note "„Keine Kennzeichnung gefunden“ ist kein Beweis"
     **Keine Kennzeichnung gefunden** beweist nicht, dass ein Mensch den Inhalt geschrieben hat: Kennzeichnungen
     lassen sich entfernen, und Inhalte anderer Systeme tragen keine Kennzeichnung dieser Installation.
+
+![Ein geprüfter Text, den ein Mensch geschrieben hat: Keine Kennzeichnung gefunden, das Text-Wasserzeichen nicht gefunden](../images/use/check-content-text-nothing.png)
 
 ## Das Ergebnis anderen zeigen {#show-the-result-to-someone-else}
 
@@ -64,6 +72,8 @@ Ihre Organisation kann eine öffentliche Prüfseite anbieten, z. B. unter `https
 kann jeder ohne Anmeldung Bilder und Dateien prüfen. Texte werden nur für Personen mit einem Konto geprüft; die
 Seite nennt, an wen man sich wenden kann. Eingeschaltet wird sie von Administratoren: siehe
 [Kennzeichnung KI-generierter Inhalte](../administer/content-marking.md#the-public-check-page).
+
+![Die öffentliche Prüfseite: Ein Bild oder eine Datei prüfen, mit Datei auswählen, dem Hinweis, dass Texte für Personen mit einem Konto geprüft werden, und was geprüft wird](../images/use/public-check.png)
 
 ## Wenn es nicht funktioniert {#when-it-does-not-work}
 

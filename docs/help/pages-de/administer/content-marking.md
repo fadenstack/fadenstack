@@ -115,6 +115,8 @@ Verhaltenskodex zur KI-Verordnung erlaubt, einzuschränken, wer Texte auf Wasser
 Seite eingeschaltet ist, werden auch die Zertifikate veröffentlicht, mit denen sich ein signiertes Ergebnis offline
 prüfen lässt.
 
+![Die Karte Provenance unter Einstellungen, Module: der Kennzeichnungsdienst läuft mit seinen Fähigkeiten, und unter den Moduleinstellungen ist die öffentliche Prüfseite eingeschaltet, mit ihrer Adresse und dem Kontakt für Textprüfungen](../images/administer/provenance-module-settings.png)
+
 ## Ausschalten und wieder einschalten {#switch-it-off-or-on-again}
 
 1. Öffnen Sie **Einstellungen → Module**.
