@@ -147,11 +147,15 @@ Certify each image on its hardware, record the report, then commit its
 manifest here; the next core release builds the backend with it, and from
 then on the catalogue points at the published image.
 
-The manifests above name local tags (`faden/ray-vllm-gb10:…`,
-`faden-ray-runtime-x86_64:2.58.0`): those images are on the machines they were
-built on (the GB10 ones on the DGX pair) and nowhere else yet. A server can hand out only
-images it holds, so they reach a server that does not have them once they
-are published to GHCR and their manifests name the registry.
+A GB10 image can also be built on a DGX node, certified there and then pushed
+unchanged (`--tag ghcr.io/fadenstack/ray-runtime-gb10:… --push`): pushing keeps
+its layers, so the certification still holds; record it again in the manifest
+the push mints. `vllm0.29.0` went this way.
+
+A manifest must name the published image. `vllm0.29.0` and x86_64 name GHCR;
+`vllm0.31.0` still names a local tag (`faden/ray-vllm-gb10:…`), an image only
+on the DGX pair: a server can hand out only images it holds, so it reaches
+other servers once it is pushed and its manifest names the registry.
 
 ## Licence
 
