@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 
 import { ApiError } from "~/api/http";
 import type { ContentCheckBody, ContentCheckResult } from "~/api/provenance";
+import { scoreLabel } from "~/lib/contentCheck";
 
 import ContentCheck from "./ContentCheck";
 
@@ -102,6 +103,14 @@ describe("ContentCheck, signed in", () => {
 
     expect(screen.getByTestId("content-check-hash")).toHaveTextContent(`SHA-256 of the content: ${"ab".repeat(32)}`);
     expect(screen.getByText(/by fadenstack-provenance\/0\.5\.0/)).toBeInTheDocument();
+  });
+
+  it("says a watermark's tiny p-value as a power of ten, not in seventeen digits", () => {
+    expect(scoreLabel(6.365925187123848e-9)).toBe("6.4e-9");
+    expect(scoreLabel(0.06390998445107827)).toBe("0.064");
+    expect(scoreLabel(0.42)).toBe("0.42");
+    expect(scoreLabel(1)).toBe("1");
+    expect(scoreLabel(0)).toBe("0");
   });
 
   it.each([

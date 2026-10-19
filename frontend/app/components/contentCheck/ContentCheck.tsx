@@ -48,6 +48,7 @@ import {
   mediaTypeOf,
   readAsBase64,
   saveResult,
+  scoreLabel,
   sizeLabel,
   textBytes,
 } from "~/lib/contentCheck";
@@ -446,7 +447,7 @@ function FindingView({ finding }: { finding: ContentFinding }) {
           )}
           {finding.score != null && (
             <Typography variant="caption" color="text.secondary">
-              {t("content_check.score", { score: finding.score })}
+              {t("content_check.score", { score: scoreLabel(finding.score) })}
             </Typography>
           )}
         </Stack>

@@ -78,6 +78,15 @@ export function sizeLabel(bytes: number): string {
   return `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`;
 }
 
+/**
+ * A finding's measure for people: two significant digits, and very small ones (a watermark's p-value, often
+ * 1e-9 or less) as a power of ten, as the finding's own text says it ("p = 6.4e-9"), not all seventeen digits.
+ */
+export function scoreLabel(score: number): string {
+  if (score !== 0 && Math.abs(score) < 0.001) return score.toExponential(1);
+  return String(Number(score.toPrecision(2)));
+}
+
 /** The error codes the backend and the engine answer with; others are shown with the server's message. */
 export const KNOWN_ERRORS = new Set([
   "too_large",
