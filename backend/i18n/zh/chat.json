@@ -33,6 +33,7 @@
   "unknown_model": "未知模型",
   "error_select_model": "发送消息前请先选择一个模型。",
   "error_no_response": "未收到模型响应。",
+  "error_no_response_length": "模型在作答之前就达到了长度上限，例如在思考时。请重试，或一次少问一些。",
   "error_last_message_no_response": "上一条消息未收到响应。你可以重试。",
   "tools_tab": "工具",
   "privacy_tab": "隐私",

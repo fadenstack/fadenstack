@@ -33,6 +33,7 @@
   "unknown_model": "Modèle inconnu",
   "error_select_model": "Veuillez sélectionner un modèle avant d’envoyer un message.",
   "error_no_response": "Aucune réponse reçue du modèle.",
+  "error_no_response_length": "Le modèle a atteint sa limite de longueur avant de répondre, par exemple en réfléchissant. Réessayez, ou demandez moins à la fois.",
   "error_last_message_no_response": "Le dernier message n'a pas reçu de réponse. Vous pouvez réessayer.",
   "tools_tab": "Outils",
   "privacy_tab": "Confidentialité",

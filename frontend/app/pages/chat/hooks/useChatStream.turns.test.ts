@@ -144,6 +144,27 @@ describe("useChatStream", () => {
     expect(result.current.messages.at(-1)).toMatchObject({ role: "user", content: "my new question" });
   });
 
+  it("says so when the model ended without a word, and keeps the message to send again", async () => {
+    api.streamChat.mockReturnValue(stream([{ turn_id: "turn-1", reasoning: "Let me think." }, { finish_reason: "stop" }]));
+    api.listMessages.mockResolvedValue([message("u0", "user", "earlier"), message("t0", "assistant", "answer")]);
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("my question", "m"));
+
+    expect(result.current.error).toMatch(/No response received/);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "user", content: "my question" });
+  });
+
+  it("says that the model ran out of length when it thought until the limit", async () => {
+    api.streamChat.mockReturnValue(stream([{ turn_id: "turn-1", reasoning: "Thinking..." }, { finish_reason: "length" }]));
+    api.listMessages.mockResolvedValue([message("u0", "user", "earlier"), message("t0", "assistant", "answer")]);
+    const { result } = renderHook(() => useChatStream({ sessionId: SID, selectedModel: "m" }));
+
+    await act(() => result.current.send("my question", "m"));
+
+    expect(result.current.error).toMatch(/length limit/);
+  });
+
   it("stops a reply it came back to", async () => {
     let abort!: () => void;
     const aborted = new Promise<never>((_, reject) => {

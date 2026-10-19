@@ -383,11 +383,18 @@ export function useChatStream({
           return;
         }
         if (!accumulated.trim()) {
+          // Ended at the token limit with nothing written: it thought until its length ran out.
           throw new Error(
-            t("error_no_response", {
-              ns: "chat",
-              defaultValue: "No response received from the model.",
-            }),
+            finish === "length"
+              ? t("error_no_response_length", {
+                  ns: "chat",
+                  defaultValue:
+                    "The model reached its length limit before it answered, for example while thinking. Try again, or ask for less at once.",
+                })
+              : t("error_no_response", {
+                  ns: "chat",
+                  defaultValue: "No response received from the model.",
+                }),
           );
         }
       } catch (err) {
