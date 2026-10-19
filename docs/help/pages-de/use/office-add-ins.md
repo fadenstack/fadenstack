@@ -59,6 +59,30 @@ Der Bereich zeigt sich in der Sprache von Office. Um eine andere zu wählen, wä
 !!! note "Der Agent sendet nie"
     In Outlook schreibt der Agent Entwürfe und öffnet sie für Sie; senden müssen Sie selbst. Ein Termin, den er erstellt, wird in Ihrem Kalender gespeichert und geöffnet; eine Besprechung mit Teilnehmern wartet in ihrem Fenster darauf, dass Sie sie senden.
 
+## Was er schreibt, ist gekennzeichnet {#what-it-writes-is-marked}
+
+Was der Agent in ein Dokument oder eine Mail schreibt, ist als mit KI erstellt gekennzeichnet, damit es sich später erkennen lässt. Die Kennzeichnungen sind verborgen und bleiben in der gespeicherten Datei:
+
+| Anwendung | Die Kennzeichnung |
+|---|---|
+| **Word** | Eine verborgene Textmarke um den Text und ein Vermerk im benutzerdefinierten XML und in den Eigenschaften des Dokuments |
+| **Excel** | Ein verborgener Name über den Zellen, die er geschrieben hat, und derselbe Vermerk in der Arbeitsmappe |
+| **PowerPoint** | Tags an den Folien und Formen, die er geschrieben hat, und derselbe Vermerk in der Präsentation |
+| **Outlook** | Eine verborgene Eigenschaft des Entwurfs und ein Header `X-AI-Generated` |
+
+![Word mit dem Absatz, den der Agent am Ende eines Memos eingefügt hat, als nachverfolgte Änderung, und daneben der Aufgabenbereich des Agenten, der sagt, was er eingefügt hat](../images/use/office-word-marked-paragraph.png)
+
+Eine Mail, die der Agent an jemanden außerhalb Ihrer Organisation entwirft, beginnt außerdem mit der sichtbaren Zeile **Diese Nachricht wurde mit KI verfasst.** (mit Ihrem Namen, **… im Auftrag von …**, wenn Outlook ihn kennt). Eine Antwort innerhalb Ihrer Organisation bekommt keine Zeile, nur die verborgenen Kennzeichnungen.
+
+![Ein Outlook-Entwurf an eine Adresse außerhalb, der mit der Zeile This message was drafted with AI. beginnt, und daneben der Aufgabenbereich des Agenten](../images/use/office-outlook-draft-outside.png)
+
+Ihre Organisation bewahrt zu jedem Stück einen signierten Nachweis auf, sodass [Inhalte prüfen](checking-content.md) ein gespeichertes Dokument oder daraus kopierten Text später findet. Lassen Sie die Kennzeichnungen stehen, wenn Sie weiterschreiben.
+
+??? info "Wo Sie die Kennzeichnung in Word sehen"
+    **Einfügen → Textmarke**, dann **Ausgeblendete Textmarken** ankreuzen: Eine Kennzeichnung ist eine Textmarke, deren Name mit `_faden_ai_` beginnt.
+
+    ![Der Dialog Textmarke in Word mit angekreuzten ausgeblendeten Textmarken und einer Textmarke namens _faden_ai_ mit einer Nummer](../images/use/office-word-bookmark.png)
+
 ## Wann er nachfragt {#what-it-asks-first}
 
 Jeder Chat beginnt im Tool-Modus **Ask**: Der Agent liest, ohne zu fragen, und fragt, bevor er etwas ändert.

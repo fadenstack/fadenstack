@@ -59,6 +59,35 @@ The pane shows itself in Office's language. To pick another, select the gear (**
 !!! note "The agent never sends"
     In Outlook the agent writes drafts and opens them for you; you send them. An appointment it creates is saved in your calendar and opened; a meeting with attendees waits in its window for you to send it.
 
+## What it writes is marked
+
+What the agent writes into a document or a mail is marked as made with AI, so that it can be recognised later. The
+marks are hidden and stay in the saved file:
+
+| Application | The mark |
+|---|---|
+| **Word** | A hidden bookmark around the text, and a note in the document's custom XML and its properties |
+| **Excel** | A hidden name over the cells it wrote, and the same note in the workbook |
+| **PowerPoint** | Tags on the slides and shapes it wrote, and the same note in the presentation |
+| **Outlook** | A hidden property of the draft and an `X-AI-Generated` header |
+
+![Word with the paragraph the agent added at the end of a memo, as a tracked change, and the agent's pane beside it saying what it added](../images/use/office-word-marked-paragraph.png)
+
+A mail the agent drafts to someone outside your organisation also starts with the visible line **This message
+was drafted with AI.** (with your name, **… on behalf of …**, when Outlook knows it). A reply inside your
+organisation gets no line, only the hidden marks.
+
+![An Outlook draft to an outside address that starts with This message was drafted with AI., and the agent's pane beside it](../images/use/office-outlook-draft-outside.png)
+
+Your organisation keeps a signed record of each piece, so [Check content](checking-content.md) finds a saved
+document, or text copied out of it, later. Leave the marks in place when you go on editing.
+
+??? info "Where to see the mark in Word"
+    **Insert → Bookmark**, then tick **Hidden bookmarks**: a mark is a bookmark whose name starts with
+    `_faden_ai_`.
+
+    ![Word's Bookmark dialog with Hidden bookmarks ticked, listing a bookmark named _faden_ai_ and a number](../images/use/office-word-bookmark.png)
+
 ## What it asks first
 
 Every chat starts in the **Ask** tool mode: the agent reads without asking, and asks before it changes anything.
