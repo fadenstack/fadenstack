@@ -1736,6 +1736,7 @@
       "record-hash": "Entspricht einem Einfügenachweis",
       "receipt-reference": "Verweist auf einen Erzeugungsbeleg",
       "record-reference": "Verweist auf einen Einfügenachweis",
+      "receipt-fingerprint": "Teilt seine Formulierungen mit einem erzeugten Text",
       "vllm-gumbel": "Text-Wasserzeichen",
       "vllm-dual_key_gumbel": "Text-Wasserzeichen"
     },

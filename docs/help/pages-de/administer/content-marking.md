@@ -42,7 +42,16 @@ Jedes Bild, das ein Bildmodell über Fadenstack zurückgibt, wird gekennzeichnet
 **Der Beleg.** Jede vollständige Antwort bekommt einen signierten Beleg: einen Nachweis, dass ein Modell dieser
 Installation einen Text mit diesem Hash erzeugt hat. Der Kennzeichnungsdienst speichert den Text nie, nur einen mit einem
 Schlüssel gebildeten Hash davon. Eine spätere Prüfung findet den Beleg eines Textes auch dann, wenn Zeilenumbrüche und Abstände geändert
-wurden, aber nicht mehr, wenn er umformuliert ist.
+wurden.
+
+**Der Fingerabdruck.** Eine Antwort ab 25 Wörtern hinterlässt mit ihrem Beleg auch einen Fingerabdruck: mit einem
+Schlüssel gebildete Hashes einiger ihrer Fünf-Wort-Formulierungen, nie den Text. Er findet eine bearbeitete Kopie
+der Antwort: Wörter gestrichen, Sätze ergänzt, Abschnitte verschoben. Eine Prüfung sagt, wie viel des Textes aus
+der Antwort stammt. Stammt das meiste daraus, lautet das Ergebnis **Als KI-generiert gekennzeichnet**; stammt nur
+ein Teil daraus (ein Zitat im eigenen Text einer Person), nennt die Prüfung die Antwort, und das Ergebnis lautet
+**Nicht eindeutig**. Der
+Fingerabdruck wirkt für jedes Modell, auch für externe, und sichert das Wasserzeichen dort ab, wo es schwach ist.
+Keines von beiden übersteht ein Umformulieren oder Übersetzen.
 
 **Das Text-Wasserzeichen.** Antworten Ihrer eigenen Modelle tragen außerdem ein unsichtbares Wasserzeichen: ein
 Muster in der Wortwahl des Modells, gebildet mit dem geheimen Wasserzeichen-Schlüssel Ihrer Installation. Es lässt
@@ -79,8 +88,10 @@ GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
 - Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein. Für
   Modelle, die MTP haben, empfehlen wir es: Antworten kommen etwa 70 % schneller. Das Wasserzeichen wird in
-  weniger ihrer Antworten gefunden (in unserer Messung in etwa der Hälfte der langen), weil die Entwürfe, die das
-  Modell übernimmt, wenig davon tragen; Belege und die Nachweise der Agenten sind dieselben wie ohne MTP.
+  weniger ihrer Antworten gefunden (in unserer Messung in etwa der Hälfte der langen, und nicht mehr, wenn sie
+  bearbeitet sind), weil die Entwürfe, die das Modell übernimmt, wenig davon tragen. Belege, Fingerabdrücke und die
+  Nachweise der Agenten sind dieselben wie ohne MTP; eine bearbeitete Antwort wird also über ihren Fingerabdruck
+  gefunden.
 - Ein Superuser kann das Wasserzeichen für eine einzelne Bereitstellung mit der Engine-Einstellung
   `watermark_config: false` ausschalten (siehe [Engine-Einstellungen](deployments.md#engine-settings)). Die Belege
   ihrer Antworten vermerken dann, dass sie keines tragen.
@@ -138,8 +149,8 @@ fragt nach einer Bestätigung und hält fest, wer es wann ausgeschaltet hat; `fa
 
 ## Nachweise {#records}
 
-Belege, die Nachweise der Einfügungen und die Berichte der Agenten darüber enthalten Hashes und IDs, nie den
-Inhalt. Sie bleiben erhalten, solange sie gebraucht werden. Jede Sicherung enthält sie, mit der Datenbank des
+Belege mit ihren Fingerabdrücken, die Nachweise der Einfügungen und die Berichte der Agenten darüber enthalten
+Hashes und IDs, nie den Inhalt. Sie bleiben erhalten, solange sie gebraucht werden. Jede Sicherung enthält sie, mit der Datenbank des
 Herkunftsnachweises und ihren Schlüsseln, und eine Wiederherstellung oder ein Upgrade behält sie (siehe
 [Sicherungen](../operate/backups.md)).
 

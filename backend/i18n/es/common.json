@@ -1736,6 +1736,7 @@
       "record-hash": "Coincide con un registro de inserción",
       "receipt-reference": "Menciona un recibo de generación",
       "record-reference": "Menciona un registro de inserción",
+      "receipt-fingerprint": "Comparte sus frases con un texto generado",
       "vllm-gumbel": "Marca de agua en el texto",
       "vllm-dual_key_gumbel": "Marca de agua en el texto"
     },

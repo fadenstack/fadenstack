@@ -68,6 +68,8 @@ class ProvenanceCapabilities:
     receipts: bool = False
     records: bool = False
     detect: bool = False
+    #: Receipt requests may carry the text's fingerprint (``text_fingerprint``).
+    fingerprints: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,6 +264,7 @@ def _capabilities(raw: Any) -> ProvenanceCapabilities:
         receipts=raw.get("receipts") is True,
         records=raw.get("records") is True,
         detect=raw.get("detect") is True,
+        fingerprints=raw.get("fingerprints") is True,
     )
 
 
@@ -287,6 +290,9 @@ class ProvenanceClient:
         self._clock = clock
         #: The anchors last read, and until when they are served without asking again.
         self._anchors: tuple[dict[str, Any], float] | None = None
+        #: The engine refused a receipt request with a fingerprint (an engine from before them): none is
+        #: sent again.
+        self._fingerprints_refused = False
 
     def _log_once(self, key: str, level: int, message: str, *args: Any) -> None:
         if key in self._logged:
@@ -476,14 +482,19 @@ class ProvenanceClient:
         watermark: dict[str, Any],
         agent: str | None = None,
         model_version: str | None = None,
+        fingerprint: tuple[list[str], int] | None = None,
     ) -> SignedReceipt:
         """A signed receipt for a text a model wrote: ``POST /api/v1/provenance/receipts``, with the token.
 
         The engine gets the text's hash only (``content_hash.text_sha256``),
-        never the text. It answers in milliseconds; the call waits 5 s at
-        most. Raises ``ProvenanceRequestError`` when no signed receipt comes back.
+        never the text, and its *fingerprint* where it has one (the phrase
+        hashes and their number, ``text_fingerprint``). An engine from before
+        fingerprints refuses one (422): the request goes again without, and
+        none is sent to it again. It answers in milliseconds; the call waits
+        5 s at most. Raises ``ProvenanceRequestError`` when no signed receipt
+        comes back.
         """
-        body = {
+        body: dict[str, Any] = {
             "kind": "text",
             "model": model,
             "model_version": model_version,
@@ -491,9 +502,25 @@ class ProvenanceClient:
             "content_sha256": content_sha256,
             "watermark": watermark,
         }
-        resp = await self._call(
-            "POST", "/api/v1/provenance/receipts", body=body, timeout=_RECEIPT_TIMEOUT_SEC,
-        )
+        printed = {}
+        if fingerprint is not None and not self._fingerprints_refused:
+            printed = {"fingerprint": fingerprint[0], "phrase_count": fingerprint[1]}
+        try:
+            resp = await self._call(
+                "POST", "/api/v1/provenance/receipts", body={**body, **printed}, timeout=_RECEIPT_TIMEOUT_SEC,
+            )
+        except ProvenanceRequestError as exc:
+            if not printed or exc.code != "invalid_request":
+                raise
+            self._fingerprints_refused = True
+            self._log_once(
+                "fingerprints-refused", logging.WARNING,
+                "The provenance engine at %s takes no text fingerprints: receipts go without them, and an "
+                "edited copy of an answer is found by its watermark only. Upgrade the engine.", self._base,
+            )
+            resp = await self._call(
+                "POST", "/api/v1/provenance/receipts", body=body, timeout=_RECEIPT_TIMEOUT_SEC,
+            )
         data = _signed(resp, "receipt")
         return SignedReceipt(
             receipt=data["receipt"], signature=data["signature"], timestamp=data.get("timestamp"),

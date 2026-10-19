@@ -1877,6 +1877,7 @@
       "record-hash": "Matches a placement record",
       "receipt-reference": "Names a generation receipt",
       "record-reference": "Names a placement record",
+      "receipt-fingerprint": "Shares its phrases with a generated text",
       "vllm-gumbel": "Text watermark",
       "vllm-dual_key_gumbel": "Text watermark"
     },

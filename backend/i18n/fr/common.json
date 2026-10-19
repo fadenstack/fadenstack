@@ -1879,6 +1879,7 @@
       "record-hash": "Correspond à un enregistrement d'insertion",
       "receipt-reference": "Cite un reçu de génération",
       "record-reference": "Cite un enregistrement d'insertion",
+      "receipt-fingerprint": "Partage ses formulations avec un texte généré",
       "vllm-gumbel": "Filigrane de texte",
       "vllm-dual_key_gumbel": "Filigrane de texte"
     },

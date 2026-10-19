@@ -26,7 +26,7 @@ import logging
 from typing import Any
 
 from faden_gateway.db.models.gateway import ProviderType
-from faden_gateway.services.gateway import content_hash
+from faden_gateway.services.gateway import content_hash, text_fingerprint
 from faden_gateway.services.gateway.provenance_client import (
     ProvenanceClient,
     ProvenanceRequestError,
@@ -235,6 +235,7 @@ async def sign(
         status = watermark(candidate, sent, completion_tokens=completion_tokens, text=text)
         return await client.receipt(
             content_sha256=content_hash.text_sha256(text), model=model, agent=agent, watermark=status,
+            fingerprint=text_fingerprint.fingerprint(text),
         )
     except ProvenanceRequestError as exc:
         logger.warning("Request %s: the answer's receipt was not signed (%s): %s", request_id, exc.code, exc)

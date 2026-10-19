@@ -287,7 +287,7 @@ async def test_the_manifest_reports_the_engine_its_contract_and_capabilities() -
     assert line["version"] == "0.4.5"
     assert line["metadata"] == {
         "contract": "provenance/v1",
-        "capabilities": {"images": False, "receipts": False, "records": False, "detect": False},
+        "capabilities": {"images": False, "receipts": False, "records": False, "detect": False, "fingerprints": False},
         "plugins": [],
     }
 

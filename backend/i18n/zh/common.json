@@ -1736,6 +1736,7 @@
       "record-hash": "与一条插入记录一致",
       "receipt-reference": "引用了一份生成回执",
       "record-reference": "引用了一条插入记录",
+      "receipt-fingerprint": "与一段生成的文本有相同的语句",
       "vllm-gumbel": "文本水印",
       "vllm-dual_key_gumbel": "文本水印"
     },

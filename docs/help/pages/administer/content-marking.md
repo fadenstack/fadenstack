@@ -39,7 +39,14 @@ Every picture that an image model returns through Fadenstack is marked before it
 
 **The receipt.** Every complete answer gets a signed receipt: a record that a model of this installation
 produced a text with this hash. The marking engine never stores the text, only a keyed hash of it. Checking a
-text later finds its receipt, even when line breaks and spacing were changed, but not once it is reworded.
+text later finds its receipt, even when line breaks and spacing were changed.
+
+**The fingerprint.** An answer of 25 words or more also leaves a fingerprint with its receipt: keyed hashes of
+some of its five-word phrases, never the text. It finds an edited copy of the answer: words taken out, sentences
+added, passages moved. A check says how much of the text comes from the answer. When most of it does, the
+result is **Marked as AI-generated**; when only part of it does (a quotation in a person's own text), the check
+names the answer and the result is **Inconclusive**. The fingerprint works for every model, remote ones too, and backs up
+the watermark where the watermark is weak. Neither survives rewording or translation.
 
 **The text watermark.** Answers of your own models also carry an invisible watermark: a pattern in the model's
 choice of words, keyed with your installation's secret watermark key. It can be found in texts of roughly 200
@@ -72,8 +79,9 @@ the one with vLLM 0.29 has none.
   its models (see [Clusters](../operate/clusters.md#runtime)).
 - Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself. We recommend MTP
   for models that have it: answers come about 70 % faster. The watermark is found in fewer of their answers (about
-  half of the long ones in our measurement), as the drafts the model accepts carry little of it; receipts and the
-  agents' records are the same as without MTP.
+  half of the long ones in our measurement, and not once they are edited), as the drafts the model accepts carry
+  little of it. Receipts, fingerprints and the agents' records are the same as without MTP, so an edited answer is
+  still found by its fingerprint.
 - A superuser can switch the watermark off for one deployment with the engine setting `watermark_config: false`
   (see [Engine settings](deployments.md#engine-settings)). The receipts of its answers then say that they carry
   none.
@@ -127,7 +135,8 @@ confirm and records who switched it off and when; `faden up` then applies it, an
 
 ## Records
 
-Receipts, the records of placements and the agents' reports about them hold hashes and ids, never the content.
+Receipts with their fingerprints, the records of placements and the agents' reports about them hold hashes and
+ids, never the content.
 They are kept as long as they are needed. Every backup includes them, with the provenance database and
 its keys, and a restore or an upgrade keeps them (see [Backups](../operate/backups.md)).
 

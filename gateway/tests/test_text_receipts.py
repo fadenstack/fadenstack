@@ -28,7 +28,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_gateway.db.models.gateway import ProviderType
-from faden_gateway.services.gateway import picture_marking, text_receipts
+from faden_gateway.services.gateway import picture_marking, text_fingerprint, text_receipts
 from faden_gateway.services.gateway import service as service_module
 from faden_gateway.services.gateway.content_hash import text_sha256
 from faden_gateway.services.gateway.llm_adapter import CompletionResult, LLMAdapter
@@ -564,6 +564,68 @@ def test_a_route_that_names_its_algorithm_or_vendor_is_said_so() -> None:
     assert text_receipts.watermark(_route(), {"temperature": 0.7}, completion_tokens=400, text=LONG)["reason"] == (
         "runtime-without-watermark"
     )
+
+
+#: An answer long and varied enough for a fingerprint (20 distinct phrases and more).
+ESSAY = (
+    "A mid-sized manufacturer can plan the maintenance of its pumps over five years by starting with an honest "
+    "inventory of every pump, its age, its duty and its history of failures. From that list the maintenance team "
+    "sets inspection intervals, keeps a small stock of seals and bearings, and trains two technicians on each shift."
+)
+
+
+@pytest.mark.anyio
+async def test_a_long_answers_receipt_carries_its_fingerprint_not_its_text() -> None:
+    fake = _Engine()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
+        client = ProvenanceClient(base_url=BASE, http_client=http, service_token=TOKEN)
+        signed = await text_receipts.sign(
+            client, ESSAY, candidate=_route(), sent={}, completion_tokens=400, model="m", agent=None, request_id="r",
+        )
+        short = await text_receipts.sign(
+            client, ANSWER, candidate=_route(), sent={}, completion_tokens=8, model="m", agent=None, request_id="s",
+        )
+    assert signed is not None and short is not None
+    sample, count = text_fingerprint.fingerprint(ESSAY) or ([], 0)
+    assert fake.asked[0]["fingerprint"] == sample and fake.asked[0]["phrase_count"] == count
+    assert "fingerprint" not in fake.asked[1], "a short answer has none"
+    assert "inventory" not in fake.requests[0].content.decode()
+
+
+class _OldEngine(_Engine):
+    """An engine from before fingerprints: it refuses a receipt request that carries one."""
+
+    def _receipt(self, body: dict[str, Any]) -> httpx.Response:
+        if "fingerprint" in body:
+            return httpx.Response(422, json={"detail": [{"msg": "Extra inputs are not permitted"}]})
+        return super()._receipt(body)
+
+
+@pytest.mark.anyio
+async def test_an_engine_without_fingerprints_gets_receipts_without(caplog: pytest.LogCaptureFixture) -> None:
+    fake = _OldEngine()
+    printed = text_fingerprint.fingerprint(ESSAY)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
+        client = ProvenanceClient(base_url=BASE, http_client=http, service_token=TOKEN)
+        with caplog.at_level(logging.WARNING):
+            first = await client.receipt(content_sha256=text_sha256(ESSAY), model="m",
+                                         watermark={"applied": "none"}, fingerprint=printed)
+            second = await client.receipt(content_sha256=text_sha256(ESSAY), model="m",
+                                          watermark={"applied": "none"}, fingerprint=printed)
+    assert first.receipt_id and second.receipt_id
+    assert ["fingerprint" in body for body in fake.asked] == [True, False, False], "once refused, never again"
+    assert caplog.text.count("takes no text fingerprints") == 1
+
+
+@pytest.mark.anyio
+async def test_a_refused_request_without_a_fingerprint_is_not_sent_again() -> None:
+    fake = _Engine()
+    fake.fail = _answer(422, {"detail": [{"msg": "bad"}]})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
+        client = ProvenanceClient(base_url=BASE, http_client=http, service_token=TOKEN)
+        with pytest.raises(ProvenanceRequestError):
+            await client.receipt(content_sha256="0" * 64, model="m", watermark={"applied": "none"})
+    assert len(fake.asked) == 1
 
 
 @pytest.mark.anyio
