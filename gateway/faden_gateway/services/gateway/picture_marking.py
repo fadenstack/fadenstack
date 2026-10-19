@@ -10,14 +10,19 @@ So does a picture given as a link, which the gateway has no bytes of to mark.
 
 The answers that carry pictures: an images answer (``data[].b64_json``), and
 a chat answer whose model answers with pictures (LiteLLM's ``message.images``,
-or ``image_url`` parts of a list ``content``).
+or ``image_url`` parts of a list ``content``), whole or streamed
+(:func:`mark_stream`: ``delta.images``, or ``image_url`` parts of a list
+``delta.content``).
 """
 
 from __future__ import annotations
 
 import base64
 import binascii
+import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, aclosing, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -166,3 +171,87 @@ async def mark_chat(
     if not marker.receipts:
         return payload, []
     return {**payload, "choices": marked}, marker.receipts
+
+
+#: What an event of a stream that carries a picture contains. Any other event -- nearly all of them, tokens of
+#: text -- passes as it came, never parsed: a stream's speed is the gateway's (llm_adapter._stream_direct).
+_PICTURE_SIGNS = (b"image_url", b'"images"')
+
+
+async def _marked_event(marker: _Marker, event: bytes) -> bytes:
+    """One SSE event (without its blank line) with its deltas' pictures marked; as it came without any."""
+    lines = event.decode("utf-8", errors="replace").splitlines()
+    data_at = next((i for i, line in enumerate(lines) if line.startswith("data:")), None)
+    if data_at is None:
+        return event
+    try:
+        body = json.loads(lines[data_at][len("data:"):].strip())
+    except ValueError:
+        return event
+    choices = body.get("choices") if isinstance(body, dict) else None
+    if not isinstance(choices, list):
+        return event
+    marked: list[Any] = []
+    for choice in choices:
+        delta = choice.get("delta") if isinstance(choice, dict) else None
+        if not isinstance(delta, dict):
+            marked.append(choice)
+            continue
+        shaped = dict(delta)
+        if isinstance(delta.get("images"), list):
+            shaped["images"] = [await marker.part(p) for p in delta["images"]]
+        if isinstance(delta.get("content"), list):
+            shaped["content"] = [await marker.part(p) for p in delta["content"]]
+        marked.append({**choice, "delta": shaped})
+    lines[data_at] = "data: " + json.dumps({**body, "choices": marked})
+    return "\n".join(lines).encode()
+
+
+async def mark_stream(
+    client: ProvenanceClient,
+    stream: AsyncIterator[bytes],
+    *,
+    model: str,
+    agent: str | None,
+    request_id: str,
+) -> AsyncIterator[bytes]:
+    """A streamed chat answer with each picture its deltas carry marked before its event leaves.
+
+    A whole answer's pictures were marked (:func:`mark_chat`); a streamed one's
+    left as the model sent them -- from a chat route that declares no task, or
+    a remote model that answers with pictures. Events are passed on whole: the
+    stream is cut at event boundaries, and only an event that names a picture
+    is read. A picture that cannot be marked ends the stream with an error
+    event (``provenance_unavailable``): neither it nor anything after it leaves.
+    The picture's receipt is in its own marks: a stream's headers have gone
+    before its pictures come.
+    """
+    marker = _Marker(client=client, model=model, agent=agent, edit_kind="generated", request_id=request_id)
+
+    async def marked(whole: bytes) -> bytes:
+        if not any(sign in whole for sign in _PICTURE_SIGNS):
+            return whole
+        events = whole.split(b"\n\n")
+        out = [await _marked_event(marker, event) for event in events[:-1]]
+        # The stream's last bytes may lack the blank line after them: read as an event too.
+        tail = await _marked_event(marker, events[-1]) if events[-1].strip() else events[-1]
+        return b"".join(event + b"\n\n" for event in out) + tail
+
+    pending = b""
+    source: AbstractAsyncContextManager[AsyncIterator[bytes]] = (
+        aclosing(stream) if hasattr(stream, "aclose") else nullcontext(stream)  # type: ignore[type-var]
+    )
+    try:
+        async with source as chunks:
+            async for chunk in chunks:
+                pending += chunk
+                end = pending.rfind(b"\n\n")
+                if end < 0:
+                    continue
+                whole, pending = pending[:end + 2], pending[end + 2:]
+                yield await marked(whole)
+        if pending:
+            yield await marked(pending)
+    except GatewayError as exc:
+        error = {"error": {"message": exc.message, "type": exc.error_type, "code": exc.code}}
+        yield f"data: {json.dumps(error)}\n\n".encode() + b"data: [DONE]\n\n"

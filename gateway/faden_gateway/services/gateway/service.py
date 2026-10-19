@@ -1549,6 +1549,17 @@ class GatewayService:
             return result, ()
         return UpstreamResult(status_code=200, payload=payload, headers=result.headers), tuple(receipts)
 
+    def _pictures_marked(
+        self, req: _Prepared, stream: Any, *, model_alias: str, request_id: str,
+    ) -> Any:
+        """A streamed answer whose pictures leave marked, as a whole answer's do; as it is, the module off."""
+        if self.provenance_client is None or req.decision is None:
+            return stream
+        return picture_marking.mark_stream(
+            self.provenance_client, stream, model=req.decision.candidate.litellm_model or model_alias,
+            agent=req.agent.id if req.agent is not None else None, request_id=request_id,
+        )
+
     def _answer_receipt(
         self, req: _Prepared, text: str, *, completion_tokens: int | None, model_alias: str, request_id: str,
     ) -> Awaitable[SignedReceipt | None] | None:
@@ -1733,6 +1744,9 @@ class GatewayService:
                 )
                 # raw_stream is a coroutine returning AsyncIterator[bytes]
                 raw_stream = await raw_stream  # type: ignore[misc]
+                raw_stream = self._pictures_marked(
+                    req, raw_stream, model_alias=model_alias, request_id=request_id,
+                )
                 # The tokens tokenize mode put in go back to the values as the
                 # answer streams. They were not: the mapping was dropped here,
                 # and the chat page -- which always streams -- showed
@@ -3328,6 +3342,9 @@ class GatewayService:
                 **_candidate_adapter_kwargs(req.decision.candidate), payload=payload, stream=True,
                 first_token_timeout_sec=_first_token_wait(req.decision.candidate),
             )
+            raw = self._pictures_marked(
+                req, raw, model_alias=str(payload.get("model") or ""), request_id=request_id,
+            )
             calls = ToolCalls()
             said: list[str] = []
             ended: dict[str, Any] = {"finish": None, "failed": False}
@@ -4167,7 +4184,11 @@ def _accumulate_stream_content(chunk: bytes, acc: list[str], calls: ToolCalls | 
         choice = parsed.get("choices", [{}])[0] if parsed.get("choices") else None
         if choice:
             delta_content = choice.get("delta", {}).get("content")
-            if delta_content:
+            if isinstance(delta_content, list):
+                # Parts, as a model that streams pictures sends them: their text is the answer's.
+                texts = (p for p in delta_content if isinstance(p, dict) and p.get("type") == "text")
+                acc.extend(str(p.get("text") or "") for p in texts)
+            elif delta_content:
                 acc.append(delta_content)
             pieces = choice.get("delta", {}).get("tool_calls")
             if calls is not None and isinstance(pieces, list):

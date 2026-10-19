@@ -464,3 +464,111 @@ async def test_a_chats_picture_that_cannot_be_marked_fails_the_answer(
 
     _refused(r, "no_signing_key")
     assert "Here it is." not in r.text
+
+
+# ── A streamed chat whose model answers with pictures ────────────
+
+
+def _chunk(delta: dict[str, Any], finish: str | None = None) -> bytes:
+    body = {"id": "c", "object": "chat.completion.chunk", "model": ALIAS,
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+    return f"data: {json.dumps(body)}\n\n".encode()
+
+
+def _streams(monkeypatch: pytest.MonkeyPatch, *chunks: bytes) -> None:
+    async def completion(self: LLMAdapter, **kwargs: Any) -> Any:
+        async def pieces() -> AsyncIterator[bytes]:
+            for chunk in chunks:
+                yield chunk
+            yield b"data: [DONE]\n\n"
+
+        return pieces()
+
+    monkeypatch.setattr(LLMAdapter, "completion", completion)
+
+
+async def _streamed_chat(client: AsyncClient) -> str:
+    r = await client.post("/v1/chat/completions", headers={"Authorization": f"Bearer {_token()}"}, json={
+        "model": ALIAS, "stream": True, "messages": [{"role": "user", "content": "Draw a lighthouse"}],
+    })
+    assert r.status_code == 200, r.text
+    return r.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("where", ["images", "content"])
+async def test_a_streamed_chats_pictures_leave_marked(
+    where: str, fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch, engine: _Engine,
+) -> None:
+    """A chat route that declares no task, or a remote model, streams a picture: it leaves marked."""
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    picture = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PICTURE}"}}
+    _streams(
+        monkeypatch,
+        _chunk({"role": "assistant", "content": "Here it is."}),
+        _chunk({"images": [{**picture, "index": 0}]} if where == "images" else {"content": [picture]}),
+        _chunk({}, finish="stop"),
+    )
+
+    text = await _streamed_chat(client)
+
+    assert "Here it is." in text
+    assert _marked(PICTURE) in text
+    assert f"base64,{PICTURE}\"" not in text, "the picture as the model made it never leaves"
+    assert len(engine.sent) == 1 and engine.sent[0]["edit_kind"] == "generated"
+
+
+@pytest.mark.anyio
+async def test_a_streamed_picture_that_cannot_be_marked_ends_the_stream_without_it(
+    fastapi_app: FastAPI, client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch,
+    engine: _Engine,
+) -> None:
+    await _seed(db_session, provider=ProviderType.VLLM, pii=None)
+    fastapi_app.state.gateway_observability = _Observability()
+    _streams(
+        monkeypatch,
+        _chunk({"role": "assistant", "content": "Here it is."}),
+        _chunk({"images": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PICTURE}"}}]}),
+        _chunk({"content": " And a second sentence."}),
+    )
+    engine.fail[1] = _answer(503, {"detail": {"code": "no_signing_key", "message": "No signing key"}})
+
+    text = await _streamed_chat(client)
+
+    assert PICTURE not in text
+    assert "provenance_unavailable" in text and picture_marking.UNMARKED_MESSAGE in text
+    assert "And a second sentence." not in text, "nothing after the picture leaves"
+
+
+@pytest.mark.anyio
+async def test_a_streamed_chat_without_pictures_passes_as_it_came(engine: _Engine) -> None:
+    """Text events are passed on as the model sent them, byte for byte, and the engine is never asked."""
+    chunks = [_chunk({"content": "A lighthouse "}), _chunk({"content": "on a rock."}), b"data: [DONE]\n\n"]
+
+    async def source() -> AsyncIterator[bytes]:
+        for chunk in chunks:
+            yield chunk
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_Engine())) as http:
+        client = ProvenanceClient(base_url=BASE, http_client=http, service_token=TOKEN)
+        out = [c async for c in picture_marking.mark_stream(client, source(), model="m", agent=None, request_id="r")]
+    assert out == chunks
+
+
+@pytest.mark.anyio
+async def test_a_picture_split_across_reads_is_still_marked() -> None:
+    """The stream is cut at event boundaries before it is looked at: a picture in two reads is one event."""
+    event = _chunk({"images": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{PICTURE}"}}]})
+    half = len(event) // 2
+
+    async def source() -> AsyncIterator[bytes]:
+        yield event[:half]
+        yield event[half:]
+
+    fake = _Engine()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
+        client = ProvenanceClient(base_url=BASE, http_client=http, service_token=TOKEN)
+        out = b"".join([c async for c in picture_marking.mark_stream(client, source(), model="m", agent=None, request_id="r")])
+    assert _marked(PICTURE).encode() in out and len(fake.sent) == 1
