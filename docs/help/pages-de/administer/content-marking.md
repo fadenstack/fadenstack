@@ -47,7 +47,10 @@ wurden, aber nicht mehr, wenn er umformuliert ist.
 **Das Text-Wasserzeichen.** Antworten Ihrer eigenen Modelle tragen außerdem ein unsichtbares Wasserzeichen: ein
 Muster in der Wortwahl des Modells, gebildet mit dem geheimen Wasserzeichen-Schlüssel Ihrer Installation. Es lässt
 sich in Texten ab etwa 200 Wörtern finden und wird schwächer, wenn der Text stark bearbeitet, übersetzt oder
-umschrieben wird.
+umschrieben wird. Ein Text, der vor allem wiedergibt, was das Modell bekommen hat (die Zusammenfassung einer Mail,
+ein umformulierter Absatz, Namen und Zahlen aus einem Dokument), trägt wenig davon, weil das Modell kaum eigene
+Wörter wählt: Ein solcher Text wird über seinen Beleg gefunden, und was die Agenten schreiben, auch über den
+Nachweis, den sie dazu ablegen.
 
 Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was davon zutrifft:
 
@@ -71,7 +74,8 @@ GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
 
 - Ein Modell bekommt das Wasserzeichen beim nächsten Start. Ein Wechsel der Runtime startet den Cluster und seine
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
-- Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein.
+- Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein. Es
+  wird in weniger ihrer Antworten gefunden, weil die Entwürfe, die das Modell übernimmt, wenig davon tragen.
 - Ein Superuser kann das Wasserzeichen für eine einzelne Bereitstellung mit der Engine-Einstellung
   `watermark_config: false` ausschalten (siehe [Engine-Einstellungen](deployments.md#engine-settings)). Die Belege
   ihrer Antworten vermerken dann, dass sie keines tragen.
@@ -155,4 +159,4 @@ Erneuern abläuft, steht unter [Schlüssel erneuern](../operate/rotating-keys.md
 | **Kennzeichnungsdienst** zeigt **Läuft nicht** | Solange der Dienst nicht läuft, können Inhalte nicht gekennzeichnet werden. Wer den Server betreibt, startet ihn wieder (`faden up`). |
 | **Der Dienst hat das Service-Token abgelehnt** | Backend und Dienst müssen dasselbe Service-Token verwenden. Wenden Sie sich an den Betreiber des Servers. |
 | **Inhalte können noch nicht geprüft werden: Für den Kennzeichnungsdienst sind keine Schlüssel eingerichtet.** | In der `.env` fehlen die Schlüssel. `faden up` legt an, was fehlt. |
-| Die Antworten eines Modells tragen kein Text-Wasserzeichen | Gehen Sie die Liste unter [Textantworten](#text-answers) durch: die Runtime, ob das Modell seitdem neu gestartet ist, die Länge der Antworten und die Temperatur. |
+| Die Antworten eines Modells tragen kein Text-Wasserzeichen | Gehen Sie die Liste unter [Textantworten](#text-answers) durch: die Runtime, ob das Modell seitdem neu gestartet ist, die Länge der Antworten, die Temperatur und ob sie einen vorgegebenen Text wiedergeben. |

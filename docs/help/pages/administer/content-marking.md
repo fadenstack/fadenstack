@@ -43,7 +43,10 @@ text later finds its receipt, even when line breaks and spacing were changed, bu
 
 **The text watermark.** Answers of your own models also carry an invisible watermark: a pattern in the model's
 choice of words, keyed with your installation's secret watermark key. It can be found in texts of roughly 200
-words or more, and it weakens when the text is heavily edited, translated or paraphrased.
+words or more, and it weakens when the text is heavily edited, translated or paraphrased. A text that mostly
+restates what the model was given (a summary of a mail, a rewrite of a paragraph, names and figures taken from a
+document) carries little of it, as the model has few words of its own to choose: such a text is found by its
+receipt, and what the agents write also by the record they keep with it.
 
 These answers carry no text watermark, and their receipt records which of these applies:
 
@@ -65,7 +68,8 @@ the one with vLLM 0.29 has none.
 
 - A model picks up the watermark the next time it starts. Switching a cluster's runtime restarts the cluster and
   its models (see [Clusters](../operate/clusters.md#runtime)).
-- Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself.
+- Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself. It is found in
+  fewer of their answers, as the drafts the model accepts carry little of it.
 - A superuser can switch the watermark off for one deployment with the engine setting `watermark_config: false`
   (see [Engine settings](deployments.md#engine-settings)). The receipts of its answers then say that they carry
   none.
@@ -143,4 +147,4 @@ rotates these keys alone; how a rotation runs is on [Rotating the keys](../opera
 | **Marking engine** says **Not running** | Content cannot be marked while the engine is not running. Whoever runs the server starts it again (`faden up`). |
 | **The engine refused the service token** | The backend and the engine must use the same service token. Tell whoever runs the server. |
 | **Content cannot be checked yet: the marking engine has no keys set up.** | The keys are missing in `.env`. `faden up` makes what is missing. |
-| A model's answers carry no text watermark | Go through the list under [Text answers](#text-answers): the runtime, whether the model has restarted since, the length of the answers and the temperature. |
+| A model's answers carry no text watermark | Go through the list under [Text answers](#text-answers): the runtime, whether the model has restarted since, the length of the answers, the temperature, and whether they restate a given text. |
