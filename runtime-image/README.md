@@ -152,10 +152,9 @@ unchanged (`--tag ghcr.io/fadenstack/ray-runtime-gb10:… --push`): pushing keep
 its layers, so the certification still holds; record it again in the manifest
 the push mints. `vllm0.29.0` went this way.
 
-A manifest must name the published image. `vllm0.29.0` and x86_64 name GHCR;
-`vllm0.31.0` still names a local tag (`faden/ray-vllm-gb10:…`), an image only
-on the DGX pair: a server can hand out only images it holds, so it reaches
-other servers once it is pushed and its manifest names the registry.
+A manifest must name the published image: a server can hand out only images it
+holds. Every manifest here names GHCR; `vllm0.31.0` went the way above too, and
+its certification was recorded again in the manifest the push minted.
 
 ## Licence
 
