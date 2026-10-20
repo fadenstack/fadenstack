@@ -162,6 +162,9 @@ jobs:
             for svc in base gateway backend frontend pii mcp skills; do
               docker manifest inspect "$REGISTRY/$svc:$VERSION" >/dev/null 2>&1 || missing="$missing $svc"
             done
+              for variant in cpu gpu; do
+                docker manifest inspect "$REGISTRY/pii:$VERSION-$variant" >/dev/null 2>&1 || missing="$missing pii-$variant"
+              done
             [ -z "$missing" ] && { echo "All images for $VERSION are published."; exit 0; }
             echo "Waiting for:$missing ($attempt/60)"
             sleep 60

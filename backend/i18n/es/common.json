@@ -1818,7 +1818,11 @@
     "subtitle": "Lo que el filtro PII encontró en las solicitudes, solo como recuentos",
     "summary": "Resumen",
     "no_volume": "No hay análisis en este periodo.",
-    "no_breakdown": "Aún no hay nada que desglosar."
+    "no_breakdown": "Aún no hay nada que desglosar.",
+    "avg_duration": "Tiempo medio de proc.",
+    "p95_duration": "Tiempo p95 de proc.",
+    "p50_short": "p50",
+    "max_short": "máx."
   },
   "pii_log": {
     "title": "Registro de Actividad PII",
@@ -1833,7 +1837,8 @@
     "col_types": "Tipos de Entidad",
     "col_source": "Fuente",
     "col_lang": "Idioma",
-    "no_events": "No se encontraron eventos PII."
+    "no_events": "No se encontraron eventos PII.",
+    "col_duration": "Duración"
   },
   "pii_policy": {
     "system_section": "Politica PII (Predeterminada del Sistema)",
@@ -4336,5 +4341,12 @@
       "open": "Ver actualizaciones",
       "dismiss": "Ocultar hasta la próxima versión"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "El servicio PII no está disponible. Estas opciones no confirman una protección activa.",
+  "pii_policy.form.reviewed": "Umbrales revisados",
+  "pii_policy.form.unreviewed": "Umbrales pendientes de revisión",
+  "pii_policy.form.adopt_profile": "Usar valores del perfil instalado",
+  "pii_policy.form.profile_mismatch": "El perfil de la política no coincide con el servicio instalado. Las solicitudes protegidas fallarán hasta que se seleccione un perfil compatible.",
+  "pii_policy.form.profile_thresholds": "Usar umbrales del perfil",
+  "pii_policy.form.installed_detector": "Detector instalado"
 }

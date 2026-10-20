@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 import os
+from pathlib import Path
 from datetime import UTC, datetime
 
 import click
@@ -14,6 +15,7 @@ from faden_cli.core.env_gen import set_module_env
 from faden_cli.core.registry import MODULES as MODULE_INFO
 from faden_cli.core.registry import MODULES_COMPAT as MODULES
 from faden_cli.core.settings import FadenConfig, config_path, load_config, save_config
+from faden_cli.core.pii_runtime import options as pii_options
 
 
 def _write_env(cfg: FadenConfig, *, enable: list[str], disable: list[str]) -> None:
@@ -94,7 +96,12 @@ def module_list() -> None:
 
 @module_group.command("enable")
 @click.argument("modules", nargs=-1, required=True)
-def module_enable(modules: tuple[str, ...]) -> None:
+@click.option("--yes", "-y", is_flag=True, help="Keep a compatible PII mode or select a preset without prompting.")
+@pii_options
+def module_enable(modules: tuple[str, ...], *, yes: bool = False, pii_profile: str | None = None,
+                  pii_model: str | None = None, pii_locale: str | None = None,
+                  pii_model_dir: Path | None = None, pii_gpu_id: str | None = None,
+                  pii_gpu_memory_mib: int | None = None, pii_cpu_threads: int | None = None) -> None:
     """Enable one or more modules.
 
     Example: faden module enable pii auth
@@ -102,6 +109,26 @@ def module_enable(modules: tuple[str, ...]) -> None:
     cfg = load_config()
     profiles = set(cfg.profiles or [])
     enabled: list[str] = []
+
+    if any(v is not None for v in (pii_profile, pii_model, pii_locale)) and "pii" not in {name.lower() for name in modules}:
+        raise click.UsageError("PII options require module enable pii")
+    if "pii" in {name.lower() for name in modules}:
+        from faden_cli.core.bundle import installed_release
+        from faden_cli.core.env_gen import read_env_file
+        from faden_cli.core.pii_runtime import deploy_step as configure_pii
+
+        env_path = cfg.env_path
+        if not env_path.is_file():
+            raise click.ClickException("Run faden deploy before configuring the PII module.")
+        old = read_env_file(env_path)
+        try:
+            configure_pii(env_path, requested=pii_profile, model_dir=pii_model_dir,
+                          model=pii_model, locale=pii_locale,
+                          gpu_id=pii_gpu_id, gpu_mib=pii_gpu_memory_mib or int(old.get("FADEN_PII_GPU_MEMORY_MIB") or 4096),
+                          threads=pii_cpu_threads, yes=yes, published=installed_release(cfg.install_path) is not None,
+                          upgrade=old.get("FADEN_BACKEND_PII_ENABLED", "").lower() == "true")
+        except (ValueError, OSError) as exc:
+            raise click.ClickException(str(exc)) from exc
 
     for mod in modules:
         mod_lower = mod.lower()

@@ -19,9 +19,9 @@ pytestmark = pytest.mark.anyio()
 
 async def test_the_totals_count_each_scan_once(dbsession: AsyncSession) -> None:
     dbsession.add_all([
-        PIIScanEvent(operation="scan", pii_detected=True, entities_found=2, source="gateway"),
-        PIIScanEvent(operation="redact", pii_detected=True, entities_found=3, source="gateway"),
-        PIIScanEvent(operation="scan", pii_detected=False, entities_found=0, source="api"),
+        PIIScanEvent(operation="scan", pii_detected=True, entities_found=2, source="gateway", duration_ms=10.0),
+        PIIScanEvent(operation="redact", pii_detected=True, entities_found=3, source="gateway", duration_ms=20.0),
+        PIIScanEvent(operation="scan", pii_detected=False, entities_found=0, source="api", duration_ms=30.0),
     ])
     await dbsession.flush()
 
@@ -29,4 +29,8 @@ async def test_the_totals_count_each_scan_once(dbsession: AsyncSession) -> None:
 
     assert (stats["total_scans"], stats["total_with_pii"], stats["total_entities"]) == (3, 2, 5)
     assert stats["detection_rate"] == pytest.approx(2 / 3, abs=1e-4)
+    assert stats["avg_duration_ms"] == pytest.approx(20.0, abs=1e-2)
+    assert stats["p50_duration_ms"] == pytest.approx(20.0, abs=1e-2)
+    assert stats["p95_duration_ms"] == pytest.approx(29.0, abs=1e-2)
+    assert stats["max_duration_ms"] == pytest.approx(30.0, abs=1e-2)
     assert stats["operation_breakdown"] == {"scan": 2, "redact": 1}

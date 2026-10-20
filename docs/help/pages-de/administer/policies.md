@@ -19,8 +19,8 @@ arbeitet nur so, wie Ihre Richtlinie es vorgibt: Sie wählen, welche Daten, für
 wenn der Filter nicht laufen kann.
 
 !!! note "Die Erkennung ist nicht immer richtig"
-    Wie gut der Filter arbeitet, hängt von der Sprache und vom Aufbau der Inhalte ab: Am besten erkennt er ganze
-    englische Sätze, weniger gut andere Sprachen sowie Tabellen, Listen, Code und kurze Fragmente. Er kann
+    Wie gut der Filter arbeitet, hängt vom installierten Profil, von der Sprache und vom Aufbau der Inhalte ab.
+    Tabellen, Listen, Code und kurze Fragmente brauchen besondere Aufmerksamkeit. Er kann
     personenbezogene Daten übersehen und Wörter maskieren, die keine sind. Testen Sie ihn mit typischen Inhalten Ihrer
     Organisation, bevor Sie sich darauf verlassen, und weisen Sie Ihre Benutzer darauf hin, nichts einzufügen, was sie
     nicht weitergeben dürfen.
@@ -57,9 +57,9 @@ nicht mehr maskiert. Speichern Sie eine Richtlinie für Ihre Organisation, wenn 
     Datumsangaben (`DATE_TIME`) stehen nicht auf der Liste. Fügen Sie sie hinzu, wenn auch Geburtsdaten erfasst
     werden sollen; einfache Zahlen in einer Nachricht können dann ebenfalls als Datum maskiert werden.
 
-Der Filter hat nur ein englisches Sprachmodell. In deutschem oder anderssprachigem Text findet er weiterhin, was eine
-feste Form hat (E-Mail-Adressen, Telefon-, Karten- und Kontonummern, IP-Adressen, Links), übersieht aber oft Namen
-und Orte.
+Das ältere Profil `presidio-legacy` unterstützt Englisch. Die lokalen mehrsprachigen Profile unterstützen Englisch
+(`en`), Deutsch (`de`), Französisch (`fr`) und Spanisch (`es`). Das Formular zeigt die Sprachen und Kategorien des
+laufenden Dienstes. Eine erfolgreiche Prüfung bestätigt keinen Schutz für eine nicht aufgeführte Sprache.
 
 ### Die Richtlinie ändern {#change-the-policy}
 
@@ -96,8 +96,45 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
     | **Ausgehende Anfragen**: **Anfragen an Cloud-Anbieter schützen**, **Anfragen an lokale Modelle schützen** | Welche Anfragen geprüft werden. |
     | **Modus** | `redact`: Personenbezogene Daten werden durch einen Platzhalter wie `<PERSON>` ersetzt, und die Antwort behält ihn. `tokenize_reversible`: Jeder Wert wird durch ein Token wie `[PERSON_1]` ersetzt und in der Antwort, die der Benutzer sieht, wieder eingesetzt. Das Modell sieht die Daten in keinem der beiden Fälle. |
     | **Wenn die Erkennung fehlschlägt** | `block`: Die Anfrage wird abgelehnt. `allow`: Sie wird ungeprüft gesendet. `fallback_to_local`: Sie wird ungeprüft an eines Ihrer eigenen Modelle mit demselben Namen gesendet, falls es eines gibt, und sonst abgelehnt. |
-    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Welche Sprache der Filter liest, wie sicher er sein muss und nach welchen Arten von Daten er sucht. Ein höherer Schwellenwert maskiert weniger. Installiert ist nur Englisch: Lassen Sie **Sprache** auf `en`. Mit einer anderen Sprache schlägt jede Prüfung fehl, und **Wenn die Erkennung fehlschlägt** entscheidet. |
+    | **Erkennung (Presidio)**: **Sprache**, **Schwellenwert**, **Entitäten** | Das installierte Profil, die Sprache und die Kategorien. **Schwellenwerte des Profils verwenden** übernimmt die Vorgaben des Profils. Ein höherer manueller Schwellenwert maskiert weniger. Wählen Sie nur angebotene Sprachen und verfügbare Kategorien; andernfalls schlägt die Prüfung fehl und **Wenn die Erkennung fehlschlägt** entscheidet. |
     | **Telemetrie**: **Personenbezogene Daten aus der Telemetrie entfernen**, **Modus** | Für Aufzeichnungen von Anfragen (Traces), die standardmäßig ausgeschaltet sind: ob ein Trace die Anfrage ohne personenbezogene Daten enthält (`sanitized`) oder nur Kennzahlen (`metrics_only`). Ohne Enterprise enthalten Traces ohnehin nur Kennzahlen. |
+
+### Ein installiertes Erkennungsprofil übernehmen {#adopt-an-installed-detector-profile}
+
+**Installierte Erkennung** zeigt Modell, Inhaltssprachpaket und Ausführungsmodus. Angeboten werden nur
+die installierten Sprachen des Pakets. Prüfen Sie nach einem Paketwechsel jede betroffene Richtlinie.
+
+Wenn Ihr Betreiber die Erkennung oder den Filtersatz ändert, prüfen Sie die Standardrichtlinie und die
+Mandanten-Overrides, die das Profil verwenden sollen:
+
+1. Prüfen Sie, ob das installierte Profil verfügbar ist. Eine Meldung über einen nicht verfügbaren Dienst bestätigt
+   keinen aktiven Schutz.
+2. Wählen Sie unter **Erkennung (Presidio)** die Schaltfläche **Standardwerte des installierten Profils verwenden**.
+   Dadurch werden das installierte Profil und **Schwellenwerte des Profils verwenden** gewählt. Ihre Kategorien und
+   Einstellungen für ausgehende Anfragen bleiben erhalten.
+3. Wählen Sie **Sprache**. Entfernen Sie Kategorien, die dafür nicht verfügbar sind, und ergänzen Sie unter
+   **Entitäten** die benötigten Kategorien. Das Übernehmen des Profils wählt nicht automatisch alle Kategorien aus.
+4. Wählen Sie den Schutz für Cloud-Anfragen, lokale Modelle oder beides. Lassen Sie **Wenn die Erkennung fehlschlägt**
+   auf `block`, wenn eine geschützte Anfrage nur nach erfolgreicher Prüfung gesendet werden darf. Speichern Sie.
+
+Ein Sprachwechsel kann eine zuvor gewählte Kategorie ungültig machen. Entfernen oder ersetzen Sie diese
+ausdrücklich. Der Dienst lehnt nicht unterstützte Kategorien ab, statt sie stillschweigend zu ignorieren.
+
+??? info "Erweiterte Kategorien und ihre Grenzen"
+    Wenn Ihr Betreiber den [erweiterten Filtersatz](../operate/installing.md#extended-pii-fields) aktiviert, stehen
+    unter anderem Datum, Alter, Geschlecht, Postleitzahlen, Identitätsdokumente, Steuer- und
+    Sozialversicherungsnummern sowie ausdrücklich benannte sensible Felder zur Verfügung. Wählen Sie die benötigten
+    Kategorien in der Richtlinie; die Verfügbarkeit allein aktiviert sie nicht.
+
+    Gesundheitsdaten, ethnische Herkunft, politische Meinungen, Religion oder Weltanschauung,
+    Gewerkschaftszugehörigkeit, genetische und biometrische Daten, Sexualleben, sexuelle Orientierung und
+    strafrechtliche Verurteilungen werden in unterstützten ausdrücklich benannten Feldern erkannt. Das ist keine
+    allgemeine Erkennung jeder sensiblen Aussage in Gesprächen und keine Garantie für DSGVO-Konformität.
+    Testen Sie die Inhalte und Feldformate Ihrer Organisation.
+
+    Numerische Werte oder Container unter einem geschützten sensiblen Schlüssel in Tool-Argumenten können
+    abgelehnt werden, wenn eine Ersetzung den Datentyp ändern würde. Andere Werte behalten ihre Typen. Bilder und
+    Audio sind keine Textprüfungen; für nicht unterstützte geschützte Inhalte gilt **Wenn die Erkennung fehlschlägt**.
 
 ### Chats und Agenten {#chats-and-agents}
 
@@ -120,6 +157,11 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
 **Datenschutz (PII) → Dashboard** zeigt nur Zahlen: die Prüfungen, wie viele davon personenbezogene Daten
 gefunden haben, die gefundenen Arten und das tägliche Volumen. **Datenschutz (PII) → Aktivitätsprotokoll** listet
 jede Prüfung mit Modus, Arten und Anzahl auf, ohne den Text selbst.
+
+Das Dashboard zeigt auch **Ø Verarbeitungszeit** und **p95 Verarbeitungszeit**, das Aktivitätsprotokoll die
+**Dauer**. Gemeint ist die gemeldete Verarbeitungszeit des PII-Dienstes einschließlich des Wartens auf die
+Erkennung. Die Antwortzeit des Sprachmodells gehört nicht dazu. Ältere Ereignisse können ohne Dauer erscheinen.
+Die Erkennungsrate ist der Anteil der Prüfungen mit einem Fund, nicht der Anteil erfolgreich entfernter Daten.
 
 ## Tool-Regeln {#tool-rules}
 

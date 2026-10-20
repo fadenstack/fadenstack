@@ -77,6 +77,10 @@ class CustomBuildHook(BuildHookInterface):
     """Add the shared deployment files to the wheel or sdist being built."""
 
     def initialize(self, version: str, build_data: dict) -> None:  # noqa: ARG002
+        catalog = Path(self.root).parent / "pii/faden_pii/pii-catalog.json"
+        if catalog.is_file():
+            prefix = "src/faden_cli" if self.target_name == "sdist" else "faden_cli"
+            build_data["force_include"][str(catalog)] = f"{prefix}/bundle/pii-catalog.json"
         shared = Path(self.root).parent / "shared"
         if not shared.is_dir():
             # Building from an sdist: the files are already in the package.

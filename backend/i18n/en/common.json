@@ -1959,7 +1959,11 @@
     "subtitle": "What the PII filter found in requests, as counts only",
     "summary": "Summary",
     "no_volume": "No scans in this period.",
-    "no_breakdown": "Nothing to break down yet."
+    "no_breakdown": "Nothing to break down yet.",
+    "avg_duration": "Avg Processing Time",
+    "p95_duration": "p95 Processing Time",
+    "p50_short": "p50",
+    "max_short": "max"
   },
   "pii_log": {
     "title": "PII Activity Log",
@@ -1974,7 +1978,8 @@
     "col_types": "Entity Types",
     "col_source": "Source",
     "col_lang": "Lang",
-    "no_events": "No PII events found."
+    "no_events": "No PII events found.",
+    "col_duration": "Duration"
   },
   "pii_policy": {
     "system_section": "PII Policy (System Default)",
@@ -4334,5 +4339,12 @@
       "open": "See updates",
       "dismiss": "Hide until the next release"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "PII service is unavailable. These options do not confirm active protection.",
+  "pii_policy.form.reviewed": "Reviewed thresholds",
+  "pii_policy.form.unreviewed": "Thresholds awaiting review",
+  "pii_policy.form.adopt_profile": "Use installed profile defaults",
+  "pii_policy.form.profile_mismatch": "The policy profile differs from the installed service. Protected requests will fail until a compatible profile is selected.",
+  "pii_policy.form.profile_thresholds": "Use profile thresholds",
+  "pii_policy.form.installed_detector": "Installed detector"
 }

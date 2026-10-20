@@ -127,6 +127,7 @@
 "How do I retire or delete an agent?" = "retire-and-delete"
 
 ["administer/policies.md"]
+"How do I configure PII categories and adopt an installed detector?" = "adopt-an-installed-detector-profile"
 "How do I switch on personal data (PII) protection?" = "personal-data"
 "How do I change the privacy policy?" = "change-the-policy"
 "How do I block or allow tools?" = "tool-rules"
@@ -165,12 +166,17 @@
 "What needs internet access?" = "what-needs-the-internet"
 
 ["operate/installing.md"]
+"How do I enable extended PII fields?" = "extended-pii-fields"
+"Can PII run on CPU without a GPU?" = "local-pii-on-cpu-or-gpu"
+"How do I choose CPU or GPU for PII?" = "local-pii-on-cpu-or-gpu"
+"How do I choose a local PII model and language pack?" = "local-pii-on-cpu-or-gpu"
 "How do I install Fadenstack?" = "install"
 "How do I sign in for the first time after installing?" = "sign-in-for-the-first-time"
 "Which everyday commands are there?" = "everyday-commands"
 "How do I uninstall Fadenstack?" = "removing-fadenstack"
 
 ["operate/upgrading.md"]
+"Does upgrading keep my PII module settings?" = "upgrade-the-pii-module"
 "How do I upgrade Fadenstack?" = "upgrade-the-server"
 "How do I know when a new version is out?" = "how-you-hear-about-a-new-release"
 "Does the update check send data about my server?" = "how-you-hear-about-a-new-release"

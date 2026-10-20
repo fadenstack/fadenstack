@@ -25,6 +25,8 @@ class PIIScanRequest(BaseModel):
         le=1.0,
         description="Minimum confidence score (0-1). Default: 0.35.",
     )
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
 
 
 class DetectedEntityDTO(BaseModel):
@@ -35,6 +37,7 @@ class DetectedEntityDTO(BaseModel):
     end: int
     score: float
     text: str
+    path: str | None = None
 
 
 class PIIScanResponse(BaseModel):
@@ -42,6 +45,7 @@ class PIIScanResponse(BaseModel):
 
     has_pii: bool
     entities: list[DetectedEntityDTO]
+    duration_ms: float | None = None
 
 
 class PIIRedactRequest(BaseModel):
@@ -62,6 +66,8 @@ class PIIRedactRequest(BaseModel):
         le=1.0,
         description="Minimum confidence score (0-1). Default: 0.35.",
     )
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
 
 
 class PIIRedactResponse(BaseModel):
@@ -69,6 +75,7 @@ class PIIRedactResponse(BaseModel):
 
     redacted_text: str
     entities_found: int
+    duration_ms: float | None = None
 
 
 # ---------------------------------------------------------------
@@ -99,6 +106,8 @@ class PIISanitizeRequest(BaseModel):
     language: str | None = Field(default=None)
     entities: list[str] | None = Field(default=None)
     score_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
     token_mapping: dict[str, str] | None = Field(
         default=None,
         description=(
@@ -121,6 +130,10 @@ class PIISanitizeResponse(BaseModel):
         default=None,
         description="Only present when mode='tokenize'. Maps tokens to original text.",
     )
+    contract_version: int = 2
+    coverage_status: str = "complete"
+    profile_fingerprint: str = "presidio-v2"
+    duration_ms: float | None = None
 
 
 class PIIDetokenizeRequest(BaseModel):
@@ -154,6 +167,18 @@ class PIIPolicyOptionsResponse(BaseModel):
     supported_sanitize_modes: list[str]
     default_language: str
     default_score_threshold: float
+    contract_version: int = 2
+    profile_id: str = "presidio-legacy"
+    profile_fingerprint: str | None = None
+    calibrated: bool = False
+    ready: bool = False
+    supported_surfaces: list[str] = [
+        "chat_text",
+        "tool_argument_strings",
+        "embedding_strings",
+    ]
+    entity_languages: dict[str, list[str]] = {}
+    detector: dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------
@@ -167,6 +192,7 @@ class DailyVolumeDTO(BaseModel):
     date: str
     count: int
     pii_count: int
+    avg_duration_ms: float | None = None
 
 
 class PIIStatsResponse(BaseModel):
@@ -176,6 +202,10 @@ class PIIStatsResponse(BaseModel):
     total_with_pii: int
     total_entities: int
     detection_rate: float
+    avg_duration_ms: float | None = None
+    p50_duration_ms: float | None = None
+    p95_duration_ms: float | None = None
+    max_duration_ms: float | None = None
     entity_type_breakdown: dict[str, int]
     operation_breakdown: dict[str, int]
     source_breakdown: dict[str, int]
@@ -196,6 +226,7 @@ class PIIEventDTO(BaseModel):
     entity_type_counts: dict[str, int] | None = None
     source: str
     request_id: str | None = None
+    duration_ms: float | None = None
 
 
 class PIIEventsResponse(BaseModel):

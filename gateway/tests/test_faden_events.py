@@ -138,7 +138,8 @@ async def test_the_pii_notice_names_types_and_the_round_comes_back_with_the_valu
     service_registry.configure("pii", enabled=True, url="http://pii.local")
 
     async def sanitize(self: PIIClient, *, payload: dict[str, Any], policy: Any, mode: str | None = None,
-                       token_mapping: dict[str, str] | None = None) -> SanitizeResult:
+                       token_mapping: dict[str, str] | None = None, request_id: str | None = None,
+                       cache_scope: str = "") -> SanitizeResult:
         text = json.dumps(payload)
         found = "Alice" in text
         return SanitizeResult(

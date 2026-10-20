@@ -89,8 +89,8 @@ class TestParsePiiPolicyValidation:
         assert policy is not None
         assert policy.egress.fail_action == "fallback_to_local"
 
-    def test_unknown_entities_filtered_out(self) -> None:
-        """Entity names not in the supported catalog must be stripped."""
+    def test_unknown_entities_retained_for_service_rejection(self) -> None:
+        """Unsupported categories must reach the service so missing coverage is explicit."""
         raw = {
             "egress": {"enabled_for_cloud": True},
             "presidio": {
@@ -106,8 +106,8 @@ class TestParsePiiPolicyValidation:
         assert policy is not None
         assert "EMAIL_ADDRESS" in policy.presidio.entities
         assert "PERSON" in policy.presidio.entities
-        assert "TOTALLY_FAKE_ENTITY" not in policy.presidio.entities
-        assert "NONEXISTENT_TYPE" not in policy.presidio.entities
+        assert "TOTALLY_FAKE_ENTITY" in policy.presidio.entities
+        assert "NONEXISTENT_TYPE" in policy.presidio.entities
 
     def test_threshold_clamped_to_valid_range(self) -> None:
         """Threshold outside [0.0, 1.0] must be clamped."""
@@ -317,11 +317,11 @@ class TestClampAndMerge:
             result = clamp_and_merge(floor, SessionPIIOverride(presidio_threshold=asked))
             assert result.presidio.threshold == 0.5
 
-    def test_threshold_never_reaches_zero(self) -> None:
-        """Zero means "service default" over there, which can be looser than the floor."""
+    def test_explicit_zero_strengthens_the_floor(self) -> None:
+        """Zero requests every valid detector candidate; it is no longer the default sentinel."""
         floor = _floor()
         result = clamp_and_merge(floor, SessionPIIOverride(presidio_threshold=0.0))
-        assert 0.0 < result.presidio.threshold <= 0.5
+        assert result.presidio.threshold == 0.0
 
     def test_weaken_right_may_raise_threshold(self) -> None:
         floor = _floor()

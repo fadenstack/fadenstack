@@ -51,3 +51,7 @@ class PIIScanEvent(Base):
     request_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True, index=True,
     )
+    # Processing duration in milliseconds (null for events logged before duration tracking)
+    duration_ms: Mapped[float | None] = mapped_column(
+        Float, nullable=True, default=None,
+    )

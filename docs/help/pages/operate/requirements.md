@@ -10,7 +10,7 @@ runs and the people using them; a GPU machine is sized by the models it runs.
 | Operating system | Linux, x86_64 | |
 | CPU cores | 4 | 8 |
 | Memory, core services | 6 GB | 8 GB |
-| Memory, with the PII, MCP and skills modules | 8 GB | 12 GB |
+| Memory, with the multilingual PII, MCP and skills modules | 12 GB | 16 GB |
 | Disk | 60 GB | 100 GB, plus the size of the models you intend to host |
 | GPU | none | none |
 
@@ -32,13 +32,17 @@ install publishes are free.
 | When you add | What grows on the server |
 |---|---|
 | People chatting at the same time | CPU of the gateway and the console API first, then database connections |
-| The PII module | About 2 GB of memory (it loads a language model), more CPU per chat turn |
+| The PII module | Additional memory for its selected model and more CPU per chat turn; allow at least 4 GB for the multilingual PII container, plus the other services |
 | MCP tools, skills | A few hundred MB of memory |
 | Models | Disk: every model is downloaded to the server and copied to the machines from there |
 | GPU machines | One runtime image per kind of machine on disk; nothing measurable in CPU or memory |
 | Tracing | Disk for the trace store |
 
 To size the services again after changing the hardware, run `faden tune` and then `faden up`.
+
+PII can use a compatible local NVIDIA GPU, or run on CPU without one. CPU handling is slower for concurrent
+requests and long documents. `faden doctor` reports compatibility and CPU availability. See
+[Local PII on CPU or GPU](installing.md#local-pii-on-cpu-or-gpu) for selection and fallback behavior.
 
 ??? info "More about sizing the services"
     `faden deploy` and `faden upgrade` size the services for the host they run on: how many worker processes each

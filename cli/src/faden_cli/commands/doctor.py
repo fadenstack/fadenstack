@@ -95,6 +95,8 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
     else:
         console.print("[cyan]i[/cyan]  GPU: none on this server (models run on the machines you add)")
 
+    _pii_check(gpu)
+
     # ── Ports ─────────────────────────────────────────────────────
     # Developer tools (git, uv, node) are `faden dev doctor`'s: a server
     # running the published images needs none of them.
@@ -145,6 +147,67 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
     console.print("[dim]Developer tools: faden dev doctor[/dim]")
     if verbose:
         console.print(f"\n[dim]Report generated with {len(port_checks)} port checks.[/dim]")
+
+
+def _pii_check(gpu) -> None:
+    from faden_cli.core.env_gen import read_env_file
+    from faden_cli.core.pii_hardware import CPU_NOTICE, detect_support
+    from faden_cli.core.sysinfo import effective_threads, pii_threads
+
+    _, env_path = _install_compose()
+    env = read_env_file(env_path) if env_path is not None and env_path.is_file() else {}
+    try:
+        budget = int(env.get("FADEN_PII_GPU_MEMORY_MIB") or 4096)
+    except ValueError:
+        budget = 4096
+    support = detect_support(gpu, gpu_mib=budget)
+    profile = env.get("FADEN_PII_EXECUTION_PROFILE", "cpu")
+    console.print("\n[bold]Local PII[/bold]")
+    if support.available:
+        for device in support.devices:
+            console.print(f"  Compatible GLiNER2 GPU: {device.name} ({device.uuid}), {device.free_mib} MiB free.")
+        identity = env.get("FADEN_PII_GPU_ID")
+        if profile.startswith("gpu-") and identity and not any(identity in (d.uuid, d.index) for d in support.devices):
+            console.print("  [yellow]Configured PII GPU is unavailable; deploy/upgrade will select CPU.[/yellow]")
+        console.print("  Choose an approved detector and compatible execution mode during deploy/upgrade.")
+    else:
+        for reason in support.reasons:
+            console.print(f"  [yellow]{reason}[/yellow]")
+        console.print("  PII GPU mode unavailable; deploy/upgrade falls back to CPU.")
+    console.print(f"  Configured PII backend: {env.get('FADEN_PII_BACKEND', 'presidio (legacy English)')}; mode: {profile}.")
+    console.print(f"  PII entity filters: {env.get('FADEN_PII_ENTITY_PROFILE', 'standard')}.")
+    console.print(f"  PII Compose host RAM limit: {env.get('FADEN_PII_MEMORY_LIMIT') or '4g'}; GPU memory is separate.")
+    if env.get("FADEN_PII_BACKEND", "presidio") != "presidio":
+        from faden_cli.core.pii_catalog import catalog, model_for_backend, resolve
+
+        try:
+            model, entry, pack = resolve(
+                env.get("FADEN_PII_MODEL_ID") or model_for_backend(env["FADEN_PII_BACKEND"]),
+                env.get("FADEN_PII_LOCALE_PACK") or catalog()["default_locale"], profile,
+            )
+            if entry["adapter"] != env["FADEN_PII_BACKEND"] or any(
+                env.get(key) and env[key] != expected for key, expected in (
+                    ("FADEN_PII_MODEL_REVISION", entry["revision"]),
+                    ("FADEN_PII_CATALOG_VERSION", catalog()["version"]),
+                    ("FADEN_PII_RULES_VERSION", catalog()["rules_version"]),
+                )
+            ):
+                raise ValueError("Installed identity differs from catalog")
+            console.print(f"  Installed detector: {model}; revision: {env.get('FADEN_PII_MODEL_REVISION') or entry['revision']}.")
+            console.print(f"  Locale pack: {env.get('FADEN_PII_LOCALE_PACK') or catalog()['default_locale']}; installed languages: {', '.join(pack['languages'])}.")
+            console.print(f"  Evaluated detector languages: {', '.join(entry['languages'])}; other languages are unsupported.")
+        except (ValueError, StopIteration):
+            console.print("  [red]Invalid PII detector/locale/execution combination; correct it before deployment.[/red]")
+    available = effective_threads()
+    suggested = pii_threads(available, gpu=profile.startswith("gpu-"))
+    console.print(f"  CPU availability: {available} thread(s); automatic PII thread budget: {suggested}.")
+    if env.get("FADEN_PII_CPU_THREADS"):
+        console.print(
+            f"  Configured PII threads: {env['FADEN_PII_CPU_THREADS']} "
+            f"({env.get('FADEN_PII_CPU_THREADS_MODE', 'manual')}); container CPU limits apply at startup."
+        )
+    console.print(f"  [yellow]{CPU_NOTICE}[/yellow]")
+    console.print("  Compatibility is a preflight check; startup validates the actual CUDA runtime and model artifacts.")
 
 
 def _install_compose() -> tuple[Path | None, Path | None]:

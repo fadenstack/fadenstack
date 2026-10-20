@@ -1,0 +1,10 @@
+# Included only when an installed PII execution profile selects CUDA.
+services:
+  faden-pii:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${FADEN_PII_GPU_ID:-0}"]
+              capabilities: [gpu]

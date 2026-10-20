@@ -290,6 +290,98 @@ ausgeschaltet hat; `faden upgrade` lässt es danach aus. Seine Nachweise bleiben
 werden, und gehen in jede Sicherung ein. Was es kennzeichnet, steht unter
 [Kennzeichnung KI-generierter Inhalte](../administer/content-marking.md).
 
+## Lokale PII-Verarbeitung auf CPU oder GPU {#local-pii-on-cpu-or-gpu}
+
+Die PII-Erkennung läuft auf Ihrem Server. Bei der Einrichtung werden die gewählten Modelldateien heruntergeladen;
+Chat-Texte werden lokal verarbeitet. Die CPU-Verarbeitung ist langsamer, besonders bei gleichzeitigen Anfragen
+oder langen Dokumenten.
+
+![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
+
+1. Führen Sie `faden doctor` aus. **Local PII** zeigt GPU-Kompatibilität, installierte Erkennung, Inhaltssprachen,
+   Ausführungsmodus und CPU-Threadbudget.
+
+    ![Doctor zeigt die installierte Erkennung und das Sprachpaket auf einem CPU-Server](../images/operate/pii-doctor-cpu.png)
+
+2. Aktivieren Sie PII bei der Bereitstellung:
+
+    ```bash
+    faden deploy --modules pii
+    ```
+
+    Wählen Sie Inhaltssprachpaket, Erkennung und Ausführungsmodus. Vorgabe ist `europe-west-v1`
+    (Englisch, Deutsch, Französisch und Spanisch). `auto` wählt die empfohlene lokale Erkennung, derzeit
+    `patronus-onnx-v1`, mit CPU-Ausführung. Eine kompatible GPU erlaubt die GPU-Ausführung von `gliner2-multi-v1`.
+    Ohne kompatible GPU erfolgt die Verarbeitung auf der CPU; die gewählte Erkennung bleibt erhalten.
+
+3. Öffnen Sie die [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) in der Konsole.
+   Prüfen Sie das installierte Profil, wählen Sie seine Sprache und übernehmen Sie es nach einem Wechsel der
+   Erkennung oder des Sprachpakets. Bisherige Richtlinieneinstellungen bleiben erhalten. Nicht aufgeführte
+   Sprachen werden abgelehnt und niemals stillschweigend als Englisch behandelt.
+
+??? info "Inhaltssprachen und Erkennung wählen"
+    | Sprachpaket | Zulässige Richtliniensprachen |
+    |---|---|
+    | `europe-west-v1` | `en`, `de`, `fr`, `es` |
+    | `english-v1` | `en` |
+    | `german-v1` | `de` |
+    | `french-v1` | `fr` |
+    | `spanish-v1` | `es` |
+
+    Wählen Sie die Sprachen Ihrer Inhalte. Ein Paket leitet keine Nationalität einer Person ab. Weitere Sprachen
+    werden derzeit nicht angeboten. Ein einsprachiges Paket erfordert passende Sprachen in Ihren Richtlinien.
+
+    ```bash
+    faden deploy --modules pii --pii-locale german-v1 --pii-model auto --pii-profile cpu -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    ```
+
+    `patronus-onnx-v1` unterstützt CPU-Ausführung. `gliner2-multi-v1` unterstützt CPU und kompatible NVIDIA-GPUs.
+    Die GPU-Auswahl wechselt die Erkennung nicht automatisch. `legacy` behält die ältere rein englische Option bei.
+
+    In einer bestehenden Installation bietet `faden module enable pii` dieselben Optionen. Führen Sie danach
+    `faden up` aus. Mit `--pii-model-dir /opt/faden/pii-models/cpu` geben Sie ein bereits bereitgestelltes
+    Verzeichnis mit Manifest an, auch für die Offline-Einrichtung. Es muss zur gewählten Erkennung passen.
+    Nur diese Erkennung wird heruntergeladen; bisherige Modellverzeichnisse bleiben für eine Rückkehr erhalten.
+
+??? info "CPU-Threads und GPU-Speicher"
+    `gpu-shared` ist für eine GPU vorgesehen, die auch andere Software nutzt. `gpu-dedicated` ist für eine GPU,
+    die Sie für PII freihalten. Die Auswahl sperrt andere Software nicht aus.
+
+    Automatisch wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht bei CPU- und zwei bei
+    GPU-Ausführung. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten auch CPU-Limits
+    des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält keine Reservierungssperre.
+    Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB. `FADEN_PII_MEMORY_LIMIT` in `.env`
+    ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher sind getrennte Budgets.
+
+### Erweiterte PII-Felder {#extended-pii-fields}
+
+Das installierte Modell und die Richtlinie sind getrennte Einstellungen. Der CPU/GPU-Modus bestimmt den
+Ausführungsort, `FADEN_PII_ENTITY_PROFILE` den verfügbaren Filtersatz. Die Richtlinie wählt die aktiven Kategorien.
+
+1. Aktivieren Sie wie oben beschrieben einen lokalen mehrsprachigen PII-Modus.
+2. Setzen Sie diese Zeile in der `.env` der Installation:
+
+    ```dotenv
+    FADEN_PII_ENTITY_PROFILE=extended
+    ```
+
+3. Führen Sie `faden up` und danach `faden doctor` aus. Doctor zeigt den eingestellten Filtersatz.
+   Prüfen Sie mit `faden status`, ob der PII-Dienst gesund ist.
+4. Öffnen Sie die [Richtlinie für personenbezogene Daten](../administer/policies.md#adopt-an-installed-detector-profile),
+   übernehmen Sie das installierte Profil und wählen Sie die zusätzlichen Kategorien. Prüfen Sie auch
+   Mandanten-Overrides und testen Sie typische Inhalte, bevor Sie sich auf die erweiterte Richtlinie verlassen.
+
+`standard` behält den bisherigen Filtersatz bei. `extended` benötigt einen lokalen mehrsprachigen Detektor und
+kann nicht mit `legacy` kombiniert werden. Auch beim Wechsel zurück zu `standard` müssen Richtlinien mit
+erweiterten Kategorien geprüft werden. Ein Upgrade behält Ihren Filtersatz bei und ergänzt bestehende
+Richtlinien nicht automatisch um Kategorien.
+
+Behalten Sie das vom Installer gewählte Modellverzeichnis bei. `--pii-model-dir` muss direkt auf das Verzeichnis
+mit `manifest.json` zeigen, nicht auf dessen übergeordneten Ordner. Übertragen Sie keine Kalibrierungsdatei
+von einem Detektor auf einen anderen.
+
 ## Befehle für den Alltag {#everyday-commands}
 
 | Befehl | Was er tut |

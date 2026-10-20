@@ -11,7 +11,7 @@ Modellen, die sie ausführt.
 | Betriebssystem | Linux, x86_64 | |
 | CPU-Kerne | 4 | 8 |
 | Arbeitsspeicher, Kerndienste | 6 GB | 8 GB |
-| Arbeitsspeicher, mit den Modulen PII, MCP und Skills | 8 GB | 12 GB |
+| Arbeitsspeicher, mit mehrsprachigem PII, MCP und Skills | 12 GB | 16 GB |
 | Speicherplatz | 60 GB | 100 GB, zuzüglich der Größe der Modelle, die Sie bereitstellen wollen |
 | GPU | keine | keine |
 
@@ -34,13 +34,17 @@ ob die Ports frei sind, die die Installation nach außen öffnet.
 | Wenn Sie hinzufügen | Was auf dem Server wächst |
 |---|---|
 | Personen, die gleichzeitig chatten | Zuerst die CPU-Last des Gateways und der Konsolen-API, dann die Datenbankverbindungen |
-| Das PII-Modul | Etwa 2 GB Arbeitsspeicher (es lädt ein Sprachmodell), mehr CPU pro Chat-Runde |
+| Das PII-Modul | Zusätzlicher Arbeitsspeicher für das gewählte Modell und mehr CPU pro Chat-Runde; mindestens 4 GB für den mehrsprachigen PII-Container zusätzlich zu den anderen Diensten einplanen |
 | MCP-Tools, Skills | Einige hundert MB Arbeitsspeicher |
 | Modelle | Speicherplatz: Jedes Modell wird auf den Server heruntergeladen und von dort auf die Maschinen kopiert |
 | GPU-Maschinen | Ein Runtime-Image pro Maschinenart auf der Festplatte; bei CPU und Arbeitsspeicher nichts Messbares |
 | Tracing | Speicherplatz für den Trace-Speicher |
 
 Um die Dienste nach einer Änderung der Hardware neu zu bemessen, führen Sie `faden tune` und danach `faden up` aus.
+
+PII kann eine kompatible lokale NVIDIA-GPU oder ohne GPU die CPU verwenden. Die CPU-Verarbeitung ist bei
+gleichzeitigen Anfragen und langen Dokumenten langsamer. `faden doctor` zeigt Kompatibilität und CPU-Kapazität.
+Siehe [Lokale PII-Verarbeitung auf CPU oder GPU](installing.md#local-pii-on-cpu-or-gpu).
 
 ??? info "Mehr zur Bemessung der Dienste"
     `faden deploy` und `faden upgrade` bemessen die Dienste für den Host, auf dem sie laufen: wie viele

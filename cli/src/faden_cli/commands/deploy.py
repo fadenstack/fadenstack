@@ -45,6 +45,7 @@ from faden_cli.core.env_gen import (
 )
 from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
+from faden_cli.core.pii_catalog import catalog as pii_catalog
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
 from faden_cli.core.settings import FadenConfig, load_config, save_config
 from faden_cli.core.tune import tune_env
@@ -513,9 +514,29 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     default=None,
     help="Days a chat someone deleted is kept before it is erased for good (default 30; asked when not given).",
 )
+@click.option("--pii-model", type=click.Choice(["auto", *pii_catalog()["models"]]), default=None,
+              help="Approved local detector, independent of CPU/GPU execution.")
+@click.option("--pii-locale", type=click.Choice(list(pii_catalog()["locales"])), default=None,
+              help="Supported content locale pack; no automatic language remapping.")
+@click.option("--pii-profile", type=click.Choice(["legacy", "cpu", "gpu-shared", "gpu-dedicated"]), default=None,
+              help="Local PII preset. Interactive runs offer a choice; -y retains a compatible installed mode.")
+@click.option("--pii-model-dir", type=click.Path(file_okay=False, exists=True, path_type=Path), default=None,
+              help="Provisioned local PII model directory, including manifest.json.")
+@click.option("--pii-gpu-memory-mib", type=click.IntRange(min=1024), default=None,
+              help="PII GPU allocator ceiling. Keep the installed budget, or use 4096 MiB for a new install.")
+@click.option("--pii-cpu-threads", type=click.IntRange(min=1, max=64), default=None,
+              help="PII threads: a quarter of available CPUs, capped at 8 for CPU / 2 for CUDA.")
+@click.option("--pii-gpu-id", default=None, help="PII NVIDIA GPU UUID or index; compatibility and free memory are checked.")
 def deploy_cmd(
     install_dir: str | None,
     *,
+    pii_profile: str | None,
+    pii_model: str | None,
+    pii_locale: str | None,
+    pii_model_dir: Path | None,
+    pii_gpu_memory_mib: int | None,
+    pii_cpu_threads: int | None,
+    pii_gpu_id: str | None,
     runtime_images: str | None,
     modules: str,
     build: bool,
@@ -689,6 +710,7 @@ def deploy_cmd(
     console.print("\n[bold cyan]Step 3: Environment configuration…[/bold cyan]")
 
     env_path = shared_dir / ".env"
+    previous_env = read_env_file(env_path) if env_path.exists() else {}
     if env_path.exists() and not force_env:
         info(f".env already exists at {env_path} (use --force-env to regenerate)")
         # What the compose file requires and an older .env lacks; stored data keeps its key.
@@ -708,6 +730,22 @@ def deploy_cmd(
     # existed gets one, so a deploy that stopped before the administrator was made can finish.
     if ensure_bootstrap_token(env_path):
         info("Bootstrap token added to .env.")
+
+    if any(v is not None for v in (pii_profile, pii_model, pii_locale)) and "pii" not in profiles:
+        raise click.UsageError("PII options require the pii module (--modules pii)")
+    if "pii" in profiles:
+        from faden_cli.core.pii_runtime import deploy_step as configure_pii
+        try:
+            needs_build = configure_pii(env_path, requested=pii_profile, model_dir=pii_model_dir,
+                                        model=pii_model, locale=pii_locale,
+                                        gpu_mib=pii_gpu_memory_mib, threads=pii_cpu_threads, gpu_id=pii_gpu_id,
+                                        yes=yes, published=release is not None,
+                                        upgrade=previous_env.get("FADEN_BACKEND_PII_ENABLED", "").lower() == "true")
+        except (ValueError, OSError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        if needs_build:
+            build = True
+            info("The selected local PII image will be built from source; adopt its profile in PII policy settings after readiness.")
 
     # Ensure host HuggingFace cache directory exists and is configured
     existing = read_env_file(env_path)

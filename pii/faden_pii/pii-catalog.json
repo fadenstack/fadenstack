@@ -1,0 +1,44 @@
+{
+  "version": "local-pii-1",
+  "rules_version": "presidio-local-v2",
+  "default_locale": "europe-west-v1",
+  "locales": {
+    "europe-west-v1": {"name": "Western European multilingual (EN/DE/FR/ES)", "languages": ["en", "de", "fr", "es"], "scripts": ["Latin"], "recommended_model": "patronus-onnx-v1"},
+    "english-v1": {"name": "English", "languages": ["en"], "scripts": ["Latin"], "recommended_model": "patronus-onnx-v1"},
+    "german-v1": {"name": "German", "languages": ["de"], "scripts": ["Latin"], "recommended_model": "patronus-onnx-v1"},
+    "french-v1": {"name": "French", "languages": ["fr"], "scripts": ["Latin"], "recommended_model": "patronus-onnx-v1"},
+    "spanish-v1": {"name": "Spanish", "languages": ["es"], "scripts": ["Latin"], "recommended_model": "patronus-onnx-v1"}
+  },
+  "models": {
+    "patronus-onnx-v1": {
+      "name": "Patronus small FP16 ONNX",
+      "adapter": "gliner-onnx", "adapter_version": 1,
+      "repository": "patronus-studio/gliner_small-v2.5-edge",
+      "revision": "6cfcbd93d7fc6f5e1658f80afa38f73891b91693",
+      "license": "Apache-2.0; backbone MIT",
+      "languages": ["en", "de", "fr", "es"], "scripts": ["Latin"],
+      "execution": ["cpu"], "precision": "float16", "build_target": "prod-cpu",
+      "patterns": ["*.json", "*.model", "onnx/fp16/*", "LICENSE*", "tokenizer*"],
+      "required_files": ["gliner_config.json", "onnx/fp16/model_fp16.onnx"],
+      "labels": {"person": "PERSON", "first_name": "PERSON", "last_name": "PERSON", "full_name": "PERSON", "address": "LOCATION", "city": "LOCATION"},
+      "offsets": "python-codepoints", "max_window_tokens": 256,
+      "max_batch_short": 8, "max_batch_long": 2,
+      "qualification": "EN/DE/FR/ES service evaluation; detection remains incomplete"
+    },
+    "gliner2-multi-v1": {
+      "name": "GLiNER2 multilingual PII",
+      "adapter": "gliner2", "adapter_version": 1,
+      "repository": "fastino/gliner2-privacy-filter-PII-multi",
+      "revision": "1cb4166094dc58fa8d836429f060d6c95f62b495",
+      "license": "Apache-2.0",
+      "languages": ["en", "de", "fr", "es"], "scripts": ["Latin"],
+      "execution": ["cpu", "gpu-shared", "gpu-dedicated"], "precision": "float32", "build_target": "prod-gpu",
+      "patterns": ["*.json", "*.safetensors", "*.model", "*.txt", "encoder_config/*", "LICENSE*"],
+      "required_files": ["config.json", "model.safetensors"],
+      "labels": {"person": "PERSON", "first_name": "PERSON", "last_name": "PERSON", "full_name": "PERSON", "address": "LOCATION", "city": "LOCATION"},
+      "offsets": "python-codepoints", "max_window_tokens": 256,
+      "max_batch_short": 32, "max_batch_long": 8,
+      "qualification": "EN/DE/FR/ES service evaluation; CPU operation is slow; detection remains incomplete"
+    }
+  }
+}

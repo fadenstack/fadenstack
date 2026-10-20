@@ -75,6 +75,7 @@ def tune_env(
     resource_pct = resource_pct or _resource_pct_of(env)
     tp = calculate_tune_profile(
         profile, system=detect_system(), resource_pct=resource_pct, modules=_modules_of(env),
+        pii_backend=env.get("FADEN_PII_BACKEND", "presidio"),
     )
     show(tp)
     if dry_run:

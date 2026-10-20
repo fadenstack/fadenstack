@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from faden_backend.settings import settings
 
-BODY = {"operation": "scan", "pii_detected": True, "entities_found": 2}
+BODY = {"operation": "scan", "pii_detected": True, "entities_found": 2, "duration_ms": 18.5}
 
 
 def _url(app: FastAPI) -> str:

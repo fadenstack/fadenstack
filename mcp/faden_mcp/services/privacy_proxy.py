@@ -7,6 +7,7 @@ are sent to upstream MCP servers.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -61,7 +62,7 @@ class PrivacyProxy:
         http_client: httpx.AsyncClient,
         service_token: str = "",
     ) -> None:
-        self._base = pii_base_url.rstrip("/")
+        self._base = pii_base_url.rstrip("/").removesuffix("/api")
         self._http = http_client
         # The PII service refuses a call without its token. None set, the call
         # fails there and is refused here like any other failed check.
@@ -97,7 +98,6 @@ class PrivacyProxy:
         except Exception:
             logger.warning(
                 "PII check could not run — refusing tool call",
-                exc_info=True,
             )
             return _refused_unavailable()
 
@@ -108,82 +108,143 @@ class PrivacyProxy:
         pii_mode: str,
     ) -> PrivacyDecision:
         """Call the PII service to scan/redact arguments."""
-        # Build a synthetic payload wrapping the arguments as a
-        # user message so Presidio can inspect the text content.
+        import json
+        import asyncio
+
+        if pii_mode not in ("redact", "block"):
+            raise ValueError("Unsupported PII mode")
+        pending = [(arguments, 0)]
+        nodes = 0
+        while pending:
+            value, depth = pending.pop()
+            nodes += 1
+            if nodes > 4096 or depth > 64:
+                raise ValueError("PII arguments exceed structural limits")
+            children = value.values() if isinstance(value, dict) else value
+            pending.extend(
+                (child, depth + 1)
+                for child in children
+                if isinstance(child, (dict, list))
+            )
+        leaves: list[tuple[Any, Any]] = []
+
+        def walk(value: Any, depth: int = 0) -> None:
+            if depth > 64:
+                raise ValueError("PII arguments too deeply nested")
+            items = value.items() if isinstance(value, dict) else enumerate(value)
+            for key, child in items:
+                if isinstance(child, str):
+                    leaves.append((value, key))
+                elif isinstance(child, (dict, list)):
+                    walk(child, depth + 1)
+
+        walk(arguments)
+        if (
+            len(leaves) > 256
+            or sum(len(parent[key].encode("utf-8")) for parent, key in leaves) > 524_288
+        ):
+            raise ValueError("PII arguments exceed text limits")
+        encoded = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > 1_048_576:
+            raise ValueError("PII arguments exceed body limits")
         payload = {
             "payload": {
                 "messages": [
                     {
-                        "role": "user",
-                        "content": _args_to_text(arguments),
-                    },
-                ],
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {
+                                    "name": "pii_arguments",
+                                    "arguments": encoded,
+                                },
+                            }
+                        ],
+                    }
+                ]
             },
-            "mode": "redact" if pii_mode == "redact" else "detect",
-            "language": "en",
+            "mode": "redact",
         }
-
-        resp = await self._http.post(
-            f"{self._base}/api/v1/pii/sanitize",
-            json=payload,
-            timeout=10.0,
-            headers=self._headers,
-        )
+        async with asyncio.timeout(10):
+            resp = await self._http.post(
+                f"{self._base}/api/v1/pii/sanitize",
+                json=payload,
+                timeout=10.0,
+                headers={**self._headers, "x-pii-budget-ms": "8000"},
+            )
         resp.raise_for_status()
         data = resp.json()
-        if not isinstance(data, dict) or "entities_found" not in data:
-            raise ValueError("PII service answer has no entities_found")
-
-        raw_entities = data["entities_found"]
-        entities_found: list[dict[str, Any]]
-        entities_count: int
-
-        if isinstance(raw_entities, list):
-            entities_found = [e for e in raw_entities if isinstance(e, dict)]
-            entities_count = len(raw_entities)
-        elif isinstance(raw_entities, int):
-            entities_found = []
-            entities_count = max(raw_entities, 0)
-        else:
-            # Neither a list nor a count: no way to tell whether the
-            # arguments hold personal data.
-            raise ValueError("PII service answer has an unusable entities_found")
-
-        pii_detected = entities_count > 0
-
-        if pii_mode == "block" and pii_detected:
+        if not isinstance(data, dict):
+            raise ValueError("Invalid PII response")
+        count, report = data.get("entities_found"), data.get("pii_report")
+        if (
+            type(count) is not int
+            or count < 0
+            or not isinstance(report, list)
+            or len(report) != count
+        ):
+            raise ValueError("Invalid PII count/report")
+        if any(
+            not isinstance(row, dict)
+            or not isinstance(row.get("entity_type"), str)
+            or type(row.get("start")) is not int
+            or type(row.get("end")) is not int
+            or not 0 <= row["start"] < row["end"]
+            or not isinstance(row.get("text"), str)
+            or type(row.get("score")) not in (int, float)
+            or not math.isfinite(row["score"])
+            or not 0 <= row["score"] <= 1
+            for row in report
+        ):
+            raise ValueError("Invalid PII report")
+        version = data.get("contract_version", 1)
+        if type(version) is not int or version != 2:
+            raise ValueError("Unsupported PII contract")
+        if version == 2 and (
+            data.get("coverage_status") != "complete"
+            or not isinstance(data.get("profile_fingerprint"), str)
+            or not data["profile_fingerprint"]
+        ):
+            raise ValueError("Incomplete PII scan")
+        try:
+            encoded_result = data["sanitized_payload"]["messages"][0]["tool_calls"][0][
+                "function"
+            ]["arguments"]
+            rebuilt = json.loads(encoded_result)
+        except (KeyError, IndexError, TypeError, ValueError, RecursionError) as error:
+            raise ValueError("Invalid PII arguments response") from error
+        _validate_argument_shape(arguments, rebuilt)
+        if pii_mode == "block" and count:
             return PrivacyDecision(
                 allowed=False,
-                sanitized_args=arguments,
-                entities_found=entities_found,
-                redaction_summary={"action": "blocked", "count": entities_count},
+                sanitized_args={},
+                entities_found=report,
+                redaction_summary={"action": "blocked", "count": count},
             )
+        return PrivacyDecision(
+            allowed=True,
+            sanitized_args=arguments if pii_mode == "block" else rebuilt,
+            entities_found=report,
+            redaction_summary={"action": "redacted", "count": count} if count else {},
+        )
 
-        if pii_mode == "redact" and pii_detected:
-            sanitized_payload = data.get("sanitized_payload", {})
-            sanitized_text = _extract_sanitized_text(sanitized_payload)
-            sanitized_args = _text_to_args(sanitized_text)
-            if sanitized_args is None:
-                # Fail closed: the redacted text is no longer a JSON object,
-                # so the original (unredacted) arguments must not be sent.
-                return PrivacyDecision(
-                    allowed=False,
-                    sanitized_args={},
-                    entities_found=entities_found,
-                    redaction_summary={
-                        "action": "blocked",
-                        "reason": "unredactable",
-                        "count": entities_count,
-                    },
-                )
-            return PrivacyDecision(
-                allowed=True,
-                sanitized_args=sanitized_args,
-                entities_found=entities_found,
-                redaction_summary={"action": "redacted", "count": entities_count},
-            )
 
-        return PrivacyDecision(allowed=True, sanitized_args=arguments)
+def _validate_argument_shape(before: Any, after: Any, depth: int = 0) -> None:
+    if depth > 64 or type(before) is not type(after):
+        raise ValueError("Invalid PII argument type")
+    if isinstance(before, dict):
+        if before.keys() != after.keys():
+            raise ValueError("Invalid PII argument fields")
+        for key, value in before.items():
+            _validate_argument_shape(value, after[key], depth + 1)
+    elif isinstance(before, list):
+        if len(before) != len(after):
+            raise ValueError("Invalid PII argument units")
+        for left, right in zip(before, after, strict=True):
+            _validate_argument_shape(left, right, depth + 1)
+    elif not isinstance(before, str) and before != after:
+        raise ValueError("Invalid PII argument value")
 
 
 async def default_pii_mode(
@@ -202,44 +263,13 @@ async def default_pii_mode(
     """
     if configured in ("allow", "redact", "block"):
         return configured
-    base = pii_base_url.rstrip("/")
+    base = pii_base_url.rstrip("/").removesuffix("/api")
     if not base:
         return "allow"
     try:
-        resp = await http_client.get(f"{base}/api/health", timeout=3.0)
+        resp = await http_client.get(f"{base}/api/ready", timeout=3.0)
         resp.raise_for_status()
     except Exception:
         logger.info("PII service not reachable — new MCP server gets PII mode allow")
         return "allow"
     return "redact"
-
-
-def _args_to_text(arguments: dict[str, Any]) -> str:
-    """Flatten tool arguments into a single text string for PII scanning."""
-    import json
-
-    return json.dumps(arguments, ensure_ascii=False)
-
-
-def _extract_sanitized_text(sanitized_payload: dict[str, Any]) -> str:
-    """Extract the sanitized text from the PII service response payload."""
-    messages = sanitized_payload.get("messages", [])
-    if messages:
-        return messages[0].get("content", "")
-    return ""
-
-
-def _text_to_args(sanitized_text: str) -> dict[str, Any] | None:
-    """Reconstruct arguments from sanitized text.
-
-    Returns ``None`` when the redacted text no longer parses back into a
-    JSON object.  The caller must then refuse the call: the original
-    arguments still contain the personal data.
-    """
-    import json
-
-    try:
-        parsed = json.loads(sanitized_text)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    return parsed if isinstance(parsed, dict) else None

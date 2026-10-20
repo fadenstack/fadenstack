@@ -783,11 +783,12 @@ services:
   # =====================================================================
   faden-pii:
     profiles: ["pii"]
-    image: ${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}
+    mem_limit: ${FADEN_PII_MEMORY_LIMIT:-4g}
+    image: ${FADEN_PII_IMAGE:-${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}}
     build:
       context: ../pii
       dockerfile: Dockerfile
-      target: prod
+      target: ${FADEN_PII_BUILD_TARGET:-prod}
       args:
         BASE_IMAGE: ${REGISTRY:-ghcr.io/fadenstack}/base:${VERSION:-latest}
     container_name: faden-pii
@@ -812,17 +813,53 @@ services:
       FADEN_PII_RABBIT_PASS: ${RABBITMQ_PII_PASS:?set it in .env, as faden deploy and faden upgrade do (Help, Installing, Secrets in .env)}
       FADEN_PII_RABBIT_VHOST: /
       # Scalability tuning (set via faden tune)
-      FADEN_PII_WORKERS_COUNT: ${FADEN_PII_WORKERS_COUNT:-4}
+      FADEN_PII_WORKERS_COUNT: ${FADEN_PII_WORKERS_COUNT:-1}
       FADEN_PII_DB_POOL_SIZE: ${FADEN_PII_DB_POOL_SIZE:-5}
       FADEN_PII_DB_MAX_OVERFLOW: ${FADEN_PII_DB_MAX_OVERFLOW:-5}
+      FADEN_PII_BACKEND: ${FADEN_PII_BACKEND:-presidio}
+      FADEN_PII_MODEL_ID: ${FADEN_PII_MODEL_ID:-}
+      FADEN_PII_MODEL_REVISION: ${FADEN_PII_MODEL_REVISION:-}
+      FADEN_PII_LOCALE_PACK: ${FADEN_PII_LOCALE_PACK:-}
+      FADEN_PII_CATALOG_VERSION: ${FADEN_PII_CATALOG_VERSION:-}
+      FADEN_PII_RULES_VERSION: ${FADEN_PII_RULES_VERSION:-}
+      FADEN_PII_ENTITY_PROFILE: ${FADEN_PII_ENTITY_PROFILE:-standard}
+      FADEN_PII_EXECUTION_PROFILE: ${FADEN_PII_EXECUTION_PROFILE:-cpu}
+      FADEN_PII_DEVICE: ${FADEN_PII_DEVICE:-cuda:0}
+      FADEN_PII_PRECISION: ${FADEN_PII_PRECISION:-float32}
+      FADEN_PII_MODEL_PATH: ${FADEN_PII_MODEL_PATH:-/models}
+      FADEN_PII_MANIFEST_PATH: ${FADEN_PII_MANIFEST_PATH:-/models/manifest.json}
+      FADEN_PII_CALIBRATION_PATH: ${FADEN_PII_CALIBRATION_PATH:-}
+      FADEN_PII_CPU_THREADS: ${FADEN_PII_CPU_THREADS:-}
+      FADEN_PII_GPU_MEMORY_MIB: ${FADEN_PII_GPU_MEMORY_MIB:-4096}
+      FADEN_PII_DEFAULT_LANGUAGE: ${FADEN_PII_DEFAULT_LANGUAGE:-en}
+      FADEN_PII_SCORE_THRESHOLD: ${FADEN_PII_SCORE_THRESHOLD:-0.35}
+      FADEN_PII_PENDING_REQUESTS: ${FADEN_PII_PENDING_REQUESTS:-64}
+      FADEN_PII_PENDING_WINDOWS: ${FADEN_PII_PENDING_WINDOWS:-512}
+      FADEN_PII_PENDING_TOKENS: ${FADEN_PII_PENDING_TOKENS:-131072}
+      FADEN_PII_PENDING_BYTES: ${FADEN_PII_PENDING_BYTES:-33554432}
+      FADEN_PII_WINDOW_TOKENS: ${FADEN_PII_WINDOW_TOKENS:-256}
+      FADEN_PII_WINDOW_OVERLAP: ${FADEN_PII_WINDOW_OVERLAP:-24}
+      # Empty means the selected image/backend defaults (CPU 8/2, GPU 32/8).
+      FADEN_PII_BATCH_SHORT: ${FADEN_PII_BATCH_SHORT:-}
+      FADEN_PII_BATCH_LONG: ${FADEN_PII_BATCH_LONG:-}
+      FADEN_PII_WORK_TIMEOUT_SECONDS: ${FADEN_PII_WORK_TIMEOUT_SECONDS:-8}
+      FADEN_PII_MAX_RECOVERIES: ${FADEN_PII_MAX_RECOVERIES:-1}
+      FADEN_PII_RECOVERY_DELAY_SECONDS: ${FADEN_PII_RECOVERY_DELAY_SECONDS:-1}
+      FADEN_PII_CACHE_ENTRIES: ${FADEN_PII_CACHE_ENTRIES:-20000}
+      FADEN_PII_CACHE_BYTES: ${FADEN_PII_CACHE_BYTES:-134217728}
+      FADEN_PII_LOCK_DIR: /run/pii-locks
+    volumes:
+      - ${FADEN_PII_MODEL_DIR:-faden_pii_models}:/models:ro
+      - faden_pii_locks:/run/pii-locks
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ready', timeout=3).read()"]
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 120s
 
   faden-pii-worker:
-    profiles: ["pii"]
+    profiles: ["pii-tasks"]
     image: ${REGISTRY:-ghcr.io/fadenstack}/pii:${VERSION:-latest}
     container_name: faden-pii-worker
     logging: *faden-logging
@@ -1184,6 +1221,8 @@ volumes:
   faden_rag_lite:
   faden_chat_files:
   faden_audit:
+  faden_pii_models:
+  faden_pii_locks:
 
 # The keys that open content: the chats, the sealed settings and provider keys, the machines' credentials, the
 # MCP servers' credentials; and the provenance engine's signer and hash keys. They are kept and changed in .env

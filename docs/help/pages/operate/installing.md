@@ -270,6 +270,94 @@ in an existing one. `faden module disable provenance` explains what stops being 
 records who switched it off and when; `faden upgrade` then leaves it off. Its records are kept as long as they are
 needed and go into every backup. What it marks is on [Content marking](../administer/content-marking.md).
 
+## Local PII on CPU or GPU
+
+PII detection runs on your server. Setup downloads the selected model files; chat text is processed locally.
+CPU processing is slower, especially with concurrent requests or long documents.
+
+![The PII language, detector and execution choices](../images/operate/pii-mode-choice.png)
+
+1. Run `faden doctor`. **Local PII** reports GPU compatibility, the installed detector, its content languages,
+   the execution mode and the CPU thread budget.
+
+    ![Doctor reports the installed detector and language pack on a CPU server](../images/operate/pii-doctor-cpu.png)
+
+2. Enable PII during deployment:
+
+    ```bash
+    faden deploy --modules pii
+    ```
+
+    Choose the content locale, detector and execution mode. The default content pack is `europe-west-v1`
+    (English, German, French and Spanish). `auto` selects the recommended local detector, currently
+    `patronus-onnx-v1`, with CPU execution. A compatible GPU allows GPU execution for `gliner2-multi-v1`.
+    Without a compatible GPU, execution falls back to CPU while preserving the selected detector.
+
+3. Open [the personal data policy](../administer/policies.md#personal-data) in the console. Review the installed
+   profile, select its language and adopt it when changing the detector or locale pack. Existing policy choices
+   are retained. An unlisted language is refused; it is never silently treated as English.
+
+??? info "Choose the content languages and detector"
+    | Locale pack | Accepted policy languages |
+    |---|---|
+    | `europe-west-v1` | `en`, `de`, `fr`, `es` |
+    | `english-v1` | `en` |
+    | `german-v1` | `de` |
+    | `french-v1` | `fr` |
+    | `spanish-v1` | `es` |
+
+    Select languages for the content you process. A pack does not infer a person's nationality. Other languages
+    are not currently offered. A single-language pack also requires matching languages in your saved policies.
+
+    ```bash
+    faden deploy --modules pii --pii-locale german-v1 --pii-model auto --pii-profile cpu -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    ```
+
+    `patronus-onnx-v1` supports CPU execution. `gliner2-multi-v1` supports CPU and compatible NVIDIA GPUs.
+    Choosing a GPU does not change the detector automatically. `legacy` retains the older English-only option.
+
+    For an existing installation, `faden module enable pii` accepts the same options. Run `faden up` afterward.
+    Use `--pii-model-dir /opt/faden/pii-models/cpu` for a previously provisioned directory containing its manifest,
+    including offline setup. The directory must match the selected detector. Only that detector is downloaded;
+    previous model directories remain available for rollback.
+
+??? info "CPU threads and GPU memory"
+    `gpu-shared` is for a GPU used by other software too. `gpu-dedicated` is for a GPU kept available for PII;
+    selecting it does not stop other software from using that GPU.
+
+    Automatic CPU threads use a quarter of the available threads, capped at eight for CPU execution and two for
+    GPU execution. `--pii-cpu-threads 2` sets an explicit count. Container CPU limits also apply at startup.
+    `--pii-gpu-memory-mib 4096` sets the allocator budget; it does not reserve memory from other software.
+    The PII container also has a 4 GiB host RAM limit. `FADEN_PII_MEMORY_LIMIT` in `.env` changes that limit;
+    run `faden up` afterward. Host RAM and GPU memory are separate budgets.
+
+### Extended PII fields {#extended-pii-fields}
+
+The installed detector and the policy are separate choices. CPU/GPU mode chooses where detection runs;
+`FADEN_PII_ENTITY_PROFILE` chooses the available filter set. The console policy chooses which categories to apply.
+
+1. Enable a local multilingual PII mode as described above.
+2. Set this line in the installation's `.env`:
+
+    ```dotenv
+    FADEN_PII_ENTITY_PROFILE=extended
+    ```
+
+3. Run `faden up`, then `faden doctor`. Doctor reports the configured entity filter set. Check that the PII service
+   is healthy with `faden status`.
+4. Open the [personal data policy](../administer/policies.md#adopt-an-installed-detector-profile), adopt the installed
+   profile and select the added categories. Review tenant overrides too. Run representative checks before relying
+   on the wider policy.
+
+`standard` retains the original filter set. `extended` requires a local multilingual detector; it cannot be combined
+with `legacy`. Returning to `standard` also requires reviewing policies that request extended categories.
+An upgrade keeps your chosen filter set. It does not automatically add categories to existing policies.
+
+Keep the model directory selected by the installer: `--pii-model-dir` must point directly to the directory containing
+`manifest.json`, not its parent. Do not copy one detector's calibration file to another detector.
+
 ## Everyday commands
 
 | Command | What it does |

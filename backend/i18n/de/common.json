@@ -1818,7 +1818,11 @@
     "subtitle": "Was der PII-Filter in Anfragen gefunden hat, nur als Anzahlen",
     "summary": "Übersicht",
     "no_volume": "Keine Scans in diesem Zeitraum.",
-    "no_breakdown": "Noch nichts aufzuschlüsseln."
+    "no_breakdown": "Noch nichts aufzuschlüsseln.",
+    "avg_duration": "Ø Verarbeitungszeit",
+    "p95_duration": "p95 Verarbeitungszeit",
+    "p50_short": "p50",
+    "max_short": "Max."
   },
   "pii_log": {
     "title": "PII-Aktivitätsprotokoll",
@@ -1833,7 +1837,8 @@
     "col_types": "Entitätstypen",
     "col_source": "Quelle",
     "col_lang": "Sprache",
-    "no_events": "Keine PII-Ereignisse gefunden."
+    "no_events": "Keine PII-Ereignisse gefunden.",
+    "col_duration": "Dauer"
   },
   "pii_policy": {
     "system_section": "PII-Richtlinie (Systemstandard)",
@@ -4336,5 +4341,12 @@
       "open": "Zu den Updates",
       "dismiss": "Bis zur nächsten Version ausblenden"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "Der PII-Dienst ist nicht verfügbar. Diese Optionen bestätigen keinen aktiven Schutz.",
+  "pii_policy.form.reviewed": "Geprüfte Schwellenwerte",
+  "pii_policy.form.unreviewed": "Schwellenwerte noch nicht geprüft",
+  "pii_policy.form.adopt_profile": "Standardwerte des installierten Profils verwenden",
+  "pii_policy.form.profile_mismatch": "Das Richtlinienprofil entspricht nicht dem installierten Dienst. Geschützte Anfragen schlagen fehl, bis ein kompatibles Profil gewählt wird.",
+  "pii_policy.form.profile_thresholds": "Schwellenwerte des Profils verwenden",
+  "pii_policy.form.installed_detector": "Installierte Erkennung"
 }

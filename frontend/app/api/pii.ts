@@ -11,6 +11,7 @@ export interface DailyVolume {
   date: string;
   count: number;
   pii_count: number;
+  avg_duration_ms?: number | null;
 }
 
 export interface PIIStats {
@@ -18,6 +19,10 @@ export interface PIIStats {
   total_with_pii: number;
   total_entities: number;
   detection_rate: number;
+  avg_duration_ms?: number | null;
+  p50_duration_ms?: number | null;
+  p95_duration_ms?: number | null;
+  max_duration_ms?: number | null;
   entity_type_breakdown: Record<string, number>;
   operation_breakdown: Record<string, number>;
   source_breakdown: Record<string, number>;
@@ -36,6 +41,7 @@ export interface PIIEvent {
   entity_type_counts: Record<string, number> | null;
   source: string;
   request_id: string | null;
+  duration_ms?: number | null;
 }
 
 export interface PIIEventsPage {
@@ -58,12 +64,28 @@ export interface PIIPolicyConfig {
   presidio: {
     language: string;
     threshold: number;
+    profile_id?: string | null;
+    threshold_mode?: "legacy" | "profile" | "override";
     entities: string[];
   };
 }
 
 export interface PIIPolicyOptionsResponse {
   source: "pii_service" | "fallback";
+  ready?: boolean;
+  profile_id?: string | null;
+  profile_fingerprint?: string | null;
+  calibrated?: boolean;
+  entity_languages?: Record<string, string[]>;
+  detector?: {
+    model_id?: string;
+    locale_pack?: string;
+    execution?: string;
+    installed_languages?: string[];
+    qualified_languages?: string[];
+    revision?: string;
+  };
+  supported_surfaces?: string[];
   supported_entities: string[];
   supported_languages: string[];
   supported_sanitize_modes: string[];
@@ -112,6 +134,8 @@ function defaultPolicyFromOptions(
     },
     presidio: {
       language: defaultLanguage,
+      profile_id: options?.profile_id ?? null,
+      threshold_mode: options?.profile_id && options.profile_id !== "presidio-legacy" ? "profile" : "legacy",
       threshold: Math.max(0, Math.min(1, defaultThreshold)),
       entities: [],
     },
@@ -171,6 +195,8 @@ export function normalizePIIPolicy(
       })(),
     },
     presidio: {
+      profile_id: typeof raw.presidio?.profile_id === "string" ? raw.presidio.profile_id : null,
+      threshold_mode: raw.presidio?.threshold_mode === "profile" || raw.presidio?.threshold_mode === "override" ? raw.presidio.threshold_mode : "legacy",
       language:
         typeof (presidioRaw as { language?: unknown }).language === "string" &&
         (presidioRaw as { language?: string }).language

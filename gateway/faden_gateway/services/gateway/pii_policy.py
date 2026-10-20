@@ -7,6 +7,7 @@ dataclasses and provides convenience predicates.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,6 +23,10 @@ VALID_ENTITIES: frozenset[str] = frozenset({
     "US_DRIVER_LICENSE", "US_ITIN", "US_PASSPORT",
     "UK_NHS", "SG_NRIC_FIN", "AU_ABN", "AU_ACN", "AU_TFN",
     "AU_MEDICARE", "IN_PAN", "IN_AADHAAR", "IN_VEHICLE_REGISTRATION",
+    "POSTAL_CODE", "NATIONAL_ID", "PASSPORT", "DRIVER_LICENSE", "TAX_ID",
+    "SOCIAL_SECURITY_NUMBER", "AGE", "GENDER", "TITLE", "ONLINE_IDENTIFIER",
+    "HEALTH_DATA", "ETHNICITY", "POLITICAL_OPINION", "RELIGION", "TRADE_UNION",
+    "GENETIC_DATA", "BIOMETRIC_DATA", "SEXUAL_ORIENTATION", "SEX_LIFE", "CRIMINAL_RECORD",
 })
 
 
@@ -50,6 +55,8 @@ class PIIPresidioConfig:
 
     language: str = "en"
     threshold: float = 0.6
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
     entities: list[str] = field(default_factory=lambda: [
         "EMAIL_ADDRESS",
         "PHONE_NUMBER",
@@ -115,17 +122,26 @@ def parse_pii_policy(raw: dict[str, Any] | None) -> PIIPolicy | None:
     )
 
     raw_threshold = float(pre_raw.get("threshold", 0.6))
+    if not math.isfinite(raw_threshold):
+        raise ValueError("Invalid PII threshold")
     raw_threshold = max(0.0, min(1.0, raw_threshold))
 
     raw_entities = list(pre_raw.get("entities", default_entities))
-    validated_entities = [e for e in raw_entities if e in VALID_ENTITIES]
-    if len(validated_entities) != len(raw_entities):
-        dropped = set(raw_entities) - set(validated_entities)
-        logger.warning("Stripped unknown PII entities: %s", dropped)
+    if any(not isinstance(e, str) or not e for e in raw_entities):
+        raise ValueError("Invalid PII entities")
+    # Retain configured categories so the service can explicitly reject unsupported
+    # coverage instead of silently dropping part of the tenant's protection.
+    validated_entities = list(dict.fromkeys(raw_entities))
+    threshold_mode = pre_raw.get("threshold_mode", "legacy")
+    profile_id = pre_raw.get("profile_id")
+    if threshold_mode not in ("legacy", "profile", "override") or (profile_id is not None and not isinstance(profile_id, str)):
+        raise ValueError("Invalid PII profile")
 
     presidio = PIIPresidioConfig(
         language=str(pre_raw.get("language", "en")),
         threshold=raw_threshold,
+        profile_id=profile_id,
+        threshold_mode=threshold_mode,
         entities=validated_entities,
     )
 
@@ -186,12 +202,11 @@ def _strengthened_threshold(floor: float, requested: float | None) -> float:
 
     A detection counts only when its score reaches the threshold, so a *lower*
     threshold finds more and a higher one finds less: the override can only go
-    down from the floor. It stays above zero, which the PII service reads as
-    "use my default".
+    down from the floor. Zero is an explicit threshold.
     """
     if requested is None:
         return floor
-    return min(floor, max(requested, 0.01))
+    return min(floor, max(requested, 0.0))
 
 
 def clamp_and_merge(
@@ -252,6 +267,8 @@ def clamp_and_merge(
 
         presidio = PIIPresidioConfig(
             language=floor.presidio.language,
+            profile_id=floor.presidio.profile_id,
+            threshold_mode=floor.presidio.threshold_mode,
             threshold=override.presidio_threshold if override.presidio_threshold is not None else floor.presidio.threshold,
             entities=merged_entities,
         )
@@ -278,6 +295,8 @@ def clamp_and_merge(
 
         presidio = PIIPresidioConfig(
             language=floor.presidio.language,
+            profile_id=floor.presidio.profile_id,
+            threshold_mode=floor.presidio.threshold_mode,
             threshold=_strengthened_threshold(floor.presidio.threshold, override.presidio_threshold),
             entities=merged_entities,
         )

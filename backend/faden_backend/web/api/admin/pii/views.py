@@ -45,7 +45,7 @@ def _pii_url() -> str:
     url = settings.pii_service_url.strip().rstrip("/")
     if url and not url.startswith(("http://", "https://")):
         url = f"http://{url}"
-    return url
+    return url.removesuffix("/api")
 
 
 def _normalize_setting_value(value_json: Any) -> Any:
@@ -59,6 +59,10 @@ def _fallback_pii_options() -> dict[str, Any]:
     """Fallback options when PII service is unavailable."""
     return {
         "source": "fallback",
+        "ready": False,
+        "profile_id": None,
+        "profile_fingerprint": None,
+        "calibrated": False,
         "supported_entities": [
             "PERSON",
             "EMAIL_ADDRESS",
@@ -153,7 +157,7 @@ async def get_pii_config_options(
     fallback = _fallback_pii_options()
     try:
         resp = await _get_pii_client().get(
-            f"{_pii_url()}/v1/pii/options",
+            f"{_pii_url()}/api/v1/pii/options",
             headers={"Authorization": f"Bearer {settings.pii_service_token}"} if settings.pii_service_token else {},
             timeout=8.0,
         )
@@ -170,6 +174,7 @@ async def get_pii_config_options(
 
     return {
         "source": "pii_service",
+        **{key: data.get(key) for key in ("profile_id", "profile_fingerprint", "calibrated", "ready", "entity_languages", "supported_surfaces", "detector")},
         "supported_entities": entities if isinstance(entities, list) else fallback["supported_entities"],
         "supported_languages": languages if isinstance(languages, list) else fallback["supported_languages"],
         "supported_sanitize_modes": sanitize_modes if isinstance(sanitize_modes, list) else fallback["supported_sanitize_modes"],
@@ -370,6 +375,7 @@ async def list_pii_events(
                 "entity_type_counts": e.entity_type_counts,
                 "source": e.source,
                 "request_id": e.request_id,
+                "duration_ms": e.duration_ms,
             }
             for e in items
         ],
@@ -392,6 +398,7 @@ class PIIEventLogRequest(BaseModel):
     entity_type_counts: dict[str, int] | None = None
     source: str = "api"
     request_id: str | None = None
+    duration_ms: float | None = Field(default=None, ge=0.0)
 
 
 @router.post("/events/log", name="pii_event_log", dependencies=[Depends(require_internal_token)])
@@ -414,5 +421,6 @@ async def log_pii_event(
         entity_type_counts=body.entity_type_counts,
         source=body.source,
         request_id=body.request_id,
+        duration_ms=body.duration_ms,
     )
     return {"id": str(event.id)}

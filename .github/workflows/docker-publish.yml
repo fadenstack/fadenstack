@@ -198,6 +198,29 @@ jobs:
       base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
       registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
 
+  pii-neural:
+    needs: [changes, base]
+    if: >-
+      needs.changes.outputs.pii == 'true' ||
+      startsWith(github.ref, 'refs/tags/core-v') ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.services == 'all' || contains(github.event.inputs.services, 'pii'))
+    strategy:
+      matrix:
+        variant: [cpu, gpu]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-build-reusable.yml
+    with:
+      service: pii
+      context: pii
+      target: prod-${{ matrix.variant }}
+      tag-suffix: -${{ matrix.variant }}
+      base-image: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}/base:${{ github.sha }}
+      registry: ${{ github.event.inputs.registry || 'ghcr.io/fadenstack' }}
+
   mcp:
     needs: [changes, base]
     if: >-

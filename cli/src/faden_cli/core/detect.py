@@ -332,7 +332,7 @@ def detect_gpu() -> GpuInfo:
                 # Get CUDA version
                 cuda_result = _run([nvidia_smi])
                 if cuda_result.returncode == 0:
-                    match = re.search(r"CUDA Version:\s*([\d.]+)", cuda_result.stdout)
+                    match = re.search(r"CUDA(?: UMD)? Version:\s*([\d.]+)", cuda_result.stdout)
                     if match:
                         info.cuda_version = match.group(1)
                         for d in info.devices:

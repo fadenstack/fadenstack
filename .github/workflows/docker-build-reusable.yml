@@ -51,6 +51,10 @@ on:
         required: false
         type: string
         default: ""
+      tag-suffix:
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -87,6 +91,7 @@ jobs:
           # release candidate's too; the raw tag below decides instead.
           flavor: |
             latest=false
+            suffix=${{ inputs.tag-suffix }},onlatest=true
           tags: |
             type=ref,event=branch
             type=ref,event=pr

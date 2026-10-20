@@ -12,17 +12,27 @@ that preserve semantic meaning for the LLM while hiding real values.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import re
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerResult
 from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import EngineResult
+
+from faden_pii.services.pii.extraction import ExtractedPayload, name_value
+from faden_pii.services.pii.spans import resolve_spans, validate_spans
+from faden_pii.services.pii.errors import PIIError
+from faden_pii.services.pii.limits import validate_units
+from faden_pii.services.pii.runtime import (
+    InferenceRuntime,
+    LegacyDetector,
+    request_budget,
+)
+from faden_pii.settings import settings as default_settings
 
 #: A value the SDK masked on the device before it left (``[[fs:PERSON_1]]``).
 #: Already a token: detecting it again would mask the mask.
@@ -46,6 +56,7 @@ DEFAULT_ENTITIES: list[str] = [
     "URL",
 ]
 
+
 @dataclass
 class DetectedEntity:
     """A single PII entity detected in the text."""
@@ -55,6 +66,7 @@ class DetectedEntity:
     end: int
     score: float
     text: str
+    path: str | None = None
 
 
 @dataclass
@@ -98,18 +110,85 @@ class PIIService:
         default_language: str = "en",
         default_score_threshold: float = 0.35,
         analysis_cache_size: int = 20_000,
+        config: Any = None,
+        detector: Any = None,
     ) -> None:
         self._analyzer = analyzer
         self._batch = BatchAnalyzerEngine(analyzer_engine=analyzer)
         self._anonymizer = anonymizer
         self._default_language = default_language
-        self._default_score_threshold = default_score_threshold
-        self._analyses = _AnalysisCache(analysis_cache_size)
+        self._default_score_threshold = (
+            detector.profile.threshold
+            if detector is not None
+            else default_score_threshold
+        )
+        self.config = config or default_settings
+        self._analyses = _AnalysisCache(
+            analysis_cache_size, self.config.pii_cache_bytes
+        )
+        self.runtime = InferenceRuntime(
+            detector or LegacyDetector(lambda: self._batch, analyzer), self.config
+        )
+        self.profile = self.runtime.profile
 
     @property
     def supported_languages(self) -> list[str]:
         """Languages the loaded NLP models cover: the only ones a check can run in."""
-        return sorted(self._analyzer.nlp_engine.get_supported_languages())
+        return sorted(self.profile.languages)
+
+    @property
+    def supported_entities(self) -> list[str]:
+        if hasattr(self.runtime.detector, "entities"):
+            return self.runtime.detector.entities
+        return (
+            sorted(self._analyzer.get_supported_entities())
+            if hasattr(self._analyzer, "get_supported_entities")
+            else DEFAULT_ENTITIES
+        )
+
+    def entities_for_language(self, language):
+        return getattr(self.runtime.detector, "entity_languages", {}).get(
+            language, self.supported_entities
+        )
+
+    def default_entities(self, language):
+        supported = self.entities_for_language(language)
+        if getattr(self.config, "pii_entity_profile", "standard") == "extended":
+            # Match the common multilingual catalog, rather than silently enabling
+            # country-specific English-only recognizers in other language policies.
+            from faden_pii.services.pii.extended import EXTENDED_ENTITIES
+
+            return sorted(
+                set(DEFAULT_ENTITIES + list(EXTENDED_ENTITIES)) & set(supported)
+            )
+        return [entity for entity in DEFAULT_ENTITIES if entity in supported]
+
+    def _on_reload(self, detector):
+        self._analyzer = detector.analyzer
+        self._batch = BatchAnalyzerEngine(analyzer_engine=detector.analyzer)
+        self.profile = detector.profile
+        self._default_score_threshold = detector.profile.threshold
+        self._analyses = _AnalysisCache(
+            self.config.pii_cache_entries, self.config.pii_cache_bytes
+        )
+
+    async def close(self):
+        await self.runtime.close()
+
+    def validate_profile(
+        self, profile_id=None, threshold_mode="legacy", score_threshold=None
+    ):
+        if profile_id is not None and profile_id != self.profile.id:
+            raise PIIError("pii_unsupported_profile")
+        if threshold_mode not in ("legacy", "profile", "override"):
+            raise PIIError("pii_unsupported_profile")
+        if (
+            self.profile.backend != "presidio"
+            and score_threshold is not None
+            and profile_id is None
+        ):
+            raise PIIError("pii_profile_required")
+        return None if threshold_mode == "profile" else score_threshold
 
     # ------------------------------------------------------------------
     # Factory
@@ -120,23 +199,46 @@ class PIIService:
         *,
         default_language: str = "en",
         default_score_threshold: float = 0.35,
+        config: Any = None,
     ) -> PIIService:
         """Create service instance; loads spaCy model (slow, do once)."""
         log.info("Initializing Presidio engines (loading spaCy model)...")
-        analyzer = AnalyzerEngine()
+        config = config or default_settings
+        detector = None
+        if config.pii_backend != "presidio":
+            if config.workers_count != 1:
+                raise ValueError("Neural PII profiles require exactly one HTTP worker")
+            from faden_pii.services.pii.detectors import NeuralDetector
+
+            detector = NeuralDetector(config)
+        if detector is None:
+            import importlib.util
+
+            if importlib.util.find_spec("en_core_web_lg") is None:
+                raise ValueError(
+                    "Local English NLP package is missing; provision en_core_web_lg before offline startup"
+                )
+        analyzer = detector.analyzer if detector is not None else AnalyzerEngine()
         anonymizer = AnonymizerEngine()
         service = cls(
             analyzer,
             anonymizer,
             default_language=default_language,
             default_score_threshold=default_score_threshold,
+            analysis_cache_size=config.pii_cache_entries,
+            config=config,
+            detector=detector,
         )
         # The first analysis finishes setting up spaCy's pipeline: the first
         # chat after a start waited ~0.9 s for it. Pay it here, at startup.
-        service._batch.analyze_iterator(
-            texts=["Warm-up: John Smith lives in Berlin."],
-            language=default_language,
-        )
+        if detector is None:
+            service._batch.analyze_iterator(
+                texts=["Warm-up: John Smith lives in Berlin."],
+                language=default_language,
+            )
+        else:
+            service.runtime.detector_factory = lambda: NeuralDetector(config)
+            service.runtime.on_reload = service._on_reload
         log.info("Presidio engines ready.")
         return service
 
@@ -154,14 +256,21 @@ class PIIService:
     ) -> ScanResult:
         """Detect PII entities in *text*."""
         lang = language or self._default_language
-        ents = entities or DEFAULT_ENTITIES
-        threshold = score_threshold or self._default_score_threshold
+        ents = entities or self.default_entities(lang)
+        threshold = (
+            self._default_score_threshold
+            if score_threshold is None
+            else score_threshold
+        )
 
         (results,) = await self._analyze_many(
             [text],
             language=lang,
             entities=ents,
             score_threshold=threshold,
+            entity_thresholds=self.profile.thresholds.get(lang)
+            if score_threshold is None
+            else None,
         )
 
         detected = [
@@ -186,25 +295,28 @@ class PIIService:
     ) -> RedactResult:
         """Detect and redact PII entities in *text*."""
         lang = language or self._default_language
-        ents = entities or DEFAULT_ENTITIES
-        threshold = score_threshold or self._default_score_threshold
+        ents = entities or self.default_entities(lang)
+        threshold = (
+            self._default_score_threshold
+            if score_threshold is None
+            else score_threshold
+        )
 
         (results,) = await self._analyze_many(
             [text],
             language=lang,
             entities=ents,
             score_threshold=threshold,
+            entity_thresholds=self.profile.thresholds.get(lang)
+            if score_threshold is None
+            else None,
         )
 
-        engine_result: EngineResult = await asyncio.to_thread(
-            self._anonymizer.anonymize,
-            text=text,
-            analyzer_results=results,
-        )
+        redacted = _redact_spans(text, results)
 
         return RedactResult(
             original_text=text,
-            redacted_text=engine_result.text,
+            redacted_text=redacted,
             entities_found=len(results),
         )
 
@@ -245,8 +357,21 @@ class PIIService:
             )
 
         lang = language or self._default_language
-        ents = entities or DEFAULT_ENTITIES
-        threshold = score_threshold or self._default_score_threshold
+        ents = entities or self.default_entities(lang)
+        threshold = (
+            self._default_score_threshold
+            if score_threshold is None
+            else score_threshold
+        )
+        extracted = ExtractedPayload(
+            payload,
+            declared_entities=set(ents)
+            if getattr(self.config, "pii_entity_profile", "standard") == "extended"
+            else None,
+        )
+        validate_units(
+            [unit.text for unit in extracted.units], token_mapping, self.config
+        )
 
         all_entities: list[DetectedEntity] = []
 
@@ -255,14 +380,47 @@ class PIIService:
         # rest goes through spaCy in one batch. Analysed one by one, each
         # message cost a spaCy run and a thread hop -- about 15 ms apiece, on
         # the whole chat history, again on every turn.
-        analyses = iter(
-            await self._analyze_many(
-                self._texts_of(payload),
-                language=lang,
-                entities=ents,
-                score_threshold=threshold,
-            ),
+        analysis_rows = await self._analyze_many(
+            [unit.text for unit in extracted.units],
+            language=lang,
+            entities=ents,
+            score_threshold=threshold,
+            entity_thresholds=self.profile.thresholds.get(lang)
+            if score_threshold is None
+            else None,
         )
+        # Explicit schema/conversation context stays outside the model cache.
+        # Only the target's offsets are masked; neighboring prompts are not copied.
+        if "PERSON" in ents:
+            for unit, results in zip(extracted.units, analysis_rows, strict=True):
+                if unit.person_hint and name_value(unit.text):
+                    results.append(RecognizerResult("PERSON", 0, len(unit.text), 1.0))
+                    results[:] = resolve_spans(unit.text, results)
+        for unit, results in zip(extracted.units, analysis_rows, strict=True):
+            if unit.entity_hint in ents and unit.text.strip():
+                results.append(
+                    RecognizerResult(unit.entity_hint, 0, len(unit.text), 1.0)
+                )
+                results[:] = resolve_spans(unit.text, results)
+        if token_mapping:
+            for unit, results in zip(extracted.units, analysis_rows, strict=True):
+                for token, value in token_mapping.items():
+                    match = re.fullmatch(r"\[([A-Z][A-Z0-9_]*)_\d+\]", token)
+                    if (
+                        match is None
+                        or not value
+                        or len(value) < 2
+                        or match[1] not in ents
+                    ):
+                        continue
+                    for found in re.finditer(
+                        r"(?<!\w)" + re.escape(value) + r"(?!\w)", unit.text
+                    ):
+                        results.append(
+                            RecognizerResult(match[1], found.start(), found.end(), 1.0)
+                        )
+                results[:] = resolve_spans(unit.text, results)
+        analyses = iter(analysis_rows)
 
         if mode == "tokenize":
             # Shared mutable state for building the token mapping.
@@ -287,26 +445,12 @@ class PIIService:
                 if not results:
                     return text
 
-                # Remove overlapping results: when two spans overlap,
-                # keep the one with the higher score (or larger span
-                # as tiebreaker). Sort by score desc, then span size desc.
-                results_sorted = sorted(
-                    results,
-                    key=lambda r: (r.score, r.end - r.start),
-                    reverse=True,
-                )
-                non_overlapping: list[RecognizerResult] = []
-                for r in results_sorted:
-                    if not any(
-                        r.start < kept.end and r.end > kept.start
-                        for kept in non_overlapping
-                    ):
-                        non_overlapping.append(r)
-
                 # Sort by start position descending so we can
                 # replace from end to start without shifting offsets.
                 sorted_results = sorted(
-                    non_overlapping, key=lambda r: r.start, reverse=True,
+                    results,
+                    key=lambda r: r.start,
+                    reverse=True,
                 )
                 chars = list(text)
                 for r in sorted_results:
@@ -344,28 +488,17 @@ class PIIService:
 
                 # Inline: replacing spans is cheap next to the analysis, and
                 # a thread hop per message is what this change removes.
-                return self._anonymizer.anonymize(
-                    text=text, analyzer_results=results,
-                ).text
+                return _redact_spans(text, results)
 
             sanitize_fn = _redact_text
 
-        # Deep-copy and walk the payload
-        sanitized = dict(payload)
-
-        # Chat completions: messages[].content
-        if "messages" in sanitized:
-            sanitized["messages"] = await self._walk_messages(
-                sanitized["messages"],
-                sanitize_fn,
-            )
-
-        # Embeddings: input (string | list[string])
-        if "input" in sanitized:
-            sanitized["input"] = await self._walk_input(
-                sanitized["input"],
-                sanitize_fn,
-            )
+        for unit in extracted.units:
+            before = len(all_entities)
+            unit.parent[unit.key] = await sanitize_fn(unit.text)
+            for entity in all_entities[before:]:
+                entity.path = unit.path
+        sanitized = extracted.rebuild()
+        validate_units([], token_mapping, self.config)
 
         return SanitizeResult(
             payload=sanitized,
@@ -428,6 +561,7 @@ class PIIService:
         language: str,
         entities: list[str],
         score_threshold: float,
+        entity_thresholds: dict[str, float] | None = None,
     ) -> list[list[RecognizerResult]]:
         """The analysis of each of *texts*, in order.
 
@@ -436,35 +570,74 @@ class PIIService:
         The texts not seen before go through spaCy together, in one batch and
         one thread hop.
         """
-        settings_key = (language, tuple(sorted(entities)), score_threshold)
+        if not self.runtime.healthy or self.runtime.closed:
+            raise PIIError("pii_unavailable", 503)
+        validate_units(texts, None, self.config)
+        if language not in self.supported_languages or any(
+            e not in self.entities_for_language(language) for e in entities
+        ):
+            raise PIIError("pii_unsupported_profile")
+        scope = request_budget.get().scope if request_budget.get() else ""
+        import math
+
+        if not math.isfinite(score_threshold) or not 0 <= score_threshold <= 1:
+            raise PIIError("pii_invalid_threshold")
+        thresholds = {
+            entity: (entity_thresholds or {}).get(entity, score_threshold)
+            for entity in entities
+        }
+        settings_key = (
+            self.profile.fingerprint,
+            scope,
+            language,
+            tuple(sorted(entities)),
+            tuple(sorted(thresholds.items())),
+        )
         keys = [
             (hashlib.sha256(t.encode("utf-8")).digest(), settings_key) for t in texts
         ]
         missing: dict[tuple[Any, ...], str] = {}
+        cached: dict[tuple, tuple] = {}
         for key, text in zip(keys, texts, strict=True):
-            if text and key not in self._analyses and key not in missing:
+            if text and key in self._analyses:
+                # Retain this request's result across the inference await. Other
+                # requests (or this batch's own inserts) can evict the LRU entry.
+                cached[key] = self._analyses.get(key)
+            elif text and key not in missing:
                 missing[key] = text
         found: dict[tuple[Any, ...], tuple[tuple[str, int, int, float], ...]] = {}
         if missing:
-            batch = await asyncio.to_thread(
-                self._batch.analyze_iterator,
-                texts=list(missing.values()),
-                language=language,
-                batch_size=len(missing),
-                entities=entities,
-                score_threshold=score_threshold,
+            batch = await self.runtime.analyze(
+                list(missing.values()),
+                {
+                    "language": language,
+                    "entities": sorted(set(entities)),
+                    "score_threshold": min(
+                        thresholds.values(), default=score_threshold
+                    ),
+                },
             )
             for (key, text), results in zip(missing.items(), batch, strict=True):
-                local = [m.span() for m in _LOCAL_TOKEN.finditer(text)]
+                try:
+                    validate_spans(text, results)
+                except PIIError:
+                    self.runtime.invalidate()
+                    raise
                 found[key] = tuple(
                     (r.entity_type, r.start, r.end, r.score)
-                    for r in results
-                    if not any(r.start < end and start < r.end for start, end in local)
+                    for r in resolve_spans(
+                        text,
+                        [
+                            r
+                            for r in results
+                            if r.score >= thresholds.get(r.entity_type, score_threshold)
+                        ],
+                    )
                 )
                 self._analyses.put(key, found[key])
         analyses: list[list[RecognizerResult]] = []
         for key, text in zip(keys, texts, strict=True):
-            spans = found.get(key) or (self._analyses.get(key) if text else ())
+            spans = found[key] if key in found else (cached[key] if text else ())
             analyses.append(
                 [
                     RecognizerResult(entity_type=e, start=b, end=f, score=sc)
@@ -475,79 +648,17 @@ class PIIService:
 
     @staticmethod
     def _texts_of(payload: dict[str, Any]) -> list[str]:
-        """The texts ``sanitize_payload`` rewrites, in the order it visits them."""
-        texts: list[str] = []
-        messages = payload.get("messages")
-        if isinstance(messages, list):
-            for msg in messages:
-                if not isinstance(msg, dict):
-                    continue
-                content = msg.get("content")
-                if isinstance(content, str):
-                    texts.append(content)
-                elif isinstance(content, list):
-                    texts.extend(
-                        part.get("text", "")
-                        for part in content
-                        if isinstance(part, dict) and part.get("type") == "text"
-                    )
-        input_value = payload.get("input")
-        if isinstance(input_value, str):
-            texts.append(input_value)
-        elif isinstance(input_value, list):
-            texts.extend(item for item in input_value if isinstance(item, str))
-        return texts
+        """The same ordered units that the sanitizer rebuilds."""
+        return [unit.text for unit in ExtractedPayload(payload).units]
 
-    @staticmethod
-    async def _walk_messages(
-        messages: Any,
-        sanitize_fn: Any,
-    ) -> list[dict[str, Any]]:
-        """Walk OpenAI messages array, sanitizing all text content."""
-        if not isinstance(messages, list):
-            return messages
-        result: list[dict[str, Any]] = []
-        for msg in messages:
-            if not isinstance(msg, dict):
-                result.append(msg)
-                continue
-            new_msg = dict(msg)
-            content = msg.get("content")
-            if isinstance(content, str):
-                new_msg["content"] = await sanitize_fn(content)
-            elif isinstance(content, list):
-                # Multimodal content array (text + image + file parts)
-                new_parts: list[Any] = []
-                for part in content:
-                    if isinstance(part, dict) and part.get("type") == "text":
-                        text_val = part.get("text", "")
-                        new_part = dict(part)
-                        new_part["text"] = await sanitize_fn(text_val)
-                        new_parts.append(new_part)
-                    else:
-                        # Image, audio, file parts -- pass through
-                        new_parts.append(part)
-                new_msg["content"] = new_parts
-            result.append(new_msg)
-        return result
 
-    @staticmethod
-    async def _walk_input(
-        input_value: Any,
-        sanitize_fn: Any,
-    ) -> Any:
-        """Walk embeddings input field (string or list of strings)."""
-        if isinstance(input_value, str):
-            return await sanitize_fn(input_value)
-        if isinstance(input_value, list):
-            result: list[Any] = []
-            for item in input_value:
-                if isinstance(item, str):
-                    result.append(await sanitize_fn(item))
-                else:
-                    result.append(item)
-            return result
-        return input_value
+def _redact_spans(text, results):
+    """Replace exactly the accepted intervals; do not merge adjacent matches."""
+    for result in sorted(results, key=lambda span: span.start, reverse=True):
+        text = (
+            text[: result.start] + "<" + result.entity_type + ">" + text[result.end :]
+        )
+    return text
 
 
 class _AnalysisCache:
@@ -556,10 +667,14 @@ class _AnalysisCache:
     Holds entity types, offsets and scores -- never the text itself.
     """
 
-    def __init__(self, size: int) -> None:
+    def __init__(self, size: int, byte_limit: int = 134_217_728) -> None:
         self._size = max(size, 0)
+        self._byte_limit = byte_limit
+        self._bytes = 0
+        self._costs: dict = {}
         self._entries: OrderedDict[
-            tuple[Any, ...], tuple[tuple[str, int, int, float], ...],
+            tuple[Any, ...],
+            tuple[tuple[str, int, int, float], ...],
         ] = OrderedDict()
 
     def __contains__(self, key: object) -> bool:
@@ -570,14 +685,29 @@ class _AnalysisCache:
         return self._entries[key]
 
     def put(
-        self, key: tuple[Any, ...], value: tuple[tuple[str, int, int, float], ...],
+        self,
+        key: tuple[Any, ...],
+        value: tuple[tuple[str, int, int, float], ...],
     ) -> None:
         if not self._size:
             return
+        cost = (
+            sys.getsizeof(key)
+            + 1024
+            + sys.getsizeof(value)
+            + sum(
+                sys.getsizeof(row) + sum(sys.getsizeof(part) for part in row)
+                for row in value
+            )
+        )
+        self._bytes -= self._costs.pop(key, 0)
         self._entries[key] = value
+        self._costs[key] = cost
+        self._bytes += cost
         self._entries.move_to_end(key)
-        while len(self._entries) > self._size:
-            self._entries.popitem(last=False)
+        while len(self._entries) > self._size or self._bytes > self._byte_limit:
+            removed, _ = self._entries.popitem(last=False)
+            self._bytes -= self._costs.pop(removed)
 
 
 def _counters(token_mapping: dict[str, str]) -> dict[str, int]:
