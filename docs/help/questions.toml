@@ -121,6 +121,7 @@
 "How do I retire or delete an agent?" = "retire-and-delete"
 
 ["administer/policies.md"]
+"How do I configure PII categories and adopt an installed detector?" = "adopt-an-installed-detector-profile"
 "How do I switch on personal data (PII) protection?" = "personal-data"
 "How do I change the privacy policy?" = "change-the-policy"
 "How do I block or allow tools?" = "tool-rules"
@@ -153,6 +154,7 @@
 "What needs internet access?" = "what-needs-the-internet"
 
 ["operate/installing.md"]
+"How do I enable extended PII fields?" = "extended-pii-fields"
 "Can PII run on CPU without a GPU?" = "local-pii-on-cpu-or-gpu"
 "How do I choose CPU or GPU for PII?" = "local-pii-on-cpu-or-gpu"
 "How do I install Fadenstack?" = "install"

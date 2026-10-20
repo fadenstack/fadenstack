@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 import hashlib
 import json
+from importlib.resources import files
 from pathlib import Path
 
 from faden_pii.services.pii.errors import PIIError
@@ -18,6 +19,30 @@ LABELS = {
     "city": "LOCATION",
 }
 LANGUAGES = ("en", "de", "fr", "es")
+
+
+def pipeline_sources() -> dict[str, str]:
+    """Include local detection behavior in the profile/cache identity.
+
+    Model bytes alone cannot distinguish changed rules, offset handling or
+    post-processing. Normalize line endings so Windows and Linux source copies
+    have the same identity; paths and installation location are excluded.
+    """
+    root = files("faden_pii.services.pii")
+    return {
+        name: hashlib.sha256(
+            root.joinpath(name).read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
+        for name in (
+            "profiles.py",
+            "detectors.py",
+            "extended.py",
+            "extraction.py",
+            "service.py",
+            "spans.py",
+            "windowing.py",
+        )
+    }
 
 
 @dataclass(frozen=True)

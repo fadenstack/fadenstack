@@ -119,6 +119,7 @@
 "Wie lege ich einen Agenten still oder lösche ihn?" = "retire-and-delete"
 
 ["administer/policies.md"]
+"Wie wähle ich PII-Kategorien und übernehme ein installiertes Profil?" = "adopt-an-installed-detector-profile"
 "Wie schalte ich den Schutz personenbezogener Daten (PII) ein?" = "personal-data"
 "Wie ändere ich die Datenschutz-Richtlinie?" = "change-the-policy"
 "Wie sperre oder erlaube ich Tools?" = "tool-rules"
@@ -151,6 +152,7 @@
 "Was braucht Internetzugang?" = "what-needs-the-internet"
 
 ["operate/installing.md"]
+"Wie aktiviere ich erweiterte PII-Felder?" = "extended-pii-fields"
 "Kann PII ohne GPU auf der CPU laufen?" = "local-pii-on-cpu-or-gpu"
 "Wie wähle ich CPU oder GPU für PII?" = "local-pii-on-cpu-or-gpu"
 "Wie installiere ich Fadenstack?" = "install"

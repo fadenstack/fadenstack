@@ -337,6 +337,33 @@ Anfragen oder langen Dokumenten.
 
 ![Doctor zeigt eine kompatible GPU und die PII-Auswahl](../images/operate/pii-doctor-gpu.png)
 
+### Erweiterte PII-Felder {#extended-pii-fields}
+
+Das installierte Modell und die Richtlinie sind getrennte Einstellungen. Der CPU/GPU-Modus bestimmt den
+Ausführungsort, `FADEN_PII_ENTITY_PROFILE` den verfügbaren Filtersatz. Die Richtlinie wählt die aktiven Kategorien.
+
+1. Aktivieren Sie wie oben beschrieben einen lokalen mehrsprachigen PII-Modus.
+2. Setzen Sie diese Zeile in der `.env` der Installation:
+
+    ```dotenv
+    FADEN_PII_ENTITY_PROFILE=extended
+    ```
+
+3. Führen Sie `faden up` und danach `faden doctor` aus. Doctor zeigt den eingestellten Filtersatz.
+   Prüfen Sie mit `faden status`, ob der PII-Dienst gesund ist.
+4. Öffnen Sie die [Richtlinie für personenbezogene Daten](../administer/policies.md#adopt-an-installed-detector-profile),
+   übernehmen Sie das installierte Profil und wählen Sie die zusätzlichen Kategorien. Prüfen Sie auch
+   Mandanten-Overrides und testen Sie typische Inhalte, bevor Sie sich auf die erweiterte Richtlinie verlassen.
+
+`standard` behält den bisherigen Filtersatz bei. `extended` benötigt einen lokalen mehrsprachigen Detektor und
+kann nicht mit `legacy` kombiniert werden. Auch beim Wechsel zurück zu `standard` müssen Richtlinien mit
+erweiterten Kategorien geprüft werden. Ein Upgrade behält Ihren Filtersatz bei und ergänzt bestehende
+Richtlinien nicht automatisch um Kategorien.
+
+Behalten Sie das vom Installer gewählte Modellverzeichnis bei. `--pii-model-dir` muss direkt auf das Verzeichnis
+mit `manifest.json` zeigen, nicht auf dessen übergeordneten Ordner. Übertragen Sie keine Kalibrierungsdatei
+von einem Detektor auf einen anderen.
+
 ## Befehle für den Alltag {#everyday-commands}
 
 | Befehl | Was er tut |

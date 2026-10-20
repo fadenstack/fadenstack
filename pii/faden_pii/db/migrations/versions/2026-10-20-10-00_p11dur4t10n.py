@@ -15,7 +15,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Add nullable duration_ms column to pii_scan_events."""
+    """Accept the compatible column already installed by an early canary."""
+    if op.get_context().as_sql:
+        op.execute(
+            "ALTER TABLE pii_scan_events ADD COLUMN IF NOT EXISTS duration_ms DOUBLE PRECISION"
+        )
+        return
+    columns = sa.inspect(op.get_bind()).get_columns("pii_scan_events")
+    existing = next((c for c in columns if c["name"] == "duration_ms"), None)
+    if existing is not None:
+        if not isinstance(existing["type"], sa.Float) or not existing["nullable"]:
+            raise RuntimeError(
+                "Existing pii_scan_events.duration_ms has an incompatible schema"
+            )
+        return
     op.add_column(
         "pii_scan_events",
         sa.Column("duration_ms", sa.Float(), nullable=True),
@@ -25,4 +38,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Drop duration_ms column from pii_scan_events."""
     op.drop_column("pii_scan_events", "duration_ms")
-

@@ -179,6 +179,11 @@ def _pii_check(gpu) -> None:
     available = effective_threads()
     suggested = pii_threads(available, gpu=profile.startswith("gpu-"))
     console.print(f"  CPU availability: {available} thread(s); automatic PII thread budget: {suggested}.")
+    if env.get("FADEN_PII_CPU_THREADS"):
+        console.print(
+            f"  Configured PII threads: {env['FADEN_PII_CPU_THREADS']} "
+            f"({env.get('FADEN_PII_CPU_THREADS_MODE', 'manual')}); container CPU limits apply at startup."
+        )
     console.print(f"  [yellow]{CPU_NOTICE}[/yellow]")
     console.print("  Compatibility is a preflight check; startup validates the actual CUDA runtime and model artifacts.")
 

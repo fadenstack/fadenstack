@@ -318,6 +318,31 @@ When a GPU is available, doctor also shows its identifier for `--pii-gpu-id`:
 
 ![Doctor reports a compatible GPU and the available PII choices](../images/operate/pii-doctor-gpu.png)
 
+### Extended PII fields {#extended-pii-fields}
+
+The installed detector and the policy are separate choices. CPU/GPU mode chooses where detection runs;
+`FADEN_PII_ENTITY_PROFILE` chooses the available filter set. The console policy chooses which categories to apply.
+
+1. Enable a local multilingual PII mode as described above.
+2. Set this line in the installation's `.env`:
+
+    ```dotenv
+    FADEN_PII_ENTITY_PROFILE=extended
+    ```
+
+3. Run `faden up`, then `faden doctor`. Doctor reports the configured entity filter set. Check that the PII service
+   is healthy with `faden status`.
+4. Open the [personal data policy](../administer/policies.md#adopt-an-installed-detector-profile), adopt the installed
+   profile and select the added categories. Review tenant overrides too. Run representative checks before relying
+   on the wider policy.
+
+`standard` retains the original filter set. `extended` requires a local multilingual detector; it cannot be combined
+with `legacy`. Returning to `standard` also requires reviewing policies that request extended categories.
+An upgrade keeps your chosen filter set. It does not automatically add categories to existing policies.
+
+Keep the model directory selected by the installer: `--pii-model-dir` must point directly to the directory containing
+`manifest.json`, not its parent. Do not copy one detector's calibration file to another detector.
+
 ## Everyday commands
 
 | Command | What it does |

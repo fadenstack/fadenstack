@@ -15,6 +15,7 @@ from faden_pii.services.pii.profiles import (
     LABELS,
     LANGUAGES,
     Profile,
+    pipeline_sources,
     load_calibration,
     verify_manifest,
 )
@@ -119,20 +120,31 @@ _CONVERSATIONAL_STOPWORDS = frozenset(
 )
 
 
-def _clean_neural_span(text: str, start: int, end: int) -> tuple[int, int] | None:
-    """Trim leading greeting tokens from neural spans and drop bare conversational filler."""
+def _clean_neural_span(
+    text: str, start: int, end: int, entity_type: str = "PERSON"
+) -> tuple[int, int] | None:
+    """Limit greeting cleanup to PERSON and conversational units.
+
+    A matching word inside a sentence may be a real name ("My name is Ty"),
+    and place names such as Nice must never go through a person stop list.
+    """
+    if entity_type != "PERSON":
+        return start, end
     span_text = text[start:end]
     normalized = " ".join(span_text.strip(" \t\r\n,!?.:;¡¿\"'").lower().split())
-    if not normalized or normalized in _CONVERSATIONAL_STOPWORDS:
+    whole_unit = " ".join(text.strip(" \t\r\n,!?.:;¡¿\"'").lower().split())
+    if not normalized or (
+        normalized == whole_unit and normalized in _CONVERSATIONAL_STOPWORDS
+    ):
         return None
-    match = _GREETING_PREFIX_RE.match(span_text)
+    match = _GREETING_PREFIX_RE.match(span_text) if not text[:start].strip() else None
     if match:
         new_start = start + match.end()
         if new_start < end:
             rem_norm = " ".join(
                 text[new_start:end].strip(" \t\r\n,!?.:;¡¿\"'").lower().split()
             )
-            if not rem_norm or rem_norm in _CONVERSATIONAL_STOPWORDS:
+            if not rem_norm:
                 return None
             return new_start, end
     return start, end
@@ -319,6 +331,7 @@ class NeuralDetector:
                 "precision": settings.pii_precision,
                 "device": self.device,
                 "rules": "presidio-local-v2",
+                "pipeline_sources": pipeline_sources(),
                 "entity_profile": settings.pii_entity_profile,
                 "versions": {
                     p: importlib.metadata.version(p)
@@ -482,11 +495,11 @@ class NeuralDetector:
                     or text[start:end] != expected
                 ):
                     raise PIIError("pii_invalid_detector_result", 503)
-                cleaned = _clean_neural_span(text, start, end)
+                kind = LABELS[value["label"]]
+                cleaned = _clean_neural_span(text, start, end, kind)
                 if cleaned is None:
                     continue
                 start, end = cleaned
-                kind = LABELS[value["label"]]
                 if kind in options["entities"]:
                     spans.append(
                         RecognizerResult(

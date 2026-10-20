@@ -154,9 +154,7 @@ async def test_declared_tool_value_masks_only_value_and_round_trips():
     service._batch.analyze_iterator = lambda *, texts, **kw: [[] for _ in texts]
     service.runtime.detector.entities = ["HEALTH_DATA"]
     payload = tool_payload({"diagnosis": "Diabetes", "count": 3, "ready": True})
-    result = await service.sanitize_payload(
-        payload, mode="tokenize"
-    )
+    result = await service.sanitize_payload(payload, mode="tokenize")
     arguments = json.loads(
         result.payload["messages"][0]["tool_calls"][0]["function"]["arguments"]
     )
@@ -214,3 +212,35 @@ def test_greeting_prefix_trimmed_from_neural_person_spans(text, expected):
     assert cleaned is not None
     start, end = cleaned
     assert text[start:end] == expected
+
+
+@pytest.mark.parametrize("name", ["Ty", "Si", "Vale", "Nice", "Hi Nguyen"])
+def test_greeting_cleanup_retains_names_in_explicit_sentence_context(name):
+    text = "My name is " + name + "."
+    start = text.index(name)
+    assert _clean_neural_span(text, start, start + len(name)) == (
+        start,
+        start + len(name),
+    )
+
+
+def test_greeting_cleanup_does_not_filter_location_names():
+    assert _clean_neural_span("Nice", 0, 4, "LOCATION") == (0, 4)
+    assert _clean_neural_span("Hi Street", 0, 9, "LOCATION") == (0, 9)
+
+
+def test_greeting_cleanup_keeps_name_after_greeting_even_when_ambiguous():
+    assert _clean_neural_span("Hi Ty", 0, 5) == (3, 5)
+
+
+@pytest.mark.parametrize(
+    "text,value,entity",
+    [
+        ("HEALTH DATA = type 2 diabetes;", "type 2 diabetes", "HEALTH_DATA"),
+        ("Religion : buddhistisch;", "buddhistisch", "RELIGION"),
+        ('"Genetic data" : "BRCA1 c.68_69delAG"', "BRCA1 c.68_69delAG", "GENETIC_DATA"),
+    ],
+)
+def test_sensitive_declarations_allow_whitespace_before_separator(text, value, entity):
+    matches = ExtendedFieldsRecognizer("en").analyze(text, [entity])
+    assert [text[m.start : m.end] for m in matches] == [value]

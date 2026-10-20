@@ -18,8 +18,8 @@ similar data in what people send, and masks it before the request reaches a mode
 policy says: you choose which data, for which models, and what happens when the filter cannot run.
 
 !!! note "Detection is not always right"
-    How well the filter works depends on the language and on the structure of the content: it does best on plain
-    English sentences, and less well on other languages and on tables, lists, code and short fragments. It can miss
+    How well the filter works depends on the installed profile, the language and the structure of the content.
+    Tables, lists, code and short fragments need particular care. It can miss
     personal data, and it can mask words that are not personal data. Try it on your organisation's typical content
     before you rely on it, and tell people not to paste what they may not share.
 
@@ -53,8 +53,9 @@ for your organisation if that must not happen.
     Dates (`DATE_TIME`) are not on the list. Add them if you need dates of birth covered; plain numbers in a
     message may then be masked as dates too.
 
-The filter has an English language model only. In German or other languages it still finds what has a fixed form
-(e-mail addresses, phone, card and account numbers, IP addresses, links), but often misses names and places.
+The older `presidio-legacy` profile supports English. The local multilingual profiles support English (`en`),
+German (`de`), French (`fr`) and Spanish (`es`). The form lists the languages and categories available from the
+running service. A successful check does not confirm protection for an unlisted language.
 
 ### Change the policy
 
@@ -80,6 +81,36 @@ your installation uses others):
 2. Change the fields under **Tenant Override**. **Effective Policy Preview** shows what requests will get.
 3. Select **Save**. **Clear Override** goes back to the default policy.
 
+### Adopt an installed detector profile
+
+After your operator changes the detector or its entity filter set, review the default policy and each tenant
+override that should use it:
+
+1. Check that the installed profile is available. An unavailable-service notice does not confirm active protection.
+2. Select **Use installed profile defaults** under **Detection (Presidio)**. This selects the installed profile and
+   **Use profile thresholds**; it keeps your selected categories and outgoing-request choices.
+3. Choose **Language**. Remove categories shown as unavailable for that language, then add the categories you need
+   under **Entities**. Adopting a profile does not automatically select every available category.
+4. Choose whether to protect cloud requests, local-model requests or both. Keep **If detection fails** at `block`
+   when a protected request must not be sent without a successful check. Save the policy.
+
+Changing the language can make a previously selected category unavailable. Remove or replace it explicitly;
+the service refuses unsupported coverage instead of silently ignoring that category.
+
+??? info "Extended categories and their limits"
+    When your operator enables the [extended filter set](../operate/installing.md#extended-pii-fields), the available
+    categories include dates, age, gender, postcodes, identity documents, tax and social-security numbers and
+    declared sensitive fields. Select the categories your policy needs; availability alone does not enable them.
+
+    Health, ethnic origin, political opinions, religion or philosophical beliefs, union membership, genetic and
+    biometric data, sex life, sexual orientation and criminal records are recognized in supported explicit fields.
+    This does not provide general detection of every sensitive statement in ordinary conversation, nor a guarantee
+    of GDPR compliance. Test your organisation's content and field formats.
+
+    Numeric or container values under a protected sensitive tool-argument key may be refused because replacing them
+    would change the tool's data type. Non-sensitive values keep their types. Images and audio are not text checks;
+    unsupported protected content follows **If detection fails**.
+
 ??? info "More about the fields (the same in both places)"
     The fields are the same in both places:
 
@@ -88,7 +119,7 @@ your installation uses others):
     | **Outgoing requests**: **Protect requests to cloud providers**, **Protect requests to local models** | Which requests are scanned. |
     | **Mode** | `redact`: personal data is replaced with a placeholder such as `<PERSON>`, and the answer keeps it. `tokenize_reversible`: each value is replaced with a token such as `[PERSON_1]`, and put back in the answer the person sees. The model sees neither. |
     | **If detection fails** | `block`: the request is refused. `allow`: it is sent unscanned. `fallback_to_local`: it is sent unscanned to one of your own models under the same name, if there is one, and refused otherwise. |
-    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | Which language the filter reads, how sure it must be, and which kinds of data it looks for. A higher threshold masks less. Only English is installed: keep **Language** at `en`. With another language every check fails, and **If detection fails** decides. |
+    | **Detection (Presidio)**: **Language**, **Score threshold**, **Entities** | The installed profile, language and categories to use. **Use profile thresholds** uses the installed profile's defaults. A manual higher threshold masks less. Choose only an advertised language and supported categories; otherwise the check fails and **If detection fails** decides. |
     | **Telemetry**: **Remove personal data from telemetry**, **Mode** | For request traces, which are off by default: whether a trace keeps the request with personal data removed (`sanitized`) or figures only (`metrics_only`). Without Enterprise, traces keep figures only anyway. |
 
 ### Chats and agents
@@ -111,6 +142,11 @@ your installation uses others):
 **Privacy (PII) → Dashboard** shows counts only: scans, how many found personal data, the kinds found, and
 the daily volume. **Privacy (PII) → Activity Log** lists every scan with its mode, kinds and counts, without
 the text itself.
+
+The dashboard also shows **Avg Processing Time** and **p95 Processing Time**; the activity log shows **Duration**.
+These describe the PII service's reported processing time, including waiting for detection. They exclude the
+model's reply time. Older events can have no duration. A detection-rate percentage is the share of checks that
+found something, not a measurement of how much personal data was successfully removed.
 
 ## Tool rules
 

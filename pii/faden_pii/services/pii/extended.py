@@ -79,7 +79,9 @@ IDENTIFIERS = {
     "SOCIAL_SECURITY_NUMBER",
     "ONLINE_IDENTIFIER",
 }
-EXTENDED_ENTITIES = tuple(k for k in FIELDS if k not in {"CREDIT_CARD", "PHONE_NUMBER"}) + ("DATE_TIME", "TITLE")
+EXTENDED_ENTITIES = tuple(
+    k for k in FIELDS if k not in {"CREDIT_CARD", "PHONE_NUMBER"}
+) + ("DATE_TIME", "TITLE")
 
 
 def declared_entity(key):
@@ -113,7 +115,9 @@ _DATE = re.compile(
     r"(?<!\w)(?:"
     r"\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?"
     r"|\d{1,2}[./-]\d{1,2}[./-](?:\d{4}|\d{2})"
-    r"|\d{1,2}(?:st|nd|rd|th|er|e|[oºª]|\.)?\s+(?:de\s+|d['’])?" + _MONTHS + r"(?:\s+de)?,?\s+\d{2,4}"
+    r"|\d{1,2}(?:st|nd|rd|th|er|e|[oºª]|\.)?\s+(?:de\s+|d['’])?"
+    + _MONTHS
+    + r"(?:\s+de)?,?\s+\d{2,4}"
     r"|" + _MONTHS + r"\s+\d{1,2}(?:st|nd|rd|th|er|e|[oºª]|\.)?,?\s+\d{2,4}"
     r"|" + _MONTHS + r"[/.-]\d{2,4}"
     r")(?!\w)",
@@ -138,7 +142,8 @@ _GENDER_IDENTITY = re.compile(
 class ExtendedFieldsRecognizer(EntityRecognizer):
     def __init__(self, language):
         super().__init__(
-            supported_entities=list(EXTENDED_ENTITIES) + ["CREDIT_CARD", "PHONE_NUMBER"],
+            supported_entities=list(EXTENDED_ENTITIES)
+            + ["CREDIT_CARD", "PHONE_NUMBER"],
             supported_language=language,
             name="ExtendedFields-v1",
         )
@@ -155,10 +160,14 @@ class ExtendedFieldsRecognizer(EntityRecognizer):
                 separator = r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es|n[oº°.]|nr\.?|#)\b)?\s*"
             elif entity == "POSTAL_CODE":
                 value = r"(?:\d{5}-\d{4}|\d{4,6}|[A-Z]\d[A-Z][ -]?\d[A-Z]\d|[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2})"
-                separator = r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)\s*"
+                separator = (
+                    r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)\s*"
+                )
             elif entity == "AGE":
                 value = r"\d{1,3}"
-                separator = r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)?\s*"
+                separator = (
+                    r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)?\s*"
+                )
             elif entity == "GENDER":
                 value = (
                     r"(?:female|male|woman|man|non[- ]?binary|non[- ]?binaire|nicht[- ]?bin[aä]r|no[- ]?binario"
@@ -168,10 +177,12 @@ class ExtendedFieldsRecognizer(EntityRecognizer):
                     r"|two[- ]?spirit|deux[- ]?esprits|zwei[- ]?geister|dos[ -]?esp[ií]ritus|androgyn(?:ous|e)?|andr[oó]gino"
                     r"|other|autre|andere|otro|not[ -]?specified|nicht[ -]?spezifiziert|non[ -]?sp[eé]cifi[eé]|no[ -]?especificado|[mfwox])"
                 )
-                separator = r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)\s*"
+                separator = (
+                    r"(?:\s*\([^)\n]{1,25}\))?\s*(?::|=|\(|\b(?:is|ist|est|es)\b)\s*"
+                )
             else:
                 value = r"[^\n\r;\"{}]+"
-                separator = r"(?::|=)\s*"
+                separator = r"\s*(?::|=)\s*"
             pattern = re.compile(
                 r"(?<!\w)(?:"
                 + keys
