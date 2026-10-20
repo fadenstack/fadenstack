@@ -1,6 +1,6 @@
 """``/api/public/provenance``: the public check page's API, without an account.
 
-Offered only when an administrator switches the page on (system setting ``provenance.public_check_enabled``)
+Offered while the page is on (system setting ``provenance.public_check_enabled``, on by default)
 and the provenance module is on; otherwise every route here answers 404, as an unknown address does.
 
 - ``GET  /api/public/provenance``          whom to ask for a text check (``provenance.public_check_contact``)

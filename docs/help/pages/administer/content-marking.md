@@ -77,11 +77,11 @@ the one with vLLM 0.29 has none.
 
 - A model picks up the watermark the next time it starts. Switching a cluster's runtime restarts the cluster and
   its models (see [Clusters](../operate/clusters.md#runtime)).
-- Models with speculative decoding (MTP, EAGLE) carry it too; Fadenstack sets that up by itself. We recommend MTP
-  for models that have it: answers come about 70 % faster. The watermark is found in fewer of their answers (about
-  half of the long ones in our measurement, and not once they are edited), as the drafts the model accepts carry
-  little of it. Receipts, fingerprints and the agents' records are the same as without MTP, so an edited answer is
-  still found by its fingerprint.
+- A chat model that watermarks starts **without speculative decoding** (MTP, EAGLE, n-gram), even when its
+  deployment asks for it. With MTP, answers came about 70 % faster, but the watermark was found in only a third
+  of long answers at best and in none of the short ones, as the drafts the model accepts carry little of it.
+  Fadenstack allows speculative decoding again only for configurations measured to keep the watermark; none has
+  been yet.
 - A superuser can switch the watermark off for one deployment with the engine setting `watermark_config: false`
   (see [Engine settings](deployments.md#engine-settings)). The receipts of its answers then say that they carry
   none.
@@ -93,6 +93,9 @@ forms and files, each in the way its host allows: in document properties or cust
 HTML attributes, in file metadata, or in the front matter of a Markdown file. The installation keeps the signed
 record of each placement.
 
+These marks are a second signal beside the text's own watermark, never the mark itself: a mail program or a web
+form can drop an HTML attribute on paste or save, and a reader copying the plain text leaves it behind.
+
 ## Who can check content
 
 Everyone signed in can check content, from the chat's avatar menu (**Check content**); you also find it in the
@@ -101,13 +104,14 @@ role has. Give it to [roles of your own](users.md#roles-of-your-own) whose peopl
 
 ## The public check page
 
-People without an account can check pictures and files too, once you offer the public check page. It is off
-until you switch it on.
+People without an account can check pictures and files on the public check page, at `/check` of your
+installation (for example `https://ai.example.internal/check`). It is on from the start: pictures and files can
+reach the public, and for them the AI Act's code of practice asks for detection anyone can use. People outside
+can only use it where they can reach your installation.
 
 1. Open **Settings → Modules** and, on the **Provenance** card, open **Module settings**.
-2. Under **Public check page**, switch on **Offer a public check page**. The card shows the page's address, for
-   example `https://ai.example.internal/check`.
-3. Enter the **Contact for text checks**, for example `alex@example.com`, and select **Save**.
+2. Enter the **Contact for text checks**, for example `alex@example.com`, and select **Save**.
+3. To take the page offline, switch off **Offer a public check page** under **Public check page**.
 
 The page checks pictures and files up to 20 MB, 10 checks a minute per address, and keeps nothing. Texts are
 refused there, and the page names your contact instead: texts are checked only for people with an account (the

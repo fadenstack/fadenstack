@@ -370,10 +370,11 @@ SETTINGS_REGISTRY: list[SettingDefinition] = [
         description=(
             "Offer the page /check, where anyone can check a picture or a file for marks without an "
             "account (10 checks a minute per address, up to 20 MB; nothing submitted is kept). Texts are "
-            "checked only for people with an account. Off by default."
+            "checked only for people with an account. On by default: pictures and files can reach the "
+            "public, and for them the Code of Practice asks for open detection."
         ),
         is_secret=False,
-        default=False,
+        default=True,
         apply_scope=SystemApplyScope.LIVE_RELOAD,
         service_targets=(),
     ),

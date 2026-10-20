@@ -86,12 +86,11 @@ GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
 
 - Ein Modell bekommt das Wasserzeichen beim nächsten Start. Ein Wechsel der Runtime startet den Cluster und seine
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
-- Modelle mit spekulativem Decoding (MTP, EAGLE) tragen es ebenfalls; das richtet Fadenstack selbst ein. Für
-  Modelle, die MTP haben, empfehlen wir es: Antworten kommen etwa 70 % schneller. Das Wasserzeichen wird in
-  weniger ihrer Antworten gefunden (in unserer Messung in etwa der Hälfte der langen, und nicht mehr, wenn sie
-  bearbeitet sind), weil die Entwürfe, die das Modell übernimmt, wenig davon tragen. Belege, Fingerabdrücke und die
-  Nachweise der Agenten sind dieselben wie ohne MTP; eine bearbeitete Antwort wird also über ihren Fingerabdruck
-  gefunden.
+- Ein Chat-Modell mit Wasserzeichen startet **ohne spekulatives Decoding** (MTP, EAGLE, N-Gramm), auch wenn seine
+  Bereitstellung es verlangt. Mit MTP kamen Antworten etwa 70 % schneller, aber das Wasserzeichen wurde höchstens
+  in einem Drittel der langen Antworten gefunden und in keiner kurzen, weil die Entwürfe, die das Modell übernimmt,
+  wenig davon tragen. Fadenstack lässt spekulatives Decoding nur für Konfigurationen wieder zu, bei denen gemessen
+  ist, dass das Wasserzeichen hält; das ist bisher keine.
 - Ein Superuser kann das Wasserzeichen für eine einzelne Bereitstellung mit der Engine-Einstellung
   `watermark_config: false` ausschalten (siehe [Engine-Einstellungen](deployments.md#engine-settings)). Die Belege
   ihrer Antworten vermerken dann, dass sie keines tragen.
@@ -103,6 +102,10 @@ Webformulare und Dateien schreiben, jeweils so, wie die Anwendung es zulässt: i
 eigenen XML-Teilen, in Kopfzeilen von E-Mails, in HTML-Attributen, in Datei-Metadaten oder im Front Matter einer
 Markdown-Datei. Die Installation bewahrt den signierten Nachweis jeder Einfügung auf.
 
+Diese Kennzeichen sind ein zweites Signal neben dem Wasserzeichen im Text, nie die Kennzeichnung selbst: Ein
+E-Mail-Programm oder ein Webformular kann ein HTML-Attribut beim Einfügen oder Speichern verwerfen, und wer den
+reinen Text kopiert, lässt es zurück.
+
 ## Wer Inhalte prüfen kann {#who-can-check-content}
 
 Alle angemeldeten Benutzer können Inhalte prüfen, über das Avatar-Menü im Chat (**Inhalte prüfen**); Sie finden die Prüfung
@@ -112,13 +115,15 @@ ebenfalls prüfen sollen.
 
 ## Die öffentliche Prüfseite {#the-public-check-page}
 
-Auch Personen ohne Konto können Bilder und Dateien prüfen, sobald Sie die öffentliche Prüfseite anbieten. Sie ist
-ausgeschaltet, bis Sie sie einschalten.
+Auch Personen ohne Konto können Bilder und Dateien prüfen, auf der öffentlichen Prüfseite unter `/check` Ihrer
+Installation (z. B. `https://ai.example.internal/check`). Sie ist von Anfang an eingeschaltet: Bilder und Dateien
+können an die Öffentlichkeit gelangen, und für sie verlangt der Verhaltenskodex zum AI Act eine Prüfung, die
+jeder nutzen kann. Personen von außen erreichen sie nur, wo sie Ihre Installation erreichen.
 
 1. Öffnen Sie **Einstellungen → Module** und auf der Karte **Herkunftsnachweis** die **Moduleinstellungen**.
-2. Schalten Sie unter **Öffentliche Prüfseite** die Option **Öffentliche Prüfseite anbieten** ein. Die Karte zeigt
-   die Adresse der Seite, z. B. `https://ai.example.internal/check`.
-3. Geben Sie den **Kontakt für Textprüfungen** ein, z. B. `alex@example.com`, und wählen Sie **Speichern**.
+2. Geben Sie den **Kontakt für Textprüfungen** ein, z. B. `alex@example.com`, und wählen Sie **Speichern**.
+3. Um die Seite vom Netz zu nehmen, schalten Sie unter **Öffentliche Prüfseite** die Option **Öffentliche
+   Prüfseite anbieten** aus.
 
 Die Seite prüft Bilder und Dateien bis 20 MB, 10 Prüfungen pro Minute und Adresse, und speichert nichts. Texte
 lehnt sie ab und nennt stattdessen Ihren Kontakt: Texte werden nur für Personen mit einem Konto geprüft (der

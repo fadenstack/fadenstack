@@ -9,8 +9,9 @@ that has the watermark, and publishes which version and how (``published``), nev
 receipt for an answer names them and the provenance engine checks a text with the same key later.
 
 - Only chat models: an embedding, scoring or picture model generates no text.
-- With speculative decoding (MTP, EAGLE) vLLM needs ``dual_key_gumbel`` and probabilistic draft sampling,
-  which this sets; parallel drafting or another method has no watermark, and the deployment starts without.
+- Speculative decoding (MTP, EAGLE, n-gram) is left out of a watermarking chat model: with it the watermark
+  was found in a third of long answers at best. Only a method in ``SPECULATIVE_MEASURED`` (none yet) is kept,
+  with ``dual_key_gumbel`` and probabilistic draft sampling as vLLM needs.
 - A deployment keeps the key version it was started with until it is applied again for another reason
   (``RayDeploymentManager``): a new version from ``faden secrets rotate`` restarts no model by itself.
 - ``engine.config`` may switch the watermark off for one deployment (``watermark_config: false``), a
@@ -31,8 +32,10 @@ log = logging.getLogger(__name__)
 MIN_VLLM = (0, 30)
 #: Tokens before each one the pseudorandom function reads (vLLM's default).
 CONTEXT_WIDTH = 4
-#: The speculative methods vLLM watermarks: autoregressive, model-based drafts.
-_SPECULATIVE_METHODS = frozenset({"mtp", "eagle", "eagle3", "dspark"})
+#: The speculative methods a watermarking chat model may keep (dual-key Gumbel): only those whose watermark
+#: passed the Phase 3 rerun (fadenstack-dev provenance-eval), at 200 to 1000 tokens. None has yet: MTP 3 on the
+#: 27B gave 0/0/17/33 % at 100/200/400/1000 tokens (2026-10-20). Every other speculative decoding is left out.
+SPECULATIVE_MEASURED: frozenset[str] = frozenset()
 #: What an operator may set of it besides switching it off: how it reads the context, never its key.
 _OPERATOR_FIELDS = ("context_width", "deduplicate_contexts", "deduplicate_contexts_max_history")
 _OFF = frozenset({"false", "off", "none", "no", "0"})
@@ -131,14 +134,19 @@ def apply(kwargs: dict[str, Any], key: tuple[int, int]) -> dict[str, Any] | None
     speculative = _speculative(kwargs)
     if speculative is not None:
         method = str(speculative.get("method") or "").lower()
-        if method not in _SPECULATIVE_METHODS or speculative.get("parallel_drafting"):
-            log.info("The text watermark is left out: vLLM does not watermark this speculative decoding.")
-            return None
-        # Draft tokens carry the watermark of one key, the rest of the other; vLLM accepts no other way.
-        config["algorithm"] = "dual_key_gumbel"
-        speculative["draft_sample_method"] = "probabilistic"
-        speculative["rejection_sample_method"] = "standard"
-        kwargs["speculative_config"] = speculative
+        if method in SPECULATIVE_MEASURED and not speculative.get("parallel_drafting"):
+            # Draft tokens carry the watermark of one key, the rest of the other; vLLM accepts no other way.
+            config["algorithm"] = "dual_key_gumbel"
+            speculative["draft_sample_method"] = "probabilistic"
+            speculative["rejection_sample_method"] = "standard"
+            kwargs["speculative_config"] = speculative
+        else:
+            # The watermark comes first (D19): with speculative decoding it was found in a third of long
+            # answers at best, so a watermarking chat model starts without it.
+            kwargs.pop("speculative_config", None)
+            log.info(
+                "Speculative decoding (%s) is left out: the text watermark does not hold with it.", method or "?",
+            )
     version, secret = key
     kwargs["watermark_config"] = {**config, "key": secret}
     return {

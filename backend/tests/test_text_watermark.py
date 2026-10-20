@@ -89,23 +89,27 @@ def test_a_chat_model_starts_with_the_current_key() -> None:
     assert engine["watermark_config"] == {"algorithm": "gumbel", "context_width": 4, "key": KEY[1]}
 
 
-def test_with_speculative_decoding_both_keys_and_probabilistic_drafts() -> None:
+@pytest.mark.parametrize("speculative", [
+    '{"method": "mtp", "num_speculative_tokens": 3}',
+    {"method": "eagle3", "num_speculative_tokens": 2},
+    {"method": "ngram", "num_speculative_tokens": 3},
+    {"method": "dspark", "parallel_drafting": True},
+], ids=["mtp", "eagle3", "ngram", "parallel-drafting"])
+def test_speculative_decoding_is_left_out_of_a_watermarking_chat_model(speculative: Any) -> None:
+    """The watermark comes first (D19): none has passed the measurement with speculative decoding yet."""
+    engine = _engine(_spec(speculative_config=speculative))
+    assert "speculative_config" not in engine
+    assert engine["watermark_config"]["algorithm"] == "gumbel"
+
+
+def test_a_measured_speculative_method_keeps_it_with_both_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(watermark, "SPECULATIVE_MEASURED", frozenset({"mtp"}))
     engine = _engine(_spec(speculative_config='{"method": "mtp", "num_speculative_tokens": 3}'))
     assert engine["watermark_config"]["algorithm"] == "dual_key_gumbel"
     assert engine["speculative_config"] == {
         "method": "mtp", "num_speculative_tokens": 3,
         "draft_sample_method": "probabilistic", "rejection_sample_method": "standard",
     }
-
-
-@pytest.mark.parametrize("speculative", [
-    {"method": "ngram", "num_speculative_tokens": 3},
-    {"method": "dspark", "parallel_drafting": True},
-], ids=["ngram", "parallel-drafting"])
-def test_a_speculative_decoding_vllm_does_not_watermark_starts_without_it(speculative: dict[str, Any]) -> None:
-    engine = _engine(_spec(speculative_config=speculative))
-    assert "watermark_config" not in engine
-    assert "draft_sample_method" not in engine["speculative_config"], "left as the operator set it"
 
 
 @pytest.mark.parametrize("config", [
