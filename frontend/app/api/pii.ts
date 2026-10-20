@@ -58,12 +58,20 @@ export interface PIIPolicyConfig {
   presidio: {
     language: string;
     threshold: number;
+    profile_id?: string | null;
+    threshold_mode?: "legacy" | "profile" | "override";
     entities: string[];
   };
 }
 
 export interface PIIPolicyOptionsResponse {
   source: "pii_service" | "fallback";
+  ready?: boolean;
+  profile_id?: string | null;
+  profile_fingerprint?: string | null;
+  calibrated?: boolean;
+  entity_languages?: Record<string, string[]>;
+  supported_surfaces?: string[];
   supported_entities: string[];
   supported_languages: string[];
   supported_sanitize_modes: string[];
@@ -112,6 +120,8 @@ function defaultPolicyFromOptions(
     },
     presidio: {
       language: defaultLanguage,
+      profile_id: options?.profile_id ?? null,
+      threshold_mode: options?.profile_id && options.profile_id !== "presidio-legacy" ? "profile" : "legacy",
       threshold: Math.max(0, Math.min(1, defaultThreshold)),
       entities: [],
     },
@@ -171,6 +181,8 @@ export function normalizePIIPolicy(
       })(),
     },
     presidio: {
+      profile_id: typeof raw.presidio?.profile_id === "string" ? raw.presidio.profile_id : null,
+      threshold_mode: raw.presidio?.threshold_mode === "profile" || raw.presidio?.threshold_mode === "override" ? raw.presidio.threshold_mode : "legacy",
       language:
         typeof (presidioRaw as { language?: unknown }).language === "string" &&
         (presidioRaw as { language?: string }).language

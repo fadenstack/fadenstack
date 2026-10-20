@@ -25,6 +25,8 @@ class PIIScanRequest(BaseModel):
         le=1.0,
         description="Minimum confidence score (0-1). Default: 0.35.",
     )
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
 
 
 class DetectedEntityDTO(BaseModel):
@@ -35,6 +37,7 @@ class DetectedEntityDTO(BaseModel):
     end: int
     score: float
     text: str
+    path: str | None = None
 
 
 class PIIScanResponse(BaseModel):
@@ -62,6 +65,8 @@ class PIIRedactRequest(BaseModel):
         le=1.0,
         description="Minimum confidence score (0-1). Default: 0.35.",
     )
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
 
 
 class PIIRedactResponse(BaseModel):
@@ -99,6 +104,8 @@ class PIISanitizeRequest(BaseModel):
     language: str | None = Field(default=None)
     entities: list[str] | None = Field(default=None)
     score_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    profile_id: str | None = None
+    threshold_mode: str = "legacy"
     token_mapping: dict[str, str] | None = Field(
         default=None,
         description=(
@@ -121,6 +128,9 @@ class PIISanitizeResponse(BaseModel):
         default=None,
         description="Only present when mode='tokenize'. Maps tokens to original text.",
     )
+    contract_version: int = 2
+    coverage_status: str = "complete"
+    profile_fingerprint: str = "presidio-v2"
 
 
 class PIIDetokenizeRequest(BaseModel):
@@ -154,6 +164,17 @@ class PIIPolicyOptionsResponse(BaseModel):
     supported_sanitize_modes: list[str]
     default_language: str
     default_score_threshold: float
+    contract_version: int = 2
+    profile_id: str = "presidio-legacy"
+    profile_fingerprint: str | None = None
+    calibrated: bool = False
+    ready: bool = False
+    supported_surfaces: list[str] = [
+        "chat_text",
+        "tool_argument_strings",
+        "embedding_strings",
+    ]
+    entity_languages: dict[str, list[str]] = {}
 
 
 # ---------------------------------------------------------------

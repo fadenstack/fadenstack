@@ -5,7 +5,7 @@ metadata:
   namespace: faden-pii
   name: faden-pii-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: faden-pii-app
@@ -17,25 +17,36 @@ spec:
       containers:
         - name: app
           image: faden_pii:latest
+          startupProbe:
+            httpGet:
+              path: /api/ready
+              port: api-port
+            failureThreshold: 60
+            periodSeconds: 5
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /api/ready
               port: api-port
             initialDelaySeconds: 5
             periodSeconds: 10
           env:
+            - name: FADEN_PII_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: faden-pii-service
+                  key: token
             - name: FADEN_PII_HOST
               value: "0.0.0.0"
             - name: FADEN_PII_WORKERS_COUNT
-              value: "10"
+              value: "1"
             - name: FADEN_PII_DB_HOST
               value: "faden-pii-db-service"
             - name: FADEN_PII_REDIS_HOST
               value: "faden-pii-redis-service"
           resources:
             limits:
-              memory: "200Mi"
-              cpu: "100m"
+              memory: "4Gi"
+              cpu: "2"
           ports:
             - containerPort: 8000
               name: api-port

@@ -19,6 +19,14 @@ import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// Render recorded, neutralized CLI output as terminal captures as well.
+// Input is a JSON array of {name, command, output}; keep raw transcripts outside docs.
+if (process.argv[2] === "--terminal") {
+  const { capture } = await import("./terminal-shots.mjs");
+  await capture(process.argv[3]);
+  process.exit(0);
+}
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../../..");
 const LANG = process.env.HELP_SHOTS_LANG || "en";

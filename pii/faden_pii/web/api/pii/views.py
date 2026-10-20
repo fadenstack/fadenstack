@@ -40,7 +40,7 @@ _event_client: httpx.AsyncClient | None = None
 def _get_event_client() -> httpx.AsyncClient:
     global _event_client
     if _event_client is None:
-        _event_client = httpx.AsyncClient(timeout=5.0)
+        _event_client = httpx.AsyncClient(timeout=2.0)
     return _event_client
 
 
@@ -73,7 +73,7 @@ async def _log_event_async(
     entity_type_counts: dict[str, int] | None = None,
     source: str = "api",
     request_id: str | None = None,
-) -> None:
+) -> bool | None:
     """Fire-and-forget POST to the backend event-log endpoint."""
     url = _backend_event_url()
     token = _backend_event_token()
@@ -95,15 +95,28 @@ async def _log_event_async(
     }
     try:
         response = await _get_event_client().post(
-            url, json=payload, headers={"Authorization": f"Bearer {token}"},
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}"},
         )
         if response.status_code in (401, 403, 503):
             logger.warning(
                 "The backend refused a PII event (%s): is the internal token set on both sides?",
                 response.status_code,
             )
+        return response.status_code < 400
     except Exception:
-        logger.debug("Failed to forward PII event to backend", exc_info=True)
+        logger.debug("Failed to forward PII event to backend")
+        return False
+
+
+async def _report_event(request: Request, **event) -> None:
+    reporter = getattr(request.app.state, "pii_events", None)
+    if reporter is not None:
+        reporter.submit(**event)
+    elif settings.environment == "pytest":
+        # ASGI unit tests do not enter app lifespan.
+        await _log_event_async(**event)
 
 
 def _get_pii_service(request: Request) -> PIIService:
@@ -119,13 +132,40 @@ async def get_policy_options(request: Request) -> PIIPolicyOptionsResponse:
     other language would fail every check.
     """
     service = getattr(request.app.state, "pii_service", None)
-    languages = service.supported_languages if service is not None else [settings.pii_default_language]
+    languages = (
+        service.supported_languages
+        if service is not None
+        else [settings.pii_default_language]
+    )
     return PIIPolicyOptionsResponse(
-        supported_entities=list(DEFAULT_ENTITIES),
+        supported_entities=service.supported_entities
+        if service is not None and hasattr(service, "supported_entities")
+        else list(DEFAULT_ENTITIES),
         supported_languages=languages,
         supported_sanitize_modes=["redact", "tokenize"],
         default_language=settings.pii_default_language,
-        default_score_threshold=settings.pii_score_threshold,
+        default_score_threshold=service.profile.threshold
+        if service is not None and hasattr(service, "profile")
+        else settings.pii_score_threshold,
+        profile_id=service.profile.id
+        if service is not None and hasattr(service, "profile")
+        else "presidio-legacy",
+        profile_fingerprint=service.profile.fingerprint
+        if service is not None and hasattr(service, "profile")
+        else None,
+        calibrated=service.profile.calibrated
+        if service is not None and hasattr(service, "profile")
+        else False,
+        ready=bool(
+            service is not None
+            and hasattr(service, "runtime")
+            and service.runtime.healthy
+        ),
+        entity_languages=getattr(
+            getattr(getattr(service, "runtime", None), "detector", None),
+            "entity_languages",
+            {},
+        ),
     )
 
 
@@ -140,17 +180,22 @@ async def scan_text(
         body.text,
         language=body.language,
         entities=body.entities,
-        score_threshold=body.score_threshold,
+        score_threshold=svc.validate_profile(
+            body.profile_id, body.threshold_mode, body.score_threshold
+        ),
     )
     # Build entity-type breakdown
     type_counts: dict[str, int] = {}
     for e in result.entities:
         type_counts[e.entity_type] = type_counts.get(e.entity_type, 0) + 1
     # Fire-and-forget event to backend (no raw text stored)
-    await _log_event_async(
+    await _report_event(
+        request,
         operation="scan",
-        language=body.language or "en",
-        score_threshold=body.score_threshold or 0.35,
+        language=body.language or settings.pii_default_language,
+        score_threshold=svc.profile.threshold
+        if body.threshold_mode == "profile" or body.score_threshold is None
+        else body.score_threshold,
         pii_detected=result.has_pii,
         entities_found=len(result.entities),
         entity_type_counts=type_counts or None,
@@ -166,6 +211,7 @@ async def scan_text(
                 end=e.end,
                 score=e.score,
                 text=e.text,
+                path=e.path,
             )
             for e in result.entities
         ],
@@ -183,13 +229,18 @@ async def redact_text(
         body.text,
         language=body.language,
         entities=body.entities,
-        score_threshold=body.score_threshold,
+        score_threshold=svc.validate_profile(
+            body.profile_id, body.threshold_mode, body.score_threshold
+        ),
     )
-    await _log_event_async(
+    await _report_event(
+        request,
         operation="redact",
         mode="redact",
-        language=body.language or "en",
-        score_threshold=body.score_threshold or 0.35,
+        language=body.language or settings.pii_default_language,
+        score_threshold=svc.profile.threshold
+        if body.threshold_mode == "profile" or body.score_threshold is None
+        else body.score_threshold,
         pii_detected=result.entities_found > 0,
         entities_found=result.entities_found,
         source=request.headers.get("x-pii-source", "api"),
@@ -227,17 +278,22 @@ async def sanitize_payload(
         mode=body.mode,
         language=body.language,
         entities=body.entities,
-        score_threshold=body.score_threshold,
+        score_threshold=svc.validate_profile(
+            body.profile_id, body.threshold_mode, body.score_threshold
+        ),
         token_mapping=body.token_mapping,
     )
     type_counts: dict[str, int] = {}
     for e in result.pii_report:
         type_counts[e.entity_type] = type_counts.get(e.entity_type, 0) + 1
-    await _log_event_async(
+    await _report_event(
+        request,
         operation="sanitize",
         mode=body.mode,
-        language=body.language or "en",
-        score_threshold=body.score_threshold or 0.35,
+        language=body.language or settings.pii_default_language,
+        score_threshold=svc.profile.threshold
+        if body.threshold_mode == "profile" or body.score_threshold is None
+        else body.score_threshold,
         pii_detected=result.entities_found > 0,
         entities_found=result.entities_found,
         entity_type_counts=type_counts or None,
@@ -254,10 +310,12 @@ async def sanitize_payload(
                 end=e.end,
                 score=e.score,
                 text=e.text,
+                path=e.path,
             )
             for e in result.pii_report
         ],
         token_mapping=result.token_mapping,
+        profile_fingerprint=svc.profile.fingerprint,
     )
 
 

@@ -124,6 +124,7 @@ class _FakePII:
     async def sanitize(
         self, _self: PIIClient, *, payload: dict[str, Any], policy: Any, mode: str | None = None,
         token_mapping: dict[str, str] | None = None,
+        request_id: str | None = None, cache_scope: str = "",
     ) -> SanitizeResult:
         self.seen.append(payload)
         self.continued.append(token_mapping)

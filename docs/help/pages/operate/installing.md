@@ -270,6 +270,54 @@ in an existing one. `faden module disable provenance` explains what stops being 
 records who switched it off and when; `faden upgrade` then leaves it off. Its records are kept as long as they are
 needed and go into every backup.
 
+## Local PII on CPU or GPU
+
+PII detection runs on your server. Setup downloads the selected model files; chat text is processed locally.
+CPU mode works without a GPU and is slower, especially with concurrent requests or long documents.
+
+![The PII mode question with CPU selected](../images/operate/pii-mode-choice.png)
+
+1. Run `faden doctor`. **Local PII** reports GPU compatibility, the configured mode and the CPU thread budget.
+
+    ![Doctor reports CPU mode when a compatible GPU is unavailable](../images/operate/pii-doctor-cpu.png)
+
+2. Enable PII during deployment:
+
+    ```bash
+    faden deploy --modules pii
+    ```
+
+    With a compatible GPU, choose `cpu`, `gpu-shared` or `gpu-dedicated` when asked. Without one, a new PII
+    installation uses CPU. The message explains an incompatible driver, unavailable Docker GPU access or
+    insufficient free memory. `legacy` retains the older English-only option.
+
+3. Open [the personal data policy](../administer/policies.md#personal-data) in the console. Review the installed
+   profile and explicitly adopt it when changing detectors. Existing policies are kept; installing a different
+   detector does not silently change their protection settings.
+
+??? info "Choose the mode without a question"
+    ```bash
+    faden deploy --modules pii --pii-profile cpu -y
+    faden deploy --modules pii --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    ```
+
+    For an existing installation, `faden module enable pii` offers the same choices. Run `faden up` afterward.
+    Use `--pii-model-dir /opt/faden/pii-models/cpu` to supply a previously provisioned directory with its manifest,
+    including when setup cannot download files. The directory must match the selected detector.
+
+    New CPU mode uses Patronus ONNX; GPU mode uses GLiNER2. Both support English, German, French and Spanish.
+    `gpu-shared` is for a GPU used by other software too. `gpu-dedicated` is for a GPU you keep available for PII;
+    selecting it does not stop other software from using that GPU.
+
+    The default uses a quarter of the available CPU threads, capped at eight in CPU mode and two in GPU mode.
+    `--pii-cpu-threads 2` sets an explicit count. Counts are reduced to the CPU availability, including container
+    limits. `--pii-gpu-memory-mib 4096` sets the GPU memory budget; it does not reserve memory from other software.
+
+When a GPU is available, doctor also shows its identifier for `--pii-gpu-id`:
+
+![Doctor reports a compatible GPU and the available PII choices](../images/operate/pii-doctor-gpu.png)
+
 ## Everyday commands
 
 | Command | What it does |

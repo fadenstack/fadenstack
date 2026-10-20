@@ -75,10 +75,10 @@ OS_RESERVE_PCT = 0.05
 #: Prometheus, Redis, nginx.
 FIXED_MB = 2100
 #: One worker process of each service ``faden tune`` sizes.
-PER_WORKER_MB = {"backend": 200, "gateway": 290, "pii": 780}
-#: The optional modules' own processes (PII's task worker holds its models too). Provenance is not
+PER_WORKER_MB = {"backend": 200, "gateway": 290, "pii": 1024}
+#: The optional modules' own processes. Core PII has one HTTP owner and no task worker. Provenance is not
 #: measured yet: taken as skills', a service of the same kind (one web worker, a database, no models).
-MODULE_MB = {"mcp": 110, "skills": 90, "pii": 1550, "provenance": 90}
+MODULE_MB = {"mcp": 110, "skills": 90, "pii": 0, "provenance": 90}
 #: One process of the backend's task worker (taskiq), before any download.
 TASK_WORKER_MB = 160
 #: A model download holds up to one xet range (64 MB) per range it fetches at once.
@@ -112,6 +112,36 @@ def detect_system() -> SystemInfo:
     )
 
 
+def effective_threads() -> int:
+    """Logical CPUs usable by this process, constrained by affinity and quota."""
+    from pathlib import Path
+
+    available = psutil.cpu_count(logical=True) or os.cpu_count() or 1
+    try:
+        available = min(available, len(psutil.Process().cpu_affinity()))
+    except (AttributeError, NotImplementedError, OSError, psutil.Error):
+        pass
+    for quota_path, period_path in (
+        (Path("/sys/fs/cgroup/cpu.max"), None),
+        (Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"), Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us")),
+    ):
+        try:
+            if period_path is None:
+                quota, period = quota_path.read_text().split()
+            else:
+                quota, period = quota_path.read_text(), period_path.read_text()
+            if quota.strip() != "max" and int(quota) > 0:
+                available = min(available, max(1, int(quota) // int(period)))
+        except (OSError, ValueError, ZeroDivisionError):
+            continue
+    return max(1, available)
+
+
+def pii_threads(available: int, *, gpu: bool = False) -> int:
+    """Use a quarter of available threads, capped by the measured profile."""
+    return min(2 if gpu else 8, max(1, available // 4))
+
+
 # ── Tune profile ─────────────────────────────────────────────────
 
 
@@ -136,6 +166,8 @@ class TuneProfile:
 
     #: Optional modules switched on ("pii", "mcp", "skills", "provenance"): they take memory.
     modules: frozenset[str] = frozenset()
+    #: Conservative process RAM allowance; neural models have a separate GPU budget.
+    pii_memory_mb: int = 1024
     #: Processes of the backend's task worker (taskiq ``--workers``).
     task_workers: int = BACKEND_TASK_WORKERS
     #: Ranges a model download fetches at once (``HF_XET_NUM_CONCURRENT_RANGE_GETS``).
@@ -180,7 +212,7 @@ class TuneProfile:
         for svc in ALL_SERVICES:
             if svc == "pii" and "pii" not in self.modules:
                 continue
-            parts[f"{svc} x{self.workers[svc]}"] = self.workers[svc] * PER_WORKER_MB[svc]
+            parts[f"{svc} x{self.workers[svc]}"] = self.workers[svc] * (self.pii_memory_mb if svc == "pii" else PER_WORKER_MB[svc])
         parts[f"task worker x{self.task_workers}"] = self.task_workers * TASK_WORKER_MB
         parts["a model download"] = self.download_ranges * XET_RANGE_MB
         return parts
@@ -194,10 +226,11 @@ class TuneProfile:
         """Cut the workers, then the task worker, then the download's ranges, to what the memory holds."""
         def rest(workers: int, task_workers: int) -> int:
             per_set = sum(
-                PER_WORKER_MB[svc] for svc in ALL_SERVICES if svc != "pii" or "pii" in self.modules
+                PER_WORKER_MB[svc] for svc in ALL_SERVICES if svc != "pii"
             )
             modules = sum(MODULE_MB.get(m, 0) for m in self.modules)
-            return FIXED_MB + modules + workers * per_set + task_workers * TASK_WORKER_MB
+            pii = self.pii_memory_mb if "pii" in self.modules else 0
+            return FIXED_MB + modules + pii + workers * per_set + task_workers * TASK_WORKER_MB
 
         budget = self.memory_budget_mb
         smallest_download = MIN_DOWNLOAD_RANGES * XET_RANGE_MB
@@ -258,6 +291,7 @@ def calculate_tune_profile(
     *,
     resource_pct: float = DEFAULT_RESOURCE_PCT,
     modules: frozenset[str] | set[str] = frozenset(),
+    pii_backend: str = "presidio",
 ) -> TuneProfile:
     """Calculate optimal scalability parameters for *profile*.
 
@@ -281,13 +315,14 @@ def calculate_tune_profile(
     the host holds -- see ``TuneProfile._fit_memory``.
     """
     sys = system or detect_system()
-    tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct, modules=frozenset(modules))
+    tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct, modules=frozenset(modules),
+                     pii_memory_mb=1024 if pii_backend == "presidio" else 3072)
 
     # Workers: dev keeps things light (1-2); prod scales within the CPU
     # budget (resource_pct of the physical cores, e.g. 2 of 8 at 25 %).
     workers = min(sys.physical_cores, 2) if profile == "dev" else tp.budget_cores
     for svc in HEAVY_SERVICES:
-        tp.workers[svc] = max(1, workers)
+        tp.workers[svc] = 1 if svc == "pii" else max(1, workers)
     for svc in LIGHT_SERVICES:
         tp.workers[svc] = 1
     tp.cpu_workers = max(1, workers)

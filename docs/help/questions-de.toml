@@ -151,12 +151,15 @@
 "Was braucht Internetzugang?" = "what-needs-the-internet"
 
 ["operate/installing.md"]
+"Kann PII ohne GPU auf der CPU laufen?" = "local-pii-on-cpu-or-gpu"
+"Wie wähle ich CPU oder GPU für PII?" = "local-pii-on-cpu-or-gpu"
 "Wie installiere ich Fadenstack?" = "install"
 "Wie melde ich mich nach der Installation zum ersten Mal an?" = "sign-in-for-the-first-time"
 "Welche Befehle brauche ich im Alltag?" = "everyday-commands"
 "Wie deinstalliere ich Fadenstack?" = "removing-fadenstack"
 
 ["operate/upgrading.md"]
+"Behält das Upgrade meine PII-Einstellungen?" = "upgrade-the-pii-module"
 "Wie aktualisiere ich Fadenstack?" = "upgrade-the-server"
 "Woher weiß ich, dass eine neue Version erschienen ist?" = "how-you-hear-about-a-new-release"
 "Sendet die Update-Prüfung Daten über meinen Server?" = "how-you-hear-about-a-new-release"

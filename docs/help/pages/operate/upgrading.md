@@ -208,6 +208,31 @@ curl --cacert ~/fadenstack/tls/ca.crt https://ai.example.internal/api/health   #
 
 Then sign in to the console. The machines and clusters are as they were.
 
+## Upgrade the PII module
+
+An enabled PII module is included in `faden upgrade`. A disabled module stays disabled. Its existing secrets,
+model directory and policies are kept.
+
+1. Run `faden upgrade --dry-run` to inspect the planned upgrade. This makes no PII changes or model downloads.
+2. Run `faden upgrade`. The PII step checks GPU compatibility and offers a mode choice. The current mode is the
+   default. On a CPU-only server with an older installation, choose `legacy` to retain English-only detection or
+   `cpu` to adopt the multilingual CPU detector.
+3. Run `faden doctor` and review the installed profile in [the personal data settings](../administer/policies.md#personal-data).
+
+`faden upgrade -y` asks no questions and retains a compatible installed mode. If an installed GLiNER2 detector
+cannot use its GPU, it runs on CPU with its existing profile; CPU processing is slower. It does not silently
+switch an existing detector to another model. To change explicitly:
+
+```bash
+faden upgrade --pii-profile cpu
+faden upgrade --pii-profile gpu-shared
+```
+
+A detector change keeps saved policies and requires explicit adoption of the installed profile in the console.
+Without the matching profile, protected requests follow their configured failure policy. A required model
+download or verification failure stops the upgrade before service replacement. For offline setup, supply a
+verified `--pii-model-dir`.
+
 ## Update the machines' agents
 
 A new release may expect a newer node agent than the machines run. The **Machines** list and each machine's page

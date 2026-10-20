@@ -44,7 +44,7 @@ def test_postgres_takes_every_service_at_its_peak(cores: int, peak: int, max_con
 def test_pii_gets_workers_but_no_database_pool() -> None:
     """Its database layer is unused: it opens no connection."""
     env = calculate_tune_profile("prod", system=_host(16)).to_env_dict()
-    assert env["FADEN_PII_WORKERS_COUNT"] == "4"
+    assert env["FADEN_PII_WORKERS_COUNT"] == "1"
     assert "FADEN_PII_DB_POOL_SIZE" not in env
 
 

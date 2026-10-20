@@ -4216,5 +4216,11 @@
       "open": "查看更新",
       "dismiss": "隐藏至下一版本"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "PII 服务不可用。这些选项不能确认保护已生效。",
+  "pii_policy.form.reviewed": "已审核的阈值",
+  "pii_policy.form.unreviewed": "阈值待审核",
+  "pii_policy.form.adopt_profile": "使用已安装配置的默认值",
+  "pii_policy.form.profile_mismatch": "策略配置与已安装的服务不匹配。选择兼容配置之前，受保护的请求将失败。",
+  "pii_policy.form.profile_thresholds": "使用配置中的阈值"
 }

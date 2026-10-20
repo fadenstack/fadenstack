@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+      target: ${FADEN_PII_BUILD_TARGET:-prod}
     image: faden_pii:${FADEN_PII_VERSION:-latest}
     restart: always
     env_file:
@@ -20,6 +21,8 @@ services:
 
   taskiq-worker:
     <<: *main_app
+    # Core PII uses the HTTP owner. Enable only for an extension that needs tasks.
+    profiles: ["pii-tasks"]
     labels: []
     command:
       - taskiq

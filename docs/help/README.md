@@ -51,6 +51,16 @@ The German pages show the German screenshots (`pages/images/de/`) where they exi
 
 ## Screenshots
 
+Recorded CLI output can also be rendered as terminal captures:
+
+```sh
+node docs/help/scripts/shots.mjs --terminal /path/to/neutral-cli-captures.json
+```
+
+The JSON contains `{name, command, output}` entries, with a picture name such as `operate/pii-doctor-cpu`.
+Capture actual command output, replace private names/paths/identifiers with STYLE.md examples, and retain raw
+transcripts outside this repository. Inspect each generated picture before including it.
+
 In `pages/images/<section>/` (German: `pages/images/de/<section>/`). Every picture is taken from a running install
 with `scripts/shots.mjs`, which replaces every lab name, address and person by the neutral examples of STYLE.md
 before the picture is taken. `HELP_SHOTS_LANG=de` takes the German ones; `HELP_SHOTS_OUT` puts a trial run

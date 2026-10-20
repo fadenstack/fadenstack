@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -39,8 +40,8 @@ export default function PiiPolicyForm({
 }: PiiPolicyFormProps) {
   const { t } = useTranslation();
   const knownEntitySet = useMemo(
-    () => new Set(options?.supported_entities ?? []),
-    [options],
+    () => new Set(options?.entity_languages?.[value.presidio.language] ?? options?.supported_entities ?? []),
+    [options, value.presidio.language],
   );
   const entities = Array.isArray(value.presidio.entities) ? value.presidio.entities : [];
   const selectedEntities = options
@@ -49,7 +50,9 @@ export default function PiiPolicyForm({
   const legacyEntities = options
     ? entities.filter((entity) => !knownEntitySet.has(entity))
     : [];
-  const availableEntities = (options?.supported_entities ?? []).filter(
+  const availableEntities = (
+    options?.entity_languages?.[value.presidio.language] ?? options?.supported_entities ?? []
+  ).filter(
     (entity) => !selectedEntities.includes(entity),
   );
   const [entityToAdd, setEntityToAdd] = useState("");
@@ -97,6 +100,9 @@ export default function PiiPolicyForm({
 
   return (
     <Stack spacing={2}>
+      {options?.source === "fallback" || options?.ready === false ? (
+        <Alert severity="warning">{t("pii_policy.form.unavailable", { defaultValue: "PII service is unavailable. These options do not confirm active protection." })}</Alert>
+      ) : null}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
           {t("pii_policy.form.telemetry")}
@@ -218,6 +224,22 @@ export default function PiiPolicyForm({
           {t("pii_policy.form.presidio")}
         </Typography>
         <Stack spacing={1.5}>
+          {options?.profile_id && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="body2">{options.profile_id} · {options.calibrated ? t("pii_policy.form.reviewed", { defaultValue: "reviewed thresholds" }) : t("pii_policy.form.unreviewed", { defaultValue: "thresholds awaiting review" })}</Typography>
+              <Button disabled={disabled || options.source !== "pii_service" || options.ready === false}
+                onClick={() => patch({ presidio: { ...value.presidio, profile_id: options.profile_id, threshold_mode: "profile" } })}>
+                {t("pii_policy.form.adopt_profile", { defaultValue: "Use installed profile defaults" })}
+              </Button>
+            </Stack>
+          )}
+          {value.presidio.profile_id && value.presidio.profile_id !== options?.profile_id && (
+            <Alert severity="warning">{t("pii_policy.form.profile_mismatch", { defaultValue: "The policy profile differs from the installed service. Protected requests will fail until a compatible profile is selected." })}</Alert>
+          )}
+          <FormControlLabel control={<Switch checked={value.presidio.threshold_mode === "profile"}
+            disabled={disabled || !value.presidio.profile_id}
+            onChange={(_, checked) => patch({ presidio: { ...value.presidio, threshold_mode: checked ? "profile" : "override" } })} />}
+            label={t("pii_policy.form.profile_thresholds", { defaultValue: "Use profile thresholds" })} />
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
             <FormControl size="small" fullWidth>
               <InputLabel>{t("pii_policy.form.language")}</InputLabel>
@@ -242,6 +264,7 @@ export default function PiiPolicyForm({
               fullWidth
               type="number"
               label={t("pii_policy.form.score_threshold")}
+              disabled={disabled || value.presidio.threshold_mode === "profile"}
               value={value.presidio.threshold}
               inputProps={{ min: 0, max: 1, step: 0.01 }}
               onChange={(event) => {
@@ -253,7 +276,6 @@ export default function PiiPolicyForm({
                   },
                 });
               }}
-              disabled={disabled}
             />
           </Stack>
 
@@ -274,6 +296,7 @@ export default function PiiPolicyForm({
                 <Chip
                   key={`legacy-${entity}`}
                   label={t("pii_policy.form.legacy_entity", { entity })}
+                  onDelete={disabled ? undefined : () => patch({ presidio: { ...value.presidio, entities: entities.filter((item) => item !== entity) } })}
                   size="small"
                   color="warning"
                   variant="outlined"

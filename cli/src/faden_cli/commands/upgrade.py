@@ -42,6 +42,7 @@ from faden_cli.core.detect import detect_docker
 from faden_cli.core.env_gen import default_env_vars, read_env_file, set_module_env, write_env_file
 from faden_cli.core.registry import MODULES
 from faden_cli.core.settings import load_config, save_config
+from faden_cli.core.pii_runtime import options as pii_options
 
 
 @click.command("upgrade")
@@ -79,6 +80,7 @@ from faden_cli.core.settings import load_config, save_config
     help="Days a chat someone deleted is kept before it is erased for good (default 30; asked when not given).",
 )
 @click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation prompt.")
+@pii_options
 def upgrade_cmd(
     *,
     no_backup: bool,
@@ -90,6 +92,11 @@ def upgrade_cmd(
     dry_run: bool,
     yes: bool,
     chat_retention_days: int | None = None,
+    pii_profile: str | None = None,
+    pii_model_dir: Path | None = None,
+    pii_gpu_id: str | None = None,
+    pii_gpu_memory_mib: int | None = None,
+    pii_cpu_threads: int | None = None,
 ) -> None:
     """Upgrade the running Fadenstack installation in place.
 
@@ -157,6 +164,8 @@ def upgrade_cmd(
 
     switching_on = default_modules(cfg)
     profiles = sorted({*(cfg.profiles or []), *(MODULES[name].profile for name in switching_on)})
+    if pii_profile is not None and "pii" not in profiles:
+        raise click.UsageError("--pii-profile requires the enabled pii module")
 
     ctx = ComposeContext(
         compose_files=compose_files,
@@ -183,6 +192,8 @@ def upgrade_cmd(
             console.print(f"  Build images:      {'skip' if no_build else 'yes'}")
         console.print(f"  Build cache:       {'no' if no_cache else 'yes'}")
         console.print(f"  Runtime images:    {runtime_images or cfg.runtime_images} (for machines)")
+        if "pii" in profiles:
+            console.print("  PII: compatibility/mode selection runs before image changes; -y keeps a compatible mode. No model download or prompt in dry-run.")
         return
 
     # ── Confirm ───────────────────────────────────────────────
@@ -302,6 +313,15 @@ def upgrade_cmd(
         # Sized again, as deploy does: what ``faden tune`` last chose.
         from faden_cli.core.tune import tune_env  # noqa: PLC0415
 
+        if "pii" in profiles:
+            from faden_cli.core.pii_runtime import deploy_step as configure_pii
+
+            try:
+                configure_pii(env_path, requested=pii_profile, model_dir=pii_model_dir,
+                              gpu_id=pii_gpu_id, gpu_mib=pii_gpu_memory_mib or int(env_vars.get("FADEN_PII_GPU_MEMORY_MIB") or 4096),
+                              threads=pii_cpu_threads, yes=yes, published=release is not None, upgrade=True)
+            except (ValueError, OSError) as exc:
+                raise click.ClickException(str(exc)) from exc
         tune_env(env_path)
         # RabbitMQ makes its users from definitions.json on every start; the
         # services log in with the passwords in .env. Written only by deploy,

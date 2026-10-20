@@ -16,8 +16,10 @@ def _proxy(sanitized: str) -> PrivacyProxy:
         return httpx.Response(
             200,
             json={
-                "entities_found": [{"type": "PERSON"}],
-                "sanitized_payload": {"messages": [{"content": sanitized}]},
+                "entities_found": 1,
+                "pii_report": [{"entity_type": "PERSON", "start": 0, "end": 12, "text": "Anna Schmidt", "score": 1.0}],
+                "contract_version": 2, "coverage_status": "complete", "profile_fingerprint": "test-profile",
+                "sanitized_payload": {"messages": [{"tool_calls": [{"function": {"arguments": json.dumps({"to": sanitized})}}]}]},
             },
         )
 
@@ -30,17 +32,17 @@ ARGS: dict[str, Any] = {"to": "Anna Schmidt"}
 
 @pytest.mark.asyncio
 async def test_redacted_json_is_sent() -> None:
-    proxy = _proxy(json.dumps({"to": "<PERSON>"}))
+    proxy = _proxy("<PERSON>")
     decision = await proxy.check(arguments=ARGS, pii_mode="redact")
     assert decision.allowed
     assert decision.sanitized_args == {"to": "<PERSON>"}
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sanitized", ['{"to": "<PERSON>', "", "[1, 2]", '"x"'])
+@pytest.mark.parametrize("sanitized", [None, [], [7], ["<PERSON>", "extra"], {"to": "<PERSON>"}])
 async def test_unparseable_redaction_is_refused(sanitized: str) -> None:
     proxy = _proxy(sanitized)
     decision = await proxy.check(arguments=ARGS, pii_mode="redact")
     assert not decision.allowed
     assert decision.sanitized_args == {}
-    assert decision.redaction_summary["reason"] == "unredactable"
+    assert decision.redaction_summary["reason"] == "check_unavailable"

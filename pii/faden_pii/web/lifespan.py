@@ -132,7 +132,17 @@ async def lifespan_setup(
     app.state.pii_service = PIIService.create(
         default_language=settings.pii_default_language,
         default_score_threshold=settings.pii_score_threshold,
+        config=settings,
     )
+    from faden_pii.services.pii.events import EventDispatcher
+    from faden_pii.web.api.pii import views as pii_views
+
+    app.state.pii_events = EventDispatcher(pii_views._log_event_async, settings)
+    from prometheus_client import REGISTRY
+    from faden_pii.services.pii.metrics import RuntimeCollector
+
+    collector = RuntimeCollector(app)
+    REGISTRY.register(collector)
 
     # ── Optional EE plugin bootstrap ─────────────────────────
     if _EE_AVAILABLE:
@@ -147,8 +157,7 @@ async def lifespan_setup(
             log.info("PII Enterprise plugin loaded successfully.")
         except SystemExit:
             log.warning(
-                "EE license validation failed for pii-pro; "
-                "running in Core-only mode.",
+                "EE license validation failed for pii-pro; running in Core-only mode.",
             )
         except Exception:
             log.exception("Failed to load PII Enterprise plugin.")
@@ -156,15 +165,23 @@ async def lifespan_setup(
 
     app.middleware_stack = app.build_middleware_stack()
 
-    yield
+    try:
+        yield
+    finally:
+        REGISTRY.unregister(collector)
+        await app.state.pii_events.close()
+        await app.state.pii_service.close()
+        if pii_views._event_client is not None:
+            await pii_views._event_client.aclose()
+            pii_views._event_client = None
 
-    # ── EE teardown ──────────────────────────────────────────
-    if _EE_AVAILABLE and getattr(app.state, "license", None) is not None:
-        try:
-            await pii_plugin.shutdown(app)
-            await teardown_ee(app)
-        except Exception:
-            log.exception("Error during PII Enterprise plugin teardown.")
-    # ──────────────────────────────────────────────────────────
+        # ── EE teardown ──────────────────────────────────────────
+        if _EE_AVAILABLE and getattr(app.state, "license", None) is not None:
+            try:
+                await pii_plugin.shutdown(app)
+                await teardown_ee(app)
+            except Exception:
+                log.exception("Error during PII Enterprise plugin teardown.")
+        # ──────────────────────────────────────────────────────────
 
-    stop_opentelemetry(app)
+        stop_opentelemetry(app)

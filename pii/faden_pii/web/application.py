@@ -62,11 +62,26 @@ def get_app() -> FastAPI:
         # directly, and warns that UJSONResponse is deprecated -- a warning
         # the tests turn into a failure.
     )
+    from fastapi.responses import JSONResponse
+    from faden_pii.services.pii.errors import PIIError
+    from faden_pii.services.pii.limits import IngressLimits
+
+    async def pii_error_handler(request, error):
+        return JSONResponse(
+            {"detail": {"code": error.code}},
+            status_code=error.status,
+            headers={"Retry-After": "1"} if error.status == 503 else None,
+        )
+
+    app.add_exception_handler(PIIError, pii_error_handler)
+    app.add_middleware(IngressLimits, settings=settings)
 
     # EE plugin routes are included FIRST so they shadow Core 402-gated
     # endpoints with enterprise implementations.
     if pii_plugin is not None:
-        app.include_router(router=pii_plugin.router(), dependencies=[Depends(verify_service_token)])
+        app.include_router(
+            router=pii_plugin.router(), dependencies=[Depends(verify_service_token)]
+        )
 
     # Main router for the API.
     app.include_router(router=api_router, prefix="/api")

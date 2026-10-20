@@ -45,6 +45,7 @@ jobs:
       cli: ${{ steps.filter.outputs.cli }}
       agent: ${{ steps.filter.outputs.agent }}
       mcp: ${{ steps.filter.outputs.mcp }}
+      pii: ${{ steps.filter.outputs.pii }}
       skills: ${{ steps.filter.outputs.skills }}
       frontend: ${{ steps.filter.outputs.frontend }}
       python: ${{ steps.filter.outputs.python }}
@@ -74,6 +75,11 @@ jobs:
               - '.github/workflows/ci.yml'
             agent:
               - 'agent/**'
+              - '.github/workflows/ci.yml'
+            pii:
+              - 'pii/**'
+              - 'gateway/faden_gateway/services/gateway/pii*'
+              - 'mcp/faden_mcp/services/privacy_proxy.py'
               - '.github/workflows/ci.yml'
             mcp:
               - 'mcp/**'
@@ -209,6 +215,26 @@ jobs:
       - run: uv sync --locked
       - run: uv run --no-sync python -m pytest -q
 
+  pii:
+    needs: changes
+    if: needs.changes.outputs.pii == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: pii
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: pii/uv.lock
+      - run: uv sync --locked
+      - run: uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+      - run: uv run --no-sync python -m pytest -q
+
   skills:
     needs: changes
     if: needs.changes.outputs.skills == 'true' || github.event_name == 'workflow_dispatch'
@@ -288,7 +314,7 @@ jobs:
   # The one check to require: it passes when every job that ran passed (a skipped job is fine).
   ci:
     if: always()
-    needs: [changes, backend, gateway, cli, agent, mcp, skills, frontend, lint]
+    needs: [changes, backend, gateway, cli, agent, mcp, pii, skills, frontend, lint]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -32,8 +32,16 @@ def _client(handler: Any) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
+def _structured(body: Any) -> Any:
+    if isinstance(body, dict) and isinstance(body.get("sanitized_payload"), dict) and "input" in body["sanitized_payload"]:
+        values = body["sanitized_payload"]["input"]
+        body = {**body, "contract_version": 2, "coverage_status": "complete", "profile_fingerprint": "test-profile",
+                "sanitized_payload": {"messages": [{"tool_calls": [{"function": {"arguments": json.dumps({"to": values[0]})}}]}]}}
+    return body
+
+
 def _answering(body: Any, status: int = 200) -> httpx.AsyncClient:
-    return _client(lambda request: httpx.Response(status, json=body))
+    return _client(lambda request: httpx.Response(status, json=_structured(body)))
 
 
 def _refused(decision: Any) -> bool:
@@ -100,7 +108,8 @@ async def test_a_non_json_answer_refuses() -> None:
 async def test_success_sends_the_redacted_arguments() -> None:
     body = {
         "entities_found": 1,
-        "sanitized_payload": {"messages": [{"content": json.dumps({"to": "<PERSON>"})}]},
+        "sanitized_payload": {"input": ["<PERSON>"]},
+        "pii_report": [{"entity_type": "PERSON", "start": 0, "end": 12, "text": "Anna Schmidt", "score": 1.0}],
     }
     proxy = PrivacyProxy(pii_base_url="http://pii", http_client=_answering(body))
     decision = await proxy.check(arguments=ARGS, pii_mode="redact")
@@ -111,7 +120,7 @@ async def test_success_sends_the_redacted_arguments() -> None:
 @pytest.mark.asyncio
 async def test_nothing_found_passes_the_arguments() -> None:
     proxy = PrivacyProxy(
-        pii_base_url="http://pii", http_client=_answering({"entities_found": 0}),
+        pii_base_url="http://pii", http_client=_answering({"entities_found": 0, "pii_report": [], "sanitized_payload": {"input": ["Anna Schmidt"]}}),
     )
     decision = await proxy.check(arguments=ARGS, pii_mode="redact")
     assert decision.allowed
@@ -121,7 +130,7 @@ async def test_nothing_found_passes_the_arguments() -> None:
 @pytest.mark.asyncio
 async def test_block_mode_blocks_found_data() -> None:
     proxy = PrivacyProxy(
-        pii_base_url="http://pii", http_client=_answering({"entities_found": 2}),
+        pii_base_url="http://pii", http_client=_answering({"entities_found": 1, "pii_report": [{"entity_type": "PERSON", "start": 0, "end": 12, "text": "Anna Schmidt", "score": 1.0}], "sanitized_payload": {"input": ["<PERSON>"]}}),
     )
     decision = await proxy.check(arguments=ARGS, pii_mode="block")
     assert not decision.allowed
@@ -263,7 +272,7 @@ async def test_the_proxy_presents_the_pii_service_token(token: str, header: str 
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json={"entities_found": [], "sanitized_payload": {}})
+        return httpx.Response(200, json=_structured({"entities_found": 0, "pii_report": [], "sanitized_payload": {"input": ["Anna Schmidt"]}}))
 
     proxy = PrivacyProxy(pii_base_url="http://pii", http_client=_client(handler), service_token=token)
     assert (await proxy.check(arguments=ARGS, pii_mode="redact")).allowed

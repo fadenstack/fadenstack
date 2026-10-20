@@ -4216,5 +4216,11 @@
       "open": "Voir les mises à jour",
       "dismiss": "Masquer jusqu'à la prochaine version"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "Le service PII est indisponible. Ces options ne confirment pas une protection active.",
+  "pii_policy.form.reviewed": "Seuils vérifiés",
+  "pii_policy.form.unreviewed": "Seuils en attente de vérification",
+  "pii_policy.form.adopt_profile": "Utiliser les valeurs du profil installé",
+  "pii_policy.form.profile_mismatch": "Le profil de la politique diffère du service installé. Les requêtes protégées échoueront tant qu’un profil compatible ne sera pas sélectionné.",
+  "pii_policy.form.profile_thresholds": "Utiliser les seuils du profil"
 }

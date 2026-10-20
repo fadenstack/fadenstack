@@ -1031,6 +1031,8 @@ class _Prepared:
 
     payload: dict[str, Any]
     egress_payload: dict[str, Any] | None = None
+    request_id: str | None = None
+    pii_scope: str = ""
     #: The media URLs the client sent, fetched by the gateway: (url, kind) -> data: URL (media_fetch.py).
     media: dict[tuple[str, str], str] = field(default_factory=dict)
     token_mapping: dict[str, str] | None = None
@@ -2214,6 +2216,9 @@ class GatewayService:
         another, so they are looked up side by side: the request waits for the
         slowest of them, not for their sum.
         """
+        req.request_id = request_id
+        import hashlib
+        req.pii_scope = hashlib.sha256(f"{auth.tenant_id}:{session_id or ''}".encode()).hexdigest()
         chat = endpoint == "/v1/chat/completions"
         payload = req.payload
         req.client_tools = {_tool_definition_name(t) for t in payload.get("tools") or []}
@@ -2505,6 +2510,8 @@ class GatewayService:
             payload=payload,
             policy=pii_policy,
             mode=pii_policy.egress.mode,
+            request_id=getattr(req, "request_id", None),
+            cache_scope=getattr(req, "pii_scope", ""),
         )
         if req is not None:
             # Types and counts only, for a notice in the UI -- never the values.
@@ -2646,6 +2653,7 @@ class GatewayService:
             result = await self.pii_client.sanitize(
                 payload=payload,
                 policy=pii_policy,
+                request_id=request_id,
                 mode="redact",  # always redact for telemetry
             )
             return result.sanitized_payload
@@ -3472,6 +3480,8 @@ class GatewayService:
                 policy=req.pii_policy,
                 mode=req.pii_policy.egress.mode,
                 token_mapping=req.token_mapping,
+                request_id=getattr(req, "request_id", None),
+                cache_scope=getattr(req, "pii_scope", ""),
             )
         except Exception:
             if req.pii_policy.egress.fail_action == "allow":

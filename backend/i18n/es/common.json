@@ -4216,5 +4216,11 @@
       "open": "Ver actualizaciones",
       "dismiss": "Ocultar hasta la próxima versión"
     }
-  }
+  },
+  "pii_policy.form.unavailable": "El servicio PII no está disponible. Estas opciones no confirman una protección activa.",
+  "pii_policy.form.reviewed": "Umbrales revisados",
+  "pii_policy.form.unreviewed": "Umbrales pendientes de revisión",
+  "pii_policy.form.adopt_profile": "Usar valores del perfil instalado",
+  "pii_policy.form.profile_mismatch": "El perfil de la política no coincide con el servicio instalado. Las solicitudes protegidas fallarán hasta que se seleccione un perfil compatible.",
+  "pii_policy.form.profile_thresholds": "Usar umbrales del perfil"
 }

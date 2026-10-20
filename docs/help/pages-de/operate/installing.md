@@ -289,6 +289,54 @@ erklärt, was dann nicht mehr gekennzeichnet wird, fragt nach einer Bestätigung
 ausgeschaltet hat; `faden upgrade` lässt es danach aus. Seine Nachweise bleiben erhalten, solange sie gebraucht
 werden, und gehen in jede Sicherung ein.
 
+## Lokale PII-Verarbeitung auf CPU oder GPU {#local-pii-on-cpu-or-gpu}
+
+Die PII-Erkennung läuft auf Ihrem Server. Bei der Einrichtung werden die gewählten Modelldateien heruntergeladen;
+Chat-Texte werden lokal verarbeitet. Der CPU-Modus benötigt keine GPU und ist langsamer, besonders bei gleichzeitigen
+Anfragen oder langen Dokumenten.
+
+![Die Frage nach dem PII-Modus mit ausgewählter CPU](../images/operate/pii-mode-choice.png)
+
+1. Führen Sie `faden doctor` aus. **Local PII** zeigt die GPU-Kompatibilität, den eingestellten Modus und das CPU-Budget.
+
+    ![Doctor zeigt den CPU-Modus ohne kompatible GPU](../images/operate/pii-doctor-cpu.png)
+
+2. Aktivieren Sie PII bei der Bereitstellung:
+
+    ```bash
+    faden deploy --modules pii
+    ```
+
+    Mit kompatibler GPU wählen Sie `cpu`, `gpu-shared` oder `gpu-dedicated`. Ohne kompatible GPU verwendet eine neue
+    PII-Installation die CPU. Die Meldung erklärt einen ungeeigneten Treiber, fehlenden GPU-Zugriff von Docker oder
+    unzureichenden freien Speicher. `legacy` behält die ältere, rein englische Erkennung bei.
+
+3. Öffnen Sie die [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) in der Konsole.
+   Prüfen und übernehmen Sie das installierte Profil ausdrücklich, wenn Sie die Erkennung wechseln. Bestehende
+   Richtlinien bleiben erhalten; ein anderes Modell ändert ihre Schutzeinstellungen nicht stillschweigend.
+
+??? info "Den Modus ohne Rückfrage wählen"
+    ```bash
+    faden deploy --modules pii --pii-profile cpu -y
+    faden deploy --modules pii --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    ```
+
+    In einer bestehenden Installation bietet `faden module enable pii` dieselben Möglichkeiten. Führen Sie danach
+    `faden up` aus. Mit `--pii-model-dir /opt/faden/pii-models/cpu` verwenden Sie ein bereits vorbereitetes Verzeichnis
+    samt Manifest, auch ohne Download bei der Einrichtung. Es muss zur ausgewählten Erkennung passen.
+
+    Der neue CPU-Modus verwendet Patronus ONNX, der GPU-Modus GLiNER2. Beide unterstützen Englisch, Deutsch,
+    Französisch und Spanisch. `gpu-shared` ist für eine gemeinsam mit anderer Software genutzte GPU gedacht.
+    `gpu-dedicated` ist für eine GPU, die Sie für PII bereithalten; die Auswahl sperrt sie nicht für andere Software.
+
+    Standardmäßig wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht im CPU-Modus und zwei im
+    GPU-Modus. `--pii-cpu-threads 2` legt die Anzahl fest. Sie wird auf die verfügbare CPU-Kapazität begrenzt, auch
+    innerhalb eines Containers. `--pii-gpu-memory-mib 4096` setzt das GPU-Speicherbudget, reserviert aber keinen
+    Speicher gegenüber anderer Software.
+
+![Doctor zeigt eine kompatible GPU und die PII-Auswahl](../images/operate/pii-doctor-gpu.png)
+
 ## Befehle für den Alltag {#everyday-commands}
 
 | Befehl | Was er tut |

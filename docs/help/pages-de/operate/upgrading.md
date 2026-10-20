@@ -222,6 +222,33 @@ curl --cacert ~/fadenstack/tls/ca.crt https://ai.example.internal/api/health   #
 
 Melden Sie sich dann an der Konsole an. Maschinen und Cluster sind wie zuvor.
 
+## Das PII-Modul aktualisieren {#upgrade-the-pii-module}
+
+Ein eingeschaltetes PII-Modul wird mit `faden upgrade` aktualisiert. Ein ausgeschaltetes bleibt aus.
+Bestehende Geheimnisse, das Modellverzeichnis und Richtlinien bleiben erhalten.
+
+1. Prüfen Sie mit `faden upgrade --dry-run` das geplante Upgrade. Dabei werden keine PII-Einstellungen geändert
+   oder Modelle heruntergeladen.
+2. Führen Sie `faden upgrade` aus. Der PII-Schritt prüft die GPU-Kompatibilität und bietet die Modusauswahl an.
+   Vorgabe ist der bisherige Modus. Auf einem CPU-Server mit älterer Installation behält `legacy` die rein
+   englische Erkennung bei; `cpu` übernimmt die mehrsprachige CPU-Erkennung.
+3. Führen Sie `faden doctor` aus und prüfen Sie das installierte Profil in den
+   [Einstellungen für personenbezogene Daten](../administer/policies.md#personal-data).
+
+`faden upgrade -y` fragt nicht nach und behält einen kompatiblen Modus bei. Kann eine installierte GLiNER2-Erkennung
+ihre GPU nicht mehr verwenden, läuft sie mit dem bisherigen Profil auf der CPU; die Verarbeitung ist langsamer.
+Ein anderes Modell wird nicht stillschweigend eingesetzt. Für einen ausdrücklichen Wechsel:
+
+```bash
+faden upgrade --pii-profile cpu
+faden upgrade --pii-profile gpu-shared
+```
+
+Nach einem Wechsel der Erkennung bleiben die gespeicherten Richtlinien erhalten. Übernehmen Sie das installierte
+Profil ausdrücklich in der Konsole. Ohne passendes Profil gilt für geschützte Anfragen die eingestellte
+Fehlerbehandlung. Schlägt ein notwendiger Download oder die Prüfung der Modelldateien fehl, stoppt das Upgrade
+vor dem Ersetzen der Dienste. Verwenden Sie ohne Download ein geprüftes `--pii-model-dir`.
+
 ## Die Agenten der Maschinen aktualisieren {#update-the-machines-agents}
 
 Ein neues Release kann einen neueren Node-Agenten erwarten, als auf den Maschinen läuft. Die Liste **Maschinen**

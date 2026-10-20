@@ -126,7 +126,12 @@ class ComposeContext:
         self.write_secret_files()
 
         cmd: list[str] = [docker, "compose"]
-        for f in self.compose_files:
+        from faden_cli.core.pii_runtime import gpu_overlay
+        files = list(self.compose_files)
+        overlay = gpu_overlay(self.env_file, self.project_dir)
+        if overlay is not None and overlay not in files:
+            files.append(overlay)
+        for f in files:
             cmd.extend(["-f", str(f)])
         if self.env_file and Path(str(self.env_file)).exists():
             cmd.extend(["--env-file", str(self.env_file)])
