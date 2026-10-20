@@ -456,10 +456,10 @@ async def test_nothing_submitted_is_logged(
 # ── The public page ────────────────────────────────────────────────────────────────
 
 
-def test_the_public_page_is_off_by_default() -> None:
+def test_the_public_page_is_on_by_default() -> None:
     by_key = registry_by_key()
     enabled = by_key[checks.PUBLIC_CHECK_ENABLED_KEY]
-    assert enabled.type == "bool" and enabled.default is False
+    assert enabled.type == "bool" and enabled.default is True
     assert enabled.category == "modules" and enabled.group == "provenance"
     contact = by_key[checks.PUBLIC_CHECK_CONTACT_KEY]
     assert contact.type == "string" and contact.default == ""
