@@ -8,6 +8,7 @@ event-log endpoints are served by the backend directly.
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 from fastapi import APIRouter, Request
@@ -73,6 +74,7 @@ async def _log_event_async(
     entity_type_counts: dict[str, int] | None = None,
     source: str = "api",
     request_id: str | None = None,
+    duration_ms: float | None = None,
 ) -> bool | None:
     """Fire-and-forget POST to the backend event-log endpoint."""
     url = _backend_event_url()
@@ -92,6 +94,7 @@ async def _log_event_async(
         "entity_type_counts": entity_type_counts,
         "source": source,
         "request_id": request_id,
+        "duration_ms": duration_ms,
     }
     try:
         response = await _get_event_client().post(
@@ -176,6 +179,7 @@ async def scan_text(
 ) -> PIIScanResponse:
     """Detect PII entities in the provided text."""
     svc = _get_pii_service(request)
+    started = time.perf_counter()
     result = await svc.scan(
         body.text,
         language=body.language,
@@ -184,6 +188,7 @@ async def scan_text(
             body.profile_id, body.threshold_mode, body.score_threshold
         ),
     )
+    duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
     # Build entity-type breakdown
     type_counts: dict[str, int] = {}
     for e in result.entities:
@@ -201,6 +206,7 @@ async def scan_text(
         entity_type_counts=type_counts or None,
         source=request.headers.get("x-pii-source", "api"),
         request_id=request.headers.get("x-request-id"),
+        duration_ms=duration_ms,
     )
     return PIIScanResponse(
         has_pii=result.has_pii,
@@ -215,6 +221,7 @@ async def scan_text(
             )
             for e in result.entities
         ],
+        duration_ms=duration_ms,
     )
 
 
@@ -225,6 +232,7 @@ async def redact_text(
 ) -> PIIRedactResponse:
     """Detect and redact PII entities from the provided text."""
     svc = _get_pii_service(request)
+    started = time.perf_counter()
     result = await svc.redact(
         body.text,
         language=body.language,
@@ -233,6 +241,7 @@ async def redact_text(
             body.profile_id, body.threshold_mode, body.score_threshold
         ),
     )
+    duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
     await _report_event(
         request,
         operation="redact",
@@ -245,10 +254,12 @@ async def redact_text(
         entities_found=result.entities_found,
         source=request.headers.get("x-pii-source", "api"),
         request_id=request.headers.get("x-request-id"),
+        duration_ms=duration_ms,
     )
     return PIIRedactResponse(
         redacted_text=result.redacted_text,
         entities_found=result.entities_found,
+        duration_ms=duration_ms,
     )
 
 
@@ -273,6 +284,7 @@ async def sanitize_payload(
             },
         )
     svc = _get_pii_service(request)
+    started = time.perf_counter()
     result = await svc.sanitize_payload(
         body.payload,
         mode=body.mode,
@@ -283,6 +295,7 @@ async def sanitize_payload(
         ),
         token_mapping=body.token_mapping,
     )
+    duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
     type_counts: dict[str, int] = {}
     for e in result.pii_report:
         type_counts[e.entity_type] = type_counts.get(e.entity_type, 0) + 1
@@ -299,6 +312,7 @@ async def sanitize_payload(
         entity_type_counts=type_counts or None,
         source=request.headers.get("x-pii-source", "api"),
         request_id=request.headers.get("x-request-id"),
+        duration_ms=duration_ms,
     )
     return PIISanitizeResponse(
         sanitized_payload=result.payload,
@@ -316,6 +330,7 @@ async def sanitize_payload(
         ],
         token_mapping=result.token_mapping,
         profile_fingerprint=svc.profile.fingerprint,
+        duration_ms=duration_ms,
     )
 
 

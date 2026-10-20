@@ -23,12 +23,14 @@ def test_cpu_preset_verifies_local_artifacts_and_retains_other_settings(tmp_path
     }
     (model / "manifest.json").write_text(json.dumps(data))
     env = tmp_path / ".env"
-    set_env_values(env, {"EXISTING_POLICY": "keep", "FADEN_PII_SERVICE_TOKEN": "fixture"})
+    set_env_values(env, {"EXISTING_POLICY": "keep", "FADEN_PII_SERVICE_TOKEN": "fixture",
+                         "FADEN_PII_ENTITY_PROFILE": "extended"})
     assert configure(env, "cpu", model)
     values = read_env_file(env)
     assert values["EXISTING_POLICY"] == "keep"
     assert values["FADEN_PII_WORKERS_COUNT"] == "1"
     assert values["FADEN_PII_BACKEND"] == "gliner-onnx"
+    assert values["FADEN_PII_ENTITY_PROFILE"] == "extended"
     assert values["FADEN_PII_BUILD_TARGET"] == "prod-cpu"
     before = env.read_text()
     assert not configure(env, None, None)
@@ -36,6 +38,8 @@ def test_cpu_preset_verifies_local_artifacts_and_retains_other_settings(tmp_path
     (model / "weights.onnx").write_bytes(b"tampered")
     with pytest.raises(ValueError, match="checksum"):
         configure(env, "cpu", model)
+    configure(env, "legacy", None)
+    assert read_env_file(env)["FADEN_PII_ENTITY_PROFILE"] == "standard"
 
 
 def test_neural_sizing_keeps_one_owner_and_reserves_more_ram():

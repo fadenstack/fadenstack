@@ -1702,7 +1702,11 @@
     "subtitle": "Was der PII-Filter in Anfragen gefunden hat, nur als Anzahlen",
     "summary": "Übersicht",
     "no_volume": "Keine Scans in diesem Zeitraum.",
-    "no_breakdown": "Noch nichts aufzuschlüsseln."
+    "no_breakdown": "Noch nichts aufzuschlüsseln.",
+    "avg_duration": "Ø Verarbeitungszeit",
+    "p95_duration": "p95 Verarbeitungszeit",
+    "p50_short": "p50",
+    "max_short": "Max."
   },
   "pii_log": {
     "title": "PII-Aktivitätsprotokoll",
@@ -1717,7 +1721,8 @@
     "col_types": "Entitätstypen",
     "col_source": "Quelle",
     "col_lang": "Sprache",
-    "no_events": "Keine PII-Ereignisse gefunden."
+    "no_events": "Keine PII-Ereignisse gefunden.",
+    "col_duration": "Dauer"
   },
   "pii_policy": {
     "system_section": "PII-Richtlinie (Systemstandard)",

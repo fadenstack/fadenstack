@@ -98,6 +98,12 @@ class Settings(BaseSettings):
         default="presidio",
         validation_alias=AliasChoices("FADEN_PII_BACKEND", "FADEN_PII_PII_BACKEND"),
     )
+    pii_entity_profile: Literal["standard", "extended"] = Field(
+        default="standard",
+        validation_alias=AliasChoices(
+            "FADEN_PII_ENTITY_PROFILE", "FADEN_PII_PII_ENTITY_PROFILE"
+        ),
+    )
     pii_execution_profile: Literal["cpu", "gpu-dedicated", "gpu-shared"] = Field(
         default="cpu",
         validation_alias=AliasChoices(
@@ -327,6 +333,8 @@ class Settings(BaseSettings):
         from faden_pii.cpu import available_threads
 
         available = available_threads()
+        if self.pii_entity_profile == "extended" and self.pii_backend == "presidio":
+            raise ValueError("Extended PII fields require a multilingual local profile")
         if "pii_cpu_threads" not in self.model_fields_set:
             self.pii_cpu_threads = min(
                 2 if self.pii_execution_profile != "cpu" else 8,

@@ -31,6 +31,7 @@ import {
   WidgetEmpty,
   type RankedBar,
 } from "~/components/dashboard/kit";
+import { fmtMs } from "~/components/dashboard/format";
 
 /** Counts by name as ranked bars, longest first, measured against the largest. */
 function ranked(counts: Record<string, number>, lang: string, color?: string): RankedBar[] {
@@ -121,7 +122,7 @@ export default function PIIDashboardPage() {
             status={status}
             skeleton={
               <StatGrid>
-                {[0, 1, 2, 3].map((i) => (
+                {[0, 1, 2, 3, 4, 5].map((i) => (
                   <Skeleton key={i} variant="rounded" height={96} />
                 ))}
               </StatGrid>
@@ -140,6 +141,25 @@ export default function PIIDashboardPage() {
                   label={t("pii_dashboard.detection_rate", "Detection Rate")}
                   value={detection == null ? null : `${(detection * 100).toFixed(1)} %`}
                   tone={detection != null && detection > 0.5 ? "error" : "default"}
+                />
+                <StatTile
+                  label={t("pii_dashboard.avg_duration", "Avg Processing Time")}
+                  value={stats.avg_duration_ms == null ? null : fmtMs(stats.avg_duration_ms, lang)}
+                  detail={
+                    stats.p50_duration_ms != null
+                      ? `${t("pii_dashboard.p50_short", "p50")} ${fmtMs(stats.p50_duration_ms, lang)}`
+                      : undefined
+                  }
+                />
+                <StatTile
+                  label={t("pii_dashboard.p95_duration", "p95 Processing Time")}
+                  value={stats.p95_duration_ms == null ? null : fmtMs(stats.p95_duration_ms, lang)}
+                  detail={
+                    stats.max_duration_ms != null
+                      ? `${t("pii_dashboard.max_short", "max")} ${fmtMs(stats.max_duration_ms, lang)}`
+                      : undefined
+                  }
+                  tone={stats.p95_duration_ms != null && stats.p95_duration_ms > 2000 ? "warning" : "default"}
                 />
               </StatGrid>
             )}

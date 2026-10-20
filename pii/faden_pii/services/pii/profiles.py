@@ -28,14 +28,16 @@ class Profile:
     threshold: float = 0.35
     thresholds: dict[str, dict[str, float]] = field(default_factory=dict)
     calibrated: bool = False
+    entity_profile: str = "standard"
 
     @property
     def id(self) -> str:
-        return {
+        name = {
             "presidio": "presidio-legacy",
             "gliner2": "gliner2-multilingual-pii",
             "gliner-onnx": "patronus-small-pii",
         }[self.backend]
+        return name if self.entity_profile == "standard" else name + "-extended-v1"
 
 
 def verify_manifest(root: Path, manifest_path: Path, backend: str) -> dict:

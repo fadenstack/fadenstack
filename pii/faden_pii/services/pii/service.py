@@ -151,6 +151,18 @@ class PIIService:
             language, self.supported_entities
         )
 
+    def default_entities(self, language):
+        supported = self.entities_for_language(language)
+        if getattr(self.config, "pii_entity_profile", "standard") == "extended":
+            # Match the common multilingual catalog, rather than silently enabling
+            # country-specific English-only recognizers in other language policies.
+            from faden_pii.services.pii.extended import EXTENDED_ENTITIES
+
+            return sorted(
+                set(DEFAULT_ENTITIES + list(EXTENDED_ENTITIES)) & set(supported)
+            )
+        return [entity for entity in DEFAULT_ENTITIES if entity in supported]
+
     def _on_reload(self, detector):
         self._analyzer = detector.analyzer
         self._batch = BatchAnalyzerEngine(analyzer_engine=detector.analyzer)
@@ -244,9 +256,7 @@ class PIIService:
     ) -> ScanResult:
         """Detect PII entities in *text*."""
         lang = language or self._default_language
-        ents = entities or [
-            e for e in DEFAULT_ENTITIES if e in self.entities_for_language(lang)
-        ]
+        ents = entities or self.default_entities(lang)
         threshold = (
             self._default_score_threshold
             if score_threshold is None
@@ -285,9 +295,7 @@ class PIIService:
     ) -> RedactResult:
         """Detect and redact PII entities in *text*."""
         lang = language or self._default_language
-        ents = entities or [
-            e for e in DEFAULT_ENTITIES if e in self.entities_for_language(lang)
-        ]
+        ents = entities or self.default_entities(lang)
         threshold = (
             self._default_score_threshold
             if score_threshold is None
@@ -349,15 +357,18 @@ class PIIService:
             )
 
         lang = language or self._default_language
-        ents = entities or [
-            e for e in DEFAULT_ENTITIES if e in self.entities_for_language(lang)
-        ]
+        ents = entities or self.default_entities(lang)
         threshold = (
             self._default_score_threshold
             if score_threshold is None
             else score_threshold
         )
-        extracted = ExtractedPayload(payload)
+        extracted = ExtractedPayload(
+            payload,
+            declared_entities=set(ents)
+            if getattr(self.config, "pii_entity_profile", "standard") == "extended"
+            else None,
+        )
         validate_units(
             [unit.text for unit in extracted.units], token_mapping, self.config
         )
@@ -385,6 +396,12 @@ class PIIService:
                 if unit.person_hint and name_value(unit.text):
                     results.append(RecognizerResult("PERSON", 0, len(unit.text), 1.0))
                     results[:] = resolve_spans(unit.text, results)
+        for unit, results in zip(extracted.units, analysis_rows, strict=True):
+            if unit.entity_hint in ents and unit.text.strip():
+                results.append(
+                    RecognizerResult(unit.entity_hint, 0, len(unit.text), 1.0)
+                )
+                results[:] = resolve_spans(unit.text, results)
         if token_mapping:
             for unit, results in zip(extracted.units, analysis_rows, strict=True):
                 for token, value in token_mapping.items():

@@ -43,7 +43,10 @@ class NeuralDetector:
             raise ValueError("The validated Patronus ONNX artifact is FP16")
         calibration = load_calibration(settings.pii_calibration_path)
         if calibration:
-            expected_profile = Profile(backend=settings.pii_backend).id
+            expected_profile = Profile(
+                backend=settings.pii_backend,
+                entity_profile=settings.pii_entity_profile,
+            ).id
             if (
                 calibration.get("profile_id") != expected_profile
                 or calibration.get("model_revision") != manifest["revision"]
@@ -182,6 +185,13 @@ class NeuralDetector:
                         supported_regions=["DE", "FR", "ES", "GB", "US"],
                     )
                 )
+            if settings.pii_entity_profile == "extended":
+                from faden_pii.services.pii.extended import ExtendedFieldsRecognizer
+
+                for lang in LANGUAGES:
+                    self.analyzer.registry.add_recognizer(
+                        ExtendedFieldsRecognizer(lang)
+                    )
             self.rules = BatchAnalyzerEngine(analyzer_engine=self.analyzer)
             identity = {
                 "manifest": manifest,
@@ -191,6 +201,7 @@ class NeuralDetector:
                 "precision": settings.pii_precision,
                 "device": self.device,
                 "rules": "presidio-local-v2",
+                "entity_profile": settings.pii_entity_profile,
                 "versions": {
                     p: importlib.metadata.version(p)
                     for p in packages + ["presidio-analyzer", "spacy"]
@@ -205,6 +216,7 @@ class NeuralDetector:
                 calibration.get("default_threshold", settings.pii_score_threshold),
                 calibration.get("thresholds", {}),
                 calibration.get("reviewed", False) is True,
+                settings.pii_entity_profile,
             )
             self.entities = sorted(
                 set(self.analyzer.get_supported_entities()) | set(LABELS.values())

@@ -175,6 +175,7 @@ def _pii_check(gpu) -> None:
             console.print(f"  [yellow]{reason}[/yellow]")
         console.print("  PII GPU mode unavailable; deploy/upgrade falls back to CPU.")
     console.print(f"  Configured PII backend: {env.get('FADEN_PII_BACKEND', 'presidio (legacy English)')}; mode: {profile}.")
+    console.print(f"  PII entity filters: {env.get('FADEN_PII_ENTITY_PROFILE', 'standard')}.")
     available = effective_threads()
     suggested = pii_threads(available, gpu=profile.startswith("gpu-"))
     console.print(f"  CPU availability: {available} thread(s); automatic PII thread budget: {suggested}.")

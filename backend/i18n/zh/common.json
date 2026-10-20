@@ -1702,7 +1702,11 @@
     "subtitle": "PII 过滤器在请求中发现的内容，仅显示计数",
     "summary": "概览",
     "no_volume": "此期间没有扫描。",
-    "no_breakdown": "暂无可细分的数据。"
+    "no_breakdown": "暂无可细分的数据。",
+    "avg_duration": "平均处理耗时",
+    "p95_duration": "p95 处理耗时",
+    "p50_short": "p50",
+    "max_short": "最大"
   },
   "pii_log": {
     "title": "PII 活动日志",
@@ -1717,7 +1721,8 @@
     "col_types": "实体类型",
     "col_source": "来源",
     "col_lang": "语言",
-    "no_events": "未找到 PII 事件。"
+    "no_events": "未找到 PII 事件。",
+    "col_duration": "耗时"
   },
   "pii_policy": {
     "system_section": "PII 策略（系统默认）",

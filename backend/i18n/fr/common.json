@@ -1845,7 +1845,11 @@
     "subtitle": "Ce que le filtre PII a trouvé dans les requêtes, en nombres uniquement",
     "summary": "Résumé",
     "no_volume": "Aucune analyse sur cette période.",
-    "no_breakdown": "Rien à détailler pour l'instant."
+    "no_breakdown": "Rien à détailler pour l'instant.",
+    "avg_duration": "Temps moyen de trait.",
+    "p95_duration": "Temps p95 de trait.",
+    "p50_short": "p50",
+    "max_short": "max."
   },
   "pii_log": {
     "title": "Journal d'activité PII",
@@ -1860,7 +1864,8 @@
     "col_types": "Types d'entités",
     "col_source": "Source",
     "col_lang": "Langue",
-    "no_events": "Aucun événement PII trouvé."
+    "no_events": "Aucun événement PII trouvé.",
+    "col_duration": "Durée"
   },
   "pii_policy": {
     "system_section": "Politique PII (par défaut système)",

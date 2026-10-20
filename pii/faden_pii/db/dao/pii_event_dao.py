@@ -35,6 +35,7 @@ class PIIEventDAO:
         entity_type_counts: dict[str, int] | None = None,
         source: str = "api",
         request_id: str | None = None,
+        duration_ms: float | None = None,
     ) -> PIIScanEvent:
         """Insert a new scan event row."""
         event = PIIScanEvent(
@@ -48,6 +49,7 @@ class PIIEventDAO:
             entity_type_counts=entity_type_counts,
             source=source,
             request_id=request_id,
+            duration_ms=duration_ms,
         )
         self.session.add(event)
         await self.session.flush()
@@ -76,11 +78,11 @@ class PIIEventDAO:
                 "daily_volume": [{"date": str, "count": int, "pii_count": int}],
             }
         """
-        base = select(PIIScanEvent)
+        filters = []
         if since:
-            base = base.where(PIIScanEvent.created_at >= since)
+            filters.append(PIIScanEvent.created_at >= since)
         if until:
-            base = base.where(PIIScanEvent.created_at <= until)
+            filters.append(PIIScanEvent.created_at <= until)
 
         # Totals
         totals_q = select(
@@ -91,13 +93,41 @@ class PIIEventDAO:
             func.coalesce(func.sum(PIIScanEvent.entities_found), 0).label(
                 "total_entities",
             ),
-        ).select_from(base.subquery())
+            func.avg(PIIScanEvent.duration_ms).label("avg_duration_ms"),
+            func.percentile_cont(0.50).within_group(PIIScanEvent.duration_ms).label(
+                "p50_duration_ms",
+            ),
+            func.percentile_cont(0.95).within_group(PIIScanEvent.duration_ms).label(
+                "p95_duration_ms",
+            ),
+            func.max(PIIScanEvent.duration_ms).label("max_duration_ms"),
+        ).where(*filters)
 
         row = (await self.session.execute(totals_q)).one()
         total_scans = row.total or 0
         total_with_pii = int(row.with_pii or 0)
         total_entities = int(row.total_entities or 0)
         detection_rate = round(total_with_pii / total_scans, 4) if total_scans else 0.0
+        avg_duration_ms = (
+            round(float(row.avg_duration_ms), 2)
+            if row.avg_duration_ms is not None
+            else None
+        )
+        p50_duration_ms = (
+            round(float(row.p50_duration_ms), 2)
+            if row.p50_duration_ms is not None
+            else None
+        )
+        p95_duration_ms = (
+            round(float(row.p95_duration_ms), 2)
+            if row.p95_duration_ms is not None
+            else None
+        )
+        max_duration_ms = (
+            round(float(row.max_duration_ms), 2)
+            if row.max_duration_ms is not None
+            else None
+        )
 
         # Operation breakdown
         op_q = (
@@ -156,6 +186,7 @@ class PIIEventDAO:
                 func.sum(
                     case((PIIScanEvent.pii_detected.is_(True), 1), else_=0),
                 ).label("pii_cnt"),
+                func.avg(PIIScanEvent.duration_ms).label("avg_duration_ms"),
             )
             .where(
                 PIIScanEvent.created_at >= effective_since,
@@ -170,6 +201,11 @@ class PIIEventDAO:
                 "date": r.day.strftime("%Y-%m-%d") if r.day else "",
                 "count": r.cnt,
                 "pii_count": int(r.pii_cnt or 0),
+                "avg_duration_ms": (
+                    round(float(r.avg_duration_ms), 2)
+                    if r.avg_duration_ms is not None
+                    else None
+                ),
             }
             for r in daily_rows
         ]
@@ -179,6 +215,10 @@ class PIIEventDAO:
             "total_with_pii": total_with_pii,
             "total_entities": total_entities,
             "detection_rate": detection_rate,
+            "avg_duration_ms": avg_duration_ms,
+            "p50_duration_ms": p50_duration_ms,
+            "p95_duration_ms": p95_duration_ms,
+            "max_duration_ms": max_duration_ms,
             "entity_type_breakdown": dict(entity_counter),
             "operation_breakdown": operation_breakdown,
             "source_breakdown": source_breakdown,

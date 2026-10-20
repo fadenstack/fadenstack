@@ -375,6 +375,7 @@ async def list_pii_events(
                 "entity_type_counts": e.entity_type_counts,
                 "source": e.source,
                 "request_id": e.request_id,
+                "duration_ms": e.duration_ms,
             }
             for e in items
         ],
@@ -397,6 +398,7 @@ class PIIEventLogRequest(BaseModel):
     entity_type_counts: dict[str, int] | None = None
     source: str = "api"
     request_id: str | None = None
+    duration_ms: float | None = Field(default=None, ge=0.0)
 
 
 @router.post("/events/log", name="pii_event_log", dependencies=[Depends(require_internal_token)])
@@ -419,5 +421,6 @@ async def log_pii_event(
         entity_type_counts=body.entity_type_counts,
         source=body.source,
         request_id=body.request_id,
+        duration_ms=body.duration_ms,
     )
     return {"id": str(event.id)}

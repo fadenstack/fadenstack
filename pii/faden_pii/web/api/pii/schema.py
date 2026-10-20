@@ -45,6 +45,7 @@ class PIIScanResponse(BaseModel):
 
     has_pii: bool
     entities: list[DetectedEntityDTO]
+    duration_ms: float | None = None
 
 
 class PIIRedactRequest(BaseModel):
@@ -74,6 +75,7 @@ class PIIRedactResponse(BaseModel):
 
     redacted_text: str
     entities_found: int
+    duration_ms: float | None = None
 
 
 # ---------------------------------------------------------------
@@ -131,6 +133,7 @@ class PIISanitizeResponse(BaseModel):
     contract_version: int = 2
     coverage_status: str = "complete"
     profile_fingerprint: str = "presidio-v2"
+    duration_ms: float | None = None
 
 
 class PIIDetokenizeRequest(BaseModel):
@@ -188,6 +191,7 @@ class DailyVolumeDTO(BaseModel):
     date: str
     count: int
     pii_count: int
+    avg_duration_ms: float | None = None
 
 
 class PIIStatsResponse(BaseModel):
@@ -197,6 +201,10 @@ class PIIStatsResponse(BaseModel):
     total_with_pii: int
     total_entities: int
     detection_rate: float
+    avg_duration_ms: float | None = None
+    p50_duration_ms: float | None = None
+    p95_duration_ms: float | None = None
+    max_duration_ms: float | None = None
     entity_type_breakdown: dict[str, int]
     operation_breakdown: dict[str, int]
     source_breakdown: dict[str, int]
@@ -217,6 +225,7 @@ class PIIEventDTO(BaseModel):
     entity_type_counts: dict[str, int] | None = None
     source: str
     request_id: str | None = None
+    duration_ms: float | None = None
 
 
 class PIIEventsResponse(BaseModel):

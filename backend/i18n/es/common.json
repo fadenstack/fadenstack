@@ -1702,7 +1702,11 @@
     "subtitle": "Lo que el filtro PII encontró en las solicitudes, solo como recuentos",
     "summary": "Resumen",
     "no_volume": "No hay análisis en este periodo.",
-    "no_breakdown": "Aún no hay nada que desglosar."
+    "no_breakdown": "Aún no hay nada que desglosar.",
+    "avg_duration": "Tiempo medio de proc.",
+    "p95_duration": "Tiempo p95 de proc.",
+    "p50_short": "p50",
+    "max_short": "máx."
   },
   "pii_log": {
     "title": "Registro de Actividad PII",
@@ -1717,7 +1721,8 @@
     "col_types": "Tipos de Entidad",
     "col_source": "Fuente",
     "col_lang": "Idioma",
-    "no_events": "No se encontraron eventos PII."
+    "no_events": "No se encontraron eventos PII.",
+    "col_duration": "Duración"
   },
   "pii_policy": {
     "system_section": "Politica PII (Predeterminada del Sistema)",

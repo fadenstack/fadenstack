@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchPIIEvents, type PIIEvent, type PIIEventsPage } from "~/api/pii";
+import { fmtMs } from "~/components/dashboard/format";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -57,7 +58,7 @@ function entityChips(counts: Record<string, number> | null) {
 }
 
 export default function PIIActivityLogPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
 
   const [data, setData] = useState<PIIEventsPage | null>(null);
@@ -152,6 +153,7 @@ export default function PIIActivityLogPage() {
                   <TableCell>{t("pii_log.col_mode", "Mode")}</TableCell>
                   <TableCell align="center">{t("pii_log.col_pii", "PII?")}</TableCell>
                   <TableCell align="right">{t("pii_log.col_entities", "Entities")}</TableCell>
+                  <TableCell align="right">{t("pii_log.col_duration", "Duration")}</TableCell>
                   <TableCell>{t("pii_log.col_types", "Entity Types")}</TableCell>
                   <TableCell>{t("pii_log.col_source", "Source")}</TableCell>
                   <TableCell>{t("pii_log.col_lang", "Lang")}</TableCell>
@@ -160,7 +162,7 @@ export default function PIIActivityLogPage() {
               <TableBody>
                 {data.items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={9} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 4 }}>
                         {t("pii_log.no_events", "No PII events found.")}
                       </Typography>
@@ -187,6 +189,9 @@ export default function PIIActivityLogPage() {
                       <Typography variant="body2" fontWeight={ev.entities_found > 0 ? 700 : 400}>
                         {ev.entities_found}
                       </Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                      {ev.duration_ms != null ? fmtMs(ev.duration_ms, i18n.language) : "—"}
                     </TableCell>
                     <TableCell>{entityChips(ev.entity_type_counts)}</TableCell>
                     <TableCell>

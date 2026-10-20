@@ -11,6 +11,7 @@ export interface DailyVolume {
   date: string;
   count: number;
   pii_count: number;
+  avg_duration_ms?: number | null;
 }
 
 export interface PIIStats {
@@ -18,6 +19,10 @@ export interface PIIStats {
   total_with_pii: number;
   total_entities: number;
   detection_rate: number;
+  avg_duration_ms?: number | null;
+  p50_duration_ms?: number | null;
+  p95_duration_ms?: number | null;
+  max_duration_ms?: number | null;
   entity_type_breakdown: Record<string, number>;
   operation_breakdown: Record<string, number>;
   source_breakdown: Record<string, number>;
@@ -36,6 +41,7 @@ export interface PIIEvent {
   entity_type_counts: Record<string, number> | null;
   source: string;
   request_id: string | null;
+  duration_ms?: number | null;
 }
 
 export interface PIIEventsPage {

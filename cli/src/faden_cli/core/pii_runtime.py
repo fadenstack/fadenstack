@@ -47,6 +47,7 @@ def configure(
     if profile == "legacy":
         values.update(
             FADEN_PII_BACKEND="presidio",
+            FADEN_PII_ENTITY_PROFILE="standard",
             FADEN_PII_EXECUTION_PROFILE="cpu",
             FADEN_PII_BUILD_TARGET="prod",
             FADEN_PII_IMAGE="",

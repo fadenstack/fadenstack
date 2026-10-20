@@ -18,6 +18,7 @@ class TextUnit:
     parent: Any
     key: Any
     person_hint: bool = False
+    entity_hint: str | None = None
 
     @property
     def text(self) -> str:
@@ -89,7 +90,11 @@ def name_question(message: Any) -> bool:
 
 
 def string_leaves(
-    value: Any, path: str = "", depth: int = 0, budget: list[int] | None = None
+    value: Any,
+    path: str = "",
+    depth: int = 0,
+    budget: list[int] | None = None,
+    declared_entities: set[str] | None = None,
 ) -> list[TextUnit]:
     """Return string values, never JSON keys or numeric/boolean values."""
     if depth > 64:
@@ -101,15 +106,29 @@ def string_leaves(
     units = []
     if isinstance(value, dict):
         for key, child in value.items():
+            entity = None
+            if declared_entities:
+                from faden_pii.services.pii.extended import declared_entity
+
+                hint = declared_entity(key)
+                entity = hint if hint in declared_entities else None
+            if entity and child is not None and not isinstance(child, str):
+                # Changing a tool's scalar type can invalidate its schema. Refuse
+                # rather than forwarding an unmasked sensitive numeric/container value.
+                raise PIIError("pii_unsupported_sensitive_value", 422)
             if isinstance(child, str):
                 budget[1] += 1
                 if budget[1] > 256:
                     raise PIIError("pii_input_too_large", 413)
                 units.append(
-                    TextUnit(f"{path}/{key}", value, key, declares_person(key))
+                    TextUnit(f"{path}/{key}", value, key, declares_person(key), entity)
                 )
             elif isinstance(child, (dict, list)):
-                units.extend(string_leaves(child, f"{path}/{key}", depth + 1, budget))
+                units.extend(
+                    string_leaves(
+                        child, f"{path}/{key}", depth + 1, budget, declared_entities
+                    )
+                )
     elif isinstance(value, list):
         for key, child in enumerate(value):
             if isinstance(child, str):
@@ -118,14 +137,20 @@ def string_leaves(
                     raise PIIError("pii_input_too_large", 413)
                 units.append(TextUnit(f"{path}/{key}", value, key))
             elif isinstance(child, (dict, list)):
-                units.extend(string_leaves(child, f"{path}/{key}", depth + 1, budget))
+                units.extend(
+                    string_leaves(
+                        child, f"{path}/{key}", depth + 1, budget, declared_entities
+                    )
+                )
     return units
 
 
 class ExtractedPayload:
     """A copy, ordered text leaves and deferred JSON serialization."""
 
-    def __init__(self, payload: dict[str, Any]) -> None:
+    def __init__(
+        self, payload: dict[str, Any], *, declared_entities: set[str] | None = None
+    ) -> None:
         # Check nesting before deepcopy can recurse into an untrusted shape.
         stack = [(payload, 0)]
         containers = 0
@@ -147,6 +172,7 @@ class ExtractedPayload:
                     (v, depth + 1) for v in value if isinstance(v, (dict, list))
                 )
         self.payload = deepcopy(payload)
+        self.declared_entities = declared_entities
         self.units: list[TextUnit] = []
         self.arguments: list[tuple[dict, str, Any]] = []
         if any(key in self.payload for key in ("prompt", "query", "documents")):
@@ -225,7 +251,7 @@ class ExtractedPayload:
             raise PIIError("pii_invalid_tool_arguments") from error
         if not isinstance(value, (dict, list)):
             raise PIIError("pii_invalid_tool_arguments")
-        units = string_leaves(value, path)
+        units = string_leaves(value, path, declared_entities=self.declared_entities)
         if len(self.units) + len(units) > 256:
             raise PIIError("pii_input_too_large", 413)
         self.units.extend(units)
