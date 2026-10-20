@@ -145,6 +145,9 @@ async def get_policy_options(request: Request) -> PIIPolicyOptionsResponse:
         if service is not None and hasattr(service, "supported_entities")
         else list(DEFAULT_ENTITIES),
         supported_languages=languages,
+        detector=getattr(
+            getattr(getattr(service, "runtime", None), "detector", None), "metadata", {}
+        ),
         supported_sanitize_modes=["redact", "tokenize"],
         default_language=settings.pii_default_language,
         default_score_threshold=service.profile.threshold

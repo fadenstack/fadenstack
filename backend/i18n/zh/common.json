@@ -4227,5 +4227,6 @@
   "pii_policy.form.unreviewed": "阈值待审核",
   "pii_policy.form.adopt_profile": "使用已安装配置的默认值",
   "pii_policy.form.profile_mismatch": "策略配置与已安装的服务不匹配。选择兼容配置之前，受保护的请求将失败。",
-  "pii_policy.form.profile_thresholds": "使用配置中的阈值"
+  "pii_policy.form.profile_thresholds": "使用配置中的阈值",
+  "pii_policy.form.installed_detector": "已安装的检测器"
 }

@@ -292,14 +292,15 @@ werden, und gehen in jede Sicherung ein.
 ## Lokale PII-Verarbeitung auf CPU oder GPU {#local-pii-on-cpu-or-gpu}
 
 Die PII-Erkennung läuft auf Ihrem Server. Bei der Einrichtung werden die gewählten Modelldateien heruntergeladen;
-Chat-Texte werden lokal verarbeitet. Der CPU-Modus benötigt keine GPU und ist langsamer, besonders bei gleichzeitigen
-Anfragen oder langen Dokumenten.
+Chat-Texte werden lokal verarbeitet. Die CPU-Verarbeitung ist langsamer, besonders bei gleichzeitigen Anfragen
+oder langen Dokumenten.
 
-![Die Frage nach dem PII-Modus mit ausgewählter CPU](../images/operate/pii-mode-choice.png)
+![Die Auswahl von PII-Sprachpaket, Erkennung und Ausführungsmodus](../images/operate/pii-mode-choice.png)
 
-1. Führen Sie `faden doctor` aus. **Local PII** zeigt die GPU-Kompatibilität, den eingestellten Modus und das CPU-Budget.
+1. Führen Sie `faden doctor` aus. **Local PII** zeigt GPU-Kompatibilität, installierte Erkennung, Inhaltssprachen,
+   Ausführungsmodus und CPU-Threadbudget.
 
-    ![Doctor zeigt den CPU-Modus ohne kompatible GPU](../images/operate/pii-doctor-cpu.png)
+    ![Doctor zeigt die installierte Erkennung und das Sprachpaket auf einem CPU-Server](../images/operate/pii-doctor-cpu.png)
 
 2. Aktivieren Sie PII bei der Bereitstellung:
 
@@ -307,35 +308,51 @@ Anfragen oder langen Dokumenten.
     faden deploy --modules pii
     ```
 
-    Mit kompatibler GPU wählen Sie `cpu`, `gpu-shared` oder `gpu-dedicated`. Ohne kompatible GPU verwendet eine neue
-    PII-Installation die CPU. Die Meldung erklärt einen ungeeigneten Treiber, fehlenden GPU-Zugriff von Docker oder
-    unzureichenden freien Speicher. `legacy` behält die ältere, rein englische Erkennung bei.
+    Wählen Sie Inhaltssprachpaket, Erkennung und Ausführungsmodus. Vorgabe ist `europe-west-v1`
+    (Englisch, Deutsch, Französisch und Spanisch). `auto` wählt die empfohlene lokale Erkennung, derzeit
+    `patronus-onnx-v1`, mit CPU-Ausführung. Eine kompatible GPU erlaubt die GPU-Ausführung von `gliner2-multi-v1`.
+    Ohne kompatible GPU erfolgt die Verarbeitung auf der CPU; die gewählte Erkennung bleibt erhalten.
 
 3. Öffnen Sie die [Richtlinie für personenbezogene Daten](../administer/policies.md#personal-data) in der Konsole.
-   Prüfen und übernehmen Sie das installierte Profil ausdrücklich, wenn Sie die Erkennung wechseln. Bestehende
-   Richtlinien bleiben erhalten; ein anderes Modell ändert ihre Schutzeinstellungen nicht stillschweigend.
+   Prüfen Sie das installierte Profil, wählen Sie seine Sprache und übernehmen Sie es nach einem Wechsel der
+   Erkennung oder des Sprachpakets. Bisherige Richtlinieneinstellungen bleiben erhalten. Nicht aufgeführte
+   Sprachen werden abgelehnt und niemals stillschweigend als Englisch behandelt.
 
-??? info "Den Modus ohne Rückfrage wählen"
+??? info "Inhaltssprachen und Erkennung wählen"
+    | Sprachpaket | Zulässige Richtliniensprachen |
+    |---|---|
+    | `europe-west-v1` | `en`, `de`, `fr`, `es` |
+    | `english-v1` | `en` |
+    | `german-v1` | `de` |
+    | `french-v1` | `fr` |
+    | `spanish-v1` | `es` |
+
+    Wählen Sie die Sprachen Ihrer Inhalte. Ein Paket leitet keine Nationalität einer Person ab. Weitere Sprachen
+    werden derzeit nicht angeboten. Ein einsprachiges Paket erfordert passende Sprachen in Ihren Richtlinien.
+
     ```bash
-    faden deploy --modules pii --pii-profile cpu -y
-    faden deploy --modules pii --pii-profile gpu-shared -y
-    faden deploy --modules pii --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    faden deploy --modules pii --pii-locale german-v1 --pii-model auto --pii-profile cpu -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-dedicated --pii-gpu-id 0 -y
     ```
 
-    In einer bestehenden Installation bietet `faden module enable pii` dieselben Möglichkeiten. Führen Sie danach
-    `faden up` aus. Mit `--pii-model-dir /opt/faden/pii-models/cpu` verwenden Sie ein bereits vorbereitetes Verzeichnis
-    samt Manifest, auch ohne Download bei der Einrichtung. Es muss zur ausgewählten Erkennung passen.
+    `patronus-onnx-v1` unterstützt CPU-Ausführung. `gliner2-multi-v1` unterstützt CPU und kompatible NVIDIA-GPUs.
+    Die GPU-Auswahl wechselt die Erkennung nicht automatisch. `legacy` behält die ältere rein englische Option bei.
 
-    Der neue CPU-Modus verwendet Patronus ONNX, der GPU-Modus GLiNER2. Beide unterstützen Englisch, Deutsch,
-    Französisch und Spanisch. `gpu-shared` ist für eine gemeinsam mit anderer Software genutzte GPU gedacht.
-    `gpu-dedicated` ist für eine GPU, die Sie für PII bereithalten; die Auswahl sperrt sie nicht für andere Software.
+    In einer bestehenden Installation bietet `faden module enable pii` dieselben Optionen. Führen Sie danach
+    `faden up` aus. Mit `--pii-model-dir /opt/faden/pii-models/cpu` geben Sie ein bereits bereitgestelltes
+    Verzeichnis mit Manifest an, auch für die Offline-Einrichtung. Es muss zur gewählten Erkennung passen.
+    Nur diese Erkennung wird heruntergeladen; bisherige Modellverzeichnisse bleiben für eine Rückkehr erhalten.
 
-    Standardmäßig wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht im CPU-Modus und zwei im
-    GPU-Modus. `--pii-cpu-threads 2` legt die Anzahl fest. Sie wird auf die verfügbare CPU-Kapazität begrenzt, auch
-    innerhalb eines Containers. `--pii-gpu-memory-mib 4096` setzt das GPU-Speicherbudget, reserviert aber keinen
-    Speicher gegenüber anderer Software.
+??? info "CPU-Threads und GPU-Speicher"
+    `gpu-shared` ist für eine GPU vorgesehen, die auch andere Software nutzt. `gpu-dedicated` ist für eine GPU,
+    die Sie für PII freihalten. Die Auswahl sperrt andere Software nicht aus.
 
-![Doctor zeigt eine kompatible GPU und die PII-Auswahl](../images/operate/pii-doctor-gpu.png)
+    Automatisch wird ein Viertel der verfügbaren CPU-Threads verwendet, höchstens acht bei CPU- und zwei bei
+    GPU-Ausführung. `--pii-cpu-threads 2` setzt eine ausdrückliche Anzahl. Beim Start gelten auch CPU-Limits
+    des Containers. `--pii-gpu-memory-mib 4096` begrenzt die Speicherzuteilung; andere Software erhält keine Reservierungssperre.
+    Für den PII-Container gilt zusätzlich ein Host-RAM-Limit von 4 GiB. `FADEN_PII_MEMORY_LIMIT` in `.env`
+    ändert dieses Limit; führen Sie danach `faden up` aus. Host-RAM und GPU-Speicher sind getrennte Budgets.
 
 ### Erweiterte PII-Felder {#extended-pii-fields}
 

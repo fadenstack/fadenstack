@@ -101,6 +101,9 @@ Eine **Mandantenrichtlinie** ersetzt die Standardrichtlinie für einen Mandanten
 
 ### Ein installiertes Erkennungsprofil übernehmen {#adopt-an-installed-detector-profile}
 
+**Installierte Erkennung** zeigt Modell, Inhaltssprachpaket und Ausführungsmodus. Angeboten werden nur
+die installierten Sprachen des Pakets. Prüfen Sie nach einem Paketwechsel jede betroffene Richtlinie.
+
 Wenn Ihr Betreiber die Erkennung oder den Filtersatz ändert, prüfen Sie die Standardrichtlinie und die
 Mandanten-Overrides, die das Profil verwenden sollen:
 

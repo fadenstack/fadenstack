@@ -40,3 +40,15 @@ def test_upgrade_dry_run_does_not_prompt_download_or_write_pii(older_install, mo
     assert result.exit_code == 0, result.output
     assert "PII:" in result.output
     assert (older_install / ".env").read_bytes() == before
+
+
+def test_old_gpu_to_cpu_migration_is_described_truthfully_in_dry_run(older_install):
+    config = older_install.parent / "faden.yaml"
+    config.write_text(config.read_text().replace("profiles: [mcp]", "profiles: [pii, mcp]"))
+    env = older_install / ".env"
+    set_env_values(env, {"FADEN_PII_BACKEND": "gliner2", "FADEN_PII_EXECUTION_PROFILE": "gpu-shared"})
+    before = env.read_bytes()
+    result = CliRunner().invoke(upgrade.upgrade_cmd, ["--dry-run", "--pii-profile", "cpu"])
+    assert result.exit_code == 0, result.output
+    assert "PII detector: patronus-onnx-v1" in result.output
+    assert env.read_bytes() == before

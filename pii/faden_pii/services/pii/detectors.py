@@ -12,14 +12,15 @@ from presidio_analyzer.nlp_engine import NlpEngineProvider
 from faden_pii.services.pii.errors import PIIError
 from faden_pii.services.pii.spans import validate_spans
 from faden_pii.services.pii.profiles import (
-    LABELS,
     LANGUAGES,
     Profile,
     pipeline_sources,
     load_calibration,
     verify_manifest,
+    verify_calibration,
 )
 from faden_pii.services.pii.windowing import Window, windows
+from faden_pii.catalog import catalog, selection
 
 _GREETING_PREFIX_RE = re.compile(
     r"^(?:hi|hello|hey|yo|sup|hallo|moin|servus|bonjour|salut|coucou|bonsoir|hola|buenas)[\s,!.:;-]+",
@@ -158,6 +159,23 @@ class NeuralDetector:
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.settings = settings
+        self.model_id, self.model_entry, self.locale_pack, self.pack = selection(
+            settings.pii_backend, settings.pii_model_id, settings.pii_locale_pack
+        )
+        self.languages = tuple(self.pack["languages"])
+        self.labels = self.model_entry["labels"]
+        self.metadata = {
+            "model_id": self.model_id,
+            "repository": self.model_entry["repository"],
+            "revision": self.model_entry["revision"],
+            "adapter_version": self.model_entry["adapter_version"],
+            "locale_pack": self.locale_pack,
+            "installed_languages": list(self.languages),
+            "qualified_languages": self.model_entry["languages"],
+            "catalog_version": catalog()["version"],
+            "rules_version": catalog()["rules_version"],
+            "execution": settings.pii_execution_profile,
+        }
         self.lock = None
         if settings.pii_model_path is None or settings.pii_manifest_path is None:
             raise ValueError(
@@ -172,16 +190,15 @@ class NeuralDetector:
         ):
             raise ValueError("The validated Patronus ONNX artifact is FP16")
         calibration = load_calibration(settings.pii_calibration_path)
-        if calibration:
-            expected_profile = Profile(
+        verify_calibration(
+            calibration,
+            Profile(
                 backend=settings.pii_backend,
                 entity_profile=settings.pii_entity_profile,
-            ).id
-            if (
-                calibration.get("profile_id") != expected_profile
-                or calibration.get("model_revision") != manifest["revision"]
-            ):
-                raise ValueError("Calibration does not match the pinned PII profile")
+                locale_pack=self.locale_pack,
+            ),
+            manifest["revision"],
+        )
         self.device = (
             "cpu" if settings.pii_execution_profile == "cpu" else settings.pii_device
         )
@@ -226,7 +243,7 @@ class NeuralDetector:
                     if self.device == "cpu":
                         raise ValueError("GLiNER2 FP16 requires CUDA")
                     self.model.quantize()
-                schema = self.model.create_schema().entities(list(LABELS))
+                schema = self.model.create_schema().entities(list(self.labels))
                 self.schema = self.model._build_schema_dicts_and_metadata([schema])[0][
                     0
                 ]
@@ -326,13 +343,17 @@ class NeuralDetector:
             identity = {
                 "manifest": manifest,
                 "calibration": calibration,
-                "labels": LABELS,
+                "labels": self.labels,
                 "nlp": settings.pii_nlp_models,
                 "precision": settings.pii_precision,
                 "device": self.device,
                 "rules": "presidio-local-v2",
                 "pipeline_sources": pipeline_sources(),
                 "entity_profile": settings.pii_entity_profile,
+                "catalog_version": catalog()["version"],
+                "model_id": self.model_id,
+                "locale_pack": self.locale_pack,
+                "languages": self.languages,
                 "versions": {
                     p: importlib.metadata.version(p)
                     for p in packages + ["presidio-analyzer", "spacy"]
@@ -343,21 +364,22 @@ class NeuralDetector:
                 hashlib.sha256(
                     json.dumps(identity, sort_keys=True).encode()
                 ).hexdigest(),
-                LANGUAGES,
+                self.languages,
                 calibration.get("default_threshold", settings.pii_score_threshold),
                 calibration.get("thresholds", {}),
                 calibration.get("reviewed", False) is True,
                 settings.pii_entity_profile,
+                self.locale_pack,
             )
             self.entities = sorted(
-                set(self.analyzer.get_supported_entities()) | set(LABELS.values())
+                set(self.analyzer.get_supported_entities()) | set(self.labels.values())
             )
             self.entity_languages = {
                 lang: sorted(
                     set(self.analyzer.get_supported_entities(language=lang))
-                    | set(LABELS.values())
+                    | set(self.labels.values())
                 )
-                for lang in LANGUAGES
+                for lang in self.languages
             }
             if any(
                 entity not in self.entity_languages[language]
@@ -377,6 +399,8 @@ class NeuralDetector:
             ("fr", "Mon prénom est Camille.", "Camille"),
             ("es", "Mi nombre es María.", "María"),
         ]:
+            if language not in self.languages:
+                continue
             threshold = self.profile.thresholds.get(language, {}).get(
                 "PERSON", self.profile.threshold
             )
@@ -403,7 +427,7 @@ class NeuralDetector:
             return int(batch.input_ids.shape[1])
         processor = self.model.data_processor
         words = [word for word, _, _ in processor.words_splitter(text)]
-        inputs, _ = processor.prepare_inputs([words], list(LABELS))
+        inputs, _ = processor.prepare_inputs([words], list(self.labels))
         return len(
             processor.transformer_tokenizer(
                 inputs, is_split_into_words=True, truncation=False
@@ -443,7 +467,7 @@ class NeuralDetector:
             if self.settings.pii_backend == "gliner2":
                 rows = self.model.batch_extract_entities(
                     texts,
-                    list(LABELS),
+                    list(self.labels),
                     batch_size=len(texts),
                     threshold=threshold,
                     include_spans=True,
@@ -460,7 +484,7 @@ class NeuralDetector:
             else:
                 rows = self.model.inference(
                     texts,
-                    list(LABELS),
+                    list(self.labels),
                     batch_size=len(texts),
                     threshold=threshold,
                     flat_ner=False,
@@ -495,7 +519,7 @@ class NeuralDetector:
                     or text[start:end] != expected
                 ):
                     raise PIIError("pii_invalid_detector_result", 503)
-                kind = LABELS[value["label"]]
+                kind = self.labels[value["label"]]
                 cleaned = _clean_neural_span(text, start, end, kind)
                 if cleaned is None:
                     continue
@@ -517,7 +541,13 @@ class NeuralDetector:
         # Rules are prepared separately in each request's language. The neural
         # schema is identical across languages, so compatible requests can share
         # a forward without splitting the available batch capacity by locale.
-        return tuple(options["entities"]), options["score_threshold"]
+        return (
+            self.model_id,
+            self.locale_pack,
+            tuple(self.labels.items()),
+            tuple(options["entities"]),
+            options["score_threshold"],
+        )
 
     def close(self):
         try:

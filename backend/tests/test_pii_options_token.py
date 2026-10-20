@@ -15,7 +15,8 @@ class _Recorder:
 
     async def get(self, url: str, *, headers: dict[str, str] | None = None, timeout: float = 0) -> httpx.Response:
         self.headers = headers
-        return httpx.Response(200, json={"supported_entities": ["PERSON"]}, request=httpx.Request("GET", url))
+        return httpx.Response(200, json={"supported_entities": ["PERSON"],
+            "detector": {"model_id": "patronus-onnx-v1", "locale_pack": "german-v1", "installed_languages": ["de"]}}, request=httpx.Request("GET", url))
 
 
 @pytest.mark.anyio
@@ -30,4 +31,6 @@ async def test_options_are_asked_for_with_the_service_token(
     result = await views.get_pii_config_options()
 
     assert result["source"] == "pii_service"
+    assert result["detector"]["locale_pack"] == "german-v1"
+    assert result["detector"]["installed_languages"] == ["de"]
     assert recorder.headers == expected

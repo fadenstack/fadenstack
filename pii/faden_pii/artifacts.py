@@ -7,19 +7,11 @@ import json
 from pathlib import Path
 import shutil
 
-from faden_pii.services.pii.profiles import GLINER2_REVISION, ONNX_REVISION
+from faden_pii.catalog import catalog
 
 MODELS = {
-    "gliner2": (
-        "fastino/gliner2-privacy-filter-PII-multi",
-        GLINER2_REVISION,
-        ["*.json", "*.safetensors", "*.model", "*.txt", "encoder_config/*", "LICENSE*"],
-    ),
-    "gliner-onnx": (
-        "patronus-studio/gliner_small-v2.5-edge",
-        ONNX_REVISION,
-        ["*.json", "*.model", "onnx/fp16/*", "LICENSE*", "tokenizer*"],
-    ),
+    entry["adapter"]: (entry["repository"], entry["revision"], entry["patterns"])
+    for entry in catalog()["models"].values()
 }
 
 

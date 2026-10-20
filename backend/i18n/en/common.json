@@ -4225,5 +4225,6 @@
   "pii_policy.form.unreviewed": "Thresholds awaiting review",
   "pii_policy.form.adopt_profile": "Use installed profile defaults",
   "pii_policy.form.profile_mismatch": "The policy profile differs from the installed service. Protected requests will fail until a compatible profile is selected.",
-  "pii_policy.form.profile_thresholds": "Use profile thresholds"
+  "pii_policy.form.profile_thresholds": "Use profile thresholds",
+  "pii_policy.form.installed_detector": "Installed detector"
 }

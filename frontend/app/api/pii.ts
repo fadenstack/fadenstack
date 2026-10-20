@@ -77,6 +77,14 @@ export interface PIIPolicyOptionsResponse {
   profile_fingerprint?: string | null;
   calibrated?: boolean;
   entity_languages?: Record<string, string[]>;
+  detector?: {
+    model_id?: string;
+    locale_pack?: string;
+    execution?: string;
+    installed_languages?: string[];
+    qualified_languages?: string[];
+    revision?: string;
+  };
   supported_surfaces?: string[];
   supported_entities: string[];
   supported_languages: string[];

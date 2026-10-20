@@ -18,8 +18,12 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from faden_cli.core.console import console, error, info, warning
+
+if TYPE_CHECKING:
+    from faden_cli.core.settings import FadenConfig
 
 
 # ── GPU detection ─────────────────────────────────────────────────
@@ -246,6 +250,14 @@ def up(
             "writes the ones an install lacks (Help, Installing, Secrets in .env)."
         )
         return 1
+    if "pii" in ctx.profiles and not build and (services is None or "faden-pii" in services):
+        from faden_cli.core.pii_runtime import warm_candidate
+
+        try:
+            warm_candidate(ctx)
+        except ValueError as exc:
+            error(str(exc))
+            return 1
     cmd = ctx.base_cmd() + ["up"]
     if detach:
         cmd.append("-d")

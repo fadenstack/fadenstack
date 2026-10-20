@@ -210,6 +210,12 @@ Then sign in to the console. The machines and clusters are as they were.
 
 ## Upgrade the PII module
 
+The resolved detector, pinned revision and locale pack are retained during upgrades, including `-y`.
+A new recommendation does not replace the installed model. Use `--pii-model auto` to select the current
+recommendation explicitly, or `--pii-locale german-v1` to restrict content languages. Changing execution
+with `--pii-profile cpu` preserves a catalog-configured detector. For older installations without a saved
+detector ID, that explicit CPU option retains its previous meaning: migrate to Patronus ONNX.
+
 An enabled PII module is included in `faden upgrade`. A disabled module stays disabled. Its existing secrets,
 model directory and policies are kept.
 
@@ -224,8 +230,8 @@ cannot use its GPU, it runs on CPU with its existing profile; CPU processing is 
 switch an existing detector to another model. To change explicitly:
 
 ```bash
-faden upgrade --pii-profile cpu
-faden upgrade --pii-profile gpu-shared
+faden upgrade --pii-model patronus-onnx-v1 --pii-profile cpu
+faden upgrade --pii-model gliner2-multi-v1 --pii-profile gpu-shared
 ```
 
 A detector change keeps saved policies and requires explicit adoption of the installed profile in the console.

@@ -155,6 +155,7 @@
 "Wie aktiviere ich erweiterte PII-Felder?" = "extended-pii-fields"
 "Kann PII ohne GPU auf der CPU laufen?" = "local-pii-on-cpu-or-gpu"
 "Wie wähle ich CPU oder GPU für PII?" = "local-pii-on-cpu-or-gpu"
+"Wie wähle ich ein lokales PII-Modell und Sprachpaket?" = "local-pii-on-cpu-or-gpu"
 "Wie installiere ich Fadenstack?" = "install"
 "Wie melde ich mich nach der Installation zum ersten Mal an?" = "sign-in-for-the-first-time"
 "Welche Befehle brauche ich im Alltag?" = "everyday-commands"

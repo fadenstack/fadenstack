@@ -4227,5 +4227,6 @@
   "pii_policy.form.unreviewed": "Umbrales pendientes de revisión",
   "pii_policy.form.adopt_profile": "Usar valores del perfil instalado",
   "pii_policy.form.profile_mismatch": "El perfil de la política no coincide con el servicio instalado. Las solicitudes protegidas fallarán hasta que se seleccione un perfil compatible.",
-  "pii_policy.form.profile_thresholds": "Usar umbrales del perfil"
+  "pii_policy.form.profile_thresholds": "Usar umbrales del perfil",
+  "pii_policy.form.installed_detector": "Detector instalado"
 }

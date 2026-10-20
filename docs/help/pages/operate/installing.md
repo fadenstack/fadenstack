@@ -273,13 +273,14 @@ needed and go into every backup.
 ## Local PII on CPU or GPU
 
 PII detection runs on your server. Setup downloads the selected model files; chat text is processed locally.
-CPU mode works without a GPU and is slower, especially with concurrent requests or long documents.
+CPU processing is slower, especially with concurrent requests or long documents.
 
-![The PII mode question with CPU selected](../images/operate/pii-mode-choice.png)
+![The PII language, detector and execution choices](../images/operate/pii-mode-choice.png)
 
-1. Run `faden doctor`. **Local PII** reports GPU compatibility, the configured mode and the CPU thread budget.
+1. Run `faden doctor`. **Local PII** reports GPU compatibility, the installed detector, its content languages,
+   the execution mode and the CPU thread budget.
 
-    ![Doctor reports CPU mode when a compatible GPU is unavailable](../images/operate/pii-doctor-cpu.png)
+    ![Doctor reports the installed detector and language pack on a CPU server](../images/operate/pii-doctor-cpu.png)
 
 2. Enable PII during deployment:
 
@@ -287,36 +288,50 @@ CPU mode works without a GPU and is slower, especially with concurrent requests 
     faden deploy --modules pii
     ```
 
-    With a compatible GPU, choose `cpu`, `gpu-shared` or `gpu-dedicated` when asked. Without one, a new PII
-    installation uses CPU. The message explains an incompatible driver, unavailable Docker GPU access or
-    insufficient free memory. `legacy` retains the older English-only option.
+    Choose the content locale, detector and execution mode. The default content pack is `europe-west-v1`
+    (English, German, French and Spanish). `auto` selects the recommended local detector, currently
+    `patronus-onnx-v1`, with CPU execution. A compatible GPU allows GPU execution for `gliner2-multi-v1`.
+    Without a compatible GPU, execution falls back to CPU while preserving the selected detector.
 
 3. Open [the personal data policy](../administer/policies.md#personal-data) in the console. Review the installed
-   profile and explicitly adopt it when changing detectors. Existing policies are kept; installing a different
-   detector does not silently change their protection settings.
+   profile, select its language and adopt it when changing the detector or locale pack. Existing policy choices
+   are retained. An unlisted language is refused; it is never silently treated as English.
 
-??? info "Choose the mode without a question"
+??? info "Choose the content languages and detector"
+    | Locale pack | Accepted policy languages |
+    |---|---|
+    | `europe-west-v1` | `en`, `de`, `fr`, `es` |
+    | `english-v1` | `en` |
+    | `german-v1` | `de` |
+    | `french-v1` | `fr` |
+    | `spanish-v1` | `es` |
+
+    Select languages for the content you process. A pack does not infer a person's nationality. Other languages
+    are not currently offered. A single-language pack also requires matching languages in your saved policies.
+
     ```bash
-    faden deploy --modules pii --pii-profile cpu -y
-    faden deploy --modules pii --pii-profile gpu-shared -y
-    faden deploy --modules pii --pii-profile gpu-dedicated --pii-gpu-id 0 -y
+    faden deploy --modules pii --pii-locale german-v1 --pii-model auto --pii-profile cpu -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-shared -y
+    faden deploy --modules pii --pii-model gliner2-multi-v1 --pii-profile gpu-dedicated --pii-gpu-id 0 -y
     ```
 
-    For an existing installation, `faden module enable pii` offers the same choices. Run `faden up` afterward.
-    Use `--pii-model-dir /opt/faden/pii-models/cpu` to supply a previously provisioned directory with its manifest,
-    including when setup cannot download files. The directory must match the selected detector.
+    `patronus-onnx-v1` supports CPU execution. `gliner2-multi-v1` supports CPU and compatible NVIDIA GPUs.
+    Choosing a GPU does not change the detector automatically. `legacy` retains the older English-only option.
 
-    New CPU mode uses Patronus ONNX; GPU mode uses GLiNER2. Both support English, German, French and Spanish.
-    `gpu-shared` is for a GPU used by other software too. `gpu-dedicated` is for a GPU you keep available for PII;
+    For an existing installation, `faden module enable pii` accepts the same options. Run `faden up` afterward.
+    Use `--pii-model-dir /opt/faden/pii-models/cpu` for a previously provisioned directory containing its manifest,
+    including offline setup. The directory must match the selected detector. Only that detector is downloaded;
+    previous model directories remain available for rollback.
+
+??? info "CPU threads and GPU memory"
+    `gpu-shared` is for a GPU used by other software too. `gpu-dedicated` is for a GPU kept available for PII;
     selecting it does not stop other software from using that GPU.
 
-    The default uses a quarter of the available CPU threads, capped at eight in CPU mode and two in GPU mode.
-    `--pii-cpu-threads 2` sets an explicit count. Counts are reduced to the CPU availability, including container
-    limits. `--pii-gpu-memory-mib 4096` sets the GPU memory budget; it does not reserve memory from other software.
-
-When a GPU is available, doctor also shows its identifier for `--pii-gpu-id`:
-
-![Doctor reports a compatible GPU and the available PII choices](../images/operate/pii-doctor-gpu.png)
+    Automatic CPU threads use a quarter of the available threads, capped at eight for CPU execution and two for
+    GPU execution. `--pii-cpu-threads 2` sets an explicit count. Container CPU limits also apply at startup.
+    `--pii-gpu-memory-mib 4096` sets the allocator budget; it does not reserve memory from other software.
+    The PII container also has a 4 GiB host RAM limit. `FADEN_PII_MEMORY_LIMIT` in `.env` changes that limit;
+    run `faden up` afterward. Host RAM and GPU memory are separate budgets.
 
 ### Extended PII fields {#extended-pii-fields}
 

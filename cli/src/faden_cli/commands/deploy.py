@@ -45,6 +45,7 @@ from faden_cli.core.env_gen import (
 )
 from faden_cli.core.private_files import private_dir, secure_install
 from faden_cli.core.registry import MODULES_COMPAT as KNOWN_MODULES
+from faden_cli.core.pii_catalog import catalog as pii_catalog
 from faden_cli.core.rmq import write_definitions as write_rmq_definitions
 from faden_cli.core.settings import FadenConfig, load_config, save_config
 from faden_cli.core.tune import tune_env
@@ -513,6 +514,10 @@ def _login_for_api_token(backend_url: str, email: str) -> str | None:
     default=None,
     help="Days a chat someone deleted is kept before it is erased for good (default 30; asked when not given).",
 )
+@click.option("--pii-model", type=click.Choice(["auto", *pii_catalog()["models"]]), default=None,
+              help="Approved local detector, independent of CPU/GPU execution.")
+@click.option("--pii-locale", type=click.Choice(list(pii_catalog()["locales"])), default=None,
+              help="Supported content locale pack; no automatic language remapping.")
 @click.option("--pii-profile", type=click.Choice(["legacy", "cpu", "gpu-shared", "gpu-dedicated"]), default=None,
               help="Local PII preset. Interactive runs offer a choice; -y retains a compatible installed mode.")
 @click.option("--pii-model-dir", type=click.Path(file_okay=False, exists=True, path_type=Path), default=None,
@@ -526,6 +531,8 @@ def deploy_cmd(
     install_dir: str | None,
     *,
     pii_profile: str | None,
+    pii_model: str | None,
+    pii_locale: str | None,
     pii_model_dir: Path | None,
     pii_gpu_memory_mib: int | None,
     pii_cpu_threads: int | None,
@@ -724,12 +731,13 @@ def deploy_cmd(
     if ensure_bootstrap_token(env_path):
         info("Bootstrap token added to .env.")
 
-    if pii_profile is not None and "pii" not in profiles:
-        raise click.UsageError("--pii-profile requires the pii module (--modules pii)")
+    if any(v is not None for v in (pii_profile, pii_model, pii_locale)) and "pii" not in profiles:
+        raise click.UsageError("PII options require the pii module (--modules pii)")
     if "pii" in profiles:
         from faden_cli.core.pii_runtime import deploy_step as configure_pii
         try:
             needs_build = configure_pii(env_path, requested=pii_profile, model_dir=pii_model_dir,
+                                        model=pii_model, locale=pii_locale,
                                         gpu_mib=pii_gpu_memory_mib, threads=pii_cpu_threads, gpu_id=pii_gpu_id,
                                         yes=yes, published=release is not None,
                                         upgrade=previous_env.get("FADEN_BACKEND_PII_ENABLED", "").lower() == "true")

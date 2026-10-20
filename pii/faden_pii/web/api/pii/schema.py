@@ -178,6 +178,7 @@ class PIIPolicyOptionsResponse(BaseModel):
         "embedding_strings",
     ]
     entity_languages: dict[str, list[str]] = {}
+    detector: dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------

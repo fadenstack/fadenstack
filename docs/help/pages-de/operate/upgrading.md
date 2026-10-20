@@ -224,6 +224,12 @@ Melden Sie sich dann an der Konsole an. Maschinen und Cluster sind wie zuvor.
 
 ## Das PII-Modul aktualisieren {#upgrade-the-pii-module}
 
+Aufgelöste Erkennung, feste Modellrevision und Sprachpaket bleiben bei Upgrades erhalten, auch mit `-y`.
+Eine neue Empfehlung ersetzt das installierte Modell nicht. Mit `--pii-model auto` wählen Sie die aktuelle
+Empfehlung ausdrücklich; `--pii-locale german-v1` beschränkt die Inhaltssprachen. `--pii-profile cpu`
+behält eine im Katalog konfigurierte Erkennung bei. Bei älteren Installationen ohne gespeicherte
+Erkennungs-ID bedeutet diese ausdrückliche CPU-Auswahl weiterhin den Wechsel zu Patronus ONNX.
+
 Ein eingeschaltetes PII-Modul wird mit `faden upgrade` aktualisiert. Ein ausgeschaltetes bleibt aus.
 Bestehende Geheimnisse, das Modellverzeichnis und Richtlinien bleiben erhalten.
 
@@ -240,8 +246,8 @@ ihre GPU nicht mehr verwenden, läuft sie mit dem bisherigen Profil auf der CPU;
 Ein anderes Modell wird nicht stillschweigend eingesetzt. Für einen ausdrücklichen Wechsel:
 
 ```bash
-faden upgrade --pii-profile cpu
-faden upgrade --pii-profile gpu-shared
+faden upgrade --pii-model patronus-onnx-v1 --pii-profile cpu
+faden upgrade --pii-model gliner2-multi-v1 --pii-profile gpu-shared
 ```
 
 Nach einem Wechsel der Erkennung bleiben die gespeicherten Richtlinien erhalten. Übernehmen Sie das installierte

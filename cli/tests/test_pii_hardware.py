@@ -131,16 +131,17 @@ def test_interactive_gpu_choice_and_noninteractive_preservation(selection, monke
     device = pii_hardware.PIIGpu("0", "GPU-abcd-1234", "NVIDIA example", "7.5", 8192)
     monkeypatch.setattr(pii_hardware, "detect_support", lambda **kw: pii_hardware.PIIGpuSupport([device]))
     prompts = []
+    answers = iter(["europe-west-v1", "gliner2-multi-v1", "gpu-dedicated"])
     monkeypatch.setattr(
-        pii_runtime.click, "prompt", lambda *a, **kw: prompts.append(kw["default"]) or "gpu-dedicated"
+        pii_runtime.click, "prompt", lambda *a, **kw: prompts.append(kw["default"]) or next(answers)
     )
     assert pii_runtime.deploy_step(env)
     values = read_env_file(env)
-    assert prompts == ["gpu-shared"]
+    assert prompts == ["europe-west-v1", "auto", "cpu"]
     assert values["FADEN_PII_GPU_ID"] == device.uuid
     assert values["FADEN_PII_EXECUTION_PROFILE"] == "gpu-dedicated"
     pii_runtime.deploy_step(env, yes=True, upgrade=True)
-    assert len(prompts) == 1
+    assert len(prompts) == 3
     assert downloaded == ["gliner2"]
 
 

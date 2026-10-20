@@ -11,18 +11,11 @@ import tempfile
 import httpx
 
 from faden_cli.core.console import info
+from faden_cli.core.pii_catalog import catalog
 
 MODELS = {
-    "gliner2": (
-        "fastino/gliner2-privacy-filter-PII-multi",
-        "1cb4166094dc58fa8d836429f060d6c95f62b495",
-        ("*.json", "*.safetensors", "*.model", "*.txt", "encoder_config/*", "LICENSE*"),
-    ),
-    "gliner-onnx": (
-        "patronus-studio/gliner_small-v2.5-edge",
-        "6cfcbd93d7fc6f5e1658f80afa38f73891b91693",
-        ("*.json", "*.model", "onnx/fp16/*", "LICENSE*", "tokenizer*"),
-    ),
+    entry["adapter"]: (entry["repository"], entry["revision"], tuple(entry["patterns"]))
+    for entry in catalog()["models"].values()
 }
 
 

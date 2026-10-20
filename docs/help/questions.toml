@@ -157,6 +157,7 @@
 "How do I enable extended PII fields?" = "extended-pii-fields"
 "Can PII run on CPU without a GPU?" = "local-pii-on-cpu-or-gpu"
 "How do I choose CPU or GPU for PII?" = "local-pii-on-cpu-or-gpu"
+"How do I choose a local PII model and language pack?" = "local-pii-on-cpu-or-gpu"
 "How do I install Fadenstack?" = "install"
 "How do I sign in for the first time after installing?" = "sign-in-for-the-first-time"
 "Which everyday commands are there?" = "everyday-commands"

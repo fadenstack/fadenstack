@@ -4227,5 +4227,6 @@
   "pii_policy.form.unreviewed": "Seuils en attente de vérification",
   "pii_policy.form.adopt_profile": "Utiliser les valeurs du profil installé",
   "pii_policy.form.profile_mismatch": "Le profil de la politique diffère du service installé. Les requêtes protégées échoueront tant qu’un profil compatible ne sera pas sélectionné.",
-  "pii_policy.form.profile_thresholds": "Utiliser les seuils du profil"
+  "pii_policy.form.profile_thresholds": "Utiliser les seuils du profil",
+  "pii_policy.form.installed_detector": "Détecteur installé"
 }

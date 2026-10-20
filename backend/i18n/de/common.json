@@ -4227,5 +4227,6 @@
   "pii_policy.form.unreviewed": "Schwellenwerte noch nicht geprüft",
   "pii_policy.form.adopt_profile": "Standardwerte des installierten Profils verwenden",
   "pii_policy.form.profile_mismatch": "Das Richtlinienprofil entspricht nicht dem installierten Dienst. Geschützte Anfragen schlagen fehl, bis ein kompatibles Profil gewählt wird.",
-  "pii_policy.form.profile_thresholds": "Schwellenwerte des Profils verwenden"
+  "pii_policy.form.profile_thresholds": "Schwellenwerte des Profils verwenden",
+  "pii_policy.form.installed_detector": "Installierte Erkennung"
 }

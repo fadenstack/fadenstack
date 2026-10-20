@@ -23,7 +23,10 @@ def windows(
     max_windows: int = 64,
 ) -> list[Window]:
     """Do not silently truncate, including a single unencodable source word."""
-    words = list(re.finditer(r"\S+", text))
+    # Han, kana and Hangul have useful character boundaries even without spaces.
+    # Keep Latin identifiers intact: slicing one could defeat checksum rules.
+    cjk = "\\u3040-\\u30ff\\u3400-\\u9fff\\uac00-\\ud7af\\U00020000-\\U0003134f"
+    words = list(re.finditer(rf"[{cjk}]|[^\s{cjk}]+", text))
     if not words:
         return [Window(0, text, length(text))] if text else []
     output = []

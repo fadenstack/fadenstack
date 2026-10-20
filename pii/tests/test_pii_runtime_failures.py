@@ -33,6 +33,7 @@ def test_model_offsets_allow_only_verified_punctuation_overhang(text, value, acc
     detector = object.__new__(NeuralDetector)
     detector.torch = SimpleNamespace(inference_mode=nullcontext)
     detector.settings = SimpleNamespace(pii_backend="gliner2")
+    detector.labels = {"person": "PERSON"}
     detector.model = SimpleNamespace(
         batch_extract_entities=lambda *a, **kw: [
             {"entities": {"person": [{**value, "confidence": 0.9}]}}

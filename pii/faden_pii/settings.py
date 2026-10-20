@@ -104,6 +104,17 @@ class Settings(BaseSettings):
             "FADEN_PII_ENTITY_PROFILE", "FADEN_PII_PII_ENTITY_PROFILE"
         ),
     )
+    pii_model_id: str = Field(default="", validation_alias="FADEN_PII_MODEL_ID")
+    pii_locale_pack: str = Field(default="", validation_alias="FADEN_PII_LOCALE_PACK")
+    pii_model_revision: str = Field(
+        default="", validation_alias="FADEN_PII_MODEL_REVISION"
+    )
+    pii_catalog_version: str = Field(
+        default="", validation_alias="FADEN_PII_CATALOG_VERSION"
+    )
+    pii_rules_version: str = Field(
+        default="", validation_alias="FADEN_PII_RULES_VERSION"
+    )
     pii_execution_profile: Literal["cpu", "gpu-dedicated", "gpu-shared"] = Field(
         default="cpu",
         validation_alias=AliasChoices(
@@ -333,6 +344,33 @@ class Settings(BaseSettings):
         from faden_pii.cpu import available_threads
 
         available = available_threads()
+        if self.pii_backend != "presidio":
+            from faden_pii.catalog import catalog, selection
+
+            model_id, entry, locale, pack = selection(
+                self.pii_backend, self.pii_model_id, self.pii_locale_pack
+            )
+            for value, expected in (
+                (self.pii_model_revision, entry["revision"]),
+                (self.pii_catalog_version, catalog()["version"]),
+                (self.pii_rules_version, catalog()["rules_version"]),
+            ):
+                if value and value != expected:
+                    raise ValueError(
+                        "Installed PII identity differs from the approved catalog"
+                    )
+            if self.pii_execution_profile not in entry["execution"]:
+                raise ValueError(
+                    "Selected PII detector does not support this execution mode"
+                )
+            if self.pii_default_language not in pack["languages"]:
+                raise ValueError(
+                    "Default PII language is outside the selected locale pack"
+                )
+            self.pii_model_id, self.pii_locale_pack = model_id, locale
+            self.pii_model_revision = entry["revision"]
+            self.pii_catalog_version = catalog()["version"]
+            self.pii_rules_version = catalog()["rules_version"]
         if self.pii_entity_profile == "extended" and self.pii_backend == "presidio":
             raise ValueError("Extended PII fields require a multilingual local profile")
         if "pii_cpu_threads" not in self.model_fields_set:
@@ -383,6 +421,11 @@ class Settings(BaseSettings):
             or not 0 <= self.pii_batch_wait_ms <= 5
         ):
             raise ValueError("PII batch exceeds validated envelope")
+        if self.pii_backend != "presidio" and (
+            self.pii_batch_short > entry["max_batch_short"]
+            or self.pii_batch_long > entry["max_batch_long"]
+        ):
+            raise ValueError("PII batch exceeds the selected adapter envelope")
         if self.pii_backend != "presidio" and self.workers_count != 1:
             raise ValueError("Neural PII requires one HTTP worker")
         return self

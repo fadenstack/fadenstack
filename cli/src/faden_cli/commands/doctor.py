@@ -169,13 +169,35 @@ def _pii_check(gpu) -> None:
         identity = env.get("FADEN_PII_GPU_ID")
         if profile.startswith("gpu-") and identity and not any(identity in (d.uuid, d.index) for d in support.devices):
             console.print("  [yellow]Configured PII GPU is unavailable; deploy/upgrade will select CPU.[/yellow]")
-        console.print("  Choose CPU, gpu-shared or gpu-dedicated during deploy/upgrade.")
+        console.print("  Choose an approved detector and compatible execution mode during deploy/upgrade.")
     else:
         for reason in support.reasons:
             console.print(f"  [yellow]{reason}[/yellow]")
         console.print("  PII GPU mode unavailable; deploy/upgrade falls back to CPU.")
     console.print(f"  Configured PII backend: {env.get('FADEN_PII_BACKEND', 'presidio (legacy English)')}; mode: {profile}.")
     console.print(f"  PII entity filters: {env.get('FADEN_PII_ENTITY_PROFILE', 'standard')}.")
+    console.print(f"  PII Compose host RAM limit: {env.get('FADEN_PII_MEMORY_LIMIT') or '4g'}; GPU memory is separate.")
+    if env.get("FADEN_PII_BACKEND", "presidio") != "presidio":
+        from faden_cli.core.pii_catalog import catalog, model_for_backend, resolve
+
+        try:
+            model, entry, pack = resolve(
+                env.get("FADEN_PII_MODEL_ID") or model_for_backend(env["FADEN_PII_BACKEND"]),
+                env.get("FADEN_PII_LOCALE_PACK") or catalog()["default_locale"], profile,
+            )
+            if entry["adapter"] != env["FADEN_PII_BACKEND"] or any(
+                env.get(key) and env[key] != expected for key, expected in (
+                    ("FADEN_PII_MODEL_REVISION", entry["revision"]),
+                    ("FADEN_PII_CATALOG_VERSION", catalog()["version"]),
+                    ("FADEN_PII_RULES_VERSION", catalog()["rules_version"]),
+                )
+            ):
+                raise ValueError("Installed identity differs from catalog")
+            console.print(f"  Installed detector: {model}; revision: {env.get('FADEN_PII_MODEL_REVISION') or entry['revision']}.")
+            console.print(f"  Locale pack: {env.get('FADEN_PII_LOCALE_PACK') or catalog()['default_locale']}; installed languages: {', '.join(pack['languages'])}.")
+            console.print(f"  Evaluated detector languages: {', '.join(entry['languages'])}; other languages are unsupported.")
+        except (ValueError, StopIteration):
+            console.print("  [red]Invalid PII detector/locale/execution combination; correct it before deployment.[/red]")
     available = effective_threads()
     suggested = pii_threads(available, gpu=profile.startswith("gpu-"))
     console.print(f"  CPU availability: {available} thread(s); automatic PII thread budget: {suggested}.")

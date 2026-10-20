@@ -228,10 +228,15 @@ export default function PiiPolicyForm({
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2">{options.profile_id} · {options.calibrated ? t("pii_policy.form.reviewed", { defaultValue: "reviewed thresholds" }) : t("pii_policy.form.unreviewed", { defaultValue: "thresholds awaiting review" })}</Typography>
               <Button disabled={disabled || options.source !== "pii_service" || options.ready === false}
-                onClick={() => patch({ presidio: { ...value.presidio, profile_id: options.profile_id, threshold_mode: "profile" } })}>
+                onClick={() => patch({ presidio: { ...value.presidio, profile_id: options.profile_id, threshold_mode: "profile", threshold: options.default_score_threshold } })}>
                 {t("pii_policy.form.adopt_profile", { defaultValue: "Use installed profile defaults" })}
               </Button>
             </Stack>
+          )}
+          {options?.detector?.model_id && (
+            <Typography variant="body2" color="text.secondary">
+              {t("pii_policy.form.installed_detector", { defaultValue: "Installed detector" })}: {options.detector.model_id} · {options.detector.locale_pack} · {options.detector.execution}
+            </Typography>
           )}
           {value.presidio.profile_id && value.presidio.profile_id !== options?.profile_id && (
             <Alert severity="warning">{t("pii_policy.form.profile_mismatch", { defaultValue: "The policy profile differs from the installed service. Protected requests will fail until a compatible profile is selected." })}</Alert>

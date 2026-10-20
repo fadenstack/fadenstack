@@ -99,6 +99,7 @@ def module_list() -> None:
 @click.option("--yes", "-y", is_flag=True, help="Keep a compatible PII mode or select a preset without prompting.")
 @pii_options
 def module_enable(modules: tuple[str, ...], *, yes: bool = False, pii_profile: str | None = None,
+                  pii_model: str | None = None, pii_locale: str | None = None,
                   pii_model_dir: Path | None = None, pii_gpu_id: str | None = None,
                   pii_gpu_memory_mib: int | None = None, pii_cpu_threads: int | None = None) -> None:
     """Enable one or more modules.
@@ -109,8 +110,8 @@ def module_enable(modules: tuple[str, ...], *, yes: bool = False, pii_profile: s
     profiles = set(cfg.profiles or [])
     enabled: list[str] = []
 
-    if pii_profile is not None and "pii" not in {name.lower() for name in modules}:
-        raise click.UsageError("--pii-profile requires module enable pii")
+    if any(v is not None for v in (pii_profile, pii_model, pii_locale)) and "pii" not in {name.lower() for name in modules}:
+        raise click.UsageError("PII options require module enable pii")
     if "pii" in {name.lower() for name in modules}:
         from faden_cli.core.bundle import installed_release
         from faden_cli.core.env_gen import read_env_file
@@ -122,6 +123,7 @@ def module_enable(modules: tuple[str, ...], *, yes: bool = False, pii_profile: s
         old = read_env_file(env_path)
         try:
             configure_pii(env_path, requested=pii_profile, model_dir=pii_model_dir,
+                          model=pii_model, locale=pii_locale,
                           gpu_id=pii_gpu_id, gpu_mib=pii_gpu_memory_mib or int(old.get("FADEN_PII_GPU_MEMORY_MIB") or 4096),
                           threads=pii_cpu_threads, yes=yes, published=installed_release(cfg.install_path) is not None,
                           upgrade=old.get("FADEN_BACKEND_PII_ENABLED", "").lower() == "true")

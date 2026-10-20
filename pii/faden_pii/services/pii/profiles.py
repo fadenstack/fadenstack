@@ -7,17 +7,11 @@ from importlib.resources import files
 from pathlib import Path
 
 from faden_pii.services.pii.errors import PIIError
+from faden_pii.catalog import catalog
 
-GLINER2_REVISION = "1cb4166094dc58fa8d836429f060d6c95f62b495"
-ONNX_REVISION = "6cfcbd93d7fc6f5e1658f80afa38f73891b91693"
-LABELS = {
-    "person": "PERSON",
-    "first_name": "PERSON",
-    "last_name": "PERSON",
-    "full_name": "PERSON",
-    "address": "LOCATION",
-    "city": "LOCATION",
-}
+GLINER2_REVISION = catalog()["models"]["gliner2-multi-v1"]["revision"]
+ONNX_REVISION = catalog()["models"]["patronus-onnx-v1"]["revision"]
+LABELS = catalog()["models"]["patronus-onnx-v1"]["labels"]
 LANGUAGES = ("en", "de", "fr", "es")
 
 
@@ -29,7 +23,7 @@ def pipeline_sources() -> dict[str, str]:
     have the same identity; paths and installation location are excluded.
     """
     root = files("faden_pii.services.pii")
-    return {
+    sources = {
         name: hashlib.sha256(
             root.joinpath(name).read_bytes().replace(b"\r\n", b"\n")
         ).hexdigest()
@@ -43,6 +37,13 @@ def pipeline_sources() -> dict[str, str]:
             "windowing.py",
         )
     }
+    sources["catalog.py"] = hashlib.sha256(
+        files("faden_pii").joinpath("catalog.py").read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
+    sources["pii-catalog.json"] = hashlib.sha256(
+        json.dumps(catalog(), sort_keys=True).encode()
+    ).hexdigest()
+    return sources
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ class Profile:
     thresholds: dict[str, dict[str, float]] = field(default_factory=dict)
     calibrated: bool = False
     entity_profile: str = "standard"
+    locale_pack: str = "europe-west-v1"
 
     @property
     def id(self) -> str:
@@ -62,7 +64,12 @@ class Profile:
             "gliner2": "gliner2-multilingual-pii",
             "gliner-onnx": "patronus-small-pii",
         }[self.backend]
-        return name if self.entity_profile == "standard" else name + "-extended-v1"
+        name = name if self.entity_profile == "standard" else name + "-extended-v1"
+        return (
+            name
+            if self.locale_pack == "europe-west-v1"
+            else name + ":" + self.locale_pack
+        )
 
 
 def verify_manifest(root: Path, manifest_path: Path, backend: str) -> dict:
@@ -74,13 +81,18 @@ def verify_manifest(root: Path, manifest_path: Path, backend: str) -> dict:
         or not data.get("files")
     ):
         raise ValueError("Invalid local PII artifact manifest")
-    if data.get("revision") != (
-        GLINER2_REVISION if backend == "gliner2" else ONNX_REVISION
-    ):
+    entry = next(
+        entry for entry in catalog()["models"].values() if entry["adapter"] == backend
+    )
+    if data.get("revision") != entry["revision"]:
         raise ValueError("Unvalidated PII model revision")
     for name, expected in data["files"].items():
         relative = Path(name)
-        if relative.is_absolute() or ".." in relative.parts:
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not (root / relative).resolve().is_relative_to(root.resolve())
+        ):
             raise ValueError("Invalid PII manifest file path")
         digest = hashlib.sha256()
         with (root / relative).open("rb") as handle:
@@ -120,3 +132,15 @@ def load_calibration(path: Path | None) -> dict:
         ):
             raise PIIError("pii_invalid_calibration", 503)
     return data
+
+
+def verify_calibration(data: dict, profile: Profile, revision: str) -> None:
+    if data and (
+        data.get("profile_id") != profile.id
+        or data.get("model_revision") != revision
+        or data.get("locale_pack") != profile.locale_pack
+        or data.get("pipeline_sources") != pipeline_sources()
+    ):
+        raise ValueError(
+            "Calibration does not match the pinned PII pipeline and locale"
+        )

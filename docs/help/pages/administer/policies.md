@@ -83,6 +83,9 @@ your installation uses others):
 
 ### Adopt an installed detector profile
 
+**Installed detector** shows the model, content locale pack and execution mode. Only the pack’s
+installed languages are offered. A locale change requires review of each affected saved policy.
+
 After your operator changes the detector or its entity filter set, review the default policy and each tenant
 override that should use it:
 
