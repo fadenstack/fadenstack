@@ -4,6 +4,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import re
 
 from presidio_analyzer import AnalyzerEngine, BatchAnalyzerEngine, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpEngineProvider
@@ -18,6 +19,123 @@ from faden_pii.services.pii.profiles import (
     verify_manifest,
 )
 from faden_pii.services.pii.windowing import Window, windows
+
+_GREETING_PREFIX_RE = re.compile(
+    r"^(?:hi|hello|hey|yo|sup|hallo|moin|servus|bonjour|salut|coucou|bonsoir|hola|buenas)[\s,!.:;-]+",
+    re.IGNORECASE,
+)
+
+_CONVERSATIONAL_STOPWORDS = frozenset(
+    {
+        # EN
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "sup",
+        "hi there",
+        "hello there",
+        "hey there",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good night",
+        "ok",
+        "okay",
+        "yes",
+        "no",
+        "yep",
+        "nope",
+        "sure",
+        "thanks",
+        "thank you",
+        "ty",
+        "thx",
+        "please",
+        "cool",
+        "great",
+        "nice",
+        "awesome",
+        "perfect",
+        "got it",
+        "understood",
+        "test",
+        "help",
+        "ping",
+        "start",
+        "stop",
+        "continue",
+        "retry",
+        "why",
+        "how",
+        "what",
+        # DE
+        "hallo",
+        "moin",
+        "servus",
+        "grüß gott",
+        "gruess gott",
+        "guten morgen",
+        "guten tag",
+        "guten abend",
+        "gute nacht",
+        "danke",
+        "vielen dank",
+        "bitte",
+        "ja",
+        "nein",
+        "alles klar",
+        "klar",
+        "genau",
+        # FR
+        "bonjour",
+        "salut",
+        "coucou",
+        "bonsoir",
+        "bonne nuit",
+        "merci",
+        "merci beaucoup",
+        "oui",
+        "non",
+        "d'accord",
+        "daccord",
+        "allô",
+        "allo",
+        # ES
+        "hola",
+        "buenas",
+        "buenos días",
+        "buenos dias",
+        "buenas tardes",
+        "buenas noches",
+        "gracias",
+        "muchas gracias",
+        "si",
+        "sí",
+        "vale",
+        "claro",
+        "perfecto",
+    }
+)
+
+
+def _clean_neural_span(text: str, start: int, end: int) -> tuple[int, int] | None:
+    """Trim leading greeting tokens from neural spans and drop bare conversational filler."""
+    span_text = text[start:end]
+    normalized = " ".join(span_text.strip(" \t\r\n,!?.:;¡¿\"'").lower().split())
+    if not normalized or normalized in _CONVERSATIONAL_STOPWORDS:
+        return None
+    match = _GREETING_PREFIX_RE.match(span_text)
+    if match:
+        new_start = start + match.end()
+        if new_start < end:
+            rem_norm = " ".join(
+                text[new_start:end].strip(" \t\r\n,!?.:;¡¿\"'").lower().split()
+            )
+            if not rem_norm or rem_norm in _CONVERSATIONAL_STOPWORDS:
+                return None
+            return new_start, end
+    return start, end
 
 
 class NeuralDetector:
@@ -364,6 +482,10 @@ class NeuralDetector:
                     or text[start:end] != expected
                 ):
                     raise PIIError("pii_invalid_detector_result", 503)
+                cleaned = _clean_neural_span(text, start, end)
+                if cleaned is None:
+                    continue
+                start, end = cleaned
                 kind = LABELS[value["label"]]
                 if kind in options["entities"]:
                     spans.append(

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 from presidio_anonymizer import AnonymizerEngine
 
+from faden_pii.services.pii.detectors import _clean_neural_span
 from faden_pii.services.pii.extended import ExtendedFieldsRecognizer, EXTENDED_ENTITIES
 from faden_pii.services.pii.errors import PIIError
 from faden_pii.services.pii.extraction import ExtractedPayload
@@ -170,3 +171,46 @@ def test_extended_identity_requires_explicit_policy_adoption():
         Profile(backend="gliner-onnx", entity_profile="extended").id
         == "patronus-small-pii-extended-v1"
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "hi",
+        "Hi",
+        "hey",
+        "Hallo",
+        "Danke",
+        "Bonjour",
+        "Merci",
+        "Hola",
+        "OK",
+        "Sure",
+        "Ja",
+        "Nein",
+        "Vale",
+        "claro",
+        "Guten Morgen",
+        "Buenas tardes",
+    ],
+)
+def test_conversational_greetings_filtered_from_neural_spans(text):
+    assert _clean_neural_span(text, 0, len(text)) is None
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Hey Max", "Max"),
+        ("Hallo Jörg", "Jörg"),
+        ("Hi, Anna", "Anna"),
+        ("Bonjour Camille", "Camille"),
+        ("Hola María", "María"),
+        ("John Smith", "John Smith"),
+    ],
+)
+def test_greeting_prefix_trimmed_from_neural_person_spans(text, expected):
+    cleaned = _clean_neural_span(text, 0, len(text))
+    assert cleaned is not None
+    start, end = cleaned
+    assert text[start:end] == expected
