@@ -19,7 +19,9 @@
     "copy": "Copiar detalles",
     "copied": "Copiado",
     "close": "Cerrar",
-    "new_tab": "(se abre en una pestaña nueva)"
+    "new_tab": "(se abre en una pestaña nueva)",
+    "preview_title": "Versión preliminar.",
+    "preview_text": "Para evaluación y pruebas; algunas partes pueden cambiar en la próxima versión. El marcado de contenido ayuda a marcar el contenido generado por IA, pero no hace que su uso cumpla por sí solo. Consulte la Ayuda, versiones preliminares."
   },
   "app": {
     "title": "Fadenstack",

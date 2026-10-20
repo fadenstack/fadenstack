@@ -19,7 +19,9 @@
     "copy": "Copier les détails",
     "copied": "Copié",
     "close": "Fermer",
-    "new_tab": "(s'ouvre dans un nouvel onglet)"
+    "new_tab": "(s'ouvre dans un nouvel onglet)",
+    "preview_title": "Préversion.",
+    "preview_text": "Pour l'évaluation et les tests ; certaines parties peuvent changer dans la prochaine version. Le marquage des contenus aide à marquer les contenus générés par l'IA, mais ne rend pas à lui seul votre usage conforme. Voir l'aide, préversions."
   },
   "app": {
     "title": "Fadenstack",

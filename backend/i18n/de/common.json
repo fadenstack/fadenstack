@@ -19,7 +19,9 @@
     "copy": "Details kopieren",
     "copied": "Kopiert",
     "close": "Schließen",
-    "new_tab": "(öffnet in einem neuen Tab)"
+    "new_tab": "(öffnet in einem neuen Tab)",
+    "preview_title": "Preview-Release.",
+    "preview_text": "Für Evaluierung und Tests; Teile können sich im nächsten Release ändern. Die Kennzeichnung von Inhalten unterstützt die Kennzeichnung KI-erzeugter Inhalte, macht Ihre Nutzung aber nicht von selbst konform. Siehe Hilfe, Preview-Releases."
   },
   "app": {
     "title": "Fadenstack",

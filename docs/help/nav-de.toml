@@ -35,6 +35,7 @@ nav = [
     { "Systemanforderungen" = "operate/requirements.md" },
     { "Installation" = "operate/installing.md" },
     { "Upgrade" = "operate/upgrading.md" },
+    { "Preview-Releases" = "operate/preview.md" },
     { "Sicherungen" = "operate/backups.md" },
     { "Schlüssel erneuern" = "operate/rotating-keys.md" },
     { "HTTPS und Vertrauen" = "operate/https.md" },

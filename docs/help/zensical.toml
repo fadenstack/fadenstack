@@ -40,6 +40,7 @@ nav = [
     { "System requirements" = "operate/requirements.md" },
     { "Installing" = "operate/installing.md" },
     { "Upgrading" = "operate/upgrading.md" },
+    { "Preview releases" = "operate/preview.md" },
     { "Backups" = "operate/backups.md" },
     { "Rotating the keys" = "operate/rotating-keys.md" },
     { "HTTPS and trust" = "operate/https.md" },

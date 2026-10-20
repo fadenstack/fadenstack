@@ -82,6 +82,9 @@ class FadenConfig:
     #: when: ``{name: {"by": OS user, "at": ISO time}}``. Deploy and upgrade leave them off;
     #: ``faden module enable`` removes the entry.
     modules_switched_off: dict[str, dict[str, str]] = field(default_factory=dict)
+    #: Preview releases accepted before deploy or upgrade went on (``release_notice``):
+    #: ``{release: {"by": OS user, "at": ISO time, "how": "prompt" or "-y"}}``.
+    preview_accepted: dict[str, dict[str, str]] = field(default_factory=dict)
     dev: DevConfig = field(default_factory=DevConfig)
 
     # ── Derived paths ─────────────────────────────────────────

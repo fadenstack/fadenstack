@@ -33,6 +33,7 @@ from faden_cli.core.compose import (
 )
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.release_notice import accept_preview
 from faden_cli.core.detect import detect_docker
 from faden_cli.core.env_gen import (
     _random_password,
@@ -600,6 +601,7 @@ def deploy_cmd(
     # workspace always builds from the local source, even when the
     # config still points at a different (possibly stale) clone.
     cfg = load_config()
+    accept_preview(cfg, yes=yes)
 
     if install_dir:
         workspace = Path(install_dir)

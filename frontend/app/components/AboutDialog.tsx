@@ -15,9 +15,13 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { aboutInfo, type AboutInfo } from "~/api/about";
+
+/** This release is a Preview (Help, "Preview releases"); the CLI's release_notice.PREVIEW says the same. */
+export const PREVIEW_RELEASE = true;
 import BrandMark from "~/components/BrandMark";
 import { helpUrl } from "~/lib/pageHelp";
 import { DEVELOPERS, EXTERNAL_LINK, SOURCE_CODE, tagVendorUrl, websiteUrl } from "~/lib/vendorLinks";
@@ -118,6 +122,11 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
             </>
           )}
         </Box>
+        {PREVIEW_RELEASE && (
+          <Alert severity="info" sx={{ mb: 2 }} data-testid="about-preview">
+            <b>{t("about.preview_title")}</b> {t("about.preview_text")}
+          </Alert>
+        )}
         <Stack component="ul" spacing={0.75} sx={{ listStyle: "none", p: 0, m: 0 }}>
           {links.map((link) => (
             <li key={link.key}>

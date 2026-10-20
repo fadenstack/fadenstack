@@ -19,7 +19,9 @@
     "copy": "Copy details",
     "copied": "Copied",
     "close": "Close",
-    "new_tab": "(opens in a new tab)"
+    "new_tab": "(opens in a new tab)",
+    "preview_title": "Preview release.",
+    "preview_text": "For evaluation and testing; parts may change in the next release. Content marking supports marking AI-generated content but does not by itself make your use compliant. See Help, Preview releases."
   },
   "app": {
     "title": "Fadenstack",

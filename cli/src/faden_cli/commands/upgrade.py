@@ -38,6 +38,7 @@ from faden_cli.core.compose import (
 )
 from faden_cli.core import installation
 from faden_cli.core.console import console, error, info, success, warning
+from faden_cli.core.release_notice import accept_preview
 from faden_cli.core.detect import detect_docker
 from faden_cli.core.env_gen import default_env_vars, read_env_file, set_module_env, write_env_file
 from faden_cli.core.registry import MODULES
@@ -110,6 +111,7 @@ def upgrade_cmd(
     console.print("\n[bold magenta]fadenstack — Upgrade[/bold magenta]\n")
 
     cfg = load_config()
+    accept_preview(cfg, yes=yes, dry_run=dry_run)
 
     if not cfg.install_dir:
         error(
