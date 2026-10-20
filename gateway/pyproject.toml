@@ -53,6 +53,7 @@ dependencies = [
   "openpyxl>=3.1.0,<4",
   "python-multipart>=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   "litellm>=1.84.0,<2",  # >=1.84.0: fixes CVE-2026-35030 / CVE-2026-42208 / CVE-2026-49468 (proxy-side); 1.82.7 & 1.82.8 were malware releases
+  "aiohttp>=3.14.4",  # >=3.14.4: GHSA-2g87-pp6c-29x5, GHSA-5wr8-gcqf-gqf3 (litellm and taskiq bring it in)
   # Transitive floors — no direct cap exists in pyproject; uv lock is conservative
   # (keeps previously locked versions), so each floor is spelled out to force the fix:
   "idna>=3.15",  # >=3.15: clears PYSEC-2026-215
