@@ -25,6 +25,26 @@
 series: []
 
 releases:
+  - version: 0.5.0rc2
+    channel: preview
+    date: ""
+    severity: normal
+    summary: >-
+      Second release candidate of 0.5.0, a Preview release (the CLI of 0.5.0rc1 did not start): content marking for the EU AI Act (Art. 50(2)), checking
+      content, the local PII runtime, the LLM Calls page and the GB10 runtime with vLLM 0.31.
+    highlights:
+      - "A Preview release: `faden deploy` and `faden upgrade` say what that means and ask before they go on."
+      - "Content marking, on by default: pictures carry signed C2PA content credentials, an invisible watermark and IPTC metadata; every text answer gets a signed receipt, and chat models on a runtime with vLLM 0.30 or later write a text watermark."
+      - "Check content: everyone signed in can check a text, a picture or a file; the public check page for pictures and files is on by default."
+      - "An edited copy of an answer is still found, by the fingerprint its receipt keeps."
+      - "Chat models that watermark start without speculative decoding (MTP), with which the watermark did not hold."
+      - "The GB10 runtime with vLLM 0.31.0, certified on the DGX Spark pair with its watermark, is the GB10 default."
+      - "The PII module runs a local model, with the language you choose."
+      - "LLM Calls: find the call that went wrong, with its route and timeline."
+      - "Known gaps: answers of remote providers and of the x86_64 runtime (vLLM 0.26) carry no text watermark yet, and are not yet refused or flagged."
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.10
   - version: 0.5.0rc1
     channel: preview
     date: ""
