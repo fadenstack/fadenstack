@@ -60,7 +60,8 @@ These answers carry no text watermark, and their receipt records which of these 
 - short answers, under 200 tokens;
 - answers asked for with temperature 0 (greedy decoding: the model always takes its most likely word);
 - answers of a model on a runtime without the watermark (see [The runtime decides](#the-runtime-decides));
-- answers of remote providers. Anthropic marks its own models' answers; the receipt says so;
+- answers of remote providers. Some mark their own models' text (Anthropic its newer models, OpenAI when an
+  account switches it on), but no answer says whether it was marked, so the receipt counts them as unmarked;
 - answers of a deployment for which a superuser switched the watermark off.
 
 !!! note "The same question, a new answer"

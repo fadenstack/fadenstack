@@ -457,8 +457,8 @@ TABLE = [
                  {"applied": "none", "reason": "no-watermark-greedy"}, id="beam-search"),
     pytest.param(_route(), {}, 400, {"applied": "none", "reason": "runtime-without-watermark"},
                  id="local-that-does-not-mark"),
-    pytest.param(_route(ProviderType.REMOTE_ANTHROPIC), {}, 400, {"applied": "upstream", "vendor": "anthropic"},
-                 id="anthropic"),
+    pytest.param(_route(ProviderType.REMOTE_ANTHROPIC), {}, 400, {"applied": "none", "reason": "no-watermark-remote-model"},
+                 id="anthropic-until-evidence"),
     pytest.param(_route(ProviderType.REMOTE_OPENAI), {}, 400,
                  {"applied": "none", "reason": "no-watermark-remote-model"}, id="other-remote"),
 ]
@@ -469,6 +469,15 @@ def test_the_watermark_follows_the_engines_table(
     route: Any, sent: dict[str, Any], tokens: int, expected: dict[str, Any],
 ) -> None:
     assert text_receipts.watermark(route, sent, completion_tokens=tokens, text=LONG) == expected
+
+
+def test_a_provider_with_evidence_for_its_mark_is_said_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(text_receipts._MARKING_PROVIDERS, ProviderType.REMOTE_ANTHROPIC, "anthropic")  # noqa: SLF001
+    monkeypatch.setitem(text_receipts._MARKING_LITELLM_PROVIDERS, "anthropic", "anthropic")  # noqa: SLF001
+    for route in (_route(ProviderType.REMOTE_ANTHROPIC), _route(ProviderType.REMOTE_CUSTOM, litellm_provider="anthropic")):
+        assert text_receipts.watermark(route, {}, completion_tokens=400, text=LONG) == {
+            "applied": "upstream", "vendor": "anthropic",
+        }
 
 
 def test_the_rows_apply_in_the_tables_order() -> None:
@@ -558,9 +567,7 @@ def test_a_route_that_names_its_algorithm_or_vendor_is_said_so() -> None:
         "applied": "model", "algorithm": "dual_key_gumbel",
     }
     custom = _route(ProviderType.REMOTE_CUSTOM, litellm_provider="anthropic")
-    assert text_receipts.watermark(custom, {}, completion_tokens=400, text=LONG) == {
-        "applied": "upstream", "vendor": "anthropic",
-    }
+    assert text_receipts.watermark(custom, {}, completion_tokens=400, text=LONG) == {"applied": "none", "reason": "no-watermark-remote-model"}
     assert text_receipts.watermark(_route(), {"temperature": 0.7}, completion_tokens=400, text=LONG)["reason"] == (
         "runtime-without-watermark"
     )
@@ -767,7 +774,7 @@ async def test_a_stream_through_the_gateways_tool_rounds_ends_with_its_receipt(
     events = _sse(r.text)
     assert _streamed_text(events) == LONG
     value = _ends_with_the_receipt(events)
-    assert value["receipt"]["watermark"] == {"applied": "upstream", "vendor": "anthropic"}
+    assert value["receipt"]["watermark"] == {"applied": "none", "reason": "no-watermark-remote-model"}
 
 
 @pytest.mark.anyio
@@ -883,8 +890,8 @@ async def test_a_reply_whose_receipt_was_not_signed_keeps_none(
                  {"applied": "none", "reason": "no-watermark-greedy"}, id="beam-search"),
     pytest.param(ProviderType.VLLM, None, {}, 250, {"applied": "none", "reason": "runtime-without-watermark"},
                  id="local-that-does-not-mark"),
-    pytest.param(ProviderType.REMOTE_ANTHROPIC, None, {}, 250, {"applied": "upstream", "vendor": "anthropic"},
-                 id="anthropic"),
+    pytest.param(ProviderType.REMOTE_ANTHROPIC, None, {}, 250, {"applied": "none", "reason": "no-watermark-remote-model"},
+                 id="anthropic-until-evidence"),
     pytest.param(ProviderType.REMOTE_OPENAI, None, {}, 250,
                  {"applied": "none", "reason": "no-watermark-remote-model"}, id="other-remote"),
 ])

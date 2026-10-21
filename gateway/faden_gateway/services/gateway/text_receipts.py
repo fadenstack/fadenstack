@@ -45,9 +45,11 @@ SHORT_TEXT_TOKENS = 200
 #: What a stream's event says when the engine gave no receipt.
 UNSIGNED: dict[str, Any] = {"receipt": None, "status": "unsigned", "reason": "server-unavailable"}
 
-#: The remote providers known to watermark their models' text, by the name their mark goes under.
-_MARKING_PROVIDERS = {ProviderType.REMOTE_ANTHROPIC: "anthropic"}
-_MARKING_LITELLM_PROVIDERS = {"anthropic": "anthropic"}
+#: The remote providers known to watermark their models' text, by the name their mark goes under. None yet:
+#: Anthropic marks per model (those released from 2 August 2026, older ones later), and OpenAI's mark is an
+#: account setting no answer shows. A provider counts here only with evidence for its models.
+_MARKING_PROVIDERS: dict[ProviderType, str] = {}
+_MARKING_LITELLM_PROVIDERS: dict[str, str] = {}
 
 
 def _choices(payload: Any) -> list[dict[str, Any]]:
@@ -196,7 +198,8 @@ def watermark(
     greedily (by the request or the route's own parameters), ``no-watermark-greedy``;
     a local route, ``model`` when its runtime says it watermarks, else
     ``runtime-without-watermark``; a remote provider that marks its text
-    (Anthropic), ``upstream`` with the provider; any other, ``no-watermark-remote-model``.
+    (none yet: ``_MARKING_PROVIDERS``), ``upstream`` with the provider; any other,
+    ``no-watermark-remote-model``.
     """
     tokens = completion_tokens if completion_tokens is not None else estimate_input_tokens(text)
     if tokens < SHORT_TEXT_TOKENS:

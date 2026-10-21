@@ -68,7 +68,9 @@ Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was da
   wahrscheinlichste Wort);
 - Antworten eines Modells auf einer Runtime ohne das Wasserzeichen (siehe
   [Die Runtime entscheidet](#the-runtime-decides));
-- Antworten externer Provider. Anthropic kennzeichnet die Antworten seiner Modelle selbst; der Beleg vermerkt das;
+- Antworten externer Provider. Manche kennzeichnen den Text ihrer Modelle selbst (Anthropic bei seinen neueren
+  Modellen, OpenAI, wenn ein Konto es einschaltet), aber keine Antwort sagt, ob sie gekennzeichnet ist; der
+  Beleg zählt sie daher als nicht gekennzeichnet;
 - Antworten einer Bereitstellung, für die ein Superuser das Wasserzeichen ausgeschaltet hat.
 
 !!! note "Dieselbe Frage, eine neue Antwort"
