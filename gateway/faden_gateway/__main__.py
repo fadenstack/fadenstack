@@ -147,6 +147,10 @@ def main() -> None:
         reload=settings.reload,
         log_level=settings.log_level.value.lower(),
         factory=True,
+        # Longer than its clients keep an idle connection (httpx: 5 s), so a client always lets go first. With
+        # both at 5 s, the backend sometimes reused a connection just as the gateway closed it: "Server
+        # disconnected without sending a response", a 502 on the chat list (0.5.0, release server).
+        timeout_keep_alive=30,
         **ssl_kwargs,
     )
 
