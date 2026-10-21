@@ -1684,7 +1684,7 @@ async def test_a_chat_model_starts_with_the_watermark_and_keeps_its_key_version_
     _fast_readiness(monkeypatch)
     monkeypatch.setattr(watermark, "runtime_has_it", lambda version: True)
     monkeypatch.setattr(settings, "provenance_enabled", True)
-    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:42")
+    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:7340917253")
     dep, _node = deployment_env
     app = f"faden-{dep.id}"
     fake = _FakeNodeControl(
@@ -1702,15 +1702,15 @@ async def test_a_chat_model_starts_with_the_watermark_and_keeps_its_key_version_
 
     await manager.reconcile_deployment(dbsession, dep, node_control=fake)
     assert dep.phase == "running"
-    assert keys_run() == [{"algorithm": "gumbel", "context_width": 4, "key": 42}]
+    assert keys_run() == [{"algorithm": "gumbel", "context_width": 4, "key": 7340917253}]
     mark = {"algorithm": "gumbel", "key_version": 1, "context_width": 4, "tokenizer": "org/tiny-model"}
     assert dep.observed_status_json["applied_watermark"] == mark
     endpoint = (await EndpointDAO(dbsession).list_for_deployment(dep.id))[0]
     assert endpoint.published_json["watermark"] == mark, "for the gateway's receipts; never the key"
-    assert "42" not in str(endpoint.published_json)
+    assert "7340917253" not in str(endpoint.published_json)
 
     # faden secrets rotate: a version 2. A saved change that compiles the same applies nothing.
-    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:42,2:43")
+    monkeypatch.setattr(settings, "provenance_watermark_keys", "1:7340917253,2:7340917254")
     dep.generation += 1
     await manager.reconcile_deployment(dbsession, dep, node_control=fake)
     assert len(keys_run()) == 1, "the model was not restarted for the new key"
@@ -1719,5 +1719,5 @@ async def test_a_chat_model_starts_with_the_watermark_and_keeps_its_key_version_
     dep.spec_json = {**dep.spec_json, "engine": {"name": "vllm", "config": {"max_model_len": 4096}}}
     dep.generation += 1
     await manager.reconcile_deployment(dbsession, dep, node_control=fake)
-    assert keys_run()[-1]["key"] == 43
+    assert keys_run()[-1]["key"] == 7340917254
     assert dep.observed_status_json["applied_watermark"]["key_version"] == 2
