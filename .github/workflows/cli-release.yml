@@ -278,7 +278,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pip install --upgrade pip
+          # pip cannot replace its own pip.exe on Windows; python -m pip can.
+          python -m pip install --upgrade pip
           # The report names what the wheel brings: the packages the notices list.
           pip install --ignore-installed --report "$RUNNER_TEMP/cli-install.json" dist/*.whl
           pip install pyinstaller
