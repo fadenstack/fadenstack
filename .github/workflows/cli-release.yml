@@ -52,11 +52,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # The deployment files the wheel carries come from shared; the release
-          # feed's entry from release/, checked against the backend's agent version.
+          # The deployment files the wheel carries come from shared, the PII catalog
+          # from pii/faden_pii; the release feed's entry from release/, checked
+          # against the backend's agent version.
           sparse-checkout: |
             cli
             shared
+            pii/faden_pii
             release
             backend/faden_backend/web/api/install
 
@@ -131,6 +133,8 @@ jobs:
           for f in docker-compose.yaml nginx/nginx.conf initdb/01-init.sql prometheus/prometheus.yml; do
             grep -q "faden_cli/bundle/shared/$f" contents.txt || { echo "::error::wheel lacks $f"; exit 1; }
           done
+          # deploy reads it while the CLI starts: without it no command runs (0.5.0rc1).
+          grep -q "faden_cli/bundle/pii-catalog.json" contents.txt || { echo "::error::wheel lacks the PII catalog"; exit 1; }
           if grep -qE "bundle/shared/(\.env|\.bootstrap-credentials|backups/)" contents.txt; then
             echo "::error::wheel carries install state"; exit 1
           fi

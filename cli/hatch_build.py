@@ -78,10 +78,14 @@ class CustomBuildHook(BuildHookInterface):
 
     def initialize(self, version: str, build_data: dict) -> None:  # noqa: ARG002
         catalog = Path(self.root).parent / "pii/faden_pii/pii-catalog.json"
+        shared = Path(self.root).parent / "shared"
         if catalog.is_file():
             prefix = "src/faden_cli" if self.target_name == "sdist" else "faden_cli"
             build_data["force_include"][str(catalog)] = f"{prefix}/bundle/pii-catalog.json"
-        shared = Path(self.root).parent / "shared"
+        elif shared.is_dir():
+            # From a checkout that lacks pii/: the CLI would not start (deploy reads the catalog on import).
+            msg = f"The PII catalog {catalog} is missing; the CLI cannot be built without it."
+            raise FileNotFoundError(msg)
         if not shared.is_dir():
             # Building from an sdist: the files are already in the package.
             return
