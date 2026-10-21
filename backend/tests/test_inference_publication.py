@@ -83,6 +83,7 @@ async def test_reconcile_publication_published_endpoint(mock_session, mock_gatew
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
         watermark=None,  # the endpoint names no watermark
+        text_marking=None,  # the provider has none set
     )
 
 
@@ -150,6 +151,7 @@ async def test_reconcile_publication_degraded_deployment_with_ready_replica(mock
         vision=None,  # the deployment does not say
         machine_tls=False,  # published plain: no machine_tls in the endpoint
         watermark=None,  # the endpoint names no watermark
+        text_marking=None,  # the provider has none set
     )
 
 

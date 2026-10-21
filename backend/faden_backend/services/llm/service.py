@@ -667,6 +667,7 @@ class LLMService:
                     litellm_model=model.hf_repo_id or None,
                     task=runtime_kind(runtime),
                     tools=runtime_calls_tools(runtime),
+                    text_marking=provider.text_marking,
                 )
         except Exception as exc:
             log.exception("Failed to start runtime container: %s", exc)
@@ -780,6 +781,19 @@ class LLMService:
             extra_params=provider.extra_params,
             tools=_calls_tools(provider),
             vision=_sees_pictures(provider),
+            text_marking=provider.text_marking,
+        )
+
+    async def publish_text_marking(self, runtime_dao: RuntimeDAO, provider: LLMProvider) -> None:
+        """Bring what an administrator set about marking a provider's chat answers to its routes now."""
+        runtimes = await runtime_dao.list_by_provider(provider.id)
+        source = None
+        if provider.source_kind and provider.source_id:
+            source = (provider.source_kind, provider.source_id)
+        await self.gateway_sync.set_text_marking(
+            runtime_ids=[runtime.id for runtime in runtimes],
+            source=source,
+            text_marking=provider.text_marking,
         )
 
     async def sync_remote_routes(self, runtime_dao: RuntimeDAO, provider: LLMProvider) -> int:

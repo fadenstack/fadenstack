@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -50,6 +51,7 @@ from faden_backend.web.api.llm.schema import (
     ResidencyOverrideRequest,
     TestEndpointRequest,
     TestEndpointResponse,
+    TextMarkingRequest,
 )
 from faden_backend.web.api.rbac import require_permission
 
@@ -602,6 +604,48 @@ async def set_provider_residency(
         severity="normal",
         audit_dao=audit_dao,
         metadata_json=json.dumps({"override": body.override}),
+    )
+    return await _dto_with_residency(provider_dao.session, provider)
+
+
+@router.put("/{provider_id}/text-marking", response_model=ProviderDTO)
+async def set_provider_text_marking(
+    provider_id: uuid.UUID,
+    body: TextMarkingRequest,
+    user: User = Depends(require_permission("llm.providers", "update")),
+    provider_dao: ProviderDAO = Depends(),
+    runtime_dao: RuntimeDAO = Depends(),
+    audit_dao: AuditDAO = Depends(),
+    llm_service: LLMService = Depends(get_llm_service),
+) -> ProviderDTO:
+    """Record that a provider marks its text itself, or let its chat answers go out unmarked; or clear either.
+
+    With the provenance module on, the gateway refuses a chat to a route whose answers would carry no mark
+    (EU AI Act Art. 50(2)): a remote provider without evidence that it marks, a runtime without the
+    watermark. Allowed on providers a deployment owns too, and it reaches the routes at once.
+    """
+    provider = await provider_dao.get(provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    who = {"by": user.email, "at": datetime.now(UTC).isoformat(timespec="seconds")}
+    marking: dict[str, Any] = {}
+    if body.upstream is not None:
+        marking["upstream"] = {**body.upstream.model_dump(mode="json", exclude_none=True), **who}
+    if body.allow_unmarked is not None:
+        marking["allow_unmarked"] = {"reason": body.allow_unmarked.reason, **who}
+    provider.text_marking = marking or None
+    await provider_dao.session.flush()
+    await provider_dao.session.refresh(provider)  # updated_at is the database's
+    await llm_service.publish_text_marking(runtime_dao, provider)
+    await audit_action(
+        action="llm.provider.text_marking",
+        target_type="llm_provider",
+        target_id=str(provider_id),
+        result=AuditResult.ALLOW,
+        actor_id=user.id,
+        severity="high" if "allow_unmarked" in marking else "normal",
+        audit_dao=audit_dao,
+        metadata_json=json.dumps(marking),
     )
     return await _dto_with_residency(provider_dao.session, provider)
 

@@ -175,6 +175,16 @@ class LLMProvider(Base):
             "private addresses. NULL: detected (services/llm/residency.py)."
         ),
     )
+    text_marking: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        doc=(
+            "What an administrator set about marking this provider's chat answers (EU AI Act Art. 50(2)): "
+            "'upstream', the evidence that the provider marks its text itself, and 'allow_unmarked', why it "
+            "may answer without a mark; each with who and when. With the provenance module on, the gateway "
+            "refuses a chat to a route that writes no mark and has neither (gateway text_marking.py)."
+        ),
+    )
     source_kind: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,

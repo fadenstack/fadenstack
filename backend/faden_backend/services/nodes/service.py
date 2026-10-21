@@ -1913,6 +1913,7 @@ class NodeControlService:
             },
             task=runtime_kind(runtime),
             tools=runtime_calls_tools(runtime),
+            text_marking=provider.text_marking,
             machine_tls=bool(getattr(runtime, "machine_tls", False)),
         )
 

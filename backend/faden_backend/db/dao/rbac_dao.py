@@ -75,6 +75,9 @@ _DEFAULT_ROLES: dict[str, dict[str, list[str]]] = {
         "chat.sessions": ["create", "read", "update", "delete"],
         "chat.attachments": ["create", "read", "delete"],
         "chat.debug": ["read"],
+        # Declaring a chat request's exempt purpose (code, translation, correction): such a request is
+        # not refused for lack of a mark (gateway text_marking.py). In no other built-in role.
+        "chat.purpose": ["declare"],
         "chat.tool_policy": ["read", "update"],
         "pii.session": ["read", "strengthen", "weaken"],
         "skills": ["read", "create", "share", "publish", "manage"],

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
@@ -148,6 +148,27 @@ class ResidencyDTO(BaseModel):
     provider: str | None = None
 
 
+class UpstreamMarkRequest(BaseModel):
+    """Evidence that a provider marks its models' text itself: where it says so, and when it was read."""
+
+    vendor: str | None = Field(default=None, max_length=64)
+    evidence_url: str = Field(min_length=12, max_length=2000, pattern=r"^https://\S+$")
+    evidence_date: date
+
+
+class AllowUnmarkedRequest(BaseModel):
+    """Why a provider's chat answers may go out without a mark."""
+
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class TextMarkingRequest(BaseModel):
+    """What an administrator says about marking a provider's chat answers; a part left out is cleared."""
+
+    upstream: UpstreamMarkRequest | None = None
+    allow_unmarked: AllowUnmarkedRequest | None = None
+
+
 class ResidencyOverrideRequest(BaseModel):
     """Say where a provider's prompts go, or ``null`` to go back to detecting it."""
 
@@ -182,6 +203,8 @@ class ProviderDTO(BaseModel):
     managed_by: ManagedByDTO | None = None
     #: What an administrator set; NULL when residency is detected.
     residency_override: str | None = None
+    #: What an administrator set about marking its chat answers (``upstream``, ``allow_unmarked``).
+    text_marking: dict[str, Any] | None = None
     #: Where its prompts go. Filled by the list and detail endpoints.
     residency: ResidencyDTO | None = None
     created_at: datetime

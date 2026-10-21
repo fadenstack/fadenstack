@@ -9,6 +9,7 @@ runtimes (Ray, Dynamo, vLLM).
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -204,6 +205,8 @@ class InferencePublicationCoordinator:
                 # How the runtime watermarks the answers (services/provenance/watermark.py):
                 # the gateway's receipt for an answer names it.
                 watermark=_watermark((primary_endpoint.published_json or {}).get("watermark")),
+                # What an administrator set about marking its answers (the derived provider's).
+                text_marking=await self._text_marking(deployment.id),
             )
         elif primary_endpoint.status in (EndpointStatus.FAILED, EndpointStatus.RETIRED) or ready_replicas == 0:
             # Endpoint is unhealthy or has 0 ready replicas
@@ -341,6 +344,19 @@ class InferencePublicationCoordinator:
         await self.session.flush()
         log.info("Removed the provider row owned by deployment %s", deployment_id)
         return True
+
+    async def _text_marking(self, deployment_id: uuid.UUID) -> dict | None:
+        """What an administrator set about marking the deployment's chat answers (its provider's).
+
+        Unreadable, the route goes out without it: the gateway then refuses chats it cannot mark, rather than
+        let them through.
+        """
+        try:
+            provider = await self._derived_provider(deployment_id)
+        except Exception:  # the routing row matters more than the setting
+            log.exception("Could not read the provider row of deployment %s", deployment_id)
+            return None
+        return getattr(provider, "text_marking", None)
 
     async def _derived_provider(self, deployment_id) -> LLMProvider | None:
         rows = await self.session.execute(

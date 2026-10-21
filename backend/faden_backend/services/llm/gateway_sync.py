@@ -144,6 +144,7 @@ class GatewaySyncService:
         tools: bool | None = None,
         vision: bool | None = None,
         machine_tls: bool = False,
+        text_marking: dict[str, Any] | None = None,
     ) -> None:
         """Create or update gateway routing records for a runtime.
 
@@ -176,6 +177,9 @@ class GatewaySyncService:
             node_metadata = {**(node_metadata or {}), "tools": tools}
         if vision is not None:
             node_metadata = {**(node_metadata or {}), "vision": vision}
+        if text_marking:
+            # What an administrator set about marking its chat answers (the provider's ``text_marking``).
+            node_metadata = {**(node_metadata or {}), "text_marking": text_marking}
         gateway_type = _map_provider_type(
             backend_provider_type, is_remote=is_remote, litellm_provider=litellm_provider,
         )
@@ -444,6 +448,7 @@ class GatewaySyncService:
         vision: bool | None = None,
         machine_tls: bool = False,
         watermark: dict[str, Any] | None = None,
+        text_marking: dict[str, Any] | None = None,
     ) -> uuid.UUID | None:
         """Create or update gateway routing records for an inference deployment.
 
@@ -527,11 +532,13 @@ class GatewaySyncService:
                             {
                                 k: v for k, v in (
                                     ("task", task), ("tools", tools), ("vision", vision),
-                                    ("watermark", watermark),
+                                    ("watermark", watermark), ("text_marking", text_marking or None),
                                 )
                                 if v is not None
                             },
-                        ) if (task or tools is not None or vision is not None or watermark) else None,
+                        ) if (
+                            task or tools is not None or vision is not None or watermark or text_marking
+                        ) else None,
                         "dep_id": deployment_id,
                         "machine_tls": machine_tls,
                     },
@@ -666,6 +673,42 @@ class GatewaySyncService:
         except Exception:
             log.exception("Gateway sync: failed to read the pool of %s", alias)
             return []
+
+    async def set_text_marking(
+        self,
+        *,
+        runtime_ids: list[uuid.UUID],
+        source: tuple[str, str] | None,
+        text_marking: dict[str, Any] | None,
+    ) -> None:
+        """Put a provider's ``text_marking`` on its routes now; the next publish writes it again.
+
+        Its runtimes' routes (*runtime_ids*), and those of the deployment or found container it belongs to
+        (*source*: the provider's ``source_kind`` and ``source_id``, as the routes carry them).
+        """
+        if not self.enabled or not (runtime_ids or source):
+            return
+        async with self._sf() as session:  # type: ignore[union-attr]
+            await session.execute(
+                text("""
+                    UPDATE llm_provider_instance
+                    SET node_metadata = CAST(
+                            (COALESCE(CAST(node_metadata AS jsonb), '{}'::jsonb) - 'text_marking')
+                            || CASE WHEN CAST(:marking AS jsonb) IS NULL THEN '{}'::jsonb
+                                    ELSE jsonb_build_object('text_marking', CAST(:marking AS jsonb)) END
+                            AS json),
+                        updated_at = NOW()
+                    WHERE id = ANY(:ids)
+                       OR (source_kind = :source_kind AND CAST(source_id AS text) = :source_id)
+                """),
+                {
+                    "marking": json.dumps(text_marking) if text_marking else None,
+                    "ids": list(runtime_ids),
+                    "source_kind": source[0] if source else None,
+                    "source_id": source[1] if source else None,
+                },
+            )
+            await session.commit()
 
     async def set_source_health(
         self,
