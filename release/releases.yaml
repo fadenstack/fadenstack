@@ -25,6 +25,41 @@
 series: []
 
 releases:
+  - version: 0.5.0
+    channel: stable
+    date: ""
+    severity: security
+    summary: >-
+      A Preview release: content marking for the EU AI Act (Art. 50(2)), with chats answered only by models
+      whose answers carry a mark; checking content, the local PII runtime, the LLM Calls page, and the GB10
+      and x86_64 runtimes with vLLM 0.31. Security updates.
+    highlights:
+      - "A Preview release: `faden deploy` and `faden upgrade` say what that means and ask before they go on."
+      - "Content marking, on by default: pictures carry signed C2PA content credentials, an invisible watermark and IPTC metadata; every text answer gets a signed receipt, and chat models on a runtime with vLLM 0.30 or later write a text watermark."
+      - "Check content: everyone signed in can check a text, a picture or a file; the public check page for pictures and files is on by default."
+      - "An edited copy of an answer is still found, by the fingerprint its receipt keeps."
+      - "Chat models that watermark start without speculative decoding (MTP), with which the watermark did not hold."
+      - "The GB10 runtime with vLLM 0.31.0, certified on the DGX Spark pair with its watermark, is the GB10 default."
+      - "The x86_64 runtime with vLLM 0.31.0 writes the text watermark too, certified on an NVIDIA TITAN RTX: the x86_64 default."
+      - "Before you upgrade: with content marking on, chats are refused for models that cannot mark their answers. Switch clusters to the runtime with vLLM 0.31, and for each remote provider record that it marks its text or allow it unmarked (Data Residency Map, Content marking). Help: Content marking."
+      - "An answer an administrator allowed without a mark carries a notice, in the chat and in the x-faden-unmarked header; work the AI Act exempts (code, translation, correction) is declared per request by those allowed to."
+      - "The PII module runs a local model, with the language you choose."
+      - "LLM Calls: find the call that went wrong, with its route and timeline."
+      - "The console chat says, under the message box, that its answers come from an AI."
+      - "Receipts count answers of remote providers as unmarked, unless an administrator recorded evidence that the provider marks them."
+      - "The provenance module's licence (still the draft) asks that the marks are kept, and Help gives a sentence for your own terms of use."
+      - "Security updates: certifi 2026.10.19 (compromised emSign roots), Pillow 13.0.0, aiohttp 3.14.5, in the services and in the node agent 0.2.11; update the machines' agents after the server (Help: Upgrading)."
+      - "Known gaps: a text can be checked only by people with an account on the installation that wrote it; the x86_64 runtime is certified on one machine, not on a cluster of several."
+    fixes:
+      - id: GHSA-6q48-6c7w-9gw2
+        severity: critical
+        summary: certifi before 2026.10.19 trusts emSign roots whose intermediate keys were compromised.
+      - id: GHSA-8g5g-8vmr-9782
+        severity: critical
+        summary: Pillow before 13.0.0 (and further advisories fixed with it).
+    upgrade_from: 0.4.0
+    components:
+      agent: 0.2.11
   - version: 0.5.0rc4
     channel: preview
     date: ""
