@@ -455,6 +455,18 @@ export default function ChatInput({
         </Box>
       )}
 
+      {/* That the answers come from an AI (EU AI Act Art. 50(1)), as the SDKs' panels say it */}
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        align="center"
+        dir="auto"
+        data-testid="ai-notice"
+        sx={{ mt: -0.5 }}
+      >
+        {t("chat.ai_notice")}
+      </Typography>
+
       {/* $ picker */}
       <Popper
         open={pickerOpen}

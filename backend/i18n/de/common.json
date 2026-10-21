@@ -2640,7 +2640,8 @@
     "rename_save": "Speichern",
     "rename_cancel": "Abbrechen",
     "title_label": "Chat-Titel",
-    "writing": "Eine Antwort wird geschrieben"
+    "writing": "Eine Antwort wird geschrieben",
+    "ai_notice": "Antworten werden von einer KI erzeugt und können falsch sein. Prüfen Sie Wichtiges."
   },
   "tools": {
     "executionMode": "Ausführung",

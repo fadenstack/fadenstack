@@ -2640,7 +2640,8 @@
     "rename_save": "Guardar",
     "rename_cancel": "Cancelar",
     "title_label": "Título del chat",
-    "writing": "Se está escribiendo una respuesta"
+    "writing": "Se está escribiendo una respuesta",
+    "ai_notice": "Las respuestas las genera una IA y pueden contener errores. Compruebe lo importante."
   },
   "tools": {
     "executionMode": "Ejecución",

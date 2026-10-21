@@ -2640,7 +2640,8 @@
     "rename_save": "保存",
     "rename_cancel": "取消",
     "title_label": "聊天标题",
-    "writing": "正在编写回复"
+    "writing": "正在编写回复",
+    "ai_notice": "回答由人工智能生成，可能有误。请核实重要信息。"
   },
   "tools": {
     "executionMode": "执行",

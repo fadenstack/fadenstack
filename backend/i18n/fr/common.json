@@ -2326,7 +2326,8 @@
     "rename_save": "Enregistrer",
     "rename_cancel": "Annuler",
     "title_label": "Titre du chat",
-    "writing": "Une réponse est en cours de rédaction"
+    "writing": "Une réponse est en cours de rédaction",
+    "ai_notice": "Les réponses sont générées par une IA et peuvent être erronées. Vérifiez l'essentiel."
   },
   "mcp": {
     "servers_title": "Serveurs MCP",

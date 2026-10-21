@@ -170,3 +170,14 @@ describe("ChatInput pictures", () => {
     expect(screen.queryByTestId("picture-hint")).toBeNull();
   });
 });
+
+describe("ChatInput AI notice", () => {
+  beforeEach(() => {
+    vi.spyOn(chatApi, "listModels").mockResolvedValue([]);
+  });
+
+  it("says under the message box that the answers come from an AI", () => {
+    renderInput(null);
+    expect(screen.getByTestId("ai-notice")).toHaveTextContent(/AI|chat\.ai_notice/);
+  });
+});
