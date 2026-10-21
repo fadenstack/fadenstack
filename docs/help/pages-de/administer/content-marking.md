@@ -22,6 +22,11 @@ Wie Benutzer einen Text, ein Bild oder eine Datei prüfen, steht unter [Inhalte 
     umschreiben, damit sein Wasserzeichen verschwindet. Der Verhaltenskodex der EU zur Kennzeichnung verlangt von
     Anbietern, darauf hinzuweisen.
 
+    Die Lizenz des Moduls Herkunftsnachweis (Abschnitt 5.5) verlangt dasselbe von Ihrer Organisation, und dass Sie es
+    in die Nutzungsbedingungen für Ihre eigenen Benutzer aufnehmen. Zum Beispiel: *"Entfernen, verändern oder
+    verbergen Sie keine Kennzeichnungen, die Inhalte als KI-erzeugt ausweisen (Wasserzeichen,
+    Herkunftsangaben, Metadaten), und helfen Sie anderen nicht dabei."*
+
 ## Bilder {#pictures}
 
 Jedes Bild, das ein Bildmodell über Fadenstack zurückgibt, wird gekennzeichnet, bevor es den Server verlässt:
