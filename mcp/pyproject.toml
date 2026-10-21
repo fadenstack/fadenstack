@@ -1,6 +1,6 @@
 [project]
 name = "faden_mcp"
-version = "0.5.0rc1"
+version = "0.5.0rc2"
 description = "MCP Tool Registry — governed MCP broker for Fadenstack"
 readme = "README.md"
 license = "Apache-2.0"

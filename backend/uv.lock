@@ -756,7 +756,7 @@ wheels = [
 
 [[package]]
 name = "faden-backend"
-version = "0.5.0rc1"
+version = "0.5.0rc2"
 source = { virtual = "." }
 dependencies = [
     { name = "aio-pika" },
