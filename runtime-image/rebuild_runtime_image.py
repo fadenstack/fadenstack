@@ -99,6 +99,17 @@ def _from_ref(dockerfile: str) -> str:
 _GB10_VLLM_RELEASE = "vllm" + _from_ref("Dockerfile.gb10-vllm").rsplit(":", 1)[-1].split("-")[0].lstrip("v")
 
 
+def _pinned_vllm(dockerfile: str) -> str:
+    found = re.search(r'"vllm(?:\[[^\]]*\])?==([0-9][^"]*)"', (HERE / dockerfile).read_text(encoding="utf-8"))
+    return "vllm" + found.group(1) if found else ""
+
+
+#: The x86_64 runtime is named after the vLLM its Dockerfile installs: ``"vllm[audio]==0.31.0"`` makes it
+#: ``vllm0.31.0``. The one before it, vLLM 0.26.0, keeps the names it shipped with
+#: (runtime-manifest-x86_64.json, faden-ray-vllm-x86_64-ray2.58).
+_X86_VLLM_RELEASE = _pinned_vllm("Dockerfile.x86_64")
+
+
 @dataclass(frozen=True)
 class Flavor:
     """One runtime image: how it is built and where its manifest goes.
@@ -139,9 +150,9 @@ FLAVORS: dict[str, Flavor] = {
         ("x86_64", Flavor(
             name="x86_64",
             dockerfile="Dockerfile.x86_64",
-            manifest="runtime-manifest-x86_64.json",
-            default_tag="faden-ray-runtime-x86_64:2.58.0",
-            runtime_id="faden-ray-vllm-x86_64-ray2.58",
+            manifest=f"runtime-manifest-x86_64-{_X86_VLLM_RELEASE}.json",
+            default_tag=f"faden-ray-runtime-x86_64:ray2.58-{_X86_VLLM_RELEASE}",
+            runtime_id=f"faden-ray-vllm-x86_64-ray2.58-{_X86_VLLM_RELEASE}",
             hardware_target="generic x86_64 NVIDIA",
             target_hardware={"platform": "generic x86_64", "gpu": "NVIDIA", "architecture": "x86_64"},
         )),

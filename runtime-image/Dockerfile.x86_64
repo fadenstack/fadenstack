@@ -13,13 +13,11 @@
 # helper starts a cluster that then reads as dead, because nothing can be
 # asked about it.
 #
-# Built from public images only, so CI can build it: it used to start from
-# `llmport-agent-ray-smoke:2.58.0`, an image that existed on one workstation.
-# That image was python:3.12.14-slim (trixie) plus `ray[serve,llm]==2.58.0`,
-# whose `llm` extra pins vLLM 0.26.0 exactly -- the stack the manifest
-# records. vLLM is named here as well, so the version shows where people read
-# it. CUDA comes with the torch and vLLM wheels; the host only needs the
-# NVIDIA driver and container toolkit.
+# Built from public images only, so CI can build it: python:3.12.14-slim
+# (trixie), Ray 2.58 and vLLM 0.31.0, the first vLLM here that writes the text
+# watermark (runtime-manifest-x86_64-vllm0.31.0.json; vLLM 0.26.0 before it,
+# runtime-manifest-x86_64.json). CUDA comes with the torch and vLLM wheels; the
+# host only needs the NVIDIA driver and container toolkit.
 FROM python:3.12.14-slim-trixie
 
 ENV PIP_NO_CACHE_DIR=1 \
@@ -32,12 +30,18 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc libc6-dev curl procps \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install "ray[serve,llm]==2.58.0" "vllm==0.26.0"
+# Ray's [llm] extra pins vLLM 0.26, so the rest of that extra is named here
+# instead, as in the GB10 image: all of it but vllm and nixl (disaggregated
+# serving only).
+RUN pip install "vllm[audio]==0.31.0" "ray[serve]==2.58.0" \
+        pyarrow jsonschema jsonref typer hf_transfer pandas ninja pybind11 meson mmh3 smart_open colorful
 
-# Every vLLM module and name Ray Serve LLM imports must resolve, so a vLLM
-# bump that moves one fails here instead of on a node.
-COPY check_ray_vllm.py /opt/llm-port/build/
-RUN python3 /opt/llm-port/build/check_ray_vllm.py
+# Ray 2.58 imports two vLLM modules from where vLLM 0.29 and later no longer
+# have them (vllm_compat.py, temporary); then every vLLM module and name Ray
+# Serve LLM imports must resolve, or the build fails here instead of on a node.
+COPY vllm_compat.py check_ray_vllm.py /opt/llm-port/build/
+RUN python3 /opt/llm-port/build/vllm_compat.py && python3 /opt/llm-port/build/check_ray_vllm.py && \
+    python3 -c "import ray.serve.llm as s; print('ray serve llm OK:', s.__name__)"
 
 # Air-gapped runtime defaults and telemetry suppression.
 ENV HF_HUB_OFFLINE=1 \
