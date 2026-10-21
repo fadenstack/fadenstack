@@ -497,7 +497,10 @@ jobs:
           # --delay-updates: both files change together, so no install reads a feed with the old signature.
           rsync -e "ssh -i $HOME/.ssh/feed -o BatchMode=yes" --delay-updates --chmod=F644 \
             feed/index.json feed/index.json.sig "$FEED_DEPLOY_HOST:v1/"
-          curl -fsS https://fadenstack.com/updates/v1/index.json | grep -q "\"${{ needs.build.outputs.version }}\""
+          # Read whole, then searched: grep -q stops at the first match and curl, piped into it, failed with
+          # "Failure writing output" (exit 23) on a feed that was published (0.5.0).
+          curl -fsS https://fadenstack.com/updates/v1/index.json -o feed-live.json
+          grep -q "\"${{ needs.build.outputs.version }}\"" feed-live.json
 
   sbom:
     needs: [build, executables]
