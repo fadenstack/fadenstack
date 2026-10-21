@@ -64,8 +64,8 @@ These answers carry no text watermark, and their receipt records which of these 
 - short answers, under 200 tokens;
 - answers asked for with temperature 0 (greedy decoding: the model always takes its most likely word);
 - answers of a model on a runtime without the watermark (see [The runtime decides](#the-runtime-decides));
-- answers of remote providers. Some mark their own models' text (Anthropic its newer models, OpenAI when an
-  account switches it on), but no answer says whether it was marked, so the receipt counts them as unmarked;
+- answers of remote providers, unless an administrator recorded that the provider marks its text itself: no
+  answer says whether it was marked (see [Models that cannot mark their answers](#models-that-cannot-mark-their-answers));
 - answers of a deployment for which a superuser switched the watermark off.
 
 !!! note "The same question, a new answer"
@@ -77,8 +77,8 @@ These answers carry no text watermark, and their receipt records which of these 
 ## The runtime decides
 
 Whether a chat model watermarks its answers depends on its cluster's runtime. On a cluster's **Runtime** card, a
-runtime with vLLM 0.30 or later has the watermark; for GB10 machines that is the runtime with vLLM 0.31, while
-the one with vLLM 0.29 has none.
+runtime with vLLM 0.30 or later has the watermark: for GB10 machines and for x86_64 machines that is the runtime
+with vLLM 0.31, while the GB10 one with vLLM 0.29 and the x86_64 one with vLLM 0.26 have none.
 
 - A model picks up the watermark the next time it starts. Switching a cluster's runtime restarts the cluster and
   its models (see [Clusters](../operate/clusters.md#runtime)).
@@ -90,6 +90,38 @@ the one with vLLM 0.29 has none.
 - A superuser can switch the watermark off for one deployment with the engine setting `watermark_config: false`
   (see [Engine settings](deployments.md#engine-settings)). The receipts of its answers then say that they carry
   none.
+
+## Models that cannot mark their answers
+
+With content marking on, a chat goes only to a model whose answers carry a mark: a model on a runtime with the
+watermark, or a remote provider for which an administrator recorded that it marks its text itself. Any other
+chat is refused with the error `unmarked_endpoint`, before anything is sent to the model. Pictures are always
+marked by Fadenstack itself; embeddings and reranking are not affected.
+
+For a model that is refused, an administrator chooses one of these, on the provider's card in the **Data
+Residency Map**, under **Content marking**:
+
+- **Run it on a runtime with the watermark** (see [The runtime decides](#the-runtime-decides)). Nothing needs to
+  be set.
+- **The provider marks its models' text itself**: for a remote API, with a link to where the provider says so
+  and the date you read it. The receipts of its answers then say that the provider marked them. Check it for
+  the models you use: Anthropic marks its newer models, OpenAI only when an account switches it on, and no
+  answer says whether it was marked.
+- **Allow answers without a mark**, with a reason. Its answers then go out with a notice: the chat shows one
+  under the answer, and the API sends the header `x-faden-unmarked: allowed-by-administrator` (and the event
+  `faden.unmarked`). The choice is recorded with your name and the time, and in the audit log.
+
+!!! warning "After the upgrade to 0.5.0"
+    Chats with remote providers, and with models on runtimes without the watermark, are refused until one of
+    the three is done. Switch x86_64 and GB10 clusters to the runtime with vLLM 0.31, and decide for each remote
+    provider.
+
+**Work that is not marked.** The AI Act does not ask for marks on text that only edits a person's text (a
+correction, a translation), nor on code. A client whose user's roles give the permission `chat.purpose:declare`
+says so per request, with `"faden": {"purpose": "correction"}` (or `translation`, `code`) in the request
+body; the model never sees it. Such a request is not refused, and its receipt says `exempt-edit`. Only the
+administrator's role has this permission; give it to others with a role of your own (see
+[Users, groups and roles](users.md#roles-of-your-own)).
 
 ## What the agents write
 

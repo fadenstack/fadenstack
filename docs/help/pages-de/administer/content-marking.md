@@ -73,9 +73,9 @@ Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was da
   wahrscheinlichste Wort);
 - Antworten eines Modells auf einer Runtime ohne das Wasserzeichen (siehe
   [Die Runtime entscheidet](#the-runtime-decides));
-- Antworten externer Provider. Manche kennzeichnen den Text ihrer Modelle selbst (Anthropic bei seinen neueren
-  Modellen, OpenAI, wenn ein Konto es einschaltet), aber keine Antwort sagt, ob sie gekennzeichnet ist; der
-  Beleg zählt sie daher als nicht gekennzeichnet;
+- Antworten externer Provider, außer ein Administrator hat festgehalten, dass der Anbieter seinen Text selbst
+  kennzeichnet: Keine Antwort sagt, ob sie gekennzeichnet ist (siehe
+  [Modelle, die ihre Antworten nicht kennzeichnen können](#models-that-cannot-mark-their-answers));
 - Antworten einer Bereitstellung, für die ein Superuser das Wasserzeichen ausgeschaltet hat.
 
 !!! note "Dieselbe Frage, eine neue Antwort"
@@ -89,7 +89,8 @@ Diese Antworten tragen kein Text-Wasserzeichen, und ihr Beleg hält fest, was da
 
 Ob ein Chat-Modell seine Antworten mit dem Wasserzeichen versieht, hängt von der Runtime seines Clusters ab. Auf
 der Karte **Laufzeit** eines Clusters gilt: Eine Runtime mit vLLM 0.30 oder neuer hat das Wasserzeichen; für
-GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
+GB10- und für x86_64-Maschinen ist das die Runtime mit vLLM 0.31, die GB10-Runtime mit vLLM 0.29 und die
+x86_64-Runtime mit vLLM 0.26 haben keines.
 
 - Ein Modell bekommt das Wasserzeichen beim nächsten Start. Ein Wechsel der Runtime startet den Cluster und seine
   Modelle neu (siehe [Cluster](../operate/clusters.md#runtime)).
@@ -101,6 +102,42 @@ GB10-Maschinen ist das die Runtime mit vLLM 0.31, die mit vLLM 0.29 hat keines.
 - Ein Superuser kann das Wasserzeichen für eine einzelne Bereitstellung mit der Engine-Einstellung
   `watermark_config: false` ausschalten (siehe [Engine-Einstellungen](deployments.md#engine-settings)). Die Belege
   ihrer Antworten vermerken dann, dass sie keines tragen.
+
+## Modelle, die ihre Antworten nicht kennzeichnen können {#models-that-cannot-mark-their-answers}
+
+Mit eingeschalteter Kennzeichnung geht ein Chat nur an ein Modell, dessen Antworten eine Kennzeichnung tragen:
+ein Modell auf einer Runtime mit dem Wasserzeichen, oder ein externer Anbieter, für den ein Administrator
+festgehalten hat, dass er seinen Text selbst kennzeichnet. Jeder andere Chat wird mit dem Fehler
+`unmarked_endpoint` abgelehnt, bevor etwas an das Modell geht. Bilder kennzeichnet Fadenstack immer selbst;
+Embeddings und Reranking sind nicht betroffen.
+
+Für ein abgelehntes Modell wählt ein Administrator eines davon, auf der Karte des Anbieters in der
+**Datenresidenz-Karte** unter **Kennzeichnung**:
+
+- **Auf einer Runtime mit dem Wasserzeichen ausführen** (siehe [Die Runtime entscheidet](#the-runtime-decides)).
+  Dann ist nichts festzulegen.
+- **Der Anbieter kennzeichnet den Text seiner Modelle selbst**: für eine externe API, mit einem Link auf die
+  Stelle, an der der Anbieter das sagt, und dem Datum, an dem Sie sie gelesen haben. Die Belege seiner Antworten
+  vermerken dann, dass der Anbieter sie gekennzeichnet hat. Prüfen Sie das für die Modelle, die Sie nutzen:
+  Anthropic kennzeichnet seine neueren Modelle, OpenAI nur, wenn ein Konto es einschaltet, und keine Antwort
+  sagt, ob sie gekennzeichnet ist.
+- **Antworten ohne Kennzeichnung erlauben**, mit einer Begründung. Seine Antworten gehen dann mit einem Hinweis
+  hinaus: Der Chat zeigt ihn unter der Antwort, die API sendet den Header
+  `x-faden-unmarked: allowed-by-administrator` (und das Ereignis `faden.unmarked`). Die Wahl wird mit Ihrem
+  Namen und der Zeit gespeichert, auch im Audit-Log.
+
+!!! warning "Nach dem Upgrade auf 0.5.0"
+    Chats mit externen Anbietern und mit Modellen auf Runtimes ohne das Wasserzeichen werden abgelehnt, bis eines
+    der drei erledigt ist. Stellen Sie x86_64- und GB10-Cluster auf die Runtime mit vLLM 0.31 um, und
+    entscheiden Sie für jeden externen Anbieter.
+
+**Arbeit, die nicht gekennzeichnet wird.** Die KI-Verordnung verlangt keine Kennzeichnung für Text, der nur den
+Text einer Person bearbeitet (eine Korrektur, eine Übersetzung), und nicht für Code. Ein Client, dessen
+Benutzer über seine Rollen die Berechtigung `chat.purpose:declare` hat, sagt das pro Anfrage mit
+`"faden": {"purpose": "correction"}` (oder `translation`, `code`) im Anfragetext; das Modell sieht es nie.
+Eine solche Anfrage wird nicht abgelehnt, und ihr Beleg vermerkt `exempt-edit`. Nur die Administratorrolle hat
+diese Berechtigung; andere bekommen sie über eine eigene Rolle (siehe
+[Benutzer, Gruppen und Rollen](users.md#roles-of-your-own)).
 
 ## Was die Agenten schreiben {#what-the-agents-write}
 
