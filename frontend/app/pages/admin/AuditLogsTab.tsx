@@ -105,7 +105,7 @@ export default function AuditLogsTab() {
       sortable: true,
       searchValue: (ev) => ev.action,
       render: (ev) => (
-        <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
+        <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem" translate="no">
           {ev.action}
         </Typography>
       ),

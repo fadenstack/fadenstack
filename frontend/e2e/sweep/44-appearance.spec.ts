@@ -38,7 +38,9 @@ test.describe("the brand and the accent", () => {
     await expect(page.getByText("fadenstack", { exact: true }).first()).toBeVisible();
     await expect(page.locator("svg[data-brand-mark]").first()).toBeVisible();
     await expect(page.locator('link[rel="icon"][href="/favicon.svg"]')).toHaveCount(1);
-    await expect(page.locator("body")).not.toContainText(/llm\.port|fadenstack\b(?!-)/i);
+    // The old name in any case; the lowercase name only as the wordmark ("Fadenstack 0.5.0" is the product).
+    await expect(page.locator("body")).not.toContainText(/llm\.port/i);
+    await expect(page.locator("body")).not.toContainText(/fadenstack\b(?!-)/);
     await w.inspect();
     await w.report("brand: dashboard");
     expect(w.failures()).toEqual([]);

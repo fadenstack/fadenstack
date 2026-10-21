@@ -96,7 +96,11 @@ export class Watch {
     await this.page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
     await this.page.waitForTimeout(800);
     const text = await this.page.locator("body").innerText().catch(() => "");
-    const lines = [...new Set(text.split("\n").map((l) => l.trim()).filter(Boolean))];
+    // Identifiers shown as they are (translate="no": an audit action such as auth.sign_in) are data, not keys.
+    const data = new Set(
+      (await this.page.locator('[translate="no"]').allInnerTexts().catch(() => [] as string[])).map((l) => l.trim()),
+    );
+    const lines = [...new Set(text.split("\n").map((l) => l.trim()).filter(Boolean))].filter((l) => !data.has(l));
     this.problems.rawKeys.push(...lines.filter(looksLikeKey));
     this.problems.errorScreen = ERROR_SCREENS.find((re) => re.test(text))?.source ?? null;
   }
