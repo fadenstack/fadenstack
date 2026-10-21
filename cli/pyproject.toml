@@ -46,6 +46,7 @@ dependencies = [
     "cryptography >=43",
     # Release versions in the update check and upgrade (0.5.0rc1 < 0.5.0).
     "packaging >=23",
+    "certifi>=2026.10.19",  # >=2026.10.19: GHSA-6q48-6c7w-9gw2 (emSign roots with compromised intermediate keys)
 ]
 
 [project.urls]

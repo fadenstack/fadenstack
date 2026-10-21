@@ -56,7 +56,7 @@ dependencies = [
   "python-multipart >=0.0.31",  # >=0.0.31: clears PYSEC-2026-3036/3037/3038/3039/3040
   # Transitive floors — uv lock is conservative (keeps previously locked versions), so each
   # floor is spelled out to force the vulnerable transitive versions up to the fix:
-  "pillow >=12.3.0",  # >=12.3.0: clears PILLOW GHSA-45hq-cxwh-f6vc et al.
+  "pillow>=13.0.0",  # >=13.0.0: GHSA-8g5g-8vmr-9782, GHSA-p4wg-p73j-c528 et al.
   "urllib3 >=2.8.0",  # >=2.8.0: clears PYSEC-2026-4175..4177
   "starlette >=1.3.1",  # >=1.3.1: clears starlette CVEs (requires instrumentator 8.x)
   "pyjwt >=2.15.0",  # >=2.15.0: clears PYSEC-2026-4140..4152/4183
@@ -68,6 +68,7 @@ dependencies = [
   "click >=8.3.3",  # >=8.3.3: clears PYSEC-2026-2132
   "pygments >=2.20.0",  # >=2.20.0: clears PYSEC-2026-2987
   "python-dotenv >=1.2.2",  # >=1.2.2: clears PYSEC-2026-2270
+  "certifi>=2026.10.19",  # >=2026.10.19: GHSA-6q48-6c7w-9gw2 (emSign roots with compromised intermediate keys)
 ]
 
 [dependency-groups]

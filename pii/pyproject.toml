@@ -54,6 +54,7 @@ dependencies = [
   "click>=8.3.3",  # >=8.3.3: clears PYSEC-2026-2132
   "pygments>=2.20.0",  # >=2.20.0: clears PYSEC-2026-2987
   "setuptools>=83.0.0",  # >=83.0.0: clears PYSEC-2026-3447
+  "certifi>=2026.10.19",  # >=2026.10.19: GHSA-6q48-6c7w-9gw2 (emSign roots with compromised intermediate keys)
 ]
 
 [project.optional-dependencies]
