@@ -20,6 +20,12 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[manifest]
+constraints = [
+    { name = "aiohttp", specifier = ">=3.14.4" },
+    { name = "pillow", specifier = ">=13.0.0" },
+]
+
 [[package]]
 name = "agent-detector"
 version = "2.0.0"
@@ -1082,12 +1088,10 @@ name = "faden-agent"
 version = "0.2.11"
 source = { editable = "." }
 dependencies = [
-    { name = "aiohttp" },
     { name = "certifi" },
     { name = "cryptography" },
     { name = "httpx" },
     { name = "huggingface-hub" },
-    { name = "pillow" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "websockets" },
@@ -1115,7 +1119,6 @@ ray-host = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "certifi", specifier = ">=2026.10.19" },
     { name = "cryptography", specifier = ">=42" },
     { name = "httpx", specifier = ">=0.27,<1.0" },
@@ -1123,7 +1126,6 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.32,<2" },
     { name = "jinja2", marker = "extra == 'llm'", specifier = ">=3.1,<4" },
     { name = "jinja2", marker = "extra == 'ray-host'", specifier = ">=3.1,<4" },
-    { name = "pillow", specifier = ">=13.0.0" },
     { name = "psutil", specifier = ">=5.9,<8.0" },
     { name = "pydantic", specifier = ">=2.0,<3.0" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0,<7.0" },
